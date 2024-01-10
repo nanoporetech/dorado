@@ -104,7 +104,7 @@ protected:
         // otherwise the pop will fail and the thread will terminate.
         start_input_queue();
         for (int i = 0; i < m_num_input_threads; ++i) {
-            m_input_threads.push_back(std::thread(std::forward<Args>(input_thread_fn)...));
+            m_input_threads.push_back(std::thread(input_thread_fn...));
         }
     }
 
@@ -129,7 +129,7 @@ private:
     void push_message_internal(Message&& message);
 
     // Input processing threads.
-    int m_num_input_threads{-1};
+    const int m_num_input_threads;
     std::vector<std::thread> m_input_threads;
 };
 
