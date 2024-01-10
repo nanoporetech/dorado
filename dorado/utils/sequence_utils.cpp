@@ -259,6 +259,15 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
             query_sequence_component.data(), static_cast<int>(query_sequence_component.length()),
             align_config);
 
+    // Check if alignment failed (edlib_result.startLocations is null)
+    if (edlib_result.startLocations == nullptr) {
+        // Free the memory allocated by edlibAlign
+        edlibFreeAlignResult(edlib_result);
+
+        // Return the tuple (-1, -1) and an empty vector
+        return std::make_tuple(-1, -1, std::vector<uint8_t>());
+    }
+
     // Let's keep two cursor positions - one for the new move table and one for the old:
     int new_move_cursor = 0;
     int old_move_cursor = 0;

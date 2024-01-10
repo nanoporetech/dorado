@@ -32,6 +32,7 @@ set(UNIT_TEST_SOURCE_FILES
     PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
+    RealignMovesTest.cpp
     RNASplitTest.cpp
     ResumeLoaderTest.cpp
     SampleSheetTests.cpp
