@@ -6,7 +6,6 @@
 #include "utils/stats.h"
 
 #include <atomic>
-#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -109,15 +108,7 @@ protected:
     }
 
     // Mark the input queue as terminating, and stop input processing threads.
-    void stop_input_processing() {
-        terminate_input_queue();
-        for (auto& t : m_input_threads) {
-            if (t.joinable()) {
-                t.join();
-            }
-        }
-        m_input_threads.clear();
-    }
+    void stop_input_processing();
 
 private:
     // The sinks to which this node can send messages.

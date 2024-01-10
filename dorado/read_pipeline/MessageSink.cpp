@@ -19,4 +19,15 @@ void MessageSink::push_message_internal(Message &&message) {
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
 
+// Mark the input queue as terminating, and stop input processing threads.
+void MessageSink::stop_input_processing() {
+    terminate_input_queue();
+    for (auto &t : m_input_threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+    m_input_threads.clear();
+}
+
 }  // namespace dorado
