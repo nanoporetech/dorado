@@ -15,7 +15,7 @@ public:
     ~MessageSinkToVector() { terminate_impl(); }
     void terminate(const dorado::FlushOptions&) override { terminate_impl(); }
     void restart() override {
-        restart_input_queue();
+        start_input_queue();
         start_threads();
     }
 

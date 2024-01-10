@@ -23,8 +23,6 @@ namespace dorado {
 // waits on the input queue before attempting to join input worker threads.
 class MessageSink {
 public:
-    // TODO -- remove old constructor
-    //MessageSink(size_t max_messages);
     MessageSink(size_t max_messages, int num_input_threads);
 
     virtual ~MessageSink() = default;
@@ -106,10 +104,7 @@ protected:
         // otherwise the pop will fail and the thread will terminate.
         start_input_queue();
         for (int i = 0; i < m_num_input_threads; ++i) {
-            // TODO -- get rid of unique_ptr?
-            std::unique_ptr<std::thread> input_thread =
-                    std::make_unique<std::thread>(std::forward<Args>(input_thread_fn)...);
-            m_input_threads.push_back(std::move(input_thread));
+            m_input_threads.push_back(std::thread(std::forward<Args>(input_thread_fn)...));
         }
     }
 
@@ -117,8 +112,8 @@ protected:
     void stop_input_processing() {
         terminate_input_queue();
         for (auto& t : m_input_threads) {
-            if (t->joinable()) {
-                t->join();
+            if (t.joinable()) {
+                t.join();
             }
         }
         m_input_threads.clear();
@@ -135,7 +130,7 @@ private:
 
     // Input processing threads.
     int m_num_input_threads{-1};
-    std::vector<std::unique_ptr<std::thread>> m_input_threads;
+    std::vector<std::thread> m_input_threads;
 };
 
 }  // namespace dorado
