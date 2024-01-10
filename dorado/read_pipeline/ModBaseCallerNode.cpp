@@ -206,6 +206,11 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             auto [moves_offset, target_start, new_move_table] =
                     utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
 
+            // If the alignment has failed, the rest of this duplex mod call cannot be completed in this direction
+            if (moves_offset == -1 && target_start == -1 && new_move_table.empty()) {
+                continue;
+            }
+
             auto signal_len = new_move_table.size() * m_block_stride;
             auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
             auto new_seq = duplex_seq.substr(target_start, num_moves);
