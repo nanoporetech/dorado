@@ -264,7 +264,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) 
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
         mm_write_sam3(&alignment_line, m_minimap_index->index(), &query, 0, reg_idx, 1, &n_regs,
-                      &regs, NULL, MM_F_OUT_MD, -1);
+                      &regs, NULL, MM_F_OUT_MD, buffer->rep_len);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
         free(regs[reg_idx].p);
