@@ -71,7 +71,6 @@ int count_trailing_chars(const std::string_view adapter, char c);
  *         If the move table cannot be computed, returns (-1, -1) and an empty vector.
  */
 std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
-std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves);
 
