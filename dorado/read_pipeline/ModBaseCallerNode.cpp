@@ -54,7 +54,7 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t max_reads)
-        : MessageSink(max_reads, remora_threads),
+        : MessageSink(max_reads, static_cast<int>(remora_threads)),
           m_runners(std::move(model_runners)),
           m_block_stride(block_stride),
           m_batch_size(m_runners[0]->batch_size()),

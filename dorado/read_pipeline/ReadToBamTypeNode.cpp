@@ -49,7 +49,7 @@ ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
                                      float modbase_threshold_frac,
                                      std::unique_ptr<const utils::SampleSheet> sample_sheet,
                                      size_t max_reads)
-        : MessageSink(max_reads, num_worker_threads),
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
           m_emit_moves(emit_moves),
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),

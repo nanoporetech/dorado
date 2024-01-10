@@ -365,7 +365,7 @@ void PolyACalculatorNode::input_thread_fn() {
 }
 
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads)
-        : MessageSink(max_reads, num_worker_threads), m_is_rna(is_rna) {
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)), m_is_rna(is_rna) {
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 

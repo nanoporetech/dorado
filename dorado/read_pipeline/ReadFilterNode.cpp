@@ -42,7 +42,7 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
                                size_t min_read_length,
                                std::unordered_set<std::string> read_ids_to_filter,
                                size_t num_worker_threads)
-        : MessageSink(1000, num_worker_threads),
+        : MessageSink(1000, static_cast<int>(num_worker_threads)),
           m_min_qscore(min_qscore),
           m_min_read_length(min_read_length),
           m_read_ids_to_filter(std::move(read_ids_to_filter)),
