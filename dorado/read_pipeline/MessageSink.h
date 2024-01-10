@@ -95,6 +95,11 @@ protected:
         // supplied.
         static_assert(sizeof...(input_thread_fn) > 0);
 
+        if (m_num_input_threads <= 0) {
+            throw std::runtime_error(
+                    "Attempting to start input processing with invalid thread count");
+        }
+
         // Should only be called at construction time, or after stop_input_processing.
         if (!m_input_threads.empty()) {
             throw std::runtime_error("Input threads already started");

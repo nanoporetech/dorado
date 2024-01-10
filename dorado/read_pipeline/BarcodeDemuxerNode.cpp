@@ -16,7 +16,7 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
                                        std::unique_ptr<const utils::SampleSheet> sample_sheet)
-        : MessageSink(10000, 0),
+        : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
           m_write_fastq(write_fastq),
