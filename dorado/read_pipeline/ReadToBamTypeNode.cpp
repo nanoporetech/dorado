@@ -5,11 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <chrono>
 
 namespace dorado {
 
-void ReadToBamType::worker_thread() {
+void ReadToBamTypeNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -45,42 +44,19 @@ void ReadToBamType::worker_thread() {
     }
 }
 
-ReadToBamType::ReadToBamType(bool emit_moves,
-                             size_t num_worker_threads,
-                             float modbase_threshold_frac,
-                             std::unique_ptr<const utils::SampleSheet> sample_sheet,
-                             size_t max_reads)
-        : MessageSink(max_reads),
-          m_num_worker_threads(num_worker_threads),
+ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
+                                     size_t num_worker_threads,
+                                     float modbase_threshold_frac,
+                                     std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                     size_t max_reads)
+        : MessageSink(max_reads, num_worker_threads),
           m_emit_moves(emit_moves),
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_sample_sheet(std::move(sample_sheet)) {
-    start_threads();
+    start_input_processing(&ReadToBamTypeNode::input_thread_fn, this);
 }
 
-ReadToBamType::~ReadToBamType() { terminate_impl(); }
-
-void ReadToBamType::start_threads() {
-    for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&ReadToBamType::worker_thread, this)));
-    }
-}
-
-void ReadToBamType::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
-    }
-    m_workers.clear();
-}
-
-void ReadToBamType::restart() {
-    restart_input_queue();
-    start_threads();
-}
+stats::NamedStats ReadToBamTypeNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado

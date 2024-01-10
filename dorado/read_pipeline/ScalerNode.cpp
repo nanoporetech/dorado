@@ -12,31 +12,17 @@
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <iterator>
+#include <unordered_map>
 #include <utility>
 
 static constexpr float EPS = 1e-9f;
 
-using namespace std::chrono_literals;
 using Slice = at::indexing::Slice;
 
-namespace dorado {
-using SampleType = basecall::SampleType;
-using ScalingStrategy = basecall::ScalingStrategy;
-using SignalNormalisationParams = basecall::SignalNormalisationParams;
+namespace {
 
-std::pair<float, float> ScalerNode::normalisation(const at::Tensor& x) {
-    // Calculate shift and scale factors for normalisation.
-    const auto& params = m_scaling_params.quantile;
-    auto quantiles =
-            dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
-    float q_a = quantiles[0].item<float>();
-    float q_b = quantiles[1].item<float>();
-    float shift = std::max(10.0f, params.shift_multiplier * (q_a + q_b));
-    float scale = std::max(1.0f, params.scale_multiplier * (q_b - q_a));
-    return {shift, scale};
-}
-
-std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
+std::pair<float, float> med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
     constexpr float factor = 1.4826f;
@@ -46,17 +32,33 @@ std::pair<float, float> ScalerNode::med_mad(const at::Tensor& x) {
     return {med.item<float>(), mad.item<float>()};
 }
 
+std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingParams& params,
+                                      const at::Tensor& x) {
+    // Calculate shift and scale factors for normalisation.
+    auto quantiles =
+            dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
+    float q_a = quantiles[0].item<float>();
+    float q_b = quantiles[1].item<float>();
+    float shift = std::max(10.0f, params.shift_multiplier * (q_a + q_b));
+    float scale = std::max(1.0f, params.scale_multiplier * (q_b - q_a));
+    return {shift, scale};
+}
+
+using SampleType = dorado::basecall::SampleType;
+using ScalingStrategy = dorado::basecall::ScalingStrategy;
+using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
+
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking
 // at the median signal value over a sliding window on the raw signal.
 // RNA002 and RNA004 have different offsets and thresholds for the
 // sliding window heuristic.
-int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleType model_type) {
+int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
-    static const std::unordered_map<dorado::SampleType, int> kOffsetMap = {
-            {dorado::SampleType::RNA002, 3500}, {dorado::SampleType::RNA004, 1000}};
-    static const std::unordered_map<dorado::SampleType, int16_t> kAdapterCutoff = {
-            {dorado::SampleType::RNA002, 550}, {dorado::SampleType::RNA004, 700}};
+    static const std::unordered_map<SampleType, int> kOffsetMap = {{SampleType::RNA002, 3500},
+                                                                   {SampleType::RNA004, 1000}};
+    static const std::unordered_map<SampleType, int16_t> kAdapterCutoff = {
+            {SampleType::RNA002, 550}, {SampleType::RNA004, 700}};
 
     const int kWindowSize = 250;
     const int kStride = 50;
@@ -64,7 +66,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
 
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
-    int signal_len = int(read.read_common.get_raw_data_samples());
+    int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
     // Check the median value change over 5 windows.
@@ -73,7 +75,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     int median_pos = 0;
     int break_point = 0;
     const int signal_start = kOffsetMap.at(model_type);
-    const int signal_end = static_cast<int>(3 * signal_len / 4);
+    const int signal_end = 3 * signal_len / 4;
     for (int i = signal_start; i < signal_end; i += kStride) {
         auto slice = at::from_blob(const_cast<int16_t*>(&signal[i]),
                                    {static_cast<int>(std::min(kWindowSize, signal_len - i))},
@@ -92,8 +94,8 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
         auto max_pos = std::distance(medians.begin(), minmax.second);
         spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
                       max_median, (max_median - min_median));
-        if ((median_pos >= int(medians.size())) && (max_median > kMinMedianForRNASignal) &&
-            (max_median - min_median > kMedianDiff) &&
+        if ((median_pos >= static_cast<int>(medians.size())) &&
+            (max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff) &&
             (window_pos[max_pos] > window_pos[min_pos])) {
             break_point = i;
             break;
@@ -104,7 +106,11 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, dorado::SampleTyp
     return break_point;
 }
 
-void ScalerNode::worker_thread() {
+}  // anonymous namespace
+
+namespace dorado {
+
+void ScalerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -154,9 +160,10 @@ void ScalerNode::worker_thread() {
             read->read_common.scale = scale;
             read->read_common.shift = shift;
         } else {
-            std::tie(shift, scale) = m_scaling_params.strategy == ScalingStrategy::QUANTILE
-                                             ? normalisation(read->read_common.raw_data)
-                                             : med_mad(read->read_common.raw_data);
+            std::tie(shift, scale) =
+                    m_scaling_params.strategy == ScalingStrategy::QUANTILE
+                            ? normalisation(m_scaling_params.quantile, read->read_common.raw_data)
+                            : med_mad(read->read_common.raw_data);
 
             // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
             // shifting/scaling in float32 form.
@@ -205,39 +212,11 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        bool trim_adapter,
                        int num_worker_threads,
                        size_t max_reads)
-        : MessageSink(max_reads),
-          m_num_worker_threads(num_worker_threads),
+        : MessageSink(max_reads, num_worker_threads),
           m_scaling_params(config),
           m_model_type(model_type),
           m_trim_adapter(trim_adapter) {
-    start_threads();
+    start_input_processing(&ScalerNode::input_thread_fn, this);
 }
-
-void ScalerNode::start_threads() {
-    for (int i = 0; i < m_num_worker_threads; i++) {
-        std::unique_ptr<std::thread> scaler_worker_thread =
-                std::make_unique<std::thread>(&ScalerNode::worker_thread, this);
-        m_worker_threads.push_back(std::move(scaler_worker_thread));
-    }
-}
-
-void ScalerNode::terminate_impl() {
-    terminate_input_queue();
-
-    // Wait for all the Scaler Node's worker threads to terminate
-    for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
-        }
-    }
-    m_worker_threads.clear();
-}
-
-void ScalerNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-stats::NamedStats ScalerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 }  // namespace dorado

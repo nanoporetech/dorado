@@ -4,7 +4,7 @@
 
 namespace dorado {
 
-void DuplexReadTaggingNode::worker_thread() {
+void DuplexReadTaggingNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -95,31 +95,19 @@ void DuplexReadTaggingNode::worker_thread() {
     }
 }
 
-DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000) { start_threads(); }
-
-void DuplexReadTaggingNode::start_threads() {
-    m_worker =
-            std::make_unique<std::thread>(std::thread(&DuplexReadTaggingNode::worker_thread, this));
-}
-
-void DuplexReadTaggingNode::terminate_impl() {
-    terminate_input_queue();
-    if (m_worker && m_worker->joinable()) {
-        m_worker->join();
-    }
+DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {
+    start_input_processing(&DuplexReadTaggingNode::input_thread_fn, this);
 }
 
 void DuplexReadTaggingNode::restart() {
-    restart_input_queue();
     m_duplex_parents.clear();
     m_parents_processed.clear();
     m_parents_wanted.clear();
-    start_threads();
+    start_input_processing(&DuplexReadTaggingNode::input_thread_fn, this);
 }
 
 stats::NamedStats DuplexReadTaggingNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
-    return stats;
+    return stats::from_obj(m_work_queue);
 }
 
 }  // namespace dorado

@@ -9,7 +9,7 @@
 class MessageSinkToVector : public dorado::MessageSink {
 public:
     MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
-            : MessageSink(max_messages), m_messages(messages) {
+            : MessageSink(max_messages, 0), m_messages(messages) {
         start_threads();
     }
     ~MessageSinkToVector() { terminate_impl(); }

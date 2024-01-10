@@ -13,8 +13,6 @@
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <string_view>
-#include <tuple>
 #include <vector>
 
 namespace {
@@ -44,8 +42,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              BarcodingInfo::FilterSet allowed_barcodes,
                                              const std::optional<std::string>& custom_kit,
                                              const std::optional<std::string>& custom_seqs)
-        : MessageSink(10000),
-          m_threads(threads),
+        : MessageSink(10000, threads),
           m_default_barcoding_info(create_barcoding_info(kit_names,
                                                          barcode_both_ends,
                                                          !no_trim,
@@ -57,38 +54,14 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
     } else {
         spdlog::debug("Barcode for {}", m_default_barcoding_info->kit_name);
     }
-    start_threads();
+    start_input_processing(&BarcodeClassifierNode::input_thread_fn, this);
 }
 
-BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000), m_threads(threads) {
-    start_threads();
+BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {
+    start_input_processing(&BarcodeClassifierNode::input_thread_fn, this);
 }
 
-void BarcodeClassifierNode::start_threads() {
-    for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&BarcodeClassifierNode::worker_thread, this)));
-    }
-}
-
-void BarcodeClassifierNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
-    }
-    m_workers.clear();
-}
-
-void BarcodeClassifierNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-BarcodeClassifierNode::~BarcodeClassifierNode() { terminate_impl(); }
-
-void BarcodeClassifierNode::worker_thread() {
+void BarcodeClassifierNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {

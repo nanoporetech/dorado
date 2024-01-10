@@ -1,7 +1,9 @@
 #pragma once
-#include "ReadPipeline.h"
+
+#include "read_pipeline/MessageSink.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -20,16 +22,14 @@ public:
     std::string get_name() const override { return "SubreadTaggerNode"; }
     ::dorado::stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { terminate_impl(); }
-    void restart() override;
+    void restart() override { start_threads(); }
 
 private:
     void start_threads();
     void terminate_impl();
-    void worker_thread();
+    void input_thread_fn();
     void check_duplex_thread();
 
-    int m_num_worker_threads = 0;
-    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
     std::unique_ptr<std::thread> m_duplex_thread;
 
     std::mutex m_subread_groups_mutex;

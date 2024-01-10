@@ -8,7 +8,7 @@
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
-#include "read_pipeline/PolyACalculator.h"
+#include "read_pipeline/PolyACalculatorNode.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -309,7 +309,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 1000);
 }
 
-DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
+DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
     auto emit_moves = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(emit_moves);
@@ -317,7 +317,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamType") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamType>(
+    run_smoke_test<dorado::ReadToBamTypeNode>(
             emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
 }
 
@@ -390,7 +390,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     }
 }
 
-DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
+DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     auto pipeline_restart = GENERATE(false, true);
     auto is_rna = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -404,7 +404,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculator") {
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
     });
 
-    run_smoke_test<dorado::PolyACalculator>(8, is_rna, 1000);
+    run_smoke_test<dorado::PolyACalculatorNode>(8, is_rna, 1000);
 }
 
 }  // namespace

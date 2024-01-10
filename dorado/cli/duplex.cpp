@@ -378,7 +378,7 @@ int duplex(int argc, char* argv[]) {
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
-        auto read_converter = pipeline_desc.add_node<ReadToBamType>(
+        auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
                 {converted_reads_sink}, emit_moves, 2, 0.0f, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.

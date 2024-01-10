@@ -1,9 +1,8 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -15,26 +14,21 @@ namespace utils {
 class SampleSheet;
 }
 
-class ReadToBamType : public MessageSink {
+class ReadToBamTypeNode : public MessageSink {
 public:
-    ReadToBamType(bool emit_moves,
-                  size_t num_worker_threads,
-                  float modbase_threshold_frac,
-                  std::unique_ptr<const utils::SampleSheet> sample_sheet,
-                  size_t max_reads);
-    ~ReadToBamType();
+    ReadToBamTypeNode(bool emit_moves,
+                      size_t num_worker_threads,
+                      float modbase_threshold_frac,
+                      std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                      size_t max_reads);
+    ~ReadToBamTypeNode() { stop_input_processing(); }
     std::string get_name() const override { return "ReadToBamType"; }
-    void terminate(const FlushOptions &) override { terminate_impl(); };
-    void restart() override;
+    stats::NamedStats sample_stats() const override;
+    void terminate(const FlushOptions &) override { stop_input_processing(); };
+    void restart() override { start_input_processing(&ReadToBamTypeNode::input_thread_fn, this); }
 
 private:
-    void start_threads();
-    void terminate_impl();
-    void worker_thread();
-
-    // Async worker for writing.
-    std::vector<std::unique_ptr<std::thread>> m_workers;
-    size_t m_num_worker_threads = 0;
+    void input_thread_fn();
 
     bool m_emit_moves;
     uint8_t m_modbase_threshold;

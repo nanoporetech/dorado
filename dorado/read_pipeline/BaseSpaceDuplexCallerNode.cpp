@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -184,7 +185,7 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         std::map<std::string, std::string> template_complement_map,
         ReadMap reads,
         size_t threads)
-        : MessageSink(1000),
+        : MessageSink(1000, 0),
           m_num_worker_threads(threads),
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)) {
