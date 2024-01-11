@@ -4,15 +4,19 @@
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/HtsReader.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #define TEST_GROUP "[bam_utils][aligner]"
@@ -34,28 +38,92 @@ public:
     bool is_disconnected() const override { return false; }
 };
 
-template <class... Args>
-std::unique_ptr<dorado::Pipeline> create_pipeline(std::vector<dorado::Message>& output_messages,
-                                                  Args&&... args) {
-    dorado::PipelineDescriptor pipeline_desc;
-    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, output_messages);
-    pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
-    return dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
+std::unordered_map<std::string, std::string> get_tags_from_sam_line_fields(
+        const std::vector<std::string>& fields) {
+    // returns tags TAG:TYPE:VALUE as kvps of TAG:TYPE to VALUE
+    std::unordered_map<std::string, std::string> result{};
+    // sam line is 11 fields plus tags
+    CHECK(fields.size() >= 11);
+    for (std::size_t field_index{11}; field_index < fields.size(); ++field_index) {
+        const auto& field = fields[field_index];
+        auto tokens = dorado::utils::split(field, ':');
+        CHECK(tokens.size() == 3);
+        result[tokens[0] + ":" + tokens[1]] = tokens[2];
+    }
+    return result;
 }
 
-template <class... Args>
-std::vector<dorado::BamPtr> RunAlignmentPipeline(dorado::HtsReader& reader, Args&&... args) {
-    std::vector<dorado::Message> messages;
-    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    auto pipeline = create_pipeline(messages, index_file_access, args...);
-    reader.read(*pipeline, 100);
-    pipeline.reset();
-    return ConvertMessages<dorado::BamPtr>(std::move(messages));
-}
+class AlignerNodeTestFixture {
+private:
+    std::vector<dorado::Message> m_output_messages{};
+
+protected:
+    std::unique_ptr<dorado::Pipeline> pipeline;
+    dorado::NodeHandle aligner_node_handle;
+
+    template <class... Args>
+    void create_pipeline(Args&&... args) {
+        dorado::PipelineDescriptor pipeline_desc;
+        auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, m_output_messages);
+        aligner_node_handle = pipeline_desc.add_node<dorado::AlignerNode>({sink}, args...);
+        pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
+    }
+
+    template <class... Args>
+    std::vector<dorado::BamPtr> RunPipelineWithBamMessages(dorado::HtsReader& reader,
+                                                           Args&&... args) {
+        auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+        create_pipeline(index_file_access, args...);
+        reader.read(*pipeline, 100);
+        pipeline->terminate({});
+        return ConvertMessages<dorado::BamPtr>(std::move(m_output_messages));
+    }
+
+    template <class MessageType, class MessageTypePtr = std::unique_ptr<MessageType>>
+    MessageTypePtr RunPipelineForRead(const dorado::AlignmentInfo& loaded_align_info,
+                                      const dorado::AlignmentInfo& client_align_info,
+                                      std::string read_id,
+                                      std::string sequence) {
+        auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+        CHECK(index_file_access->load_index(loaded_align_info.reference_file,
+                                            loaded_align_info.minimap_options,
+                                            2) == dorado::alignment::IndexLoadResult::success);
+        create_pipeline(index_file_access, 2);
+
+        dorado::ReadCommon read_common{};
+        read_common.client_info = std::make_shared<TestClientInfo>(client_align_info);
+        read_common.read_id = std::move(read_id);
+        read_common.seq = std::move(sequence);
+
+        auto read = std::make_unique<MessageType>();
+        read->read_common = std::move(read_common);
+
+        pipeline->push_message(std::move(read));
+        pipeline->terminate({});
+
+        CHECK((m_output_messages.size() == 1 &&
+               std::holds_alternative<MessageTypePtr>(m_output_messages[0])));
+
+        return std::get<MessageTypePtr>(std::move(m_output_messages[0]));
+    }
+
+    std::string get_sam_line_from_bam(dorado::BamPtr bam_record) {
+        dorado::SamHdrPtr header(sam_hdr_init());
+        const auto& aligner_ref =
+                dynamic_cast<dorado::AlignerNode&>(pipeline->get_node_ref(aligner_node_handle));
+        dorado::utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
+
+        auto sam_line_buffer = dorado::utils::allocate_kstring();
+        dorado::utils::PostCondition free_buffer([&sam_line_buffer] { ks_free(&sam_line_buffer); });
+        CHECK(sam_format1(header.get(), bam_record.get(), &sam_line_buffer) >= 0);
+
+        return std::string(ks_str(&sam_line_buffer), ks_len(&sam_line_buffer));
+    }
+};
 
 }  // namespace
 
-TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -66,7 +134,7 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -90,7 +158,7 @@ TEST_CASE("AlignerTest: Check standard alignment", TEST_GROUP) {
     }
 }
 
-TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary alignment", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -101,7 +169,7 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 2);
 
     // Check first alignment is primary.
@@ -127,7 +195,9 @@ TEST_CASE("AlignerTest: Check supplementary alignment", TEST_GROUP) {
     }
 }
 
-TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerTest: Check reverse complement alignment",
+                 TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -138,7 +208,7 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -159,7 +229,9 @@ TEST_CASE("AlignerTest: Check reverse complement alignment", TEST_GROUP) {
     CHECK(orig_qual == aligned_qual);
 }
 
-TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerTest: Check dorado tags are retained",
+                 TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -170,7 +242,7 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -184,7 +256,9 @@ TEST_CASE("AlignerTest: Check dorado tags are retained", TEST_GROUP) {
     }
 }
 
-TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerTest: Check modbase tags are removed for secondary alignments",
+                 TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -196,7 +270,7 @@ TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments"
     options.index_batch_size = 1'000'000'000ull;
     options.soft_clipping = GENERATE(true, false);
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
     REQUIRE(bam_records.size() == 3);
 
     bam1_t* primary_rec = bam_records[0].get();
@@ -227,7 +301,9 @@ TEST_CASE("AlignerTest: Check modbase tags are removed for secondary alignments"
     }
 }
 
-TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerTest: Verify impact of updated aligner args",
+                 TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "query.fa";
@@ -238,7 +314,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
         options.kmer_size = options.window_size = 28;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
-        auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
+        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 2);  // Generates 2 alignments.
     }
 
@@ -248,7 +324,7 @@ TEST_CASE("AlignerTest: Verify impact of updated aligner args", TEST_GROUP) {
         options.kmer_size = options.window_size = 5;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
-        auto bam_records = RunAlignmentPipeline(reader, ref.string(), options, 2);
+        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 2);
         CHECK(bam_records.size() == 1);  // Generates 1 alignment.
     }
 }
@@ -264,120 +340,64 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), options, 1));
 }
 
-SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
+SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GROUP) {
     GIVEN("AlgnerNode constructed with populated index file collection") {
-        const std::string read_id{"aligner_node_test"};
+        const std::string READ_ID{"aligner_node_test"};
         fs::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
 
-        dorado::AlignmentInfo loaded_align_info{};
-        loaded_align_info.minimap_options = dorado::alignment::dflt_options;
-        loaded_align_info.reference_file = ref.string();
-        auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        CHECK(index_file_access->load_index(loaded_align_info.reference_file,
-                                            loaded_align_info.minimap_options,
-                                            2) == dorado::alignment::IndexLoadResult::success);
-        std::vector<dorado::Message> messages;
-        auto pipeline = create_pipeline(messages, index_file_access, 2);
+        dorado::AlignmentInfo align_info{};
+        align_info.minimap_options = dorado::alignment::dflt_options;
+        align_info.reference_file = ref.string();
 
-        dorado::ReadCommon read_common{};
-        read_common.read_id = read_id;
+        const std::string TEST_SEQUENCE{"ACGTACGTACGTACGT"};
 
         AND_GIVEN("client with no alignment requirements") {
-            auto client_without_align = std::make_shared<TestClientInfo>(dorado::AlignmentInfo{});
-            read_common.client_info = client_without_align;
-
+            const dorado::AlignmentInfo EMPTY_ALIGN_INFO{};
             WHEN("push simplex read to pipeline") {
-                read_common.seq = "ACGTACGTACGTACGT";
-                auto simplex_read = std::make_unique<dorado::SimplexRead>();
-                simplex_read->read_common = std::move(read_common);
-                simplex_read->read_common.seq = "ACGTACGTACGTACGT";
-
-                pipeline->push_message(std::move(simplex_read));
-                pipeline.reset();
-
-                THEN("Single simplex read is output") {
-                    REQUIRE((messages.size() == 1 &&
-                             std::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
-                }
+                auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
+                        align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
 
                 THEN("Output simplex read has empty alignment_string") {
-                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
                     REQUIRE(simplex_read->read_common.alignment_string.empty());
                 }
             }
 
             WHEN("push duplex read to pipeline") {
-                read_common.seq = "ACGTACGTACGTACGT";
-                auto duplex_read = std::make_unique<dorado::DuplexRead>();
-                duplex_read->read_common = std::move(read_common);
-
-                pipeline->push_message(std::move(duplex_read));
-                pipeline.reset();
-
-                THEN("Single duplex read is output") {
-                    REQUIRE((messages.size() == 1 &&
-                             std::holds_alternative<dorado::DuplexReadPtr>(messages[0])));
-                }
-
+                auto duplex_read = RunPipelineForRead<dorado::DuplexRead>(
+                        align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
                 THEN("Output duplex read has empty alignment_string") {
-                    duplex_read = std::get<dorado::DuplexReadPtr>(std::move(messages[0]));
                     REQUIRE(duplex_read->read_common.alignment_string.empty());
                 }
             }
         }
 
         AND_GIVEN("client requiring alignment") {
-            auto client_requiring_alignment = std::make_shared<TestClientInfo>(loaded_align_info);
-            read_common.client_info = client_requiring_alignment;
-
             WHEN("push simplex read with no alignment matches to pipeline") {
-                read_common.seq = "ACGTACGTACGTACGT";
-                auto simplex_read = std::make_unique<dorado::SimplexRead>();
-                simplex_read->read_common = std::move(read_common);
-
-                pipeline->push_message(std::move(simplex_read));
-                pipeline.reset();
-
-                THEN("Single simplex read is output") {
-                    REQUIRE((messages.size() == 1 &&
-                             std::holds_alternative<dorado::SimplexReadPtr>(messages[0])));
-                }
+                auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(align_info, align_info,
+                                                                            READ_ID, TEST_SEQUENCE);
 
                 THEN("Output simplex read has alignment_string populated") {
-                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
                     REQUIRE_FALSE(simplex_read->read_common.alignment_string.empty());
                 }
 
                 THEN("Output simplex read has alignment_string containing unmapped sam line") {
-                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
-                    const std::string expected{read_id +
+                    const std::string expected{READ_ID +
                                                dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                     REQUIRE(simplex_read->read_common.alignment_string == expected);
                 }
             }
 
             WHEN("push duplex read with no alignment matches to pipeline") {
-                read_common.seq = "ACGTACGTACGTACGT";
-                auto duplex_read = std::make_unique<dorado::DuplexRead>();
-                duplex_read->read_common = std::move(read_common);
-
-                pipeline->push_message(std::move(duplex_read));
-                pipeline.reset();
-
-                THEN("Single duplex read is output") {
-                    REQUIRE((messages.size() == 1 &&
-                             std::holds_alternative<dorado::DuplexReadPtr>(messages[0])));
-                }
+                auto duplex_read = RunPipelineForRead<dorado::DuplexRead>(align_info, align_info,
+                                                                          READ_ID, TEST_SEQUENCE);
 
                 THEN("Output duplex read has alignment_string populated") {
-                    duplex_read = std::get<dorado::DuplexReadPtr>(std::move(messages[0]));
                     REQUIRE_FALSE(duplex_read->read_common.alignment_string.empty());
                 }
 
                 THEN("Output duplex read has alignment_string containing unmapped sam line") {
-                    duplex_read = std::get<dorado::DuplexReadPtr>(std::move(messages[0]));
-                    const std::string expected{read_id +
+                    const std::string expected{READ_ID +
                                                dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                     REQUIRE(duplex_read->read_common.alignment_string == expected);
                 }
@@ -387,21 +407,16 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
                 dorado::HtsReader reader(ref.string(), std::nullopt);
                 reader.read();
                 auto sequence = dorado::utils::extract_sequence(reader.record.get());
-                read_common.seq = dorado::utils::extract_sequence(reader.record.get());
 
                 WHEN("pushed as simplex read to pipeline") {
-                    auto simplex_read = std::make_unique<dorado::SimplexRead>();
-                    simplex_read->read_common = std::move(read_common);
+                    auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
+                            align_info, align_info, READ_ID, sequence);
 
-                    pipeline->push_message(std::move(simplex_read));
-                    pipeline.reset();
-
-                    simplex_read = std::get<dorado::SimplexReadPtr>(std::move(messages[0]));
                     THEN("Output sam line has read_id as QNAME") {
-                        const std::string expected{read_id +
+                        const std::string expected{READ_ID +
                                                    dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                         REQUIRE(simplex_read->read_common.alignment_string.substr(
-                                        0, read_id.size()) == read_id);
+                                        0, READ_ID.size()) == READ_ID);
                     }
 
                     THEN("Output sam line contains sequence string") {
@@ -411,18 +426,14 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
                 }
 
                 WHEN("pushed as duplex read to pipeline") {
-                    auto duplex_read = std::make_unique<dorado::DuplexRead>();
-                    duplex_read->read_common = std::move(read_common);
+                    auto duplex_read = RunPipelineForRead<dorado::DuplexRead>(
+                            align_info, align_info, READ_ID, sequence);
 
-                    pipeline->push_message(std::move(duplex_read));
-                    pipeline.reset();
-
-                    duplex_read = std::get<dorado::DuplexReadPtr>(std::move(messages[0]));
                     THEN("Output sam line has read_id as QNAME") {
-                        const std::string expected{read_id +
+                        const std::string expected{READ_ID +
                                                    dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                         REQUIRE(duplex_read->read_common.alignment_string.substr(
-                                        0, read_id.size()) == read_id);
+                                        0, READ_ID.size()) == READ_ID);
                     }
 
                     THEN("Output sam line contains sequence string") {
@@ -432,5 +443,92 @@ SCENARIO("AlignerNode push SimplexRead", TEST_GROUP) {
                 }
             }
         }
+    }
+}
+
+std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
+        const std::string& fasta_file) {
+    std::ifstream query_input_stream(fasta_file);
+
+    std::string line;
+    std::getline(query_input_stream, line);
+    CHECK(!line.empty());
+    CHECK(dorado::utils::starts_with(line, ">"));
+    line = line.substr(1);
+    auto read_id = line.substr(0, line.find_first_of(" "));
+
+    std::string sequence;
+    while (std::getline(query_input_stream, sequence)) {
+        if (!dorado::utils::starts_with(sequence, ">")) {
+            break;
+        }
+    }
+    CHECK(!sequence.empty());
+
+    return {read_id, sequence};
+}
+
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerNode compare BamPtr and ReadCommon processing",
+                 TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = (aligner_test_dir / "target.fq").string();
+    auto query = (aligner_test_dir / "query.fa").string();
+
+    auto options = dorado::alignment::dflt_options;
+    options.kmer_size = options.window_size = 5;
+    options.index_batch_size = 1'000'000'000ull;
+
+    // Get the sam line from BAM pipeline
+    dorado::HtsReader bam_reader(query, std::nullopt);
+    auto bam_records = RunPipelineWithBamMessages(bam_reader, ref, options, 2);
+    CHECK(bam_records.size() == 1);
+    auto sam_line_from_bam_ptr = get_sam_line_from_bam(std::move(bam_records[0]));
+
+    // Get the sam line from ReadCommon pipeline
+    auto [read_id, sequence] = get_read_id_and_sequence_from_fasta(query);
+    dorado::AlignmentInfo align_info{};
+    align_info.minimap_options = options;
+    align_info.reference_file = ref;
+    auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
+            align_info, align_info, std::move(read_id), std::move(sequence));
+    auto sam_line_from_read_common = std::move(simplex_read->read_common.alignment_string);
+
+    // Do the comparison checks
+    CHECK_FALSE(sam_line_from_read_common.empty());
+
+    if (sam_line_from_read_common.at(sam_line_from_read_common.size() - 1) == '\n') {
+        sam_line_from_read_common =
+                sam_line_from_read_common.substr(0, sam_line_from_read_common.size() - 1);
+    }
+
+    const auto bam_fields = dorado::utils::split(sam_line_from_bam_ptr, '\t');
+    const auto read_common_fields = dorado::utils::split(sam_line_from_read_common, '\t');
+    CHECK(bam_fields.size() == read_common_fields.size());
+    CHECK(bam_fields.size() >= 11);
+    // first 11 mandatory fields should be identical
+    for (std::size_t field_index{0}; field_index < 11; ++field_index) {
+        CHECK(bam_fields[field_index] == read_common_fields[field_index]);
+    }
+
+    const auto bam_tags = get_tags_from_sam_line_fields(bam_fields);
+    const auto read_common_tags = get_tags_from_sam_line_fields(read_common_fields);
+    CHECK(bam_tags.size() == read_common_tags.size());
+    for (const auto& [key, bam_value] : bam_tags) {
+        INFO(key);
+        auto tag_entry = read_common_tags.find(key);
+        REQUIRE(tag_entry != read_common_tags.end());
+        // de:f tag compare to 4dp as this is the precision the minimap sam line generation function uses
+        const auto& read_common_value = tag_entry->second;
+        if (key == "de:f") {
+            auto bam_value_as_float = std::stof(bam_value);
+            auto read_common_value_as_float = std::stof(read_common_value);
+            float diff = bam_value_as_float - read_common_value_as_float;
+            constexpr float TOLERANCE_DP4{1e-04f};
+            CHECK(diff < TOLERANCE_DP4);
+            continue;
+        }
+
+        CHECK(read_common_value == bam_value);
     }
 }

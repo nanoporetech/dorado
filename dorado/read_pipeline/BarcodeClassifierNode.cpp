@@ -55,7 +55,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
     if (m_default_barcoding_info->kit_name.empty()) {
         spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
     } else {
-        spdlog::info("Barcode for {}", m_default_barcoding_info->kit_name);
+        spdlog::debug("Barcode for {}", m_default_barcoding_info->kit_name);
     }
     start_threads();
 }
@@ -136,6 +136,10 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto bc = generate_barcode_string(bc_res);
     bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     m_num_records++;
+    {
+        std::lock_guard lock(m_barcode_count_mutex);
+        m_barcode_count[bc]++;
+    }
 
     if (m_default_barcoding_info->trim) {
         int seqlen = irecord->core.l_qseq;
@@ -171,6 +175,12 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["num_barcodes_demuxed"] = m_num_records.load();
+    {
+        for (const auto& [bc_name, bc_count] : m_barcode_count) {
+            std::string key = "bc." + bc_name;
+            stats[key] = static_cast<float>(bc_count);
+        }
+    }
     return stats;
 }
 
