@@ -136,6 +136,13 @@ int HtsWriter::write(bam1_t* const record) {
     }
     m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
+    // Verify that the MN tag, if it exists, and the sequence length are in sync.
+    if (auto tag = bam_aux_get(record, "MN"); tag != nullptr) {
+        if (bam_aux2i(tag) != record->core.l_qseq) {
+            throw std::runtime_error("MN tag and sequence length are not in sync.");
+        };
+    }
+
     // FIXME -- HtsWriter is constructed in a state where attempting to write
     // will segfault, since set_and_write_header has to have been called
     // in order to set m_header.
