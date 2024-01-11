@@ -1,6 +1,7 @@
 #include "Trimmer.h"
 
 #include "utils/bam_utils.h"
+#include "utils/sequence_utils.h"
 #include "utils/trim.h"
 
 #include <ATen/ATen.h>
@@ -28,6 +29,13 @@ void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t,uint64_t> sample
         throw std::runtime_error("Read trimming is not supported for duplex reads");
     }
     raw_data = raw_data.index({Slice(sample_trim_interval.first, sample_trim_interval.second)});
+}
+
+// For alignments that are reverse complemented, the trim interval derived from adapters/barcodes
+// will need to be reverse complemented when applied to the trimming of modbase tags because
+// modbase tags are all relative to the original sequence that was basecalled.
+std::pair<int, int> reverse_complement_interval(const std::pair<int, int>& interval, int seqlen) {
+    return {seqlen - interval.second, seqlen - interval.first};
 }
 
 }  // namespace
@@ -122,6 +130,8 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
 BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     bam1_t* input_record = input.get();
 
+    bool is_seq_reversed = input_record->core.flag & BAM_FREVERSE;
+
     // Fetch components that need to be trimmed.
     std::string seq = utils::extract_sequence(input_record);
     std::vector<uint8_t> qual = utils::extract_quality(input_record);
@@ -141,8 +151,10 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     // |---------------------- ns ------------------|
     // |----ts----|--------moves signal-------------|
     ns = int(trimmed_moves.size() * stride) + ts;
-    auto [trimmed_modbase_str, trimmed_modbase_probs] =
-            utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
+    auto [trimmed_modbase_str, trimmed_modbase_probs] = utils::trim_modbase_info(
+            is_seq_reversed ? utils::reverse_complement(seq) : seq, modbase_str, modbase_probs,
+            is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
+                            : trim_interval);
     auto n_cigar = input_record->core.n_cigar;
     std::vector<uint32_t> ops;
     uint32_t ref_pos_consumed = 0;
@@ -180,6 +192,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
         bam_aux_del(out_record, bam_aux_get(out_record, "ML"));
         bam_aux_update_array(out_record, "ML", 'C', int(trimmed_modbase_probs.size()),
                              (uint8_t*)trimmed_modbase_probs.data());
+        bam_aux_update_int(out_record, "MN", trimmed_seq.length());
     }
 
     bam_aux_update_int(out_record, "ts", ts);
