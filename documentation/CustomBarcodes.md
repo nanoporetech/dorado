@@ -28,10 +28,10 @@ The following are all the options that can be defined in the arrangement file.
 name = "custom_barcode"
 kit = "BC"
 
-mask_1_front = "ATCG"
-mask_1_rear = "ATCG"
-mask_2_front = "TTAA"
-mask_2_rear = "GGCC"
+mask1_front = "ATCG"
+mask1_rear = "ATCG"
+mask2_front = "TTAA"
+mask2_rear = "GGCC"
 
 # Barcode sequences
 barcode1_pattern = "BC%02i"
@@ -44,7 +44,7 @@ last_index = 96
 min_soft_barcode_threshold = 0.2
 min_hard_barcode_threshold = 0.2
 min_soft_flank_threshold = 0.3
-min_hard_barcode_threshold = 0.3
+min_hard_flank_threshold = 0.3
 min_barcode_score_dist = 0.1
 ```
 
