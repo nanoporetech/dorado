@@ -239,6 +239,11 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
             query_sequence,
             target_sequence);  // We are going to compute the overlap between the two reads
 
+    auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
+    // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
+    if (!is_overlap) {
+        return failed_realignment;
+    }
     // Advance the query and target position.
     ++query_start;
     ++target_start;
@@ -264,8 +269,8 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         // Free the memory allocated by edlibAlign
         edlibFreeAlignResult(edlib_result);
 
-        // Return the tuple (-1, -1) and an empty vector
-        return std::make_tuple(-1, -1, std::vector<uint8_t>());
+        // Return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
+        return failed_realignment;
     }
 
     // Let's keep two cursor positions - one for the new move table and one for the old:

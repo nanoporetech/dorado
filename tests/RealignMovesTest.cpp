@@ -14,7 +14,7 @@ TEST_CASE("Realign Moves No Error", TEST_GROUP) {
     std::vector<uint8_t> moves = {1, 0, 1, 0, 1, 0, 0, 1};  // Example moves vector
 
     // Test that calling realign_moves does not throw any exceptions
-    REQUIRE_NOTHROW(utils::realign_moves(query_sequence, target_sequence, moves));
+    CHECK_NOTHROW(utils::realign_moves(query_sequence, target_sequence, moves));
 }
 
 TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
@@ -26,10 +26,13 @@ TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
     REQUIRE_NOTHROW(utils::realign_moves(query_sequence, target_sequence, moves));
 
     // Call the function and store the result
-    auto result = utils::realign_moves(query_sequence, target_sequence, moves);
+    int move_offset, target_start;
+    std::vector<uint8_t> new_moves;
 
-    // Check that the returned tuple has the expected values
-    REQUIRE(std::get<0>(result) == -1);    // Check the first value of the tuple
-    REQUIRE(std::get<1>(result) == -1);    // Check the second value of the tuple
-    REQUIRE(std::get<2>(result).empty());  // Check that the vector in the tuple is empty
+    CHECK_NOTHROW(std::tie(move_offset, target_start, new_moves) =
+                          utils::realign_moves(query_sequence, target_sequence, moves));
+
+    CHECK(move_offset == -1);
+    CHECK(target_start == -1);
+    CHECK(new_moves.empty());
 }
