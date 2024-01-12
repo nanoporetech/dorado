@@ -95,7 +95,7 @@ TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     class OrderTestNode : public MessageSink {
     public:
         OrderTestNode(int index, std::vector<NodeHandle>& destruction_order)
-                : MessageSink(1), m_destruction_order(destruction_order), m_index(index) {}
+                : MessageSink(1, 0), m_destruction_order(destruction_order), m_index(index) {}
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
         void terminate(const dorado::FlushOptions&) override {}

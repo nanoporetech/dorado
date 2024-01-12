@@ -478,7 +478,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 PairingNode::PairingNode(std::map<std::string, std::string> template_complement_map,
                          int num_worker_threads,
                          size_t max_reads)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, 0),
           m_num_worker_threads(num_worker_threads),
           m_template_complement_map(std::move(template_complement_map)) {
     // Set up the complement-template_map
@@ -493,7 +493,7 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
 PairingNode::PairingNode(DuplexPairingParameters pairing_params,
                          int num_worker_threads,
                          size_t max_reads)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, 0),
           m_num_worker_threads(num_worker_threads),
           m_max_num_keys(std::numeric_limits<size_t>::max()),
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
@@ -542,7 +542,7 @@ void PairingNode::terminate_impl() {
 }
 
 void PairingNode::restart() {
-    restart_input_queue();
+    start_input_queue();
     start_threads();
 }
 
