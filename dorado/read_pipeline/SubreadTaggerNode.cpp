@@ -6,7 +6,7 @@
 
 namespace dorado {
 
-void SubreadTaggerNode::worker_thread() {
+void SubreadTaggerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -111,7 +111,7 @@ void SubreadTaggerNode::check_duplex_thread() {
 }
 
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads) {
+        : MessageSink(max_reads, num_worker_threads) {
     start_threads();
 }
 
@@ -124,22 +124,11 @@ SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
 void SubreadTaggerNode::start_threads() {
     m_terminate.store(false);
     m_duplex_thread = std::make_unique<std::thread>(&SubreadTaggerNode::check_duplex_thread, this);
-    for (int i = 0; i < m_num_worker_threads; ++i) {
-        auto worker_thread = std::make_unique<std::thread>(&SubreadTaggerNode::worker_thread, this);
-        m_worker_threads.push_back(std::move(worker_thread));
-    }
+    start_input_processing(&SubreadTaggerNode::input_thread_fn, this);
 }
 
 void SubreadTaggerNode::terminate_impl() {
-    terminate_input_queue();
-
-    // Wait for all the node's worker threads to terminate
-    for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
-        }
-    }
-    m_worker_threads.clear();
+    stop_input_processing();
 
     m_terminate.store(true);
     m_check_duplex_cv.notify_one();
@@ -148,11 +137,6 @@ void SubreadTaggerNode::terminate_impl() {
         m_duplex_thread->join();
     }
     m_duplex_thread.reset();
-}
-
-void SubreadTaggerNode::restart() {
-    restart_input_queue();
-    start_threads();
 }
 
 }  // namespace dorado

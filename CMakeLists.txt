@@ -187,59 +187,64 @@ set(LIB_SOURCE_FILES
     dorado/api/runner_creation.h
     dorado/api/pipeline_creation.cpp
     dorado/api/pipeline_creation.h
-    dorado/read_pipeline/FakeDataLoader.cpp
-    dorado/read_pipeline/FakeDataLoader.h
-    dorado/read_pipeline/ReadPipeline.cpp
-    dorado/read_pipeline/ReadPipeline.h
-    dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/DefaultClientInfo.h
-    dorado/read_pipeline/ScalerNode.cpp
-    dorado/read_pipeline/ScalerNode.h
-    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
-    dorado/read_pipeline/StereoDuplexEncoderNode.h
-    dorado/read_pipeline/BasecallerNode.cpp
-    dorado/read_pipeline/BasecallerNode.h
-    dorado/read_pipeline/ModBaseCallerNode.cpp
-    dorado/read_pipeline/ModBaseCallerNode.h
-    dorado/read_pipeline/ReadFilterNode.cpp
-    dorado/read_pipeline/ReadFilterNode.h
-    dorado/read_pipeline/ReadToBamTypeNode.cpp
-    dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/SubreadTaggerNode.cpp
-    dorado/read_pipeline/SubreadTaggerNode.h
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
+    dorado/read_pipeline/AdapterDetectorNode.cpp
+    dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
-    dorado/read_pipeline/HtsReader.cpp
-    dorado/read_pipeline/HtsReader.h
-    dorado/read_pipeline/HtsWriter.cpp
-    dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/ProgressTracker.h
-    dorado/read_pipeline/ResumeLoaderNode.cpp
-    dorado/read_pipeline/ResumeLoaderNode.h
-    dorado/read_pipeline/DuplexReadTaggingNode.cpp
-    dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
-    dorado/read_pipeline/AdapterDetectorNode.cpp
-    dorado/read_pipeline/AdapterDetectorNode.h
+    dorado/read_pipeline/BasecallerNode.cpp
+    dorado/read_pipeline/BasecallerNode.h
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
+    dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/DefaultClientInfo.h
+    dorado/read_pipeline/DuplexReadTaggingNode.cpp
+    dorado/read_pipeline/DuplexReadTaggingNode.h
+    dorado/read_pipeline/FakeDataLoader.cpp
+    dorado/read_pipeline/FakeDataLoader.h
+    dorado/read_pipeline/HtsReader.cpp
+    dorado/read_pipeline/HtsReader.h
+    dorado/read_pipeline/HtsWriter.cpp
+    dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/MessageSink.cpp
+    dorado/read_pipeline/MessageSink.h
+    dorado/read_pipeline/ModBaseCallerNode.cpp
+    dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
-    dorado/read_pipeline/PolyACalculator.cpp
-    dorado/read_pipeline/PolyACalculator.h
+    dorado/read_pipeline/PolyACalculatorNode.cpp
+    dorado/read_pipeline/PolyACalculatorNode.h
+    dorado/read_pipeline/ProgressTracker.h
+    dorado/read_pipeline/ReadFilterNode.cpp
+    dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadPipeline.cpp
+    dorado/read_pipeline/ReadPipeline.h
+    dorado/read_pipeline/ReadSplitNode.cpp
+    dorado/read_pipeline/ReadSplitNode.h
+    dorado/read_pipeline/ReadToBamTypeNode.cpp
+    dorado/read_pipeline/ReadToBamTypeNode.h
+    dorado/read_pipeline/ResumeLoaderNode.cpp
+    dorado/read_pipeline/ResumeLoaderNode.h
+    dorado/read_pipeline/ScalerNode.cpp
+    dorado/read_pipeline/ScalerNode.h
+    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
+    dorado/read_pipeline/StereoDuplexEncoderNode.h
+    dorado/read_pipeline/SubreadTaggerNode.cpp
+    dorado/read_pipeline/SubreadTaggerNode.h
+    dorado/read_pipeline/messages.cpp
+    dorado/read_pipeline/messages.h
+    dorado/read_pipeline/flush_options.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stereo_features.cpp
     dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
-    dorado/read_pipeline/ReadSplitNode.cpp
-    dorado/read_pipeline/ReadSplitNode.h
     dorado/splitter/DuplexReadSplitter.cpp
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp

@@ -35,7 +35,5 @@ $ brew link autoconf@2.69
 
 The following other packages need to be available as well
 ```bash
-brew install openssl
-brew install zstd
-brew install libaec
+brew install openssl zstd hdf5
 ```

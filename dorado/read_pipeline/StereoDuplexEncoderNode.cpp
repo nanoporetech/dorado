@@ -90,7 +90,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     return read;
 }
 
-void StereoDuplexEncoderNode::worker_thread() {
+void StereoDuplexEncoderNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -109,37 +109,14 @@ void StereoDuplexEncoderNode::worker_thread() {
 }
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
-        : MessageSink(1000), m_input_signal_stride(input_signal_stride) {
-    start_threads();
-}
-
-void StereoDuplexEncoderNode::start_threads() {
-    const int num_worker_threads = std::thread::hardware_concurrency();
-    for (int i = 0; i < num_worker_threads; ++i) {
-        std::unique_ptr<std::thread> stereo_encoder_worker_thread =
-                std::make_unique<std::thread>(&StereoDuplexEncoderNode::worker_thread, this);
-        m_worker_threads.push_back(std::move(stereo_encoder_worker_thread));
-    }
-}
-
-void StereoDuplexEncoderNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& t : m_worker_threads) {
-        if (t->joinable()) {
-            t->join();
-        }
-    }
-    m_worker_threads.clear();
-}
-
-void StereoDuplexEncoderNode::restart() {
-    restart_input_queue();
-    start_threads();
+        : MessageSink(1000, std::thread::hardware_concurrency()),
+          m_input_signal_stride(input_signal_stride) {
+    start_input_processing(&StereoDuplexEncoderNode::input_thread_fn, this);
 }
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();
-    stats["encoded_pairs"] = double(m_num_encoded_pairs);
+    stats["encoded_pairs"] = static_cast<double>(m_num_encoded_pairs);
     return stats;
 }
 

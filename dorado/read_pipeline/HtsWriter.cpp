@@ -9,14 +9,13 @@
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <stdexcept>
-#include <string>
-#include <unordered_set>
 
 namespace dorado {
 
 HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads)
-        : MessageSink(10000) {
+        : MessageSink(10000, 1) {
     switch (mode) {
     case OutputMode::FASTQ:
         m_file = hts_open(filename.c_str(), "wf");
@@ -43,28 +42,11 @@ HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t thread
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
-    start_threads();
-}
-
-void HtsWriter::start_threads() {
-    m_worker = std::make_unique<std::thread>(std::thread(&HtsWriter::worker_thread, this));
-}
-
-void HtsWriter::terminate_impl() {
-    terminate_input_queue();
-    if (m_worker && m_worker->joinable()) {
-        m_worker->join();
-    }
-    m_worker.reset();
-}
-
-void HtsWriter::restart() {
-    restart_input_queue();
-    start_threads();
+    start_input_processing(&HtsWriter::input_thread_fn, this);
 }
 
 HtsWriter::~HtsWriter() {
-    terminate_impl();
+    stop_input_processing();
     sam_hdr_destroy(m_header);
     hts_close(m_file);
 }
@@ -80,7 +62,7 @@ HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     throw std::runtime_error("Unknown output mode: " + mode);
 }
 
-void HtsWriter::worker_thread() {
+void HtsWriter::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a BamPtr, ignore it.
@@ -136,6 +118,13 @@ int HtsWriter::write(bam1_t* const record) {
     }
     m_primary = m_total - m_secondary - m_supplementary - m_unmapped;
 
+    // Verify that the MN tag, if it exists, and the sequence length are in sync.
+    if (auto tag = bam_aux_get(record, "MN"); tag != nullptr) {
+        if (bam_aux2i(tag) != record->core.l_qseq) {
+            throw std::runtime_error("MN tag and sequence length are not in sync.");
+        };
+    }
+
     // FIXME -- HtsWriter is constructed in a state where attempting to write
     // will segfault, since set_and_write_header has to have been called
     // in order to set m_header.
@@ -161,9 +150,9 @@ int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
 
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
-    stats["unique_simplex_reads_written"] = double(m_processed_read_ids.size());
-    stats["duplex_reads_written"] = m_duplex_reads_written.load();
-    stats["split_reads_written"] = m_split_reads_written.load();
+    stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());
+    stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
+    stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());
     return stats;
 }
 

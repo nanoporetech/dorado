@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -9,27 +9,24 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace dorado {
 
-class PolyACalculator : public MessageSink {
+class PolyACalculatorNode : public MessageSink {
 public:
-    PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads);
-    ~PolyACalculator() { terminate_impl(); }
+    PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads);
+    ~PolyACalculatorNode() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { terminate_impl(); };
-    void restart() override;
+    void restart() override { start_input_processing(&PolyACalculatorNode::input_thread_fn, this); }
 
 private:
-    void start_threads();
     void terminate_impl();
-    void worker_thread();
+    void input_thread_fn();
 
-    // Async worker for writing.
-    std::vector<std::unique_ptr<std::thread>> m_workers;
-    size_t m_num_worker_threads = 0;
     const bool m_is_rna;
     std::atomic<size_t> total_tail_lengths_called{0};
     std::atomic<int> num_called{0};

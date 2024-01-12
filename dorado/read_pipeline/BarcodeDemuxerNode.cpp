@@ -16,40 +16,24 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
                                        std::unique_ptr<const utils::SampleSheet> sample_sheet)
-        : MessageSink(10000),
+        : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
           m_write_fastq(write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
-    start_threads();
-}
-
-void BarcodeDemuxerNode::start_threads() {
-    m_worker = std::make_unique<std::thread>(std::thread(&BarcodeDemuxerNode::worker_thread, this));
-}
-
-void BarcodeDemuxerNode::terminate_impl() {
-    terminate_input_queue();
-    if (m_worker && m_worker->joinable()) {
-        m_worker->join();
-    }
-}
-
-void BarcodeDemuxerNode::restart() {
-    restart_input_queue();
-    start_threads();
+    start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this);
 }
 
 BarcodeDemuxerNode::~BarcodeDemuxerNode() {
-    terminate_impl();
+    stop_input_processing();
     sam_hdr_destroy(m_header);
     for (auto& [k, f] : m_files) {
         hts_close(f);
     }
 }
 
-void BarcodeDemuxerNode::worker_thread() {
+void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         auto aln = std::move(std::get<BamPtr>(message));
