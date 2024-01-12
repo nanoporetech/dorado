@@ -54,9 +54,8 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t max_reads)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, static_cast<int>(remora_threads)),
           m_runners(std::move(model_runners)),
-          m_num_input_workers(remora_threads),
           m_block_stride(block_stride),
           m_batch_size(m_runners[0]->batch_size()),
           // TODO -- more principled calculation of output queue size
@@ -85,21 +84,18 @@ void ModBaseCallerNode::start_threads() {
             ++m_num_active_runner_workers;
         }
     }
-    for (size_t i = 0; i < m_num_input_workers; ++i) {
-        auto t = std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
-        m_input_workers.push_back(std::move(t));
-        ++m_num_active_input_workers;
-    }
+    start_input_processing(&ModBaseCallerNode::input_thread_fn, this);
 }
 
 void ModBaseCallerNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& t : m_input_workers) {
-        if (t->joinable()) {
-            t->join();
-        }
+    // Signal termination in the input queue, and wait for input threads to join.
+    stop_input_processing();
+    // Signal termination in the chunk queues.
+    for (auto& chunk_queue : m_chunk_queues) {
+        chunk_queue->terminate();
     }
-    m_input_workers.clear();
+    // Wait for runner workers to join, now that they have been asked to via chunk queue
+    // termination.
     for (auto& t : m_runner_workers) {
         if (t->joinable()) {
             t->join();
@@ -119,7 +115,6 @@ void ModBaseCallerNode::restart() {
     for (auto& chunk_queue : m_chunk_queues) {
         chunk_queue->restart();
     }
-    restart_input_queue();
     m_processed_chunks.restart();
     start_threads();
 }
@@ -409,7 +404,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
     }
 }
 
-void ModBaseCallerNode::input_worker_thread() {
+void ModBaseCallerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -421,13 +416,6 @@ void ModBaseCallerNode::input_worker_thread() {
             simplex_mod_call(std::move(message));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
             duplex_mod_call(std::move(message));
-        }
-    }
-
-    int num_remaining_workers = --m_num_active_input_workers;
-    if (num_remaining_workers == 0) {
-        for (auto& chunk_queue : m_chunk_queues) {
-            chunk_queue->terminate();
         }
     }
 }

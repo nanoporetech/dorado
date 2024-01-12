@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 
 #include <string>
 #include <unordered_set>

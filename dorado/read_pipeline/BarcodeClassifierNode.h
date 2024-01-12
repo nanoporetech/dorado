@@ -1,6 +1,7 @@
 #pragma once
+
 #include "demux/BarcodeClassifierSelector.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -10,7 +11,6 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace dorado {
@@ -25,29 +25,24 @@ public:
                           const std::optional<std::string>& custom_kit,
                           const std::optional<std::string>& custom_seqs);
     BarcodeClassifierNode(int threads);
-    ~BarcodeClassifierNode();
+    ~BarcodeClassifierNode() { stop_input_processing(); }
     std::string get_name() const override { return "BarcodeClassifierNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
-    void restart() override;
+    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void restart() override {
+        start_input_processing(&BarcodeClassifierNode::input_thread_fn, this);
+    }
 
 private:
-    void start_threads();
-
-    size_t m_threads{1};
-    std::atomic<size_t> m_active{0};
-    std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
     std::shared_ptr<const BarcodingInfo> m_default_barcoding_info;
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
     std::shared_ptr<const BarcodingInfo> get_barcoding_info(const SimplexRead& read) const;
 
-    void worker_thread();
+    void input_thread_fn();
     void barcode(BamPtr& read);
     void barcode(SimplexRead& read);
-
-    void terminate_impl();
 
     // Track how many reads were classified as each barcode for debugging
     // purposes.

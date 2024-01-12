@@ -376,18 +376,6 @@ ReadPair::ReadData ReadPair::ReadData::from_read(const SimplexRead &read,
     return data;
 }
 
-MessageSink::MessageSink(size_t max_messages) : m_work_queue(max_messages) {}
-
-void MessageSink::push_message_internal(Message &&message) {
-#ifndef NDEBUG
-    const auto status =
-#endif
-            m_work_queue.try_push(std::move(message));
-    // try_push will fail if the sink has been told to terminate.
-    // We do not expect to be pushing reads from this source if that is the case.
-    assert(status == utils::AsyncQueueStatus::Success);
-}
-
 // Depth first search that establishes a topological ordering for node destruction.
 // Returns true if a cycle is found.
 bool Pipeline::DFS(const std::vector<PipelineDescriptor::NodeDescriptor> &node_descriptors,
@@ -474,8 +462,6 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
     }
 }
 
-void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
-
 void Pipeline::push_message(Message &&message) {
     assert(!m_nodes.empty());
     const auto source_node_index = m_source_to_sink_order.front();
@@ -512,18 +498,6 @@ Pipeline::~Pipeline() {
         auto &node = m_nodes.at(handle);
         node.reset();
     }
-}
-
-// Free functions
-bool is_read_message(const Message &message) {
-    return std::holds_alternative<SimplexReadPtr>(message) ||
-           std::holds_alternative<DuplexReadPtr>(message);
-}
-
-uint64_t SimplexRead::get_end_time_ms() const {
-    return read_common.start_time_ms +
-           ((end_sample - start_sample) * 1000) /
-                   read_common.sample_rate;  //TODO get rid of the trimmed thing?
 }
 
 }  // namespace dorado
