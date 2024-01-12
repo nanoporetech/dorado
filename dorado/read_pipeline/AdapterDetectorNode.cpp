@@ -110,8 +110,7 @@ void AdapterDetectorNode::check_and_update_barcoding(SimplexRead& read,
         return;
     }
     int post_barcode_seq_len = int(read.read_common.pre_trim_seq_length);
-    if (read.read_common.barcode_trim_interval.first != 0 &&
-        read.read_common.barcode_trim_interval.second != 0) {
+    if (read.read_common.barcode_trim_interval.first != std::pair<int, int>(0, 0)) {
         post_barcode_seq_len = read.read_common.barcode_trim_interval.second -
                                read.read_common.barcode_trim_interval.first;
     }
