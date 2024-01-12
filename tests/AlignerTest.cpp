@@ -21,6 +21,7 @@
 
 #define TEST_GROUP "[bam_utils][aligner]"
 
+using Catch::Matchers::Equals;
 namespace fs = std::filesystem;
 
 namespace {
@@ -531,4 +532,36 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
         CHECK(read_common_value == bam_value);
     }
+}
+
+TEST_CASE_METHOD(AlignerNodeTestFixture,
+                 "AlignerTest: Check SA tag in non-primary alignments has correct CIGAR string",
+                 TEST_GROUP) {
+    using Catch::Matchers::Contains;
+
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
+    auto query = aligner_test_dir / "basecall_target.fa";
+
+    auto options = dorado::alignment::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1'000'000'000ull;
+    options.soft_clipping = GENERATE(true, false);
+    dorado::HtsReader reader(query.string(), std::nullopt);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 1);
+    REQUIRE(bam_records.size() == 3);
+
+    bam1_t* primary_rec = bam_records[0].get();
+    bam1_t* secondary_rec = bam_records[1].get();
+    bam1_t* supplementary_rec = bam_records[2].get();
+
+    // Check aux tags.
+    CHECK_THAT(bam_aux2Z(bam_aux_get(primary_rec, "SA")), Equals("read2,1,+,999S899M,60,0;"));
+    if (options.soft_clipping) {
+        CHECK_THAT(bam_aux2Z(bam_aux_get(secondary_rec, "SA")),
+                   Equals("read3,1,+,999M899S,0,0;read2,1,+,999S899M,60,0;"));
+    } else {
+        CHECK(bam_aux_get(secondary_rec, "SA") == nullptr);
+    }
+    CHECK_THAT(bam_aux2Z(bam_aux_get(supplementary_rec, "SA")), Equals("read3,1,+,999M899S,0,0;"));
 }
