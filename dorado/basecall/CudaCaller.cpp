@@ -265,6 +265,10 @@ int CudaCaller::determine_batch_size(const CRFModelConfig &model_config,
                 best_time = time;
                 best_batch_size = batch_size;
             }
+
+            // Clear the cache each time. Without this, intermittent cuda memory allocation errors
+            // are seen on windows laptop NVIDIA RTX A5500 Laptop GPU. See JIRA issue DOR-466
+            c10::cuda::CUDACachingAllocator::emptyCache();
         }
     } else {
         spdlog::debug("Maximum safe estimated batch size for {}: {}", m_device, max_batch_size);
