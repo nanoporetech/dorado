@@ -342,6 +342,7 @@ void DataLoader::load_reads(const std::string& path,
                 if (m_loaded_read_count == m_max_reads) {
                     break;
                 }
+                spdlog::debug("Load reads from file {}", entry.path().string());
                 std::string ext = std::filesystem::path(entry).extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(),
                                [](unsigned char c) { return std::tolower(c); });
