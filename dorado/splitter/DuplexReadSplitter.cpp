@@ -35,8 +35,9 @@ std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
     auto shift = subrange.first;
     auto span = subrange.second - subrange.first;
 
-    if (span == 0)
+    if (span == 0) {
         return std::nullopt;
+    }
 
     auto edlib_cfg = edlibNewAlignConfig(dist_thr, EDLIB_MODE_HW, EDLIB_TASK_LOC, NULL, 0);
 

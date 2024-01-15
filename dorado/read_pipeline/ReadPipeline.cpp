@@ -457,8 +457,9 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
     for (size_t i = 0; i < m_nodes.size(); ++i) {
         auto &node = m_nodes.at(i);
         const auto &sink_handles = descriptor.m_node_descriptors.at(i).sink_handles;
-        for (const auto sink_handle : sink_handles)
+        for (const auto sink_handle : sink_handles) {
             node->add_sink(dynamic_cast<MessageSink &>(*m_nodes.at(sink_handle)));
+        }
     }
 }
 

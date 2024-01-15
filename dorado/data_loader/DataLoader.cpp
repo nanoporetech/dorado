@@ -950,9 +950,10 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         HighFive::Group raw = read.getGroup("Raw");
         auto ds = raw.getDataSet("Signal");
-        if (ds.getDataType().string() != "Integer16")
+        if (ds.getDataType().string() != "Integer16") {
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
+        }
 
         auto options = at::TensorOptions().dtype(at::kShort);
         auto samples = at::empty(ds.getElementCount(), options);

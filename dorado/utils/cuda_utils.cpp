@@ -238,8 +238,9 @@ size_t available_memory(torch::Device device) {
 }
 
 void handle_cuda_result(int cuda_result) {
-    if (cuda_result == cudaSuccess)
+    if (cuda_result == cudaSuccess) {
         return;
+    }
 
     if (cuda_result == cudaErrorNoKernelImageForDevice) {
         throw std::runtime_error(

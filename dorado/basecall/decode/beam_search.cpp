@@ -108,8 +108,9 @@ uint32_t crc32c(uint32_t crc, uint32_t new_bits) {
     for (int i = 0; i < NUM_NEW_BITS; ++i) {
         auto b = (new_bits ^ crc) & 1;
         crc >>= 1;
-        if (b)
+        if (b) {
             crc ^= POLYNOMIAL;
+        }
         new_bits >>= 1;
     }
     return crc;
