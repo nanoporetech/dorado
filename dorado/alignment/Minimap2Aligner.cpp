@@ -122,8 +122,9 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= BAM_FSUPPLEMENTARY;
         }
 
-        if ((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_NO_PRINT_2ND))
+        if ((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_NO_PRINT_2ND)) {
             continue;
+        }
 
         const bool skip_seq_qual = !(mm_map_opts.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
                                    !(mm_map_opts.flag & MM_F_SECONDARY_SEQ);
@@ -193,10 +194,12 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         }
         if (use_hard_clip) {
             l_seq -= clip_len[0] + clip_len[1];
-            if (seq_tmp)
+            if (seq_tmp) {
                 seq_tmp += clip_len[0];
-            if (qual_tmp)
+            }
+            if (qual_tmp) {
                 qual_tmp += clip_len[0];
+            }
         }
 
         // new output record

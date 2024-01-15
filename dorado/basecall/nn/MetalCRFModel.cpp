@@ -24,8 +24,9 @@ MetalLinearImpl::MetalLinearImpl(int insize, int outsize, bool has_bias) {
     auto weight = torch::empty({outsize, insize});
     auto bias = torch::empty({outsize});
     register_parameter("weight", weight, false);
-    if (has_bias)
+    if (has_bias) {
         register_parameter("bias", bias, false);
+    }
 }
 
 MetalConv1dImpl::MetalConv1dImpl(int layer,

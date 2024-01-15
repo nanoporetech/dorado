@@ -68,8 +68,9 @@ std::string ModBaseContext::encode() const {
             m[m_offsets[i]] = 'X';
             s << m;
         }
-        if (i < 3)
+        if (i < 3) {
             s << ':';
+        }
     }
     return s.str();
 }
