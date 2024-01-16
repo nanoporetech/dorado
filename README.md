@@ -341,19 +341,25 @@ Here are a few examples of model complexes:
 | fast  | Latest compatible **fast** model |
 | hac  | Latest compatible **hac** model |
 | sup  | Latest compatible **sup** model |
-| hac@latest | Latest compatible **hac** model |
-| hac@v4.2.0  | Compatible **hac** model with version `v4.2.0`  |
-| hac@v3.5 | Compatible **hac** model with version `v3.5.0`  |
-| hac,5mCG_5hmCG  | Latest compatible **hac** model and latest **5mCG_5hmCG** modifications model |
-| hac,5mCG_5hmCG@v2  | Latest compatible **hac** model and **5mCG_5hmCG** modifications model with version `v2.0.0`  |
-| sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and both **5mCG_5hmCG** and **6mA** latest modifications models  |
+| hac@latest | Latest compatible **hac** simplex basecalling model |
+| hac@v4.2.0  | Simplex basecalling **hac** model with version `v4.2.0` |
+| hac@v3.5 | Simplex basecalling **hac** model with version `v3.5.0` |
+| hac,5mCG_5hmCG  | Latest compatible **hac** simplex model and latest **5mCG_5hmCG** modifications model for the chosen basecall model |
+| hac,5mCG_5hmCG@v2  | Latest compatible **hac** simplex model and **5mCG_5hmCG** modifications model with version `v2.0.0` |
+| sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and latest compatible **5mCG_5hmCG** and **6mA** modifications models |
 
-Automatically selected modification models will always match the base simplex model version selected. Noting the highlighted version changes, for example:
+### Modification model versioning
+
+The versioning of modification models is bound to the simplex model. In other words the modification model version is reset for each new simplex model release. 
+
+Automatically selected modification models will always match the base simplex model version and will be the latest compatible version unless a specific version is set by the user. Automatic modification model selection will not allow the mixing of modification models which are bound to different simplex model versions.  
+
+Note the highlighted version changes in the example below:
 
 | Model Complex | Description | Models |
 | :------------ | :---------- | :---------- |
-| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model (`v3.1.0`) | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 <br /> dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3.1   |
-| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model (`v2.0.0`) |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
+| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model | dna_r10.4.1_e8.2_400bps_sup@`v4.3.0` <br /> dna_r10.4.1_e8.2_400bps_sup@`v4.3.0`_5mCG_5hmCG@`v1`   |
+| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
 
 ## Developer quickstart
 
