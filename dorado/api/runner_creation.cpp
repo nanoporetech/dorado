@@ -99,15 +99,6 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
             for (size_t i = 0; i < num_gpu_runners; i++) {
                 runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j]));
             }
-            if (batch_size == 0) {
-                spdlog::info(" - set batch size for {} to {}", devices[j],
-                             runners.back()->batch_size());
-            } else {
-                if (runners.back()->batch_size() != batch_size) {
-                    spdlog::warn("- set batch size for {} to {}", devices[j],
-                                 runners.back()->batch_size());
-                }
-            }
         }
     }
 #else
