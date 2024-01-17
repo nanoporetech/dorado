@@ -176,8 +176,9 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
     const int num_batch_pieces = m_batch_size / MTL_CORE_BATCH_SIZE;
     for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
         if (num_batch_pieces % m_out_split == 0 &&
-            complete_linear_out_size / m_out_split <= kMaxBufferSize)
+            complete_linear_out_size / m_out_split <= kMaxBufferSize) {
             break;
+        }
     }
     auto piece_size = complete_linear_out_size / m_out_split;
     if (piece_size > kMaxBufferSize) {

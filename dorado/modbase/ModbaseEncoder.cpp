@@ -267,9 +267,10 @@ __attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_len9(
 std::vector<int8_t> ModBaseEncoder::encode_kmer(const std::vector<int>& seq,
                                                 const std::vector<int>& seq_mappings) const {
     // Specialised version for the case of kmer_len 9 that can be faster.
-    if (m_kmer_len == 9)
+    if (m_kmer_len == 9) {
         return encode_kmer_len9(seq, seq_mappings, m_bases_before, m_bases_after,
                                 m_context_samples);
+    }
 
     return encode_kmer_generic(seq, seq_mappings, m_bases_before, m_bases_after, m_context_samples,
                                m_kmer_len);
