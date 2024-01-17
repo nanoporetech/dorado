@@ -165,16 +165,16 @@ void setup(std::vector<std::string> args,
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 is_rna_model(model_config), 1000);
     }
+    if (adapter_trimming_enabled) {
+        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
+                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
+                !primer_no_trim);
+    }
     if (barcode_enabled) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
                 std::move(custom_kit), std::move(custom_seqs));
-    }
-    if (adapter_trimming_enabled) {
-        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
-                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
