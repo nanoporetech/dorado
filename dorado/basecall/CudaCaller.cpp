@@ -72,21 +72,9 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     }
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
-    auto [crfmodel_bytes_per_chunk, decode_bytes_per_chunk] = calculate_memory_requirements();
-#if TORCH_VERSION_MAJOR >= 2
-    // Do not re-use smaller chunks of buffers larger than half the decode size
-    // This prevents small allocations from reusing large sections of cached allocated memory
-    // which can lead to OoM errors when the original large allocation is needed again
-    auto max_split_size_mb = decode_bytes_per_chunk * m_batch_size / (2 * 1024 * 1024);
-    auto device_stats = c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
-    if (max_split_size_mb < device_stats.max_split_size) {
-        std::string max_split_size_mb_settings =
-                "max_split_size_mb:" + std::to_string(max_split_size_mb);
-        c10::cuda::CUDACachingAllocator::setAllocatorSettings(max_split_size_mb_settings);
-    }
-#endif
     c10::cuda::CUDACachingAllocator::emptyCache();
 
+    auto [crfmodel_bytes_per_chunk, decode_bytes_per_chunk] = calculate_memory_requirements();
     spdlog::debug("{} Model memory {:.2f}GB", m_device,
                   (crfmodel_bytes_per_chunk * m_batch_size) / GB);
     spdlog::debug("{} Decode memory {:.2f}GB", m_device,
