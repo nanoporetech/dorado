@@ -47,6 +47,29 @@ public:
 
 int count_trailing_chars(const std::string_view adapter, char c);
 
+/**
+ * @brief Realigns a move table based on a given query sequence and a target sequence.
+ *
+ * This function adjusts the moves table to align with the target sequence, accounting
+ * for any differences between the query and target sequences. It returns a tuple containing
+ * an offset into the original moves table to account for trimming, a location in the target
+ * sequence where the realigned sequence starts, and the newly computed move table.
+ * If the new move table cannot be computed, the function returns a tuple with values (-1, -1)
+ * and an empty vector.
+ *
+ * @param query_sequence The original sequence of moves, representing the initial alignment.
+ * @param target_sequence The sequence to which the moves need to be realigned. This could
+ *                        differ from the query sequence.
+ * @param moves The original move table as a vector of unsigned 8-bit integers, aligned with
+ *              the query sequence.
+ *
+ * @return std::tuple<int, int, std::vector<uint8_t>>
+ *         A tuple containing:
+ *         1. An offset into the old moves table (int), accounting for adjustments made during realignment.
+ *         2. The start location in the target sequence (int) where the realigned sequence begins.
+ *         3. The newly computed move table (std::vector<uint8_t>).
+ *         If the move table cannot be computed, returns (-1, -1) and an empty vector.
+ */
 std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves);
