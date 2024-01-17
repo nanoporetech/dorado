@@ -15,7 +15,7 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
         : m_caller(std::move(caller)),
           m_input(m_caller->create_input_tensor()),
           m_output(m_caller->create_output_tensor()),
-          m_stream(c10::cuda::getStreamFromPool(false, m_input.device().index())) {}
+          m_stream(c10::cuda::getStreamFromPool(false, m_caller->device().index())) {}
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
