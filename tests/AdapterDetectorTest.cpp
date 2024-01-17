@@ -175,10 +175,10 @@ TEST_CASE(
         read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>();
         auto& barcode_results = *read.read_common.barcoding_result;
         barcode_results.barcode_name = "fake_barcode";
-        auto front_barcode_start = front_adapter.length() + front_primer.length();
-        auto front_barcode_end = front_barcode_start + front_barcode.length();
-        auto rear_barcode_start = front_barcode_end + seq.length();
-        auto rear_barcode_end = rear_barcode_start + rear_barcode.length();
+        int front_barcode_start = int(front_adapter.length() + front_primer.length());
+        int front_barcode_end = front_barcode_start + int(front_barcode.length());
+        int rear_barcode_start = front_barcode_end + int(seq.length());
+        int rear_barcode_end = rear_barcode_start + int(rear_barcode.length());
         barcode_results.top_barcode_pos = {front_barcode_start, front_barcode_end};
         barcode_results.bottom_barcode_pos = {rear_barcode_start, rear_barcode_end};
 
@@ -186,10 +186,10 @@ TEST_CASE(
         std::string expected_trimmed_seq = front_barcode + seq + rear_barcode;
         CHECK(read.read_common.seq == expected_trimmed_seq);
         CHECK(read.read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
-        auto expected_front_barcode_start = 0;
-        auto expected_front_barcode_end = front_barcode.length();
-        auto expected_rear_barcode_start = expected_front_barcode_end + seq.length();
-        auto expected_rear_barcode_end = expected_rear_barcode_start + rear_barcode.length();
+        int expected_front_barcode_start = 0;
+        int expected_front_barcode_end = int(front_barcode.length());
+        int expected_rear_barcode_start = expected_front_barcode_end + int(seq.length());
+        int expected_rear_barcode_end = expected_rear_barcode_start + int(rear_barcode.length());
         CHECK(barcode_results.top_barcode_pos ==
               std::pair<int, int>(expected_front_barcode_start, expected_front_barcode_end));
         CHECK(barcode_results.bottom_barcode_pos ==
@@ -219,10 +219,11 @@ TEST_CASE(
         read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>();
         auto& barcode_results = *read.read_common.barcoding_result;
         barcode_results.barcode_name = "fake_barcode";
-        auto front_barcode_start = 5;
-        auto front_barcode_end = 15;
-        auto rear_barcode_start = front_adapter.length() + front_primer.length() + seq.length() + 5;
-        auto rear_barcode_end = rear_barcode_start + 10;
+        int front_barcode_start = 5;
+        int front_barcode_end = 15;
+        int rear_barcode_start =
+                int(front_adapter.length() + front_primer.length() + seq.length()) + 5;
+        int rear_barcode_end = rear_barcode_start + 10;
         barcode_results.top_barcode_pos = {front_barcode_start, front_barcode_end};
         barcode_results.bottom_barcode_pos = {rear_barcode_start, rear_barcode_end};
 
