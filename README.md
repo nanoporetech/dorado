@@ -86,6 +86,8 @@ $ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 
 ### DNA Adapter and primer trimming
 
+The dorado software can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demux the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could negatively impact demuxing.
+
 #### In-line with basecalling
 
 By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence.
@@ -99,6 +101,8 @@ The `--trim` option takes as its argument one of the following values:
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
+If adapter/primer trimming is done in-line with basecalling in combination with demuxing, then the software will automatically make sure that the trimming of adapters and primers does not interfere with the demuxing process. However, if you intend to do demuxing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to insure that any barcode sequences remain completely intact in the reads.
+
 #### Trimming existing datasets
 
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
@@ -110,6 +114,8 @@ $ dorado trim <reads> > trimmed.bam
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
+
+If it is also your intention to demux the data, then it is recommended that you do that before trimming any adapters and primers, as trimming adapters and primers first may result in the demux software being unable to classify the barcodes properly.
 
 ### RNA Adapter trimming
 
