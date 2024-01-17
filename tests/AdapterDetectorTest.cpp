@@ -167,7 +167,7 @@ TEST_CASE(
         read.read_common.moves = moves;
         read.read_common.raw_data = at::zeros(moves.size() * stride);
 
-        const int flank_size = front_adapter.length() + front_primer.length();
+        const auto flank_size = front_adapter.length() + front_primer.length();
         const int additional_trimmed_samples =
                 int(stride * 2 * flank_size);  // * 2 is because we have 2 moves per base
 
