@@ -109,6 +109,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
                          trim_interval.first, trim_interval.second, read.read_common.seq);
             return;
         }
+        demux::AdapterDetector::check_and_update_barcoding(read, trim_interval);
         Trimmer::trim_sequence(read, trim_interval);
         read.read_common.adapter_trim_interval = trim_interval;
     }
