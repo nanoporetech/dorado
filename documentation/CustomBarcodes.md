@@ -28,23 +28,25 @@ The following are all the options that can be defined in the arrangement file.
 name = "custom_barcode"
 kit = "BC"
 
-mask_1_front = "ATCG"
-mask_1_rear = "ATCG"
-mask_2_front = "TTAA"
-mask_2_rear = "GGCC"
+mask1_front = "ATCG"
+mask1_rear = "ATCG"
+mask2_front = "TTAA"
+mask2_rear = "GGCC"
 
 # Barcode sequences
 barcode1_pattern = "BC%02i"
 barcode2_pattern = "BC%02i"
 first_index = 1
-last_index = 96
+last_index = 24
+first_index_inner = 1
+last_index_inner = 96
 
 ## Scoring options
 [scoring]
 min_soft_barcode_threshold = 0.2
 min_hard_barcode_threshold = 0.2
 min_soft_flank_threshold = 0.3
-min_hard_barcode_threshold = 0.3
+min_hard_flank_threshold = 0.3
 min_barcode_score_dist = 0.1
 ```
 
@@ -56,14 +58,16 @@ The table below describes the arrangement options in more detail.
 | -- | -- |
 | name | (Required) Name of the barcode arrangement. This name will be used to report the barcode classification. |
 | kit | (Optional) Which class of barcodes this arrangement belongs to (if any). |
-| mask_1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask_1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask_2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
-| mask_2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
+| mask1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
+| mask1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
+| mask2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
+| mask2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
 | barcode1_pattern | (Required) An expression capturing the sequences to use for the front barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | barcode2_pattern | (Optional) An expression capturing the sequences to use for the rear barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
 | last_index | (Required) End index for range of barcode sequences to use in the arrangement. Used in combination with the `first_index`. |
+| first_index_inner | (Optional) Start index for range of barcode sequences to use in dual-barcode arrangements. Used in combination with the `last_index_inner`. |
+| last_index_inner | (Optional) End index for range of barcode sequences to use in dual-barcode arrangement. Used in combination with the `first_index_inner`. |
 
 The pre-built barcode sequence in Dorado can be found in this [file](../dorado/utils/barcode_kits.cpp) under the `barcodes` map.
 
@@ -89,7 +93,7 @@ if that score is greater than `min_barcode_score_dist`, the best candidate is co
 | min_soft_barcode_threshold | If barcode score meets this threshold and flank score meets its hard threshold, consider a hit. Soft score is higher than hard score. |
 | min_hard_barcode_threshold | Minimum score threshold a barcode must meet. |
 | min_soft_flank_threshold | If flank score meets this threshold and barcode score meets its hard threshold, consider a hit. Soft score is higher than hard score. |
-| min_hard_barcode_threshold | Minimum score threshold a flank must meet. |
+| min_hard_flank_threshold | Minimum score threshold a flank must meet. |
 | min_barcode_score_dist | Minimum distance between barcode scores of best and second best hits. |
 
 ### Custom Sequences File 
