@@ -32,7 +32,6 @@ private:
     void input_thread_fn();
     void process_read(BamPtr& read);
     void process_read(SimplexRead& read);
-    static void check_and_update_barcoding(SimplexRead& read, std::pair<int, int>& trim_interval);
 };
 
 }  // namespace dorado
