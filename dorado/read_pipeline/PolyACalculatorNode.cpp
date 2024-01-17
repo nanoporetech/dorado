@@ -1,4 +1,4 @@
-#include "PolyACalculator.h"
+#include "PolyACalculatorNode.h"
 
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
@@ -7,9 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <limits>
 #include <utility>
 
 namespace {
@@ -286,7 +284,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_drna() { return SignalAnchor
 
 namespace dorado {
 
-void PolyACalculator::worker_thread() {
+void PolyACalculatorNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -366,26 +364,13 @@ void PolyACalculator::worker_thread() {
     }
 }
 
-PolyACalculator::PolyACalculator(size_t num_worker_threads, bool is_rna, size_t max_reads)
-        : MessageSink(max_reads), m_num_worker_threads(num_worker_threads), m_is_rna(is_rna) {
-    start_threads();
+PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads)
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)), m_is_rna(is_rna) {
+    start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 
-void PolyACalculator::start_threads() {
-    for (size_t i = 0; i < m_num_worker_threads; i++) {
-        m_workers.push_back(
-                std::make_unique<std::thread>(std::thread(&PolyACalculator::worker_thread, this)));
-    }
-}
-
-void PolyACalculator::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
-    }
-    m_workers.clear();
+void PolyACalculatorNode::terminate_impl() {
+    stop_input_processing();
 
     spdlog::debug("Total called {}, not called {}, avg tail length {}", num_called.load(),
                   num_not_called.load(),
@@ -406,16 +391,11 @@ void PolyACalculator::terminate_impl() {
     }
 }
 
-void PolyACalculator::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-stats::NamedStats PolyACalculator::sample_stats() const {
+stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
-    stats["reads_not_estimated"] = num_not_called.load();
-    stats["reads_estimated"] = num_called.load();
-    stats["average_tail_length"] = double(
+    stats["reads_not_estimated"] = static_cast<double>(num_not_called.load());
+    stats["reads_estimated"] = static_cast<double>(num_called.load());
+    stats["average_tail_length"] = static_cast<double>(
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
     return stats;
 }

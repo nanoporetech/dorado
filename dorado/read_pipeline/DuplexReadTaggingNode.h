@@ -5,7 +5,6 @@
 
 #include <memory>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -18,19 +17,14 @@ namespace dorado {
 class DuplexReadTaggingNode : public MessageSink {
 public:
     DuplexReadTaggingNode();
-    ~DuplexReadTaggingNode() { terminate_impl(); }
+    ~DuplexReadTaggingNode() { stop_input_processing(); }
     std::string get_name() const override { return "DuplexReadTaggingNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { terminate_impl(); }
+    void terminate(const FlushOptions &) override { stop_input_processing(); }
     void restart() override;
 
 private:
-    void start_threads();
-    void terminate_impl();
-    void worker_thread();
-
-    // Async worker for writing.
-    std::unique_ptr<std::thread> m_worker;
+    void input_thread_fn();
 
     std::unordered_map<std::string, SimplexReadPtr> m_duplex_parents;
     std::unordered_set<std::string> m_parents_processed;

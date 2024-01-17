@@ -39,7 +39,7 @@ struct BasecallerNode::BasecallingRead {
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
 
-void BasecallerNode::input_worker_thread() {
+void BasecallerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -305,9 +305,9 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
-                               const std::string &node_name,
+                               std::string node_name,
                                uint32_t read_mean_qscore_start_pos)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, 1),
           m_model_runners(std::move(model_runners)),
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
@@ -318,7 +318,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_chunks_in(CalcMaxChunksIn(m_model_runners)),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
-          m_node_name(node_name) {
+          m_node_name(std::move(node_name)) {
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
@@ -332,7 +332,8 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
 
 void BasecallerNode::start_threads() {
-    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    start_input_processing(&BasecallerNode::input_thread_fn, this);
+
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
     for (size_t i = 0; i < m_working_reads_managers.size(); i++) {
@@ -346,11 +347,7 @@ void BasecallerNode::start_threads() {
 }
 
 void BasecallerNode::terminate_impl() {
-    terminate_input_queue();
-    if (m_input_worker && m_input_worker->joinable()) {
-        m_input_worker->join();
-    }
-    m_input_worker.reset();
+    stop_input_processing();
     for (auto &t : m_basecall_workers) {
         if (t.joinable()) {
             t.join();
@@ -370,7 +367,6 @@ void BasecallerNode::restart() {
     for (auto &runner : m_model_runners) {
         runner->restart();
     }
-    restart_input_queue();
     m_chunks_in.restart();
     m_processed_chunks.restart();
     start_threads();

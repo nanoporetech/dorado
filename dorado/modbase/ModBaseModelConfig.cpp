@@ -119,8 +119,9 @@ ModBaseInfo get_modbase_info(
     size_t index = 0;
     for (const auto& info : model_info) {
         for (const auto& name : info.long_names) {
-            if (!result.long_names.empty())
+            if (!result.long_names.empty()) {
                 result.long_names += ' ';
+            }
             result.long_names += name;
         }
         result.alphabet.insert(result.alphabet.end(), info.alphabet.begin(), info.alphabet.end());

@@ -18,9 +18,7 @@ void add_sa_tag(bam1_t* record,
                 int32_t hits,
                 int32_t aln_idx,
                 int32_t l_seq,
-                const mm_idx_t* idx,
-                const bool use_hard_clip) {
-    const auto clip_char = use_hard_clip ? "H" : "S";
+                const mm_idx_t* idx) {
     std::stringstream ss;
     for (int i = 0; i < hits; i++) {
         if (i == aln_idx) {
@@ -50,7 +48,7 @@ void add_sa_tag(bam1_t* record,
         ss << r->rs + 1 << ",";
         ss << "+-"[r->rev] << ",";
         if (clip5) {
-            ss << clip5 << clip_char;
+            ss << clip5 << "S";
         }
         if (num_matches) {
             ss << num_matches << "M";
@@ -62,7 +60,7 @@ void add_sa_tag(bam1_t* record,
             ss << num_deletes << "D";
         }
         if (clip3) {
-            ss << clip3 << clip_char;
+            ss << clip3 << "S";
         }
         ss << "," << r->mapq << "," << (r->blen - r->mlen + r->p->n_ambi) << ";";
     }
@@ -122,8 +120,9 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             flag |= BAM_FSUPPLEMENTARY;
         }
 
-        if ((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_NO_PRINT_2ND))
+        if ((flag & BAM_FSECONDARY) && (mm_map_opts.flag & MM_F_NO_PRINT_2ND)) {
             continue;
+        }
 
         const bool skip_seq_qual = !(mm_map_opts.flag & MM_F_SOFTCLIP) && (flag & BAM_FSECONDARY) &&
                                    !(mm_map_opts.flag & MM_F_SECONDARY_SEQ);
@@ -193,10 +192,12 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         }
         if (use_hard_clip) {
             l_seq -= clip_len[0] + clip_len[1];
-            if (seq_tmp)
+            if (seq_tmp) {
                 seq_tmp += clip_len[0];
-            if (qual_tmp)
+            }
+            if (qual_tmp) {
                 qual_tmp += clip_len[0];
+            }
         }
 
         // new output record
@@ -220,7 +221,12 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
         // Add new tags to match minimap2.
         add_tags(record, aln, seq, buf);
-        add_sa_tag(record, reg, hits, j, static_cast<int>(l_seq), mm_index, use_hard_clip);
+        if (!skip_seq_qual) {
+            // Here pass the original query length before any hard clip because the
+            // the CIGAR string in SA tag only makes use of soft clip. And for that to be
+            // correct the unclipped query length is needed.
+            add_sa_tag(record, reg, hits, j, static_cast<int>(seq.size()), mm_index);
+        }
 
         // Remove MM/ML/MN tags if secondary alignment and soft clipping is not enabled.
         if ((flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) && !(mm_map_opts.flag & MM_F_SOFTCLIP)) {

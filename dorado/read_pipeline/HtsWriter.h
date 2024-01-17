@@ -26,8 +26,8 @@ public:
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
-    void restart() override;
+    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void restart() override { start_input_processing(&HtsWriter::input_thread_fn, this); }
 
     int set_and_write_header(const sam_hdr_t* header);
     static OutputMode get_output_mode(const std::string& mode);
@@ -36,8 +36,6 @@ public:
     size_t get_unmapped() const { return m_unmapped; }
 
 private:
-    void start_threads();
-    void terminate_impl();
     size_t m_total{0};
     size_t m_primary{0};
     size_t m_unmapped{0};
@@ -46,8 +44,7 @@ private:
     sam_hdr_t* m_header{nullptr};
 
     htsFile* m_file{nullptr};
-    std::unique_ptr<std::thread> m_worker;
-    void worker_thread();
+    void input_thread_fn();
     int write(bam1_t* record);
     std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};

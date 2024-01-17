@@ -343,6 +343,7 @@ void DataLoader::load_reads(const std::string& path,
                 if (m_loaded_read_count == m_max_reads) {
                     break;
                 }
+                spdlog::debug("Load reads from file {}", entry.path().string());
                 std::string ext = std::filesystem::path(entry).extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(),
                                [](unsigned char c) { return std::tolower(c); });
@@ -949,9 +950,10 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         HighFive::Group raw = read.getGroup("Raw");
         auto ds = raw.getDataSet("Signal");
-        if (ds.getDataType().string() != "Integer16")
+        if (ds.getDataType().string() != "Integer16") {
             throw std::runtime_error("Invalid FAST5 Signal data type of " +
                                      ds.getDataType().string());
+        }
 
         auto options = at::TensorOptions().dtype(at::kShort);
         auto samples = at::empty(ds.getElementCount(), options);

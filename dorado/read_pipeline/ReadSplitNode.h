@@ -1,10 +1,10 @@
 #pragma once
-#include "ReadPipeline.h"
+
+#include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace dorado {
 
@@ -17,20 +17,14 @@ public:
     ReadSplitNode(std::unique_ptr<const splitter::ReadSplitter> splitter,
                   int num_worker_threads,
                   size_t max_reads);
-    ~ReadSplitNode() { terminate_impl(); }
+    ~ReadSplitNode() { stop_input_processing(); }
     std::string get_name() const override { return "ReadSplitNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { terminate_impl(); }
-    void restart() override;
+    void terminate(const FlushOptions &) override { stop_input_processing(); }
+    void restart() override { start_input_processing(&ReadSplitNode::input_thread_fn, this); }
 
 private:
-    void start_threads();
-    void terminate_impl();
-
-    void worker_thread();  // Worker thread performs splitting asynchronously.
-
-    const int m_num_worker_threads;
-    std::vector<std::thread> m_worker_threads;
+    void input_thread_fn();  // Worker thread performs splitting asynchronously.
 
     std::unique_ptr<const splitter::ReadSplitter> m_splitter;
 };

@@ -24,6 +24,7 @@ IncludeCategories:
 IncludeIsMainRegex: '(_test|_tests|Tests|Test)?$'
 IndentCaseLabels: false
 IndentWidth: 4
+InsertBraces: true
 PointerAlignment: Middle
 ReflowComments: false
 SortIncludes: true

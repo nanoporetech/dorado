@@ -53,10 +53,9 @@ private:
         return 64;
     }
 
-    int determine_batch_size(const CRFModelConfig &model_config,
-                             int chunk_size_in,
-                             float memory_limit_fraction,
-                             bool run_benchmark);
+    std::pair<int64_t, int64_t> calculate_memory_requirements() const;
+    int determine_batch_size(float memory_limit_fraction, bool run_benchmark);
+
     void start_threads();
     void cuda_thread_fn();
 
