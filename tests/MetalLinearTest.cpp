@@ -35,7 +35,7 @@ TEST_CASE(TEST_GROUP "Linear") {
 
     // Example values for HAC model run.
     const int layer_size = 384;       // Typical LSTM layer size for HAC model.
-    const int in_batch_size = 768;    // Runtime-specified: number of chunks handled simultaneously.
+    const int in_batch_size = 96;     // Runtime-specified: number of chunks handled simultaneously.
     const int tile_size = 8;          // Size of simdgroup_* tiles.  Dictated by Metal itself.
     const int lstm_chunk_size = 200;  // Number of samples in a chunk divided by model stride
     const int out_size = 1024;  // 4-mer transition matrix without fixed stay scores => 4**4 * 4
