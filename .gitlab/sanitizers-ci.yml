@@ -56,9 +56,9 @@ sanitize:linux:arm64:bionic:
     when:
     - job_execution_timeout
 
-sanitize:macos:m1:
+sanitize:macos:arm:
   extends:
-    - build:macos:m1
+    - build:macos:arm
     - .sanitizer_common
 
 sanitize:macos:x64:
