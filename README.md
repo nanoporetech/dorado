@@ -19,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.5.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-linux-x64.tar.gz)
- - [dorado-0.5.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-linux-arm64.tar.gz)
- - [dorado-0.5.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-osx-arm64.zip)
- - [dorado-0.5.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-win64.zip)
+ - [dorado-0.5.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-linux-x64.tar.gz)
+ - [dorado-0.5.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-linux-arm64.tar.gz)
+ - [dorado-0.5.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-osx-arm64.zip)
+ - [dorado-0.5.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-win64.zip)
 
 ## Platforms
 
@@ -84,9 +84,9 @@ $ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 
 **Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
-### DNA Adapter and primer trimming
+### DNA adapter and primer trimming
 
-The dorado software can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demux the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could negatively impact demuxing.
+Dorado can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demultiplex the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could interfere with correct demultiplexing.
 
 #### In-line with basecalling
 
@@ -101,7 +101,7 @@ The `--trim` option takes as its argument one of the following values:
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
-If adapter/primer trimming is done in-line with basecalling in combination with demuxing, then the software will automatically make sure that the trimming of adapters and primers does not interfere with the demuxing process. However, if you intend to do demuxing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to insure that any barcode sequences remain completely intact in the reads.
+If adapter/primer trimming is done in-line with basecalling in combination with demultiplexing, then the software will automatically ensure that the trimming of adapters and primers does not interfere with the demultiplexing process. However, if you intend to do demultiplexing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to ensure that any barcode sequences remain completely intact in the reads.
 
 #### Trimming existing datasets
 
@@ -115,7 +115,7 @@ $ dorado trim <reads> > trimmed.bam
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
 
-If it is also your intention to demux the data, then it is recommended that you do that before trimming any adapters and primers, as trimming adapters and primers first may result in the demux software being unable to classify the barcodes properly.
+If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification.
 
 ### RNA Adapter trimming
 
@@ -288,6 +288,8 @@ The names of Dorado models are systematically structured, each segment correspon
 
 Below is a table of the available basecalling models and the modified basecalling models that can be used with them. The bolded models are for the latest released condition with 5 kHz data.
 
+The versioning of modification models is bound to the basecalling model. This means that the modification model version is reset for each new simplex model release. For example, `6mA@v1` compatible with `v4.3.0` basecalling models is more recent than `6mA@v2` compatible with `v4.2.0` basecalling models.
+
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v4.3.0** | | | 5 kHz |
@@ -340,6 +342,8 @@ The `model` argument in dorado can specify either a model path or a model **_com
 (fast|hac|sup)[@(version|latest)][,modification[@(version|latest)]][,...]
 ```
 
+Automatically selected modification models will always match the base simplex model version and will be the latest compatible version unless a specific version is set by the user. Automatic modification model selection will not allow the mixing of modification models which are bound to different simplex model versions.  
+
 Here are a few examples of model complexes:
 
 | Model Complex | Description |
@@ -354,18 +358,6 @@ Here are a few examples of model complexes:
 | hac,5mCG_5hmCG@v2  | Latest compatible **hac** simplex model and **5mCG_5hmCG** modifications model with version `v2.0.0` |
 | sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and latest compatible **5mCG_5hmCG** and **6mA** modifications models |
 
-### Modification model versioning
-
-The versioning of modification models is bound to the simplex model. In other words the modification model version is reset for each new simplex model release. 
-
-Automatically selected modification models will always match the base simplex model version and will be the latest compatible version unless a specific version is set by the user. Automatic modification model selection will not allow the mixing of modification models which are bound to different simplex model versions.  
-
-Note the highlighted version changes in the example below:
-
-| Model Complex | Description | Models |
-| :------------ | :---------- | :---------- |
-| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model | dna_r10.4.1_e8.2_400bps_sup@`v4.3.0` <br /> dna_r10.4.1_e8.2_400bps_sup@`v4.3.0`_5mCG_5hmCG@`v1`   |
-| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
 
 ## Developer quickstart
 

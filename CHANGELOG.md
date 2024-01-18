@@ -2,6 +2,17 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.5.2] (18 Jan 2024)
+
+This release of Dorado fixes a bug causing malformed CIGAR strings, prevents crashing when calling modifications with duplex, and improves adapter and primer trimming support.
+
+* [] - Fix malformed CIGAR string for non-primary alignment
+* 0a057bb14c6342092eaf5787c5de90f41c08a93b - Fix duplex modifications crash
+* d453db274d68f5f315deb1f1238814ec24953588 - Add missing support for RAD adapter detection and trimming
+* 8c2d004d71c9c21fb7bfbe283ba44bc100a67793 - Correctly trim modbase tags for reverse strand alignments
+* 76f24b29312af4a6bb22e02e79f439bd1ccfd725 - Update custom barcode documentation
+* 9959654ba7377d3807d5d96aabdc9b40d74c5d0d - Only require standardisation parameters if standardisation is active
+
 # [0.5.1] (21 Dec 2023)
 
 This release of Dorado fixes bugs with adapter trimming and custom barcodes, introduces a more accurate 6mA model, and adds several quality of life improvements.
