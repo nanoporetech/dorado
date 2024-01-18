@@ -39,6 +39,7 @@ public:
 
     at::Tensor create_input_tensor() const;
     at::Tensor create_output_tensor() const;
+    c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
