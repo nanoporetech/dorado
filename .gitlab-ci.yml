@@ -31,7 +31,7 @@ variables:
 
 .macos_m1_runner: &macos_m1_runner
   tags:
-    - xcode-13.3.1
+    - xcode-14.2
     - m1
   variables:
     MACOSX_DEPLOYMENT_TARGET: "12.3"
@@ -39,6 +39,7 @@ variables:
 .macos_x64_runner: &macos_x64_runner
   tags:
     - osx_x86
+    - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
 
