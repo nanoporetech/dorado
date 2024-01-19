@@ -39,7 +39,7 @@ void set_torch_allocator_max_split_size() {
             // user has set this via env_var - let torch parse and use their value
             return;
         }
-        settings += std::string(",") + pytorch_cuda_alloc_conf;        
+        settings += std::string(",") + pytorch_cuda_alloc_conf;
     }
 
     c10::cuda::CUDACachingAllocator::setAllocatorSettings(settings);
