@@ -8,8 +8,6 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
-    compat_utils.cpp
-    compat_utils.h
     dev_utils.cpp
     dev_utils.h
     driver_query.cpp
@@ -41,6 +39,7 @@ add_library(dorado_utils
     thread_utils.h
     time_utils.cpp
     time_utils.h
+    torch_utils.cpp
     torch_utils.h
     trim.cpp
     trim.h
@@ -95,6 +94,7 @@ target_link_libraries(dorado_utils
         edlib
         spdlog::spdlog
     PRIVATE
+        dorado_compat
         minimap2
         OpenSSL::SSL
         htslib

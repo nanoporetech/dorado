@@ -78,6 +78,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         dorado_models_lib
         dorado_basecall
         dorado_modbase
+        dorado_compat
         minimap2
         ${ZLIB_LIBRARIES}
         ${POD5_LIBRARIES}

@@ -1,11 +1,11 @@
 #define CATCH_CONFIG_RUNNER
 
-#include "utils/compat_utils.h"
+#include "compat/compat_utils.h"
 #include "utils/torch_utils.h"
 
 #include <catch2/catch.hpp>
 #include <nvtx3/nvtx3.hpp>
-#include <torch/torch.h>
+#include <torch/utils.h>
 
 #include <clocale>
 
