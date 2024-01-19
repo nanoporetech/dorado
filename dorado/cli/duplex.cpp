@@ -30,6 +30,7 @@
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
+#include <torch/utils.h>
 
 #include <cstdlib>
 #include <exception>

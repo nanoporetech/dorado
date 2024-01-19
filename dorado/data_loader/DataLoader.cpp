@@ -3,7 +3,6 @@
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/PostCondition.h"
-#include "utils/compat_utils.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
 #include "vbz_plugin_user_utils.h"

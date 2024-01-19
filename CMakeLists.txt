@@ -159,6 +159,7 @@ add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
+add_subdirectory(dorado/compat)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/basecall)
@@ -368,6 +369,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_lib
         dorado_io_lib
         dorado_models_lib
+        dorado_compat
         minimap2
     )
 
