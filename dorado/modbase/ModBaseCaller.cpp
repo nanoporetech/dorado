@@ -12,6 +12,7 @@
 #endif
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
+#include <torch/version.h>
 
 #include <chrono>
 
