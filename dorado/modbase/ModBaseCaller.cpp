@@ -12,7 +12,6 @@
 #endif
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
-#include <torch/version.h>
 
 #include <chrono>
 
@@ -73,17 +72,10 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     if (device == "cpu") {
         // no slow_conv2d_cpu for type Half, need to use float32
         m_options = at::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
+#ifdef __APPLE__
     } else if (device == "metal") {
-#if TORCH_VERSION_MAJOR < 2
-        // no metal implementation yet, force to cpu
-        auto torchMetalBackend = torch::kCPU;
-        auto torchMetalDtype = torch::kFloat32;
-        spdlog::debug("- no metal backend available for modified basecalling, defaulting to CPU.");
-#else
-        auto torchMetalBackend = torch::kMPS;
-        auto torchMetalDtype = torch::kFloat16;
+        m_options = at::TensorOptions().device(torch::kMPS).dtype(torch::kFloat16);
 #endif
-        m_options = at::TensorOptions().device(torchMetalBackend).dtype(torchMetalDtype);
     } else {
         m_options = at::TensorOptions().device(device).dtype(torch::kFloat16);
     }
