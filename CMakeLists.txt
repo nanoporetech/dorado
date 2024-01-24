@@ -44,7 +44,7 @@ function(enable_warnings_as_errors TARGET_NAME)
             _CRT_SECURE_NO_WARNINGS
         )
     else()
-        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror -Wextra)
+        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror -Wextra -Wundef)
     endif()
 endfunction()
 
