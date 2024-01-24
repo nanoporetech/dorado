@@ -59,12 +59,6 @@ std::string get_modification_model(const std::string& simplex_model,
 // get the sampling rate that the model is compatible with
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
 
-// the mean Q-score of short reads are artificially lowered because of
-// some lower quality bases at the beginning of the read. to correct for
-// that, mean Q-score calculation should ignore the first few bases. The
-// number of bases to ignore is dependent on the model.
-uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name);
-
 // Extract the model name from the model path.
 std::string extract_model_name_from_path(const std::filesystem::path& model_path);
 

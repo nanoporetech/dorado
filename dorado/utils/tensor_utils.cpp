@@ -29,8 +29,9 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 __attribute__((target("avx2,f16c"))) void convert_f32_to_f16_impl(c10::Half* const dest,
                                                                   const float* const src,
                                                                   std::size_t count) {
-    if (!count)
+    if (!count) {
         return;
+    }
 
     // Unroll to AVX register size: 8 floats.
     static constexpr size_t kUnroll = 8;

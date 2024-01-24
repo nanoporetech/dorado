@@ -159,8 +159,11 @@ add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
 
 enable_testing()
 
+add_subdirectory(dorado/compat)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
+add_subdirectory(dorado/basecall)
+add_subdirectory(dorado/modbase)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -179,74 +182,70 @@ set(LIB_SOURCE_FILES
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
-    dorado/nn/CRFModel.h
-    dorado/nn/CRFModel.cpp
-    dorado/nn/CRFModelConfig.h
-    dorado/nn/CRFModelConfig.cpp
-    dorado/nn/ModelRunner.h
-    dorado/nn/ModBaseModel.cpp
-    dorado/nn/ModBaseModel.h
-    dorado/nn/ModBaseModelConfig.cpp
-    dorado/nn/ModBaseModelConfig.h    
-    dorado/nn/ModBaseRunner.cpp
-    dorado/nn/ModBaseRunner.h
-    dorado/nn/Runners.cpp
-    dorado/nn/Runners.h
-    dorado/read_pipeline/Pipelines.cpp
-    dorado/read_pipeline/Pipelines.h
-    dorado/read_pipeline/FakeDataLoader.cpp
-    dorado/read_pipeline/FakeDataLoader.h
-    dorado/read_pipeline/ReadPipeline.cpp
-    dorado/read_pipeline/ReadPipeline.h
-    dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/DefaultClientInfo.h
-    dorado/read_pipeline/ScalerNode.cpp
-    dorado/read_pipeline/ScalerNode.h
-    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
-    dorado/read_pipeline/StereoDuplexEncoderNode.h
-    dorado/read_pipeline/BasecallerNode.cpp
-    dorado/read_pipeline/BasecallerNode.h
-    dorado/read_pipeline/ModBaseCallerNode.cpp
-    dorado/read_pipeline/ModBaseCallerNode.h
-    dorado/read_pipeline/ReadFilterNode.cpp
-    dorado/read_pipeline/ReadFilterNode.h
-    dorado/read_pipeline/ReadToBamTypeNode.cpp
-    dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/SubreadTaggerNode.cpp
-    dorado/read_pipeline/SubreadTaggerNode.h
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
+    dorado/api/caller_creation.cpp
+    dorado/api/caller_creation.h
+    dorado/api/runner_creation.cpp
+    dorado/api/runner_creation.h
+    dorado/api/pipeline_creation.cpp
+    dorado/api/pipeline_creation.h
+    dorado/read_pipeline/AdapterDetectorNode.cpp
+    dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/AlignerNode.cpp
     dorado/read_pipeline/AlignerNode.h
-    dorado/read_pipeline/HtsReader.cpp
-    dorado/read_pipeline/HtsReader.h
-    dorado/read_pipeline/HtsWriter.cpp
-    dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/ProgressTracker.h
-    dorado/read_pipeline/ResumeLoaderNode.cpp
-    dorado/read_pipeline/ResumeLoaderNode.h
-    dorado/read_pipeline/DuplexReadTaggingNode.cpp
-    dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/BarcodeClassifierNode.cpp
     dorado/read_pipeline/BarcodeClassifierNode.h
     dorado/read_pipeline/BarcodeDemuxerNode.cpp
     dorado/read_pipeline/BarcodeDemuxerNode.h
-    dorado/read_pipeline/AdapterDetectorNode.cpp
-    dorado/read_pipeline/AdapterDetectorNode.h
+    dorado/read_pipeline/BasecallerNode.cpp
+    dorado/read_pipeline/BasecallerNode.h
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
+    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
+    dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/DefaultClientInfo.h
+    dorado/read_pipeline/DuplexReadTaggingNode.cpp
+    dorado/read_pipeline/DuplexReadTaggingNode.h
+    dorado/read_pipeline/FakeDataLoader.cpp
+    dorado/read_pipeline/FakeDataLoader.h
+    dorado/read_pipeline/HtsReader.cpp
+    dorado/read_pipeline/HtsReader.h
+    dorado/read_pipeline/HtsWriter.cpp
+    dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/MessageSink.cpp
+    dorado/read_pipeline/MessageSink.h
+    dorado/read_pipeline/ModBaseCallerNode.cpp
+    dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
-    dorado/read_pipeline/PolyACalculator.cpp
-    dorado/read_pipeline/PolyACalculator.h
+    dorado/read_pipeline/PolyACalculatorNode.cpp
+    dorado/read_pipeline/PolyACalculatorNode.h
+    dorado/read_pipeline/ProgressTracker.h
+    dorado/read_pipeline/ReadFilterNode.cpp
+    dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadPipeline.cpp
+    dorado/read_pipeline/ReadPipeline.h
+    dorado/read_pipeline/ReadSplitNode.cpp
+    dorado/read_pipeline/ReadSplitNode.h
+    dorado/read_pipeline/ReadToBamTypeNode.cpp
+    dorado/read_pipeline/ReadToBamTypeNode.h
+    dorado/read_pipeline/ResumeLoaderNode.cpp
+    dorado/read_pipeline/ResumeLoaderNode.h
+    dorado/read_pipeline/ScalerNode.cpp
+    dorado/read_pipeline/ScalerNode.h
+    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
+    dorado/read_pipeline/StereoDuplexEncoderNode.h
+    dorado/read_pipeline/SubreadTaggerNode.cpp
+    dorado/read_pipeline/SubreadTaggerNode.h
+    dorado/read_pipeline/messages.cpp
+    dorado/read_pipeline/messages.h
+    dorado/read_pipeline/flush_options.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stereo_features.cpp
     dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
-    dorado/read_pipeline/ReadSplitNode.cpp
-    dorado/read_pipeline/ReadSplitNode.h
     dorado/splitter/DuplexReadSplitter.cpp
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp
@@ -263,35 +262,7 @@ set(LIB_SOURCE_FILES
     dorado/demux/Trimmer.h
     dorado/demux/parse_custom_kit.cpp
     dorado/demux/parse_custom_kit.h
-    dorado/decode/beam_search.cpp
-    dorado/decode/beam_search.h
-    dorado/decode/CPUDecoder.cpp
-    dorado/decode/CPUDecoder.h
-    dorado/modbase/modbase_encoder.cpp
-    dorado/modbase/modbase_encoder.h
-    dorado/modbase/modbase_scaler.cpp
-    dorado/modbase/modbase_scaler.h
-    dorado/modbase/ModBaseContext.cpp
-    dorado/modbase/ModBaseContext.h
-    dorado/modbase/MotifMatcher.cpp
-    dorado/modbase/MotifMatcher.h
  )
-
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        list(APPEND LIB_SOURCE_FILES
-            dorado/nn/MetalCRFModel.h
-            dorado/nn/MetalCRFModel.cpp
-        )
-    else()
-        list(APPEND LIB_SOURCE_FILES
-            dorado/decode/GPUDecoder.cpp
-            dorado/decode/GPUDecoder.h
-            dorado/nn/CudaCRFModel.h
-            dorado/nn/CudaCRFModel.cpp
-        )
-    endif()
-endif()
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
 
@@ -303,16 +274,10 @@ set_target_properties(dorado_lib
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
-target_compile_definitions(dorado_lib
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-)
-
 target_include_directories(dorado_lib
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}/dorado
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
-        ${KOI_INCLUDE}
         ${POD5_INCLUDE}
 )
 # 3rdparty libs should be considered SYSTEM headers
@@ -348,8 +313,9 @@ target_link_libraries(dorado_lib
         vbz_hdf_plugin
         edlib
         dorado_utils
+        dorado_basecall
+        dorado_modbase
     PRIVATE
-        ${KOI_LIBRARIES}    
         minimap2
 )
 
@@ -403,6 +369,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_lib
         dorado_io_lib
         dorado_models_lib
+        dorado_compat
         minimap2
     )
 

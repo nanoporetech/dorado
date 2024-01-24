@@ -17,7 +17,7 @@ TEST_CASE(TEST_TAG "  ModelVariant enumeration", TEST_TAG) {
         CHECK(codes.at("fast") == ModelVariant::FAST);
         CHECK(codes.at("hac") == ModelVariant::HAC);
         CHECK(codes.at("sup") == ModelVariant::SUP);
-        CHECK(codes.size() == 4);
+        CHECK(codes.size() == static_cast<size_t>(ModelVariant::NONE));
     }
 
     SECTION("ModelVariant get_model_code") {
@@ -39,17 +39,13 @@ TEST_CASE(TEST_TAG "  ModelVariant enumeration", TEST_TAG) {
         CHECK_THROWS_AS(to_string(ModelVariant::NONE), std::logic_error);
     }
 
-    SECTION("ModelVariant self consitent") {
+    SECTION("ModelVariant self consistent") {
         for (const auto& code : codes) {
             if (code.second != ModelVariant::NONE) {
                 CHECK(code.second == get_model_variant(to_string(code.second)));
             }
         }
     }
-
-    SECTION("ModelVariant::NONE is last member") {
-        CHECK(static_cast<uint16_t>(ModelVariant::NONE) == codes.size());
-    };
 }
 
 TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
@@ -62,7 +58,7 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
         CHECK(mods.at("5mC") == ModsVariant::M_5mC);
         CHECK(mods.at("6mA") == ModsVariant::M_6mA);
         CHECK(mods.at("m6A_DRACH") == ModsVariant::M_m6A_DRACH);
-        CHECK(mods.size() == 6);
+        CHECK(mods.size() == static_cast<size_t>(ModsVariant::NONE));
     }
 
     SECTION("ModsVariant get_mods_code") {
@@ -96,21 +92,18 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
         CHECK(set.size() == mods.size());
     }
 
-    SECTION("ModsVariant self consitent") {
+    SECTION("ModsVariant self consistent") {
         for (const auto& mod : mods) {
             CHECK(mod.second == get_mods_variant(to_string(mod.second)));
         }
     }
-
-    SECTION("ModsVariant::NONE is last member") {
-        CHECK(static_cast<uint16_t>(ModsVariant::NONE) == mods.size());
-    };
 }
 
 TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
     const auto& vers = version_map();
 
     SECTION("ModelVersion to_string") {
+        CHECK(to_string(ModelVersion::v0_0_0) == "v0.0.0");
         CHECK(to_string(ModelVersion::v0_1_0) == "v0.1.0");
         CHECK(to_string(ModelVersion::v1_0_0) == "v1.0.0");
         CHECK(to_string(ModelVersion::v1_1_0) == "v1.1.0");
@@ -129,7 +122,8 @@ TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CHECK(to_string(ModelVersion::v4_2_0) == "v4.2.0");
         CHECK(to_string(ModelVersion::v4_3_0) == "v4.3.0");
         CHECK(to_string(ModelVersion::NONE) == "latest");
-        CHECK(vers.size() == 18);
+        CHECK(vers.size() ==
+              static_cast<size_t>(ModelVersion::NONE) + 1);  // +1 as "NONE" is included in the map
     }
 
     SECTION("ModelVersion no duplicates") {
@@ -140,15 +134,11 @@ TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CHECK(set.size() == vers.size());
     }
 
-    SECTION("ModelVersion self consitent") {
+    SECTION("ModelVersion self consistent") {
         for (const auto& ver : vers) {
             CHECK(ver.second == vers.at(to_string(ver.second)));
         }
     }
-
-    SECTION("ModelVersion::NONE is last member") {
-        CHECK(static_cast<uint16_t>(ModelVersion::NONE) == vers.size());
-    };
 }
 
 TEST_CASE(TEST_TAG "  ModelVariantPair / ModsVariantPair", TEST_TAG) {

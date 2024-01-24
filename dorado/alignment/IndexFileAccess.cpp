@@ -98,9 +98,11 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& file,
 std::shared_ptr<const Minimap2Index> IndexFileAccess::get_index(const std::string& file,
                                                                 const Minimap2Options& options) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto index = get_or_load_compatible_index(file, options);
-    assert(index && "get_index expects a compatible index to have been loaded");
-    return index;
+    // N.B. Although the index file for a client must be loaded before reads are added to the pipeline
+    // it is still possible that the index for a read in the pipeline does not have its index loaded
+    // if the client disconnected and caused the index to be unloaded while there were still reads in
+    // the pipeline. For this reason we do not assert a non-null index.
+    return get_or_load_compatible_index(file, options);
 }
 
 bool IndexFileAccess::is_index_loaded(const std::string& file,

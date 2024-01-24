@@ -1,6 +1,6 @@
 #include "Version.h"
 #include "cli/cli.h"
-#include "utils/compat_utils.h"
+#include "compat/compat_utils.h"
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>

@@ -12,51 +12,25 @@
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <string_view>
-#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
 AdapterDetectorNode::AdapterDetectorNode(int threads, bool trim_adapters, bool trim_primers)
-        : MessageSink(10000),
-          m_threads(threads),
+        : MessageSink(10000, threads),
           m_trim_adapters(trim_adapters),
           m_trim_primers(trim_primers) {
-    start_threads();
+    start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
 AdapterDetectorNode::AdapterDetectorNode(int threads)
-        : MessageSink(10000), m_threads(threads), m_trim_adapters(true), m_trim_primers(true) {
-    start_threads();
+        : MessageSink(10000, threads), m_trim_adapters(true), m_trim_primers(true) {
+    start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
-void AdapterDetectorNode::start_threads() {
-    for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(std::make_unique<std::thread>(
-                std::thread(&AdapterDetectorNode::worker_thread, this)));
-    }
-}
-
-void AdapterDetectorNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
-    }
-    m_workers.clear();
-}
-
-void AdapterDetectorNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-AdapterDetectorNode::~AdapterDetectorNode() { terminate_impl(); }
-
-void AdapterDetectorNode::worker_thread() {
+void AdapterDetectorNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
@@ -94,6 +68,11 @@ void AdapterDetectorNode::process_read(BamPtr& read) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
+        if (trim_interval.first >= trim_interval.second) {
+            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
+                         trim_interval.first, trim_interval.second, seq);
+            return;
+        }
         read = Trimmer::trim_sequence(std::move(read), trim_interval);
     }
 }
@@ -125,7 +104,14 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
+        if (trim_interval.first >= trim_interval.second) {
+            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
+                         trim_interval.first, trim_interval.second, read.read_common.seq);
+            return;
+        }
+        demux::AdapterDetector::check_and_update_barcoding(read, trim_interval);
         Trimmer::trim_sequence(read, trim_interval);
+        read.read_common.adapter_trim_interval = trim_interval;
     }
     m_num_records++;
 }

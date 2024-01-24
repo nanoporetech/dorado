@@ -1,19 +1,18 @@
 #include "Version.h"
+#include "api/pipeline_creation.h"
+#include "api/runner_creation.h"
+#include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
 #include "models/kits.h"
 #include "models/models.h"
-#include "nn/CRFModelConfig.h"
-#include "nn/ModBaseRunner.h"
-#include "nn/Runners.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/Pipelines.h"
-#include "read_pipeline/PolyACalculator.h"
+#include "read_pipeline/PolyACalculatorNode.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -32,6 +31,7 @@
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
+#include <torch/utils.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -86,7 +86,7 @@ void setup(std::vector<std::string> args,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
            const ModelSelection& model_selection) {
-    const auto model_config = load_crf_model_config(model_path);
+    const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
@@ -119,12 +119,12 @@ void setup(std::vector<std::string> args,
     const bool enable_aligner = !ref.empty();
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = create_modbase_runners(remora_models, device,
-                                                 default_parameters.mod_base_runners_per_caller,
-                                                 remora_batch_size);
+    auto remora_runners = api::create_modbase_runners(
+            remora_models, device, default_parameters.mod_base_runners_per_caller,
+            remora_batch_size);
 
-    auto [runners, num_devices] = create_basecall_runners(model_config, device, num_runners, 0,
-                                                          batch_size, chunk_size, 1.f, false);
+    auto [runners, num_devices] = api::create_basecall_runners(model_config, device, num_runners, 0,
+                                                               batch_size, chunk_size, 1.f, false);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -158,13 +158,18 @@ void setup(std::vector<std::string> args,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
-    current_sink_node = pipeline_desc.add_node<ReadToBamType>(
+    current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
-        current_sink_node = pipeline_desc.add_node<PolyACalculator>(
+        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
                 is_rna_model(model_config), 1000);
+    }
+    if (adapter_trimming_enabled) {
+        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
+                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
+                !primer_no_trim);
     }
     if (barcode_enabled) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
@@ -172,25 +177,15 @@ void setup(std::vector<std::string> args,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
                 std::move(custom_kit), std::move(custom_seqs));
     }
-    if (adapter_trimming_enabled) {
-        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
-                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim);
-    }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
-    if (mean_qscore_start_pos < 0) {
-        mean_qscore_start_pos = models::get_mean_qscore_start_pos_by_model_name(model_name);
-        if (mean_qscore_start_pos < 0) {
-            throw std::runtime_error("Mean q-score start position cannot be < 0");
-        }
-    }
-    pipelines::create_simplex_pipeline(
+
+    api::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
-            mean_qscore_start_pos, thread_allocations.scaler_node_threads,
+            mean_qscore_start_pos, !adapter_no_trim, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
             thread_allocations.remora_threads, current_sink_node,
             PipelineDescriptor::InvalidNodeHandle);
@@ -288,6 +283,7 @@ void setup(std::vector<std::string> args,
 
 int basecaller(int argc, char* argv[]) {
     utils::InitLogging();
+    utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 

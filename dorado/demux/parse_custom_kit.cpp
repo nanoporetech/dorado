@@ -36,13 +36,12 @@ bool check_normalized_id_pattern(const std::string& pattern) {
     return true;
 }
 
-std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
+std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
         const std::string& arrangement_file) {
     const toml::value config_toml = toml::parse(arrangement_file);
 
     if (!config_toml.contains("arrangement")) {
-        throw std::runtime_error(
-                "Custom barcode arrangement file must have [arrangement] section.");
+        return std::nullopt;
     }
 
     barcode_kits::KitInfo new_kit;
@@ -108,7 +107,7 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
                                  (barcode1_pattern != barcode2_pattern);
     }
 
-    return {kit_name, new_kit};
+    return std::make_pair(kit_name, new_kit);
 }
 
 BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file) {

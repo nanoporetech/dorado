@@ -43,19 +43,16 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const std::string& filename,
                          const alignment::Minimap2Options& options,
                          int threads)
-        : MessageSink(10000),
-          m_threads(threads),
+        : MessageSink(10000, threads),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, filename, options, threads)),
           m_index_file_access(std::move(index_file_access)) {
-    start_threads();
+    start_input_processing(&AlignerNode::input_thread_fn, this);
 }
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access, int threads)
-        : MessageSink(10000),
-          m_threads(threads),
-          m_index_file_access(std::move(index_file_access)) {
-    start_threads();
+        : MessageSink(10000, threads), m_index_file_access(std::move(index_file_access)) {
+    start_input_processing(&AlignerNode::input_thread_fn, this);
 }
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
@@ -66,31 +63,19 @@ std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
     }
     auto index =
             m_index_file_access->get_index(align_info.reference_file, align_info.minimap_options);
+    if (!index) {
+        if (read_common.client_info->is_disconnected()) {
+            // Unlikely but ... may have disconnected since last checked and caused a
+            // an unload of the index file.
+            return {};
+        }
+        throw std::runtime_error(
+                "Cannot align read. Expected alignment reference file is not loaded: " +
+                align_info.reference_file);
+    }
+
     return index;
 }
-
-void AlignerNode::start_threads() {
-    for (size_t i = 0; i < m_threads; i++) {
-        m_workers.push_back(std::thread(&AlignerNode::worker_thread, this));
-    }
-}
-
-void AlignerNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& m : m_workers) {
-        if (m.joinable()) {
-            m.join();
-        }
-    }
-    m_workers.clear();
-}
-
-void AlignerNode::restart() {
-    restart_input_queue();
-    start_threads();
-}
-
-AlignerNode::~AlignerNode() { terminate_impl(); }
 
 alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() const {
     assert(m_index_for_bam_messages != nullptr &&
@@ -98,14 +83,24 @@ alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() 
     return alignment::Minimap2Aligner(m_index_for_bam_messages).get_sequence_records_for_header();
 }
 
-void AlignerNode::worker_thread() {
+void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
+    if (read_common.client_info->is_disconnected()) {
+        return;
+    }
+
+    auto index = get_index(read_common);
+    if (!index) {
+        return;
+    }
+
+    alignment::Minimap2Aligner(index).align(read_common, tbuf);
+}
+
+void AlignerNode::input_thread_fn() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     auto align_read = [this, tbuf](auto&& read) {
-        auto index = get_index(read->read_common);
-        if (index) {
-            alignment::Minimap2Aligner(index).align(read->read_common, tbuf);
-        }
+        align_read_common(read->read_common, tbuf);
         send_message_to_sink(std::move(read));
     };
     while (get_input_message(message)) {

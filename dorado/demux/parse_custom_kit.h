@@ -2,6 +2,7 @@
 
 #include "utils/barcode_kits.h"
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -15,7 +16,7 @@ struct BarcodeKitScoringParams {
     float min_barcode_score_dist = 0.25f;
 };
 
-std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
+std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
         const std::string& arrangement_file);
 
 std::unordered_map<std::string, std::string> parse_custom_barcode_sequences(

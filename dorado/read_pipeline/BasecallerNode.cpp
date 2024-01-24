@@ -1,20 +1,22 @@
 #include "BasecallerNode.h"
 
-#include "decode/CPUDecoder.h"
+#include "basecall/CRFModelConfig.h"
+#include "basecall/ModelRunnerBase.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
+#include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>
 #include <cstdlib>
 
-#if defined(__APPLE__) && DORADO_GPU_BUILD
+#if DORADO_METAL_BUILD
 #include "utils/metal_utils.h"
 #endif
 
 using namespace std::chrono_literals;
-using namespace torch::indexing;
+using namespace at::indexing;
 
 namespace dorado {
 
@@ -37,7 +39,7 @@ struct BasecallerNode::BasecallingRead {
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
 
-void BasecallerNode::input_worker_thread() {
+void BasecallerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -116,7 +118,7 @@ void BasecallerNode::input_worker_thread() {
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
-    auto model_runner = m_model_runners[worker_id];
+    auto &model_runner = m_model_runners[worker_id];
     dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
     m_call_chunks_ms += timer.GetElapsedMS();
@@ -192,7 +194,7 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
-#if defined(__APPLE__) && DORADO_GPU_BUILD
+#if DORADO_METAL_BUILD
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool autorelease_pool;
 #endif
@@ -241,15 +243,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (slice_size != m_chunk_size) {
                 if (input_slice.ndimension() == 1) {
                     auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                    input_slice = torch::concat(
-                            {input_slice.repeat({n}),
-                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})});
+                    input_slice = at::concat({input_slice.repeat({n}),
+                                              input_slice.index({Ellipsis, Slice(0, overhang)})});
                 } else if (input_slice.ndimension() == 2) {
                     auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
-                    input_slice = torch::concat(
-                            {input_slice.repeat({1, n}),
-                             input_slice.index({Ellipsis, torch::indexing::Slice(0, overhang)})},
-                            1);
+                    input_slice = at::concat({input_slice.repeat({1, n}),
+                                              input_slice.index({Ellipsis, Slice(0, overhang)})},
+                                             1);
                 }
             }
 
@@ -288,7 +288,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 namespace {
 
 // Calculates the input queue size.
-size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
+size_t CalcMaxChunksIn(const std::vector<basecall::RunnerPtr> &model_runners) {
     // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
@@ -300,14 +300,14 @@ size_t CalcMaxChunksIn(const std::vector<Runner> &model_runners) {
 
 }  // namespace
 
-BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
+BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                                size_t overlap,
                                int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
-                               const std::string &node_name,
+                               std::string node_name,
                                uint32_t read_mean_qscore_start_pos)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, 1),
           m_model_runners(std::move(model_runners)),
           m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
@@ -318,7 +318,7 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_chunks_in(CalcMaxChunksIn(m_model_runners)),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
-          m_node_name(node_name) {
+          m_node_name(std::move(node_name)) {
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
@@ -332,7 +332,8 @@ BasecallerNode::BasecallerNode(std::vector<Runner> model_runners,
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
 
 void BasecallerNode::start_threads() {
-    m_input_worker = std::make_unique<std::thread>([this] { input_worker_thread(); });
+    start_input_processing(&BasecallerNode::input_thread_fn, this);
+
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
     for (size_t i = 0; i < m_working_reads_managers.size(); i++) {
@@ -346,11 +347,7 @@ void BasecallerNode::start_threads() {
 }
 
 void BasecallerNode::terminate_impl() {
-    terminate_input_queue();
-    if (m_input_worker && m_input_worker->joinable()) {
-        m_input_worker->join();
-    }
-    m_input_worker.reset();
+    stop_input_processing();
     for (auto &t : m_basecall_workers) {
         if (t.joinable()) {
             t.join();
@@ -370,7 +367,6 @@ void BasecallerNode::restart() {
     for (auto &runner : m_model_runners) {
         runner->restart();
     }
-    restart_input_queue();
     m_chunks_in.restart();
     m_processed_chunks.restart();
     start_threads();

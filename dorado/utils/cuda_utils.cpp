@@ -121,23 +121,87 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     std::regex e("[0-9]+");
     std::smatch m;
 
+    auto num_devices = torch::cuda::device_count();
     if (device_string.substr(0, 5) != "cuda:") {
         return devices;  // empty vector;
     } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        auto num_devices = torch::cuda::device_count();
         for (size_t i = 0; i < num_devices; i++) {
             devices.push_back("cuda:" + std::to_string(i));
         }
     } else {
         while (std::regex_search(device_string, m, e)) {
             for (auto x : m) {
-                devices.push_back("cuda:" + x.str());
+                std::string device_id = x.str();
+                int device_idx = std::stoi(device_id);
+                if (device_idx >= int(num_devices) || device_idx < 0) {
+                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
+                                             "\" from device string " + device_string +
+                                             ", there are " + std::to_string(num_devices) +
+                                             " visible CUDA devices.");
+                }
+                devices.push_back("cuda:" + device_id);
             }
             device_string = m.suffix().str();
         }
     }
 
     return devices;
+}
+
+std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
+    std::vector<CUDADeviceInfo> results;
+    std::regex e("[0-9]+");
+    std::smatch m;
+    auto num_devices = torch::cuda::device_count();
+
+    // Get the set of ids that are in use according to the device_string
+    std::set<int> device_ids;
+    if (device_string.substr(0, 5) != "cuda:") {
+        // Nothing to add to device_ids
+    } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
+        if (num_devices == 0) {
+            throw std::runtime_error("device string set to " + device_string +
+                                     " but no CUDA devices available.");
+        }
+        for (int i = 0; i < int(num_devices); i++) {
+            device_ids.insert(i);
+        }
+    } else {
+        while (std::regex_search(device_string, m, e)) {
+            for (auto x : m) {
+                std::string device_id = x.str();
+                int device_idx = std::stoi(device_id);
+                if (device_idx >= int(num_devices) || device_idx < 0) {
+                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
+                                             "\" from device string " + device_string +
+                                             ", there are " + std::to_string(num_devices) +
+                                             " visible CUDA devices.");
+                }
+                device_ids.insert(device_idx);
+            }
+            device_string = m.suffix().str();
+        }
+    }
+
+    // Now inspect all the devices on the host to create the CUDADeviceInfo
+    for (int device_id = 0; device_id < int(num_devices); device_id++) {
+        CUDADeviceInfo device_info;
+        device_info.device_id = device_id;
+
+        cudaSetDevice(device_id);
+        cudaMemGetInfo(&device_info.free_mem, &device_info.total_mem);
+        cudaDeviceGetAttribute(&device_info.compute_cap_major, cudaDevAttrComputeCapabilityMajor,
+                               device_id);
+        cudaDeviceGetAttribute(&device_info.compute_cap_minor, cudaDevAttrComputeCapabilityMinor,
+                               device_id);
+        cudaGetDeviceProperties(&device_info.device_properties, device_id);
+
+        device_info.in_use = device_ids.find(device_id) != device_ids.end();
+
+        results.push_back(device_info);
+    }
+
+    return results;
 }
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
@@ -174,8 +238,9 @@ size_t available_memory(torch::Device device) {
 }
 
 void handle_cuda_result(int cuda_result) {
-    if (cuda_result == cudaSuccess)
+    if (cuda_result == cudaSuccess) {
         return;
+    }
 
     if (cuda_result == cudaErrorNoKernelImageForDevice) {
         throw std::runtime_error(

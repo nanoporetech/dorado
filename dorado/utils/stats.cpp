@@ -21,8 +21,9 @@ StatsSampler::StatsSampler(std::chrono::system_clock::duration sampling_period,
           m_sampling_thread(&StatsSampler::sampling_thread_fn, this) {}
 
 StatsSampler::~StatsSampler() {
-    if (m_sampling_thread.joinable())
+    if (m_sampling_thread.joinable()) {
         terminate();
+    }
 }
 
 void StatsSampler::terminate() {
@@ -32,8 +33,9 @@ void StatsSampler::terminate() {
 
 void StatsSampler::dump_stats(std::ostream& out_stream,
                               std::optional<std::regex> name_filter) const {
-    if (m_records.empty())
+    if (m_records.empty()) {
         return;
+    }
 
     // Determine the set of stats names across all time steps, filtered according
     // to the user-specified criterion.
@@ -41,8 +43,9 @@ void StatsSampler::dump_stats(std::ostream& out_stream,
     std::set<std::string> stat_names;
     for (const auto& [elapsed_ms, record] : m_records) {
         for (const auto& [name, value] : record) {
-            if (!name_filter.has_value() || std::regex_match(name, name_filter.value()))
+            if (!name_filter.has_value() || std::regex_match(name, name_filter.value())) {
                 stat_names.insert(name);
+            }
         }
     }
 
@@ -85,8 +88,9 @@ void StatsSampler::sampling_thread_fn() {
         // Sample stats from each node.
         for (const auto& reporter : m_stats_reporters) {
             const auto [obj_name, obj_stats] = reporter();
-            for (const auto& [name, value] : obj_stats)
+            for (const auto& [name, value] : obj_stats) {
                 stats_record.stats[obj_name + "." + name] = value;
+            }
         }
 
         // Inform all callables of these stats.

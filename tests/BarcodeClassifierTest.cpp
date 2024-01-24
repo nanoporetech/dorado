@@ -8,6 +8,7 @@
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 
+#include <ATen/Functions.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
@@ -218,6 +219,7 @@ TEST_CASE(
         moves.push_back(0);
     }
     read->read_common.moves = moves;
+    read->read_common.raw_data = at::zeros(moves.size() * stride);
 
     // Generate mod prob table so only the first A after the front flank has a mod.
     const std::vector<std::string> mod_alphabet = {"A", "a", "C", "G", "T"};
@@ -302,6 +304,12 @@ TEST_CASE(
             CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
 
             CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
+            // 100 is trimmed sequence length. 51 is leading flank length.
+            // * 2 is number of moves per base.
+            // ns is shorter than the number of raw samples because the signal
+            // corresponding to the trimmed trailing flank needs to be removed from the end
+            // of the original signal.
+            CHECK(bam_aux2i(bam_aux_get(rec, "ns")) == ((100 + 51) * 2 * stride));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
             auto msg_read = std::get<SimplexReadPtr>(std::move(message));
@@ -320,6 +328,8 @@ TEST_CASE(
             CHECK(read_common.base_mod_probs[1] == 235);
 
             CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+            // Number of trimmed bases is 100, so number of moves should be 2 * 100.
+            CHECK(read_common.get_raw_data_samples() == 100 * 2 * stride);
 
             auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
@@ -406,4 +416,16 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
             }
         }
     }
+}
+
+TEST_CASE(
+        "BarcodeClassifier: Fail if no kit name is passed and custom kit doesn't contain "
+        "arrangement",
+        TEST_GROUP) {
+    const fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
+    const auto kit_file = data_dir / "scoring_params.toml";
+
+    CHECK_THROWS_WITH(
+            demux::BarcodeClassifier({}, kit_file.string(), std::nullopt),
+            "Either custom kit must include kit arrangement or a kit name needs to be passed in.");
 }

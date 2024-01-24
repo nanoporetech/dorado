@@ -29,16 +29,17 @@ variables:
 
 # Build stage components
 
-.macos_m1_runner: &macos_m1_runner
+.macos_arm_runner: &macos_arm_runner
   tags:
-    - xcode-13.3.1
-    - m1
+    - osx_arm64
+    - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "12.3"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
     - osx_x86
+    - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
 
@@ -297,11 +298,11 @@ build:windows_koi_download:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
 
-build:macos:m1:
+build:macos:arm:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .macos_m1_runner
+    - .macos_arm_runner
     - .build_dorado
 
 build:macos:x64:
@@ -315,7 +316,7 @@ build:ios:m1:
   variables:
     BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
     BUILD_TARGET: "all"
-  <<: *macos_m1_runner
+  <<: *macos_arm_runner
   <<: *build_dorado_lib_only
 
 build_archive:linux:x86:focal:
@@ -370,9 +371,9 @@ build_archive:windows:
     - .build_dorado_archive
     - .on_nightly_or_manual
 
-build_archive:macos:m1:
+build_archive:macos:arm:
   extends:
-    - .macos_m1_runner
+    - .macos_arm_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
   script:
@@ -473,12 +474,12 @@ test:linux:arm64:focal:
   needs:
     - build:linux:arm64:focal
 
-test:macos:m1:
+test:macos:arm:
   extends:
-    - .macos_m1_runner
+    - .macos_arm_runner
     - .test_dorado
   needs:
-    - build:macos:m1
+    - build:macos:arm
 
 test:macos:x64:
   extends:
@@ -573,6 +574,9 @@ test:model_download:linux:x86:focal:
 .mlhub_sre:
   extends:
     - .mlhub
+  needs:
+    - job: build:linux:x86:focal
+      artifacts: false
   script:
     - echo ${MODELS}
     - |
@@ -586,8 +590,8 @@ test:model_download:linux:x86:focal:
               "duplex_models":'${DUPLEX_MODELS}',
               "sre_output":"'${SRE_OUTPUT_ROOT}'/'${CI_COMMIT_SHA}'/",
               "sre_config":"${projectDir}/configs/'${SRE_CONFIG}'",
-              "dorado_branch":"'${CI_COMMIT_SHA}'",
-              "dorado_exe":""
+              "basecaller_mode":"dorado_artifact",
+              "basecaller":"'${CI_COMMIT_SHA}'"
               }
       }' \
       ${MLHUB_TRIGGER_URL}
@@ -714,6 +718,6 @@ deploy:all:
     - build_archive:linux:x86:centos7
     - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:focal
-    - build_archive:macos:m1
+    - build_archive:macos:arm
     - build_archive:macos:x64
     - build_archive:windows

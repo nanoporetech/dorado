@@ -730,6 +730,20 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_6mA@v2",
+                "7b8e2887ba113832063555a0bc4df0e27ae2d905dbf7b65d05d7f91cf07df670",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_6mA@v2",
+                "643891d0cafcb07e6f985b17ed2fe3e033feff4db9c4c3053faa5e3281b4b5b4",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_5mCG_5hmCG@v1",
                 "49b1f6e1ae353bf0991c0001a47bdb9d2c01e097b60229ec6f576ff1d02bf604",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
@@ -755,14 +769,6 @@ const std::vector<ModelInfo> models = {
 };
 
 }  // namespace modified
-
-const std::unordered_map<std::string, uint16_t> mean_qscore_start_pos_by_model = {
-
-        // To add model specific start positions for older models,
-        // create an entry keyed by model name with the value as
-        // the desired start position.
-        // e.g. {"dna_r10.4.1_e8.2_5khz_400bps_fast@v4.2.0", 10}
-};
 
 std::string calculate_checksum(std::string_view data) {
     // Hash the data.
@@ -836,6 +842,7 @@ class ModelDownloader {
 
         httplib::Client http(urls::URL_ROOT);
         http.set_follow_location(true);
+        http.set_connection_timeout(20);
 
         const char* proxy_url = getenv("dorado_proxy");
         const char* ps = getenv("dorado_proxy_port");
@@ -1075,17 +1082,7 @@ SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
         return iter->second.sampling_rate;
     } else {
         // This can only happen if a model_info.chemistry not in chemistries which should be impossible.
-        throw std::logic_error("Couldn't find chemsitry: " + to_string(model_info.chemistry));
-    }
-}
-
-uint32_t get_mean_qscore_start_pos_by_model_name(const std::string& model_name) {
-    auto iter = mean_qscore_start_pos_by_model.find(model_name);
-    if (iter != mean_qscore_start_pos_by_model.end()) {
-        return iter->second;
-    } else {
-        // Assume start position of 60 as default.
-        return 60;
+        throw std::logic_error("Couldn't find chemistry: " + to_string(model_info.chemistry));
     }
 }
 

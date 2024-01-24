@@ -35,10 +35,10 @@ TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
 
     auto keys = utils::extract_pg_keys_from_hdr(sam.string(), {"PN", "CL", "VN"});
     CHECK(keys["PN"] == "dorado");
-    CHECK(keys["VN"] == "0.2.3+0f041c4+dirty");
+    CHECK(keys["VN"] == "0.5.0+5fa4de73+dirty");
     CHECK(keys["CL"] ==
           "dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -x cpu --modified-bases "
-          "5mCG");
+          "5mCG --emit-sam");
 }
 
 TEST_CASE("BamUtilsTest: add_rg_hdr read group headers", TEST_GROUP) {

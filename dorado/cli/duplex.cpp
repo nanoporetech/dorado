@@ -1,18 +1,17 @@
 #include "Version.h"
+#include "api/pipeline_creation.h"
+#include "api/runner_creation.h"
+#include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
 #include "models/kits.h"
 #include "models/metadata.h"
 #include "models/models.h"
-#include "nn/CRFModelConfig.h"
-#include "nn/ModBaseRunner.h"
-#include "nn/Runners.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/DuplexReadTaggingNode.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/Pipelines.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
@@ -31,6 +30,7 @@
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
+#include <torch/utils.h>
 
 #include <cstdlib>
 #include <exception>
@@ -48,10 +48,10 @@ namespace {
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    CRFModelConfig model_config;
+    basecall::CRFModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    CRFModelConfig stereo_model_config;
+    basecall::CRFModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -122,7 +122,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = load_crf_model_config(model_path);
+            const auto model_config = basecall::load_crf_model_config(model_path);
             const auto model_name = model_path.filename().string();
             check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
                                             recursive_file_loading);
@@ -153,10 +153,10 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_finder.get_simplex_model_name();
-    const auto model_config = load_crf_model_config(model_path);
+    const auto model_config = basecall::load_crf_model_config(model_path);
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    const auto stereo_model_config = load_crf_model_config(stereo_model_path);
+    const auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
 
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,
@@ -171,6 +171,7 @@ using namespace std::chrono_literals;
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
     utils::InitLogging();
+    utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
     // The issue appears to be that enabling deterministic algorithms
@@ -379,7 +380,7 @@ int duplex(int argc, char* argv[]) {
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
-        auto read_converter = pipeline_desc.add_node<ReadToBamType>(
+        auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
                 {converted_reads_sink}, emit_moves, 2, 0.0f, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
@@ -449,7 +450,7 @@ int duplex(int argc, char* argv[]) {
             temp_model_paths = models.temp_paths;
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
-            auto mod_base_runners = create_modbase_runners(
+            auto mod_base_runners = api::create_modbase_runners(
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
                     default_parameters.remora_batchsize);
 
@@ -473,22 +474,20 @@ int duplex(int argc, char* argv[]) {
             const size_t num_runners = default_parameters.num_runners;
 
             int stereo_batch_size = 0;
-#if DORADO_GPU_BUILD
-#ifdef __APPLE__
+#if DORADO_METAL_BUILD
             if (device == "metal") {
                 // For now, the minimal batch size is used for the duplex model.
                 stereo_batch_size = 48;
             }
 #endif
-#endif
             // Note: The memory assignment between simplex and duplex callers have been
             // performed based on empirical results considering a SUP model for simplex
             // calling.
             auto [runners, num_devices] =
-                    create_basecall_runners(models.model_config, device, num_runners, 0, batch_size,
-                                            chunk_size, 0.9f, true);
+                    api::create_basecall_runners(models.model_config, device, num_runners, 0,
+                                                 batch_size, chunk_size, 0.9f, true);
 
-            std::vector<Runner> stereo_runners;
+            std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
             // _remaining_ memory to the caller. So, we allocate all of the available
             // memory after simplex caller has been instantiated to the duplex caller.
@@ -499,8 +498,8 @@ int duplex(int argc, char* argv[]) {
             // chances for the stereo model to use the cached allocations from the simplex
             // model.
             std::tie(stereo_runners, std::ignore) =
-                    create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
-                                            stereo_batch_size, chunk_size, 0.5f, true);
+                    api::create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
+                                                 stereo_batch_size, chunk_size, 0.5f, true);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 
@@ -513,15 +512,8 @@ int duplex(int argc, char* argv[]) {
             }
 
             auto mean_qscore_start_pos = models.model_config.mean_qscore_start_pos;
-            if (mean_qscore_start_pos < 0) {
-                mean_qscore_start_pos =
-                        models::get_mean_qscore_start_pos_by_model_name(models.stereo_model_name);
-                if (mean_qscore_start_pos < 0) {
-                    throw std::runtime_error("Mean q-score start position cannot be < 0");
-                }
-            }
 
-            pipelines::create_stereo_duplex_pipeline(
+            api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
                     std::move(mod_base_runners), overlap, mean_qscore_start_pos,
                     int(num_devices * 2), int(num_devices),

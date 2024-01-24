@@ -19,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.5.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-linux-x64.tar.gz)
- - [dorado-0.5.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-linux-arm64.tar.gz)
- - [dorado-0.5.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-osx-arm64.zip)
- - [dorado-0.5.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.0-win64.zip)
+ - [dorado-0.5.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-linux-x64.tar.gz)
+ - [dorado-0.5.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-linux-arm64.tar.gz)
+ - [dorado-0.5.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-osx-arm64.zip)
+ - [dorado-0.5.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.1-win64.zip)
 
 ## Platforms
 
@@ -84,7 +84,9 @@ $ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 
 **Note: it is important to choose a different filename for the BAM file you are writing to when using `--resume-from`**. If you use the same filename, the interrupted BAM file will lose the existing basecalls and basecalling will restart from the beginning.
 
-### Adapter and primer trimming
+### DNA Adapter and primer trimming
+
+The dorado software can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demux the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could negatively impact demuxing.
 
 #### In-line with basecalling
 
@@ -99,17 +101,25 @@ The `--trim` option takes as its argument one of the following values:
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
+If adapter/primer trimming is done in-line with basecalling in combination with demuxing, then the software will automatically make sure that the trimming of adapters and primers does not interfere with the demuxing process. However, if you intend to do demuxing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to insure that any barcode sequences remain completely intact in the reads.
+
 #### Trimming existing datasets
 
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim --output-dir <output-folder-for-trimmed-bams> <reads>
+$ dorado trim <reads> > trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
+
+If it is also your intention to demux the data, then it is recommended that you do that before trimming any adapters and primers, as trimming adapters and primers first may result in the demux software being unable to classify the barcodes properly.
+
+### RNA Adapter trimming
+
+Adapters for RNA002 and RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
 
 ### Modified basecalling
 
@@ -145,7 +155,7 @@ Dorado will report the duplex rate as the number of nucleotides in the duplex ba
 Duplex basecalling can be performed with modified base detection, producing hemi-methylation calls for duplex reads:
 
 ```
-$ dorado duplex hac,5mCG_5hmCG pod5s/
+$ dorado duplex hac,5mCG_5hmCG pod5s/ > duplex.bam
 ```
 More information on how hemi-methylation calls are represented can be found in [page 7 of the SAM specification document (version aa7440d)](https://samtools.github.io/hts-specs/SAMtags.pdf) and [Modkit documentation](https://nanoporetech.github.io/modkit/intro_pileup_hemi.html).
 
@@ -156,14 +166,14 @@ Dorado supports aligning existing basecalls or producing aligned output directly
 To align existing basecalls, run:
 
 ```
-$ dorado aligner <index> <reads> 
+$ dorado aligner <index> <reads>  > aligned.bam
 ```
 where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a file in any HTS format.
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
 ```
-$ dorado basecaller <model> <reads> --reference <index>
+$ dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
@@ -173,7 +183,7 @@ Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses t
 The `dorado summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
 
 ```
-$ dorado summary <bam>
+$ dorado summary <bam> > summary.tsv
 ```
 
 Note that summary generation is only available for reads basecalled from POD5 files. Reads basecalled from .fast5 files are not compatible with the summary command.
@@ -186,7 +196,7 @@ Dorado supports barcode classification for existing basecalls as well as produci
 
 In this mode, reads are classified into their barcode groups during basecalling as part of the same command. To enable this, run:
 ```
-$ dorado basecaller <model> <reads> --kit-name <barcode-kit-name>
+$ dorado basecaller <model> <reads> --kit-name <barcode-kit-name> > calls.bam
 ```
 
 This will result in a single output stream with classified reads. The classification will be reflected in the read group name as well as in the `BC` tag of the output record.
@@ -281,8 +291,8 @@ Below is a table of the available basecalling models and the modified basecallin
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v4.3.0** | | | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
@@ -311,7 +321,7 @@ Below is a table of the available basecalling models and the modified basecallin
 
 ### **RNA models:**
 
-**Note:** The BAM format does not support `U` bases. Therefore, when Dorado is performing RNA basecalling, the resulting output files will include `T` instead of `U`. This is consistent across output file types.
+**Note:** The BAM format does not support `U` bases. Therefore, when Dorado is performing RNA basecalling, the resulting output files will include `T` instead of `U`. This is consistent across output file types. The same applies to parsing inputs. Any input HTS file (e.g. FASTQ generated by `guppy`/`basecall_server`) with `U` bases is not handled by `dorado`.
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
@@ -337,19 +347,25 @@ Here are a few examples of model complexes:
 | fast  | Latest compatible **fast** model |
 | hac  | Latest compatible **hac** model |
 | sup  | Latest compatible **sup** model |
-| hac@latest | Latest compatible **hac** model |
-| hac@v4.2.0  | Compatible **hac** model with version `v4.2.0`  |
-| hac@v3.5 | Compatible **hac** model with version `v3.5.0`  |
-| hac,5mCG_5hmCG  | Latest compatible **hac** model and latest **5mCG_5hmCG** modifications model |
-| hac,5mCG_5hmCG@v2  | Latest compatible **hac** model and **5mCG_5hmCG** modifications model with version `v2.0.0`  |
-| sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and both **5mCG_5hmCG** and **6mA** latest modifications models  |
+| hac@latest | Latest compatible **hac** simplex basecalling model |
+| hac@v4.2.0  | Simplex basecalling **hac** model with version `v4.2.0` |
+| hac@v3.5 | Simplex basecalling **hac** model with version `v3.5.0` |
+| hac,5mCG_5hmCG  | Latest compatible **hac** simplex model and latest **5mCG_5hmCG** modifications model for the chosen basecall model |
+| hac,5mCG_5hmCG@v2  | Latest compatible **hac** simplex model and **5mCG_5hmCG** modifications model with version `v2.0.0` |
+| sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and latest compatible **5mCG_5hmCG** and **6mA** modifications models |
 
-Automatically selected modification models will always match the base simplex model version selected. Noting the highlighted version changes, for example:
+### Modification model versioning
+
+The versioning of modification models is bound to the simplex model. In other words the modification model version is reset for each new simplex model release. 
+
+Automatically selected modification models will always match the base simplex model version and will be the latest compatible version unless a specific version is set by the user. Automatic modification model selection will not allow the mixing of modification models which are bound to different simplex model versions.  
+
+Note the highlighted version changes in the example below:
 
 | Model Complex | Description | Models |
 | :------------ | :---------- | :---------- |
-| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model (`v3.1.0`) | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 <br /> dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mCG_5hmCG@v3.1   |
-| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model (`v2.0.0`) |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
+| sup,5mCG_5hmCG  | Latest compatible **sup** model and latest **5mCG_5hmCG** modifications model | dna_r10.4.1_e8.2_400bps_sup@`v4.3.0` <br /> dna_r10.4.1_e8.2_400bps_sup@`v4.3.0`_5mCG_5hmCG@`v1`   |
+| sup@v4.1,5mCG_5hmCG  | Compatible **sup** model with version `v4.1.0` and latest **5mCG_5hmCG** modifications model |  dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`<br />dna_r10.4.1_e8.2_400bps_sup@`v4.1.0`_5mCG_5hmCG@`v2`   |
 
 ## Developer quickstart
 

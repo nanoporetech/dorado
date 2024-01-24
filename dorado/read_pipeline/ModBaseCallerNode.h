@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -16,14 +16,17 @@
 
 namespace dorado {
 
+namespace modbase {
 class ModBaseRunner;
+using RunnerPtr = std::unique_ptr<ModBaseRunner>;
+}  // namespace modbase
 
 class ModBaseCallerNode : public MessageSink {
     struct RemoraChunk;
     struct WorkingRead;
 
 public:
-    ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+    ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                       size_t remora_threads,
                       size_t block_stride,
                       size_t max_reads);
@@ -43,7 +46,7 @@ private:
     void init_modbase_info();
 
     // Worker threads, scales and chunks reads for runners and enqueues them
-    void input_worker_thread();
+    void input_thread_fn();
 
     // Worker threads, performs the GPU calls to the modbase models
     void modbasecall_worker_thread(size_t worker_id, size_t caller_id);
@@ -56,14 +59,12 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    std::vector<std::unique_ptr<ModBaseRunner>> m_runners;
-    size_t m_num_input_workers = 0;
+    std::vector<modbase::RunnerPtr> m_runners;
     size_t m_block_stride;
     size_t m_batch_size;
 
     std::unique_ptr<std::thread> m_output_worker;
     std::vector<std::unique_ptr<std::thread>> m_runner_workers;
-    std::vector<std::unique_ptr<std::thread>> m_input_workers;
 
     utils::AsyncQueue<std::unique_ptr<RemoraChunk>> m_processed_chunks;
     std::vector<std::unique_ptr<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>> m_chunk_queues;
@@ -73,7 +74,6 @@ private:
     std::unordered_set<std::shared_ptr<WorkingRead>> m_working_reads;
 
     std::atomic<int> m_num_active_runner_workers{0};
-    std::atomic<int> m_num_active_input_workers{0};
 
     std::shared_ptr<const ModBaseInfo> m_mod_base_info;
     // The offsets to the canonical bases in the modbase alphabet

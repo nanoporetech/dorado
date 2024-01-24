@@ -118,8 +118,11 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
         const std::optional<std::string>& custom_kit) {
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
     if (custom_kit) {
-        auto [kit_name, kit_info] = demux::parse_custom_arrangement(*custom_kit);
-        kit_map[kit_name] = kit_info;
+        auto custom_arrangement = demux::parse_custom_arrangement(*custom_kit);
+        if (custom_arrangement) {
+            const auto& [kit_name, kit_info] = *custom_arrangement;
+            kit_map[kit_name] = kit_info;
+        }
     }
     return kit_map;
 }
@@ -208,17 +211,15 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
         const std::vector<std::string>& kit_names) {
     std::vector<BarcodeCandidateKit> candidates_list;
 
-    const auto& kit_info_map = barcode_kits::get_kit_infos();
-
     std::vector<std::string> final_kit_names;
     if (!m_custom_kit.empty()) {
         for (auto& [kit_name, _] : m_custom_kit) {
             final_kit_names.push_back(kit_name);
         }
     } else if (kit_names.empty()) {
-        for (auto& [kit_name, _] : kit_info_map) {
-            final_kit_names.push_back(kit_name);
-        }
+        throw std::runtime_error(
+                "Either custom kit must include kit arrangement or a kit name needs to be passed "
+                "in.");
     } else {
         final_kit_names = kit_names;
     }
@@ -567,6 +568,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         bool barcode_both_ends,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
     if (read_seq.length() < TRIM_LENGTH) {
+        spdlog::trace("Read length shorter than minimum required ({}) : {}", TRIM_LENGTH, read_seq);
         return UNCLASSIFIED;
     }
     const std::string_view fwd = read_seq;
@@ -612,11 +614,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         auto best_bottom_score = std::max_element(
                 scores.begin(), scores.end(),
                 [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
-        spdlog::trace("Check double ends: top bc {}, bottom bc {}", best_top_score->barcode_name,
-                      best_bottom_score->barcode_name);
         if ((best_top_score->score > m_scoring_params.min_soft_barcode_threshold) &&
             (best_bottom_score->score > m_scoring_params.min_soft_barcode_threshold) &&
             (best_top_score->barcode_name != best_bottom_score->barcode_name)) {
+            spdlog::trace("Two ends confidently predict different BCs: top bc {}, bottom bc {}",
+                          best_top_score->barcode_name, best_bottom_score->barcode_name);
             return UNCLASSIFIED;
         }
     }
@@ -660,7 +662,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
-        if (out.top_score < 0.6 || out.bottom_score < 0.6) {
+        if (std::min(out.top_score, out.bottom_score) <
+            m_scoring_params.min_hard_barcode_threshold) {
             return UNCLASSIFIED;
         }
     }

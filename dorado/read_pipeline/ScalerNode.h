@@ -1,42 +1,32 @@
 #pragma once
-#include "ReadPipeline.h"
-#include "nn/CRFModelConfig.h"
+
+#include "basecall/CRFModelConfig.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
-#include <ATen/core/TensorBody.h>
-
-#include <atomic>
 #include <string>
-#include <thread>
-#include <utility>
-#include <vector>
 
 namespace dorado {
 
 class ScalerNode : public MessageSink {
 public:
-    ScalerNode(const SignalNormalisationParams& config,
-               SampleType model_type,
+    ScalerNode(const basecall::SignalNormalisationParams& config,
+               basecall::SampleType model_type,
+               bool trim_adapter,
                int num_worker_threads,
                size_t max_reads);
-    ~ScalerNode() { terminate_impl(); }
+    ~ScalerNode() { stop_input_processing(); }
     std::string get_name() const override { return "ScalerNode"; }
-    stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
-    void restart() override;
+    stats::NamedStats sample_stats() const override { return stats::from_obj(m_work_queue); }
+    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void restart() override { start_input_processing(&ScalerNode::input_thread_fn, this); }
 
 private:
-    void start_threads();
-    void terminate_impl();
-    void worker_thread();  // Worker thread performs scaling and trimming asynchronously.
-    std::vector<std::unique_ptr<std::thread>> m_worker_threads;
-    std::atomic<int> m_num_worker_threads;
+    void input_thread_fn();
 
-    SignalNormalisationParams m_scaling_params;
-    const SampleType m_model_type;
-
-    std::pair<float, float> med_mad(const at::Tensor& x);
-    std::pair<float, float> normalisation(const at::Tensor& x);
+    const basecall::SignalNormalisationParams m_scaling_params;
+    const basecall::SampleType m_model_type;
+    const bool m_trim_adapter;
 };
 
 }  // namespace dorado

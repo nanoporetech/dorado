@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../nn/ModelRunner.h"
-#include "ReadPipeline.h"
+#include "read_pipeline/MessageSink.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -9,10 +8,18 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
 namespace dorado {
+
+namespace basecall {
+class ModelRunnerBase;
+using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
+}  // namespace basecall
 
 class BasecallerNode : public MessageSink {
     struct BasecallingRead;
@@ -20,24 +27,24 @@ class BasecallerNode : public MessageSink {
 
 public:
     // Chunk size and overlap are in raw samples
-    BasecallerNode(std::vector<Runner> model_runners,
+    BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                    size_t overlap,
                    int batch_timeout_ms,
                    std::string model_name,
                    size_t max_reads,
-                   const std::string& node_name,
+                   std::string node_name,
                    uint32_t read_mean_qscore_start_pos);
     ~BasecallerNode();
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
+    void terminate(const FlushOptions &) override { terminate_impl(); }
     void restart() override;
 
 private:
     void start_threads();
     void terminate_impl();
-    // Consume reads from input queue
-    void input_worker_thread();
+    // Consume reads from input queue, chunks them up, and sticks them in the pending list.
+    void input_thread_fn();
     // Basecall reads
     void basecall_worker_thread(int worker_id);
     // Basecall batch of chunks
@@ -46,7 +53,7 @@ private:
     void working_reads_manager();
 
     // Vector of model runners (each with their own GPU access etc)
-    std::vector<Runner> m_model_runners;
+    std::vector<basecall::RunnerPtr> m_model_runners;
     // Chunk length
     size_t m_chunk_size;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
@@ -85,15 +92,13 @@ private:
     // Class data members whose construction launches threads must therefore have their
     // declarations follow those of the state on which they rely, e.g. mutexes, if their
     // initialisation is via initialiser lists.
-    // Chunks up incoming reads and sticks them in the pending list.
-    std::unique_ptr<std::thread> m_input_worker;
     // Basecalls chunks from the queue and puts read on the sink.
     std::vector<std::thread> m_basecall_workers;
     // Stitches working reads into complete reads.
     std::vector<std::thread> m_working_reads_managers;
 
     // Performance monitoring stats.
-    std::string m_node_name;
+    const std::string m_node_name;
     std::atomic<int64_t> m_num_batches_called = 0;
     std::atomic<int64_t> m_num_partial_batches_called = 0;
     std::atomic<int64_t> m_call_chunks_ms = 0;

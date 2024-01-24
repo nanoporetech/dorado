@@ -1,9 +1,9 @@
 #include "ModBaseCallerNode.h"
 
 #include "modbase/ModBaseContext.h"
-#include "modbase/modbase_encoder.h"
-#include "nn/ModBaseModelConfig.h"
-#include "nn/ModBaseRunner.h"
+#include "modbase/ModBaseModelConfig.h"
+#include "modbase/ModBaseRunner.h"
+#include "modbase/ModbaseEncoder.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -50,13 +50,12 @@ struct ModBaseCallerNode::WorkingRead {
             num_modbase_chunks_called;  // Number of modbase chunks which have been scored
 };
 
-ModBaseCallerNode::ModBaseCallerNode(std::vector<std::unique_ptr<ModBaseRunner>> model_runners,
+ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                                      size_t remora_threads,
                                      size_t block_stride,
                                      size_t max_reads)
-        : MessageSink(max_reads),
+        : MessageSink(max_reads, static_cast<int>(remora_threads)),
           m_runners(std::move(model_runners)),
-          m_num_input_workers(remora_threads),
           m_block_stride(block_stride),
           m_batch_size(m_runners[0]->batch_size()),
           // TODO -- more principled calculation of output queue size
@@ -85,21 +84,18 @@ void ModBaseCallerNode::start_threads() {
             ++m_num_active_runner_workers;
         }
     }
-    for (size_t i = 0; i < m_num_input_workers; ++i) {
-        auto t = std::make_unique<std::thread>(&ModBaseCallerNode::input_worker_thread, this);
-        m_input_workers.push_back(std::move(t));
-        ++m_num_active_input_workers;
-    }
+    start_input_processing(&ModBaseCallerNode::input_thread_fn, this);
 }
 
 void ModBaseCallerNode::terminate_impl() {
-    terminate_input_queue();
-    for (auto& t : m_input_workers) {
-        if (t->joinable()) {
-            t->join();
-        }
+    // Signal termination in the input queue, and wait for input threads to join.
+    stop_input_processing();
+    // Signal termination in the chunk queues.
+    for (auto& chunk_queue : m_chunk_queues) {
+        chunk_queue->terminate();
     }
-    m_input_workers.clear();
+    // Wait for runner workers to join, now that they have been asked to via chunk queue
+    // termination.
     for (auto& t : m_runner_workers) {
         if (t->joinable()) {
             t->join();
@@ -119,15 +115,14 @@ void ModBaseCallerNode::restart() {
     for (auto& chunk_queue : m_chunk_queues) {
         chunk_queue->restart();
     }
-    restart_input_queue();
     m_processed_chunks.restart();
     start_threads();
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<const ModBaseModelConfig>> base_mod_params;
+    std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
-    utils::ModBaseContext context_handler;
+    modbase::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
         const auto& params = runner->caller_params(caller_id);
         if (!params.motif.empty()) {
@@ -137,7 +132,7 @@ void ModBaseCallerNode::init_modbase_info() {
         m_num_states += params.base_mod_count;
     }
 
-    auto result = get_modbase_info(base_mod_params);
+    auto result = modbase::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(result.alphabet), std::move(result.long_names), context_handler.encode());
 
@@ -206,6 +201,11 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             auto [moves_offset, target_start, new_move_table] =
                     utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
 
+            // If the alignment has failed, the rest of this duplex mod call cannot be completed in this direction
+            if (moves_offset == -1 && target_start == -1 && new_move_table.empty()) {
+                continue;
+            }
+
             auto signal_len = new_move_table.size() * m_block_stride;
             auto num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
             auto new_seq = duplex_seq.substr(target_start, num_moves);
@@ -229,8 +229,8 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                 auto context_samples = (params.context_before + params.context_after);
 
                 // One-hot encodes the kmer at each signal step for input into the network
-                ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                                       params.bases_after);
+                modbase::ModBaseEncoder encoder(m_block_stride, context_samples,
+                                                params.bases_before, params.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, new_seq);
@@ -355,8 +355,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto context_samples = (params.context_before + params.context_after);
 
         // One-hot encodes the kmer at each signal step for input into the network
-        ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
-                               params.bases_after);
+        modbase::ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+                                        params.bases_after);
         encoder.init(sequence_ints, seq_to_sig_map);
 
         auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
@@ -409,7 +409,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
     }
 }
 
-void ModBaseCallerNode::input_worker_thread() {
+void ModBaseCallerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
 
     Message message;
@@ -421,13 +421,6 @@ void ModBaseCallerNode::input_worker_thread() {
             simplex_mod_call(std::move(message));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
             duplex_mod_call(std::move(message));
-        }
-    }
-
-    int num_remaining_workers = --m_num_active_input_workers;
-    if (num_remaining_workers == 0) {
-        for (auto& chunk_queue : m_chunk_queues) {
-            chunk_queue->terminate();
         }
     }
 }

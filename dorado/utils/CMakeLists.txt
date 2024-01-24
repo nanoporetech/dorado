@@ -8,8 +8,6 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
-    compat_utils.cpp
-    compat_utils.h
     dev_utils.cpp
     dev_utils.h
     driver_query.cpp
@@ -37,8 +35,11 @@ add_library(dorado_utils
     sys_stats.h
     tensor_utils.cpp
     tensor_utils.h
+    thread_utils.cpp
+    thread_utils.h
     time_utils.cpp
     time_utils.h
+    torch_utils.cpp
     torch_utils.h
     trim.cpp
     trim.h
@@ -68,14 +69,9 @@ endif()
 target_compile_definitions(dorado_utils
     PUBLIC
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
+        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
+        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>        
 )
-
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_utils
-        PRIVATE
-        "precompiled.h"
-    )
-endif()
 
 target_include_directories(dorado_utils
     INTERFACE
@@ -98,10 +94,17 @@ target_link_libraries(dorado_utils
         edlib
         spdlog::spdlog
     PRIVATE
+        dorado_compat
         minimap2
         OpenSSL::SSL
         htslib
 )
+
+if (DORADO_ENABLE_PCH)
+    add_subdirectory(pch)
+    target_link_libraries(dorado_utils PUBLIC dorado_pch)
+    target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
+endif()
 
 if(APPLE AND DORADO_GPU_BUILD)
     add_dependencies(dorado_utils metal-lib)

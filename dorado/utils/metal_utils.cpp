@@ -15,6 +15,10 @@
 #include <optional>
 #include <string>
 
+namespace MTL {
+auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
+}  // namespace MTL
+
 using namespace MTL;
 
 namespace fs = std::filesystem;
@@ -206,6 +210,30 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
+bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count) {
+    cb->commit();
+    cb->waitUntilCompleted();
+
+    auto status = cb->status();
+    bool success = (status == MTL::CommandBufferStatusCompleted);
+    if (success) {
+        spdlog::debug("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
+                      1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
+    } else {
+        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
+                     try_count);
+        if (status == MTL::CommandBufferStatusError) {
+            const auto *const error_ptr = cb->error();
+            if (error_ptr) {
+                spdlog::warn("Command buffer error code: {} ({})", error_ptr->code(),
+                             error_ptr->localizedDescription()->utf8String());
+            }
+        }
+    }
+    return success;
+}
+
 static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : at::Allocator {
@@ -236,8 +264,9 @@ NS::SharedPtr<MTL::Device> get_mtl_device() {
 int get_mtl_device_core_count() {
     // We cache the count once it has been obtained.
     static int gpu_core_count = -1;
-    if (gpu_core_count != -1)
+    if (gpu_core_count != -1) {
         return gpu_core_count;
+    }
 
 #if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
@@ -277,8 +306,9 @@ int get_mtl_device_core_count() {
 int get_apple_cpu_perf_core_count() {
     // We cache the count once it has been obtained.
     static int cpu_perf_core_count = -1;
-    if (cpu_perf_core_count != -1)
+    if (cpu_perf_core_count != -1) {
         return cpu_perf_core_count;
+    }
 
     size_t size = sizeof(cpu_perf_core_count);
     if (sysctlbyname("hw.perflevel0.physicalcpu", &cpu_perf_core_count, &size, nullptr, 0) == -1) {
@@ -302,8 +332,9 @@ int get_apple_cpu_perf_core_count() {
 
 MTL::Buffer *mtl_for_tensor(const at::Tensor &x) {
     // Metal kernels assume contiguity.
-    if (!x.is_contiguous())
+    if (!x.is_contiguous()) {
         throw std::runtime_error("Tensor is not contiguous");
+    }
     auto ptr = (MTL::Buffer *)(x.storage().data_ptr().get_context());
     assert(ptr != nullptr);
     return ptr;

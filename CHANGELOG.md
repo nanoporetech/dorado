@@ -2,6 +2,36 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.5.1] (21 Dec 2023)
+
+This release of Dorado fixes bugs with adapter trimming and custom barcodes, introduces a more accurate 6mA model, and adds several quality of life improvements.
+
+* 9a4639261576bf957392b406f7e36664b1ddf9eb - Replace use of constant with a parameter from custom barcode file.
+* 1893d69a4f472df00936db3fe7c31a72de31c23a - Decouple basecall library from models library.
+* e42761c65b96e4feecdbdaff343928e30e258ee8 - Allow RNA adapter trimming to be skipped.
+* a510d531af46dc07c445d59914e809b4a18de0ad - Prevent simultaneous usage of multiple modbase models affecting the same canonical base.
+* 371a252ac5d62512597d288bb3396cc93a2b18fc - Fix incorrect sample count in the ns tag with sequence trimming.
+* 9f532ffe298c72f39984fc68e36e9fa24d811382 - Remove modbase tags for non-primary alignments except when soft clipping is enabled.
+* 52431e685dae82fd94ecf12c52f5d3cd8f78fd1a - Update 6mA model.
+* 7109c1c639f19b8bea5ea4e7faacb6cf32e58fb6 - Remove superfluous clamp from Metal model implementation.
+* 5fa4de73a38e5ff858e9ed7662d8b72844588c6d - Refactor decoder interfaces.
+* a3dfc94a1bf37644d95ed2acabd7bb27e5229245 - Improve README for adapter trimming.
+* 3bfb1f052bdf5b09998a511cb6369c2227d8bc3a - Fix bug with out-of-order primer trimming positions.
+* b1302aee6accd8e9a56037311c176649f8b166bd - Allow alignment to be skipped for disconnected clients.
+* 55d09f9f985923494b8ef407f35e788cfd6039d4 - Update HDF5 pre-built library location.
+* 2048ad5f371d50ec03268d4a69c566b73a661bf0 - Decrease httplib connection timeout.
+* aae47b1313511c330765c418cff55e2cc7f51323 - Refactor codebase to unify interfaces and reduce dependencies.
+* 6ed81c5edcf0d6e0d20da4d250891e0a7e77b92a - Run separate modbase models in different CUDA streams.
+* decb9e7ca8688e365f5f340802534dedaf7bf026 - Update build settings to simplify integration into basecall server.
+* e8b07e20925dcfb79538d7cdcc40a9e064560bbc - Report warning and skip FAST5 files when datasets contain FAST5 and POD5 files.
+* 6c984a0b04617866251920d11092618e24cc5f43 - Enable Xcode builds.
+* 6d317935ffb4974cab4bc2a1617eeddaf47976a3 - Split Metal LSTM kernel into multiple command buffers.
+* 364d15d9c4fbc6d88a7cc8f35657da5d31c51aaa - Fix bug with passing custom barcode file into basecaller command.
+* 951e3c3f4cd645580b8f09ee7d24f94f99043910 - Allow read to override adapter/primer trimming defaults.
+* d6e2a801608e1b3ae0baaee346c1690f63f5032f - Clean up model auto download directories.
+* c5523515d66b57a3aa862cf5b1296e6082942e07 - Improve error handling during model auto download.
+* 936d40883b1c4fcd6d8dccbc90d62a5d4d444b81 - Report incorrect results warning for CPU basecalling on TX2.
+
 # [0.5.0] (5 Dec 2023)
 
 This release of Dorado introduces new, more accurate, and faster v4.3 basecalling models. It also enables hemi-methylation basecalling of duplex reads. Dorado now supports DNA primer and adapter trimming, custom barcode arrangements and sequences, and can automatically select the correct model for your data. Furthermore, this release introduces speed and memory enhancements for basecalling on Apple silicon and various stability improvements.

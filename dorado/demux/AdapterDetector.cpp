@@ -18,7 +18,8 @@
 
 namespace {
 
-const int TRIM_LENGTH = 150;
+const int ADAPTER_TRIM_LENGTH = 75;
+const int PRIMER_TRIM_LENGTH = 150;
 
 // Create edlib configuration for detecting adapters and primers.
 EdlibAlignConfig init_edlib_config_for_adapters() {
@@ -60,9 +61,7 @@ const std::vector<Primer> primers = {
         {"PCS110_forward",
          "TCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTT"},
         {"PCS110_reverse", "ATCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGTTTCTGTTGGTGCTGATATTGCTTT"},
-        // Not included because it is too similar to RBK barcode flank
-        // {"RAD", "GCTTGGGTGTTTAACCGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA"}
-};
+        {"RAD", "GCTTGGGTGTTTAACCGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA"}};
 
 }  // namespace
 
@@ -116,6 +115,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
                                            const std::vector<Query>& queries,
                                            AdapterDetector::QueryType query_type) const {
     const std::string_view seq_view(seq);
+    const auto TRIM_LENGTH = (query_type == ADAPTER ? ADAPTER_TRIM_LENGTH : PRIMER_TRIM_LENGTH);
     const std::string_view read_front = seq_view.substr(0, TRIM_LENGTH);
     int rear_start = std::max(0, int(seq.length()) - TRIM_LENGTH);
     const std::string_view read_rear = seq_view.substr(rear_start, TRIM_LENGTH);
@@ -128,7 +128,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         const auto& name = queries[i].name;
         const auto& query_seq = queries[i].sequence;
         const auto& query_seq_rev = queries[i].sequence_rev;
-        spdlog::debug("Checking adapter/primer {}", name);
+        spdlog::trace("Checking adapter/primer {}", name);
 
         auto front_result = edlibAlign(query_seq.data(), int(query_seq.length()), read_front.data(),
                                        int(read_front.length()), placement_config);
@@ -204,6 +204,81 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     result.front = front_results[best_front];
     result.rear = rear_results[best_rear];
     return result;
+}
+
+void AdapterDetector::check_and_update_barcoding(SimplexRead& read,
+                                                 std::pair<int, int>& trim_interval) {
+    // If barcoding has been done, we may need to make some adjustments.
+    if (!read.read_common.barcoding_result) {
+        return;
+    }
+    int post_barcode_seq_len = int(read.read_common.pre_trim_seq_length);
+    if (read.read_common.barcode_trim_interval != std::pair<int, int>(0, 0)) {
+        post_barcode_seq_len = read.read_common.barcode_trim_interval.second -
+                               read.read_common.barcode_trim_interval.first;
+    }
+    bool front_barcode_trimmed = (read.read_common.barcode_trim_interval.first > 0);
+    bool rear_barcode_trimmed = (read.read_common.barcode_trim_interval.second > 0 &&
+                                 read.read_common.barcode_trim_interval.second <
+                                         int(read.read_common.pre_trim_seq_length));
+
+    if (trim_interval.first > 0) {
+        // An adapter or primer was found at the beginning of the read.
+        // If any barcodes were found, their position details will need to be updated
+        // so that they refer to the position in the trimmed read. If the barcode
+        // overlaps the region we are planning to trim, then this probably means that
+        // the barcode was misidentified as a primer, so we should not trim it.
+        if (read.read_common.barcoding_result) {
+            auto& barcode_result = *read.read_common.barcoding_result;
+            if (barcode_result.barcode_name != "unclassified") {
+                if (front_barcode_trimmed) {
+                    // We've already trimmed a front barcode. Adapters and primers do not appear after barcodes, so
+                    // we should ignore this.
+                    trim_interval.first = 0;
+                } else {
+                    if (barcode_result.top_barcode_pos != std::pair<int, int>(-1, -1)) {
+                        // We have detected, but not trimmed, a front barcode.
+                        if (barcode_result.top_barcode_pos.first < trim_interval.first) {
+                            // We've misidentified the barcode as a primer. Ignore it.
+                            trim_interval.first = 0;
+                        } else {
+                            // Update the position to correspond to the trimmed sequence.
+                            barcode_result.top_barcode_pos.first -= trim_interval.first;
+                            barcode_result.top_barcode_pos.second -= trim_interval.first;
+                        }
+                    }
+                    if (barcode_result.bottom_barcode_pos != std::pair<int, int>(-1, -1) &&
+                        !rear_barcode_trimmed) {
+                        // We have detected a rear barcode, and have not trimmed barcodes, so we need to update
+                        // the rear barcode position to correspond to the sequence which has now had a front adapter
+                        // and/or primer trimmed from it.
+                        barcode_result.bottom_barcode_pos.first -= trim_interval.first;
+                        barcode_result.bottom_barcode_pos.second -= trim_interval.first;
+                    }
+                }
+            }
+        }
+    }
+    if (trim_interval.second > 0 && trim_interval.second != post_barcode_seq_len) {
+        // An adapter or primer was found at the end of the read.
+        // This does not require any barcode positions to be updated, but if the
+        // barcode overlaps the region we are planning to trim, then this probably
+        // means that the barcode was misidentified as a primer, so we should not
+        // trim it.
+        if (read.read_common.barcoding_result) {
+            auto& barcode_result = *read.read_common.barcoding_result;
+            if (barcode_result.barcode_name != "unclassified") {
+                if (rear_barcode_trimmed) {
+                    // We've already trimmed a rear barcode. Adapters and primers do not appear before rear barcodes,
+                    // so we should ignore this.
+                    trim_interval.second = post_barcode_seq_len;
+                } else if (barcode_result.bottom_barcode_pos.second > trim_interval.second) {
+                    // We've misidentified the rear barcode as a primer. Ignore it.
+                    trim_interval.second = post_barcode_seq_len;
+                }
+            }
+        }
+    }
 }
 
 }  // namespace demux

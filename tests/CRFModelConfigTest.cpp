@@ -1,4 +1,4 @@
-#include "nn/CRFModelConfig.h"
+#include "basecall/CRFModelConfig.h"
 
 #include "TestUtils.h"
 
@@ -12,7 +12,7 @@
 
 #define CUT_TAG "[CRFModelConfig]"
 
-using namespace dorado;
+using namespace dorado::basecall;
 namespace fs = std::filesystem;
 
 TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
