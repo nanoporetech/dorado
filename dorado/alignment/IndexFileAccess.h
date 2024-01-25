@@ -57,11 +57,6 @@ public:
     // The underlying minimap index will be deallocated.
     void unload_index(const std::string& file, const Minimap2IndexOptions& index_options);
 
-    // Check whether the index has the MM_I_NO_SEQ flag set.
-    // This is to support server usecases checking whether full alignment requested by
-    // the client is available.
-    bool index_is_no_seq(const std::string& file, const Minimap2Options& options) const;
-
     // returns a string containing the sequence records for the requested index
     std::string generate_sequence_records_header(const std::string& file,
                                                  const Minimap2Options& options) const;

@@ -111,12 +111,6 @@ bool IndexFileAccess::is_index_loaded(const std::string& file,
     return is_index_loaded_impl(file, options);
 }
 
-bool IndexFileAccess::index_is_no_seq(const std::string& file,
-                                      const Minimap2Options& options) const {
-    auto loaded_index = get_exact_index(file, options);
-    return loaded_index->index()->flag & MM_I_NO_SEQ;
-}
-
 std::string IndexFileAccess::generate_sequence_records_header(
         const std::string& file,
         const Minimap2Options& options) const {
