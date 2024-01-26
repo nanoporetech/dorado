@@ -2,12 +2,22 @@
 # Benchmark script for Dorado benchmarking.
 
 import argparse
+import logging
 import os
 from dataclasses import dataclass
 import subprocess as sp
 from typing import Optional, List
 import sys
 from pathlib import Path
+
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+root.addHandler(handler)
 
 # TODO: Add RNA4 dataset
 POD5_MAP = {
@@ -17,12 +27,9 @@ POD5_MAP = {
 # TODO: Add references
 REF_MAP = {}
 
-# Fetch Dorado binary location
-DORADO_BIN = os.environ["DORADO_BIN"]
-
 
 def run_cmd(cmd: List[str], stderr=sp.PIPE, stdout=sp.DEVNULL):
-    print("Running cmd:", " ".join(cmd))
+    logging.info("Running cmd: %s", " ".join(cmd))
     return sp.run(
         " ".join(cmd),
         shell=True,
@@ -52,8 +59,8 @@ class DoradoConfig:
             run_cmd(download_cmd, stderr=None, stdout=None)
         return output_path
 
-    def generate_dorado_cmd(self):
-        cmds = [DORADO_BIN]
+    def generate_dorado_cmd(self, dorado_bin: str):
+        cmds = [dorado_bin]
         cmds.append("duplex" if self.duplex else "basecaller")
         cmds.append(self.model_variant)
         cmds.append(self.download_data(POD5_MAP[self.data_type]))
@@ -176,42 +183,86 @@ def parse_speed(output):
     raise RuntimeError(f"Unable to parse speed from output \n{output}")
 
 
-def log_speed(config: DoradoConfig, speed: float, output_dir: str):
+def log_speed(
+    config: DoradoConfig,
+    test_name: str,
+    speed: float,
+    output_dir: str,
+    platform: str,
+    gpu_type: str,
+    sequencer: str = None,
+):
     # Log speeds in two places
-    print(f"Dorado speed: {speed}")
-    path = Path(output_dir)
+    logging.info("Dorado speed: %f", speed)
+    path = Path(output_dir) / platform / sequencer / test_name
     path.mkdir(parents=True, exist_ok=True)
-    with open(path / "speed.txt", "w") as fh:
-        fh.write(str(speed))
+    speed = int(speed)
     with open(path / "speed.csv", "w") as fh:
         fh.write(
-            "type,duplex,model_variant,devices,max_reads,mods,reference,barcode_kit,speed\n"
+            "type,duplex,model_variant,devices,max_reads,mods,reference,barcode_kit,platform,gpu_type,sequencer,speed\n"
         )
         fh.write(
-            f"{config.data_type},{config.duplex},{config.model_variant},{config.devices},{config.max_reads},{config.mods},{config.reference},{config.barcode_kit},{speed}\n"
+            f"{config.data_type},{config.duplex},{config.model_variant},{config.devices},{config.max_reads},{config.mods},{config.reference},{config.barcode_kit},{platform},{gpu_type},{sequencer},{speed}\n"
         )
+
+
+def parse_args():
+    new_line = "\n"
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--test-name",
+        help=f"Name of the test to run. Options: \n{new_line.join(TEST_MAP.keys())}",
+        type=str,
+        nargs="+",
+        required=True,
+    )
+    parser.add_argument(
+        "--gpu-type", help="Type of GPU being used", type=str, required=True
+    )
+    parser.add_argument(
+        "--platform", help="Platform being run on", type=str, required=True
+    )
+    parser.add_argument(
+        "--sequencer",
+        help="Type of sequencing compute tower being run on",
+        type=str,
+        default="standalone",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Output directory for benchmark results",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "--dorado-bin", help="Location of dorado binary", type=str, required=True
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        new_line = "\n"
-        print(
-            f"Run python benchmark.py <test_name> where test_name is in \n{new_line.join(TEST_MAP.keys())}"
+    args = parse_args()
+
+    tests = args.test_name
+    for test_name in tests:
+        if test_name not in TEST_MAP:
+            new_line = "\n"
+            raise RuntimeError(
+                f"Test {test_name} not found. Please provide one of \n{new_line.join(TEST_MAP.keys())}"
+            )
+
+        logging.info("Running test %s", test_name)
+
+        config = TEST_MAP[test_name]
+        cmd = config.generate_dorado_cmd(args.dorado_bin)
+        result = run_cmd(cmd)
+        speed = parse_speed(result.stderr)
+        log_speed(
+            config,
+            test_name,
+            speed,
+            args.output_dir,
+            args.platform,
+            args.gpu_type,
+            args.sequencer,
         )
-        sys.exit(0)
-
-    test_name = sys.argv[1]
-    if test_name not in TEST_MAP:
-        new_line = "\n"
-        raise RuntimeError(
-            f"Test {test_name} not found. Please provide one of \n{new_line.join(TEST_MAP.keys())}"
-        )
-
-    print(f"Running test {test_name}")
-
-    config = TEST_MAP[test_name]
-    cmd = config.generate_dorado_cmd()
-    result = run_cmd(cmd)
-    speed = parse_speed(result.stderr)
-    output_dir = "benchmark_result"
-    log_speed(config, speed, output_dir)
