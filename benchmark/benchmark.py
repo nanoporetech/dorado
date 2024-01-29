@@ -110,6 +110,16 @@ TEST_MAP = {
         reference=None,
         barcode_kit=None,
     ),
+    "dna_kit14_400bps_5khz_simplex_hac_osxarm_5mCG-5hmCG_noaln_nobarcode": DoradoConfig(
+        data_type="dna_kit14_400bps_5khz",
+        model_variant="hac@v4.3.0",
+        duplex=False,
+        devices=None,
+        max_reads=500,
+        mods=["5mCG_5hmCG"],
+        reference=None,
+        barcode_kit=None,
+    ),
     "dna_kit14_400bps_5khz_simplex_fast_cuda0_nomods_noaln_nobarcode": DoradoConfig(
         data_type="dna_kit14_400bps_5khz",
         model_variant="fast@v4.3.0",
@@ -137,6 +147,16 @@ TEST_MAP = {
         devices="cuda:0",
         max_reads=1000,
         mods=None,
+        reference=None,
+        barcode_kit=None,
+    ),
+    "dna_kit14_400bps_5khz_simplex_hac_cuda0_5mCG-5hmCG_noaln_nobarcode": DoradoConfig(
+        data_type="dna_kit14_400bps_5khz",
+        model_variant="hac@v4.3.0",
+        duplex=False,
+        devices="cuda:0",
+        max_reads=5000,
+        mods=["5mCG_5hmCG"],
         reference=None,
         barcode_kit=None,
     ),
@@ -170,6 +190,16 @@ TEST_MAP = {
         reference=None,
         barcode_kit=None,
     ),
+    "dna_kit14_400bps_5khz_simplex_hac_cudaall_5mCG-5hmCG_noaln_nobarcode": DoradoConfig(
+        data_type="dna_kit14_400bps_5khz",
+        model_variant="hac@v4.3.0",
+        duplex=False,
+        devices="cuda:all",
+        max_reads=5000,
+        mods=["5mCG_5hmCG"],
+        reference=None,
+        barcode_kit=None,
+    ),
 }
 
 
@@ -190,13 +220,13 @@ def log_speed(
     output_dir: str,
     platform: str,
     gpu_type: str,
-    sequencer: str = None,
+    sequencer: str,
 ):
+    speed = int(speed)
     # Log speeds in two places
     logging.info("Dorado speed: %f", speed)
     path = Path(output_dir) / platform / sequencer / test_name
     path.mkdir(parents=True, exist_ok=True)
-    speed = int(speed)
     with open(path / "speed.csv", "w") as fh:
         fh.write(
             "type,duplex,model_variant,devices,max_reads,mods,reference,barcode_kit,platform,gpu_type,sequencer,speed\n"

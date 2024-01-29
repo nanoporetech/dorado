@@ -1,5 +1,6 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
+  - local: .gitlab/benchmarks-ci.yml
 
 workflow:
   rules:
@@ -69,20 +70,6 @@ variables:
     - VS2019
     - cuda-${CUDA}
 
-# This runner is generally only available at night, as we take an
-# entire PromethION and only allow a single benchmarking job to run on
-# it at a time. Use it with $NIGHTLY_BUILD (check jobs for examples of
-# how to do this).
-.linux_v100_benchmark_runner: &linux_v100_benchmark_runner
-  tags:
-    - benchmark-p48
-    - pct0211
-
-.linux_a100_benchmark_runner: &linux_a100_benchmark_runner
-  tags:
-    - benchmark-a100
-    - pca100039
-
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
@@ -115,17 +102,6 @@ variables:
 
 .run_dorado_cmake_cpack: &run_dorado_cmake_cpack
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
-
-.run_dorado_benchmark: &run_dorado_benchmark
-  variables:
-    DORADO_BIN: "./dist/bin/dorado"
-    OUTPUT_DIR: "benchmark_result"
-  script:
-    - python3 benchmark/benchmark.py --test-name ${REGRESSION_TEST_NAME} --gpu-type ${GPU_TYPE} --platform ${PLATFORM} --output-dir ${OUTPUT_DIR} --dorado-bin ${DORADO_BIN} --sequencer ${SEQUENCER}
-  artifacts:
-    paths:
-      - benchmark_result
-  interruptible: true
 
 .build_dorado: &build_dorado
   stage: build
@@ -243,48 +219,6 @@ build:linux:x86:focal:
     - .linux_runner
     - .build_dorado
 
-regression_test:linux:x86:focal:v100:
-  parallel:
-    matrix:
-      - REGRESSION_TEST_NAME:
-        - dna_kit14_400bps_5khz_simplex_fast_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_hac_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_sup_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_fast_cudaall_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_hac_cudaall_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  variables:
-    GPU_TYPE: "v100"
-    PLATFORM: "linux"
-    SEQUENCER: "p48"
-  extends:
-    - .linux_v100_benchmark_runner
-    - .run_dorado_benchmark
-  needs:
-    - build:linux:x86:focal
-
-regression_test:linux:x86:focal:a100:
-  parallel:
-    matrix:
-      - REGRESSION_TEST_NAME:
-        - dna_kit14_400bps_5khz_simplex_fast_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_hac_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_sup_cuda0_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_fast_cudaall_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_hac_cudaall_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  variables:
-    GPU_TYPE: "a100"
-    PLATFORM: "linux"
-    SEQUENCER: "p48"
-  extends:
-    - .linux_a100_benchmark_runner
-    - .run_dorado_benchmark
-  needs:
-    - build:linux:x86:focal
-
 build:linux:x86:focal:debug:
   variables:
     BUILD_TYPE: "Debug"
@@ -372,23 +306,6 @@ build:macos:arm:
   extends:
     - .macos_arm_runner
     - .build_dorado
-
-regression_test:macos:m1:
-  parallel:
-    matrix:
-      - REGRESSION_TEST_NAME:
-        - dna_kit14_400bps_5khz_simplex_fast_osxarm_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_hac_osxarm_nomods_noaln_nobarcode
-        - dna_kit14_400bps_5khz_simplex_sup_osxarm_nomods_noaln_nobarcode
-  variables:
-    GPU_TYPE: "apple"
-    PLATFORM: "osx"
-    SEQUENCER: "standalone"
-  extends:
-    - .macos_arm_runner
-    - .run_dorado_benchmark
-  needs:
-    - build:macos:arm
 
 build:macos:x64:
   variables:
