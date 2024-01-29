@@ -499,7 +499,7 @@ Low GPU utilization can lead to reduced basecalling speed. This problem can be i
 
 ## Licence and Copyright
 
-(c) 2023 Oxford Nanopore Technologies PLC.
+(c) 2024 Oxford Nanopore Technologies PLC.
 
 Dorado is distributed under the terms of the Oxford Nanopore
 Technologies PLC.  Public License, v. 1.0.  If a copy of the License
