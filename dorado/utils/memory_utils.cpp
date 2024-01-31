@@ -6,7 +6,10 @@
 #include <sys/sysinfo.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
+#include <sys/sysctl.h>
 #endif
+
+#include <array>
 
 namespace {
 constexpr size_t BYTES_PER_GB{1024 * 1024 * 1024};
@@ -44,6 +47,33 @@ size_t available_host_memory_GB() {
 #else
     // Unsupported
     return 0;
+}
+
+size_t total_host_memory_GB() {
+#if defined(WIN32)
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    return static_cast<size_t>(status.ullTotalPhys) / BYTES_PER_GB;
+
+#elif defined(__linux__)
+    struct sysinfo info;
+    if (sysinfo(&info) < 0) {
+        return 0;
+    }
+    return static_cast<size_t>(info.totalram) * info.mem_unit / BYTES_PER_GB;
+
+#elif defined(__APPLE__)
+    std::array name{CTL_HW, HW_MEMSIZE};
+    uint64_t total_size = 0;
+    size_t length = sizeof(total_size);
+    if (sysctl(name.data(), name.size(), &total_size, &length, nullptr, 0) != -1) {
+        return total_size / BYTES_PER_GB;
+    }
+    return 0;
+
+#else
+#error "Unsupported platform"
 #endif
 }
 
