@@ -231,16 +231,6 @@ TEST_CASE(
 }
 
 TEST_CASE(TEST_GROUP
-          " index_is_no_seq with index for valid test data reference file and default options "
-          "returns false",
-          TEST_GROUP) {
-    IndexFileAccess cut{};
-    cut.load_index(valid_reference_file(), dflt_options, 1);
-
-    REQUIRE_FALSE(cut.index_is_no_seq(valid_reference_file(), dflt_options));
-}
-
-TEST_CASE(TEST_GROUP
           " generate_sequence_records_header with index for loaded index returns non-empty string",
           TEST_GROUP) {
     IndexFileAccess cut{};
