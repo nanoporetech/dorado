@@ -14,12 +14,12 @@
 
 namespace {
 #if DORADO_CUDA_BUILD
-std::vector<c10::optional<c10::Stream>> get_streams_from_tensors(
-        const std::vector<at::Tensor>& tensors) {
+std::vector<c10::optional<c10::Stream>> get_streams_from_caller(
+        const std::shared_ptr<dorado::modbase::ModBaseCaller>& caller) {
     std::vector<c10::optional<c10::Stream>> streams;
-    for (const auto& tensor : tensors) {
-        if (tensor.device().is_cuda()) {
-            streams.push_back(c10::cuda::getStreamFromPool(false, tensor.device().index()));
+    for (size_t i = 0; i < caller->num_model_callers(); ++i) {
+        if (caller->device().is_cuda()) {
+            streams.push_back(c10::cuda::getStreamFromPool(false, caller->device().index()));
         } else {
             streams.emplace_back();
         }
@@ -37,7 +37,7 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller)
           m_input_seqs(m_caller->create_input_seq_tensors())
 #if DORADO_CUDA_BUILD
           ,
-          m_streams(get_streams_from_tensors(m_input_sigs))
+          m_streams(get_streams_from_caller(m_caller))
 #endif
 {
 }
