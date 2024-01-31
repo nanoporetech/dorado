@@ -19,8 +19,8 @@ struct BarcodeKitScoringParams {
 std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
         const std::string& arrangement_file);
 
-std::unordered_map<std::string, std::string> parse_custom_barcode_sequences(
-        const std::string& sequenecs_file);
+std::unordered_map<std::string, std::string> parse_custom_sequences(
+        const std::string& sequences_file);
 
 BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file);
 

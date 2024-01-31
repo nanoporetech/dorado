@@ -254,6 +254,8 @@ set(LIB_SOURCE_FILES
     dorado/splitter/splitter_utils.h
     dorado/demux/AdapterDetector.cpp
     dorado/demux/AdapterDetector.h
+    dorado/demux/AdapterDetectorSelector.h
+    dorado/demux/AdapterDetectorSelector.cpp
     dorado/demux/BarcodeClassifier.cpp
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp

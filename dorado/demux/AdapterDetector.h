@@ -14,11 +14,11 @@ namespace demux {
 
 class AdapterDetector {
 public:
-    AdapterDetector();
+    AdapterDetector(const std::optional<std::string>& custom_sequences);
     ~AdapterDetector();
 
-    AdapterScoreResult find_adapters(const std::string& seq);
-    AdapterScoreResult find_primers(const std::string& seq);
+    AdapterScoreResult find_adapters(const std::string& seq) const;
+    AdapterScoreResult find_primers(const std::string& seq) const;
 
     struct Query {
         std::string name;
@@ -39,6 +39,7 @@ private:
     AdapterScoreResult detect(const std::string& seq,
                               const std::vector<Query>& queries,
                               QueryType query_type) const;
+    void parse_custom_sequence_file(const std::string& custom_sequence_file);
 };
 
 }  // namespace demux
