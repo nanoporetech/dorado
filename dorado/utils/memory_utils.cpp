@@ -44,9 +44,10 @@ size_t available_host_memory_GB() {
         unused_mem = static_cast<size_t>(vm_stats.free_count) * page_size / BYTES_PER_GB;
     }
     return unused_mem;
+
 #else
-    // Unsupported
-    return 0;
+#error "Unsupported platform"
+#endif
 }
 
 size_t total_host_memory_GB() {
