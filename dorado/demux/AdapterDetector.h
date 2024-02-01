@@ -24,6 +24,7 @@ public:
         std::string name;
         std::string sequence;
         std::string sequence_rev;
+        bool operator<(const Query& rhs) const { return name < rhs.name; }
     };
 
     const std::vector<Query>& get_adapter_sequences() const;

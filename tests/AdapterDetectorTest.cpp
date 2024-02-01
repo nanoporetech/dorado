@@ -118,8 +118,8 @@ TEST_CASE("AdapterDetector: test custom primer detection", TEST_GROUP) {
     const auto& primers = detector.get_primer_sequences();
     // Make sure the primers have been properly loaded.
     std::vector<std::string> expected_names = {"primer1", "primer2"};
-    std::vector<std::string> expected_seqs = {"TTCGAAT", "GACCTCTG"};
-    std::vector<std::string> expected_rc_seqs = {"ATTCGAA", "CAGAGGTC"};
+    std::vector<std::string> expected_seqs = {"TGCGAAT", "GACCTCTG"};
+    std::vector<std::string> expected_rc_seqs = {"ATTCGCA", "CAGAGGTC"};
     CHECK(primers.size() == expected_names.size());
     for (size_t i = 0; i < primers.size(); ++i) {
         CHECK(primers[i].name == expected_names[i]);

@@ -96,6 +96,10 @@ void AdapterDetector::parse_custom_sequence_file(const std::string& filename) {
         Query entry = {item.first, item.second, utils::reverse_complement(item.second)};
         m_primer_sequences.emplace_back(std::move(entry));
     }
+    // For testing purposes, we want to make sure the sequences are in a deterministic order.
+    // Note that parse_custom_sequences() returns an unordered_map, so the order may vary by
+    // platform or implementation.
+    std::sort(m_primer_sequences.begin(), m_primer_sequences.end());
 }
 
 AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq) const {
