@@ -9,18 +9,40 @@
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_TEST_FIXTURE_METHOD(name) \
+    TEST_CASE_METHOD(GpuMonitorTestFixture, CUT_TAG " " name, CUT_TAG)
 
 namespace {
 
+class GpuMonitorTestFixture {
+protected:
+    unsigned int num_devices;
+    std::optional<unsigned int> first_accessible_device;
+
+public:
+    GpuMonitorTestFixture() {
+        num_devices = dorado::utils::gpu_monitor::detail::get_device_count();
+        for (unsigned int index{}; index < num_devices; ++index) {
+            if (dorado::utils::gpu_monitor::detail::is_accessible_device(index)) {
+                first_accessible_device = index;
+                break;
+            }
+        }
+    }
+};
+}  // namespace
+
+namespace dorado::utils::gpu_monitor::test {
+
 DEFINE_TEST("get_nvidia_driver_version has value if torch::hasCUDA") {
-    auto driver_version = dorado::utils::gpu_monitor::get_nvidia_driver_version();
+    auto driver_version = get_nvidia_driver_version();
     if (torch::hasCUDA()) {
         REQUIRE(driver_version.has_value());
     }
 }
 
 DEFINE_TEST("get_nvidia_driver_version retruns valid version string") {
-    auto driver_version = dorado::utils::gpu_monitor::get_nvidia_driver_version();
+    auto driver_version = get_nvidia_driver_version();
     if (driver_version.has_value()) {
         CHECK(!driver_version->empty());
         // Version string should be made up of digits and dots only.
@@ -33,8 +55,8 @@ DEFINE_TEST("get_nvidia_driver_version retruns valid version string") {
 }
 
 DEFINE_TEST("get_nvidia_driver_version multiple calls return the same result") {
-    auto driver_version_0 = dorado::utils::gpu_monitor::get_nvidia_driver_version();
-    auto driver_version_1 = dorado::utils::gpu_monitor::get_nvidia_driver_version();
+    auto driver_version_0 = get_nvidia_driver_version();
+    auto driver_version_1 = get_nvidia_driver_version();
     CHECK(driver_version_0.has_value() == driver_version_1.has_value());
     if (driver_version_0.has_value()) {
         REQUIRE(*driver_version_0 == *driver_version_1);
@@ -43,7 +65,7 @@ DEFINE_TEST("get_nvidia_driver_version multiple calls return the same result") {
 
 #if defined(__APPLE__)
 DEFINE_TEST("get_nvidia_driver_version does not have value on Apple") {
-    auto driver_version = dorado::utils::gpu_monitor::get_nvidia_driver_version();
+    auto driver_version = get_nvidia_driver_version();
     CHECK(!driver_version.has_value());
 }
 #endif  // __APPLE__
@@ -92,7 +114,7 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
 
     for (const auto &test : tests) {
         CAPTURE(test.test_name);
-        auto version = dorado::utils::gpu_monitor::detail::parse_nvidia_version_line(test.line);
+        auto version = detail::parse_nvidia_version_line(test.line);
         CHECK(version.has_value() == test.valid);
         if (version.has_value() && test.valid) {
             CHECK(version == test.version);
@@ -100,27 +122,236 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
     }
 }
 
-#if !defined(__APPLE__)
-DEFINE_TEST("get_device_count does not throw") {
-    REQUIRE_NOTHROW(dorado::utils::gpu_monitor::detail::get_device_count());
+#if defined(__APPLE__)
+DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(detail::get_device_count() == 0); }
+
+DEFINE_TEST("get_device_current_temperature on apple does not throw") {
+    REQUIRE_NOTHROW(detail::get_device_current_temperature(0));
 }
 
-DEFINE_TEST("get_device_count returns a value if torch getNumGPUs is non-zero") {
-    if (!torch::getNumGPUs()) {
-        return;
-    }
-    auto num_devices = dorado::utils::gpu_monitor::detail::get_device_count();
-    REQUIRE(num_devices.has_value());
+DEFINE_TEST("get_device_current_temperature on apple does not return a value") {
+    auto temperature = detail::get_device_current_temperature(0);
+    REQUIRE_FALSE(temperature.has_value());
 }
+#else
+
+DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(detail::get_device_count()); }
 
 DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
     if (!torch::getNumGPUs()) {
         return;
     }
-    auto num_devices = dorado::utils::gpu_monitor::detail::get_device_count();
-    CHECK(num_devices.has_value());
-    REQUIRE(*num_devices > 0);
+    CHECK(detail::get_device_count() > 0);
 }
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_current_temperature with valid device index does not throw") {
+    if (!first_accessible_device) {
+        return;
+    }
+    CHECK_NOTHROW(detail::get_device_current_temperature(*first_accessible_device));
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_current_temperature with valid device index returns non-zero value") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto temp = detail::get_device_current_temperature(*first_accessible_device);
+    REQUIRE(temp.has_value());
+    CHECK(*temp > 0);  // Let's assume it's not freezing!
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_current_temperature returns a non-zero value for all valid devices") {
+    // Let's assume it's not freezing!
+    for (unsigned int device_index{}; device_index < num_devices; ++device_index) {
+        CAPTURE(device_index);
+        if (!detail::is_accessible_device(device_index)) {
+            continue;
+        }
+        auto temp = detail::get_device_current_temperature(device_index);
+        REQUIRE(temp.has_value());
+        CHECK(*temp > 0);  // Let's assume it's not freezing!
+    }
+}
+
+DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device does not throw") {
+    if (!first_accessible_device) {
+        return;
+    }
+    CHECK_NOTHROW(get_device_status_info(*first_accessible_device));
+}
+
+DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device has assigned value") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    CHECK(info.has_value());
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with correct device_id") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CHECK(info->device_index == *first_accessible_device);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns non-zero temperature") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->current_temperature_error);
+    REQUIRE(info->current_temperature.has_value());
+    CHECK(*info->current_temperature > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns non-zero shutdown threshold") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->gpu_shutdown_temperature_error);
+    REQUIRE(info->gpu_shutdown_temperature.has_value());
+    CHECK(*info->gpu_shutdown_temperature > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns non-zero slowdown threshold") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->gpu_slowdown_temperature_error);
+    REQUIRE(info->gpu_slowdown_temperature.has_value());
+    CHECK(*info->gpu_slowdown_temperature > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with non-zero max operating "
+        "temperature") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->gpu_max_operating_temperature_error);
+    REQUIRE(info->gpu_max_operating_temperature.has_value());
+    CHECK(*info->gpu_max_operating_temperature > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with non-zero current_power_usage") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->current_power_usage_error);
+    REQUIRE(info->current_power_usage.has_value());
+    CHECK(*info->current_power_usage > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with non-zero power_cap") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->default_power_cap_error);
+    REQUIRE(info->default_power_cap.has_value());
+    CHECK(*info->default_power_cap > 0);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with percentage_utilization_gpu in "
+        "range") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->percentage_utilization_error);
+    REQUIRE(info->percentage_utilization_gpu.has_value());
+    CHECK(*info->percentage_utilization_gpu <= 100);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with percentage_utilization_memory in "
+        "range") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->percentage_utilization_error);
+    REQUIRE(info->percentage_utilization_memory.has_value());
+    CHECK(*info->percentage_utilization_memory <= 100);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with current_performace_state in range") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->current_performace_state_error);
+    REQUIRE(info->current_performace_state.has_value());
+    CHECK(*info->current_performace_state <= 32);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with current_throttling_reason in "
+        "range") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->current_throttling_reason_error);
+    REQUIRE(info->current_throttling_reason.has_value());
+    CHECK(*info->current_throttling_reason <= 0x1000ULL);
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_device_status_info with valid device returns with non-empty device name") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info = get_device_status_info(*first_accessible_device);
+    REQUIRE(info.has_value());
+    CAPTURE(info->device_name_error);
+    REQUIRE(info->device_name.has_value());
+    CHECK_FALSE(info->device_name->empty());
+}
+
+DEFINE_TEST_FIXTURE_METHOD(
+        "get_accessible_devices_status_info returns at least one entry (with device name assigned) "
+        "if there is an accessible device") {
+    if (!first_accessible_device) {
+        return;
+    }
+    auto info_collection = get_accessible_devices_status_info();
+    CHECK_FALSE(info_collection.empty());
+    for (const auto &info : info_collection) {
+        CAPTURE(info.device_name_error);
+        REQUIRE(info.device_name.has_value());
+        CHECK_FALSE(info.device_name->empty());
+    }
+}
+
 #endif  //#if !defined(__APPLE__)
 
-}  // namespace
+}  // namespace dorado::utils::gpu_monitor::test

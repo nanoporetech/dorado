@@ -28,14 +28,24 @@ namespace {
 
 // Prefixless versions of symbols we use
 // X(name, optional)
-#define FOR_EACH_NVML_SYMBOL(X)      \
-    X(DeviceGetCount, false)         \
-    X(DeviceGetCount_v2, true)       \
-    X(Init, false)                   \
-    X(Init_v2, true)                 \
-    X(Shutdown, false)               \
-    X(SystemGetDriverVersion, false) \
-    X(ErrorString, false)            \
+#define FOR_EACH_NVML_SYMBOL(X)                     \
+    X(DeviceGetCount, false)                        \
+    X(DeviceGetCount_v2, true)                      \
+    X(DeviceGetCurrentClocksThrottleReasons, false) \
+    X(DeviceGetHandleByIndex, false)                \
+    X(DeviceGetHandleByIndex_v2, true)              \
+    X(DeviceGetName, false)                         \
+    X(DeviceGetPerformanceState, false)             \
+    X(DeviceGetPowerManagementDefaultLimit, false)  \
+    X(DeviceGetPowerUsage, false)                   \
+    X(DeviceGetTemperature, false)                  \
+    X(DeviceGetTemperatureThreshold, false)         \
+    X(DeviceGetUtilizationRates, false)             \
+    X(Init, false)                                  \
+    X(Init_v2, true)                                \
+    X(Shutdown, false)                              \
+    X(SystemGetDriverVersion, false)                \
+    X(ErrorString, false)                           \
     // line intentionally blank
 
 /**
@@ -183,6 +193,7 @@ class NVMLAPI {
         auto *device_count_op = m_DeviceGetCount_v2 ? m_DeviceGetCount_v2 : m_DeviceGetCount;
         auto result = device_count_op(&m_device_count);
         if (result != NVML_SUCCESS) {
+            m_device_count = 0;
             spdlog::warn("Call to DeviceGetCount failed: {}", ErrorString(result));
         }
     }
@@ -193,8 +204,61 @@ public:
         return api.m_handle != nullptr ? &api : nullptr;
     }
 
+    std::optional<nvmlDevice_t> get_device_handle(unsigned int device_index) {
+        nvmlDevice_t device;
+        auto *get_handle = m_DeviceGetHandleByIndex_v2 ? m_DeviceGetHandleByIndex_v2
+                                                       : m_DeviceGetHandleByIndex;
+        nvmlReturn_t result = get_handle(device_index, &device);
+        if (result != NVML_SUCCESS) {
+            return std::nullopt;
+        }
+        return device;
+    }
+
     nvmlReturn_t SystemGetDriverVersion(char *version, unsigned int length) {
         return m_SystemGetDriverVersion(version, length);
+    }
+
+    nvmlReturn_t DeviceGetTemperature(const nvmlDevice_t &device,
+                                      nvmlTemperatureSensors_t sensorType,
+                                      unsigned int *temp) {
+        return m_DeviceGetTemperature(device, sensorType, temp);
+    }
+
+    nvmlReturn_t DeviceGetTemperatureThreshold(const nvmlDevice_t &device,
+                                               nvmlTemperatureThresholds_t thresholdType,
+                                               unsigned int *temp) {
+        return m_DeviceGetTemperatureThreshold(device, thresholdType, temp);
+    }
+
+    nvmlReturn_t DeviceGetPerformanceState(const nvmlDevice_t &device, unsigned int *limit) {
+        nvmlPstates_t state;
+        auto result = m_DeviceGetPerformanceState(device, &state);
+        *limit = static_cast<unsigned int>(state);
+        return result;
+    }
+
+    nvmlReturn_t DeviceGetPowerManagementDefaultLimit(const nvmlDevice_t &device,
+                                                      unsigned int *limit) {
+        return m_DeviceGetPowerManagementDefaultLimit(device, limit);
+    }
+
+    nvmlReturn_t DeviceGetPowerUsage(const nvmlDevice_t &device, unsigned int *power) {
+        return m_DeviceGetPowerUsage(device, power);
+    }
+
+    nvmlReturn_t DeviceGetUtilizationRates(const nvmlDevice_t &device,
+                                           nvmlUtilization_t *utilization) {
+        return m_DeviceGetUtilizationRates(device, utilization);
+    }
+
+    nvmlReturn_t DeviceGetCurrentClocksThrottleReasons(const nvmlDevice_t &device,
+                                                       unsigned long long *clocksThrottleReasons) {
+        return m_DeviceGetCurrentClocksThrottleReasons(device, clocksThrottleReasons);
+    }
+
+    nvmlReturn_t DeviceGetName(const nvmlDevice_t &device, char *name, unsigned int length) {
+        return m_DeviceGetName(device, name, length);
     }
 
     unsigned int get_device_count() { return m_device_count; }
@@ -248,7 +312,138 @@ std::optional<std::string> read_version_from_proc() {
 }
 #endif
 
+void assign_threshold_temp(NVMLAPI *nvml,
+                           const nvmlDevice_t &device,
+                           nvmlTemperatureThresholds_t thresholdType,
+                           std::optional<unsigned int> &temp,
+                           std::string &error_reason) {
+    unsigned int value{};
+    auto result = nvml->DeviceGetTemperatureThreshold(device, thresholdType, &value);
+    if (result == NVML_SUCCESS) {
+        temp = value;
+    } else {
+        error_reason = nvml->ErrorString(result);
+    }
+}
+
+void set_threshold_temperatures(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_SHUTDOWN,
+                          info.gpu_shutdown_temperature, info.gpu_shutdown_temperature_error);
+    assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_SLOWDOWN,
+                          info.gpu_slowdown_temperature, info.gpu_slowdown_temperature_error);
+    assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_GPU_MAX,
+                          info.gpu_max_operating_temperature,
+                          info.gpu_max_operating_temperature_error);
+}
+
+void set_current_power_usage(NVMLAPI *nvml, nvmlDevice_t &device, DeviceStatusInfo &info) {
+    unsigned int value{};
+    auto result = nvml->DeviceGetPowerUsage(device, &value);
+    if (result == NVML_SUCCESS) {
+        info.current_power_usage = value;
+    } else {
+        info.current_power_usage_error = nvml->ErrorString(result);
+    }
+}
+
+void set_power_cap(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    unsigned int value{};
+    auto result = nvml->DeviceGetPowerManagementDefaultLimit(device, &value);
+    if (result == NVML_SUCCESS) {
+        info.default_power_cap = value;
+    } else {
+        info.default_power_cap_error = nvml->ErrorString(result);
+    }
+}
+
+void set_utilization(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    nvmlUtilization_t utilization{};
+    auto result = nvml->DeviceGetUtilizationRates(device, &utilization);
+    if (result != NVML_SUCCESS) {
+        info.percentage_utilization_error = nvml->ErrorString(result);
+        return;
+    }
+    info.percentage_utilization_gpu = utilization.gpu;
+    info.percentage_utilization_memory = utilization.memory;
+}
+
+void set_current_performace(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    unsigned int value;
+    auto result = nvml->DeviceGetPerformanceState(device, &value);
+    if (result == NVML_SUCCESS) {
+        info.current_performace_state = value;
+    } else {
+        info.current_performace_state_error = nvml->ErrorString(result);
+    }
+}
+
+void set_current_throttling_reason(NVMLAPI *nvml,
+                                   const nvmlDevice_t &device,
+                                   DeviceStatusInfo &info) {
+    unsigned long long reason{};
+    auto result = nvml->DeviceGetCurrentClocksThrottleReasons(device, &reason);
+    if (result == NVML_SUCCESS) {
+        info.current_throttling_reason = std::move(reason);
+    } else {
+        info.current_throttling_reason_error = nvml->ErrorString(result);
+    }
+}
+
+void set_current_temperature(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    unsigned int value{};
+    auto result = nvml->DeviceGetTemperature(device, NVML_TEMPERATURE_GPU, &value);
+    if (result == NVML_SUCCESS) {
+        info.current_temperature = value;
+    } else {
+        info.current_temperature_error = nvml->ErrorString(result);
+    }
+}
+
+void set_device_name(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+    char device_name[NVML_DEVICE_NAME_V2_BUFFER_SIZE];
+    auto result = nvml->DeviceGetName(device, device_name, NVML_DEVICE_NAME_V2_BUFFER_SIZE);
+    if (result == NVML_SUCCESS) {
+        info.device_name = device_name;
+    } else {
+        info.device_name_error = nvml->ErrorString(result);
+    }
+}
+
 }  // namespace
+
+std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
+    auto nvml = NVMLAPI::get();
+    if (!nvml) {
+        return std::nullopt;
+    }
+    auto device = nvml->get_device_handle(device_index);
+    if (!device) {
+        return std::nullopt;
+    }
+    DeviceStatusInfo info{};
+    set_current_temperature(nvml, *device, info);
+    set_threshold_temperatures(nvml, *device, info);
+    set_current_power_usage(nvml, *device, info);
+    set_power_cap(nvml, *device, info);
+    set_utilization(nvml, *device, info);
+    set_current_performace(nvml, *device, info);
+    set_current_throttling_reason(nvml, *device, info);
+    set_device_name(nvml, *device, info);
+    return info;
+}
+
+std::vector<DeviceStatusInfo> get_accessible_devices_status_info() {
+    std::vector<DeviceStatusInfo> result{};
+    const auto max_devices = detail::get_device_count();
+    for (unsigned int device_index{}; device_index < max_devices; ++device_index) {
+        auto status_info = get_device_status_info(device_index);
+        if (!status_info) {
+            continue;
+        }
+        result.push_back(std::move(*status_info));
+    }
+    return result;
+}
 
 std::optional<std::string> get_nvidia_driver_version() {
     std::optional<std::string> version;
@@ -294,15 +489,52 @@ std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
     return std::string(line.substr(version_begin, version_end - version_begin));
 }
 
-std::optional<unsigned int> get_device_count() {
+unsigned int get_device_count() {
+#if HAS_NVML
+    auto nvml = NVMLAPI::get();
+    return nvml ? nvml->get_device_count() : 0;
+#else
+    return std::nullopt;
+#endif  // HAS_NVML
+}
+
+std::optional<unsigned int> get_device_current_temperature(unsigned int device_index) {
 #if HAS_NVML
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
     }
-    return nvml->get_device_count();
+    auto device_handle = nvml->get_device_handle(device_index);
+    if (!device_handle) {
+        return std::nullopt;
+    }
+    unsigned int temp{};
+    auto result = nvml->DeviceGetTemperature(*device_handle, NVML_TEMPERATURE_GPU, &temp);
+    if (result != NVML_SUCCESS) {
+        return std::nullopt;
+    }
+    return temp;
 #else
     return std::nullopt;
+#endif  // HAS_NVML
+}
+
+bool is_accessible_device(unsigned int device_index) {
+#if HAS_NVML
+    auto nvml = NVMLAPI::get();
+    if (!nvml) {
+        return false;
+    }
+    if (device_index >= nvml->get_device_count()) {
+        return false;
+    }
+    auto device_handle = nvml->get_device_handle(device_index);
+    if (!device_handle) {
+        return false;
+    }
+    return true;
+#else
+    return false;
 #endif  // HAS_NVML
 }
 
