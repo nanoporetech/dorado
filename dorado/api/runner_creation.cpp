@@ -8,6 +8,7 @@
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
 #elif DORADO_CUDA_BUILD
+#include "basecall/CudaCaller.h"
 #include "basecall/CudaModelRunner.h"
 #include "utils/cuda_utils.h"
 #endif
@@ -27,9 +28,11 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t batch_size,
         size_t chunk_size,
         float memory_fraction,
-        bool guard_gpus) {
+        bool guard_gpus,
+        bool low_latency) {
 #ifdef __APPLE__
     (void)guard_gpus;
+    (void)low_latency;
 #endif
 
     std::vector<basecall::RunnerPtr> runners;
@@ -87,8 +90,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 
         for (auto device_string : devices) {
             futures.push_back(pool.push(create_cuda_caller, model_config, int(chunk_size),
-                                        int(batch_size), device_string, memory_fraction,
-                                        guard_gpus));
+                                        int(batch_size), device_string, memory_fraction, guard_gpus,
+                                        low_latency));
         }
 
         for (auto& caller : futures) {
@@ -96,8 +99,11 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
 
         for (size_t j = 0; j < num_devices; j++) {
+            int chunk_sizes = callers[j]->num_chunk_sizes();
             for (size_t i = 0; i < num_gpu_runners; i++) {
-                runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j]));
+                for (int c = 0; c < chunk_sizes; ++c) {
+                    runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j], c));
+                }
             }
         }
     }
@@ -110,8 +116,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 #endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
     assert(std::all_of(runners.begin(), runners.end(), [&](const auto& runner) {
-        return runner->model_stride() == model_stride &&
-               runner->chunk_size() == adjusted_chunk_size;
+        return runner->model_stride() == model_stride;
+        //        && runner->chunk_size() == adjusted_chunk_size;
     }));
 
     if (chunk_size != adjusted_chunk_size) {
@@ -167,16 +173,14 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     return remora_runners;
 }
 
-#if DORADO_GPU_BUILD
-#ifndef __APPLE__
+#if DORADO_CUDA_BUILD
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller) {
-    return std::make_unique<basecall::CudaModelRunner>(std::move(caller));
+    return std::make_unique<basecall::CudaModelRunner>(std::move(caller), 0);
 }
-#else
+#elif DORADO_METAL_BUILD
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller) {
     return std::make_unique<basecall::MetalModelRunner>(std::move(caller));
 }
-#endif
 #endif
 
 modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller) {

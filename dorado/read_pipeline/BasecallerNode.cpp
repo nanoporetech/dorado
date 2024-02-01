@@ -7,9 +7,11 @@
 
 #include <ATen/ATen.h>
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>
+#include <iostream>
 
 #if DORADO_METAL_BUILD
 #include "utils/metal_utils.h"
@@ -38,6 +40,15 @@ struct BasecallerNode::BasecallingRead {
     std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
+
+int BasecallerNode::get_chunk_queue_idx(size_t read_raw_size) {
+    for (size_t i = m_chunk_sizes.size() - 1; i > 0; --i) {
+        if (read_raw_size <= m_chunk_sizes[i]) {
+            return i;
+        }
+    }
+    return 0;
+}
 
 void BasecallerNode::input_thread_fn() {
     at::InferenceMode inference_mode_guard;
@@ -70,25 +81,27 @@ void BasecallerNode::input_thread_fn() {
         size_t raw_size =
                 read_common_data.raw_data
                         .sizes()[read_common_data.raw_data.sizes().size() - 1];  // Time dimension.
+        int chunk_queue_idx = get_chunk_queue_idx(raw_size);
+        size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
         size_t offset = 0;
         size_t chunk_in_read_idx = 0;
-        size_t signal_chunk_step = m_chunk_size - m_overlap;
+        size_t signal_chunk_step = chunk_size - m_overlap;
         auto working_read = std::make_shared<BasecallingRead>();
         std::vector<std::unique_ptr<BasecallingChunk>> read_chunks;
         read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
-                working_read, offset, chunk_in_read_idx++, m_chunk_size));
+                working_read, offset, chunk_in_read_idx++, chunk_size));
         size_t num_chunks = 1;
-        auto last_chunk_offset = raw_size - m_chunk_size;
+        auto last_chunk_offset = raw_size - chunk_size;
         auto misalignment = last_chunk_offset % m_model_stride;
         if (misalignment != 0) {
             // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
             last_chunk_offset += m_model_stride - misalignment;
         }
-        while (offset + m_chunk_size < raw_size) {
+        while (offset + chunk_size < raw_size) {
             offset = std::min(offset + signal_chunk_step, last_chunk_offset);
             read_chunks.push_back(std::make_unique<BasecallingChunk>(
-                    working_read, offset, chunk_in_read_idx++, m_chunk_size));
+                    working_read, offset, chunk_in_read_idx++, chunk_size));
             ++num_chunks;
         }
         working_read->called_chunks.resize(num_chunks);
@@ -108,19 +121,24 @@ void BasecallerNode::input_thread_fn() {
         // needs to be done after working_read->read is set as chunks could be processed
         // before we set that value otherwise
         for (auto &chunk : read_chunks) {
-            m_chunks_in.try_push(std::move(chunk));
+            m_chunk_in_queues[chunk_queue_idx]->try_push(std::move(chunk));
         }
     }
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-    m_chunks_in.terminate();
+    for (auto &chunk_queue : m_chunk_in_queues) {
+        chunk_queue->terminate();
+    }
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto &model_runner = m_model_runners[worker_id];
     dorado::stats::Timer timer;
+    spdlog::trace("Basecalling batch T={}, N={}, chunks={}, worker={}", model_runner->chunk_size(),
+                  model_runner->batch_size(), m_batched_chunks[worker_id].size(), worker_id);
     auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
+    m_num_samples_incl_padding += model_runner->chunk_size() * model_runner->batch_size();
     m_call_chunks_ms += timer.GetElapsedMS();
 
     for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
@@ -201,11 +219,14 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     at::InferenceMode inference_mode_guard;
 
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
-    int batch_size = int(m_model_runners[worker_id]->batch_size());
+    size_t batch_size = m_model_runners[worker_id]->batch_size();
+    size_t chunk_size = m_model_runners[worker_id]->chunk_size();
+    int batch_timeout_ms = m_model_runners[worker_id]->batch_timeout_ms();
     while (true) {
         std::unique_ptr<BasecallingChunk> chunk;
-        const auto pop_status = m_chunks_in.try_pop_until(
-                chunk, last_chunk_reserve_time + std::chrono::milliseconds(m_batch_timeout_ms));
+        int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
+        const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(
+                chunk, last_chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
 
         if (pop_status == utils::AsyncQueueStatus::Terminate) {
             break;
@@ -224,13 +245,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         // There's chunks to get_scores, so let's add them to our input tensor
         // FIXME -- it should not be possible to for this condition to be untrue.
-        if (m_batched_chunks[worker_id].size() != size_t(batch_size)) {
+        if (m_batched_chunks[worker_id].size() != batch_size) {
             // Copy the chunk into the input tensor
             auto &source_read = chunk->owning_read->read;
 
             auto &read_common = get_read_common_data(source_read);
             auto input_slice = read_common.raw_data.index(
-                    {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + m_chunk_size)});
+                    {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + chunk_size)});
             size_t slice_size;
             if (input_slice.ndimension() == 1) {
                 slice_size = input_slice.size(0);
@@ -240,13 +261,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             // repeat-pad any non-full chunks
             // Stereo and Simplex encoding need to be treated differently
-            if (slice_size != m_chunk_size) {
+            if (slice_size != chunk_size) {
                 if (input_slice.ndimension() == 1) {
-                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
                     input_slice = at::concat({input_slice.repeat({n}),
                                               input_slice.index({Ellipsis, Slice(0, overhang)})});
                 } else if (input_slice.ndimension() == 2) {
-                    auto [n, overhang] = std::div((int)m_chunk_size, (int)slice_size);
+                    auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
                     input_slice = at::concat({input_slice.repeat({1, n}),
                                               input_slice.index({Ellipsis, Slice(0, overhang)})},
                                              1);
@@ -262,7 +283,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
-        if (m_batched_chunks[worker_id].size() == size_t(batch_size)) {
+        if (m_batched_chunks[worker_id].size() == batch_size) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
         }
@@ -302,26 +323,37 @@ size_t CalcMaxChunksIn(const std::vector<basecall::RunnerPtr> &model_runners) {
 
 BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                                size_t overlap,
-                               int batch_timeout_ms,
                                std::string model_name,
                                size_t max_reads,
                                std::string node_name,
                                uint32_t read_mean_qscore_start_pos)
         : MessageSink(max_reads, 1),
           m_model_runners(std::move(model_runners)),
-          m_chunk_size(m_model_runners.front()->chunk_size()),
           m_overlap(overlap),
           m_model_stride(m_model_runners.front()->model_stride()),
           m_rna(is_rna_model(m_model_runners.front()->config())),
-          m_batch_timeout_ms(batch_timeout_ms),
           m_model_name(std::move(model_name)),
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
-          m_chunks_in(CalcMaxChunksIn(m_model_runners)),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
           m_node_name(std::move(node_name)) {
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
+
+    for (auto &runner_ptr : m_model_runners) {
+        if (!m_chunk_sizes.empty() && runner_ptr->chunk_size() == m_chunk_sizes[0]) {
+            break;
+        }
+        m_chunk_sizes.push_back(runner_ptr->chunk_size());
+    }
+
+    auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();
+    for (auto s : m_chunk_sizes) {
+        m_chunk_in_queues.emplace_back(
+                std::make_unique<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>(
+                        chunk_queue_size));
+        spdlog::debug("BasecallerNode chunk size {}", s);
+    }
 
     initialization_time = std::chrono::system_clock::now();
 
@@ -367,7 +399,9 @@ void BasecallerNode::restart() {
     for (auto &runner : m_model_runners) {
         runner->restart();
     }
-    m_chunks_in.restart();
+    for (auto &chunk_queue : m_chunk_in_queues) {
+        chunk_queue->restart();
+    }
     m_processed_chunks.restart();
     start_threads();
 }
@@ -386,6 +420,7 @@ stats::NamedStats BasecallerNode::sample_stats() const {
     stats["working_reads_signal_mb"] = double(m_working_reads_signal_bytes) / double((1024 * 1024));
     stats["bases_processed"] = double(m_num_bases_processed);
     stats["samples_processed"] = double(m_num_samples_processed);
+    stats["samples_incl_padding"] = double(m_num_samples_incl_padding);
     return stats;
 }
 

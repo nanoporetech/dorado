@@ -26,7 +26,8 @@ public:
                int batch_size,
                const std::string &device,
                float memory_limit_fraction,
-               bool exclusive_gpu_access);
+               bool exclusive_gpu_access,
+               bool low_latency);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -37,10 +38,11 @@ public:
     void terminate();
     void restart();
 
-    at::Tensor create_input_tensor() const;
-    at::Tensor create_output_tensor() const;
+    std::pair<at::Tensor, at::Tensor> create_input_output_tensor(int chunk_size_idx) const;
+    int num_chunk_sizes() const { return int(m_in_chunk_sizes.size()); };
     c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
+    int batch_timeout_ms() const { return m_low_latency ? 100 : 10000; }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
 
@@ -55,7 +57,7 @@ private:
     }
 
     std::pair<int64_t, int64_t> calculate_memory_requirements() const;
-    int determine_batch_size(float memory_limit_fraction, bool run_benchmark);
+    void determine_batch_sizes(float memory_limit_fraction, int batch_size, int chunk_size);
 
     void start_threads();
     void cuda_thread_fn();
@@ -71,8 +73,10 @@ private:
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
-    int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
+    int m_num_input_features;
+    std::vector<int> m_batch_sizes, m_in_chunk_sizes, m_out_chunk_sizes;
     bool m_exclusive_gpu_access;
+    bool m_low_latency;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

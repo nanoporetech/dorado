@@ -37,7 +37,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         overlap = adjusted_overlap;
     }
 
-    const int kBatchTimeoutMS = 100;
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
 
@@ -67,9 +66,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         first_node_handle = scaler_node;
     }
     current_node_handle = scaler_node;
-    auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {}, std::move(runners), overlap, kBatchTimeoutMS, model_name, 1000, "BasecallerNode",
-            mean_qscore_start_pos);
+    auto basecaller_node =
+            pipeline_desc.add_node<BasecallerNode>({}, std::move(runners), overlap, model_name,
+                                                   1000, "BasecallerNode", mean_qscore_start_pos);
     pipeline_desc.add_node_sink(current_node_handle, basecaller_node);
     current_node_handle = basecaller_node;
     last_node_handle = basecaller_node;
@@ -127,11 +126,10 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto duplex_rg_name = std::string(model_name + "_" + stereo_model_name);
     auto stereo_model_stride = stereo_runners.front()->model_stride();
     auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
-    const int kStereoBatchTimeoutMS = 5000;
 
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {}, std::move(stereo_runners), adjusted_stereo_overlap, kStereoBatchTimeoutMS,
-            duplex_rg_name, 1000, "StereoBasecallerNode", mean_qscore_start_pos);
+            {}, std::move(stereo_runners), adjusted_stereo_overlap, duplex_rg_name, 1000,
+            "StereoBasecallerNode", mean_qscore_start_pos);
 
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
@@ -169,10 +167,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
 
-    const int kSimplexBatchTimeoutMS = 100;
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {splitter_node}, std::move(runners), adjusted_simplex_overlap, kSimplexBatchTimeoutMS,
-            model_name, 1000, "BasecallerNode", mean_qscore_start_pos);
+            {splitter_node}, std::move(runners), adjusted_simplex_overlap, model_name, 1000,
+            "BasecallerNode", mean_qscore_start_pos);
 
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
             {basecaller_node}, model_config.signal_norm_params, basecall::SampleType::DNA, false,

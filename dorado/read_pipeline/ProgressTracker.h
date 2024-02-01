@@ -62,6 +62,9 @@ public:
             } else {
                 samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
                 spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
+                spdlog::debug("> Including Padding @ Samples/s: {:.3e} ({:.2f}%)",
+                              m_num_samples_incl_padding / (duration / 1000.0),
+                              100.f * m_num_samples_processed / m_num_samples_incl_padding);
             }
         }
 
@@ -110,12 +113,11 @@ public:
         m_num_simplex_bases_processed = int64_t(fetch_stat("BasecallerNode.bases_processed"));
         m_num_bases_processed = m_num_simplex_bases_processed;
         m_num_samples_processed = int64_t(fetch_stat("BasecallerNode.samples_processed"));
+        m_num_samples_incl_padding = int64_t(fetch_stat("BasecallerNode.samples_incl_padding"));
         if (m_duplex) {
             m_num_duplex_bases_processed =
                     int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
             m_num_bases_processed += m_num_duplex_bases_processed;
-            m_num_samples_processed +=
-                    int64_t(fetch_stat("StereoBasecallerNode.samples_processed"));
         }
         m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
         m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
@@ -165,6 +167,7 @@ public:
 private:
     int64_t m_num_bases_processed{0};
     int64_t m_num_samples_processed{0};
+    int64_t m_num_samples_incl_padding{0};
     int64_t m_num_simplex_bases_processed{0};
     int64_t m_num_duplex_bases_processed{0};
     int m_num_simplex_reads_written{0};

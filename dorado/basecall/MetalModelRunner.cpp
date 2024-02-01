@@ -39,6 +39,7 @@ const CRFModelConfig &MetalModelRunner::config() const { return m_caller->config
 size_t MetalModelRunner::model_stride() const { return m_caller->config().stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
+int MetalModelRunner::batch_timeout_ms() const { return (config().num_features == 1) ? 100 : 5000; }
 
 void MetalModelRunner::terminate() { m_caller->terminate(); }
 void MetalModelRunner::restart() { m_caller->restart(); }

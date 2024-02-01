@@ -11,11 +11,11 @@
 
 namespace dorado::basecall {
 
-CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller)
+CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size_idx)
         : m_caller(std::move(caller)),
-          m_input(m_caller->create_input_tensor()),
-          m_output(m_caller->create_output_tensor()),
-          m_stream(c10::cuda::getStreamFromPool(false, m_caller->device().index())) {}
+          m_stream(c10::cuda::getStreamFromPool(false, m_caller->device().index())) {
+    std::tie(m_input, m_output) = m_caller->create_input_output_tensor(chunk_size_idx);
+}
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
@@ -32,6 +32,7 @@ const CRFModelConfig &CudaModelRunner::config() const { return m_caller->config(
 size_t CudaModelRunner::model_stride() const { return m_caller->config().stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
+int CudaModelRunner::batch_timeout_ms() const { return m_caller->batch_timeout_ms(); }
 void CudaModelRunner::terminate() { m_caller->terminate(); }
 void CudaModelRunner::restart() { m_caller->restart(); }
 

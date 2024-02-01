@@ -23,6 +23,7 @@ public:
     virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
+    virtual int batch_timeout_ms() const = 0;
     virtual void terminate() = 0;
     virtual void restart() = 0;
     virtual std::string get_name() const = 0;
