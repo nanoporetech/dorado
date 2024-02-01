@@ -69,15 +69,15 @@ const std::vector<Primer> primers = {
 namespace dorado {
 namespace demux {
 
-AdapterDetector::AdapterDetector(const std::optional<std::string>& custom_sequences) {
+AdapterDetector::AdapterDetector(const std::optional<std::string>& custom_primer_file) {
     m_adapter_sequences.resize(adapters.size());
     for (size_t i = 0; i < adapters.size(); ++i) {
         m_adapter_sequences[i].name = adapters[i].name;
         m_adapter_sequences[i].sequence = adapters[i].front_sequence;
         m_adapter_sequences[i].sequence_rev = adapters[i].rear_sequence;
     }
-    if (custom_sequences.has_value()) {
-        parse_custom_sequence_file(custom_sequences.value());
+    if (custom_primer_file.has_value()) {
+        parse_custom_sequence_file(custom_primer_file.value());
     } else {
         m_primer_sequences.resize(primers.size());
         for (size_t i = 0; i < primers.size(); ++i) {

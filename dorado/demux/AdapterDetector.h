@@ -14,7 +14,7 @@ namespace demux {
 
 class AdapterDetector {
 public:
-    AdapterDetector(const std::optional<std::string>& custom_sequences);
+    AdapterDetector(const std::optional<std::string>& custom_primer_file);
     ~AdapterDetector();
 
     AdapterScoreResult find_adapters(const std::string& seq) const;
