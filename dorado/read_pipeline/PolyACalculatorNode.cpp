@@ -104,6 +104,12 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                       second_last.second, second_last.first, last.second);
                         second_last.second = last.second;
                         intervals.pop_back();
+                    } else if (second_last.second - second_last.first <
+                               std::round(num_samples_per_base * min_base_count)) {
+                        auto it = intervals.end();
+                        --it;
+                        --it;
+                        intervals.erase(it);
                     }
                 }
                 spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
@@ -119,18 +125,42 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
     spdlog::trace("found intervals {}", int_str);
 
+    // Cluster intervals
+    const int kMaxInterruption = 2 * kMaxSampleGap;
+    ;
+    std::vector<std::pair<int, int>> clustered_intervals;
+    for (const auto& i : intervals) {
+        if (clustered_intervals.empty()) {
+            clustered_intervals.push_back(i);
+        } else {
+            auto& last = clustered_intervals.back();
+            if (std::abs(i.first - last.second) < kMaxInterruption) {
+                last.second = i.second;
+            }
+        }
+    }
+
+    int_str = "";
+    for (auto in : clustered_intervals) {
+        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+    }
+    spdlog::trace("clustered intervals {}", int_str);
+
     std::vector<std::pair<int, int>> filtered_intervals;
-    std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                 [&](auto& i) {
+    std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
+                 std::back_inserter(filtered_intervals), [&](auto& i) {
                      int interval_size = i.second - i.first;
                      // Filter out any small intervals.
                      if (interval_size < (std::round(num_samples_per_base * min_base_count))) {
                          return false;
                      }
-                     // Only keep intervals that are close-ish to the signal anchor.
-                     return (std::abs(signal_anchor - i.second) < interval_size ||
-                             std::abs(signal_anchor - i.first) < interval_size ||
-                             ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
+                     // Only keep intervals that are close-ish to the signal anchor or to the previous interval.
+                     bool within_anchor_dist =
+                             (std::abs(signal_anchor - i.second) < interval_size ||
+                              std::abs(signal_anchor - i.first) < interval_size ||
+                              ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
+
+                     return within_anchor_dist;
                  });
 
     int_str = "";
