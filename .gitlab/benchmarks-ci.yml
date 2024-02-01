@@ -29,8 +29,16 @@
   script:
     - python3 benchmark/benchmark.py --test-name ${REGRESSION_TEST_NAME} --gpu-type ${GPU_TYPE} --platform ${PLATFORM} --output-dir ${OUTPUT_DIR} --dorado-bin ${DORADO_BIN} --sequencer ${SEQUENCER}
   artifacts:
+    when: always
     paths:
       - benchmark_result
+    expire_in: 90 days
+  rules:
+    - if: "$BINIGHTLY_BUILD"
+      allow_failure: false
+    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+      when: manual
+      allow_failure: true
   interruptible: true
 
 regression_test:linux:x86:focal:v100:
