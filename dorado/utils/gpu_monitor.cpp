@@ -431,6 +431,7 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
         return std::nullopt;
     }
     DeviceStatusInfo info{};
+    info.device_index = device_index;
     set_current_temperature(nvml, *device, info);
     set_threshold_temperatures(nvml, *device, info);
     set_current_power_usage(nvml, *device, info);
