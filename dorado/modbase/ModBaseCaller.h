@@ -52,6 +52,7 @@ public:
 
     std::vector<at::Tensor> create_input_sig_tensors() const;
     std::vector<at::Tensor> create_input_seq_tensors() const;
+    c10::Device device() const { return m_options.device(); }
 
     at::Tensor call_chunks(size_t model_id,
                            at::Tensor& input_sigs,
