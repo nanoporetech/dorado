@@ -14,7 +14,7 @@ enum class ThrottleReason : unsigned long long {
     /** Bit mask representing no clocks throttling
      *
      * Clocks are as high as possible.
-     * */
+     */
     none = 0x0000000000000000LL,
 
     /** Nothing is running on the GPU and the clocks are dropping to Idle state
@@ -99,6 +99,10 @@ enum class ThrottleReason : unsigned long long {
      * @see bug 1997531
      */
     display_clock_setting = 0x0000000000000100LL,
+
+    all_reasons = gpu_idle | applications_clocks_setting | sw_power_cap | hw_slowdown | sync_boost |
+                  sw_thermal_slowdown | hw_thermal_slowdown | hw_power_brake_slowdown |
+                  display_clock_setting
 };
 
 std::ostream& operator<<(std::ostream& os, ThrottleReason reason);
