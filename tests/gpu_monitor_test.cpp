@@ -122,27 +122,7 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
     }
 }
 
-#if defined(__APPLE__)
-DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(detail::get_device_count() == 0); }
-
-DEFINE_TEST("get_device_current_temperature on apple does not throw") {
-    REQUIRE_NOTHROW(detail::get_device_current_temperature(0));
-}
-
-DEFINE_TEST("get_device_current_temperature on apple does not return a value") {
-    auto temperature = detail::get_device_current_temperature(0);
-    REQUIRE_FALSE(temperature.has_value());
-}
-#else
-
 DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(detail::get_device_count()); }
-
-DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
-    if (!torch::getNumGPUs()) {
-        return;
-    }
-    CHECK(detail::get_device_count() > 0);
-}
 
 DEFINE_TEST_FIXTURE_METHOD(
         "get_device_current_temperature with valid device index does not throw") {
@@ -352,6 +332,24 @@ DEFINE_TEST_FIXTURE_METHOD(
     }
 }
 
-#endif  //#if !defined(__APPLE__)
+#if defined(_WIN32) || defined(__linux__)
 
+DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
+    if (!torch::getNumGPUs()) {
+        return;
+    }
+    CHECK(detail::get_device_count() > 0);
+}
+#else
+DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(detail::get_device_count() == 0); }
+
+DEFINE_TEST("get_device_current_temperature on apple does not throw") {
+    REQUIRE_NOTHROW(detail::get_device_current_temperature(0));
+}
+
+DEFINE_TEST("get_device_current_temperature on apple does not return a value") {
+    auto temperature = detail::get_device_current_temperature(0);
+    REQUIRE_FALSE(temperature.has_value());
+}
+#endif
 }  // namespace dorado::utils::gpu_monitor::test

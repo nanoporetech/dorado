@@ -25,6 +25,11 @@ namespace dorado::utils::gpu_monitor {
 namespace {
 
 #if HAS_NVML
+#ifdef NVML_DEVICE_NAME_V2_BUFFER_SIZE
+#define ONT_NVML_BUFFER_SIZE NVML_DEVICE_NAME_V2_BUFFER_SIZE
+#elif defined(NVML_DEVICE_NAME_BUFFER_SIZE)
+#define ONT_NVML_BUFFER_SIZE NVML_DEVICE_NAME_BUFFER_SIZE
+#endif
 
 // Prefixless versions of symbols we use
 // X(name, optional)
@@ -286,32 +291,6 @@ std::optional<std::string> read_version_from_nvml() {
     }
 }
 
-#endif  // HAS_NVML
-
-#if defined(__linux__)
-std::optional<std::string> read_version_from_proc() {
-    std::ifstream version_file("/proc/driver/nvidia/version",
-                               std::ios_base::in | std::ios_base::binary);
-    if (!version_file.is_open()) {
-        spdlog::warn("No NVIDIA version file found in /proc");
-        return std::nullopt;
-    }
-
-    // Parse the file line by line.
-    std::string line;
-    while (std::getline(version_file, line)) {
-        auto info = detail::parse_nvidia_version_line(line);
-        if (info.has_value()) {
-            // We only expect there to be 1 version line, so we can return it immediately.
-            return info;
-        }
-    }
-
-    spdlog::warn("No version line found in /proc version file");
-    return std::nullopt;
-}
-#endif
-
 void assign_threshold_temp(NVMLAPI *nvml,
                            const nvmlDevice_t &device,
                            nvmlTemperatureThresholds_t thresholdType,
@@ -400,18 +379,49 @@ void set_current_temperature(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceSt
 }
 
 void set_device_name(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
-    char device_name[NVML_DEVICE_NAME_V2_BUFFER_SIZE];
-    auto result = nvml->DeviceGetName(device, device_name, NVML_DEVICE_NAME_V2_BUFFER_SIZE);
+#ifdef ONT_NVML_BUFFER_SIZE
+    char device_name[ONT_NVML_BUFFER_SIZE];
+    auto result = nvml->DeviceGetName(device, device_name, ONT_NVML_BUFFER_SIZE);
     if (result == NVML_SUCCESS) {
         info.device_name = device_name;
     } else {
         info.device_name_error = nvml->ErrorString(result);
     }
+#else
+    info.device_name_error = "NVML buffer size undefined";
+#endif
 }
+
+#endif  // HAS_NVML
+
+#if defined(__linux__)
+std::optional<std::string> read_version_from_proc() {
+    std::ifstream version_file("/proc/driver/nvidia/version",
+                               std::ios_base::in | std::ios_base::binary);
+    if (!version_file.is_open()) {
+        spdlog::warn("No NVIDIA version file found in /proc");
+        return std::nullopt;
+    }
+
+    // Parse the file line by line.
+    std::string line;
+    while (std::getline(version_file, line)) {
+        auto info = detail::parse_nvidia_version_line(line);
+        if (info.has_value()) {
+            // We only expect there to be 1 version line, so we can return it immediately.
+            return info;
+        }
+    }
+
+    spdlog::warn("No version line found in /proc version file");
+    return std::nullopt;
+}
+#endif
 
 }  // namespace
 
 std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
+#if HAS_NVML
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
@@ -430,9 +440,13 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     set_current_throttling_reason(nvml, *device, info);
     set_device_name(nvml, *device, info);
     return info;
+#else
+    return {};
+#endif
 }
 
 std::vector<DeviceStatusInfo> get_accessible_devices_status_info() {
+#if HAS_NVML
     std::vector<DeviceStatusInfo> result{};
     const auto max_devices = detail::get_device_count();
     for (unsigned int device_index{}; device_index < max_devices; ++device_index) {
@@ -443,6 +457,9 @@ std::vector<DeviceStatusInfo> get_accessible_devices_status_info() {
         result.push_back(std::move(*status_info));
     }
     return result;
+#else
+    return {};
+#endif
 }
 
 std::optional<std::string> get_nvidia_driver_version() {
