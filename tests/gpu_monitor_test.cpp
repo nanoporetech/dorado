@@ -318,18 +318,20 @@ DEFINE_TEST_FIXTURE_METHOD(
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
-        "get_accessible_devices_status_info returns at least one entry (with device name assigned) "
+        "get_devices_status_info returns at least one entry (with device name assigned) "
         "if there is an accessible device") {
     if (!first_accessible_device) {
         return;
     }
-    auto info_collection = get_accessible_devices_status_info();
-    CHECK_FALSE(info_collection.empty());
-    for (const auto &info : info_collection) {
-        CAPTURE(info.device_name_error);
-        REQUIRE(info.device_name.has_value());
-        CHECK_FALSE(info.device_name->empty());
-    }
+    CAPTURE(*first_accessible_device);
+    auto info_collection = get_devices_status_info();
+    REQUIRE_FALSE(info_collection.empty());
+    REQUIRE(info_collection.size() > *first_accessible_device);
+    REQUIRE(info_collection[*first_accessible_device].has_value());
+    auto info = *info_collection[*first_accessible_device];
+    CAPTURE(info.device_name_error);
+    REQUIRE(info.device_name.has_value());
+    CHECK_FALSE(info.device_name->empty());
 }
 
 #if defined(_WIN32) || defined(__linux__)

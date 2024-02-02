@@ -70,8 +70,7 @@ struct DeviceStatusInfo {
 
 std::optional<DeviceStatusInfo> get_device_status_info(int device_index);
 
-// N.B there may be less entries than detail::get_device_count if not all devices can be fully queried via NVML
-std::vector<DeviceStatusInfo> get_accessible_devices_status_info();
+std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info();
 
 /// Implementation details, exposed for testing.
 namespace detail {

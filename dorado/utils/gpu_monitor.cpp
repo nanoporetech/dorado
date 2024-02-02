@@ -420,8 +420,8 @@ std::optional<std::string> read_version_from_proc() {
 
 }  // namespace
 
-std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
 #if HAS_NVML
+std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
@@ -440,21 +440,18 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     set_current_throttling_reason(nvml, *device, info);
     set_device_name(nvml, *device, info);
     return info;
-#else
-    return {};
-#endif
 }
+#else
+std::optional<DeviceStatusInfo> get_device_status_info(int) { return std::nullopt; }
+#endif
 
-std::vector<DeviceStatusInfo> get_accessible_devices_status_info() {
+std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
 #if HAS_NVML
-    std::vector<DeviceStatusInfo> result{};
+    std::vector<std::optional<DeviceStatusInfo>> result{};
     const auto max_devices = detail::get_device_count();
     for (unsigned int device_index{}; device_index < max_devices; ++device_index) {
+        result.push_back(get_device_status_info(device_index));
         auto status_info = get_device_status_info(device_index);
-        if (!status_info) {
-            continue;
-        }
-        result.push_back(std::move(*status_info));
     }
     return result;
 #else
@@ -511,12 +508,12 @@ unsigned int get_device_count() {
     auto nvml = NVMLAPI::get();
     return nvml ? nvml->get_device_count() : 0;
 #else
-    return std::nullopt;
+    return 0;
 #endif  // HAS_NVML
 }
 
-std::optional<unsigned int> get_device_current_temperature(unsigned int device_index) {
 #if HAS_NVML
+std::optional<unsigned int> get_device_current_temperature(unsigned int device_index) {
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
@@ -531,13 +528,13 @@ std::optional<unsigned int> get_device_current_temperature(unsigned int device_i
         return std::nullopt;
     }
     return temp;
-#else
-    return std::nullopt;
-#endif  // HAS_NVML
 }
+#else
+std::optional<unsigned int> get_device_current_temperature(unsigned int) { return std::nullopt; }
+#endif  // HAS_NVML
 
-bool is_accessible_device(unsigned int device_index) {
 #if HAS_NVML
+bool is_accessible_device(unsigned int device_index) {
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return false;
@@ -550,10 +547,10 @@ bool is_accessible_device(unsigned int device_index) {
         return false;
     }
     return true;
-#else
-    return false;
-#endif  // HAS_NVML
 }
+#else
+bool is_accessible_device(unsigned int) { return false; }
+#endif  // HAS_NVML
 
 }  // namespace detail
 
