@@ -24,6 +24,7 @@ public:
     size_t model_stride() const final { return m_config.stride; }
     size_t chunk_size() const final { return m_input.size(2); }
     size_t batch_size() const final { return m_input.size(0); }
+    // Timeout is short for simplex (features == 1), longer for duplex which gets a subset of reads
     int batch_timeout_ms() const final { return m_config.num_features == 1 ? 100 : 5000; }
     void terminate() final {}
     void restart() final {}

@@ -41,7 +41,7 @@ struct BasecallerNode::BasecallingRead {
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
 
-int BasecallerNode::get_chunk_queue_idx(size_t read_raw_size) {
+size_t BasecallerNode::get_chunk_queue_idx(size_t read_raw_size) {
     for (size_t i = m_chunk_sizes.size() - 1; i > 0; --i) {
         if (read_raw_size <= m_chunk_sizes[i]) {
             return i;
@@ -81,7 +81,7 @@ void BasecallerNode::input_thread_fn() {
         size_t raw_size =
                 read_common_data.raw_data
                         .sizes()[read_common_data.raw_data.sizes().size() - 1];  // Time dimension.
-        int chunk_queue_idx = get_chunk_queue_idx(raw_size);
+        size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
         size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
         size_t offset = 0;
@@ -341,6 +341,10 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
     m_batched_chunks.resize(num_workers);
 
     for (auto &runner_ptr : m_model_runners) {
+        // m_model_runners is effectively a 3D array with dimensions
+        // [num_devices][num_gpu_runners][chunk_sizes] (see
+        // `dorado::api::create_basecall_runners`). This means the chunk sizes are repeated,
+        // and to get the list of chunk sizes we stop once we see the first chunk size again.
         if (!m_chunk_sizes.empty() && runner_ptr->chunk_size() == m_chunk_sizes[0]) {
             break;
         }

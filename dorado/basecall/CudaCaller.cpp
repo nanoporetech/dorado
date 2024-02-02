@@ -213,6 +213,11 @@ void CudaCaller::determine_batch_sizes(float memory_limit_fraction,
     return;
 #endif
 
+    // For the low latency use case (adaptive sampling) we only want one (short) chunk size
+    // so that all those reads go into the same queue and complete as fast as possible. For
+    // high throughput basecalling we add a second, shorter chunk size to handle short reads
+    // better. However, either of the queues might fill so slowly that we hit the batch timeout
+    // and run partially filled batches.
     if (!m_low_latency) {
         // Use a second chunk size which is half the requested one
         m_out_chunk_sizes.push_back(m_out_chunk_sizes[0] / 2);

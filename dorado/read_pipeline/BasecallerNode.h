@@ -51,7 +51,7 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
-    int get_chunk_queue_idx(size_t read_raw_size);
+    size_t get_chunk_queue_idx(size_t read_raw_size);
 
     // Vector of model runners (each with their own GPU access etc)
     std::vector<basecall::RunnerPtr> m_model_runners;

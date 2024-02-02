@@ -115,10 +115,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     auto model_stride = runners.front()->model_stride();
 #endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
-    assert(std::all_of(runners.begin(), runners.end(), [&](const auto& runner) {
-        return runner->model_stride() == model_stride;
-        //        && runner->chunk_size() == adjusted_chunk_size;
-    }));
+    assert(std::all_of(runners.begin(), runners.end(),
+                       [&](const auto& runner) { return runner->model_stride() == model_stride; }));
 
     if (chunk_size != adjusted_chunk_size) {
         spdlog::debug("- adjusted chunk size to match model stride: {} -> {}", chunk_size,
