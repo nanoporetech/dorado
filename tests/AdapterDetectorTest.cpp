@@ -26,7 +26,7 @@ using namespace dorado;
 TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::AdapterDetector detector;
+    demux::AdapterDetector detector(std::nullopt);
     const auto& adapters = detector.get_adapter_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
@@ -71,7 +71,7 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
 TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::AdapterDetector detector;
+    demux::AdapterDetector detector(std::nullopt);
     const auto& primers = detector.get_primer_sequences();
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
@@ -109,8 +109,61 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     }
 }
 
+TEST_CASE("AdapterDetector: test custom primer detection", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
+    fs::path seq_dir = fs::path(get_data_dir("adapter_trim"));
+    auto custom_primer_file = (seq_dir / "custom_primers.fasta").string();
+
+    demux::AdapterDetector detector(custom_primer_file);
+    const auto& primers = detector.get_primer_sequences();
+    // Make sure the primers have been properly loaded.
+    std::vector<std::string> expected_names = {"primer1", "primer2"};
+    std::vector<std::string> expected_seqs = {"TGCGAAT", "GACCTCTG"};
+    std::vector<std::string> expected_rc_seqs = {"ATTCGCA", "CAGAGGTC"};
+    CHECK(primers.size() == expected_names.size());
+    for (size_t i = 0; i < primers.size(); ++i) {
+        CHECK(primers[i].name == expected_names[i]);
+        CHECK(primers[i].sequence == expected_seqs[i]);
+        CHECK(primers[i].sequence_rev == expected_rc_seqs[i]);
+    }
+
+    auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
+    HtsReader reader(test_file.string(), std::nullopt);
+    reader.read();
+    std::string seq = utils::extract_sequence(reader.record.get());
+    for (size_t i = 0; i < primers.size(); ++i) {
+        // First put the primer at the beginning, and its reverse at the end.
+        auto new_sequence1 = "ACGTAC" + primers[i].sequence + seq + primers[i].sequence_rev + "TTT";
+        auto res1 = detector.find_primers(new_sequence1);
+        CHECK(res1.front.name == primers[i].name + "_FWD");
+        CHECK(res1.front.position == std::make_pair(6, int(primers[i].sequence.length()) + 5));
+        CHECK(res1.front.score == 1.0f);
+        CHECK(res1.rear.name == primers[i].name + "_REV");
+        CHECK(res1.rear.position ==
+              std::make_pair(int(primers[i].sequence.length() + seq.length()) + 6,
+                             int(primers[i].sequence.length() + seq.length() +
+                                 primers[i].sequence_rev.length()) +
+                                     5));
+        CHECK(res1.rear.score == 1.0f);
+
+        // Now put the reverse primers at the beginning, and the forward ones at the end.
+        auto new_sequence2 = "ACGTAC" + primers[i].sequence_rev + seq + primers[i].sequence + "TTT";
+        auto res2 = detector.find_primers(new_sequence2);
+        CHECK(res2.front.name == primers[i].name + "_REV");
+        CHECK(res2.front.position == std::make_pair(6, int(primers[i].sequence_rev.length()) + 5));
+        CHECK(res2.front.score == 1.0f);
+        CHECK(res2.rear.name == primers[i].name + "_FWD");
+        CHECK(res2.rear.position ==
+              std::make_pair(int(primers[i].sequence_rev.length() + seq.length()) + 6,
+                             int(primers[i].sequence_rev.length() + seq.length() +
+                                 primers[i].sequence.length()) +
+                                     5));
+        CHECK(res2.rear.score == 1.0f);
+    }
+}
+
 void detect_and_trim(SimplexRead& read) {
-    demux::AdapterDetector detector;
+    demux::AdapterDetector detector(std::nullopt);
     auto seqlen = int(read.read_common.seq.length());
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
@@ -135,7 +188,7 @@ TEST_CASE(
     using Catch::Matchers::Equals;
 
     const std::string seq = std::string(200, 'A');
-    demux::AdapterDetector detector;
+    demux::AdapterDetector detector(std::nullopt);
     const auto& adapters = detector.get_adapter_sequences();
     const auto& primers = detector.get_primer_sequences();
     const auto& front_adapter = adapters[1].sequence;
@@ -247,14 +300,14 @@ TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true);
+    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Create new read that is [LSK110_FWD] - [cDNA_VNP_FWD] - 200 As - [cDNA_VNP_REV] [LSK110_REV].
     auto read = std::make_unique<SimplexRead>();
     const std::string nonbc_seq = std::string(200, 'A');
-    demux::AdapterDetector detector;
+    demux::AdapterDetector detector(std::nullopt);
     const auto& adapters = detector.get_adapter_sequences();
     const auto& primers = detector.get_primer_sequences();
     const auto& front_adapter = adapters[1].sequence;

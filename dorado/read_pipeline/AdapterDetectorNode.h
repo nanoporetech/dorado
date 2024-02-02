@@ -1,6 +1,6 @@
 #pragma once
 
-#include "demux/AdapterDetector.h"
+#include "demux/AdapterDetectorSelector.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -14,7 +14,10 @@ namespace dorado {
 
 class AdapterDetectorNode : public MessageSink {
 public:
-    AdapterDetectorNode(int threads, bool trim_adapters, bool trim_primers);
+    AdapterDetectorNode(int threads,
+                        bool trim_adapters,
+                        bool trim_primers,
+                        const std::optional<std::string>& custom_seqs);
     AdapterDetectorNode(int threads);
     ~AdapterDetectorNode() override { stop_input_processing(); }
     std::string get_name() const override { return "AdapterDetectorNode"; }
@@ -23,11 +26,10 @@ public:
     void restart() override { start_input_processing(&AdapterDetectorNode::input_thread_fn, this); }
 
 private:
-    bool m_trim_adapters;
-    bool m_trim_primers;
+    std::shared_ptr<const AdapterInfo> m_default_adapter_info;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
-    demux::AdapterDetector m_detector;
+    demux::AdapterDetectorSelector m_detector_selector{};
 
     void input_thread_fn();
     void process_read(BamPtr& read);

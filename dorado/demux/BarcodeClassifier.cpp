@@ -155,7 +155,7 @@ BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
                                      const std::optional<std::string>& custom_kit,
                                      const std::optional<std::string>& custom_barcodes)
         : m_custom_kit(process_custom_kit(custom_kit)),
-          m_custom_seqs(custom_barcodes ? parse_custom_barcode_sequences(*custom_barcodes)
+          m_custom_seqs(custom_barcodes ? parse_custom_sequences(*custom_barcodes)
                                         : std::unordered_map<std::string, std::string>{}),
           m_scoring_params(custom_kit ? parse_scoring_params(*custom_kit)
                                       : BarcodeKitScoringParams{}),

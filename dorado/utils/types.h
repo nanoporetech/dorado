@@ -16,6 +16,7 @@ namespace dorado {
 struct AdapterInfo {
     bool trim_adapters{true};
     bool trim_primers{true};
+    std::optional<std::string> custom_seqs = std::nullopt;
 };
 
 struct BarcodingInfo {
