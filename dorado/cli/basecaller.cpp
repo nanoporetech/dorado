@@ -114,6 +114,22 @@ void setup(std::vector<std::string> args,
         spdlog::info(
                 " - BAM format does not support `U`, so RNA output files will include `T` instead "
                 "of `U` for all file types.");
+        if (estimate_poly_a && adapter_no_trim) {
+            spdlog::info(
+                    "Enabling adapter trimming as it is required for estimation of RNA poly-a "
+                    "tail.");
+            adapter_no_trim = false;
+        }
+    } else {
+        if (!primer_no_trim || !barcode_no_trim || !adapter_no_trim) {
+            primer_no_trim = true;
+            barcode_no_trim = true;
+            adapter_no_trim = true;
+            spdlog::info(
+                    "Estimation of DNA poly-a tail has been requested, so adapter/primer/barcode "
+                    "trimming have been "
+                    "disabled.");
+        }
     }
 
     const bool enable_aligner = !ref.empty();
@@ -515,18 +531,6 @@ int basecaller(int argc, char* argv[]) {
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
         std::exit(EXIT_FAILURE);
-    }
-    if (parser.visible.get<bool>("--estimate-poly-a")) {
-        if (trim_options == "primers" || trim_options == "adapters" || trim_options == "all") {
-            spdlog::error(
-                    "--trim cannot be used with options 'primers', 'adapters', or 'all', "
-                    "if you are also using --estimate-poly-a.");
-            std::exit(EXIT_FAILURE);
-        }
-        no_trim_primers = no_trim_adapters = true;
-        spdlog::info(
-                "Estimation of poly-a has been requested, so adapter/primer trimming has been "
-                "disabled.");
     }
 
     if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
