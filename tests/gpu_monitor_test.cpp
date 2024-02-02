@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
@@ -354,4 +355,17 @@ DEFINE_TEST("get_device_current_temperature on apple does not return a value") {
     REQUIRE_FALSE(temperature.has_value());
 }
 #endif
+
+DEFINE_TEST("to_string with valid ThrottleReason returns non_empty string") {
+    auto reason = to_string(ThrottleReason::sw_power_cap);
+    CHECK_FALSE(reason.empty());
+}
+
+DEFINE_TEST("stream insertion op with valid ThrottleReason inserts non_empty string") {
+    std::ostringstream os;
+    os << ThrottleReason::gpu_idle;
+    auto reason = os.str();
+    CHECK_FALSE(reason.empty());
+}
+
 }  // namespace dorado::utils::gpu_monitor::test

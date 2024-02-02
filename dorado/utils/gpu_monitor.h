@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <optional>
 #include <string>
 #include <vector>
@@ -99,6 +100,9 @@ enum class ThrottleReason : unsigned long long {
      */
     display_clock_setting = 0x0000000000000100LL,
 };
+
+std::ostream& operator<<(std::ostream& os, ThrottleReason reason);
+std::string to_string(ThrottleReason reason);
 
 /**
  * Get the installed NVIDIA driver version.
