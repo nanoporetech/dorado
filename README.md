@@ -117,6 +117,10 @@ The `--no-trim-primers` option can be used to prevent the trimming of primer seq
 
 If it is also your intention to demux the data, then it is recommended that you do that before trimming any adapters and primers, as trimming adapters and primers first may result in the demux software being unable to classify the barcodes properly.
 
+#### Custom Primer Trimming
+
+The software automatically searches for primer sequences used in ONT kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a fasta file containing the primer sequences you want to search for. The record names of the sequences do not matter. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for. 
+
 ### RNA Adapter trimming
 
 Adapters for RNA002 and RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
