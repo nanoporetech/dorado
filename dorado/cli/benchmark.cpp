@@ -42,7 +42,7 @@ int benchmark(int argc, char* argv[]) {
 
         // nth_element
         start = std::chrono::system_clock::now();
-        res = utils::quantile(x, q);
+        res = utils::quantile<float>(x, q);
         end = std::chrono::system_clock::now();
 
         duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();

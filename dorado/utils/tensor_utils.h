@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ATen/ATen.h>
 #include <ATen/core/TensorBody.h>
 
 #include <cstddef>
@@ -18,7 +19,26 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
 // Computes the q-th quantiles of each row of the input tensor `t`
 // using a partial sort as opposed a full sort per torch::quantiles
 // Only `interpolation='lower'` is currently implemented.
-at::Tensor quantile(const at::Tensor t, const at::Tensor q);
+template <typename T>
+at::Tensor quantile(const at::Tensor t, const at::Tensor q) {
+    assert(q.dtype() == at::ScalarType::Float);
+
+    auto tmp = t.clone();
+    auto [qval, qidx] = q.sort();
+    auto res = at::empty_like(q);
+
+    auto start = tmp.data_ptr<T>();
+    auto end = tmp.data_ptr<T>() + tmp.size(0);
+
+    for (int i = 0; i < q.size(0); i++) {
+        auto m = tmp.data_ptr<T>() + static_cast<size_t>((tmp.size(0) - 1) * qval[i].item<float>());
+        std::nth_element(start, m, end);
+        res[qidx[i]] = *m;
+        start = m;
+    }
+
+    return res;
+}
 
 // Computes the q-th quantiles of each row of the input tensor `t`
 // using a counting sort which is extremely fast for low range integers.

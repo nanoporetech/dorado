@@ -527,7 +527,7 @@ int basecaller(int argc, char* argv[]) {
                     "if you are also using --estimate-poly-a.");
             std::exit(EXIT_FAILURE);
         }
-        no_trim_primers = no_trim_adapters = true;
+        no_trim_primers = no_trim_adapters = false;
         spdlog::info(
                 "Estimation of poly-a has been requested, so adapter/primer trimming has been "
                 "disabled.");

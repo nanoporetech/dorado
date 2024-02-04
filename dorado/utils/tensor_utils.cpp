@@ -86,27 +86,6 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
     return weights;
 }
 
-at::Tensor quantile(const at::Tensor t, const at::Tensor q) {
-    assert(q.dtype() == at::ScalarType::Float);
-
-    auto tmp = t.clone();
-    auto [qval, qidx] = q.sort();
-    auto res = at::empty_like(q);
-
-    auto start = tmp.data_ptr<float>();
-    auto end = tmp.data_ptr<float>() + tmp.size(0);
-
-    for (int i = 0; i < q.size(0); i++) {
-        auto m = tmp.data_ptr<float>() +
-                 static_cast<size_t>((tmp.size(0) - 1) * qval[i].item<float>());
-        std::nth_element(start, m, end);
-        res[qidx[i]] = *m;
-        start = m;
-    }
-
-    return res;
-}
-
 at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
     assert(q.dtype() == at::ScalarType::Float);
 

@@ -14,7 +14,7 @@ namespace splitter {
 
 struct RNASplitSettings {
     int16_t pore_thr = 1500;
-    uint64_t pore_cl_dist = 4000;  // TODO maybe use frequency * 1sec here?
+    uint64_t pore_cl_dist = 2000;  // TODO maybe use frequency * 1sec here?
     //maximal 'open pore' region to consider (bp)
     uint64_t max_pore_region = 500;
     //in samples
