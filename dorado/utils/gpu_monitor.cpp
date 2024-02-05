@@ -490,41 +490,6 @@ std::optional<std::string> get_nvidia_driver_version() {
     return version;
 }
 
-std::string to_string(ThrottleReason reason) {
-    switch (reason) {
-    case ThrottleReason::none:
-        return "none";
-    case ThrottleReason::gpu_idle:
-        return "gpu_idle";
-    case ThrottleReason::applications_clocks_setting:
-        return "applications_clocks_setting";
-    case ThrottleReason::sw_power_cap:
-        return "sw_power_cap";
-    case ThrottleReason::hw_slowdown:
-        return "hw_slowdown";
-    case ThrottleReason::sync_boost:
-        return "sync_boost";
-    case ThrottleReason::sw_thermal_slowdown:
-        return "sw_thermal_slowdown";
-    case ThrottleReason::hw_thermal_slowdown:
-        return "hw_thermal_slowdown";
-    case ThrottleReason::hw_power_brake_slowdown:
-        return "hw_power_brake_slowdown";
-    case ThrottleReason::display_clock_setting:
-        return "display_clock_setting";
-    case ThrottleReason::all_reasons:
-        return "all_reasons";
-    }
-    // unreachable code, but prevents compiler warning:
-    // error: control reaches end of non-void function [-Werror=return-type]
-    throw std::runtime_error("unrecognised Result value");
-}
-
-std::ostream &operator<<(std::ostream &os, ThrottleReason result) {
-    os << to_string(result);
-    return os;
-}
-
 namespace detail {
 
 std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
