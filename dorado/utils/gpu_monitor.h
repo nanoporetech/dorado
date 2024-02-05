@@ -64,11 +64,11 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index);
 
 std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info();
 
+unsigned int get_device_count();
+
 /// Implementation details, exposed for testing.
 namespace detail {
 std::optional<std::string> parse_nvidia_version_line(std::string_view line);
-
-unsigned int get_device_count();
 
 std::optional<unsigned int> get_device_current_temperature(unsigned int device_index);
 

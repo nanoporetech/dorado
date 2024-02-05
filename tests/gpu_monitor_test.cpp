@@ -22,7 +22,7 @@ protected:
 
 public:
     GpuMonitorTestFixture() {
-        num_devices = dorado::utils::gpu_monitor::detail::get_device_count();
+        num_devices = dorado::utils::gpu_monitor::get_device_count();
         for (unsigned int index{}; index < num_devices; ++index) {
             if (dorado::utils::gpu_monitor::detail::is_accessible_device(index)) {
                 first_accessible_device = index;
@@ -123,7 +123,7 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
     }
 }
 
-DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(detail::get_device_count()); }
+DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(get_device_count()); }
 
 DEFINE_TEST_FIXTURE_METHOD(
         "get_device_current_temperature with valid device index does not throw") {
@@ -139,6 +139,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto temp = detail::get_device_current_temperature(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(temp.has_value());
     CHECK(*temp > 0);  // Let's assume it's not freezing!
 }
@@ -152,6 +155,9 @@ DEFINE_TEST_FIXTURE_METHOD(
             continue;
         }
         auto temp = detail::get_device_current_temperature(device_index);
+
+        // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+        // in which case consider rewriting the specific test to pass if the optional is not set
         REQUIRE(temp.has_value());
         CHECK(*temp > 0);  // Let's assume it's not freezing!
     }
@@ -178,6 +184,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CHECK(info->device_index == *first_accessible_device);
 }
@@ -188,6 +197,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->current_temperature_error);
     REQUIRE(info->current_temperature.has_value());
@@ -200,6 +212,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->gpu_shutdown_temperature_error);
     REQUIRE(info->gpu_shutdown_temperature.has_value());
@@ -212,6 +227,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->gpu_slowdown_temperature_error);
     REQUIRE(info->gpu_slowdown_temperature.has_value());
@@ -225,6 +243,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->gpu_max_operating_temperature_error);
     REQUIRE(info->gpu_max_operating_temperature.has_value());
@@ -237,6 +258,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->current_power_usage_error);
     REQUIRE(info->current_power_usage.has_value());
@@ -249,6 +273,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->default_power_cap_error);
     REQUIRE(info->default_power_cap.has_value());
@@ -262,6 +289,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->percentage_utilization_error);
     REQUIRE(info->percentage_utilization_gpu.has_value());
@@ -275,6 +305,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->percentage_utilization_error);
     REQUIRE(info->percentage_utilization_memory.has_value());
@@ -288,6 +321,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->current_performance_state_error);
     REQUIRE(info->current_performance_state.has_value());
@@ -301,6 +337,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->current_throttling_reason_error);
     REQUIRE(info->current_throttling_reason.has_value());
@@ -313,6 +352,9 @@ DEFINE_TEST_FIXTURE_METHOD(
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.has_value());
     CAPTURE(info->device_name_error);
     REQUIRE(info->device_name.has_value());
@@ -332,20 +374,23 @@ DEFINE_TEST_FIXTURE_METHOD(
     REQUIRE(info_collection[*first_accessible_device].has_value());
     auto info = *info_collection[*first_accessible_device];
     CAPTURE(info.device_name_error);
+
+    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
+    // in which case consider rewriting the specific test to pass if the optional is not set
     REQUIRE(info.device_name.has_value());
     CHECK_FALSE(info.device_name->empty());
 }
 
-#if defined(_WIN32) || defined(__linux__)
+#if !defined(__APPLE__)
 
 DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
     if (!torch::getNumGPUs()) {
         return;
     }
-    CHECK(detail::get_device_count() > 0);
+    CHECK(get_device_count() > 0);
 }
 #else
-DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(detail::get_device_count() == 0); }
+DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(get_device_count() == 0); }
 
 DEFINE_TEST("get_device_current_temperature on apple does not throw") {
     REQUIRE_NOTHROW(detail::get_device_current_temperature(0));

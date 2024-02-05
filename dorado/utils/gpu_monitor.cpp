@@ -31,6 +31,7 @@ namespace {
 #elif defined(NVML_DEVICE_NAME_BUFFER_SIZE)
 #define ONT_NVML_BUFFER_SIZE NVML_DEVICE_NAME_BUFFER_SIZE
 #endif
+static_assert(ONT_NVML_BUFFER_SIZE, "nvml buffer size must be defined");
 
 // Prefixless versions of symbols we use
 // X(name, optional)
@@ -394,7 +395,6 @@ void retrieve_and_assign_current_temperature(NVMLAPI *nvml,
 void retrieve_and_assign_device_name(NVMLAPI *nvml,
                                      const nvmlDevice_t &device,
                                      DeviceStatusInfo &info) {
-#ifdef ONT_NVML_BUFFER_SIZE
     char device_name[ONT_NVML_BUFFER_SIZE];
     auto result = nvml->DeviceGetName(device, device_name, ONT_NVML_BUFFER_SIZE);
     if (result == NVML_SUCCESS) {
@@ -402,9 +402,6 @@ void retrieve_and_assign_device_name(NVMLAPI *nvml,
     } else {
         info.device_name_error = nvml->ErrorString(result);
     }
-#else
-    info.device_name_error = "NVML buffer size undefined";
-#endif
 }
 
 #endif  // HAS_NVML
@@ -435,8 +432,8 @@ std::optional<std::string> read_version_from_proc() {
 
 }  // namespace
 
-#if HAS_NVML
 std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
+#if HAS_NVML
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
@@ -456,15 +453,15 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     retrieve_and_assign_current_throttling_reason(nvml, *device, info);
     retrieve_and_assign_device_name(nvml, *device, info);
     return info;
-}
 #else
-std::optional<DeviceStatusInfo> get_device_status_info(int) { return std::nullopt; }
+    (void)device_index;
 #endif
+}
 
 std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
 #if HAS_NVML
     std::vector<std::optional<DeviceStatusInfo>> result{};
-    const auto max_devices = detail::get_device_count();
+    const auto max_devices = get_device_count();
     for (unsigned int device_index{}; device_index < max_devices; ++device_index) {
         result.push_back(get_device_status_info(device_index));
         auto status_info = get_device_status_info(device_index);
@@ -488,6 +485,15 @@ std::optional<std::string> get_nvidia_driver_version() {
     }
 #endif  // __linux__
     return version;
+}
+
+unsigned int get_device_count() {
+#if HAS_NVML
+    auto nvml = NVMLAPI::get();
+    return nvml ? nvml->get_device_count() : 0;
+#else
+    return 0;
+#endif  // HAS_NVML
 }
 
 namespace detail {
@@ -519,17 +525,8 @@ std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
     return std::string(line.substr(version_begin, version_end - version_begin));
 }
 
-unsigned int get_device_count() {
-#if HAS_NVML
-    auto nvml = NVMLAPI::get();
-    return nvml ? nvml->get_device_count() : 0;
-#else
-    return 0;
-#endif  // HAS_NVML
-}
-
-#if HAS_NVML
 std::optional<unsigned int> get_device_current_temperature(unsigned int device_index) {
+#if HAS_NVML
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return std::nullopt;
@@ -544,13 +541,13 @@ std::optional<unsigned int> get_device_current_temperature(unsigned int device_i
         return std::nullopt;
     }
     return temp;
-}
 #else
-std::optional<unsigned int> get_device_current_temperature(unsigned int) { return std::nullopt; }
+    (void)device_index;
 #endif  // HAS_NVML
+}
 
-#if HAS_NVML
 bool is_accessible_device(unsigned int device_index) {
+#if HAS_NVML
     auto nvml = NVMLAPI::get();
     if (!nvml) {
         return false;
@@ -563,10 +560,10 @@ bool is_accessible_device(unsigned int device_index) {
         return false;
     }
     return true;
-}
 #else
-bool is_accessible_device(unsigned int) { return false; }
+    (void)device_index;
 #endif  // HAS_NVML
+}
 
 }  // namespace detail
 
