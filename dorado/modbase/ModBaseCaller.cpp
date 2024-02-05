@@ -29,9 +29,6 @@ struct ModBaseCaller::ModBaseTask {
     at::Tensor out;
     bool done{false};
     int num_chunks;
-#if DORADO_CUDA_BUILD
-    c10::optional<c10::Stream> stream;
-#endif
 };
 
 ModBaseCaller::ModBaseData::ModBaseData(const std::filesystem::path& model_path,
@@ -48,15 +45,18 @@ ModBaseCaller::ModBaseData::ModBaseData(const std::filesystem::path& model_path,
 
 #if DORADO_CUDA_BUILD
     if (opts.device().is_cuda()) {
+        stream = c10::cuda::getStreamFromPool(false, opts.device().index());
+
         auto sig_len = static_cast<int64_t>(params.context_before + params.context_after);
         auto kmer_len = params.bases_after + params.bases_before + 1;
 
         // Warmup
+        c10::cuda::OptionalCUDAStreamGuard guard(stream);
         auto input_sigs = torch::empty({batch_size, 1, sig_len}, opts);
         auto input_seqs =
                 torch::empty({batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts);
         module_holder->forward(input_sigs, input_seqs);
-        torch::cuda::synchronize(opts.device().index());
+        stream->synchronize();
     }
 #endif
 }
@@ -147,11 +147,6 @@ at::Tensor ModBaseCaller::call_chunks(size_t model_id,
     auto& caller_data = m_caller_data[model_id];
     auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                               input_seqs.to(m_options.device()), num_chunks);
-#if DORADO_CUDA_BUILD
-    if (m_options.device().is_cuda()) {
-        task->stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
-    }
-#endif
     {
         std::lock_guard<std::mutex> lock(caller_data->input_lock);
         caller_data->input_queue.push_front(task);
@@ -202,6 +197,9 @@ void ModBaseCaller::start_threads() {
 
 void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
     auto& caller_data = m_caller_data[model_id];
+#if DORADO_CUDA_BUILD
+    c10::cuda::OptionalCUDAStreamGuard guard(caller_data->stream);
+#endif
     while (true) {
         nvtx3::scoped_range loop{"modbase_task_thread_fn"};
         at::InferenceMode guard;
@@ -219,18 +217,12 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
         caller_data->input_queue.pop_back();
         input_lock.unlock();
 
-#if DORADO_CUDA_BUILD
-        // If task->stream is set, sets the current stream to task->stream, and the current device to
-        // the device associated with the stream. Resets both to their prior state on destruction
-        c10::cuda::OptionalCUDAStreamGuard stream_guard(task->stream);
-#endif
-
         std::unique_lock<std::mutex> task_lock(task->mut);
         stats::Timer timer;
         task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
 #if DORADO_CUDA_BUILD
-        if (task->stream.has_value()) {
-            task->stream->synchronize();
+        if (caller_data->stream.has_value()) {
+            caller_data->stream->synchronize();
         }
 #endif
         // Only meaningful if we're syncing the stream.

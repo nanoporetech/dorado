@@ -23,15 +23,13 @@ namespace dorado::basecall {
 static constexpr float GB = 1.0e9f;
 
 struct CudaCaller::NNTask {
-    NNTask(at::Tensor input_, int num_chunks_, c10::Stream stream_)
-            : input(input_), num_chunks(num_chunks_), stream(stream_) {}
+    NNTask(at::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
     at::Tensor input;
     int num_chunks;
     decode::DecodeData out;
     std::mutex mut;
     std::condition_variable cv;
     bool done{false};
-    c10::Stream stream;
 };
 
 CudaCaller::CudaCaller(const CRFModelConfig &model_config,
@@ -44,7 +42,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
-          m_exclusive_gpu_access(exclusive_gpu_access) {
+          m_exclusive_gpu_access(exclusive_gpu_access),
+          m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
 
     m_decoder_options.q_shift = model_config.qbias;
@@ -85,10 +84,11 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     spdlog::info("{} using batch size {}", m_device, m_batch_size);
 
     // Warmup
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     auto input = torch::empty({m_batch_size, m_num_input_features, m_in_chunk_size}, m_options);
     auto scores = m_module->forward(input);
     m_decoder->beam_search_part_1({scores, m_batch_size, m_decoder_options});
-    torch::cuda::synchronize(m_options.device().index());
+    m_stream.synchronize();
 
     start_threads();
 }
@@ -103,16 +103,13 @@ CudaCaller::~CudaCaller() {
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
                                                           at::Tensor &output,
-                                                          int num_chunks,
-                                                          c10::cuda::CUDAStream stream) {
+                                                          int num_chunks) {
     NVTX3_FUNC_RANGE();
-    c10::cuda::CUDAStreamGuard stream_guard(stream);
-
     if (num_chunks == 0) {
         return std::vector<decode::DecodedChunk>();
     }
 
-    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, stream);
+    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks);
     {
         std::lock_guard<std::mutex> lock(m_input_lock);
         m_input_queue.push_front(task);
@@ -298,6 +295,8 @@ void CudaCaller::cuda_thread_fn() {
     const std::string input_q_cv_scope_str =
             "input_queue_cv_device_" + std::to_string(m_options.device().index());
     const std::string gpu_lock_scope_str = "gpu_lock_" + std::to_string(m_options.device().index());
+
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     while (true) {
         nvtx3::scoped_range loop{loop_scope_str};
         std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -319,8 +318,6 @@ void CudaCaller::cuda_thread_fn() {
         auto gpu_lock =
                 dorado::utils::acquire_gpu_lock(m_options.device().index(), m_exclusive_gpu_access);
         nvtxRangePop();
-
-        c10::cuda::CUDAStreamGuard stream_guard(task->stream);
 
         std::unique_lock<std::mutex> task_lock(task->mut);
 
@@ -356,7 +353,7 @@ void CudaCaller::cuda_thread_fn() {
             const auto forward_ms = timer.GetElapsedMS();
             task->out =
                     m_decoder->beam_search_part_1({scores, task->num_chunks, m_decoder_options});
-            task->stream.synchronize();
+            m_stream.synchronize();
             const auto forward_plus_decode_ms = timer.GetElapsedMS();
             m_model_ms += forward_ms;
             m_decode_ms += forward_plus_decode_ms - forward_ms;

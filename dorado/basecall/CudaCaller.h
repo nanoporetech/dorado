@@ -31,8 +31,7 @@ public:
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
                                                   at::Tensor &output,
-                                                  int num_chunks,
-                                                  c10::cuda::CUDAStream stream);
+                                                  int num_chunks);
 
     void terminate();
     void restart();
@@ -73,6 +72,7 @@ private:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features, m_batch_size, m_in_chunk_size, m_out_chunk_size;
     bool m_exclusive_gpu_access;
+    c10::cuda::CUDAStream m_stream;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;
