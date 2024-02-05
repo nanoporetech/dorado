@@ -306,7 +306,9 @@ void assign_threshold_temp(NVMLAPI *nvml,
     }
 }
 
-void set_threshold_temperatures(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_threshold_temperatures(NVMLAPI *nvml,
+                                                const nvmlDevice_t &device,
+                                                DeviceStatusInfo &info) {
     assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_SHUTDOWN,
                           info.gpu_shutdown_temperature, info.gpu_shutdown_temperature_error);
     assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_SLOWDOWN,
@@ -316,7 +318,9 @@ void set_threshold_temperatures(NVMLAPI *nvml, const nvmlDevice_t &device, Devic
                           info.gpu_max_operating_temperature_error);
 }
 
-void set_current_power_usage(NVMLAPI *nvml, nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_current_power_usage(NVMLAPI *nvml,
+                                             nvmlDevice_t &device,
+                                             DeviceStatusInfo &info) {
     unsigned int value{};
     auto result = nvml->DeviceGetPowerUsage(device, &value);
     if (result == NVML_SUCCESS) {
@@ -326,7 +330,9 @@ void set_current_power_usage(NVMLAPI *nvml, nvmlDevice_t &device, DeviceStatusIn
     }
 }
 
-void set_power_cap(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_power_cap(NVMLAPI *nvml,
+                                   const nvmlDevice_t &device,
+                                   DeviceStatusInfo &info) {
     unsigned int value{};
     auto result = nvml->DeviceGetPowerManagementDefaultLimit(device, &value);
     if (result == NVML_SUCCESS) {
@@ -336,7 +342,9 @@ void set_power_cap(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &
     }
 }
 
-void set_utilization(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_utilization(NVMLAPI *nvml,
+                                     const nvmlDevice_t &device,
+                                     DeviceStatusInfo &info) {
     nvmlUtilization_t utilization{};
     auto result = nvml->DeviceGetUtilizationRates(device, &utilization);
     if (result != NVML_SUCCESS) {
@@ -347,19 +355,21 @@ void set_utilization(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo
     info.percentage_utilization_memory = utilization.memory;
 }
 
-void set_current_performace(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_current_performance(NVMLAPI *nvml,
+                                             const nvmlDevice_t &device,
+                                             DeviceStatusInfo &info) {
     unsigned int value;
     auto result = nvml->DeviceGetPerformanceState(device, &value);
     if (result == NVML_SUCCESS) {
-        info.current_performace_state = value;
+        info.current_performance_state = value;
     } else {
-        info.current_performace_state_error = nvml->ErrorString(result);
+        info.current_performance_state_error = nvml->ErrorString(result);
     }
 }
 
-void set_current_throttling_reason(NVMLAPI *nvml,
-                                   const nvmlDevice_t &device,
-                                   DeviceStatusInfo &info) {
+void retrieve_and_assign_current_throttling_reason(NVMLAPI *nvml,
+                                                   const nvmlDevice_t &device,
+                                                   DeviceStatusInfo &info) {
     unsigned long long reason{};
     auto result = nvml->DeviceGetCurrentClocksThrottleReasons(device, &reason);
     if (result == NVML_SUCCESS) {
@@ -369,7 +379,9 @@ void set_current_throttling_reason(NVMLAPI *nvml,
     }
 }
 
-void set_current_temperature(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_current_temperature(NVMLAPI *nvml,
+                                             const nvmlDevice_t &device,
+                                             DeviceStatusInfo &info) {
     unsigned int value{};
     auto result = nvml->DeviceGetTemperature(device, NVML_TEMPERATURE_GPU, &value);
     if (result == NVML_SUCCESS) {
@@ -379,7 +391,9 @@ void set_current_temperature(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceSt
     }
 }
 
-void set_device_name(NVMLAPI *nvml, const nvmlDevice_t &device, DeviceStatusInfo &info) {
+void retrieve_and_assign_device_name(NVMLAPI *nvml,
+                                     const nvmlDevice_t &device,
+                                     DeviceStatusInfo &info) {
 #ifdef ONT_NVML_BUFFER_SIZE
     char device_name[ONT_NVML_BUFFER_SIZE];
     auto result = nvml->DeviceGetName(device, device_name, ONT_NVML_BUFFER_SIZE);
@@ -433,14 +447,14 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     }
     DeviceStatusInfo info{};
     info.device_index = device_index;
-    set_current_temperature(nvml, *device, info);
-    set_threshold_temperatures(nvml, *device, info);
-    set_current_power_usage(nvml, *device, info);
-    set_power_cap(nvml, *device, info);
-    set_utilization(nvml, *device, info);
-    set_current_performace(nvml, *device, info);
-    set_current_throttling_reason(nvml, *device, info);
-    set_device_name(nvml, *device, info);
+    retrieve_and_assign_current_temperature(nvml, *device, info);
+    retrieve_and_assign_threshold_temperatures(nvml, *device, info);
+    retrieve_and_assign_current_power_usage(nvml, *device, info);
+    retrieve_and_assign_power_cap(nvml, *device, info);
+    retrieve_and_assign_utilization(nvml, *device, info);
+    retrieve_and_assign_current_performance(nvml, *device, info);
+    retrieve_and_assign_current_throttling_reason(nvml, *device, info);
+    retrieve_and_assign_device_name(nvml, *device, info);
     return info;
 }
 #else

@@ -157,8 +157,8 @@ struct DeviceStatusInfo {
             percentage_utilization_error;  // Shared error reason retrieving utilization info (gpu and memory)
 
     std::optional<unsigned int>
-            current_performace_state;  // 0 (max) .. 15 (min) performance. 32 represents unknown performance.
-    std::string current_performace_state_error;
+            current_performance_state;  // 0 (max) .. 15 (min) performance. 32 represents unknown performance.
+    std::string current_performance_state_error;
 };
 
 std::optional<DeviceStatusInfo> get_device_status_info(int device_index);

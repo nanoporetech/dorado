@@ -282,15 +282,16 @@ DEFINE_TEST_FIXTURE_METHOD(
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
-        "get_device_status_info with valid device returns with current_performace_state in range") {
+        "get_device_status_info with valid device returns with current_performance_state in "
+        "range") {
     if (!first_accessible_device) {
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
     REQUIRE(info.has_value());
-    CAPTURE(info->current_performace_state_error);
-    REQUIRE(info->current_performace_state.has_value());
-    CHECK(*info->current_performace_state <= 32);
+    CAPTURE(info->current_performance_state_error);
+    REQUIRE(info->current_performance_state.has_value());
+    CHECK(*info->current_performance_state <= 32);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
