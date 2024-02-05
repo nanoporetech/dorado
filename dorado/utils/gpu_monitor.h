@@ -7,8 +7,9 @@
 
 namespace dorado::utils::gpu_monitor {
 
+// Reproduces the #defined nvml values for nvmlClocksThrottleReasons, so we don't need to expose nvml.h
 enum class ThrottleReason : unsigned long long {
-    // Ignore! Tag enabling SFINAE approach to enabling bitwise operators with this scoped enum
+    // Ignore! Tag enabling SFINAE approach to supporting bitwise operators with this scoped enum
     bit_flags = 0x0000000000000000LL,
 
     /** Bit mask representing no clocks throttling
@@ -95,8 +96,6 @@ enum class ThrottleReason : unsigned long long {
     hw_power_brake_slowdown = 0x0000000000000080LL,
 
     /** GPU clocks are limited by current setting of Display clocks
-     *
-     * @see bug 1997531
      */
     display_clock_setting = 0x0000000000000100LL,
 
