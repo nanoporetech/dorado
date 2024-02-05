@@ -38,8 +38,8 @@ public:
     void terminate();
     void restart();
 
-    std::pair<at::Tensor, at::Tensor> create_input_output_tensor(int chunk_size_idx) const;
-    int num_chunk_sizes() const { return int(m_in_chunk_sizes.size()); };
+    std::pair<at::Tensor, at::Tensor> create_input_output_tensor(size_t batch_dims_idx) const;
+    size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
     int batch_timeout_ms() const { return m_low_latency ? 100 : 10000; }
@@ -57,7 +57,7 @@ private:
     }
 
     std::pair<int64_t, int64_t> calculate_memory_requirements() const;
-    void determine_batch_sizes(float memory_limit_fraction, int batch_size, int chunk_size);
+    void determine_batch_dims(float memory_limit_fraction, int batch_size, int chunk_size);
 
     void start_threads();
     void cuda_thread_fn();
@@ -74,9 +74,17 @@ private:
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features;
-    std::vector<int> m_batch_sizes, m_in_chunk_sizes, m_out_chunk_sizes;
     bool m_exclusive_gpu_access;
     bool m_low_latency;
+
+    // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to
+    // speed up processing of reads that are shorter than the longest chunk size.
+    struct BatchDims {
+        int N;      // Batch size
+        int T_in;   // Chunk size (in)
+        int T_out;  // Chunk size (out), after stride
+    };
+    std::vector<BatchDims> m_batch_dims;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

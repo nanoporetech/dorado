@@ -17,7 +17,7 @@ class CudaCaller;
 
 class CudaModelRunner final : public ModelRunnerBase {
 public:
-    explicit CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size_idx);
+    explicit CudaModelRunner(std::shared_ptr<CudaCaller> caller, size_t batch_dims_idx);
     void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig& config() const final;

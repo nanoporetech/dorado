@@ -11,10 +11,10 @@
 
 namespace dorado::basecall {
 
-CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, int chunk_size_idx)
+CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, size_t batch_dims_idx)
         : m_caller(std::move(caller)),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->device().index())) {
-    std::tie(m_input, m_output) = m_caller->create_input_output_tensor(chunk_size_idx);
+    std::tie(m_input, m_output) = m_caller->create_input_output_tensor(batch_dims_idx);
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {

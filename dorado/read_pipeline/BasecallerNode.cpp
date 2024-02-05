@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <iostream>
 
 #if DORADO_METAL_BUILD
 #include "utils/metal_utils.h"
@@ -42,12 +41,18 @@ struct BasecallerNode::BasecallingRead {
 };
 
 size_t BasecallerNode::get_chunk_queue_idx(size_t read_raw_size) {
-    for (size_t i = m_chunk_sizes.size() - 1; i > 0; --i) {
-        if (read_raw_size <= m_chunk_sizes[i]) {
-            return i;
+    // A read goes either to the queue with the smallest chunk size which can fit the whole read,
+    // or, if the read is larger than all chunk sizes, the queue with the largest chunk size.
+    size_t best_idx = 0;
+    for (size_t i = 1; i < m_chunk_sizes.size(); ++i) {
+        size_t best_size = m_chunk_sizes[best_idx];
+        size_t this_size = m_chunk_sizes[i];
+        if ((best_size < read_raw_size && best_size < this_size) ||
+            (read_raw_size < this_size && this_size < best_size)) {
+            best_idx = i;
         }
     }
-    return 0;
+    return best_idx;
 }
 
 void BasecallerNode::input_thread_fn() {
@@ -219,12 +224,12 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     at::InferenceMode inference_mode_guard;
 
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
-    size_t batch_size = m_model_runners[worker_id]->batch_size();
-    size_t chunk_size = m_model_runners[worker_id]->chunk_size();
-    int batch_timeout_ms = m_model_runners[worker_id]->batch_timeout_ms();
+    const size_t batch_size = m_model_runners[worker_id]->batch_size();
+    const size_t chunk_size = m_model_runners[worker_id]->chunk_size();
+    const int batch_timeout_ms = m_model_runners[worker_id]->batch_timeout_ms();
+    const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     while (true) {
         std::unique_ptr<BasecallingChunk> chunk;
-        int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
         const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(
                 chunk, last_chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
 
@@ -252,26 +257,20 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             auto &read_common = get_read_common_data(source_read);
             auto input_slice = read_common.raw_data.index(
                     {Ellipsis, Slice(chunk->input_offset, chunk->input_offset + chunk_size)});
-            size_t slice_size;
+
+            // Make sure the slice tensor is 2D
             if (input_slice.ndimension() == 1) {
-                slice_size = input_slice.size(0);
-            } else {
-                slice_size = input_slice.sizes()[1];
+                input_slice = input_slice.unsqueeze(0);
             }
+            size_t slice_size = input_slice.size(-1);
 
             // repeat-pad any non-full chunks
             // Stereo and Simplex encoding need to be treated differently
             if (slice_size != chunk_size) {
-                if (input_slice.ndimension() == 1) {
-                    auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
-                    input_slice = at::concat({input_slice.repeat({n}),
-                                              input_slice.index({Ellipsis, Slice(0, overhang)})});
-                } else if (input_slice.ndimension() == 2) {
-                    auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
-                    input_slice = at::concat({input_slice.repeat({1, n}),
-                                              input_slice.index({Ellipsis, Slice(0, overhang)})},
-                                             1);
-                }
+                auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
+                input_slice = at::concat({input_slice.repeat({1, n}),
+                                          input_slice.index({Ellipsis, Slice(0, overhang)})},
+                                         1);
             }
 
             // Insert the chunk in the input tensor
@@ -342,9 +341,9 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
 
     for (auto &runner_ptr : m_model_runners) {
         // m_model_runners is effectively a 3D array with dimensions
-        // [num_devices][num_gpu_runners][chunk_sizes] (see
+        // [num_devices][num_gpu_runners][num_chunk_sizes] (see
         // `dorado::api::create_basecall_runners`). This means the chunk sizes are repeated,
-        // and to get the list of chunk sizes we stop once we see the first chunk size again.
+        // and to get the list of chunk sizes we iterate until we see the first chunk size again.
         if (!m_chunk_sizes.empty() && runner_ptr->chunk_size() == m_chunk_sizes[0]) {
             break;
         }
@@ -353,7 +352,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
 
     auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();
     for (auto s : m_chunk_sizes) {
-        m_chunk_in_queues.emplace_back(
+        m_chunk_in_queues.push_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>(
                         chunk_queue_size));
         spdlog::debug("BasecallerNode chunk size {}", s);

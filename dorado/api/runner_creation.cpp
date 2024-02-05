@@ -99,10 +99,11 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
 
         for (size_t j = 0; j < num_devices; j++) {
-            int chunk_sizes = callers[j]->num_chunk_sizes();
+            size_t num_batch_dims = callers[j]->num_batch_dims();
             for (size_t i = 0; i < num_gpu_runners; i++) {
-                for (int c = 0; c < chunk_sizes; ++c) {
-                    runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j], c));
+                for (size_t batch_dims_idx = 0; batch_dims_idx < num_batch_dims; ++batch_dims_idx) {
+                    runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j],
+                                                                                  batch_dims_idx));
                 }
             }
         }

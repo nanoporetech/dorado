@@ -109,5 +109,6 @@ struct CRFModelConfig {
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
+bool is_duplex_model(const CRFModelConfig& model_config);
 
 }  // namespace dorado::basecall
