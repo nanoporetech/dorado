@@ -26,8 +26,8 @@
 | ------ | -----------------------------------------------------------|
 | RG:Z:  | `<runid>_<basecalling_model>_<barcode_arrangement>`        |
 | qs:i:  | mean basecall qscore rounded to the nearest integer        |
-| ns:i:  | the number of samples in the signal corresponding to the <br /> sequence. ns includes the number of samples trimmed from <br /> the start of the signal (reflected in ts) but does not <br /> include any samples trimmed from the rear of the signal <br />i.e. basecall/move table maps to the [ts:ns] interval of <br /> of the signal |
 | ts:i:  | the number of samples trimmed from the start of the signal |
+| ns:i:  | the basecalled sequence corresponds to the interval `signal[ts : ns]` <br /> the move table maps to the same interval. <br /> note that `ns` reflects trimming (if any) from the rear <br /> of the signal. |
 | mx:i:  | read mux                                                   |
 | ch:i:  | read channel                                               |
 | rn:i:  | read number                                                |
