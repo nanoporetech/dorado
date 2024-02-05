@@ -48,10 +48,11 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto sequence = moves_sequence_qstring[1];
     auto qstring = moves_sequence_qstring[2];
 
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
     {
         utils::ScopedProfileRange spr{"back_guides", 2};
         dorado::utils::handle_cuda_result(host_back_guide_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
                 m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
                 sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
                 int(options.beam_width), options.beam_cut, options.blank_score));
@@ -59,7 +60,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     {
         utils::ScopedProfileRange spr{"beam_search", 2};
         dorado::utils::handle_cuda_result(host_beam_search_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
                 m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
                 sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
                 int(options.beam_width), options.beam_cut, options.blank_score));
@@ -67,7 +68,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     {
         utils::ScopedProfileRange spr{"compute_posts", 2};
         dorado::utils::handle_cuda_result(host_compute_posts_step(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
                 m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
                 sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
                 int(options.beam_width), options.beam_cut, options.blank_score));
@@ -75,7 +76,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     {
         utils::ScopedProfileRange spr{"decode", 2};
         dorado::utils::handle_cuda_result(host_run_decode(
-                chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
                 m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
                 sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
                 int(options.beam_width), options.beam_cut, options.blank_score, options.move_pad));

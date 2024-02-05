@@ -23,13 +23,15 @@ namespace dorado::basecall {
 static constexpr float GB = 1.0e9f;
 
 struct CudaCaller::NNTask {
-    NNTask(at::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
+    NNTask(at::Tensor input_, int num_chunks_, c10::Stream stream_)
+            : input(input_), num_chunks(num_chunks_), stream(stream_) {}
     at::Tensor input;
     int num_chunks;
     decode::DecodeData out;
     std::mutex mut;
     std::condition_variable cv;
     bool done{false};
+    c10::Stream stream;
 };
 
 CudaCaller::CudaCaller(const CRFModelConfig &model_config,
@@ -110,7 +112,7 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         return std::vector<decode::DecodedChunk>();
     }
 
-    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks);
+    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, stream);
     {
         std::lock_guard<std::mutex> lock(m_input_lock);
         m_input_queue.push_front(task);
@@ -291,9 +293,6 @@ void CudaCaller::start_threads() {
 
 void CudaCaller::cuda_thread_fn() {
     at::InferenceMode guard;
-    c10::cuda::CUDAGuard device_guard(m_options.device());
-    auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
-
     const std::string loop_scope_str =
             "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
     const std::string input_q_cv_scope_str =
@@ -320,6 +319,8 @@ void CudaCaller::cuda_thread_fn() {
         auto gpu_lock =
                 dorado::utils::acquire_gpu_lock(m_options.device().index(), m_exclusive_gpu_access);
         nvtxRangePop();
+
+        c10::cuda::CUDAStreamGuard stream_guard(task->stream);
 
         std::unique_lock<std::mutex> task_lock(task->mut);
 
@@ -355,7 +356,7 @@ void CudaCaller::cuda_thread_fn() {
             const auto forward_ms = timer.GetElapsedMS();
             task->out =
                     m_decoder->beam_search_part_1({scores, task->num_chunks, m_decoder_options});
-            stream.synchronize();
+            task->stream.synchronize();
             const auto forward_plus_decode_ms = timer.GetElapsedMS();
             m_model_ms += forward_ms;
             m_decode_ms += forward_plus_decode_ms - forward_ms;
