@@ -72,9 +72,10 @@ bool check_nearby_adapter(const SimplexRead& read, SampleRange<int16_t> r, float
     int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
-    auto min_slice = at::from_blob(const_cast<int16_t*>(&signal[r.end_sample]),
-                                   {static_cast<int>(std::min(100ull, signal_len - r.end_sample))},
-                                   at::TensorOptions().dtype(at::kShort));
+    auto min_slice =
+            at::from_blob(const_cast<int16_t*>(&signal[r.end_sample]),
+                          {static_cast<int>(std::min((uint64_t)100, signal_len - r.end_sample))},
+                          at::TensorOptions().dtype(at::kShort));
     auto min = min_slice.median().item<int16_t>();
     spdlog::trace("Min around pore region {} is {}", r.end_sample, min);
     return min <= static_cast<int16_t>(p10);
