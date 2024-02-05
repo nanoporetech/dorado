@@ -198,7 +198,7 @@ void ModBaseCaller::start_threads() {
 void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
     auto& caller_data = m_caller_data[model_id];
 #if DORADO_CUDA_BUILD
-    c10::cuda::OptionalCUDAStreamGuard guard(caller_data->stream);
+    c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
 #endif
     while (true) {
         nvtx3::scoped_range loop{"modbase_task_thread_fn"};
