@@ -97,7 +97,12 @@ public:
 
     size_t get_raw_data_samples() const { return is_duplex ? raw_data.size(1) : raw_data.size(0); }
 
+    // Track length of estimated polyA tail in bases.
     int rna_poly_tail_length{-1};
+    // Track position of end of RNA adapter in signal space. If the RNA adapter is
+    // trimmed, this will be 0. Otherwise it will be the position in the signal
+    // where the adapter ends.
+    int rna_adapter_end_signal_pos{0};
 
     // subread_id is used to track 2 types of offsprings of a read
     // (1) read splits

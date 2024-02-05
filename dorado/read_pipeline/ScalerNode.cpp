@@ -120,10 +120,17 @@ void ScalerNode::worker_thread() {
         bool is_rna = (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (is_rna && m_trim_adapter) {
+        if (is_rna) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            read->read_common.raw_data =
-                    read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
+            if (m_trim_adapter) {
+                read->read_common.raw_data =
+                        read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
+                read->read_common.rna_adapter_end_signal_pos = 0;
+            } else {
+                // If RNA adapter isn't trimmed, track where the adapter signal is ending
+                // so it can be used during polyA estimation.
+                read->read_common.rna_adapter_end_signal_pos = trim_start;
+            }
         }
 
         assert(read->read_common.raw_data.dtype() == at::kShort);
