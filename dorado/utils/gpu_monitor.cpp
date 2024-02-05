@@ -498,6 +498,8 @@ std::string to_string(ThrottleReason reason) {
         return "hw_power_brake_slowdown";
     case ThrottleReason::display_clock_setting:
         return "display_clock_setting";
+    case ThrottleReason::all_reasons:
+        return "all_reasons";
     }
     // unreachable code, but prevents compiler warning:
     // error: control reaches end of non-void function [-Werror=return-type]
