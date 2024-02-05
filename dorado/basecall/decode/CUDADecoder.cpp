@@ -29,8 +29,10 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
             at::TensorOptions().dtype(at::kChar).device(scores.device()).requires_grad(false);
 
     auto chunks = at::empty({N, 4}, tensor_options_int32);
-    chunks.index({at::indexing::Slice(), 0}) = at::arange(0, int(T * N), int(T));
-    chunks.index({at::indexing::Slice(), 2}) = at::arange(0, int(T * N), int(T));
+    chunks.index({at::indexing::Slice(), 0}) =
+            at::arange(0, int(T * N), int(T), tensor_options_int32);
+    chunks.index({at::indexing::Slice(), 2}) =
+            at::arange(0, int(T * N), int(T), tensor_options_int32);
     chunks.index({at::indexing::Slice(), 1}) = int(T);
     chunks.index({at::indexing::Slice(), 3}) = 0;
 
@@ -42,8 +44,6 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto path = at::zeros(N * (T + 1), tensor_options_int32);
 
     auto moves_sequence_qstring = at::zeros({3, N * T}, tensor_options_int8);
-
-    moves_sequence_qstring.index({at::indexing::Slice()}) = 0.0;
     auto moves = moves_sequence_qstring[0];
     auto sequence = moves_sequence_qstring[1];
     auto qstring = moves_sequence_qstring[2];
