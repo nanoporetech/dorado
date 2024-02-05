@@ -15,7 +15,8 @@ dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model_name=${2:-dna_r10.4.1_e8.2_400bps_hac@v4.1.0}
 batch=${3:-384}
 model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
-model_name_5k_v43=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
+model_name_5k_v43=${5:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
+model_name_rna004=${6:-rna004_130bps_hac@v3.0.1}
 data_dir=$test_dir/data
 output_dir_name=$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
@@ -30,6 +31,8 @@ $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
 model_5k=${output_dir}/${model_name_5k}
 $dorado_bin download --model ${model_name_5k_v43} --directory ${output_dir}
 model_5k_v43=${output_dir}/${model_name_5k_v43}
+$dorado_bin download --model ${model_name_rna004} --directory ${output_dir}
+model_rna004=${output_dir}/${model_name_rna004}
 
 echo dorado basecaller test stage
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
@@ -234,11 +237,18 @@ if cmp --silent -- "$file1" "$file2"; then
 fi
 
 echo "dorado test poly(A) tail estimation"
-$dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/polya.bam
-samtools quickcheck -u $output_dir/polya.bam
-num_estimated_reads=$(samtools view $output_dir/polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+$dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
+samtools quickcheck -u $output_dir/cdna_polya.bam
+num_estimated_reads=$(samtools view $output_dir/cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
 if [[ $num_estimated_reads -ne "2" ]]; then
     echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+    exit 1
+fi
+$dorado_bin basecaller -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam
+samtools quickcheck -u $output_dir/rna_polya.bam
+num_estimated_reads=$(samtools view $output_dir/rna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+if [[ $num_estimated_reads -ne "1" ]]; then
+    echo "1 poly(A) estimated reads expected. Found ${num_estimated_reads}"
     exit 1
 fi
 
