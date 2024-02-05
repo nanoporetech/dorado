@@ -105,7 +105,7 @@ TEST_CASE("Parse custom barcode sequences", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_sequences = data_dir / "test_sequences.fasta";
 
-    auto barcode_sequences = dorado::demux::parse_custom_barcode_sequences(test_sequences.string());
+    auto barcode_sequences = dorado::demux::parse_custom_sequences(test_sequences.string());
 
     CHECK(barcode_sequences.size() == 4);
     CHECK(barcode_sequences["BC01"] == "AAAAAA");

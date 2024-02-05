@@ -1,5 +1,6 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
+  - local: .gitlab/benchmarks-ci.yml
 
 workflow:
   rules:
@@ -18,6 +19,7 @@ stages:
   - build
   - test
   - deploy
+  - regression_test
 
 variables:
   BUILD_DIR: build
@@ -557,7 +559,6 @@ test:model_download:linux:x86:focal:
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
   interruptible: true
-
 
 # MLHub
 

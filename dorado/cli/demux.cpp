@@ -131,9 +131,9 @@ int demuxer(int argc, char* argv[]) {
         custom_kit = parser.get<std::string>("--barcode-arrangement");
     }
 
-    std::optional<std::string> custom_seqs = std::nullopt;
+    std::optional<std::string> custom_barcode_file = std::nullopt;
     if (parser.is_used("--barcode-sequences")) {
-        custom_seqs = parser.get<std::string>("--barcode-sequences");
+        custom_barcode_file = parser.get<std::string>("--barcode-sequences");
     }
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
@@ -176,7 +176,7 @@ int demuxer(int argc, char* argv[]) {
         pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names, parser.get<bool>("--barcode-both-ends"),
                 parser.get<bool>("--no-trim"), std::move(allowed_barcodes), std::move(custom_kit),
-                std::move(custom_seqs));
+                std::move(custom_barcode_file));
     }
 
     // Create the Pipeline from our description.

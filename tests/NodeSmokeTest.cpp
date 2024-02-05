@@ -366,7 +366,7 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     CAPTURE(pipeline_restart);
 
     set_pipeline_restart(pipeline_restart);
-    run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers);
+    run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers, std::nullopt);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {

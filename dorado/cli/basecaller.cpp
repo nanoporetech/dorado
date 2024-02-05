@@ -82,7 +82,8 @@ void setup(std::vector<std::string> args,
            bool primer_no_trim,
            const std::string& barcode_sample_sheet,
            const std::optional<std::string>& custom_kit,
-           const std::optional<std::string>& custom_seqs,
+           const std::optional<std::string>& custom_barcode_file,
+           const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
            const ModelSelection& model_selection) {
@@ -169,13 +170,13 @@ void setup(std::vector<std::string> args,
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim);
+                !primer_no_trim, std::move(custom_primer_file));
     }
     if (barcode_enabled) {
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
-                std::move(custom_kit), std::move(custom_seqs));
+                std::move(custom_kit), std::move(custom_barcode_file));
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -414,6 +415,9 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--barcode-sequences")
             .help("Path to file with custom barcode sequences.")
             .default_value(std::nullopt);
+    parser.visible.add_argument("--primer-sequences")
+            .help("Path to file with custom primer sequences.")
+            .default_value(std::nullopt);
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
                   "dRNA use cases. Note that if this flag is set, then adapter/primer detection "
@@ -541,9 +545,14 @@ int basecaller(int argc, char* argv[]) {
         custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
     }
 
-    std::optional<std::string> custom_seqs = std::nullopt;
+    std::optional<std::string> custom_barcode_seqs = std::nullopt;
     if (parser.visible.is_used("--barcode-sequences")) {
-        custom_seqs = parser.visible.get<std::string>("--barcode-sequences");
+        custom_barcode_seqs = parser.visible.get<std::string>("--barcode-sequences");
+    }
+
+    std::optional<std::string> custom_primer_file = std::nullopt;
+    if (parser.visible.is_used("--primer-sequences")) {
+        custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
     }
 
     fs::path model_path;
@@ -598,8 +607,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::vector<std::string>>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
-              std::move(custom_kit), std::move(custom_seqs), resume_parser,
-              parser.visible.get<bool>("--estimate-poly-a"), model_selection);
+              std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
+              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

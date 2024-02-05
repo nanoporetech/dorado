@@ -1,5 +1,6 @@
 #include "AdapterDetector.h"
 
+#include "parse_custom_kit.h"
 #include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -68,28 +69,44 @@ const std::vector<Primer> primers = {
 namespace dorado {
 namespace demux {
 
-AdapterDetector::AdapterDetector() {
+AdapterDetector::AdapterDetector(const std::optional<std::string>& custom_primer_file) {
     m_adapter_sequences.resize(adapters.size());
     for (size_t i = 0; i < adapters.size(); ++i) {
         m_adapter_sequences[i].name = adapters[i].name;
         m_adapter_sequences[i].sequence = adapters[i].front_sequence;
         m_adapter_sequences[i].sequence_rev = adapters[i].rear_sequence;
     }
-    m_primer_sequences.resize(primers.size());
-    for (size_t i = 0; i < primers.size(); ++i) {
-        m_primer_sequences[i].name = primers[i].name;
-        m_primer_sequences[i].sequence = primers[i].sequence;
-        m_primer_sequences[i].sequence_rev = utils::reverse_complement(primers[i].sequence);
+    if (custom_primer_file.has_value()) {
+        parse_custom_sequence_file(custom_primer_file.value());
+    } else {
+        m_primer_sequences.resize(primers.size());
+        for (size_t i = 0; i < primers.size(); ++i) {
+            m_primer_sequences[i].name = primers[i].name;
+            m_primer_sequences[i].sequence = primers[i].sequence;
+            m_primer_sequences[i].sequence_rev = utils::reverse_complement(primers[i].sequence);
+        }
     }
 }
 
 AdapterDetector::~AdapterDetector() = default;
 
-AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq) {
+void AdapterDetector::parse_custom_sequence_file(const std::string& filename) {
+    auto sequence_map = parse_custom_sequences(filename);
+    for (const auto& item : sequence_map) {
+        Query entry = {item.first, item.second, utils::reverse_complement(item.second)};
+        m_primer_sequences.emplace_back(std::move(entry));
+    }
+    // For testing purposes, we want to make sure the sequences are in a deterministic order.
+    // Note that parse_custom_sequences() returns an unordered_map, so the order may vary by
+    // platform or implementation.
+    std::sort(m_primer_sequences.begin(), m_primer_sequences.end());
+}
+
+AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq) const {
     return detect(seq, m_adapter_sequences, ADAPTER);
 }
 
-AdapterScoreResult AdapterDetector::find_primers(const std::string& seq) {
+AdapterScoreResult AdapterDetector::find_primers(const std::string& seq) const {
     return detect(seq, m_primer_sequences, PRIMER);
 }
 
