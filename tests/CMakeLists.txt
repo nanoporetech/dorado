@@ -1,5 +1,5 @@
 
-set(UNIT_TEST_SOURCE_FILES
+add_executable(dorado_tests
     main.cpp
     AdapterDetectorTest.cpp
     AlignerTest.cpp
@@ -15,20 +15,17 @@ set(UNIT_TEST_SOURCE_FILES
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
-    Fast5DataLoaderTest.cpp
     gpu_monitor_test.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
-    ModelFinderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
-    Pod5DataLoaderTest.cpp
     PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
@@ -45,19 +42,24 @@ set(UNIT_TEST_SOURCE_FILES
     TrimTest.cpp
 )
 
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        list(APPEND UNIT_TEST_SOURCE_FILES
-	        MetalLinearTest.cpp
-        )
-    else()
-        list(APPEND UNIT_TEST_SOURCE_FILES
-            cuda_utils_test.cpp
-        )
-    endif()
+if (NOT IOS)
+    target_sources(dorado_tests
+        PRIVATE
+            # No FAST5 or POD5 on iOS
+            Fast5DataLoaderTest.cpp
+            Pod5DataLoaderTest.cpp
+            # No dorado_io_lib on iOS
+            ModelFinderTest.cpp
+    )
 endif()
 
-add_executable(dorado_tests ${UNIT_TEST_SOURCE_FILES})
+if (DORADO_GPU_BUILD)
+    if(APPLE)
+        target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
+    else()
+        target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
+    endif()
+endif()
 
 set(SMOKE_TEST_SOURCE_FILES
     main.cpp
@@ -71,18 +73,23 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
     endif()
 
-    target_link_libraries(${TEST_BIN}
+    target_link_libraries(${TEST_BIN} PRIVATE
         PRIVATE
-        dorado_lib
-        dorado_io_lib
-        dorado_models_lib
-        dorado_basecall
-        dorado_modbase
-        dorado_compat
-        minimap2
-        ${ZLIB_LIBRARIES}
-        ${POD5_LIBRARIES}
+            dorado_lib
+            dorado_models_lib
+            dorado_basecall
+            dorado_modbase
+            dorado_compat
+            minimap2
+            ${ZLIB_LIBRARIES}
+    )
+    if (NOT IOS)
+        target_link_libraries(${TEST_BIN}
+            PRIVATE
+                dorado_io_lib
+                ${POD5_LIBRARIES}
         )
+    endif()
 
     target_include_directories(${TEST_BIN}
         SYSTEM
@@ -113,6 +120,16 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path
     if (ECM_ENABLE_SANITIZERS AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") AND (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         set_tests_properties(${TEST_BIN} PROPERTIES ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_append:${TORCH_LIB}/lib")
+    endif()
+
+    if (IOS)
+        set_target_properties(${TEST_BIN} PROPERTIES
+            BUNDLE True
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${TEST_BIN}"
+            MACOSX_BUNDLE_BUNDLE_NAME ${TEST_BIN}
+            MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+        )
     endif()
 endforeach()
 
