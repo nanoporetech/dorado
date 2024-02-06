@@ -13,10 +13,10 @@ set(UNIT_TEST_SOURCE_FILES
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
     CRFModelConfigTest.cpp
-    DriverQueryTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
+    gpu_monitor_test.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp
