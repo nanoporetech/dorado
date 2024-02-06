@@ -109,9 +109,15 @@ else()
         endif()
 
     elseif(APPLE)
-        if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            set(TORCH_URL https://nanoporetech.box.com/shared/static/nzdq2wk45pzbwi2zex92j28dt3s5k9vt.tgz)
-            set(TORCH_LIB_SUFFIX "/")
+        if (IOS)
+            if (PLATFORM STREQUAL "OS64")
+                set(TORCH_URL https://nanoporetech.box.com/shared/static/nzdq2wk45pzbwi2zex92j28dt3s5k9vt.tgz)
+                set(TORCH_LIB_SUFFIX "/")
+            else()
+                message(FATAL_ERROR "Unknown iOS platform: ${PLATFORM}")
+            endif()
+            # All iOS builds are static
+            set(USING_STATIC_TORCH_LIB TRUE)
         elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
             if (TRY_USING_STATIC_TORCH_LIB)
                 set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-macos-x64-ont.zip)
@@ -233,6 +239,14 @@ if (USING_STATIC_TORCH_LIB)
                 ${METAL_FRAMEWORK}
                 ${MPS_FRAMEWORK}
                 ${MPSG_FRAMEWORK}
+            )
+        endif()
+        if (IOS)
+            find_library(UIKIT_FRAMEWORK UIKit REQUIRED)
+            find_library(COREML_FRAMEWORK CoreML REQUIRED)
+            list(APPEND TORCH_LIBRARIES
+                ${UIKIT_FRAMEWORK}
+                ${COREML_FRAMEWORK}
             )
         endif()
 
