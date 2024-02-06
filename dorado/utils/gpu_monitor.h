@@ -70,8 +70,6 @@ unsigned int get_device_count();
 namespace detail {
 std::optional<std::string> parse_nvidia_version_line(std::string_view line);
 
-std::optional<unsigned int> get_device_current_temperature(unsigned int device_index);
-
 // check whether the given device can queried via NVML
 bool is_accessible_device(unsigned int device_index);
 }  // namespace detail

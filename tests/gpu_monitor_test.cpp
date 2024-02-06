@@ -125,44 +125,6 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
 
 DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(get_device_count()); }
 
-DEFINE_TEST_FIXTURE_METHOD(
-        "get_device_current_temperature with valid device index does not throw") {
-    if (!first_accessible_device) {
-        return;
-    }
-    CHECK_NOTHROW(detail::get_device_current_temperature(*first_accessible_device));
-}
-
-DEFINE_TEST_FIXTURE_METHOD(
-        "get_device_current_temperature with valid device index returns non-zero value") {
-    if (!first_accessible_device) {
-        return;
-    }
-    auto temp = detail::get_device_current_temperature(*first_accessible_device);
-
-    // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
-    // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(temp.has_value());
-    CHECK(*temp > 0);  // Let's assume it's not freezing!
-}
-
-DEFINE_TEST_FIXTURE_METHOD(
-        "get_device_current_temperature returns a non-zero value for all valid devices") {
-    // Let's assume it's not freezing!
-    for (unsigned int device_index{}; device_index < num_devices; ++device_index) {
-        CAPTURE(device_index);
-        if (!detail::is_accessible_device(device_index)) {
-            continue;
-        }
-        auto temp = detail::get_device_current_temperature(device_index);
-
-        // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
-        // in which case consider rewriting the specific test to pass if the optional is not set
-        REQUIRE(temp.has_value());
-        CHECK(*temp > 0);  // Let's assume it's not freezing!
-    }
-}
-
 DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device does not throw") {
     if (!first_accessible_device) {
         return;
@@ -391,15 +353,6 @@ DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is no
 }
 #else
 DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(get_device_count() == 0); }
-
-DEFINE_TEST("get_device_current_temperature on apple does not throw") {
-    REQUIRE_NOTHROW(detail::get_device_current_temperature(0));
-}
-
-DEFINE_TEST("get_device_current_temperature on apple does not return a value") {
-    auto temperature = detail::get_device_current_temperature(0);
-    REQUIRE_FALSE(temperature.has_value());
-}
 #endif
 
 }  // namespace dorado::utils::gpu_monitor::test

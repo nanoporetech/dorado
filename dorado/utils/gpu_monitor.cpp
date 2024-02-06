@@ -525,27 +525,6 @@ std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
     return std::string(line.substr(version_begin, version_end - version_begin));
 }
 
-std::optional<unsigned int> get_device_current_temperature(unsigned int device_index) {
-#if HAS_NVML
-    auto nvml = NVMLAPI::get();
-    if (!nvml) {
-        return std::nullopt;
-    }
-    auto device_handle = nvml->get_device_handle(device_index);
-    if (!device_handle) {
-        return std::nullopt;
-    }
-    unsigned int temp{};
-    auto result = nvml->DeviceGetTemperature(*device_handle, NVML_TEMPERATURE_GPU, &temp);
-    if (result != NVML_SUCCESS) {
-        return std::nullopt;
-    }
-    return temp;
-#else
-    (void)device_index;
-#endif  // HAS_NVML
-}
-
 bool is_accessible_device(unsigned int device_index) {
 #if HAS_NVML
     auto nvml = NVMLAPI::get();
