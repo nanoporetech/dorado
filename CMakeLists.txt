@@ -503,10 +503,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
     
     enable_warnings_as_errors(dorado_io_lib)
+endif()
 
-    if (NOT DORADO_DISABLE_TESTS)
-        add_subdirectory(tests)
-    endif()
+if (NOT DORADO_DISABLE_TESTS)
+    add_subdirectory(tests)
 endif()
 
 if(NOT DORADO_DISABLE_PACKAGING)
