@@ -3,6 +3,7 @@
 #include "crf_utils.h"
 #include "decode/beam_search.h"
 #include "utils/math_utils.h"
+#include "utils/memory_utils.h"
 #include "utils/metal_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -42,6 +43,14 @@ struct MetalCaller::NNTask {
 MetalCaller::MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size)
         : m_config(model_config) {
     ScopedAutoReleasePool autorelease_pool;
+
+    // Our metal builds assume shared memory, so it's safe to check host.
+    if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
+        spdlog::warn(
+                "Less than 16GB of memory available: {}GB detected. "
+                "This is below minimum spec and may cause issues",
+                total_mem);
+    }
 
     m_num_input_features = model_config.num_features;
 
