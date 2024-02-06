@@ -455,6 +455,7 @@ std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
     return info;
 #else
     (void)device_index;
+    return std::nullopt;
 #endif
 }
 
@@ -541,6 +542,7 @@ bool is_accessible_device(unsigned int device_index) {
     return true;
 #else
     (void)device_index;
+    return false;
 #endif  // HAS_NVML
 }
 
