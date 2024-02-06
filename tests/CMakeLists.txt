@@ -2,17 +2,17 @@
 set(UNIT_TEST_SOURCE_FILES
     main.cpp
     AdapterDetectorTest.cpp
-    CustomBarcodeParserTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
-    BamWriterTest.cpp
     BamUtilsTest.cpp
+    BamWriterTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
     CRFModelConfigTest.cpp
+    CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
     Fast5DataLoaderTest.cpp
@@ -21,11 +21,11 @@ set(UNIT_TEST_SOURCE_FILES
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
-    MotifMatcherTest.cpp
     ModelFinderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
+    MotifMatcherTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
@@ -33,8 +33,8 @@ set(UNIT_TEST_SOURCE_FILES
     ReadFilterNodeTest.cpp
     ReadTest.cpp
     RealignMovesTest.cpp
-    RNASplitTest.cpp
     ResumeLoaderTest.cpp
+    RNASplitTest.cpp
     SampleSheetTests.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
