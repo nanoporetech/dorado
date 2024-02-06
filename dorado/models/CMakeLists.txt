@@ -1,8 +1,10 @@
 add_library(dorado_models_lib STATIC
-    kits.h
     kits.cpp
-    metadata.h
+    kits.h
     metadata.cpp
+    metadata.h
+    model_downloader.h
+    model_downloader.cpp
     models.cpp
     models.h
 )
