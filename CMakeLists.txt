@@ -314,7 +314,6 @@ target_link_libraries(dorado_lib
     PUBLIC
         ${TORCH_LIBRARIES}
         htslib
-        vbz_hdf_plugin
         edlib
         dorado_utils
         dorado_basecall
@@ -492,6 +491,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         PRIVATE
             ${POD5_LIBRARIES}
             ${HDF5_C_LIBRARIES}
+            vbz_hdf_plugin
             ${CMAKE_DL_LIBS}
             ${ZLIB_LIBRARIES}
     )
