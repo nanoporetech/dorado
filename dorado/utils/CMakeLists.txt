@@ -8,6 +8,8 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
+    crypto_utils.h
+    crypto_utils.cpp
     dev_utils.cpp
     dev_utils.h
     duplex_utils.cpp
@@ -121,6 +123,10 @@ endif()
 
 if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     target_link_libraries(dorado_utils PUBLIC ${IOKIT})
+endif()
+
+if (NOT APPLE)
+    target_link_libraries(dorado_utils PRIVATE OpenSSL::SSL)
 endif()
 
 if(NOT WIN32)
