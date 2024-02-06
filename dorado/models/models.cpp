@@ -3,6 +3,8 @@
 #include "data_loader/ModelFinder.h"
 #include "kits.h"
 #include "metadata.h"
+#include "utils/crypto_utils.h"
+#include "utils/string_utils.h"
 
 #include <elzip/elzip.hpp>
 
@@ -20,8 +22,6 @@
 #define CPPHTTPLIB_SEND_FLAGS MSG_NOSIGNAL
 #endif
 #define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "utils/string_utils.h"
-
 #include <httplib.h>
 #include <spdlog/spdlog.h>
 
@@ -778,8 +778,7 @@ const std::vector<ModelInfo> models = {
 
 std::string calculate_checksum(std::string_view data) {
     // Hash the data.
-    std::array<unsigned char, SHA256_DIGEST_LENGTH> hash{};
-    SHA256(reinterpret_cast<const unsigned char*>(data.data()), data.size(), hash.data());
+    const auto hash = utils::crypto::sha256(data);
 
     // Stringify it.
     std::ostringstream checksum;

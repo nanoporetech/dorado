@@ -1,6 +1,6 @@
 #include "uuid_utils.h"
 
-#include <openssl/evp.h>
+#include "crypto_utils.h"
 
 #include <algorithm>
 #include <array>
@@ -10,14 +10,8 @@
 namespace dorado::utils {
 
 std::string derive_uuid(const std::string& input_uuid, const std::string& desc) {
-    // Hash the input UUID using SHA-256
-    EVP_MD_CTX* mdctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(mdctx, EVP_sha256(), nullptr);
-    EVP_DigestUpdate(mdctx, input_uuid.c_str(), input_uuid.size());
-    EVP_DigestUpdate(mdctx, desc.c_str(), desc.size());
-    unsigned char hash[EVP_MAX_MD_SIZE];
-    EVP_DigestFinal_ex(mdctx, hash, nullptr);
-    EVP_MD_CTX_free(mdctx);
+    // Hash the input UUID+desc using SHA-256
+    const auto hash = utils::crypto::sha256(input_uuid + desc);
 
     // Truncate the hash to 16 bytes (128 bits) to match the size of a UUID
     std::array<unsigned char, 16> truncated_hash;

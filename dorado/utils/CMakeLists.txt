@@ -100,7 +100,6 @@ target_link_libraries(dorado_utils
     PRIVATE
         dorado_compat
         minimap2
-        OpenSSL::SSL
         htslib
 )
 
