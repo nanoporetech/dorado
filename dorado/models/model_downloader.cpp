@@ -8,6 +8,7 @@
 
 #include <sstream>
 
+#if DORADO_MODELS_HAS_HTTPLIB
 #ifndef _WIN32
 // Required for MSG_NOSIGNAL and SO_NOSIGPIPE
 #include <sys/socket.h>
@@ -19,6 +20,7 @@
 #endif
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include <httplib.h>
+#endif  // DORADO_MODELS_HAS_HTTPLIB
 
 namespace fs = std::filesystem;
 
@@ -45,6 +47,7 @@ std::string calculate_checksum(std::string_view data) {
     return std::move(checksum).str();
 }
 
+#if DORADO_MODELS_HAS_HTTPLIB
 void set_ssl_cert_file() {
 #ifndef _WIN32
     // Allow the user to override this.
@@ -92,8 +95,12 @@ void set_ssl_cert_file() {
     }
 #endif  // _WIN32
 }
+#endif  // DORADO_MODELS_HAS_HTTPLIB
 
-auto create_client() {
+}  // namespace
+
+#if DORADO_MODELS_HAS_HTTPLIB
+auto ModelDownloader::create_client() {
     set_ssl_cert_file();
 
     auto http = std::make_unique<httplib::Client>(urls::URL_ROOT);
@@ -127,25 +134,42 @@ auto create_client() {
 
     return http;
 }
+#endif  // DORADO_MODELS_HAS_HTTPLIB
 
-}  // namespace
-
-ModelDownloader::ModelDownloader(fs::path directory)
-        : m_client(create_client()), m_directory(std::move(directory)) {}
+ModelDownloader::ModelDownloader(fs::path directory) : m_directory(std::move(directory)) {
+#if DORADO_MODELS_HAS_HTTPLIB
+    m_client = create_client();
+#endif
+}
 
 ModelDownloader::~ModelDownloader() = default;
 
 bool ModelDownloader::download(const std::string& model, const ModelInfo& info) {
     auto archive = m_directory / (model + ".zip");
 
-    // Try and download using httplib, falling back on curl.
-    if (!download_httplib(model, info, archive) && !download_curl(model, info, archive)) {
-        return false;
+    // Try and download using the native approach, falling back on httplib then on system curl.
+    bool success = false;
+#if DORADO_MODELS_HAS_FOUNDATION
+    if (!success) {
+        success = download_foundation(model, info, archive);
     }
+#endif
+#if DORADO_MODELS_HAS_HTTPLIB
+    if (!success) {
+        success = download_httplib(model, info, archive);
+    }
+#endif
+#if DORADO_MODELS_HAS_CURL_EXE
+    if (!success) {
+        success = download_curl(model, info, archive);
+    }
+#endif
 
     // Extract it.
-    extract(archive);
-    return true;
+    if (success) {
+        extract(archive);
+    }
+    return success;
 }
 
 std::string ModelDownloader::get_url(const std::string& model) const {
@@ -168,6 +192,7 @@ void ModelDownloader::extract(const fs::path& archive) const {
     fs::remove(archive);
 }
 
+#if DORADO_MODELS_HAS_HTTPLIB
 bool ModelDownloader::download_httplib(const std::string& model,
                                        const ModelInfo& info,
                                        const fs::path& archive) {
@@ -188,7 +213,9 @@ bool ModelDownloader::download_httplib(const std::string& model,
     output.close();
     return true;
 }
+#endif  // DORADO_MODELS_HAS_HTTPLIB
 
+#if DORADO_MODELS_HAS_CURL_EXE
 bool ModelDownloader::download_curl(const std::string& model,
                                     const ModelInfo& info,
                                     const fs::path& archive) {
@@ -212,5 +239,6 @@ bool ModelDownloader::download_curl(const std::string& model,
     output.close();
     return validate_checksum(buffer, info);
 }
+#endif  // DORADO_MODELS_HAS_CURL_EXE
 
 }  // namespace dorado::models
