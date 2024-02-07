@@ -75,7 +75,7 @@ if (IOS)
     # them manually on a real device.
     set(TEST_DEVICE "iPhone 15 Pro Max")
     add_test(
-        NAME kill_simulator
+        NAME kill_simulator_before
         COMMAND xcrun simctl shutdown ${TEST_DEVICE}
     )
     add_test(
@@ -85,8 +85,17 @@ if (IOS)
     # Kill the sim if it's running otherwise we fail to launch a new one.
     set_tests_properties(launch_simulator
         PROPERTIES
-            DEPENDS kill_simulator
+            DEPENDS kill_simulator_before
             FIXTURES_SETUP interacting_with_device
+    )
+    # Kill the sim after so that it's not just hanging around.
+    add_test(
+        NAME kill_simulator_after
+        COMMAND xcrun simctl shutdown ${TEST_DEVICE}
+    )
+    set_tests_properties(kill_simulator_after
+        PROPERTIES
+            FIXTURES_CLEANUP interacting_with_device
     )
 endif()
 
