@@ -10,8 +10,8 @@ if (NOT MULTI_CONFIG)
   if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
-message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 endif()
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 
 # If no prefix is provided we install next to the binary directory.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
