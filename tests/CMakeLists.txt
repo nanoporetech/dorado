@@ -76,7 +76,7 @@ if (IOS)
     set(TEST_DEVICE "iPhone 15 Pro Max")
     add_test(
         NAME kill_simulator_before
-        COMMAND xcrun simctl shutdown ${TEST_DEVICE}
+        COMMAND xcrun simctl shutdown all
     )
     add_test(
         NAME launch_simulator
