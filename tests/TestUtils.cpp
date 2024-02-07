@@ -4,11 +4,30 @@
 #include <fstream>
 #include <iostream>
 
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 namespace dorado::tests {
 
 std::filesystem::path get_data_dir(const std::string& sub_dir) {
-    const std::filesystem::path data_path = std::filesystem::path("./tests/data/") / sub_dir;
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+    char raw_path[PATH_MAX]{};
 
+    CFURLRef root_url = CFBundleCopyBundleURL(CFBundleGetMainBundle());
+    if (!CFURLGetFileSystemRepresentation(
+                root_url, true, reinterpret_cast<unsigned char*>(raw_path), sizeof(raw_path))) {
+        std::cerr << "Failed to resolve bundle path." << std::endl;
+        exit(1);
+    }
+    CFRelease(root_url);
+
+    const std::filesystem::path root_path(raw_path);
+#else
+    const std::filesystem::path root_path("./tests/data/");
+#endif
+
+    const auto data_path = root_path / sub_dir;
     if (!std::filesystem::exists(data_path)) {
         std::cerr << "Datapath " << data_path
                   << " does not exist, exiting.\n"
