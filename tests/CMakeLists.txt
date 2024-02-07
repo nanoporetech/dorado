@@ -61,12 +61,12 @@ if (DORADO_GPU_BUILD)
     endif()
 endif()
 
-set(SMOKE_TEST_SOURCE_FILES
+
+add_executable(dorado_smoke_tests
     main.cpp
     NodeSmokeTest.cpp
 )
 
-add_executable(dorado_smoke_tests ${SMOKE_TEST_SOURCE_FILES})
 
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
