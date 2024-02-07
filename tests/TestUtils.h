@@ -6,7 +6,7 @@
 
 namespace dorado::tests {
 
-std::string get_data_dir(const std::string& sub_dir);
+std::filesystem::path get_data_dir(const std::string& sub_dir);
 
 // Reads into a string.
 std::string ReadFileIntoString(const std::filesystem::path& path);
@@ -18,7 +18,7 @@ std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path);
 
 #define get_pod5_data_dir() get_data_dir("pod5")
 
-#define get_single_pod5_file_path() (get_data_dir("pod5") + "/single_na24385.pod5")
+#define get_single_pod5_file_path() (get_data_dir("pod5") / "single_na24385.pod5")
 
 #define get_nested_pod5_data_dir() get_data_dir("nested_pod5_folder")
 

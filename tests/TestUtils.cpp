@@ -6,7 +6,7 @@
 
 namespace dorado::tests {
 
-std::string get_data_dir(const std::string& sub_dir) {
+std::filesystem::path get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path data_path = std::filesystem::path("./tests/data/") / sub_dir;
 
     if (!std::filesystem::exists(data_path)) {
@@ -16,7 +16,7 @@ std::string get_data_dir(const std::string& sub_dir) {
                   << std::endl;
         exit(1);
     }
-    return data_path.string();
+    return data_path;
 }
 
 std::string ReadFileIntoString(const std::filesystem::path& path) {
