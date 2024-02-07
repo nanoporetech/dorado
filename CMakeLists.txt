@@ -13,6 +13,10 @@ if (NOT MULTI_CONFIG)
 message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 endif()
 
+# If no prefix is provided we install next to the binary directory.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+endif()
 
 if(WIN32)
   # all third parties are release builds, so we must match the windows runtime
@@ -375,12 +379,6 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_compat
         minimap2
     )
-
-    if (DEFINED DORADO_INSTALL_PATH)
-        set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
-    else()
-        set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
-    endif()
 
     install(TARGETS dorado RUNTIME)
 endif()
