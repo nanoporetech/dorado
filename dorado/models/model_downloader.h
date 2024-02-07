@@ -23,6 +23,7 @@ private:
     const std::filesystem::path m_directory;
 
     std::string get_url(const std::string& model) const;
+    bool validate_checksum(std::string_view data, const ModelInfo& info) const;
     void extract(const std::filesystem::path& archive) const;
 
     bool download_httplib(const std::string& model,

@@ -152,6 +152,17 @@ std::string ModelDownloader::get_url(const std::string& model) const {
     return urls::URL_ROOT + urls::URL_PATH + model + ".zip";
 }
 
+bool ModelDownloader::validate_checksum(std::string_view data, const ModelInfo& info) const {
+    // Check that this matches the hash we expect.
+    const auto checksum = calculate_checksum(data);
+    if (checksum != info.checksum) {
+        spdlog::error("Model download failed checksum validation: {} - {} != {}", info.name,
+                      checksum, info.checksum);
+        return false;
+    }
+    return true;
+}
+
 void ModelDownloader::extract(const fs::path& archive) const {
     elz::extractZip(archive, m_directory);
     fs::remove(archive);
@@ -167,11 +178,7 @@ bool ModelDownloader::download_httplib(const std::string& model,
         return false;
     }
 
-    // Check that this matches the hash we expect.
-    const auto checksum = calculate_checksum(res->body);
-    if (checksum != info.checksum) {
-        spdlog::error("Model download failed checksum validation: {} - {} != {}", model, checksum,
-                      info.checksum);
+    if (!validate_checksum(res->body, info)) {
         return false;
     }
 
@@ -203,14 +210,7 @@ bool ModelDownloader::download_curl(const std::string& model,
     buffer.resize(fs::file_size(archive));
     output.read(buffer.data(), buffer.size());
     output.close();
-
-    const auto checksum = calculate_checksum(buffer);
-    if (checksum != info.checksum) {
-        spdlog::error("Model download failed checksum validation: {} - {} != {}", model, checksum,
-                      info.checksum);
-        return false;
-    }
-    return true;
+    return validate_checksum(buffer, info);
 }
 
 }  // namespace dorado::models
