@@ -68,6 +68,29 @@ add_executable(dorado_smoke_tests
 )
 
 
+if (IOS)
+    # I'm assuming that these tests will only be run in the sim on CI, so they
+    # depend on the sim being launched.
+    # Note: The test targets can still be built, but you'll need to install+launch
+    # them manually on a real device.
+    set(TEST_DEVICE "iPhone 15 Pro Max")
+    add_test(
+        NAME kill_simulator
+        COMMAND xcrun simctl shutdown ${TEST_DEVICE}
+    )
+    add_test(
+        NAME launch_simulator
+        COMMAND xcrun simctl boot ${TEST_DEVICE}
+    )
+    # Kill the sim if it's running otherwise we fail to launch a new one.
+    set_tests_properties(launch_simulator
+        PROPERTIES
+            DEPENDS kill_simulator
+            FIXTURES_SETUP interacting_with_device
+    )
+endif()
+
+
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
@@ -95,19 +118,53 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         SYSTEM
         PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/catch2
-        )
+    )
     
     enable_warnings_as_errors(${TEST_BIN})
-
-    add_test(
-        NAME ${TEST_BIN}
-        COMMAND ${TEST_BIN}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        )
-
     if(NOT MSVC)
         # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
         target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
+    endif()
+
+    if (IOS)
+        add_test(
+            NAME install_${TEST_BIN}
+            COMMAND
+                xcrun simctl install
+                    booted
+                    # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
+                    # when building for the sim.
+                    ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
+        )
+        set_tests_properties(install_${TEST_BIN}
+            PROPERTIES
+                # Make sure the sim is running
+                DEPENDS launch_simulator
+                # Don't try and do more than 1 thing on the device.
+                FIXTURES_REQUIRED interacting_with_device
+        )
+        add_test(
+            NAME ${TEST_BIN}
+            COMMAND
+                xcrun simctl launch
+                    --console
+                    --terminate-running-process
+                    booted
+                    com.ont.${TEST_BIN}
+        )
+        set_tests_properties(${TEST_BIN}
+            PROPERTIES
+                # Make sure the app is installed before running it.
+                DEPENDS install_${TEST_BIN}
+                # Don't try and do more than 1 thing on the device.
+                FIXTURES_REQUIRED interacting_with_device
+        )
+    else()
+        add_test(
+            NAME ${TEST_BIN}
+            COMMAND ${TEST_BIN}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
     endif()
 
     # The tests need to be able to find the libs in order to run.
