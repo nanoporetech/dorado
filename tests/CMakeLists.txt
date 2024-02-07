@@ -146,11 +146,8 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         add_test(
             NAME ${TEST_BIN}
             COMMAND
-                xcrun simctl launch
-                    --console
-                    --terminate-running-process
-                    booted
-                    com.ont.${TEST_BIN}
+                ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py
+                    --identifier com.ont.${TEST_BIN}
         )
         set_tests_properties(${TEST_BIN}
             PROPERTIES
