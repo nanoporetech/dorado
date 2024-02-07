@@ -1,6 +1,5 @@
 
 add_executable(dorado_tests
-    main.cpp
     AdapterDetectorTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
@@ -63,8 +62,23 @@ endif()
 
 
 add_executable(dorado_smoke_tests
-    main.cpp
     NodeSmokeTest.cpp
+)
+
+
+add_library(dorado_tests_common STATIC
+    main.cpp
+    TestUtils.cpp
+)
+target_link_libraries(dorado_tests_common
+    PUBLIC
+        dorado_utils
+        dorado_compat
+)
+target_include_directories(dorado_tests_common
+    SYSTEM
+    PUBLIC
+        ${DORADO_3RD_PARTY_SOURCE}/catch2
 )
 
 
@@ -105,13 +119,13 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
     endif()
 
-    target_link_libraries(${TEST_BIN} PRIVATE
+    target_link_libraries(${TEST_BIN}
         PRIVATE
+            dorado_tests_common
             dorado_lib
             dorado_models_lib
             dorado_basecall
             dorado_modbase
-            dorado_compat
             minimap2
             ${ZLIB_LIBRARIES}
     )
@@ -122,12 +136,6 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
                 ${POD5_LIBRARIES}
         )
     endif()
-
-    target_include_directories(${TEST_BIN}
-        SYSTEM
-        PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/catch2
-    )
     
     enable_warnings_as_errors(${TEST_BIN})
     if(NOT MSVC)
