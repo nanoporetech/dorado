@@ -106,10 +106,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                         intervals.pop_back();
                     } else if (second_last.second - second_last.first <
                                std::round(num_samples_per_base * min_base_count)) {
-                        auto it = intervals.end();
-                        --it;
-                        --it;
-                        intervals.erase(it);
+                        intervals.erase(intervals.end() - 2);
                     }
                 }
                 spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
@@ -127,7 +124,6 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
 
     // Cluster intervals
     const int kMaxInterruption = 2 * kMaxSampleGap;
-    ;
     std::vector<std::pair<int, int>> clustered_intervals;
     for (const auto& i : intervals) {
         if (clustered_intervals.empty()) {
@@ -136,6 +132,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             auto& last = clustered_intervals.back();
             if (std::abs(i.first - last.second) < kMaxInterruption) {
                 last.second = i.second;
+            } else {
+                clustered_intervals.push_back(i);
             }
         }
     }

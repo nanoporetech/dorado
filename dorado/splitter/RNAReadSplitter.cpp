@@ -27,12 +27,10 @@ RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) cons
     auto p99 = quantiles[2].item<float>();
     spdlog::trace("Read {} quantiles {} {} {}", ext_read.read->read_common.read_id, p10, p95, p99);
     float pore_thr = (p99 >= p95 * 1.5f ? p99 : m_settings.pore_thr);
-    //auto pore_thr = m_settings.pore_thr;
     ext_read.possible_pore_regions =
             detect_pore_signal<int16_t>(ext_read.read->read_common.raw_data, pore_thr,
                                         m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
     ext_read.p10 = p10;
-    //ext_read.p10 = 10;
     for (const auto& range : ext_read.possible_pore_regions) {
         spdlog::trace("Pore range {}-{} {}", range.start_sample, range.end_sample,
                       ext_read.read->read_common.read_id);
@@ -66,18 +64,15 @@ std::vector<SimplexReadPtr> RNAReadSplitter::subreads(SimplexReadPtr read,
 }
 
 bool check_nearby_adapter(const SimplexRead& read, SampleRange<int16_t> r, float p10) {
-    //(void) read; (void) r; (void) p10;
-    //return false;
     assert(read.read_common.raw_data.dtype() == at::kShort);
     int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
-    const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
 
-    auto min_slice =
-            at::from_blob(const_cast<int16_t*>(&signal[r.end_sample]),
-                          {static_cast<int>(std::min((uint64_t)100, signal_len - r.end_sample))},
-                          at::TensorOptions().dtype(at::kShort));
-    auto min = min_slice.median().item<int16_t>();
-    spdlog::trace("Min around pore region {} is {}", r.end_sample, min);
+    const uint64_t kRegionAroundPore = 100;
+    auto min_slice = read.read_common.raw_data.slice(
+            0, r.end_sample, r.end_sample + std::min(kRegionAroundPore, signal_len - r.end_sample));
+    auto min = min_slice.min().item<int16_t>();
+    spdlog::trace("{}: Min around pore region {} is {}", read.read_common.read_id, r.end_sample,
+                  min);
     return min <= static_cast<int16_t>(p10);
 }
 
