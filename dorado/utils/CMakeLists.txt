@@ -110,6 +110,9 @@ if (DORADO_ENABLE_PCH)
 endif()
 
 if(APPLE AND DORADO_GPU_BUILD)
+    find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
+    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+    find_library(APPLE_FWK_METAL Metal REQUIRED)
     add_dependencies(dorado_utils metal-lib)
     target_link_libraries(
         dorado_utils
@@ -117,11 +120,11 @@ if(APPLE AND DORADO_GPU_BUILD)
         ${APPLE_FWK_FOUNDATION}
         ${APPLE_FWK_QUARTZ_CORE}
         ${APPLE_FWK_METAL}
-    )   
-endif()
-
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(dorado_utils PUBLIC ${IOKIT})
+    )
+    if (NOT IOS)
+        find_library(IOKIT IOKit REQUIRED)
+        target_link_libraries(dorado_utils PUBLIC ${IOKIT})
+    endif()
 endif()
 
 if (NOT APPLE)
