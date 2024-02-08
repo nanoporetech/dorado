@@ -13,6 +13,10 @@
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -74,7 +78,15 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
         m_options = at::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
 #ifdef __APPLE__
     } else if (device == "metal") {
-        m_options = at::TensorOptions().device(torch::kMPS).dtype(torch::kFloat16);
+#if TARGET_OS_IPHONE
+        spdlog::warn("Using CPU backend since no MPS backend available on iOS.");
+        const auto device_type = torch::kCPU;
+        const auto scalar_type = torch::kFloat32;
+#else
+        const auto device_type = torch::kMPS;
+        const auto scalar_type = torch::kFloat16;
+#endif
+        m_options = at::TensorOptions().device(device_type).dtype(scalar_type);
 #endif
     } else {
         m_options = at::TensorOptions().device(device).dtype(torch::kFloat16);
