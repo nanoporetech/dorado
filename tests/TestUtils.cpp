@@ -22,7 +22,7 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     }
     CFRelease(root_url);
 
-    const std::filesystem::path root_path(raw_path);
+    const auto root_path = std::filesystem::path(raw_path) / "data";
 #else
     const std::filesystem::path root_path("./tests/data/");
 #endif

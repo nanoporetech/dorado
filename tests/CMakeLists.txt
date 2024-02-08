@@ -186,11 +186,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         file(TOUCH ${METALLIB_PATH})
 
         # Grab all the data files that we want to package.
-        file(GLOB DATA_RESOURCES
-            RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/data/*
-        )
-        list(APPEND DATA_RESOURCES ${METALLIB_PATH})
+        set(DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data;${METALLIB_PATH}")
 
         # To package data into the app we need to make it a source file.
         target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
