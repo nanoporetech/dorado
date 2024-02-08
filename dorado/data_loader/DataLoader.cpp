@@ -23,6 +23,10 @@
 #include <stdexcept>
 #include <vector>
 
+namespace dorado {
+
+namespace {
+
 /**
  * @brief Fetches directory entries from a specified path.
  *
@@ -57,8 +61,6 @@ auto fetch_directory_entries(const std::filesystem::path& path, bool recursive) 
 
     return entries;
 }
-
-namespace {
 
 // ReadID should be a drop-in replacement for read_id_t
 static_assert(sizeof(dorado::ReadID) == sizeof(read_id_t));
@@ -145,10 +147,6 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
 
     return pod5_entries;
 }
-
-}  // namespace
-
-namespace dorado {
 
 // TODO: Replace the const * to read_by_channel and read_id_to_index
 // with const &. Initial attempt led to a big performance drop
@@ -266,6 +264,8 @@ bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
     }
     return false;
 }
+
+}  // namespace
 
 void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_reader(pod5); }
 
