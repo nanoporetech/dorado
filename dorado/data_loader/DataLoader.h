@@ -4,6 +4,7 @@
 #include "utils/types.h"
 
 #include <array>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -37,27 +38,28 @@ public:
                std::optional<std::unordered_set<std::string>> read_list,
                std::unordered_set<std::string> read_ignore_list);
     ~DataLoader() = default;
-    void load_reads(const std::string& path,
+    void load_reads(const std::filesystem::path& path,
                     bool recursive_file_loading,
                     ReadOrder traversal_order);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
-            std::string data_path,
+            std::filesystem::path data_path,
             std::string model_path,
             std::string modbase_model_names,
             bool recursive_file_loading);
 
-    static int get_num_reads(std::string data_path,
+    static int get_num_reads(std::filesystem::path data_path,
                              std::optional<std::unordered_set<std::string>> read_list,
                              const std::unordered_set<std::string>& ignore_read_list,
                              bool recursive_file_loading);
 
-    static bool is_read_data_present(std::string data_path, bool recursive_file_loading);
+    static bool is_read_data_present(std::filesystem::path data_path, bool recursive_file_loading);
 
-    static uint16_t get_sample_rate(std::string data_path, bool recursive_file_loading);
+    static uint16_t get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading);
 
-    static std::vector<models::ChemistryKey> get_sequencing_chemistry(std::string data_path,
-                                                                      bool recursive_file_loading);
+    static std::vector<models::ChemistryKey> get_sequencing_chemistry(
+            std::filesystem::path data_path,
+            bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
@@ -73,7 +75,7 @@ private:
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
-    void load_read_channels(std::string data_path, bool recursive_file_loading);
+    void load_read_channels(std::filesystem::path data_path, bool recursive_file_loading);
     Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
     std::string m_device;

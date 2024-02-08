@@ -36,7 +36,7 @@
  *                  True for recursive mode, false for non-recursive mode.
  * @return A vector of directory entries fetched from the specified path.
  */
-auto fetch_directory_entries(const std::string& path, bool recursive) {
+auto fetch_directory_entries(const std::filesystem::path& path, bool recursive) {
     using DirEntry = std::filesystem::directory_entry;
 
     std::vector<DirEntry> entries;
@@ -269,11 +269,11 @@ bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
 
 void Pod5Destructor::operator()(Pod5FileReader_t* pod5) { pod5_close_and_free_reader(pod5); }
 
-void DataLoader::load_reads(const std::string& path,
+void DataLoader::load_reads(const std::filesystem::path& path,
                             bool recursive_file_loading,
                             ReadOrder traversal_order) {
     if (!std::filesystem::exists(path)) {
-        spdlog::error("Requested input path {} does not exist!", path);
+        spdlog::error("Requested input path {} does not exist!", path.string());
         return;
     }
 
@@ -364,7 +364,7 @@ void DataLoader::load_reads(const std::string& path,
     iterate_directory(filtered_entries);
 }
 
-int DataLoader::get_num_reads(std::string data_path,
+int DataLoader::get_num_reads(std::filesystem::path data_path,
                               std::optional<std::unordered_set<std::string>> read_list,
                               const std::unordered_set<std::string>& ignore_read_list,
                               bool recursive_file_loading) {
@@ -418,7 +418,7 @@ int DataLoader::get_num_reads(std::string data_path,
     return int(num_reads);
 }
 
-void DataLoader::load_read_channels(std::string data_path, bool recursive_file_loading) {
+void DataLoader::load_read_channels(std::filesystem::path data_path, bool recursive_file_loading) {
     auto iterate_directory = [&](const auto& iterator) {
         for (const auto& entry : iterator) {
             auto file_path = std::filesystem::path(entry);
@@ -503,7 +503,7 @@ void DataLoader::load_read_channels(std::string data_path, bool recursive_file_l
 }
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
-        std::string data_path,
+        std::filesystem::path data_path,
         std::string model_path,
         std::string modbase_model_names,
         bool recursive_file_loading) {
@@ -568,7 +568,8 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
-bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file_loading) {
+bool DataLoader::is_read_data_present(std::filesystem::path data_path,
+                                      bool recursive_file_loading) {
     auto check_directory = [&](const auto& iterator) {
         for (const auto& entry : iterator) {
             std::string ext = std::filesystem::path(entry).extension().string();
@@ -584,7 +585,7 @@ bool DataLoader::is_read_data_present(std::string data_path, bool recursive_file
     return check_directory(fetch_directory_entries(data_path, recursive_file_loading));
 }
 
-uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_loading) {
+uint16_t DataLoader::get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
     auto iterate_directory = [&](const auto& iterator) {
@@ -673,7 +674,7 @@ uint16_t DataLoader::get_sample_rate(std::string data_path, bool recursive_file_
 }
 
 std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
-        std::string data_path,
+        std::filesystem::path data_path,
         bool recursive_file_loading) {
     std::vector<models::ChemistryKey> chemistries = {};
 

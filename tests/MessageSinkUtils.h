@@ -54,7 +54,7 @@ std::vector<T> ConvertMessages(std::vector<dorado::Message>&& messages) {
     return converted_messages;
 }
 
-inline size_t CountSinkReads(const std::string& data_path,
+inline size_t CountSinkReads(const std::filesystem::path& data_path,
                              const std::string& device,
                              size_t num_worker_threads,
                              size_t max_reads,
