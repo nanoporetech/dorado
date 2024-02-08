@@ -145,31 +145,16 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
 
     if (IOS)
         add_test(
-            NAME install_${TEST_BIN}
-            COMMAND
-                xcrun simctl install
-                    booted
-                    # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
-                    # when building for the sim.
-                    ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
-        )
-        set_tests_properties(install_${TEST_BIN}
-            PROPERTIES
-                # Make sure the sim is running
-                DEPENDS launch_simulator
-                # Don't try and do more than 1 thing on the device.
-                FIXTURES_REQUIRED interacting_with_device
-        )
-        add_test(
             NAME ${TEST_BIN}
             COMMAND
                 ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py
+                    # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
+                    # when building for the sim.
+                    --app_path ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
                     --identifier com.ont.${TEST_BIN}
         )
         set_tests_properties(${TEST_BIN}
             PROPERTIES
-                # Make sure the app is installed before running it.
-                DEPENDS install_${TEST_BIN}
                 # Don't try and do more than 1 thing on the device.
                 FIXTURES_REQUIRED interacting_with_device
         )
