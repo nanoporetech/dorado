@@ -48,7 +48,7 @@ TEST_CASE(TEST_GROUP
 }
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.") {
-    std::string data_path(get_pod5_data_dir());
+    auto data_path = get_pod5_data_dir();
 
     SECTION("pod5 file only, no read ids list") {
         CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt, {}, false) == 1);
@@ -67,22 +67,22 @@ TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from single pod5.") {
-    std::string single_read_path(get_pod5_data_dir());
+    auto single_read_path = get_pod5_data_dir();
     CHECK(dorado::DataLoader::get_sample_rate(single_read_path, false) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from pod5 dir.") {
-    std::string data_path(get_pod5_data_dir());
+    auto data_path = get_pod5_data_dir();
     CHECK(dorado::DataLoader::get_sample_rate(data_path, false) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from nested pod5.") {
-    std::string data_path(get_nested_pod5_data_dir());
+    auto data_path = get_nested_pod5_data_dir();
     CHECK(dorado::DataLoader::get_sample_rate(data_path, true) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
-    std::string data_path(get_data_dir("multi_read_pod5"));
+    auto data_path = get_data_dir("multi_read_pod5");
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -102,7 +102,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
 }
 
 TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
-    std::string data_path(get_data_dir("multi_read_pod5"));
+    auto data_path = get_data_dir("multi_read_pod5");
 
     SECTION("read ignore list with 1 read") {
         auto read_ignore_list = std::unordered_set<std::string>();
@@ -126,7 +126,7 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
 }
 
 TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by channel order.") {
-    std::string data_path(get_data_dir("single_channel_multi_read_pod5"));
+    auto data_path = get_data_dir("single_channel_multi_read_pod5");
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;

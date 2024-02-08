@@ -253,7 +253,7 @@ models::ModelInfo ModelFinder::get_simplex_model_info(const std::string& model_n
 }
 
 void check_sampling_rates_compatible(const std::string& model_name,
-                                     const std::string& data_path,
+                                     const std::filesystem::path& data_path,
                                      const int config_sample_rate,
                                      const bool recursive_file_loading) {
     SamplingRate sample_rate;
