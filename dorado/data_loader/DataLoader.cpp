@@ -504,7 +504,7 @@ void DataLoader::load_read_channels(std::filesystem::path data_path, bool recurs
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
         std::filesystem::path data_path,
-        std::string model_path,
+        std::string model_name,
         std::string modbase_model_names,
         bool recursive_file_loading) {
     std::unordered_map<std::string, ReadGroup> read_groups;
@@ -543,10 +543,10 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                             spdlog::error("Failed to free run info");
                         }
 
-                        std::string id = run_id + "_" + model_path;
+                        std::string id = run_id + "_" + model_name;
                         read_groups[id] = ReadGroup{
                                 run_id,
-                                model_path,
+                                model_name,
                                 modbase_model_names,
                                 flowcell_id,
                                 device_id,
