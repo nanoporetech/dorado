@@ -246,10 +246,8 @@ if (USING_STATIC_TORCH_LIB)
         endif()
         if (IOS)
             find_library(UIKIT_FRAMEWORK UIKit REQUIRED)
-            find_library(COREML_FRAMEWORK CoreML REQUIRED)
             list(APPEND TORCH_LIBRARIES
                 ${UIKIT_FRAMEWORK}
-                ${COREML_FRAMEWORK}
             )
         endif()
 
