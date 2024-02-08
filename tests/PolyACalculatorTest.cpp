@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "utils/sequence_utils.h"
 
@@ -93,7 +94,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     CHECK(out->read_common.rna_poly_tail_length == -1);
 }
 
-TEST_CASE("PolyACalculator: Test parsing bad config files", TEST_GROUP) {
+TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     auto tmp_dir = TempDir(fs::temp_directory_path() / "polya_test");
     std::filesystem::create_directories(tmp_dir.m_path);
 
@@ -107,7 +108,7 @@ TEST_CASE("PolyACalculator: Test parsing bad config files", TEST_GROUP) {
             outfile.close();
         }
 
-        CHECK_THROWS_WITH(PolyACalculatorNode(2, false, 1000, &path),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&path),
                           "Both front_primer and rear_primer must be provided in the PolyA "
                           "configuration file.");
     }
@@ -122,8 +123,37 @@ TEST_CASE("PolyACalculator: Test parsing bad config files", TEST_GROUP) {
             outfile.close();
         }
 
-        CHECK_THROWS_WITH(PolyACalculatorNode(2, false, 1000, &path),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&path),
                           "Both plasmid_front_flank and plasmid_rear_flank must be provided in the "
                           "PolyA configuration file.");
+    }
+
+    SECTION("Parse all supported configs") {
+        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
+        const toml::value data{
+                {"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
+                                        {"plasmid_rear_flank", "ACTG"},
+                                        {"front_primer", "AAAAAA"},
+                                        {"rear_primer", "GGGGGG"}}},
+                {"tail", toml::table{{"tail_interrupt_length", 10}, {"min_base_count", 15}}}};
+        const std::string fmt = toml::format(data);
+        std::ofstream outfile(path);
+        if (outfile.is_open()) {
+            outfile << fmt;
+            outfile.close();
+        }
+
+        auto config = dorado::poly_tail::prepare_config(&path);
+        CHECK(config.front_primer == "AAAAAA");
+        CHECK(config.rc_front_primer == "TTTTTT");
+        CHECK(config.rear_primer == "GGGGGG");
+        CHECK(config.rc_rear_primer == "CCCCCC");
+        CHECK(config.plasmid_front_flank == "CGTA");
+        CHECK(config.rc_plasmid_front_flank == "TACG");
+        CHECK(config.plasmid_rear_flank == "ACTG");
+        CHECK(config.rc_plasmid_rear_flank == "CAGT");
+        CHECK(config.is_plasmid);  // Since the plasmid flanks were specified
+        CHECK(config.tail_interrupt_length == 10);
+        CHECK(config.min_base_count == 15);
     }
 }

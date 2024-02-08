@@ -1,5 +1,6 @@
 #pragma once
 
+#include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
@@ -26,20 +27,6 @@ public:
     void terminate(const FlushOptions &) override { terminate_impl(); };
     void restart() override { start_input_processing(&PolyACalculatorNode::input_thread_fn, this); }
 
-    struct PolyAConfig {
-        std::string front_primer = "TTTCTGTTGGTGCTGATATTGCTTT";                          // SSP
-        std::string rear_primer = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";  // VNP
-        std::string rc_front_primer = "";
-        std::string rc_rear_primer = "";
-        std::string plasmid_front_flank = "";
-        std::string plasmid_rear_flank = "";
-        std::string rc_plasmid_front_flank = "";
-        std::string rc_plasmid_rear_flank = "";
-        bool is_plasmid = false;
-        int tail_interrupt_length = 10;
-        int min_base_count = 10;
-    };
-
 private:
     void terminate_impl();
     void input_thread_fn();
@@ -52,7 +39,7 @@ private:
     std::mutex m_mutex;
     std::map<int, int> tail_length_counts;
 
-    PolyAConfig m_config;
+    poly_tail::PolyTailConfig m_config;
 };
 
 }  // namespace dorado
