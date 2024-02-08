@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace dorado::poly_tail {
 
 struct PolyTailConfig {

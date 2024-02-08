@@ -5,6 +5,8 @@
 #include <toml.hpp>
 #include <toml/value.hpp>
 
+#include <string>
+
 namespace dorado::poly_tail {
 
 PolyTailConfig prepare_config(const std::string* config_file) {
