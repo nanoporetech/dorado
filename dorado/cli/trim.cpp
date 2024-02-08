@@ -69,6 +69,7 @@ int trim(int argc, char* argv[]) {
             .help("Skip primer detection and trimming. Only adapters will be detected and trimmed.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--primer-sequences").help("Path to file with custom primer sequences.");
 
     try {
         parser.parse_args(argc, argv);
@@ -129,11 +130,17 @@ int trim(int argc, char* argv[]) {
         output_mode = HtsWriter::OutputMode::UBAM;
     }
 
+    std::optional<std::string> custom_primer_file = std::nullopt;
+    if (parser.is_used("--primer-sequences")) {
+        custom_primer_file = parser.get<std::string>("--primer-sequences");
+    }
+
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, trim_writer_threads);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
-                                                !parser.get<bool>("--no-trim-primers"));
+                                                !parser.get<bool>("--no-trim-primers"),
+                                                custom_primer_file);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

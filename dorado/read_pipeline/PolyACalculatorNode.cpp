@@ -278,7 +278,9 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
 // RNA polyA appears at the beginning of the strand. Since the adapter
 // for RNA has been trimmed off already, the polyA search can begin
 // from the start of the signal.
-SignalAnchorInfo determine_signal_anchor_and_strand_drna() { return SignalAnchorInfo{false, 0, 0}; }
+SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
+    return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0};
+}
 
 }  // namespace
 
@@ -301,7 +303,7 @@ void PolyACalculatorNode::input_thread_fn() {
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
-                m_is_rna ? determine_signal_anchor_and_strand_drna()
+                m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
                          : determine_signal_anchor_and_strand_cdna(*read);
 
         if (signal_anchor >= 0) {

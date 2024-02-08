@@ -3,7 +3,9 @@
 #include "ModBaseModelConfig.h"
 #include "MotifMatcher.h"
 #include "utils/stats.h"
-
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAStream.h>
+#endif
 #include <torch/nn.h>
 
 #include <atomic>
@@ -43,6 +45,9 @@ public:
         std::mutex input_lock;
         std::condition_variable input_cv;
         const int batch_size;
+#if DORADO_CUDA_BUILD
+        c10::optional<c10::Stream> stream;
+#endif
     };
 
     ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
@@ -52,6 +57,7 @@ public:
 
     std::vector<at::Tensor> create_input_sig_tensors() const;
     std::vector<at::Tensor> create_input_seq_tensors() const;
+    c10::Device device() const { return m_options.device(); }
 
     at::Tensor call_chunks(size_t model_id,
                            at::Tensor& input_sigs,

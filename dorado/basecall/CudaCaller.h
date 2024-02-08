@@ -32,8 +32,7 @@ public:
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
                                                   at::Tensor &output,
-                                                  int num_chunks,
-                                                  c10::cuda::CUDAStream stream);
+                                                  int num_chunks);
 
     void terminate();
     void restart();
@@ -76,6 +75,7 @@ private:
     int m_num_input_features;
     bool m_exclusive_gpu_access;
     bool m_low_latency;
+    c10::cuda::CUDAStream m_stream;
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to
     // speed up processing of reads that are shorter than the longest chunk size.

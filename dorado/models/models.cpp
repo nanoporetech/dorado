@@ -440,6 +440,12 @@ const std::vector<ModelInfo> models = {
         ModelInfo{
                 "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
                 "d434525cbe1fd00adbd7f8a5f0e7f0bf09b77a9e67cd90f037c5ab52013e7974",
+                CC::DNA_R10_4_1_E8_2_260BPS,
+                ModelVariantPair{ModelVariant::NONE, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_4khz_stereo@v1.1",
+                "d434525cbe1fd00adbd7f8a5f0e7f0bf09b77a9e67cd90f037c5ab52013e7974",
                 CC::DNA_R10_4_1_E8_2_400BPS_4KHZ,
                 ModelVariantPair{ModelVariant::NONE, VV::NONE},
         },

@@ -1,5 +1,6 @@
 #include "AdapterDetectorNode.h"
 
+#include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
@@ -18,15 +19,18 @@
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
-AdapterDetectorNode::AdapterDetectorNode(int threads, bool trim_adapters, bool trim_primers)
-        : MessageSink(10000, threads),
-          m_trim_adapters(trim_adapters),
-          m_trim_primers(trim_primers) {
+AdapterDetectorNode::AdapterDetectorNode(int threads,
+                                         bool trim_adapters,
+                                         bool trim_primers,
+                                         const std::optional<std::string>& custom_seqs)
+        : MessageSink(10000, threads) {
+    AdapterInfo info{trim_adapters, trim_primers, custom_seqs};
+    m_default_adapter_info = std::make_shared<AdapterInfo>(std::move(info));
     start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
-AdapterDetectorNode::AdapterDetectorNode(int threads)
-        : MessageSink(10000, threads), m_trim_adapters(true), m_trim_primers(true) {
+AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {
+    m_default_adapter_info = std::make_shared<AdapterInfo>();
     start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
@@ -54,17 +58,18 @@ void AdapterDetectorNode::process_read(BamPtr& read) {
 
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
-    if (m_trim_adapters) {
-        auto adapter_res = m_detector.find_adapters(seq);
+    auto detector = m_detector_selector.get_detector(*m_default_adapter_info);
+    if (m_default_adapter_info->trim_adapters) {
+        auto adapter_res = detector->find_adapters(seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    if (m_trim_primers) {
-        auto primer_res = m_detector.find_primers(seq);
+    if (m_default_adapter_info->trim_primers) {
+        auto primer_res = detector->find_primers(seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
     m_num_records++;
 
-    if (m_trim_adapters || m_trim_primers) {
+    if (m_default_adapter_info->trim_adapters || m_default_adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
@@ -85,19 +90,22 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
     // Check read for instruction on what to trim.
-    bool trim_adapters = m_trim_adapters;
-    bool trim_primers = m_trim_primers;
+    bool trim_adapters = m_default_adapter_info->trim_adapters;
+    bool trim_primers = m_default_adapter_info->trim_primers;
+    auto adapter_info = m_default_adapter_info;
     if (read.read_common.adapter_info) {
         // The read contains instruction on what to trim, so ignore class defaults.
+        adapter_info = read.read_common.adapter_info;
         trim_adapters = read.read_common.adapter_info->trim_adapters;
         trim_primers = read.read_common.adapter_info->trim_primers;
     }
+    auto detector = m_detector_selector.get_detector(*adapter_info);
     if (trim_adapters) {
-        auto adapter_res = m_detector.find_adapters(read.read_common.seq);
+        auto adapter_res = detector->find_adapters(read.read_common.seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
     if (trim_primers) {
-        auto primer_res = m_detector.find_primers(read.read_common.seq);
+        auto primer_res = detector->find_primers(read.read_common.seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
     if (trim_adapters || trim_primers) {

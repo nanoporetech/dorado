@@ -44,7 +44,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
           m_decoder(decode::create_decoder(device, m_config)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
           m_exclusive_gpu_access(exclusive_gpu_access),
-          m_low_latency(low_latency) {
+          m_low_latency(low_latency),
+          m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
 
     m_decoder_options.q_shift = model_config.qbias;
@@ -62,6 +63,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = calculate_memory_requirements();
 
     // Warmup
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     for (const auto &batch_dim : m_batch_dims) {
         auto input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
         auto scores = m_module->forward(input);
@@ -73,7 +75,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
         spdlog::debug("{} Decode memory {:.2f}GB", m_device,
                       (decode_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
     }
-    torch::cuda::synchronize(m_options.device().index());
+    m_stream.synchronize();
 
     start_threads();
 }
@@ -88,11 +90,8 @@ CudaCaller::~CudaCaller() {
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
                                                           at::Tensor &output,
-                                                          int num_chunks,
-                                                          c10::cuda::CUDAStream stream) {
+                                                          int num_chunks) {
     NVTX3_FUNC_RANGE();
-    c10::cuda::CUDAStreamGuard stream_guard(stream);
-
     if (num_chunks == 0) {
         return std::vector<decode::DecodedChunk>();
     }
@@ -334,14 +333,13 @@ void CudaCaller::start_threads() {
 
 void CudaCaller::cuda_thread_fn() {
     at::InferenceMode guard;
-    c10::cuda::CUDAGuard device_guard(m_options.device());
-    auto stream = c10::cuda::getCurrentCUDAStream(m_options.device().index());
-
     const std::string loop_scope_str =
             "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
     const std::string input_q_cv_scope_str =
             "input_queue_cv_device_" + std::to_string(m_options.device().index());
     const std::string gpu_lock_scope_str = "gpu_lock_" + std::to_string(m_options.device().index());
+
+    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     while (true) {
         nvtx3::scoped_range loop{loop_scope_str};
         std::unique_lock<std::mutex> input_lock(m_input_lock);
@@ -398,7 +396,7 @@ void CudaCaller::cuda_thread_fn() {
             const auto forward_ms = timer.GetElapsedMS();
             task->out =
                     m_decoder->beam_search_part_1({scores, task->num_chunks, m_decoder_options});
-            stream.synchronize();
+            m_stream.synchronize();
             const auto forward_plus_decode_ms = timer.GetElapsedMS();
             m_model_ms += forward_ms;
             m_decode_ms += forward_plus_decode_ms - forward_ms;
