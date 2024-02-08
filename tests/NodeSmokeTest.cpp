@@ -124,17 +124,6 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
     } while (false)
 #endif
 
-// Wrapper around a temporary directory since one doesn't exist in the standard
-struct TempDir {
-    TempDir(std::filesystem::path path) : m_path(std::move(path)) {}
-    ~TempDir() { std::filesystem::remove_all(m_path); }
-
-    TempDir(const TempDir&) = delete;
-    TempDir& operator=(const TempDir&) = delete;
-
-    std::filesystem::path m_path;
-};
-
 // Download a model to a temporary directory
 TempDir download_model(const std::string& model) {
     // Create a new directory to download the model to
@@ -404,7 +393,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
     });
 
-    run_smoke_test<dorado::PolyACalculatorNode>(8, is_rna, 1000);
+    run_smoke_test<dorado::PolyACalculatorNode>(8, is_rna, 1000, nullptr);
 }
 
 }  // namespace

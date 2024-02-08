@@ -5,12 +5,79 @@
 
 #include <edlib.h>
 #include <spdlog/spdlog.h>
+#include <toml.hpp>
+#include <toml/value.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <utility>
 
 namespace {
+
+using PolyAConfig = dorado::PolyACalculatorNode::PolyAConfig;
+
+// Prepare the PolyA configuration struct. If a configuration
+// file is available, parse it to extract parameters. Otherwise
+// prepare the default configuration.
+PolyAConfig prepare_config(const std::string* config_file) {
+    PolyAConfig config;
+
+    if (config_file != nullptr) {
+        const toml::value config_toml = toml::parse(*config_file);
+
+        if (config_toml.contains("anchors")) {
+            const auto& anchors = toml::find(config_toml, "anchors");
+
+            if (anchors.contains("front_primer") || anchors.contains("rear_primer")) {
+                if (!(anchors.contains("front_primer") && anchors.contains("rear_primer"))) {
+                    throw std::runtime_error(
+                            "Both front_primer and rear_primer must be provided in the PolyA "
+                            "configuration file.");
+                }
+                config.front_primer = toml::find<std::string>(anchors, "front_primer");
+                config.rear_primer = toml::find<std::string>(anchors, "rear_primer");
+            }
+
+            if (anchors.contains("plasmid_front_flank") || anchors.contains("plasmid_rear_flank")) {
+                if (!(anchors.contains("plasmid_front_flank") &&
+                      anchors.contains("plasmid_rear_flank"))) {
+                    throw std::runtime_error(
+                            "Both plasmid_front_flank and plasmid_rear_flank must be provided in "
+                            "the PolyA configuration file.");
+                }
+                config.plasmid_front_flank =
+                        toml::find<std::string>(anchors, "plasmid_front_flank");
+                config.plasmid_rear_flank = toml::find<std::string>(anchors, "plasmid_rear_flank");
+                config.is_plasmid = true;
+            }
+        }
+
+        if (config_toml.contains("tail")) {
+            const auto& tail = toml::find(config_toml, "tail");
+
+            if (tail.contains("tail_interrupt_length")) {
+                config.tail_interrupt_length = toml::find<int>(tail, "tail_interrupt_length");
+            }
+        }
+    }
+
+    if (!config.front_primer.empty()) {
+        config.rc_front_primer = dorado::utils::reverse_complement(config.front_primer);
+    }
+    if (!config.rear_primer.empty()) {
+        config.rc_rear_primer = dorado::utils::reverse_complement(config.rear_primer);
+    }
+    if (!config.plasmid_front_flank.empty()) {
+        config.rc_plasmid_front_flank =
+                dorado::utils::reverse_complement(config.plasmid_front_flank);
+        spdlog::info("{} {}", config.plasmid_rear_flank, config.rc_plasmid_rear_flank);
+    }
+    if (!config.plasmid_rear_flank.empty()) {
+        config.rc_plasmid_rear_flank = dorado::utils::reverse_complement(config.plasmid_rear_flank);
+    }
+
+    return config;
+}
 
 struct SignalAnchorInfo {
     // Is the strand in forward or reverse direction.
@@ -31,12 +98,13 @@ const int kMaxTailLength = 750;
 // an empirically determined threshold, and consecutive windows have
 // similar avg and stdev, then those windows are considered to be part
 // of the polyA tail.
-std::pair<int, int> determine_signal_bounds(int signal_anchor,
-                                            bool fwd,
-                                            const dorado::SimplexRead& read,
-                                            float num_samples_per_base,
-                                            bool is_rna,
-                                            int min_base_count) {
+std::pair<int, int> determine_signal_bounds(
+        int signal_anchor,
+        bool fwd,
+        const dorado::SimplexRead& read,
+        float num_samples_per_base,
+        bool is_rna,
+        const dorado::PolyACalculatorNode::PolyAConfig& config) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = int(read.read_common.get_raw_data_samples());
 
@@ -105,7 +173,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                         second_last.second = last.second;
                         intervals.pop_back();
                     } else if (second_last.second - second_last.first <
-                               std::round(num_samples_per_base * min_base_count)) {
+                               std::round(num_samples_per_base * config.min_base_count)) {
                         intervals.erase(intervals.end() - 2);
                     }
                 }
@@ -123,7 +191,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::trace("found intervals {}", int_str);
 
     // Cluster intervals
-    const int kMaxInterruption = 2 * kMaxSampleGap;
+    const int kMaxInterruption =
+            int(std::round(num_samples_per_base * config.tail_interrupt_length));
     std::vector<std::pair<int, int>> clustered_intervals;
     for (const auto& i : intervals) {
         if (clustered_intervals.empty()) {
@@ -145,21 +214,22 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     spdlog::trace("clustered intervals {}", int_str);
 
     std::vector<std::pair<int, int>> filtered_intervals;
-    std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
-                 std::back_inserter(filtered_intervals), [&](auto& i) {
-                     int interval_size = i.second - i.first;
-                     // Filter out any small intervals.
-                     if (interval_size < (std::round(num_samples_per_base * min_base_count))) {
-                         return false;
-                     }
-                     // Only keep intervals that are close-ish to the signal anchor or to the previous interval.
-                     bool within_anchor_dist =
-                             (std::abs(signal_anchor - i.second) < interval_size ||
-                              std::abs(signal_anchor - i.first) < interval_size ||
-                              ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
+    std::copy_if(
+            clustered_intervals.begin(), clustered_intervals.end(),
+            std::back_inserter(filtered_intervals), [&](auto& i) {
+                int interval_size = i.second - i.first;
+                // Filter out any small intervals.
+                if (interval_size < (std::round(num_samples_per_base * config.min_base_count))) {
+                    return false;
+                }
+                // Only keep intervals that are close-ish to the signal anchor or to the previous interval.
+                bool within_anchor_dist =
+                        (std::abs(signal_anchor - i.second) < interval_size ||
+                         std::abs(signal_anchor - i.first) < interval_size ||
+                         ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
 
-                     return within_anchor_dist;
-                 });
+                return within_anchor_dist;
+            });
 
     int_str = "";
     for (auto in : filtered_intervals) {
@@ -237,12 +307,13 @@ float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRead& read) {
-    const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
-    const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
-    const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
-    const std::string VNP_rc = dorado::utils::reverse_complement(VNP);
-    int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
+SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRead& read,
+                                                         const PolyAConfig& config) {
+    const std::string& front_primer = config.front_primer;
+    const std::string& front_primer_rc = config.rc_front_primer;
+    const std::string& rear_primer = config.rear_primer;
+    const std::string& rear_primer_rc = config.rc_rear_primer;
+    int trailing_Ts = dorado::utils::count_trailing_chars(rear_primer, 'T');
 
     const int kWindowSize = 150;
     std::string read_top = read.read_common.seq.substr(0, kWindowSize);
@@ -254,18 +325,20 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     align_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult top_v1 = edlibAlign(SSP.data(), int(SSP.length()), read_top.data(),
-                                         int(read_top.length()), align_config);
-    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), int(VNP_rc.length()), read_bottom.data(),
-                                            int(read_bottom.length()), align_config);
+    EdlibAlignResult top_v1 = edlibAlign(front_primer.data(), int(front_primer.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v1 =
+            edlibAlign(rear_primer_rc.data(), int(rear_primer_rc.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
 
     int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
 
     // Check for reverse strand.
-    EdlibAlignResult top_v2 = edlibAlign(VNP.data(), int(VNP.length()), read_top.data(),
-                                         int(read_top.length()), align_config);
-    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), int(SSP_rc.length()), read_bottom.data(),
-                                            int(read_bottom.length()), align_config);
+    EdlibAlignResult top_v2 = edlibAlign(rear_primer.data(), int(rear_primer.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v2 =
+            edlibAlign(front_primer_rc.data(), int(front_primer_rc.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
@@ -332,7 +405,7 @@ void PolyACalculatorNode::input_thread_fn() {
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
                 m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
-                         : determine_signal_anchor_and_strand_cdna(*read);
+                         : determine_signal_anchor_and_strand_cdna(*read, m_config);
 
         if (signal_anchor >= 0) {
             spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
@@ -343,7 +416,7 @@ void PolyACalculatorNode::input_thread_fn() {
             // Walk through signal. Require a minimum of length 10 poly-A since below that
             // the current algorithm returns a lot of false intervals.
             auto [signal_start, signal_end] = determine_signal_bounds(
-                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, 10);
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, m_config);
             auto signal_len = signal_end - signal_start;
 
             // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
@@ -394,8 +467,12 @@ void PolyACalculatorNode::input_thread_fn() {
     }
 }
 
-PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads)
+PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
+                                         bool is_rna,
+                                         size_t max_reads,
+                                         const std::string* config_file)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)), m_is_rna(is_rna) {
+    m_config = prepare_config(config_file);
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 

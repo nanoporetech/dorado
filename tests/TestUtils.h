@@ -50,3 +50,14 @@ inline std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path
 #define get_stereo_data_dir() get_data_dir("stereo")
 
 #define get_aligner_data_dir() get_data_dir("aligner_test")
+
+// Wrapper around a temporary directory since one doesn't exist in the standard
+struct TempDir {
+    TempDir(std::filesystem::path path) : m_path(std::move(path)) {}
+    ~TempDir() { std::filesystem::remove_all(m_path); }
+
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+
+    std::filesystem::path m_path;
+};

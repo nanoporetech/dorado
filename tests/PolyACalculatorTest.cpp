@@ -5,10 +5,13 @@
 
 #include <catch2/catch.hpp>
 #include <spdlog/spdlog.h>
+#include <toml.hpp>
+#include <toml/value.hpp>
 #include <torch/torch.h>
 
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -32,7 +35,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, is_rna, 1000);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, is_rna, 1000, nullptr);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -56,4 +59,71 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
 
     auto out = std::get<SimplexReadPtr>(std::move(messages[0]));
     CHECK(out->read_common.rna_poly_tail_length == gt);
+}
+
+TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST_GROUP) {
+    auto config = (fs::path(get_data_dir("poly_a/configs")) / "polya.toml").string();
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, false, 1000, &config);
+
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
+
+    fs::path data_dir = fs::path(get_data_dir("poly_a/r9_rev_cdna"));
+    auto seq_file = data_dir / "seq.txt";
+    auto signal_file = data_dir / "signal.tensor";
+    auto moves_file = data_dir / "moves.bin";
+    auto read = std::make_unique<SimplexRead>();
+    read->read_common.seq = ReadFileIntoString(seq_file.string());
+    read->read_common.qstring = std::string(read->read_common.seq.length(), '~');
+    read->read_common.moves = ReadFileIntoVector(moves_file.string());
+    read->read_common.model_stride = 5;
+    torch::load(read->read_common.raw_data, signal_file.string());
+    read->read_common.read_id = "read_id";
+    // Push a Read type.
+    pipeline->push_message(std::move(read));
+
+    pipeline->terminate(DefaultFlushOptions());
+
+    CHECK(messages.size() == 1);
+
+    auto out = std::get<SimplexReadPtr>(std::move(messages[0]));
+    CHECK(out->read_common.rna_poly_tail_length == -1);
+}
+
+TEST_CASE("PolyACalculator: Test parsing bad config files", TEST_GROUP) {
+    auto tmp_dir = TempDir(fs::temp_directory_path() / "polya_test");
+    std::filesystem::create_directories(tmp_dir.m_path);
+
+    SECTION("Only one primer is provided") {
+        auto path = (tmp_dir.m_path / "only_one_primer.toml").string();
+        const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
+        const std::string fmt = toml::format(data);
+        std::ofstream outfile(path);
+        if (outfile.is_open()) {
+            outfile << fmt;
+            outfile.close();
+        }
+
+        CHECK_THROWS_WITH(PolyACalculatorNode(2, false, 1000, &path),
+                          "Both front_primer and rear_primer must be provided in the PolyA "
+                          "configuration file.");
+    }
+
+    SECTION("Only one plasmid flank is provided") {
+        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
+        const toml::value data{{"anchors", toml::table{{"plasmid_rear_flank", "ACTG"}}}};
+        const std::string fmt = toml::format(data);
+        std::ofstream outfile(path);
+        if (outfile.is_open()) {
+            outfile << fmt;
+            outfile.close();
+        }
+
+        CHECK_THROWS_WITH(PolyACalculatorNode(2, false, 1000, &path),
+                          "Both plasmid_front_flank and plasmid_rear_flank must be provided in the "
+                          "PolyA configuration file.");
+    }
 }
