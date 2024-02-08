@@ -317,6 +317,8 @@ build:ios:m1:
     - .macos_arm_runner
     - .build_dorado
   script:
+    # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
+    - unset MACOSX_DEPLOYMENT_TARGET
     - export SDKROOT=$(xcrun --sdk ${SDK_NAME} --show-sdk-path)
     - echo "SDKROOT=${SDKROOT}"
     - export BUILD_OPTIONS="
