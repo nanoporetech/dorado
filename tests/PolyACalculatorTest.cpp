@@ -130,12 +130,11 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
 
     SECTION("Parse all supported configs") {
         auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
-        const toml::value data{
-                {"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
-                                        {"plasmid_rear_flank", "ACTG"},
-                                        {"front_primer", "AAAAAA"},
-                                        {"rear_primer", "GGGGGG"}}},
-                {"tail", toml::table{{"tail_interrupt_length", 10}, {"min_base_count", 15}}}};
+        const toml::value data{{"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
+                                                       {"plasmid_rear_flank", "ACTG"},
+                                                       {"front_primer", "AAAAAA"},
+                                                       {"rear_primer", "GGGGGG"}}},
+                               {"tail", toml::table{{"tail_interrupt_length", 10}}}};
         const std::string fmt = toml::format(data);
         std::ofstream outfile(path);
         if (outfile.is_open()) {
@@ -154,6 +153,5 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         CHECK(config.rc_plasmid_rear_flank == "CAGT");
         CHECK(config.is_plasmid);  // Since the plasmid flanks were specified
         CHECK(config.tail_interrupt_length == 10);
-        CHECK(config.min_base_count == 15);
     }
 }

@@ -46,9 +46,6 @@ PolyTailConfig prepare_config(const std::string* config_file) {
             if (tail.contains("tail_interrupt_length")) {
                 config.tail_interrupt_length = toml::find<int>(tail, "tail_interrupt_length");
             }
-            if (tail.contains("min_base_count")) {
-                config.min_base_count = toml::find<int>(tail, "min_base_count");
-            }
         }
     }
 

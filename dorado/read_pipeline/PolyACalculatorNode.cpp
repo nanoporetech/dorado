@@ -125,7 +125,11 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
     spdlog::trace("found intervals {}", int_str);
 
-    // Cluster intervals
+    // Cluster intervals if there are interrupted poly tails that should
+    // be combined. Interruption length is specified through a config file.
+    // In the example below, tail estimation show include both stretches
+    // of As along with the small gap in the middle.
+    // e.g. -----AAAAAAA--AAAAAA-----
     const int kMaxInterruption =
             int(std::round(num_samples_per_base * config.tail_interrupt_length));
     std::vector<std::pair<int, int>> clustered_intervals;
@@ -148,23 +152,24 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
     spdlog::trace("clustered intervals {}", int_str);
 
+    // Once the clustered intervals are available, filter them by how
+    // close they are to the anchor.
     std::vector<std::pair<int, int>> filtered_intervals;
-    std::copy_if(
-            clustered_intervals.begin(), clustered_intervals.end(),
-            std::back_inserter(filtered_intervals), [&](auto& i) {
-                int interval_size = i.second - i.first;
-                // Filter out any small intervals.
-                if (interval_size < (std::round(num_samples_per_base * config.min_base_count))) {
-                    return false;
-                }
-                // Only keep intervals that are close-ish to the signal anchor or to the previous interval.
-                bool within_anchor_dist =
-                        (std::abs(signal_anchor - i.second) < interval_size ||
-                         std::abs(signal_anchor - i.first) < interval_size ||
-                         ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
-
-                return within_anchor_dist;
-            });
+    std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
+                 std::back_inserter(filtered_intervals), [&](auto& i) {
+                     int buffer = i.second - i.first;
+                     // Only keep intervals that are close-ish to the signal anchor.
+                     // i.e. the anchor needs to be within the buffer region of
+                     // the interval. The buffer is currently the length of the interval
+                     // itself. This heuristic generally works because a longer interval
+                     // detected is likely to be the correct one so we relax the
+                     // how close it needs to be to the anchor to account for errors
+                     // in anchor determination.
+                     // <----buffer---|--- interval ---|---- buffer---->
+                     bool within_anchor_dist = (signal_anchor >= std::max(0, i.first - buffer)) &&
+                                               (signal_anchor <= (i.second + buffer));
+                     return within_anchor_dist;
+                 });
 
     int_str = "";
     for (auto in : filtered_intervals) {
