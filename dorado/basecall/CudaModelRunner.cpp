@@ -5,7 +5,7 @@
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"
 
-#include <c10/cuda/CUDAStream.h>
+#include <c10/cuda/CUDAGuard.h>
 
 #include <sstream>
 
@@ -24,7 +24,8 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
 std::vector<decode::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
     stats::Timer timer;
-    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, m_stream);
+    c10::cuda::CUDAStreamGuard guard(m_stream);
+    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks);
     return decoded_chunks;
 }
 

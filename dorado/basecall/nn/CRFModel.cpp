@@ -700,12 +700,13 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
         }
     }
 
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
     auto mm_out = wm.temp({wm.N * wm.T, 4 * layer_size}, torch::kF16);
     for (size_t i = 0; i < rnns.size(); ++i) {
         int dir = (i & 1) ? 1 : -1;
         dorado::utils::matmul_f16(inout.view({-1, layer_size}), device_w_ih[i], mm_out);
         dorado::utils::handle_cuda_result(host_small_lstm(
-                wm.N, wm.T, layer_size, dir, mm_out.data_ptr(), device_w_hh[i].data_ptr(),
+                stream, wm.N, wm.T, layer_size, dir, mm_out.data_ptr(), device_w_hh[i].data_ptr(),
                 device_bias[i].data_ptr(), device_scale[i].data_ptr(), inout.data_ptr()));
     }
 }
