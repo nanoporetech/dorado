@@ -311,7 +311,7 @@ build:ios:m1:
   variables:
     BUILD_TARGET: "ALL_BUILD"
     PLATFORM: "OS64"
-    DORADO_DISABLE_TESTS: "ON"
+    DORADO_RUN_TESTS: "OFF"
   extends:
     - .macos_arm_runner
     - .build_dorado
@@ -324,14 +324,17 @@ build:ios:m1:
       -D SKIP_HDF_PLUGINS=ON
       -D DEPLOYMENT_TARGET=16.0
       -D DORADO_DISABLE_DORADO=ON
-      -D DORADO_DISABLE_TESTS=${DORADO_DISABLE_TESTS}"
+      -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
+      -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
     - !reference [.build_dorado, script]
 
 build:ios_sim:m1:
   variables:
     PLATFORM: "SIMULATORARM64"
-    DORADO_DISABLE_TESTS: "OFF"
+    DORADO_RUN_TESTS: "ON"
   extends:
+    # Note that we don't technically need CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED
+    # disabled for simulator builds, but it doesn't hurt.
     - build:ios:m1
 
 build_archive:linux:x86:focal:

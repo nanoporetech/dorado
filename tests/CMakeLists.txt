@@ -1,4 +1,11 @@
+option(DORADO_DISABLE_TESTS "Disable building the tests" OFF)
+option(DORADO_RUN_TESTS "Run the tests. Certain platforms don't have the infrastructure to do this atm" ON)
 
+if (DORADO_DISABLE_TESTS)
+    return()
+endif()
+
+# dorado_tests
 add_executable(dorado_tests
     AdapterDetectorTest.cpp
     AlignerTest.cpp
@@ -40,7 +47,6 @@ add_executable(dorado_tests
     TimeUtilsTest.cpp
     TrimTest.cpp
 )
-
 if (NOT IOS)
     target_sources(dorado_tests
         PRIVATE
@@ -51,7 +57,6 @@ if (NOT IOS)
             ModelFinderTest.cpp
     )
 endif()
-
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
@@ -61,11 +66,13 @@ if (DORADO_GPU_BUILD)
 endif()
 
 
+# dorado_smoke_tests
 add_executable(dorado_smoke_tests
     NodeSmokeTest.cpp
 )
 
 
+# dorado_tests_common
 add_library(dorado_tests_common STATIC
     main.cpp
     TestUtils.cpp
@@ -82,7 +89,8 @@ target_include_directories(dorado_tests_common
 )
 
 
-if (IOS)
+# Setup/teardown for iOS tests
+if (IOS AND DORADO_RUN_TESTS)
     # I'm assuming that these tests will only be run in the sim on CI, so they
     # depend on the sim being launched.
     # Note: The test targets can still be built, but you'll need to install+launch
@@ -114,6 +122,7 @@ if (IOS)
 endif()
 
 
+# Finish setting up each target and add them as tests.
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
@@ -136,13 +145,44 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
                 ${POD5_LIBRARIES}
         )
     endif()
-    
+
     enable_warnings_as_errors(${TEST_BIN})
-    if(NOT MSVC)
+    if (MSVC)
+        set_target_properties(${TEST_BIN} PROPERTIES LINK_OPTIONS "/ignore:4099")
+    else()
         # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
         target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
     endif()
 
+    if (IOS)
+        # default.metallib is generated, but we need it as a source file to package it,
+        # so create it if it doesn't exist.
+        set(METALLIB_PATH ${CMAKE_BINARY_DIR}/lib/default.metallib)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+        file(TOUCH ${METALLIB_PATH})
+
+        # Grab all the data files that we want to package.
+        set(DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data;${METALLIB_PATH}")
+
+        # To package data into the app we need to make it a source file.
+        target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
+
+        set_target_properties(${TEST_BIN} PROPERTIES
+            BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${TEST_BIN}"
+            MACOSX_BUNDLE_BUNDLE_NAME ${TEST_BIN}
+            MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            RESOURCE "${DATA_RESOURCES}"
+        )
+    endif()
+
+    # Don't add the test if we can't run it
+    if (NOT DORADO_RUN_TESTS)
+        continue()
+    endif()
+
+    # Add the test.
     if (IOS)
         add_test(
             NAME ${TEST_BIN}
@@ -170,35 +210,11 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
         set_tests_properties(${TEST_BIN} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
-        set_target_properties(${TEST_BIN} PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
 
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path
     if (ECM_ENABLE_SANITIZERS AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64") AND (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
         set_tests_properties(${TEST_BIN} PROPERTIES ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_append:${TORCH_LIB}/lib")
-    endif()
-
-    if (IOS)
-        # default.metallib is generated, but we need it as a source file to package it,
-        # so create it if it doesn't exist.
-        set(METALLIB_PATH ${CMAKE_BINARY_DIR}/lib/default.metallib)
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-        file(TOUCH ${METALLIB_PATH})
-
-        # Grab all the data files that we want to package.
-        set(DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data;${METALLIB_PATH}")
-
-        # To package data into the app we need to make it a source file.
-        target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
-
-        set_target_properties(${TEST_BIN} PROPERTIES
-            BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${TEST_BIN}"
-            MACOSX_BUNDLE_BUNDLE_NAME ${TEST_BIN}
-            MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
-            RESOURCE "${DATA_RESOURCES}"
-        )
     endif()
 endforeach()
 
