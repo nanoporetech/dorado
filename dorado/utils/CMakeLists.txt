@@ -109,18 +109,22 @@ if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
 endif()
 
-if(APPLE AND DORADO_GPU_BUILD)
+if(APPLE)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
-    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
-    find_library(APPLE_FWK_METAL Metal REQUIRED)
-    add_dependencies(dorado_utils metal-lib)
-    target_link_libraries(
-        dorado_utils
+    target_link_libraries(dorado_utils
         PUBLIC
-        ${APPLE_FWK_FOUNDATION}
-        ${APPLE_FWK_QUARTZ_CORE}
-        ${APPLE_FWK_METAL}
+            ${APPLE_FWK_FOUNDATION}
     )
+    if (DORADO_GPU_BUILD)
+        find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+        find_library(APPLE_FWK_METAL Metal REQUIRED)
+        add_dependencies(dorado_utils metal-lib)
+        target_link_libraries(dorado_utils
+            PUBLIC
+                ${APPLE_FWK_QUARTZ_CORE}
+                ${APPLE_FWK_METAL}
+        )
+    endif()
     if (NOT IOS)
         find_library(IOKIT IOKit REQUIRED)
         target_link_libraries(dorado_utils PUBLIC ${IOKIT})
