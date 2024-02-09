@@ -262,10 +262,9 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (input_slice.ndimension() == 1) {
                 input_slice = input_slice.unsqueeze(0);
             }
-            size_t slice_size = input_slice.size(-1);
+            size_t slice_size = input_slice.size(1);
 
             // repeat-pad any non-full chunks
-            // Stereo and Simplex encoding need to be treated differently
             if (slice_size != chunk_size) {
                 auto [n, overhang] = std::div((int)chunk_size, (int)slice_size);
                 input_slice = at::concat({input_slice.repeat({1, n}),

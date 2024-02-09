@@ -17,11 +17,9 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         int batch_size,
         const std::string& device,
         float memory_limit_fraction,
-        bool exclusive_gpu_access,
-        bool low_latency) {
+        PipelineType pipeline_type) {
     return std::make_shared<basecall::CudaCaller>(model_config, chunk_size, batch_size, device,
-                                                  memory_limit_fraction, exclusive_gpu_access,
-                                                  low_latency);
+                                                  memory_limit_fraction, pipeline_type);
 }
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller>

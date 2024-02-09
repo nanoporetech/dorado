@@ -37,14 +37,13 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
                        int batch_size,
                        const std::string &device,
                        float memory_limit_fraction,
-                       bool exclusive_gpu_access,
-                       bool low_latency)
+                       dorado::api::PipelineType pipeline_type)
         : m_config(model_config),
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
-          m_exclusive_gpu_access(exclusive_gpu_access),
-          m_low_latency(low_latency),
+          m_low_latency(pipeline_type == dorado::api::PipelineType::SIMPLEX_LOW_LATENCY),
+          m_pipeline_type(pipeline_type),
           m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
 
@@ -216,15 +215,33 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     return;
 #endif
 
-    // For the low latency use case (adaptive sampling) we only want one (short) chunk size
-    // so that all those reads go into the same queue and complete as fast as possible. For
-    // high throughput basecalling we add a second, shorter chunk size to handle short reads
-    // better. However, either of the queues might fill so slowly that we hit the batch timeout
-    // and run partially filled batches.
-    if (!m_low_latency) {
-        // Use a second chunk size which is half the requested one
-        int T_out = m_batch_dims[0].T_out / 2;
-        m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+    // For high throughput simplex basecalling we use additional, shorter chunk sizes to handle
+    // short reads better. As either of the queues might fill so slowly that we hit the
+    // batch timeout and run partially filled batches, we set a long batch timeout.
+    // As reads sitting in the pipeline for a long time doesn't mix well with duplex pairing,
+    // we don't use extra chunk sizes for duplex. Similarly, for the low latency use case
+    // (adaptive sampling) we only want one (short) chunk size so that all those reads go into
+    // the same queue and complete as fast as possible.
+    if (m_pipeline_type == dorado::api::PipelineType::SIMPLEX) {
+        const char *env_extra_chunk_sizes = std::getenv("DORADO_EXTRA_CHUNK_SIZES");
+        if (env_extra_chunk_sizes != nullptr) {
+            constexpr char SEPARATOR = ';';
+            std::string env_string(env_extra_chunk_sizes);
+            for (size_t start = 0, end = 0; end != std::string::npos; start = end + 1) {
+                int T_out = std::atoi(env_string.c_str() + start) / m_config.stride;
+                if (T_out > 0) {
+                    m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+                }
+                end = env_string.find(SEPARATOR, start);
+            }
+        } else {
+            // Use other chunk sizes as a fraction of the requested one
+            // TODO: determine the best set of chunk sizes
+            for (float fraction : {0.5f}) {
+                int T_out = int(m_batch_dims[0].T_out * fraction);
+                m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+            }
+        }
     }
 
     // If running on a Jetson device with unified memory for CPU and GPU we can't use all
@@ -358,8 +375,7 @@ void CudaCaller::cuda_thread_fn() {
         input_lock.unlock();
 
         nvtxRangePushA(gpu_lock_scope_str.c_str());
-        auto gpu_lock =
-                dorado::utils::acquire_gpu_lock(m_options.device().index(), m_exclusive_gpu_access);
+        auto gpu_lock = dorado::utils::acquire_gpu_lock(m_options.device().index(), !m_low_latency);
         nvtxRangePop();
 
         std::unique_lock<std::mutex> task_lock(task->mut);

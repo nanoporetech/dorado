@@ -2,7 +2,6 @@
 
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
-#include "caller_creation.h"
 #include "modbase/ModBaseModelConfig.h"
 
 #if DORADO_METAL_BUILD
@@ -28,8 +27,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t batch_size,
         size_t chunk_size,
         float memory_fraction,
-        bool guard_gpus,
-        bool low_latency) {
+        PipelineType pipeline_type) {
 #ifdef __APPLE__
     (void)guard_gpus;
     (void)low_latency;
@@ -90,8 +88,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 
         for (auto device_string : devices) {
             futures.push_back(pool.push(create_cuda_caller, model_config, int(chunk_size),
-                                        int(batch_size), device_string, memory_fraction, guard_gpus,
-                                        low_latency));
+                                        int(batch_size), device_string, memory_fraction,
+                                        pipeline_type));
         }
 
         for (auto& caller : futures) {
@@ -112,13 +110,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     (void)num_gpu_runners;
 #endif
 
-#ifndef NDEBUG
-    auto model_stride = runners.front()->model_stride();
-#endif
     auto adjusted_chunk_size = runners.front()->chunk_size();
-    assert(std::all_of(runners.begin(), runners.end(),
-                       [&](const auto& runner) { return runner->model_stride() == model_stride; }));
-
     if (chunk_size != adjusted_chunk_size) {
         spdlog::debug("- adjusted chunk size to match model stride: {} -> {}", chunk_size,
                       adjusted_chunk_size);

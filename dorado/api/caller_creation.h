@@ -22,6 +22,8 @@ class ModBaseCaller;
 
 namespace dorado::api {
 
+enum class PipelineType { SIMPLEX_LOW_LATENCY, SIMPLEX, DUPLEX };
+
 #if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const basecall::CRFModelConfig& model_config,
@@ -29,8 +31,7 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         int batch_size,
         const std::string& device,
         float memory_limit_fraction,
-        bool exclusive_gpu_access,
-        bool low_latency);
+        PipelineType pipeline_type);
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller>
 create_metal_caller(const basecall::CRFModelConfig& model_config, int chunk_size, int batch_size);

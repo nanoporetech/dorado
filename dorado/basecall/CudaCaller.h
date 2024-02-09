@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CRFModelConfig.h"
+#include "api/caller_creation.h"
 #include "decode/Decoder.h"
 #include "utils/stats.h"
 
@@ -26,8 +27,7 @@ public:
                int batch_size,
                const std::string &device,
                float memory_limit_fraction,
-               bool exclusive_gpu_access,
-               bool low_latency);
+               dorado::api::PipelineType pipeline_type);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -41,7 +41,7 @@ public:
     size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
-    int batch_timeout_ms() const { return m_low_latency ? 100 : 10000; }
+    int batch_timeout_ms() const { return m_low_latency ? 100 : 60000; }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
 
@@ -73,8 +73,8 @@ private:
     std::condition_variable m_input_cv;
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features;
-    bool m_exclusive_gpu_access;
     bool m_low_latency;
+    dorado::api::PipelineType m_pipeline_type;
     c10::cuda::CUDAStream m_stream;
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to
