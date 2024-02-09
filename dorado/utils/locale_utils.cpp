@@ -1,6 +1,8 @@
 #include "locale_utils.h"
 
 #ifndef _WIN32
+#include <stdlib.h>
+
 #include <clocale>
 #endif
 
