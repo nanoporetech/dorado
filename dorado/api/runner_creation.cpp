@@ -29,8 +29,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         float memory_fraction,
         PipelineType pipeline_type) {
 #ifdef __APPLE__
-    (void)guard_gpus;
-    (void)low_latency;
+    (void)pipeline_type;
 #endif
 
     std::vector<basecall::RunnerPtr> runners;
