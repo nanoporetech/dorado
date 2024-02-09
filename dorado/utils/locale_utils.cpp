@@ -18,7 +18,7 @@ void ensure_user_locale_may_be_set() {
     // whose only failure mode is ERROR_INSUFFICIENT_BUFFER, which will not be the case.
 #else
     // An invalid value for the LANG environment variable (e.g. if it's not present
-    // on the machine) may cause setting the locale the the user preference with
+    // on the machine) may cause setting the user preferred locale with
     // setlocale(LC_ALL, "") to fail and return null.
     // So test for null and provide a valid LANG value if needed
     // For fallback behaviour of setlocale(LC_ALL, "") see:
