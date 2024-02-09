@@ -12,13 +12,7 @@
 int main(int argc, char* argv[]) {
     // global setup...
 
-    if (auto prev = std::setlocale(LC_ALL, ""); !prev) {
-        // user has a LANG value set but that locale is not available - override with default C locale
-        setenv("LANG", "C", true);
-    } else {
-        // restore whatever we just changed testing the locale
-        std::setlocale(LC_ALL, prev);
-    }
+    dorado::utils::ensure_user_locale_may_be_set_DOR_234();
 
     dorado::utils::make_torch_deterministic();
     torch::set_num_threads(1);
