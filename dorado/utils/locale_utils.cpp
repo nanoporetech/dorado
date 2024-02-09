@@ -1,7 +1,7 @@
 #include "locale_utils.h"
 
 #ifndef _WIN32
-#include <locale>
+#include <clocale>
 #endif
 
 namespace dorado::utils {
