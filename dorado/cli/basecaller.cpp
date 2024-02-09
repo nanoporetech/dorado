@@ -400,7 +400,7 @@ int basecaller(int argc, char* argv[]) {
             .implicit_value(true);
     parser.visible.add_argument("--trim")
             .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
-                  "Default behavior is to trim all detected adapters, primers, or barcodes. "
+                  "Default behaviour is to trim all detected adapters, primers, or barcodes. "
                   "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
                   "adapters and "
                   "primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. "
@@ -426,7 +426,7 @@ int basecaller(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--poly-a-config")
-            .help("Configuration file for PolyA estimation to change default behaviors")
+            .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
     cli::add_minimap2_arguments(parser, alignment::dflt_options);

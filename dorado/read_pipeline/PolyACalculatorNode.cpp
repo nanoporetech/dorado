@@ -147,7 +147,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
 
     int_str = "";
-    for (auto in : clustered_intervals) {
+    for (const auto& in : clustered_intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
     spdlog::trace("clustered intervals {}", int_str);
@@ -172,7 +172,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                  });
 
     int_str = "";
-    for (auto in : filtered_intervals) {
+    for (const auto& in : filtered_intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
     spdlog::trace("filtered intervals {}", int_str);
@@ -411,8 +411,9 @@ PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
                                          bool is_rna,
                                          size_t max_reads,
                                          const std::string* config_file)
-        : MessageSink(max_reads, static_cast<int>(num_worker_threads)), m_is_rna(is_rna) {
-    m_config = poly_tail::prepare_config(config_file);
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
+          m_is_rna(is_rna),
+          m_config(poly_tail::prepare_config(config_file)) {
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 

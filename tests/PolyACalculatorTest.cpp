@@ -12,7 +12,7 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -98,17 +98,19 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     auto tmp_dir = TempDir(fs::temp_directory_path() / "polya_test");
     std::filesystem::create_directories(tmp_dir.m_path);
 
+    SECTION("Check failure with non-existent file.") {
+        const std::string missing_file = "foo_bar_baz";
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&missing_file),
+                          "Failed to open file foo_bar_baz");
+    }
+
     SECTION("Only one primer is provided") {
         auto path = (tmp_dir.m_path / "only_one_primer.toml").string();
         const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
         const std::string fmt = toml::format(data);
-        std::ofstream outfile(path);
-        if (outfile.is_open()) {
-            outfile << fmt;
-            outfile.close();
-        }
+        std::stringstream buffer(fmt);
 
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&path),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(buffer),
                           "Both front_primer and rear_primer must be provided in the PolyA "
                           "configuration file.");
     }
@@ -117,13 +119,9 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
         const toml::value data{{"anchors", toml::table{{"plasmid_rear_flank", "ACTG"}}}};
         const std::string fmt = toml::format(data);
-        std::ofstream outfile(path);
-        if (outfile.is_open()) {
-            outfile << fmt;
-            outfile.close();
-        }
+        std::stringstream buffer(fmt);
 
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&path),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(buffer),
                           "Both plasmid_front_flank and plasmid_rear_flank must be provided in the "
                           "PolyA configuration file.");
     }
@@ -136,13 +134,9 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
                                                        {"rear_primer", "GGGGGG"}}},
                                {"tail", toml::table{{"tail_interrupt_length", 10}}}};
         const std::string fmt = toml::format(data);
-        std::ofstream outfile(path);
-        if (outfile.is_open()) {
-            outfile << fmt;
-            outfile.close();
-        }
+        std::stringstream buffer(fmt);
 
-        auto config = dorado::poly_tail::prepare_config(&path);
+        auto config = dorado::poly_tail::prepare_config(buffer);
         CHECK(config.front_primer == "AAAAAA");
         CHECK(config.rc_front_primer == "TTTTTT");
         CHECK(config.rear_primer == "GGGGGG");
