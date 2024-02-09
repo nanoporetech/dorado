@@ -91,29 +91,23 @@ target_include_directories(dorado_tests_common
 
 # Setup/teardown for iOS tests
 if (IOS AND DORADO_RUN_TESTS)
+    set(IOS_TEST_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py)
     # I'm assuming that these tests will only be run in the sim on CI, so they
     # depend on the sim being launched.
     # Note: The test targets can still be built, but you'll need to install+launch
     # them manually on a real device.
-    set(TEST_DEVICE "iPhone 15 Pro Max")
-    add_test(
-        NAME kill_simulator_before
-        COMMAND xcrun simctl shutdown all
-    )
     add_test(
         NAME launch_simulator
-        COMMAND xcrun simctl boot ${TEST_DEVICE}
+        COMMAND ${IOS_TEST_SCRIPT} --setup
     )
-    # Kill the sim if it's running otherwise we fail to launch a new one.
     set_tests_properties(launch_simulator
         PROPERTIES
-            DEPENDS kill_simulator_before
             FIXTURES_SETUP interacting_with_device
     )
     # Kill the sim after so that it's not just hanging around.
     add_test(
         NAME kill_simulator_after
-        COMMAND xcrun simctl shutdown ${TEST_DEVICE}
+        COMMAND ${IOS_TEST_SCRIPT} --teardown
     )
     set_tests_properties(kill_simulator_after
         PROPERTIES
@@ -187,15 +181,16 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         add_test(
             NAME ${TEST_BIN}
             COMMAND
-                ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py
+                ${IOS_TEST_SCRIPT}
+                    --run
                     # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
                     # when building for the sim.
                     --app_path ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
                     --identifier com.ont.${TEST_BIN}
+                    --device booted
         )
         set_tests_properties(${TEST_BIN}
             PROPERTIES
-                # Don't try and do more than 1 thing on the device.
                 FIXTURES_REQUIRED interacting_with_device
         )
     else()
