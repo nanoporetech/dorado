@@ -3,8 +3,9 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 
-#include <catch2/catch.hpp>
 #include <torch/torch.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>

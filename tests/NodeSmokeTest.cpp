@@ -20,8 +20,9 @@
 #endif
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
 #include <torch/types.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>

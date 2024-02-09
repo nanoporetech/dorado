@@ -2,8 +2,9 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "splitter/RNAReadSplitter.h"
 
-#include <catch2/catch.hpp>
 #include <torch/serialize.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <filesystem>
