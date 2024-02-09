@@ -149,6 +149,7 @@ struct BarcodeClassifier::BarcodeCandidateKit {
     int bottom_context_rear_flank_len;
     std::vector<std::string> barcode_names;
     std::string kit;
+    std::string barcode_kit;
 };
 
 BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
@@ -235,6 +236,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         BarcodeCandidateKit candidate;
         candidate.kit = kit_name;
+        candidate.barcode_kit = kit_info.name;
         const auto& ref_bc_name = kit_info.barcodes[0];
         const auto& ref_bc = get_barcode_sequence(ref_bc_name);
 
@@ -419,6 +421,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         res.variant = var1_is_best ? "var1" : "var2";
         res.barcode_name = barcode_name;
         res.kit = candidate.kit;
+        res.barcode_kit = candidate.barcode_kit;
 
         results.push_back(res);
     }
@@ -485,6 +488,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         BarcodeScoreResult res;
         res.barcode_name = barcode_name;
         res.kit = candidate.kit;
+        res.barcode_kit = candidate.barcode_kit;
         res.top_score = top_mask_score;
         res.bottom_score = bottom_mask_score;
         res.score = std::max(res.top_score, res.bottom_score);
@@ -545,6 +549,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         BarcodeScoreResult res;
         res.barcode_name = barcode_name;
         res.kit = candidate.kit;
+        res.barcode_kit = candidate.barcode_kit;
         res.top_flank_score = top_flank_score;
         res.bottom_flank_score = -1.f;
         res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
