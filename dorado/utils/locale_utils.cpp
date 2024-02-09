@@ -1,18 +1,18 @@
 #include "locale_utils.h"
 
-#ifdef _WIN32
+#ifndef _WIN32
 #include <locale>
 #endif
 
 namespace dorado::utils {
 
 void ensure_user_locale_may_be_set() {
-    // JIRA issue https://nanoporetech.atlassian.net/browse/DOR-234
+    // JIRA issue DOR-234.
     // The indicators library tries to set the user preferred locale, so we ensure
     // this is possible.
 #ifdef _WIN32
     // No-op on windows as setlocale with an empty locale will succeed as it
-    // will set the locale name to the value returned the by GetUserDefaultLocaleName
+    // will set the locale name to the value returned by GetUserDefaultLocaleName
     // whose only failure mode is ERROR_INSUFFICIENT_BUFFER, which will not be the case.
 #else
     // An invalid value for the LANG environment variable (e.g. if it's not present
