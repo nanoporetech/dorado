@@ -42,6 +42,9 @@ elseif(WIN32)
     list(APPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY_DOWNLOAD}/${HDF_VER}/${HDF_VER})
 
     install(FILES ${HDF5_ZLIB_INSTALL_DIR}/bin/zlib.dll DESTINATION bin)
+elseif (IOS)
+    # iOS doesn't make use of HDF5.
+    return()
 endif()
 
 if(DYNAMIC_HDF)

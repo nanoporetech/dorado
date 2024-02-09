@@ -293,7 +293,6 @@ target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
         ${TORCH_INCLUDE_DIRS}
-        ${HDF5_INCLUDE_DIRS}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -488,7 +487,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             dorado_models_lib
         PRIVATE
             ${POD5_LIBRARIES}
-            ${HDF5_C_LIBRARIES}
+            HDF5::HDF5
             vbz_hdf_plugin
             ${CMAKE_DL_LIBS}
             ${ZLIB_LIBRARIES}
