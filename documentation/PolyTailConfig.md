@@ -12,11 +12,11 @@ Dorado also supports additional features that can be customized through a config
 ```
 cDNA
 
-5' ---- ADAPTER ---- FRONT_PRIMER ---- cDNA ---- poly(A) ---- RC(PRIMER_REAR) ---- 3'
+5' ---- ADAPTER ---- FRONT_PRIMER ---- cDNA ---- poly(A) ---- RC(REAR_PRIMER) ---- 3'
 
 OR
 
-5' ---- ADAPTER ---- PRIMER_REAR ---- poly(T) ---- RC(cDNA) ---- RC(FRONT_PRIMER) ---- 3'
+5' ---- ADAPTER ---- REAR_PRIMER ---- poly(T) ---- RC(cDNA) ---- RC(FRONT_PRIMER) ---- 3'
 ```
 
 ```
@@ -41,8 +41,8 @@ The configuration file needs to be in the `toml` format.
 
 ```
 [anchors]
-primer_front = "ATCG"
-primer_rear = "CGTA"
+front_primer = "ATCG"
+rear_primer = "CGTA"
 plasmid_front_flank = "CGATCG"
 plasmid_rear_flank = "TGACTGC"
 
@@ -54,8 +54,8 @@ tail_interrupt_length = 10
 
 | Option | Description |
 | -- | -- |
-| primer_front | Front primer sequence for cDNA |
-| primer_rear | Rear primer sequence for cDNA |
+| front_primer | Front primer sequence for cDNA |
+| rear_primer | Rear primer sequence for cDNA |
 | plasmid_front_flank | Front flanking sequence of poly(A) in plasmid |
 | plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
-| tail_interrupt_length | Combine tails that are within this distance of each other (default 0, don't combine any) |
+| tail_interrupt_length | Combine tails that are within this distance of each other (default is 0, i.e. don't combine any) |
