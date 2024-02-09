@@ -1,11 +1,10 @@
 #include "Version.h"
 #include "cli/cli.h"
-#include "compat/compat_utils.h"
+#include "utils/locale_utils.h"
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
 
-#include <clocale>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -55,7 +54,7 @@ int main(int argc, char* argv[]) {
     // Load logging settings from environment/command-line.
     spdlog::cfg::load_env_levels();
 
-    dorado::utils::ensure_user_locale_may_be_set_DOR_234();
+    dorado::utils::ensure_user_locale_may_be_set();
 
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},

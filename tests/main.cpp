@@ -1,18 +1,16 @@
 #define CATCH_CONFIG_RUNNER
 
-#include "compat/compat_utils.h"
+#include "utils/locale_utils.h"
 #include "utils/torch_utils.h"
 
 #include <catch2/catch.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <torch/utils.h>
 
-#include <clocale>
-
 int main(int argc, char* argv[]) {
     // global setup...
 
-    dorado::utils::ensure_user_locale_may_be_set_DOR_234();
+    dorado::utils::ensure_user_locale_may_be_set();
 
     dorado::utils::make_torch_deterministic();
     torch::set_num_threads(1);

@@ -16,6 +16,8 @@ add_library(dorado_utils
     fs_utils.h
     gpu_monitor.cpp
     gpu_monitor.h
+    locale_utils.cpp
+    locale_utils.h
     log_utils.cpp
     log_utils.h
     math_utils.h
