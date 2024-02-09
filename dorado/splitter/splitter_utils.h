@@ -17,6 +17,21 @@ namespace dorado::splitter {
 typedef std::pair<uint64_t, uint64_t> PosRange;
 typedef std::vector<PosRange> PosRanges;
 
+template <class FilterF>
+auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
+    PosRanges filtered;
+    std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
+    return filtered;
+}
+
+//merges overlapping ranges and ranges separated by merge_dist or less
+//ranges supposed to be sorted by start coordinate
+PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist);
+
+SimplexReadPtr subread(const SimplexRead& read,
+                       std::optional<PosRange> seq_range,
+                       PosRange signal_range);
+
 template <typename T>
 struct SampleRange {
     //inclusive
@@ -32,21 +47,6 @@ struct SampleRange {
 
 template <typename T>
 using SampleRanges = std::vector<SampleRange<T>>;
-
-template <typename RangeT, class FilterF>
-auto filter_ranges(const RangeT& ranges, FilterF filter_f) {
-    RangeT filtered;
-    std::copy_if(ranges.begin(), ranges.end(), std::back_inserter(filtered), filter_f);
-    return filtered;
-}
-
-//merges overlapping ranges and ranges separated by merge_dist or less
-//ranges supposed to be sorted by start coordinate
-PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist);
-
-SimplexReadPtr subread(const SimplexRead& read,
-                       std::optional<PosRange> seq_range,
-                       PosRange signal_range);
 
 template <typename T>
 SampleRanges<T> detect_pore_signal(const at::Tensor& signal,

@@ -19,7 +19,6 @@ private:
     struct ExtRead {
         SimplexReadPtr read;
         splitter::SampleRanges<int16_t> possible_pore_regions;
-        float p10;
     };
 
     using SplitFinderF = std::function<splitter::SampleRanges<int16_t>(const ExtRead&)>;
