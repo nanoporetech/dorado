@@ -237,9 +237,7 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
 static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : at::Allocator {
-    virtual ~MTLAllocator() = default;
-
-    virtual at::DataPtr allocate(size_t n) const {
+    at::DataPtr allocate(size_t n) const override {
         if (n == 0) {
             return at::DataPtr(nullptr, at::DeviceType::CPU);
         } else if (n >= (size_t(1) << 32)) {
