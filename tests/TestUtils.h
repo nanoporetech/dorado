@@ -1,5 +1,8 @@
 #pragma once
 
+#include <spdlog/spdlog.h>
+
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -35,6 +38,12 @@ struct TempDir {
     TempDir& operator=(const TempDir&) = delete;
 
     std::filesystem::path m_path;
+};
+
+class TraceLogger {
+public:
+    TraceLogger() { spdlog::set_level(spdlog::level::trace); }
+    ~TraceLogger() { spdlog::set_level(spdlog::level::off); }
 };
 
 }  // namespace dorado::tests

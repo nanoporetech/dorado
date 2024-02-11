@@ -119,20 +119,23 @@ BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file
     }
 
     const auto& config = toml::find(config_toml, "scoring");
-    if (config.contains("min_soft_barcode_threshold")) {
-        params.min_soft_barcode_threshold = toml::find<float>(config, "min_soft_barcode_threshold");
+    if (config.contains("max_barcode_score")) {
+        params.max_barcode_score = toml::find<int>(config, "max_barcode_score");
     }
-    if (config.contains("min_hard_barcode_threshold")) {
-        params.min_hard_barcode_threshold = toml::find<float>(config, "min_hard_barcode_threshold");
-    }
-    if (config.contains("min_soft_flank_threshold")) {
-        params.min_soft_flank_threshold = toml::find<float>(config, "min_soft_flank_threshold");
-    }
-    if (config.contains("min_hard_flank_threshold")) {
-        params.min_hard_flank_threshold = toml::find<float>(config, "min_hard_flank_threshold");
+    if (config.contains("barcode_end_proximity")) {
+        params.barcode_end_proximity = toml::find<int>(config, "barcode_end_proximity");
     }
     if (config.contains("min_barcode_score_dist")) {
-        params.min_barcode_score_dist = toml::find<float>(config, "min_barcode_score_dist");
+        params.min_barcode_score_dist = toml::find<int>(config, "min_barcode_score_dist");
+    }
+    if (config.contains("min_separation_only_dist")) {
+        params.min_separation_only_dist = toml::find<int>(config, "min_separation_only_dist");
+    }
+    if (config.contains("flank_left_pad")) {
+        params.flank_left_pad = toml::find<int>(config, "flank_left_pad");
+    }
+    if (config.contains("flank_right_pad")) {
+        params.flank_right_pad = toml::find<int>(config, "flank_right_pad");
     }
 
     return params;

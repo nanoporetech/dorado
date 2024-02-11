@@ -120,11 +120,12 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
 
     auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
 
-    CHECK(scoring_params.min_soft_barcode_threshold == Approx(0.1f));
-    CHECK(scoring_params.min_hard_barcode_threshold == Approx(0.2f));
-    CHECK(scoring_params.min_soft_flank_threshold == Approx(0.3f));
-    CHECK(scoring_params.min_hard_flank_threshold == Approx(0.4f));
-    CHECK(scoring_params.min_barcode_score_dist == Approx(0.5));
+    CHECK(scoring_params.max_barcode_score == 10);
+    CHECK(scoring_params.barcode_end_proximity == 75);
+    CHECK(scoring_params.min_barcode_score_dist == 3);
+    CHECK(scoring_params.min_separation_only_dist == 5);
+    CHECK(scoring_params.flank_left_pad == 5);
+    CHECK(scoring_params.flank_right_pad == 10);
 }
 
 TEST_CASE("Parse default scoring params", "[barcode_demux]") {
@@ -135,15 +136,12 @@ TEST_CASE("Parse default scoring params", "[barcode_demux]") {
 
     auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
 
-    CHECK(scoring_params.min_soft_barcode_threshold ==
-          Approx(default_params.min_soft_barcode_threshold));
-    CHECK(scoring_params.min_hard_barcode_threshold ==
-          Approx(default_params.min_hard_barcode_threshold));
-    CHECK(scoring_params.min_soft_flank_threshold ==
-          Approx(default_params.min_soft_flank_threshold));
-    CHECK(scoring_params.min_hard_flank_threshold ==
-          Approx(default_params.min_hard_flank_threshold));
-    CHECK(scoring_params.min_barcode_score_dist == Approx(default_params.min_barcode_score_dist));
+    CHECK(scoring_params.max_barcode_score == default_params.max_barcode_score);
+    CHECK(scoring_params.barcode_end_proximity == default_params.barcode_end_proximity);
+    CHECK(scoring_params.min_barcode_score_dist == default_params.min_barcode_score_dist);
+    CHECK(scoring_params.min_separation_only_dist == default_params.min_separation_only_dist);
+    CHECK(scoring_params.flank_left_pad == default_params.flank_left_pad);
+    CHECK(scoring_params.flank_right_pad == default_params.flank_right_pad);
 }
 
 TEST_CASE("Check for normalized id pattern", "[barcode_demux]") {
