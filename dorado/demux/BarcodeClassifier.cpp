@@ -148,8 +148,6 @@ std::string extract_right_buffer(const std::string& flank, int buffer) {
 namespace demux {
 
 const int TRIM_LENGTH = 175;
-const int LEFT_BUFFER = 5;
-const int RIGHT_BUFFER = 10;
 const BarcodeScoreResult UNCLASSIFIED{};
 
 struct BarcodeClassifier::BarcodeCandidateKit {
@@ -256,6 +254,8 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
                     "an equal number of them");
         }
 
+        // For click chemistry based, the flank region placement is better if the leading
+        // flank sequence of the top barcode is ignored.
         bool use_leading_flank = true;
         if (kit_name.find("SQK-RBK114") != std::string::npos) {
             use_leading_flank = false;
