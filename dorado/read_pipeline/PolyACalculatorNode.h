@@ -5,13 +5,9 @@
 #include "utils/stats.h"
 
 #include <atomic>
-#include <cstdint>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
-#include <vector>
 
 namespace dorado {
 

@@ -11,7 +11,7 @@
 #include <cmath>
 #include <utility>
 
-using PolyTailConfig = dorado::poly_tail::PolyTailConfig;
+using dorado::poly_tail::PolyTailConfig;
 
 namespace {
 
@@ -57,12 +57,14 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
         return {avg, std::sqrt(var)};
     };
 
-    std::vector<std::pair<int, int>> intervals;
     std::pair<float, float> last_interval_stats;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
     const float kVar = 0.35f;
+    // How close the mean values should be for consecutive intervals
+    // to be merged.
+    const float kMeanValueProximity = 0.2f;
     // Determine the outer boundary of the signal space to
     // consider based on the anchor.
     const int kSpread = int(std::round(num_samples_per_base * kMaxTailLength));
@@ -78,6 +80,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     int right_end = std::min(signal_len, signal_anchor + kSpread);
     spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
+    std::vector<std::pair<int, int>> intervals;
     const int kStride = 3;
     for (int s = left_end; s < right_end; s += kStride) {
         int e = std::min(s + kMaxSampleGap, right_end);
@@ -86,7 +89,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             // If a new interval overlaps with the previous interval, just extend
             // the previous interval.
             if (intervals.size() > 1 && intervals.back().second >= s &&
-                std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
+                std::abs(avg - last_interval_stats.first) < kMeanValueProximity &&
+                (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
                 spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}", last.first,
                               last.second, s, e, avg, stdev);
@@ -131,7 +135,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
     const int kMaxInterruption =
-            int(std::round(num_samples_per_base * config.tail_interrupt_length));
+            static_cast<int>(std::round(num_samples_per_base * config.tail_interrupt_length));
     std::vector<std::pair<int, int>> clustered_intervals;
     for (const auto& i : intervals) {
         if (clustered_intervals.empty()) {

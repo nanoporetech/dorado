@@ -8,7 +8,7 @@
 
 #include <chrono>
 #include <cmath>
-#include <iostream>
+#include <sstream>
 #include <string>
 
 using namespace dorado::splitter;
