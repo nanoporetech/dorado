@@ -1,11 +1,10 @@
 #include "Version.h"
 #include "cli/cli.h"
-#include "compat/compat_utils.h"
+#include "utils/locale_utils.h"
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
 
-#include <clocale>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -55,13 +54,7 @@ int main(int argc, char* argv[]) {
     // Load logging settings from environment/command-line.
     spdlog::cfg::load_env_levels();
 
-    if (auto prev = std::setlocale(LC_ALL, ""); !prev) {
-        // user has a LANG value set but that locale is not available - override with default C locale
-        setenv("LANG", "C", true);
-    } else {
-        // restore whatever we just changed testing the locale
-        std::setlocale(LC_ALL, prev);
-    }
+    dorado::utils::ensure_user_locale_may_be_set();
 
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},
