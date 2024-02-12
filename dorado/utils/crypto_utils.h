@@ -5,7 +5,7 @@
 
 namespace dorado::utils::crypto {
 
-using SHA256Digest = std::array<uint8_t, 32>;
+using SHA256Digest = std::array<unsigned char, 32>;
 SHA256Digest sha256(std::string_view data);
 
 }  // namespace dorado::utils::crypto
