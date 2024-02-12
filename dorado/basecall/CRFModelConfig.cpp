@@ -340,9 +340,7 @@ bool is_rna_model(const CRFModelConfig &model_config) {
     return filename.u8string().rfind("rna", 0) == 0;
 }
 
-bool is_duplex_model(const CRFModelConfig &model_config) {
-    return model_config.out_features.value_or(1) > 1;
-}
+bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
 
 std::string to_string(const Activation &activation) {
     switch (activation) {

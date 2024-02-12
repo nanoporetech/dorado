@@ -37,12 +37,12 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
                        int batch_size,
                        const std::string &device,
                        float memory_limit_fraction,
-                       dorado::api::PipelineType pipeline_type)
+                       PipelineType pipeline_type)
         : m_config(model_config),
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
-          m_low_latency(pipeline_type == dorado::api::PipelineType::SIMPLEX_LOW_LATENCY),
+          m_low_latency(pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(pipeline_type),
           m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
@@ -222,7 +222,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     // we don't use extra chunk sizes for duplex. Similarly, for the low latency use case
     // (adaptive sampling) we only want one (short) chunk size so that all those reads go into
     // the same queue and complete as fast as possible.
-    if (m_pipeline_type == dorado::api::PipelineType::SIMPLEX) {
+    if (m_pipeline_type == PipelineType::simplex) {
         const char *env_extra_chunk_sizes = std::getenv("DORADO_EXTRA_CHUNK_SIZES");
         if (env_extra_chunk_sizes != nullptr) {
             constexpr char SEPARATOR = ';';

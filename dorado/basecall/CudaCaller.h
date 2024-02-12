@@ -27,7 +27,7 @@ public:
                int batch_size,
                const std::string &device,
                float memory_limit_fraction,
-               dorado::api::PipelineType pipeline_type);
+               PipelineType pipeline_type);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -74,7 +74,7 @@ private:
     std::unique_ptr<std::thread> m_cuda_thread;
     int m_num_input_features;
     bool m_low_latency;
-    dorado::api::PipelineType m_pipeline_type;
+    PipelineType m_pipeline_type;
     c10::cuda::CUDAStream m_stream;
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to

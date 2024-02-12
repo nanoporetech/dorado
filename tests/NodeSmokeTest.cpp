@@ -229,7 +229,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     // Create runners
     auto [runners, num_devices] = dorado::api::create_basecall_runners(
             model_config, device, default_params.num_runners, 1, batch_size,
-            default_params.chunksize, 1.f, dorado::api::PipelineType::SIMPLEX);
+            default_params.chunksize, 1.f, dorado::api::PipelineType::simplex);
     CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap, model_name,

@@ -10,24 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado {
-
-namespace basecall {
-struct CRFModelConfig;
-
-#if DORADO_CUDA_BUILD
-class CudaCaller;
-#elif DORADO_METAL_BUILD
-class MetalCaller;
-#endif
-
-}  // namespace basecall
-
-namespace modbase {
-class ModBaseCaller;
-}
-
-namespace api {
+namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
@@ -53,5 +36,4 @@ basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller
 
 modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller);
 
-}  // namespace api
-}  // namespace dorado
+}  // namespace dorado::api

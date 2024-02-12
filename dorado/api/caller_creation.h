@@ -1,5 +1,7 @@
 #pragma once
 
+#include "basecall/ModelRunnerBase.h"
+
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -21,8 +23,7 @@ class ModBaseCaller;
 }
 
 namespace dorado::api {
-
-enum class PipelineType { SIMPLEX_LOW_LATENCY, SIMPLEX, DUPLEX };
+using dorado::basecall::PipelineType;
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
