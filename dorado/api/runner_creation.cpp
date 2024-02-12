@@ -59,7 +59,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     }
 #if DORADO_METAL_BUILD
     else if (device == "metal") {
-        auto caller = create_metal_caller(model_config, int(chunk_size), int(batch_size));
+        auto caller = create_metal_caller(model_config, int(chunk_size), int(batch_size),
+                                          memory_fraction);
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
