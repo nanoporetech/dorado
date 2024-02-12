@@ -89,6 +89,10 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
         // after that of the minimum median value.
         window_pos[median_pos % window_pos.size()] = median_pos;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
+        // The range of raw signal values is within the range of [-500, 3000] (TODO: they're
+        // likely are non-negative but need to confirm that). So the median values lie
+        // in the same range, and any difference between the median values
+        // will not result in an overflow with the int16_t data type.
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
         auto min_pos = std::distance(medians.begin(), minmax.first);
