@@ -414,7 +414,7 @@ void PolyACalculatorNode::input_thread_fn() {
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
                                          bool is_rna,
                                          size_t max_reads,
-                                         const std::string* config_file)
+                                         const std::string* const config_file)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
           m_is_rna(is_rna),
           m_config(poly_tail::prepare_config(config_file)) {
