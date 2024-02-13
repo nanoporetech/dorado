@@ -37,6 +37,8 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
 
     if (std::none_of(std::begin(scores), std::end(scores),
                      [threshold](auto val) { return val < threshold; })) {
+        spdlog::trace("{} flank edit distance too high {}", read.read_common.read_id,
+                      *std::min_element(std::begin(scores), std::end(scores)));
         return {false, -1, 0, false};
     }
 

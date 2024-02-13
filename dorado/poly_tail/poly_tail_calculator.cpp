@@ -205,7 +205,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
 int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                                             const SignalAnchorInfo& signal_info) const {
-    spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
+    spdlog::trace("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
                   signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
 
     auto num_samples_per_base = estimate_samples_per_base(read);
@@ -221,7 +221,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
                     signal_info.trailing_adapter_bases;
 
-    spdlog::debug(
+    spdlog::trace(
             "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
             "{}, samples/base {} trim {} read len {}",
             read.read_common.read_id, num_bases, signal_info.signal_anchor, signal_start,

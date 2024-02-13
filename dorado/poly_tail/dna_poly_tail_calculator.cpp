@@ -71,7 +71,7 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
 
         result = {fwd, signal_anchor, trailing_Ts, false};
     } else {
-        spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
+        spdlog::trace("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));
     }
 
