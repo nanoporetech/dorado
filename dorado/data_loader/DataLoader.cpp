@@ -118,7 +118,9 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
         if (ext == ".fast5") {
             if (!issued_fast5_warn) {
                 spdlog::warn(
-                        "FAST5 support is unoptimized and will result in poor performance. "
+                        "Deprecation Warning: FAST5 support will be dropped in an upcoming "
+                        "release. "
+                        "FAST5 loading is unoptimized and will result in poor performance. "
                         "Please convert your dataset to POD5: "
                         "https://pod5-file-format.readthedocs.io/en/latest/docs/"
                         "tools.html#pod5-convert-fast5");
