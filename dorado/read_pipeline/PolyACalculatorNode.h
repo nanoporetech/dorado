@@ -1,7 +1,6 @@
 #pragma once
 
 #include "poly_tail/poly_tail_calculator.h"
-#include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
