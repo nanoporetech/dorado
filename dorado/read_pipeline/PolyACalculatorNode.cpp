@@ -305,17 +305,17 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
     int trailing_tail_bases = 0;
     if (fwd) {
         if (fwd_v1.editDistance < threshold) {
-            trailing_tail_bases += front_flank.size() - front_flank.find_last_not_of('A') - 1;
+            trailing_tail_bases += dorado::utils::count_trailing_chars(front_flank, 'A');
         }
         if (fwd_v2.editDistance < threshold) {
-            trailing_tail_bases += rear_flank.find_first_not_of('A');
+            trailing_tail_bases += dorado::utils::count_leading_chars(rear_flank, 'A');
         }
     } else {
         if (rev_v1.editDistance < threshold) {
-            trailing_tail_bases += rear_flank_rc.size() - rear_flank_rc.find_last_not_of('T') - 1;
+            trailing_tail_bases += dorado::utils::count_trailing_chars(rear_flank_rc, 'T');
         }
         if (rev_v2.editDistance < threshold) {
-            trailing_tail_bases += front_flank_rc.find_first_not_of('T');
+            trailing_tail_bases += dorado::utils::count_leading_chars(front_flank_rc, 'T');
         }
     }
 
