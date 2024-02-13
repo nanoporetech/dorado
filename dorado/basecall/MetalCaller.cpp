@@ -40,7 +40,10 @@ struct MetalCaller::NNTask {
     uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
 };
 
-MetalCaller::MetalCaller(const CRFModelConfig &model_config, int chunk_size, int batch_size)
+MetalCaller::MetalCaller(const CRFModelConfig &model_config,
+                         int chunk_size,
+                         int batch_size,
+                         float memory_limit_fraction)
         : m_config(model_config) {
     ScopedAutoReleasePool autorelease_pool;
 
@@ -76,7 +79,8 @@ MetalCaller::MetalCaller(const CRFModelConfig &model_config, int chunk_size, int
             model_config.model_path, model_config.out_features.has_value(), model_config.bias);
 
     auto selected_batch_size = (batch_size == 0)
-                                       ? benchmark_batch_sizes(model_config, state_dict, chunk_size)
+                                       ? benchmark_batch_sizes(model_config, state_dict, chunk_size,
+                                                               memory_limit_fraction)
                                        : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
     set_chunk_batch_size(model_config, state_dict, chunk_size, selected_batch_size);
 
@@ -231,9 +235,12 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
 
 int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
                                        const std::vector<at::Tensor> &state_dict,
-                                       int chunk_size) {
+                                       int chunk_size,
+                                       float memory_limit_fraction) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
-    spdlog::debug("Physical memory available {} GB", physical_memory / (size_t{1} << 30));
+    const size_t usable_memory = physical_memory * memory_limit_fraction;
+    spdlog::debug("Physical/Usable memory available: {}/{} GB", physical_memory / BYTES_PER_GB,
+                  usable_memory / BYTES_PER_GB);
 
     // Constrain the maximum batch size to use about half physical memory for decode buffers,
     // with neural network GPU buffers and CPU buffers assumed to occupy a subset of the
@@ -248,7 +255,7 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
              static_cast<size_t>(m_states) * sizeof(float));    // Back guides.
     spdlog::trace("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
     const int max_batch_size = static_cast<int>(
-            std::clamp(utils::pad_to(physical_memory / (2 * decode_buffer_size_per_elem),
+            std::clamp(utils::pad_to(usable_memory / (2 * decode_buffer_size_per_elem),
                                      static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
                        static_cast<size_t>(MTL_CORE_BATCH_SIZE),
                        static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count())));

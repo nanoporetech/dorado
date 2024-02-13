@@ -31,8 +31,11 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         float memory_limit_fraction,
         bool exclusive_gpu_access);
 #elif DORADO_METAL_BUILD
-std::shared_ptr<basecall::MetalCaller>
-create_metal_caller(const basecall::CRFModelConfig& model_config, int chunk_size, int batch_size);
+std::shared_ptr<basecall::MetalCaller> create_metal_caller(
+        const basecall::CRFModelConfig& model_config,
+        int chunk_size,
+        int batch_size,
+        float memory_limit_fraction);
 #endif
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
