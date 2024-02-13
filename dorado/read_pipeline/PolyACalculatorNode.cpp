@@ -302,7 +302,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
         base_anchor = rear_result.startLocations[0];
     }
 
-    int trailing_tail_bases = 0;
+    size_t trailing_tail_bases = 0;
     if (fwd) {
         if (fwd_v1.editDistance < threshold) {
             trailing_tail_bases += dorado::utils::count_trailing_chars(front_flank, 'A');
@@ -330,7 +330,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
                                                             read.read_common.seq.size() + 1);
     int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
-    return {fwd, signal_anchor, trailing_tail_bases, split_tail};
+    return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), split_tail};
 }
 
 // In order to find the approximate location of the start/end (anchor) of the polyA
@@ -346,7 +346,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     const std::string& front_primer_rc = config.rc_front_primer;
     const std::string& rear_primer = config.rear_primer;
     const std::string& rear_primer_rc = config.rc_rear_primer;
-    int trailing_Ts = dorado::utils::count_trailing_chars(rear_primer, 'T');
+    int trailing_Ts = static_cast<int>(dorado::utils::count_trailing_chars(rear_primer, 'T'));
 
     const int kWindowSize = 150;
     std::string_view seq_view = std::string_view(read.read_common.seq);
