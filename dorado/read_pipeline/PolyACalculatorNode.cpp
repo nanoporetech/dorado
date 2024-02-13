@@ -444,14 +444,14 @@ void PolyACalculatorNode::input_thread_fn() {
 
         if (signal_anchor >= 0) {
             auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
-            auto calculate_num_bases = [&](int anchor, int bases_to_remove) {
+            auto calculate_num_bases = [&, is_fwd = fwd](int anchor, int bases_to_remove) {
                 spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
-                              fwd ? '+' : '-', anchor);
+                              is_fwd ? '+' : '-', anchor);
 
                 // Walk through signal. Require a minimum of length 10 poly-A since below that
                 // the current algorithm returns a lot of false intervals.
                 auto [signal_start, signal_end] = determine_signal_bounds(
-                        anchor, fwd, *read, num_samples_per_base, m_is_rna, m_config);
+                        anchor, is_fwd, *read, num_samples_per_base, m_is_rna, m_config);
                 auto signal_len = signal_end - signal_start;
 
                 // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
