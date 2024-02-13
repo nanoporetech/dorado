@@ -46,8 +46,11 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     EdlibAlignResult& front_result = fwd ? fwd_v1 : rev_v1;
     EdlibAlignResult& rear_result = fwd ? fwd_v2 : rev_v2;
 
-    // good edits but reversed results means we cleaved through the tail itself
-    bool split_tail = (rear_result.startLocations[0] < front_result.startLocations[0]);
+    // good flank detection with the front and rear in order is the only configuration
+    // where we can be sure we haven't cleaved the tail
+    bool whole_tail = front_result.editDistance < threshold &&
+                      rear_result.editDistance < threshold &&
+                      front_result.endLocations[0] < rear_result.startLocations[0];
 
     int base_anchor = front_result.endLocations[0];
     if (front_result.editDistance - rear_result.editDistance > threshold) {
@@ -83,7 +86,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
                                                             read.read_common.seq.size() + 1);
     int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
-    return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), split_tail};
+    return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), !whole_tail};
 }
 
 }  // namespace dorado::poly_tail
