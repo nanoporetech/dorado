@@ -10,9 +10,13 @@ if (NOT MULTI_CONFIG)
   if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   endif()
-message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 endif()
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 
+# If no prefix is provided we install next to the binary directory.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+endif()
 
 if(WIN32)
   # all third parties are release builds, so we must match the windows runtime
@@ -289,7 +293,6 @@ target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
         ${TORCH_INCLUDE_DIRS}
-        ${HDF5_INCLUDE_DIRS}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -314,7 +317,6 @@ target_link_libraries(dorado_lib
     PUBLIC
         ${TORCH_LIBRARIES}
         htslib
-        vbz_hdf_plugin
         edlib
         dorado_utils
         dorado_basecall
@@ -376,12 +378,6 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_compat
         minimap2
     )
-
-    if (DEFINED DORADO_INSTALL_PATH)
-        set(CMAKE_INSTALL_PREFIX ${DORADO_INSTALL_PATH})
-    else()
-        set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
-    endif()
 
     install(TARGETS dorado RUNTIME)
 endif()
@@ -491,7 +487,8 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
             dorado_models_lib
         PRIVATE
             ${POD5_LIBRARIES}
-            ${HDF5_C_LIBRARIES}
+            HDF5::HDF5
+            vbz_hdf_plugin
             ${CMAKE_DL_LIBS}
             ${ZLIB_LIBRARIES}
     )
@@ -503,11 +500,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     )
     
     enable_warnings_as_errors(dorado_io_lib)
-
-    if (NOT DORADO_DISABLE_TESTS)
-        add_subdirectory(tests)
-    endif()
 endif()
+
+add_subdirectory(tests)
 
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)

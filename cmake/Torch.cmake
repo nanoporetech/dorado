@@ -109,9 +109,20 @@ else()
         endif()
 
     elseif(APPLE)
-        if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            set(TORCH_URL https://nanoporetech.box.com/shared/static/nzdq2wk45pzbwi2zex92j28dt3s5k9vt.tgz)
-            set(TORCH_LIB_SUFFIX "/")
+        if (IOS)
+            if (PLATFORM STREQUAL "OS64")
+                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-ios-ont.zip)
+                set(TORCH_PATCH_SUFFIX -ont)
+                set(TORCH_LIB_SUFFIX "/libtorch")
+                set(USING_STATIC_TORCH_LIB TRUE)
+            elseif (PLATFORM STREQUAL "SIMULATORARM64")
+                set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-ios-sim-arm-ont.zip)
+                set(TORCH_PATCH_SUFFIX -ont-sim-arm)
+                set(TORCH_LIB_SUFFIX "/libtorch")
+                set(USING_STATIC_TORCH_LIB TRUE)
+            else()
+                message(FATAL_ERROR "Unknown iOS platform: ${PLATFORM}")
+            endif()
         elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
             if (TRY_USING_STATIC_TORCH_LIB)
                 set(TORCH_URL https://cdn.oxfordnanoportal.com/software/analysis/torch-2.0.0-macos-x64-ont.zip)
@@ -233,6 +244,12 @@ if (USING_STATIC_TORCH_LIB)
                 ${METAL_FRAMEWORK}
                 ${MPS_FRAMEWORK}
                 ${MPSG_FRAMEWORK}
+            )
+        endif()
+        if (IOS)
+            find_library(UIKIT_FRAMEWORK UIKit REQUIRED)
+            list(APPEND TORCH_LIBRARIES
+                ${UIKIT_FRAMEWORK}
             )
         endif()
 

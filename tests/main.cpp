@@ -3,9 +3,10 @@
 #include "utils/locale_utils.h"
 #include "utils/torch_utils.h"
 
-#include <catch2/catch.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <torch/utils.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 int main(int argc, char* argv[]) {
     // global setup...
@@ -24,7 +25,10 @@ int main(int argc, char* argv[]) {
 
     int result = Catch::Session().run(argc, argv);
 
-    // global clean-up...
-
+    if (result == 0) {
+        // We print this so that we can check for it on iOS.
+        // See run_ios_test.py.
+        printf("ALL TESTS RAN SUCCESSFULLY\n");
+    }
     return result;
 }

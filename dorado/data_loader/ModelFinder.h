@@ -102,7 +102,7 @@ private:
 // Attempts to assert that the model sampling rate and data sampling rate are compatible.
 // Warns if testing fails. Throws an exception if sampling rates are known to be incompatible.
 void check_sampling_rates_compatible(const std::string& model_name,
-                                     const std::string& data_path,
+                                     const std::filesystem::path& data_path,
                                      const int config_sample_rate,
                                      const bool recursive_file_loading);
 

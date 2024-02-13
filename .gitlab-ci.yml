@@ -119,13 +119,6 @@ variables:
     expire_in: 1 day
   interruptible: true
 
-.build_dorado_lib_only: &build_dorado_lib_only
-  stage: build
-  script:
-    - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DDORADO_DISABLE_DORADO=1 -DDORADO_DISABLE_TESTS=1 -DDORADO_DISABLE_PACKAGING=1
-    - cmake --build ${BUILD_DIR} -j 8
-  interruptible: true
-
 .build_dorado_archive: &build_dorado_archive
   stage: build
   script:
@@ -316,10 +309,39 @@ build:macos:x64:
 
 build:ios:m1:
   variables:
-    BUILD_OPTIONS: "-DCMAKE_TOOLCHAIN_FILE=cmake/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DSKIP_HDF_PLUGINS=1 -DDEPLOYMENT_TARGET=16.0"
-    BUILD_TARGET: "all"
-  <<: *macos_arm_runner
-  <<: *build_dorado_lib_only
+    BUILD_TARGET: "ALL_BUILD"
+    PLATFORM: "OS64"
+    SDK_NAME: "iphoneos"
+    DORADO_RUN_TESTS: "OFF"
+  extends:
+    - .macos_arm_runner
+    - .build_dorado
+  script:
+    # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
+    - unset MACOSX_DEPLOYMENT_TARGET
+    - export SDKROOT=$(xcrun --sdk ${SDK_NAME} --show-sdk-path)
+    - echo "SDKROOT=${SDKROOT}"
+    - export BUILD_OPTIONS="
+      -G Xcode
+      -D CMAKE_TOOLCHAIN_FILE=$(pwd)/cmake/ios-cmake/ios.toolchain.cmake
+      -D PLATFORM=${PLATFORM}
+      -D ENABLE_BITCODE=OFF
+      -D SKIP_HDF_PLUGINS=ON
+      -D DEPLOYMENT_TARGET=16.0
+      -D DORADO_DISABLE_DORADO=ON
+      -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
+      -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
+    - !reference [.build_dorado, script]
+
+build:ios_sim:m1:
+  variables:
+    PLATFORM: "SIMULATORARM64"
+    SDK_NAME: "iphonesimulator"
+    DORADO_RUN_TESTS: "ON"
+  extends:
+    # Note that we don't technically need CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED
+    # disabled for simulator builds, but it doesn't hurt.
+    - build:ios:m1
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1

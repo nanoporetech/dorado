@@ -1,40 +1,43 @@
+option(DORADO_DISABLE_TESTS "Disable building the tests" OFF)
+option(DORADO_RUN_TESTS "Run the tests. Certain platforms don't have the infrastructure to do this atm" ON)
 
-set(UNIT_TEST_SOURCE_FILES
-    main.cpp
+if (DORADO_DISABLE_TESTS)
+    return()
+endif()
+
+# dorado_tests
+add_executable(dorado_tests
     AdapterDetectorTest.cpp
-    CustomBarcodeParserTest.cpp
     AlignerTest.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
-    BamWriterTest.cpp
     BamUtilsTest.cpp
+    BamWriterTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp    
     CliUtilsTest.cpp
     CRFModelConfigTest.cpp
+    CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
-    Fast5DataLoaderTest.cpp
     gpu_monitor_test.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
-    MotifMatcherTest.cpp
-    ModelFinderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
+    MotifMatcherTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
-    Pod5DataLoaderTest.cpp
     PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
     ReadTest.cpp
     RealignMovesTest.cpp
-    RNASplitTest.cpp
     ResumeLoaderTest.cpp
+    RNASplitTest.cpp
     SampleSheetTests.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
@@ -44,28 +47,76 @@ set(UNIT_TEST_SOURCE_FILES
     TimeUtilsTest.cpp
     TrimTest.cpp
 )
-
+if (NOT IOS)
+    target_sources(dorado_tests
+        PRIVATE
+            # No FAST5 or POD5 on iOS
+            Fast5DataLoaderTest.cpp
+            Pod5DataLoaderTest.cpp
+            # No dorado_io_lib on iOS
+            ModelFinderTest.cpp
+    )
+endif()
 if (DORADO_GPU_BUILD)
     if(APPLE)
-        list(APPEND UNIT_TEST_SOURCE_FILES
-	        MetalLinearTest.cpp
-        )
+        target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
     else()
-        list(APPEND UNIT_TEST_SOURCE_FILES
-            cuda_utils_test.cpp
-        )
+        target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
     endif()
 endif()
 
-add_executable(dorado_tests ${UNIT_TEST_SOURCE_FILES})
 
-set(SMOKE_TEST_SOURCE_FILES
-    main.cpp
+# dorado_smoke_tests
+add_executable(dorado_smoke_tests
     NodeSmokeTest.cpp
 )
 
-add_executable(dorado_smoke_tests ${SMOKE_TEST_SOURCE_FILES})
 
+# dorado_tests_common
+add_library(dorado_tests_common STATIC
+    main.cpp
+    TestUtils.cpp
+)
+target_link_libraries(dorado_tests_common
+    PUBLIC
+        dorado_utils
+        dorado_compat
+)
+target_include_directories(dorado_tests_common
+    SYSTEM
+    PUBLIC
+        ${DORADO_3RD_PARTY_SOURCE}/catch2
+)
+
+
+# Setup/teardown for iOS tests
+if (IOS AND DORADO_RUN_TESTS)
+    set(IOS_TEST_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py)
+    # I'm assuming that these tests will only be run in the sim on CI, so they
+    # depend on the sim being launched.
+    # Note: The test targets can still be built, but you'll need to install+launch
+    # them manually on a real device.
+    add_test(
+        NAME launch_simulator
+        COMMAND ${IOS_TEST_SCRIPT} --setup
+    )
+    set_tests_properties(launch_simulator
+        PROPERTIES
+            FIXTURES_SETUP interacting_with_device
+    )
+    # Kill the sim after so that it's not just hanging around.
+    add_test(
+        NAME kill_simulator_after
+        COMMAND ${IOS_TEST_SCRIPT} --teardown
+    )
+    set_tests_properties(kill_simulator_after
+        PROPERTIES
+            FIXTURES_CLEANUP interacting_with_device
+    )
+endif()
+
+
+# Finish setting up each target and add them as tests.
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
@@ -73,41 +124,87 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
 
     target_link_libraries(${TEST_BIN}
         PRIVATE
-        dorado_lib
-        dorado_io_lib
-        dorado_models_lib
-        dorado_basecall
-        dorado_modbase
-        dorado_compat
-        minimap2
-        ${ZLIB_LIBRARIES}
-        ${POD5_LIBRARIES}
+            dorado_tests_common
+            dorado_lib
+            dorado_models_lib
+            dorado_basecall
+            dorado_modbase
+            minimap2
+            ${ZLIB_LIBRARIES}
+    )
+    if (NOT IOS)
+        target_link_libraries(${TEST_BIN}
+            PRIVATE
+                dorado_io_lib
+                ${POD5_LIBRARIES}
         )
+    endif()
 
-    target_include_directories(${TEST_BIN}
-        SYSTEM
-        PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/catch2
-        )
-    
     enable_warnings_as_errors(${TEST_BIN})
-
-    add_test(
-        NAME ${TEST_BIN}
-        COMMAND ${TEST_BIN}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        )
-
-    if(NOT MSVC)
+    if (MSVC)
+        set_target_properties(${TEST_BIN} PROPERTIES LINK_OPTIONS "/ignore:4099")
+    else()
         # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
         target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
+    endif()
+
+    if (IOS)
+        # default.metallib is generated, but we need it as a source file to package it,
+        # so create it if it doesn't exist.
+        set(METALLIB_PATH ${CMAKE_BINARY_DIR}/lib/default.metallib)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+        file(TOUCH ${METALLIB_PATH})
+
+        # Grab all the data files that we want to package.
+        set(DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data;${METALLIB_PATH}")
+
+        # To package data into the app we need to make it a source file.
+        target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
+
+        set_target_properties(${TEST_BIN} PROPERTIES
+            BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${TEST_BIN}"
+            MACOSX_BUNDLE_BUNDLE_NAME ${TEST_BIN}
+            MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
+            RESOURCE "${DATA_RESOURCES}"
+        )
+    endif()
+
+    # Don't add the test if we can't run it
+    if (NOT DORADO_RUN_TESTS)
+        continue()
+    endif()
+
+    # Add the test.
+    if (IOS)
+        add_test(
+            NAME ${TEST_BIN}
+            COMMAND
+                ${IOS_TEST_SCRIPT}
+                    --run
+                    # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
+                    # when building for the sim.
+                    --app_path ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
+                    --identifier com.ont.${TEST_BIN}
+                    --device booted
+        )
+        set_tests_properties(${TEST_BIN}
+            PROPERTIES
+                FIXTURES_REQUIRED interacting_with_device
+        )
+    else()
+        add_test(
+            NAME ${TEST_BIN}
+            COMMAND ${TEST_BIN}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
     endif()
 
     # The tests need to be able to find the libs in order to run.
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
         set_tests_properties(${TEST_BIN} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
-        set_target_properties(${TEST_BIN} PROPERTIES LINK_OPTIONS "/ignore:4099")
     endif()
 
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path

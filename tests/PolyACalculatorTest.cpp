@@ -4,11 +4,12 @@
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "utils/sequence_utils.h"
 
-#include <catch2/catch.hpp>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <toml/value.hpp>
 #include <torch/torch.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <filesystem>
