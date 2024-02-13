@@ -239,9 +239,8 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
                                        float memory_limit_fraction) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
     const size_t usable_memory = physical_memory * memory_limit_fraction;
-    const size_t one_gb = size_t{1} << 30;
-    spdlog::debug("Physical/Available memory available: {}/{} GB", physical_memory / one_gb,
-                  usable_memory / one_gb);
+    spdlog::debug("Physical/Usable memory available: {}/{} GB", physical_memory / BYTES_PER_GB,
+                  usable_memory / BYTES_PER_GB);
 
     // Constrain the maximum batch size to use about half physical memory for decode buffers,
     // with neural network GPU buffers and CPU buffers assumed to occupy a subset of the
