@@ -25,6 +25,9 @@ struct SignalAnchorInfo {
     // Number of additional A/T bases in the polyA
     // stretch from the adapter.
     int trailing_adapter_bases = 0;
+    // Whether the polyA/T tail is split between the front/end of the read
+    // This can only be true for plasmids
+    bool split_tail = false;
 };
 
 const int kMaxTailLength = 750;
@@ -244,6 +247,90 @@ float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
     }
 }
 
+SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::SimplexRead& read,
+                                                            const PolyTailConfig& config) {
+    const std::string& front_flank = config.plasmid_front_flank;
+    const std::string& rear_flank = config.plasmid_rear_flank;
+    const std::string& front_flank_rc = config.rc_plasmid_front_flank;
+    const std::string& rear_flank_rc = config.rc_plasmid_rear_flank;
+
+    const int kWindowSize = (int)read.read_common.seq.length();
+    std::string_view seq_view = std::string_view(read.read_common.seq);
+    std::string_view read_top = seq_view.substr(0, kWindowSize);
+    auto bottom_start = std::max(0, (int)seq_view.length() - kWindowSize);
+    std::string_view read_bottom = seq_view.substr(bottom_start, kWindowSize);
+
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_LOC;
+    align_config.mode = EDLIB_MODE_HW;
+
+    // Check for forward strand.
+    EdlibAlignResult fwd_v1 = edlibAlign(front_flank.data(), int(front_flank.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult fwd_v2 =
+            edlibAlign(rear_flank.data(), int(rear_flank.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
+
+    // Check for reverse strand.
+    EdlibAlignResult rev_v1 = edlibAlign(rear_flank_rc.data(), int(rear_flank_rc.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult rev_v2 =
+            edlibAlign(front_flank_rc.data(), int(front_flank_rc.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
+
+    auto scores = {fwd_v1.editDistance, fwd_v2.editDistance, rev_v1.editDistance,
+                   rev_v2.editDistance};
+
+    if (std::none_of(std::begin(scores), std::end(scores), [](auto val) { return val < 10; })) {
+        return {false, -1, 0, false};
+    }
+
+    bool fwd = std::distance(std::begin(scores),
+                             std::min_element(std::begin(scores), std::end(scores))) < 2;
+
+    EdlibAlignResult& front_result = fwd ? fwd_v1 : rev_v1;
+    EdlibAlignResult& rear_result = fwd ? fwd_v2 : rev_v2;
+
+    // good edits but reversed results means we cleaved through the tail itself
+    bool split_tail = (rear_result.startLocations[0] < front_result.startLocations[0]);
+
+    int base_anchor = front_result.endLocations[0];
+    if (front_result.editDistance - rear_result.editDistance > 10) {
+        // front sequence cleaved?
+        base_anchor = rear_result.startLocations[0];
+    }
+
+    int trailing_tail_bases = 0;
+    if (fwd) {
+        if (fwd_v1.editDistance < 10) {
+            trailing_tail_bases += front_flank.size() - front_flank.find_last_not_of('A') - 1;
+        }
+        if (fwd_v2.editDistance < 10) {
+            trailing_tail_bases += rear_flank.find_first_not_of('A');
+        }
+    } else {
+        if (rev_v1.editDistance < 10) {
+            trailing_tail_bases += rear_flank_rc.size() - rear_flank_rc.find_last_not_of('T') - 1;
+        }
+        if (rev_v2.editDistance < 10) {
+            trailing_tail_bases += front_flank_rc.find_first_not_of('T');
+        }
+    }
+
+    edlibFreeAlignResult(fwd_v1);
+    edlibFreeAlignResult(fwd_v2);
+    edlibFreeAlignResult(rev_v1);
+    edlibFreeAlignResult(rev_v2);
+
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                                            read.read_common.get_raw_data_samples(),
+                                                            read.read_common.seq.size() + 1);
+    int signal_anchor = int(seq_to_sig_map[base_anchor]);
+
+    return {fwd, signal_anchor, trailing_tail_bases, split_tail};
+}
+
 // In order to find the approximate location of the start/end (anchor) of the polyA
 // cDNA tail, the adapter ends are aligned to the reads to find the breakpoint
 // between the read and the adapter. Adapter alignment also helps determine
@@ -260,9 +347,10 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     int trailing_Ts = dorado::utils::count_trailing_chars(rear_primer, 'T');
 
     const int kWindowSize = 150;
-    std::string read_top = read.read_common.seq.substr(0, kWindowSize);
-    auto bottom_start = std::max(0, (int)read.read_common.seq.length() - kWindowSize);
-    std::string read_bottom = read.read_common.seq.substr(bottom_start, kWindowSize);
+    std::string_view seq_view = std::string_view(read.read_common.seq);
+    std::string_view read_top = seq_view.substr(0, kWindowSize);
+    auto bottom_start = std::max(0, (int)seq_view.length() - kWindowSize);
+    std::string_view read_bottom = seq_view.substr(bottom_start, kWindowSize);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_LOC;
@@ -290,7 +378,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     bool fwd = dist_v1 < dist_v2;
     bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
 
-    SignalAnchorInfo result = {false, -1, trailing_Ts};
+    SignalAnchorInfo result = {false, -1, trailing_Ts, false};
 
     if (proceed) {
         int base_anchor = 0;
@@ -306,7 +394,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
                 read.read_common.seq.size() + 1);
         int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
-        result = {fwd, signal_anchor, trailing_Ts};
+        result = {fwd, signal_anchor, trailing_Ts, false};
     } else {
         spdlog::debug("{} primer edit distance too high {}", read.read_common.read_id,
                       std::min(dist_v1, dist_v2));
@@ -324,7 +412,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
 // for RNA has been trimmed off already, the polyA search can begin
 // from the start of the signal.
 SignalAnchorInfo determine_signal_anchor_and_strand_drna(const dorado::SimplexRead& read) {
-    return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0};
+    return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0, false};
 }
 
 }  // namespace
@@ -347,47 +435,56 @@ void PolyACalculatorNode::input_thread_fn() {
 
         // Determine the strand direction, approximate base space anchor for the tail, and whether
         // the final length needs to be adjusted depending on the adapter sequence.
-        auto [fwd, signal_anchor, trailing_Ts] =
-                m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
-                         : determine_signal_anchor_and_strand_cdna(*read, m_config);
+        auto [fwd, signal_anchor, trailing_Ts, split_tail] =
+                m_is_rna              ? determine_signal_anchor_and_strand_drna(*read)
+                : m_config.is_plasmid ? determine_signal_anchor_and_strand_plasmid(*read, m_config)
+                                      : determine_signal_anchor_and_strand_cdna(*read, m_config);
 
         if (signal_anchor >= 0) {
-            spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
-                          fwd ? '+' : '-', signal_anchor);
-
             auto num_samples_per_base = estimate_samples_per_base(*read, m_is_rna);
+            auto calculate_num_bases = [&](int anchor, int bases_to_remove) {
+                spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
+                              fwd ? '+' : '-', anchor);
 
-            // Walk through signal. Require a minimum of length 10 poly-A since below that
-            // the current algorithm returns a lot of false intervals.
-            auto [signal_start, signal_end] = determine_signal_bounds(
-                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, m_config);
-            auto signal_len = signal_end - signal_start;
+                // Walk through signal. Require a minimum of length 10 poly-A since below that
+                // the current algorithm returns a lot of false intervals.
+                auto [signal_start, signal_end] = determine_signal_bounds(
+                        anchor, fwd, *read, num_samples_per_base, m_is_rna, m_config);
+                auto signal_len = signal_end - signal_start;
 
-            // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
-            // tails, especially shorter ones. This correction factor appears to fix the bias
-            // for most dRNA data. This exponential fit was done based on the standards data.
-            // TODO: In order to improve this, perhaps another pass over the tail interval is needed
-            // to get a more refined boundary estimation?
-            if (m_is_rna) {
-                signal_len -= int(std::round(std::min(
-                        100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len)))));
-            }
+                // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
+                // tails, especially shorter ones. This correction factor appears to fix the bias
+                // for most dRNA data. This exponential fit was done based on the standards data.
+                // TODO: In order to improve this, perhaps another pass over the tail interval is needed
+                // to get a more refined boundary estimation?
+                if (m_is_rna) {
+                    signal_len -= int(std::round(std::min(
+                            100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len)))));
+                }
 
-            int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
-                            trailing_Ts;
-
-            if (num_bases > 0 && num_bases < kMaxTailLength) {
+                int num_bases =
+                        int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
+                        bases_to_remove;
                 spdlog::debug(
                         "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
-                        "{}, "
-                        "samples/base {} trim {} read len {}",
-                        read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, signal_len, num_samples_per_base,
-                        read->read_common.num_trimmed_samples, read->read_common.seq.length());
+                        "{}, samples/base {} trim {} read len {}",
+                        read->read_common.read_id, num_bases, anchor, signal_start, signal_end,
+                        signal_len, num_samples_per_base, read->read_common.num_trimmed_samples,
+                        read->read_common.seq.length());
+                return num_bases;
+            };
 
-                // Set tail length property in the read.
-                read->read_common.rna_poly_tail_length = num_bases;
+            int num_bases = calculate_num_bases(signal_anchor, trailing_Ts);
+            if (split_tail) {
+                auto split_bases = std::max(0, calculate_num_bases(0, 0));
+                if (num_bases < kMaxTailLength && num_bases + split_bases > kMaxTailLength) {
+                    spdlog::debug("{} split PolyA exceeded maximum tail length, {} + {}",
+                                  read->read_common.read_id, num_bases, split_bases);
+                }
+                num_bases += split_bases;
+            }
 
+            if (num_bases > 0 && num_bases < kMaxTailLength) {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
                 ++num_called;
@@ -395,14 +492,12 @@ void PolyACalculatorNode::input_thread_fn() {
                     std::lock_guard<std::mutex> lock(m_mutex);
                     tail_length_counts[num_bases]++;
                 }
+                // Set tail length property in the read.
+                read->read_common.rna_poly_tail_length = num_bases;
             } else {
-                spdlog::debug(
-                        "{} PolyA bases {}, signal anchor {} Signal range is {}, "
-                        "samples/base {}, trim  {}",
-                        read->read_common.read_id, num_bases, signal_anchor, signal_start,
-                        signal_end, num_samples_per_base, read->read_common.num_trimmed_samples);
                 num_not_called++;
             }
+
         } else {
             num_not_called++;
         }
