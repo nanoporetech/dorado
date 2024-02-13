@@ -253,6 +253,7 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
     const std::string& rear_flank = config.plasmid_rear_flank;
     const std::string& front_flank_rc = config.rc_plasmid_front_flank;
     const std::string& rear_flank_rc = config.rc_plasmid_rear_flank;
+    const int threshold = config.plasmid_flank_threshold;
 
     const int kWindowSize = (int)read.read_common.seq.length();
     std::string_view seq_view = std::string_view(read.read_common.seq);
@@ -281,7 +282,8 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
     auto scores = {fwd_v1.editDistance, fwd_v2.editDistance, rev_v1.editDistance,
                    rev_v2.editDistance};
 
-    if (std::none_of(std::begin(scores), std::end(scores), [](auto val) { return val < 10; })) {
+    if (std::none_of(std::begin(scores), std::end(scores),
+                     [threshold](auto val) { return val < threshold; })) {
         return {false, -1, 0, false};
     }
 
@@ -295,24 +297,24 @@ SignalAnchorInfo determine_signal_anchor_and_strand_plasmid(const dorado::Simple
     bool split_tail = (rear_result.startLocations[0] < front_result.startLocations[0]);
 
     int base_anchor = front_result.endLocations[0];
-    if (front_result.editDistance - rear_result.editDistance > 10) {
+    if (front_result.editDistance - rear_result.editDistance > threshold) {
         // front sequence cleaved?
         base_anchor = rear_result.startLocations[0];
     }
 
     int trailing_tail_bases = 0;
     if (fwd) {
-        if (fwd_v1.editDistance < 10) {
+        if (fwd_v1.editDistance < threshold) {
             trailing_tail_bases += front_flank.size() - front_flank.find_last_not_of('A') - 1;
         }
-        if (fwd_v2.editDistance < 10) {
+        if (fwd_v2.editDistance < threshold) {
             trailing_tail_bases += rear_flank.find_first_not_of('A');
         }
     } else {
-        if (rev_v1.editDistance < 10) {
+        if (rev_v1.editDistance < threshold) {
             trailing_tail_bases += rear_flank_rc.size() - rear_flank_rc.find_last_not_of('T') - 1;
         }
-        if (rev_v2.editDistance < 10) {
+        if (rev_v2.editDistance < threshold) {
             trailing_tail_bases += front_flank_rc.find_first_not_of('T');
         }
     }

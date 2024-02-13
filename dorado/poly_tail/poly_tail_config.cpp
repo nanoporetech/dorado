@@ -43,6 +43,13 @@ PolyTailConfig prepare_config(std::istream& is) {
         }
     }
 
+    if (config_toml.contains("threshold")) {
+        const auto& threshold = toml::find(config_toml, "threshold");
+        if (threshold.contains("plasmid_flank_threshold")) {
+            config.plasmid_flank_threshold = toml::find<int>(threshold, "plasmid_flank_threshold");
+        }
+    }
+
     if (config_toml.contains("tail")) {
         const auto& tail = toml::find(config_toml, "tail");
 
