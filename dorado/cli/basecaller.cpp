@@ -86,6 +86,7 @@ void setup(std::vector<std::string> args,
            const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
+           const std::string* const polya_config,
            const ModelSelection& model_selection) {
     const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
@@ -166,7 +167,7 @@ void setup(std::vector<std::string> args,
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config), 1000);
+                is_rna_model(model_config), 1000, polya_config);
     }
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
@@ -400,7 +401,7 @@ int basecaller(int argc, char* argv[]) {
             .implicit_value(true);
     parser.visible.add_argument("--trim")
             .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
-                  "Default behavior is to trim all detected adapters, primers, or barcodes. "
+                  "Default behaviour is to trim all detected adapters, primers, or barcodes. "
                   "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
                   "adapters and "
                   "primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. "
@@ -425,6 +426,9 @@ int basecaller(int argc, char* argv[]) {
                   "will be disabled.")
             .default_value(false)
             .implicit_value(true);
+    parser.visible.add_argument("--poly-a-config")
+            .help("Configuration file for PolyA estimation to change default behaviours")
+            .default_value(std::string(""));
 
     cli::add_minimap2_arguments(parser, alignment::dflt_options);
     cli::add_internal_arguments(parser);
@@ -521,6 +525,8 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
         std::exit(EXIT_FAILURE);
     }
+
+    std::string polya_config = "";
     if (parser.visible.get<bool>("--estimate-poly-a")) {
         if (trim_options == "primers" || trim_options == "adapters" || trim_options == "all") {
             spdlog::error(
@@ -532,6 +538,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::info(
                 "Estimation of poly-a has been requested, so adapter/primer trimming has been "
                 "disabled.");
+        polya_config = parser.visible.get<std::string>("--poly-a-config");
     }
 
     if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
@@ -609,7 +616,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), model_selection);
+              resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
+              polya_config.empty() ? nullptr : &polya_config, model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

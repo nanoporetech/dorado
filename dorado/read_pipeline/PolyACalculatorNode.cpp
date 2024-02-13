@@ -1,5 +1,6 @@
 #include "PolyACalculatorNode.h"
 
+#include "poly_tail/poly_tail_config.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -9,6 +10,8 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+using dorado::poly_tail::PolyTailConfig;
 
 namespace {
 
@@ -36,7 +39,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                             const dorado::SimplexRead& read,
                                             float num_samples_per_base,
                                             bool is_rna,
-                                            int min_base_count) {
+                                            const PolyTailConfig& config) {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = int(read.read_common.get_raw_data_samples());
 
@@ -54,12 +57,14 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
         return {avg, std::sqrt(var)};
     };
 
-    std::vector<std::pair<int, int>> intervals;
     std::pair<float, float> last_interval_stats;
 
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
     const float kVar = 0.35f;
+    // How close the mean values should be for consecutive intervals
+    // to be merged.
+    const float kMeanValueProximity = 0.2f;
     // Determine the outer boundary of the signal space to
     // consider based on the anchor.
     const int kSpread = int(std::round(num_samples_per_base * kMaxTailLength));
@@ -75,6 +80,7 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     int right_end = std::min(signal_len, signal_anchor + kSpread);
     spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
+    std::vector<std::pair<int, int>> intervals;
     const int kStride = 3;
     for (int s = left_end; s < right_end; s += kStride) {
         int e = std::min(s + kMaxSampleGap, right_end);
@@ -83,7 +89,8 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
             // If a new interval overlaps with the previous interval, just extend
             // the previous interval.
             if (intervals.size() > 1 && intervals.back().second >= s &&
-                std::abs(avg - last_interval_stats.first) < 0.2 && (avg > kMinAvgVal)) {
+                std::abs(avg - last_interval_stats.first) < kMeanValueProximity &&
+                (avg > kMinAvgVal)) {
                 auto& last = intervals.back();
                 spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}", last.first,
                               last.second, s, e, avg, stdev);
@@ -104,6 +111,9 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                       second_last.second, second_last.first, last.second);
                         second_last.second = last.second;
                         intervals.pop_back();
+                    } else if (second_last.second - second_last.first <
+                               std::round(num_samples_per_base * config.min_base_count)) {
+                        intervals.erase(intervals.end() - 2);
                     }
                 }
                 spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
@@ -119,22 +129,54 @@ std::pair<int, int> determine_signal_bounds(int signal_anchor,
     }
     spdlog::trace("found intervals {}", int_str);
 
+    // Cluster intervals if there are interrupted poly tails that should
+    // be combined. Interruption length is specified through a config file.
+    // In the example below, tail estimation show include both stretches
+    // of As along with the small gap in the middle.
+    // e.g. -----AAAAAAA--AAAAAA-----
+    const int kMaxInterruption =
+            static_cast<int>(std::round(num_samples_per_base * config.tail_interrupt_length));
+    std::vector<std::pair<int, int>> clustered_intervals;
+    for (const auto& i : intervals) {
+        if (clustered_intervals.empty()) {
+            clustered_intervals.push_back(i);
+        } else {
+            auto& last = clustered_intervals.back();
+            if (std::abs(i.first - last.second) < kMaxInterruption) {
+                last.second = i.second;
+            } else {
+                clustered_intervals.push_back(i);
+            }
+        }
+    }
+
+    int_str = "";
+    for (const auto& in : clustered_intervals) {
+        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+    }
+    spdlog::trace("clustered intervals {}", int_str);
+
+    // Once the clustered intervals are available, filter them by how
+    // close they are to the anchor.
     std::vector<std::pair<int, int>> filtered_intervals;
-    std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
-                 [&](auto& i) {
-                     int interval_size = i.second - i.first;
-                     // Filter out any small intervals.
-                     if (interval_size < (std::round(num_samples_per_base * min_base_count))) {
-                         return false;
-                     }
+    std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
+                 std::back_inserter(filtered_intervals), [&](auto& i) {
+                     int buffer = i.second - i.first;
                      // Only keep intervals that are close-ish to the signal anchor.
-                     return (std::abs(signal_anchor - i.second) < interval_size ||
-                             std::abs(signal_anchor - i.first) < interval_size ||
-                             ((i.first <= signal_anchor) && (signal_anchor <= i.second)));
+                     // i.e. the anchor needs to be within the buffer region of
+                     // the interval. The buffer is currently the length of the interval
+                     // itself. This heuristic generally works because a longer interval
+                     // detected is likely to be the correct one so we relax the
+                     // how close it needs to be to the anchor to account for errors
+                     // in anchor determination.
+                     // <----buffer---|--- interval ---|---- buffer---->
+                     bool within_anchor_dist = (signal_anchor >= std::max(0, i.first - buffer)) &&
+                                               (signal_anchor <= (i.second + buffer));
+                     return within_anchor_dist;
                  });
 
     int_str = "";
-    for (auto in : filtered_intervals) {
+    for (const auto& in : filtered_intervals) {
         int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
     }
     spdlog::trace("filtered intervals {}", int_str);
@@ -209,12 +251,13 @@ float estimate_samples_per_base(const dorado::SimplexRead& read, bool is_rna) {
 // the approximate anchor for the tail, and if there needs to be an adjustment
 // made to the final polyA tail count based on the adapter sequence (e.g. because
 // the adapter itself contains several As).
-SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRead& read) {
-    const std::string SSP = "TTTCTGTTGGTGCTGATATTGCTTT";
-    const std::string SSP_rc = dorado::utils::reverse_complement(SSP);
-    const std::string VNP = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";
-    const std::string VNP_rc = dorado::utils::reverse_complement(VNP);
-    int trailing_Ts = dorado::utils::count_trailing_chars(VNP, 'T');
+SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRead& read,
+                                                         const PolyTailConfig& config) {
+    const std::string& front_primer = config.front_primer;
+    const std::string& front_primer_rc = config.rc_front_primer;
+    const std::string& rear_primer = config.rear_primer;
+    const std::string& rear_primer_rc = config.rc_rear_primer;
+    int trailing_Ts = dorado::utils::count_trailing_chars(rear_primer, 'T');
 
     const int kWindowSize = 150;
     std::string read_top = read.read_common.seq.substr(0, kWindowSize);
@@ -226,18 +269,20 @@ SignalAnchorInfo determine_signal_anchor_and_strand_cdna(const dorado::SimplexRe
     align_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult top_v1 = edlibAlign(SSP.data(), int(SSP.length()), read_top.data(),
-                                         int(read_top.length()), align_config);
-    EdlibAlignResult bottom_v1 = edlibAlign(VNP_rc.data(), int(VNP_rc.length()), read_bottom.data(),
-                                            int(read_bottom.length()), align_config);
+    EdlibAlignResult top_v1 = edlibAlign(front_primer.data(), int(front_primer.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v1 =
+            edlibAlign(rear_primer_rc.data(), int(rear_primer_rc.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
 
     int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
 
     // Check for reverse strand.
-    EdlibAlignResult top_v2 = edlibAlign(VNP.data(), int(VNP.length()), read_top.data(),
-                                         int(read_top.length()), align_config);
-    EdlibAlignResult bottom_v2 = edlibAlign(SSP_rc.data(), int(SSP_rc.length()), read_bottom.data(),
-                                            int(read_bottom.length()), align_config);
+    EdlibAlignResult top_v2 = edlibAlign(rear_primer.data(), int(rear_primer.length()),
+                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult bottom_v2 =
+            edlibAlign(front_primer_rc.data(), int(front_primer_rc.length()), read_bottom.data(),
+                       int(read_bottom.length()), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
@@ -304,7 +349,7 @@ void PolyACalculatorNode::input_thread_fn() {
         // the final length needs to be adjusted depending on the adapter sequence.
         auto [fwd, signal_anchor, trailing_Ts] =
                 m_is_rna ? determine_signal_anchor_and_strand_drna(*read)
-                         : determine_signal_anchor_and_strand_cdna(*read);
+                         : determine_signal_anchor_and_strand_cdna(*read, m_config);
 
         if (signal_anchor >= 0) {
             spdlog::debug("{} Strand {}; poly A/T signal anchor {}", read->read_common.read_id,
@@ -315,7 +360,7 @@ void PolyACalculatorNode::input_thread_fn() {
             // Walk through signal. Require a minimum of length 10 poly-A since below that
             // the current algorithm returns a lot of false intervals.
             auto [signal_start, signal_end] = determine_signal_bounds(
-                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, 10);
+                    signal_anchor, fwd, *read, num_samples_per_base, m_is_rna, m_config);
             auto signal_len = signal_end - signal_start;
 
             // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
@@ -366,8 +411,13 @@ void PolyACalculatorNode::input_thread_fn() {
     }
 }
 
-PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads)
-        : MessageSink(max_reads, static_cast<int>(num_worker_threads)), m_is_rna(is_rna) {
+PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
+                                         bool is_rna,
+                                         size_t max_reads,
+                                         const std::string* const config_file)
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
+          m_is_rna(is_rna),
+          m_config(poly_tail::prepare_config(config_file)) {
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 

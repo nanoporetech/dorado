@@ -11,10 +11,6 @@
 
 #include <array>
 
-namespace {
-constexpr size_t BYTES_PER_GB{1024 * 1024 * 1024};
-}
-
 namespace dorado::utils {
 
 size_t available_host_memory_GB() {

@@ -22,9 +22,13 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
                                                   memory_limit_fraction, pipeline_type);
 }
 #elif DORADO_METAL_BUILD
-std::shared_ptr<basecall::MetalCaller>
-create_metal_caller(const basecall::CRFModelConfig& model_config, int chunk_size, int batch_size) {
-    return std::make_shared<basecall::MetalCaller>(model_config, chunk_size, batch_size);
+std::shared_ptr<basecall::MetalCaller> create_metal_caller(
+        const basecall::CRFModelConfig& model_config,
+        int chunk_size,
+        int batch_size,
+        float memory_limit_fraction) {
+    return std::make_shared<basecall::MetalCaller>(model_config, chunk_size, batch_size,
+                                                   memory_limit_fraction);
 }
 #endif
 

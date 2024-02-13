@@ -1,22 +1,22 @@
 #pragma once
 
+#include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
 #include <atomic>
-#include <cstdint>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
-#include <vector>
 
 namespace dorado {
 
 class PolyACalculatorNode : public MessageSink {
 public:
-    PolyACalculatorNode(size_t num_worker_threads, bool is_rna, size_t max_reads);
+    PolyACalculatorNode(size_t num_worker_threads,
+                        bool is_rna,
+                        size_t max_reads,
+                        const std::string *const config_file);
     ~PolyACalculatorNode() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;
@@ -34,6 +34,8 @@ private:
 
     std::mutex m_mutex;
     std::map<int, int> tail_length_counts;
+
+    poly_tail::PolyTailConfig m_config;
 };
 
 }  // namespace dorado

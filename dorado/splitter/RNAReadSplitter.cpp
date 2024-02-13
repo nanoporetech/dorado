@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <sstream>
 #include <string>
 
 using namespace dorado::splitter;
@@ -91,6 +92,7 @@ std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) con
 
     std::vector<SimplexReadPtr> split_result;
     size_t subread_id = 0;
+    std::ostringstream log_output;
     for (auto& ext_read : to_split) {
         if (!ext_read.read->read_common.parent_read_id.empty()) {
             ext_read.read->read_common.subread_id = subread_id++;
@@ -101,10 +103,14 @@ std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) con
             ext_read.read->read_common.read_id = subread_uuid;
         }
 
+        log_output << ext_read.read->read_common.read_id << " ("
+                   << ext_read.read->read_common.split_point << "); ";
+
         split_result.push_back(std::move(ext_read.read));
     }
 
-    spdlog::trace("Read {} split into {} subreads", read_id, split_result.size());
+    spdlog::trace("Read {} split into {} subreads: {}", read_id, split_result.size(),
+                  log_output.str());
 
     auto stop_ts = high_resolution_clock::now();
     spdlog::trace("READ duration: {} microseconds (ID: {})",

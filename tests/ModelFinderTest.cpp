@@ -304,26 +304,27 @@ TEST_CASE(TEST_TAG "  ModelFinder check_sampling_rates_compatible ", TEST_TAG) {
     SECTION(" check_sampling_rates_compatible") {
         auto [model_name, data_path, config_sample_rate] =
                 GENERATE(table<std::string, std::string, SamplingRate>({
-                        std::make_tuple("dna_r9.4.1_e8_sup@v3.6", "pod5/dna_r9.4.1_e8", 4000),
+                        std::make_tuple("dna_r9.4.1_e8_sup@v3.6", "dna_r9.4.1_e8", 4000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_4khz", 4000),
+                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
                         std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.3.0",
-                                        "pod5/dna_r10.4.1_e8.2_400bps_5khz", 5000),
-                        std::make_tuple("rna002_70bps_hac@v3", "pod5/rna002_70bps", 3000),
-                        std::make_tuple("rna004_130bps_fast@v3.0.1", "pod5/rna004_130bps", 4000),
-
+                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
+                        std::make_tuple("rna002_70bps_hac@v3", "rna002_70bps", 3000),
+                        std::make_tuple("rna004_130bps_fast@v3.0.1", "rna004_130bps", 4000),
                 }));
 
         CAPTURE(model_name);
-        CHECK_NOTHROW(dorado::check_sampling_rates_compatible(
-                model_name, get_data_dir("pod5") + data_path, config_sample_rate, true));
+        const auto path = get_data_dir("pod5") / data_path;
+        REQUIRE(std::filesystem::exists(path));
+        CHECK_NOTHROW(dorado::check_sampling_rates_compatible(model_name, path, config_sample_rate,
+                                                              true));
     }
 }

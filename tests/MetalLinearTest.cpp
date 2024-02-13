@@ -1,7 +1,8 @@
 #include "utils/metal_utils.h"
 
-#include <catch2/catch.hpp>
 #include <torch/torch.h>
+// Catch2 must come after torch since both define CHECK()
+#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <vector>

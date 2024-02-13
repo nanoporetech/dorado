@@ -63,6 +63,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
     const int kWindowSize = 250;
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
+    const int16_t kMedianDiffForDiffOnlyCheck = 150;
 
     const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
 
@@ -88,15 +89,20 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
         // after that of the minimum median value.
         window_pos[median_pos % window_pos.size()] = median_pos;
         auto minmax = std::minmax_element(medians.begin(), medians.end());
+        // The range of raw signal values is within the range of [-500, 3000] (TODO: they're
+        // likely are non-negative but need to confirm that). So the median values lie
+        // in the same range, and any difference between the median values
+        // will not result in an overflow with the int16_t data type.
         int16_t min_median = *minmax.first;
         int16_t max_median = *minmax.second;
         auto min_pos = std::distance(medians.begin(), minmax.first);
         auto max_pos = std::distance(medians.begin(), minmax.second);
         spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
                       max_median, (max_median - min_median));
-        if ((median_pos >= static_cast<int>(medians.size())) &&
-            (max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff) &&
-            (window_pos[max_pos] > window_pos[min_pos])) {
+        if ((median_pos >= static_cast<int>(medians.size()) &&
+             window_pos[max_pos] > window_pos[min_pos]) &&
+            (((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) ||
+             (max_median - min_median > kMedianDiffForDiffOnlyCheck))) {
             break_point = i;
             break;
         }

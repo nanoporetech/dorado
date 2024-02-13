@@ -1,14 +1,10 @@
 download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS13_iOS16.zip metal-cpp)
-find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
-find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
-find_library(APPLE_FWK_METAL Metal REQUIRED)
-find_library(IOKIT IOKit REQUIRED)
 
 set(AIR_FILES)
 set(METAL_SOURCES dorado/basecall/metal/nn.metal)
 
-if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(XCRUN_SDK iphoneos)
+if (IOS)
+    set(XCRUN_SDK ${SDK_NAME})
 else()
     set(XCRUN_SDK macosx)
 endif()

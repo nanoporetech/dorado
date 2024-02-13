@@ -36,7 +36,7 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, matched read list") {
 }
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list.") {
-    std::string data_path(get_fast5_data_dir());
+    auto data_path = get_fast5_data_dir();
 
     SECTION("fast5 file only, no read ids list") {
         CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt, {}, false) == 1);
@@ -55,6 +55,6 @@ TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from fast5") {
-    std::string data_path(get_fast5_data_dir());
+    auto data_path = get_fast5_data_dir();
     CHECK(dorado::DataLoader::get_sample_rate(data_path, false) == 6024);
 }

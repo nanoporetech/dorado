@@ -8,6 +8,8 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
+    crypto_utils.h
+    crypto_utils.cpp
     dev_utils.cpp
     dev_utils.h
     duplex_utils.cpp
@@ -98,7 +100,6 @@ target_link_libraries(dorado_utils
     PRIVATE
         dorado_compat
         minimap2
-        OpenSSL::SSL
         htslib
 )
 
@@ -108,19 +109,30 @@ if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
 endif()
 
-if(APPLE AND DORADO_GPU_BUILD)
-    add_dependencies(dorado_utils metal-lib)
-    target_link_libraries(
-        dorado_utils
+if(APPLE)
+    find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
+    target_link_libraries(dorado_utils
         PUBLIC
-        ${APPLE_FWK_FOUNDATION}
-        ${APPLE_FWK_QUARTZ_CORE}
-        ${APPLE_FWK_METAL}
-    )   
+            ${APPLE_FWK_FOUNDATION}
+    )
+    if (DORADO_GPU_BUILD)
+        find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+        find_library(APPLE_FWK_METAL Metal REQUIRED)
+        add_dependencies(dorado_utils metal-lib)
+        target_link_libraries(dorado_utils
+            PUBLIC
+                ${APPLE_FWK_QUARTZ_CORE}
+                ${APPLE_FWK_METAL}
+        )
+    endif()
+    if (NOT IOS)
+        find_library(IOKIT IOKit REQUIRED)
+        target_link_libraries(dorado_utils PUBLIC ${IOKIT})
+    endif()
 endif()
 
-if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    target_link_libraries(dorado_utils PUBLIC ${IOKIT})
+if (NOT APPLE)
+    target_link_libraries(dorado_utils PRIVATE OpenSSL::SSL)
 endif()
 
 if(NOT WIN32)
