@@ -46,6 +46,9 @@ rear_primer = "CGTA"
 plasmid_front_flank = "CGATCG"
 plasmid_rear_flank = "TGACTGC"
 
+[threshold]
+plasmid_flank_threshold = 10
+
 [tail]
 tail_interrupt_length = 10
 ```
