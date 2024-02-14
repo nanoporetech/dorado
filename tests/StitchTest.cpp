@@ -1,6 +1,7 @@
 #include "read_pipeline/stitch.h"
 
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/math_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -65,6 +66,8 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     }
 
     dorado::ReadCommon read_common;
+    read_common.model_stride = static_cast<int>(dorado::utils::div_round_closest(
+            called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size()));
     REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, called_chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";

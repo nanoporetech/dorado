@@ -4,14 +4,15 @@
 #include "utils/math_utils.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace dorado::utils {
 
 void stitch_chunks(ReadCommon& read_common,
                    const std::vector<std::unique_ptr<Chunk>>& called_chunks) {
-    // Calculate the chunk down sampling, round to closest int.
-    read_common.model_stride = int(
-            div_round_closest(called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size()));
+    assert(static_cast<int>(div_round_closest(called_chunks[0]->raw_chunk_size,
+                                              called_chunks[0]->moves.size())) ==
+           read_common.model_stride);
 
     int start_pos = 0;
     int mid_point_front = 0;
