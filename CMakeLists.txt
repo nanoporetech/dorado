@@ -230,6 +230,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ProgressTracker.h
     dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadForwarderNode.cpp
+    dorado/read_pipeline/ReadForwarderNode.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ReadSplitNode.cpp
