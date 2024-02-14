@@ -64,27 +64,7 @@ PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 
-void PolyACalculatorNode::terminate_impl() {
-    stop_input_processing();
-
-    spdlog::debug("Total called {}, not called {}, avg tail length {}", num_called.load(),
-                  num_not_called.load(),
-                  num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
-
-    // Visualize a distribution of the tail lengths called.
-    static bool done = false;
-    if (!done && (spdlog::get_level() <= spdlog::level::debug)) {
-        int max_val = -1;
-        for (auto [k, v] : tail_length_counts) {
-            max_val = std::max(v, max_val);
-        }
-        int factor = std::max(1, 1 + max_val / 100);
-        for (auto [k, v] : tail_length_counts) {
-            spdlog::debug("{:03d} : {}", k, std::string(v / factor, '*'));
-        }
-        done = true;
-    }
-}
+void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
 
 stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
@@ -92,6 +72,14 @@ stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats["reads_estimated"] = static_cast<double>(num_called.load());
     stats["average_tail_length"] = static_cast<double>(
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
+
+    if (spdlog::get_level() <= spdlog::level::debug) {
+        for (const auto& [len, count] : tail_length_counts) {
+            std::string key = "pt." + std::to_string(len);
+            stats[key] = static_cast<float>(count);
+        }
+    }
+
     return stats;
 }
 

@@ -86,6 +86,23 @@ public:
                 spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
             }
         }
+
+        if (m_num_poly_a_called + m_num_poly_a_not_called > 0) {
+            // Visualize a distribution of the tail lengths called.
+            if (!m_poly_a_tail_length_count.empty()) {
+                spdlog::debug("PolyA tail length distribution :");
+                auto max_val = std::max_element(
+                        m_poly_a_tail_length_count.begin(), m_poly_a_tail_length_count.end(),
+                        [](const auto& l, const auto& r) { return l.second < r.second; });
+                int factor = std::max(1, 1 + max_val->second / 100);
+                for (const auto& [len, count] : m_poly_a_tail_length_count) {
+                    spdlog::debug("{:03d} : {}", len, std::string(count / factor, '*'));
+                }
+            }
+
+            spdlog::info("> PolyA tails called {}, not called {}, avg tail length {}",
+                         m_num_poly_a_called, m_num_poly_a_not_called, m_avg_poly_a_tail_lengths);
+        }
     }
 
     void update_progress_bar(const stats::NamedStats& stats) {
@@ -124,6 +141,11 @@ public:
         // Barcode demuxing stats.
         m_num_barcodes_demuxed = int(fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed"));
 
+        // PolyA tail stats.
+        m_num_poly_a_called = int(fetch_stat("PolyACalculator.reads_estimated"));
+        m_num_poly_a_not_called = int(fetch_stat("PolyACalculator.reads_not_estimated"));
+        m_avg_poly_a_tail_lengths = int(fetch_stat("PolyACalculator.average_tail_length"));
+
         // don't output progress bar if stderr is not a tty
         if (!utils::is_fd_tty(stderr)) {
             return;
@@ -160,6 +182,17 @@ public:
                 }
             }
         }
+
+        if (m_num_poly_a_called + m_num_poly_a_not_called > 0 &&
+            (spdlog::get_level() <= spdlog::level::debug)) {
+            for (const auto& [stat, val] : stats) {
+                const std::string prefix = "PolyACalculator.pt.";
+                if (utils::starts_with(stat, prefix)) {
+                    auto len = std::stoi(stat.substr(prefix.length()));
+                    m_poly_a_tail_length_count[len] = static_cast<int>(val);
+                }
+            }
+        }
     }
 
 private:
@@ -174,10 +207,14 @@ private:
     int m_num_duplex_reads_filtered{0};
     int m_num_duplex_bases_filtered{0};
     int m_num_barcodes_demuxed{0};
+    int m_num_poly_a_called{0};
+    int m_num_poly_a_not_called{0};
+    int m_avg_poly_a_tail_lengths{0};
 
     int m_num_reads_expected;
 
     std::map<std::string, size_t> m_barcode_count;
+    std::map<int, int> m_poly_a_tail_length_count;
 
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     std::chrono::time_point<std::chrono::system_clock> m_end_time;
