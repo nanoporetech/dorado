@@ -6,7 +6,7 @@
 
 #define TEST_GROUP "[ReadForwarderNodeTest]"
 
-TEST_CASE("Minimal", TEST_GROUP) {
+TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto add_to_vec_callback = [&messages](dorado::Message&& message) {
         messages.push_back(std::move(message));
