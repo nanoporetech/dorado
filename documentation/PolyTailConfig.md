@@ -61,4 +61,5 @@ tail_interrupt_length = 10
 | rear_primer | Rear primer sequence for cDNA |
 | plasmid_front_flank | Front flanking sequence of poly(A) in plasmid |
 | plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
+| plasmid_flank_threshold | The edit distance threshold to use for detection of the plasmid flank sequences |
 | tail_interrupt_length | Combine tails that are within this distance of each other (default is 0, i.e. don't combine any) |
