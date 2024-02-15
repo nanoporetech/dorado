@@ -116,36 +116,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
-# Bring in spdlog
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
-# Avoid namespace clashes with static torch.
-target_compile_definitions(spdlog PUBLIC
-    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
-    "FMT_END_NAMESPACE=}}"
-)
-
-# ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
-set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
-
-option(ONT_MM2_EXE "Build minimap2 exe" OFF)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2 EXCLUDE_FROM_ALL)
-message(STATUS "build minimap2 exe: ${ONT_MM2_EXE}")
-message(STATUS "build minimap2 lib: ${ONT_MM2_LIB}")
-if (ONT_MM2_EXE)
-    install(TARGETS minimap2_exe)
-    add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
-endif()
-# Disable warnings from minimap source
-disable_warnings(minimap2)
-
-set(BUILD_TESTING OFF)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
-# Disable warnings from edlib source
-disable_warnings(edlib)
-set(BUILD_TESTING ON)
-
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
+# Bring in 3rdparty libs
+add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
