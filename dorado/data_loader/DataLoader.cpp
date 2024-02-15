@@ -118,7 +118,8 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
         if (ext == ".fast5") {
             if (!issued_fast5_warn) {
                 spdlog::warn(
-                        "Deprecation Warning: FAST5 support will be dropped in an upcoming "
+                        "Deprecation Warning: FAST5 support in Dorado will be dropped in an "
+                        "upcoming "
                         "release. "
                         "FAST5 loading is unoptimized and will result in poor performance. "
                         "Please convert your dataset to POD5: "
