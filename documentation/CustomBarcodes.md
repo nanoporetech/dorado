@@ -41,11 +41,12 @@ last_index = 96
 
 ## Scoring options
 [scoring]
-min_soft_barcode_threshold = 0.2
-min_hard_barcode_threshold = 0.2
-min_soft_flank_threshold = 0.3
-min_hard_flank_threshold = 0.3
-min_barcode_score_dist = 0.1
+max_barcode_cost = 11
+barcode_end_proximity = 75
+min_barcode_score_dist = 3
+min_separation_only_dist = 6
+flank_left_pad = 5
+flank_right_pad = 10
 ```
 
 #### Arrangement Options
@@ -72,25 +73,26 @@ The pre-built barcode sequence in Dorado can be found in this [file](../dorado/u
 Dorado maintains a default set of parameters for scoring each barcode to determine the best classification. These parameters have been tuned based on barcoding kits from Oxford Nanopore. However, the default parameters may not be optimal for new arrangements and kits.
 
 The classification heuristic applied by Dorado is the following -
-1. Dorado calculates a separate score for the barcode flanks and the barcode sequence itself. The score is roughly `1.0f - edit_distance / length(target_seq)`, where the `target_seq` is either the reference flank or reference barcode sequence.
-2. For double ended barcodes, the __best__ window (either front or rear) is chosen based on the flank scores.
-3. After choosing the best window for an arrangement, each barcode candidate within the arrangement is sorted by the barcode score.
+1. Dorado uses the flanking sequences defined in `maskX_front/rear` to find a window in the read where the barcode is situated. 
+2. For double ended barcodes, the __best__ window (either from the front or rear of the read) is chosen based on the alignment of the flanking mask sequences.
+3. After choosing the best window for an arrangement, each barcode candidate within the arrangement is aligned to the subsequence within the window. The alignment may optionally consider additional bases from the preceding/succeeding flank (as specifed in the `flank_left_pad` and `flank_right_pad` parameters). The edit distance of this alignment is assigned as a score to each barcode.
 
 Once barcodes are sorted by barcode score, the top candidate is checked against the following rules -
-1. If the flank score is above `min_soft_flank_threshold` and the barcode score is above `min_hard_barcode_threshold`, then the barcode is kept as a candidate.
-2. If the barcode score is above `min_soft_barcode_threshold` and the flank score is above `min_hard_flank_threshold`, then the barcode is kept as a candidate.
-3. If the arrangement is double ended, if both the top and bottom barcode sequence scores are above `min_hard_barcode_threshold`, then the barcode is kept as a candidate.
+1. Is the barcode score below `max_barcode_cost` and the distance between top 2 barcode scores greater than `min_barcode_score_dist`?.
+2. Is the barcode score above `max_barcode_cost` but the distance between top 2 barcodes scores greater then `min_separation_only_dist`?
 
-If a candidate still remains and there are at least 2 scores candidates in the sorted list, the difference between the best and second best candidate is computed. Only
-if that score is greater than `min_barcode_score_dist`, the best candidate is considered a hit. Otherwise the read is considered as `unclassified`.
+If a candidate meets one of the above conditions and the location of the start/end of the barcode construct is within `barcode_end_proximity` bases of the ends of the read, then it is considered a hit.
 
 | Scoring option | Description |
 | -- | -- |
-| min_soft_barcode_threshold | If barcode score meets this threshold and flank score meets its hard threshold, consider a hit. Soft score is higher than hard score. |
-| min_hard_barcode_threshold | Minimum score threshold a barcode must meet. |
-| min_soft_flank_threshold | If flank score meets this threshold and barcode score meets its hard threshold, consider a hit. Soft score is higher than hard score. |
-| min_hard_barcode_threshold | Minimum score threshold a flank must meet. |
-| min_barcode_score_dist | Minimum distance between barcode scores of best and second best hits. |
+| max_barcode_cost | The maximum edit distance allowed for a classified barcode. Considered in conjunction with the `min_barcode_score_dist` parameter. |
+| min_barcode_score_dist | The minimum score difference between top-2 barcodes required for classification. Used in conjunction with `max_barcode_cost`. |
+| min_separation_only_dist | The minimum score difference between the top-2 barcodes required for classification when the `max_barcode_cost` is not met. |
+| barcode_end_proximity | Proximity of the end of the barcode construct to the ends of the read required for classification. |
+| flank_left_pad | Number of bases to use from preceding flank during barcode alignment. |
+| flank_right_pad | Number of bases to use from succeeding flank during barcode alignment. |
+
+For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases is typically good. Note that errors from this padding region are also part of the barcode alignment score. Therefore a bigger padding region may require a higher `max_barcode_cost` for classification.
 
 ### Custom Sequences File 
 

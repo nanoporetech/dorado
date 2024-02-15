@@ -168,7 +168,12 @@ struct BarcodeClassifier::BarcodeCandidateKit {
     std::string bottom_context_rev_left_buffer;
     std::string bottom_context_rev_right_buffer;
     std::vector<std::string> barcode_names;
+    // This is the specific barcode kit product name
+    // that is selected by the user, such as SQK-RBK114-96
+    // or EXP-PBC096
     std::string kit;
+    // This is the barcode ligation group name, such as RAB
+    // or 16S, which is shared by multiple product names.
     std::string barcode_kit;
 };
 
@@ -734,7 +739,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                 [](const auto& l, const auto& r) { return l.bottom_score < r.bottom_score; });
         auto best_score = std::max(best_top_score->score, best_bottom_score->score);
         auto score_dist = std::abs(best_top_score->score - best_bottom_score->score);
-        if ((best_score <= m_scoring_params.max_barcode_score) &&
+        if ((best_score <= m_scoring_params.max_barcode_cost) &&
             (score_dist <= m_scoring_params.min_barcode_score_dist) &&
             (best_top_score->barcode_name != best_bottom_score->barcode_name)) {
             spdlog::trace("Two ends confidently predict different BCs: top bc {}, bottom bc {}",
@@ -754,7 +759,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     spdlog::trace("Scores: {}", d.str());
     auto best_score = scores.begin();
     auto are_scores_acceptable = [this](const auto& score) {
-        return score.score <= m_scoring_params.max_barcode_score;
+        return score.score <= m_scoring_params.max_barcode_cost;
     };
 
     BarcodeScoreResult out = UNCLASSIFIED;
@@ -779,9 +784,9 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // For more stringent classification, ensure that both ends of a read
         // have a high score for the same barcode. If not then consider it
         // unclassified.
-        if (std::max(out.top_score, out.bottom_score) > m_scoring_params.max_barcode_score) {
+        if (std::max(out.top_score, out.bottom_score) > m_scoring_params.max_barcode_cost) {
             spdlog::trace("Min of top {} and bottom scores {} > max barcode score {}",
-                          out.top_score, out.bottom_score, m_scoring_params.max_barcode_score);
+                          out.top_score, out.bottom_score, m_scoring_params.max_barcode_cost);
             return UNCLASSIFIED;
         }
     }

@@ -119,8 +119,8 @@ BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file
     }
 
     const auto& config = toml::find(config_toml, "scoring");
-    if (config.contains("max_barcode_score")) {
-        params.max_barcode_score = toml::find<int>(config, "max_barcode_score");
+    if (config.contains("max_barcode_cost")) {
+        params.max_barcode_cost = toml::find<int>(config, "max_barcode_cost");
     }
     if (config.contains("barcode_end_proximity")) {
         params.barcode_end_proximity = toml::find<int>(config, "barcode_end_proximity");

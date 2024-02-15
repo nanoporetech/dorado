@@ -9,7 +9,7 @@
 namespace dorado::demux {
 
 struct BarcodeKitScoringParams {
-    int max_barcode_score = 12;
+    int max_barcode_cost = 12;
     int barcode_end_proximity = 75;
     int min_barcode_score_dist = 3;
     int min_separation_only_dist = 6;

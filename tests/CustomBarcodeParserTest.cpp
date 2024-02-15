@@ -120,7 +120,7 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
 
     auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
 
-    CHECK(scoring_params.max_barcode_score == 10);
+    CHECK(scoring_params.max_barcode_cost == 10);
     CHECK(scoring_params.barcode_end_proximity == 75);
     CHECK(scoring_params.min_barcode_score_dist == 3);
     CHECK(scoring_params.min_separation_only_dist == 5);
@@ -136,7 +136,7 @@ TEST_CASE("Parse default scoring params", "[barcode_demux]") {
 
     auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
 
-    CHECK(scoring_params.max_barcode_score == default_params.max_barcode_score);
+    CHECK(scoring_params.max_barcode_cost == default_params.max_barcode_cost);
     CHECK(scoring_params.barcode_end_proximity == default_params.barcode_end_proximity);
     CHECK(scoring_params.min_barcode_score_dist == default_params.min_barcode_score_dist);
     CHECK(scoring_params.min_separation_only_dist == default_params.min_separation_only_dist);
