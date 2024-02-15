@@ -377,67 +377,56 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
 std::vector<std::pair<std::string, DuplexReadSplitter::SplitFinderF>>
 DuplexReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
-    split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
-                                 return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
-                                     return check_nearby_adapter(*read.read, r,
-                                                                 m_settings.adapter_edist);
-                                 });
-                             }});
+    split_finders.emplace_back(std::make_pair("PORE_ADAPTER", [&](const ExtRead& read) {
+        return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
+            return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
+        });
+    }));
 
     if (!m_settings.simplex_mode) {
-        split_finders.push_back(
-                {"PORE_FLANK", [&](const ExtRead& read) {
-                     return merge_ranges(
-                             filter_ranges(read.possible_pore_regions,
-                                           [&](PosRange r) {
-                                               return check_flank_match(*read.read, r,
-                                                                        m_settings.flank_err);
-                                           }),
-                             m_settings.strand_end_flank + m_settings.strand_start_flank);
-                 }});
+        split_finders.emplace_back(std::make_pair("PORE_FLANK", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_flank_match(*read.read, r, m_settings.flank_err);
+            };
+            return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
+                                m_settings.strand_end_flank + m_settings.strand_start_flank);
+        }));
 
-        split_finders.push_back(
-                {"PORE_ALL", [&](const ExtRead& read) {
-                     return merge_ranges(
-                             filter_ranges(read.possible_pore_regions,
-                                           [&](PosRange r) {
-                                               return check_nearby_adapter(
-                                                              *read.read, r,
-                                                              m_settings.relaxed_adapter_edist) &&
-                                                      check_flank_match(
-                                                              *read.read, r,
-                                                              m_settings.relaxed_flank_err);
-                                           }),
-                             m_settings.strand_end_flank + m_settings.strand_start_flank);
-                 }});
+        split_finders.emplace_back(std::make_pair("PORE_ALL", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_nearby_adapter(*read.read, r, m_settings.relaxed_adapter_edist) &&
+                       check_flank_match(*read.read, r, m_settings.relaxed_flank_err);
+            };
+            return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
+                                m_settings.strand_end_flank + m_settings.strand_start_flank);
+        }));
 
-        split_finders.push_back(
-                {"ADAPTER_FLANK", [&](const ExtRead& read) {
-                     return filter_ranges(
-                             find_adapter_matches(m_settings.adapter, read.read->read_common.seq,
-                                                  m_settings.adapter_edist,
-                                                  m_settings.expect_adapter_prefix),
-                             [&](PosRange r) {
-                                 return check_flank_match(*read.read, {r.first, r.first},
-                                                          m_settings.flank_err);
-                             });
-                 }});
+        split_finders.emplace_back(std::make_pair("ADAPTER_FLANK", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_flank_match(*read.read, {r.first, r.first}, m_settings.flank_err);
+            };
+            return filter_ranges(
+                    find_adapter_matches(m_settings.adapter, read.read->read_common.seq,
+                                         m_settings.adapter_edist,
+                                         m_settings.expect_adapter_prefix),
+                    filter);
+        }));
 
-        split_finders.push_back({"ADAPTER_MIDDLE", [&](const ExtRead& read) {
-                                     if (auto split = identify_middle_adapter_split(*read.read)) {
-                                         return PosRanges{*split};
-                                     } else {
-                                         return PosRanges();
-                                     }
-                                 }});
+        split_finders.emplace_back(std::make_pair("ADAPTER_MIDDLE", [&](const ExtRead& read) {
+            if (auto split = identify_middle_adapter_split(*read.read)) {
+                return PosRanges{*split};
+            } else {
+                return PosRanges();
+            }
+        }));
 
-        split_finders.push_back({"SPLIT_MIDDLE", [&](const ExtRead& read) {
-                                     if (auto split = identify_extra_middle_split(*read.read)) {
-                                         return PosRanges{*split};
-                                     } else {
-                                         return PosRanges();
-                                     }
-                                 }});
+        split_finders.emplace_back(std::make_pair("SPLIT_MIDDLE", [&](const ExtRead& read) {
+            if (auto split = identify_extra_middle_split(*read.read)) {
+                return PosRanges{*split};
+            } else {
+                return PosRanges();
+            }
+        }));
     }
 
     return split_finders;
