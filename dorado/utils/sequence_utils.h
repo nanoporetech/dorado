@@ -45,7 +45,8 @@ public:
     static const std::vector<int> BASE_IDS;
 };
 
-int count_trailing_chars(const std::string_view adapter, char c);
+size_t count_trailing_chars(const std::string_view seq, char c);
+size_t count_leading_chars(const std::string_view seq, char c);
 
 /**
  * @brief Realigns a move table based on a given query sequence and a target sequence.

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "poly_tail/poly_tail_config.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
 #include <atomic>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -27,7 +28,6 @@ private:
     void terminate_impl();
     void input_thread_fn();
 
-    const bool m_is_rna;
     std::atomic<size_t> total_tail_lengths_called{0};
     std::atomic<int> num_called{0};
     std::atomic<int> num_not_called{0};
@@ -35,7 +35,7 @@ private:
     std::mutex m_mutex;
     std::map<int, int> tail_length_counts;
 
-    poly_tail::PolyTailConfig m_config;
+    std::unique_ptr<poly_tail::PolyTailCalculator> m_calculator;
 };
 
 }  // namespace dorado
