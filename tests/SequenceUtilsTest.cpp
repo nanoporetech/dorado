@@ -4,19 +4,19 @@
 
 #include <cstdlib>
 
-#define TEST_GROUP "[utils]"
+#define TEST_GROUP "[seq_utils]"
 
 using std::make_tuple;
 using namespace dorado::utils;
 
-TEST_CASE(TEST_GROUP ": Test base_to_int") {
+TEST_CASE(TEST_GROUP ": Test base_to_int", TEST_GROUP) {
     CHECK(base_to_int('A') == 0);
     CHECK(base_to_int('C') == 1);
     CHECK(base_to_int('G') == 2);
     CHECK(base_to_int('T') == 3);
 }
 
-TEST_CASE(TEST_GROUP ": Test sequence_to_ints") {
+TEST_CASE(TEST_GROUP ": Test sequence_to_ints", TEST_GROUP) {
     SECTION("Test empty string") {
         auto actual_results = sequence_to_ints("");
         std::vector<int> expected_results = {};
@@ -30,7 +30,7 @@ TEST_CASE(TEST_GROUP ": Test sequence_to_ints") {
     }
 }
 
-TEST_CASE(TEST_GROUP "reverse_complement") {
+TEST_CASE(TEST_GROUP "reverse_complement", TEST_GROUP) {
     CHECK(dorado::utils::reverse_complement("") == "");
     CHECK(dorado::utils::reverse_complement("ACGT") == "ACGT");
     std::srand(42);
@@ -55,7 +55,7 @@ TEST_CASE(TEST_GROUP "reverse_complement") {
     }
 }
 
-TEST_CASE(TEST_GROUP "mean_q_score") {
+TEST_CASE(TEST_GROUP "mean_q_score", TEST_GROUP) {
     CHECK(dorado::utils::mean_qscore_from_qstring("") == 0.0f);
 
     // Repeated values within range.
@@ -80,8 +80,40 @@ TEST_CASE(TEST_GROUP "mean_q_score") {
     }
 }
 
-TEST_CASE(TEST_GROUP "mean_q_score from non-zero start position") {
+TEST_CASE(TEST_GROUP "mean_q_score from non-zero start position", TEST_GROUP) {
     auto [str, start_pos, score] = GENERATE(table<std::string, int, float>(
             {make_tuple("####%%%%", 0, 2.88587f), make_tuple("####%%%%", 4, 4.0f)}));
     CHECK(dorado::utils::mean_qscore_from_qstring(str.substr(start_pos)) == Approx(score));
+}
+
+TEST_CASE(TEST_GROUP ": count leading chars", TEST_GROUP) {
+    auto [seq, expected] = GENERATE(table<std::string, size_t>({
+            make_tuple("", 0),
+            make_tuple("A", 1),
+            make_tuple("C", 0),
+            make_tuple("AAA", 3),
+            make_tuple("AAAACGT", 4),
+            make_tuple("CAGT", 0),
+            make_tuple("CGTCGT", 0),
+            make_tuple("CGTAAA", 0),
+    }));
+    CAPTURE(seq);
+    auto actual = dorado::utils::count_leading_chars(seq, 'A');
+    CHECK(actual == expected);
+}
+
+TEST_CASE(TEST_GROUP ": count trailing chars", TEST_GROUP) {
+    auto [seq, expected] = GENERATE(table<std::string, size_t>({
+            make_tuple("", 0),
+            make_tuple("A", 1),
+            make_tuple("C", 0),
+            make_tuple("AAA", 3),
+            make_tuple("AAAACGT", 0),
+            make_tuple("CAGT", 0),
+            make_tuple("CGTCGT", 0),
+            make_tuple("CGTAAA", 3),
+    }));
+    CAPTURE(seq);
+    auto actual = dorado::utils::count_trailing_chars(seq, 'A');
+    CHECK(actual == expected);
 }
