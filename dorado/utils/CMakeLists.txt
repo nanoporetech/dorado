@@ -31,6 +31,8 @@ add_library(dorado_utils
     PostCondition.h
     SampleSheet.cpp
     SampleSheet.h
+    scoped_debug_log.cpp
+    scoped_debug_log.h
     sequence_utils.cpp
     sequence_utils.h
     stats.cpp
