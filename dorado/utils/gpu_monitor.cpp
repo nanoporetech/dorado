@@ -7,7 +7,7 @@
 #endif
 
 #if HAS_NVML
-#include "scoped_debug_log.h"
+#include "scoped_trace_log.h"
 
 #include <nvml.h>
 #if defined(_WIN32)
@@ -198,7 +198,7 @@ class NvmlApi final {
             return;
         }
         auto *device_count_op = m_DeviceGetCount_v2 ? m_DeviceGetCount_v2 : m_DeviceGetCount;
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         auto result = device_count_op(&m_device_count);
         if (result != NVML_SUCCESS) {
             m_device_count = 0;
@@ -224,7 +224,7 @@ public:
         nvmlDevice_t device;
         auto *get_handle = m_DeviceGetHandleByIndex_v2 ? m_DeviceGetHandleByIndex_v2
                                                        : m_DeviceGetHandleByIndex;
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         nvmlReturn_t result = get_handle(device_index, &device);
         if (result != NVML_SUCCESS) {
             return std::nullopt;
@@ -233,27 +233,27 @@ public:
     }
 
     nvmlReturn_t SystemGetDriverVersion(char *version, unsigned int length) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_SystemGetDriverVersion(version, length);
     }
 
     nvmlReturn_t DeviceGetTemperature(const nvmlDevice_t &device,
                                       nvmlTemperatureSensors_t sensorType,
                                       unsigned int *temp) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetTemperature(device, sensorType, temp);
     }
 
     nvmlReturn_t DeviceGetTemperatureThreshold(const nvmlDevice_t &device,
                                                nvmlTemperatureThresholds_t thresholdType,
                                                unsigned int *temp) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         log.write("nvmlTemperatureThresholds_t: " + std::to_string(thresholdType));
         return m_DeviceGetTemperatureThreshold(device, thresholdType, temp);
     }
 
     nvmlReturn_t DeviceGetPerformanceState(const nvmlDevice_t &device, unsigned int *limit) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         nvmlPstates_t state;
         auto result = m_DeviceGetPerformanceState(device, &state);
         *limit = static_cast<unsigned int>(state);
@@ -262,29 +262,29 @@ public:
 
     nvmlReturn_t DeviceGetPowerManagementDefaultLimit(const nvmlDevice_t &device,
                                                       unsigned int *limit) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetPowerManagementDefaultLimit(device, limit);
     }
 
     nvmlReturn_t DeviceGetPowerUsage(const nvmlDevice_t &device, unsigned int *power) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetPowerUsage(device, power);
     }
 
     nvmlReturn_t DeviceGetUtilizationRates(const nvmlDevice_t &device,
                                            nvmlUtilization_t *utilization) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetUtilizationRates(device, utilization);
     }
 
     nvmlReturn_t DeviceGetCurrentClocksThrottleReasons(const nvmlDevice_t &device,
                                                        unsigned long long *clocksThrottleReasons) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetCurrentClocksThrottleReasons(device, clocksThrottleReasons);
     }
 
     nvmlReturn_t DeviceGetName(const nvmlDevice_t &device, char *name, unsigned int length) {
-        ScopedDebugLog log{__func__};
+        ScopedTraceLog log{__func__};
         return m_DeviceGetName(device, name, length);
     }
 

@@ -1,4 +1,4 @@
-#include "scoped_debug_log.h"
+#include "scoped_trace_log.h"
 
 #include <spdlog/spdlog.h>
 
@@ -10,18 +10,18 @@ const std::string SCOPED_LOG_EXIT{"[EXIT]"};
 const std::string SCOPED_LOG_MESSAGE{"[MSG]"};
 }  // namespace
 
-ScopedDebugLog::ScopedDebugLog(std::string context) : m_context(std::move(context)) {
+ScopedTraceLog::ScopedTraceLog(std::string context) : m_context(std::move(context)) {
     write_log_message(SCOPED_LOG_ENTER, {});
 }
 
-ScopedDebugLog::~ScopedDebugLog() { write_log_message(SCOPED_LOG_EXIT, {}); }
+ScopedTraceLog::~ScopedTraceLog() { write_log_message(SCOPED_LOG_EXIT, {}); }
 
-void ScopedDebugLog::write_log_message(const std::string &message_type,
+void ScopedTraceLog::write_log_message(const std::string &message_type,
                                        const std::string &message) {
-    spdlog::debug("{} {} {}", m_context, message_type, message);
+    spdlog::trace("{} {} {}", m_context, message_type, message);
 }
 
-void ScopedDebugLog::write(const std::string &message) {
+void ScopedTraceLog::write(const std::string &message) {
     write_log_message(SCOPED_LOG_MESSAGE, message);
 }
 
