@@ -60,7 +60,7 @@ struct DeviceStatusInfo {
     std::string current_performance_state_error;
 };
 
-std::optional<DeviceStatusInfo> get_device_status_info(int device_index);
+std::optional<DeviceStatusInfo> get_device_status_info(unsigned int device_index);
 
 std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info();
 

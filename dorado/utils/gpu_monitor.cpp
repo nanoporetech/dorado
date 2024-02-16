@@ -17,9 +17,13 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sstream>
+#include <unordered_map>
 
 namespace dorado::utils::gpu_monitor {
 
@@ -59,7 +63,7 @@ static_assert(ONT_NVML_BUFFER_SIZE, "nvml buffer size must be defined");
  * Handle to the NVML API.
  * Also provides a scoped wrapper around NVML API initialisation.
  */
-class NVMLAPI {
+class NvmlApi {
     // Includes devices which cannot be accessed via NVML so need to check return codes
     // on individual device specific NVML function calls.
     unsigned int m_device_count{};
@@ -183,15 +187,8 @@ class NVMLAPI {
         platform_close();
     }
 
-    NVMLAPI() {
-        init();
-        set_device_count();
-    }
-
-    ~NVMLAPI() { shutdown(); }
-
-    NVMLAPI(const NVMLAPI &) = delete;
-    NVMLAPI &operator=(const NVMLAPI &) = delete;
+    NvmlApi(const NvmlApi &) = delete;
+    NvmlApi &operator=(const NvmlApi &) = delete;
 
     void set_device_count() {
         if (!m_handle) {
@@ -205,11 +202,19 @@ class NVMLAPI {
         }
     }
 
-public:
-    static NVMLAPI *get() {
-        static NVMLAPI api;
-        return api.m_handle != nullptr ? &api : nullptr;
+    // This slight design flaw is in place of having NvmlApi as a singleton.
+    // Instead it is held as a member variable of the DeviceInfoCache singleton.
+    // This is prefereable to having dependencies between singletons.
+    friend class DeviceInfoCache;
+    NvmlApi() {
+        init();
+        set_device_count();
     }
+
+    ~NvmlApi() { shutdown(); }
+
+public:
+    bool is_loaded() { return m_handle != nullptr; }
 
     std::optional<nvmlDevice_t> get_device_handle(unsigned int device_index) {
         nvmlDevice_t device;
@@ -273,27 +278,7 @@ public:
     const char *ErrorString(nvmlReturn_t result) { return m_ErrorString(result); }
 };
 
-std::optional<std::string> read_version_from_nvml() {
-    // See if we have access to the API.
-    auto *nvml_api = NVMLAPI::get();
-    if (nvml_api == nullptr) {
-        // NVMLAPI will have reported a warning if we get here.
-        return std::nullopt;
-    }
-
-    // Grab the driver version
-    char version[NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE + 1]{};
-    nvmlReturn_t result =
-            nvml_api->SystemGetDriverVersion(version, NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE);
-    if (result == NVML_SUCCESS) {
-        return version;
-    } else {
-        spdlog::warn("Failed to query driver version: {}", nvml_api->ErrorString(result));
-        return std::nullopt;
-    }
-}
-
-void assign_threshold_temp(NVMLAPI *nvml,
+void assign_threshold_temp(NvmlApi *nvml,
                            const nvmlDevice_t &device,
                            nvmlTemperatureThresholds_t thresholdType,
                            std::optional<unsigned int> &temp,
@@ -307,7 +292,7 @@ void assign_threshold_temp(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_threshold_temperatures(NVMLAPI *nvml,
+void retrieve_and_assign_threshold_temperatures(NvmlApi *nvml,
                                                 const nvmlDevice_t &device,
                                                 DeviceStatusInfo &info) {
     assign_threshold_temp(nvml, device, NVML_TEMPERATURE_THRESHOLD_SHUTDOWN,
@@ -319,7 +304,7 @@ void retrieve_and_assign_threshold_temperatures(NVMLAPI *nvml,
                           info.gpu_max_operating_temperature_error);
 }
 
-void retrieve_and_assign_current_power_usage(NVMLAPI *nvml,
+void retrieve_and_assign_current_power_usage(NvmlApi *nvml,
                                              nvmlDevice_t &device,
                                              DeviceStatusInfo &info) {
     unsigned int value{};
@@ -331,7 +316,7 @@ void retrieve_and_assign_current_power_usage(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_power_cap(NVMLAPI *nvml,
+void retrieve_and_assign_power_cap(NvmlApi *nvml,
                                    const nvmlDevice_t &device,
                                    DeviceStatusInfo &info) {
     unsigned int value{};
@@ -343,7 +328,7 @@ void retrieve_and_assign_power_cap(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_utilization(NVMLAPI *nvml,
+void retrieve_and_assign_utilization(NvmlApi *nvml,
                                      const nvmlDevice_t &device,
                                      DeviceStatusInfo &info) {
     nvmlUtilization_t utilization{};
@@ -356,7 +341,7 @@ void retrieve_and_assign_utilization(NVMLAPI *nvml,
     info.percentage_utilization_memory = utilization.memory;
 }
 
-void retrieve_and_assign_current_performance(NVMLAPI *nvml,
+void retrieve_and_assign_current_performance(NvmlApi *nvml,
                                              const nvmlDevice_t &device,
                                              DeviceStatusInfo &info) {
     unsigned int value;
@@ -368,7 +353,7 @@ void retrieve_and_assign_current_performance(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_current_throttling_reason(NVMLAPI *nvml,
+void retrieve_and_assign_current_throttling_reason(NvmlApi *nvml,
                                                    const nvmlDevice_t &device,
                                                    DeviceStatusInfo &info) {
     unsigned long long reason{};
@@ -380,7 +365,7 @@ void retrieve_and_assign_current_throttling_reason(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_current_temperature(NVMLAPI *nvml,
+void retrieve_and_assign_current_temperature(NvmlApi *nvml,
                                              const nvmlDevice_t &device,
                                              DeviceStatusInfo &info) {
     unsigned int value{};
@@ -392,7 +377,7 @@ void retrieve_and_assign_current_temperature(NVMLAPI *nvml,
     }
 }
 
-void retrieve_and_assign_device_name(NVMLAPI *nvml,
+void retrieve_and_assign_device_name(NvmlApi *nvml,
                                      const nvmlDevice_t &device,
                                      DeviceStatusInfo &info) {
     char device_name[ONT_NVML_BUFFER_SIZE];
@@ -401,6 +386,118 @@ void retrieve_and_assign_device_name(NVMLAPI *nvml,
         info.device_name = device_name;
     } else {
         info.device_name_error = nvml->ErrorString(result);
+    }
+}
+
+class DeviceHandles {
+    NvmlApi &m_nvml;
+    std::unordered_map<unsigned int, std::optional<nvmlDevice_t>> m_device_handles{};
+
+public:
+    DeviceHandles(NvmlApi &nvml) : m_nvml(nvml) { assert(m_nvml.is_loaded()); }
+
+    std::optional<nvmlDevice_t> get_handle(unsigned int device_index) {
+        auto device_handle_lookup = m_device_handles.find(device_index);
+        if (device_handle_lookup != m_device_handles.end()) {
+            return device_handle_lookup->second;
+        }
+
+        auto device = m_nvml.get_device_handle(device_index);
+        m_device_handles[device_index] = device;
+        return device;
+    }
+};
+
+class DeviceInfoCache {
+    std::mutex m_mutex{};
+    NvmlApi m_nvml{};
+    std::unique_ptr<DeviceHandles> m_device_handles;
+    std::unordered_map<nvmlDevice_t, std::optional<DeviceStatusInfo>> m_device_info{};
+
+    DeviceInfoCache() {
+        if (m_nvml.is_loaded()) {
+            m_device_handles = std::make_unique<DeviceHandles>(m_nvml);
+        }
+    }
+
+    std::optional<DeviceStatusInfo> create_new_device_entry(unsigned int device_index,
+                                                            nvmlDevice_t device) {
+        auto &info = m_device_info.emplace(device, DeviceStatusInfo{}).first->second;
+        info->device_index = device_index;
+        retrieve_and_assign_threshold_temperatures(&m_nvml, device, *info);
+        retrieve_and_assign_power_cap(&m_nvml, device, *info);
+        retrieve_and_assign_device_name(&m_nvml, device, *info);
+        return info;
+    }
+
+    std::pair<std::optional<DeviceStatusInfo>, nvmlDevice_t> get_cached_device_info(
+            unsigned int device_index) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        auto device = m_device_handles->get_handle(device_index);
+        if (!device) {
+            return {std::nullopt, nullptr};
+        }
+
+        auto device_info_lookup = m_device_info.find(*device);
+        if (device_info_lookup != m_device_info.end()) {
+            return {device_info_lookup->second, *device};
+        }
+
+        return {create_new_device_entry(device_index, *device), *device};
+    }
+
+public:
+    static DeviceInfoCache &instance() {
+        static DeviceInfoCache cache;
+        return cache;
+    }
+
+    std::optional<nvmlDevice_t> get_device_handle(unsigned int device_index) {
+        if (!m_nvml.is_loaded()) {
+            return std::nullopt;
+        }
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_device_handles->get_handle(device_index);
+    }
+
+    NvmlApi &nvml() { return m_nvml; }
+
+    std::optional<DeviceStatusInfo> get_device_info(unsigned int device_index) {
+        if (!m_nvml.is_loaded()) {
+            return std::nullopt;
+        }
+        auto [info, device] = get_cached_device_info(device_index);
+        if (!info) {
+            return std::nullopt;
+        }
+
+        // We have a copy of the cached DeviceStatusInfo so we can update without
+        // locking. NVML itelf is thread safe.
+        retrieve_and_assign_current_temperature(&m_nvml, device, *info);
+        retrieve_and_assign_current_power_usage(&m_nvml, device, *info);
+        retrieve_and_assign_utilization(&m_nvml, device, *info);
+        retrieve_and_assign_current_performance(&m_nvml, device, *info);
+        retrieve_and_assign_current_throttling_reason(&m_nvml, device, *info);
+
+        return info;
+    }
+};
+
+std::optional<std::string> read_version_from_nvml() {
+    auto &nvml_api = DeviceInfoCache::instance().nvml();
+    if (!nvml_api.is_loaded()) {
+        return std::nullopt;
+    }
+
+    // Grab the driver version
+    char version[NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE + 1]{};
+    nvmlReturn_t result =
+            nvml_api.SystemGetDriverVersion(version, NVML_SYSTEM_DRIVER_VERSION_BUFFER_SIZE);
+    if (result == NVML_SUCCESS) {
+        return version;
+    } else {
+        spdlog::warn("Failed to query driver version: {}", nvml_api.ErrorString(result));
+        return std::nullopt;
     }
 }
 
@@ -432,27 +529,9 @@ std::optional<std::string> read_version_from_proc() {
 
 }  // namespace
 
-std::optional<DeviceStatusInfo> get_device_status_info(int device_index) {
+std::optional<DeviceStatusInfo> get_device_status_info(unsigned int device_index) {
 #if HAS_NVML
-    auto nvml = NVMLAPI::get();
-    if (!nvml) {
-        return std::nullopt;
-    }
-    auto device = nvml->get_device_handle(device_index);
-    if (!device) {
-        return std::nullopt;
-    }
-    DeviceStatusInfo info{};
-    info.device_index = device_index;
-    retrieve_and_assign_current_temperature(nvml, *device, info);
-    retrieve_and_assign_threshold_temperatures(nvml, *device, info);
-    retrieve_and_assign_current_power_usage(nvml, *device, info);
-    retrieve_and_assign_power_cap(nvml, *device, info);
-    retrieve_and_assign_utilization(nvml, *device, info);
-    retrieve_and_assign_current_performance(nvml, *device, info);
-    retrieve_and_assign_current_throttling_reason(nvml, *device, info);
-    retrieve_and_assign_device_name(nvml, *device, info);
-    return info;
+    return DeviceInfoCache::instance().get_device_info(device_index);
 #else
     (void)device_index;
     return std::nullopt;
@@ -490,8 +569,7 @@ std::optional<std::string> get_nvidia_driver_version() {
 
 unsigned int get_device_count() {
 #if HAS_NVML
-    auto nvml = NVMLAPI::get();
-    return nvml ? nvml->get_device_count() : 0;
+    return DeviceInfoCache::instance().nvml().get_device_count();
 #else
     return 0;
 #endif  // HAS_NVML
@@ -528,18 +606,7 @@ std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
 
 bool is_accessible_device(unsigned int device_index) {
 #if HAS_NVML
-    auto nvml = NVMLAPI::get();
-    if (!nvml) {
-        return false;
-    }
-    if (device_index >= nvml->get_device_count()) {
-        return false;
-    }
-    auto device_handle = nvml->get_device_handle(device_index);
-    if (!device_handle) {
-        return false;
-    }
-    return true;
+    return DeviceInfoCache::instance().get_device_handle(device_index).has_value();
 #else
     (void)device_index;
     return false;
