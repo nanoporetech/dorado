@@ -26,6 +26,7 @@
 #include <mutex>
 #include <sstream>
 #include <unordered_map>
+#include <utility>
 
 namespace dorado::utils::gpu_monitor {
 
@@ -207,7 +208,7 @@ class NvmlApi final {
 
     // This slight design flaw is in place of having NvmlApi as a singleton.
     // Instead it is held as a member variable of the DeviceInfoCache singleton.
-    // This is prefereable to having dependencies between singletons.
+    // This is preferable to having dependencies between singletons.
     friend class DeviceInfoCache;
     NvmlApi() {
         init();
@@ -569,9 +570,7 @@ std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
 std::optional<std::string> get_nvidia_driver_version() {
     std::optional<std::string> version;
 #if HAS_NVML
-    if (!version) {
-        version = read_version_from_nvml();
-    }
+    version = read_version_from_nvml();
 #endif  // HAS_NVML
 #if defined(__linux__)
     if (!version) {

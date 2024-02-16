@@ -5,9 +5,9 @@
 namespace dorado::utils {
 
 namespace {
-static const std::string SCOPED_LOG_ENTER{"[ENTRY]"};
-static const std::string SCOPED_LOG_EXIT{"[EXIT]"};
-static const std::string SCOPED_LOG_MESSAGE{"[MSG]"};
+const std::string SCOPED_LOG_ENTER{"[ENTRY]"};
+const std::string SCOPED_LOG_EXIT{"[EXIT]"};
+const std::string SCOPED_LOG_MESSAGE{"[MSG]"};
 }  // namespace
 
 ScopedDebugLog::ScopedDebugLog(std::string context) : m_context(std::move(context)) {
