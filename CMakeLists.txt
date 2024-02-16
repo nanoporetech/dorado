@@ -3,7 +3,10 @@ set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 
-project(dorado)
+project(dorado LANGUAGES C CXX)
+if(APPLE)
+  enable_language(OBJC OBJCXX)
+endif()
 
 get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
 if (NOT MULTI_CONFIG)
@@ -227,6 +230,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/ProgressTracker.h
     dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/ReadFilterNode.h
+    dorado/read_pipeline/ReadForwarderNode.cpp
+    dorado/read_pipeline/ReadForwarderNode.h
     dorado/read_pipeline/ReadPipeline.cpp
     dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ReadSplitNode.cpp

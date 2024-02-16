@@ -34,6 +34,7 @@ add_executable(dorado_tests
     PipelineTest.cpp
     PolyACalculatorTest.cpp
     ReadFilterNodeTest.cpp
+    ReadForwarderNodeTest.cpp
     ReadTest.cpp
     RealignMovesTest.cpp
     ResumeLoaderTest.cpp

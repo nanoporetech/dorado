@@ -34,7 +34,7 @@ public:
 
     at::Tensor raw_data;  // Loaded from source file
 
-    int model_stride;  // The down sampling factor of the model
+    int model_stride{-1};  // The down sampling factor of the model
 
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
@@ -107,6 +107,10 @@ public:
     size_t subread_id{0};
     size_t split_count{1};
     uint32_t split_point{0};
+
+    // Metadata used by basecall server.
+    float model_q_bias{0.0f};
+    float model_q_scale{0.0f};
 
 private:
     void generate_duplex_read_tags(bam1_t*) const;
