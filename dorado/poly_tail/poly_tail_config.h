@@ -14,7 +14,7 @@ struct PolyTailConfig {
     std::string plasmid_rear_flank;
     std::string rc_plasmid_front_flank;
     std::string rc_plasmid_rear_flank;
-    int plasmid_flank_threshold = 10;
+    int flank_threshold = 30;
     bool is_plasmid = false;
     int tail_interrupt_length = 0;
     int min_base_count = 10;

@@ -13,7 +13,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     const std::string& rear_flank = m_config.plasmid_rear_flank;
     const std::string& front_flank_rc = m_config.rc_plasmid_front_flank;
     const std::string& rear_flank_rc = m_config.rc_plasmid_rear_flank;
-    const int threshold = m_config.plasmid_flank_threshold;
+    const int threshold = m_config.flank_threshold;
 
     std::string_view seq_view = std::string_view(read.read_common.seq);
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();

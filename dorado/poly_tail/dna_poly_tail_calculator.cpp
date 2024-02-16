@@ -19,8 +19,10 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     const std::string& front_primer_rc = m_config.rc_front_primer;
     const std::string& rear_primer = m_config.rear_primer;
     const std::string& rear_primer_rc = m_config.rc_rear_primer;
+    const int threshold = m_config.flank_threshold;
     int trailing_Ts = static_cast<int>(dorado::utils::count_trailing_chars(rear_primer, 'T'));
 
+    const int kMinSeparation = 10;
     const int kWindowSize = 150;
     std::string_view seq_view = std::string_view(read.read_common.seq);
     std::string_view read_top = seq_view.substr(0, kWindowSize);
@@ -51,7 +53,8 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     bool fwd = dist_v1 < dist_v2;
-    bool proceed = std::min(dist_v1, dist_v2) < 30 && std::abs(dist_v1 - dist_v2) > 10;
+    bool proceed =
+            std::min(dist_v1, dist_v2) < threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts, false};
 
