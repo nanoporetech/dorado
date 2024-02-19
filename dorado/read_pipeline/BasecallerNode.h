@@ -29,7 +29,6 @@ public:
     // Chunk size and overlap are in raw samples
     BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                    size_t overlap,
-                   int batch_timeout_ms,
                    std::string model_name,
                    size_t max_reads,
                    std::string node_name,
@@ -52,18 +51,16 @@ private:
     // Construct complete reads
     void working_reads_manager();
 
+    size_t get_chunk_queue_idx(size_t read_raw_size);
+
     // Vector of model runners (each with their own GPU access etc)
     std::vector<basecall::RunnerPtr> m_model_runners;
-    // Chunk length
-    size_t m_chunk_size;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
     // Whether the model is for rna
     bool m_rna;
-    // Time in milliseconds before partial batches are called.
-    int m_batch_timeout_ms;
     // model_name
     std::string m_model_name;
     // Mean Q-score start position from model properties.
@@ -76,8 +73,11 @@ private:
     std::chrono::time_point<std::chrono::system_clock> initialization_time;
     // Time when Basecaller Node terminates. Used for benchmarking and debugging
     std::chrono::time_point<std::chrono::system_clock> termination_time;
-    // Async queue to keep track of basecalling chunks.
-    utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_chunks_in;
+    // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
+    // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`
+    std::vector<size_t> m_chunk_sizes;
+    std::vector<std::unique_ptr<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>>
+            m_chunk_in_queues;
 
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
@@ -106,6 +106,7 @@ private:
     std::atomic<int64_t> m_working_reads_size = 0;
     std::atomic<int64_t> m_num_bases_processed = 0;
     std::atomic<int64_t> m_num_samples_processed = 0;
+    std::atomic<int64_t> m_num_samples_incl_padding = 0;
     std::atomic<int64_t> m_working_reads_signal_bytes = 0;
 };
 
