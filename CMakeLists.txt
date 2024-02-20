@@ -8,6 +8,11 @@ if(APPLE)
   enable_language(OBJC OBJCXX)
 endif()
 
+# BUILD_SHARED_LIBS is a global variable, so if we don't set it here at the start, we won't get
+#  the same behaviour if we re-configure CMake compared to a clean configure, because it's
+#  eventually set elsewhere
+set(BUILD_SHARED_LIBS OFF)
+
 get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
 if (NOT MULTI_CONFIG)
   if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
@@ -18,7 +23,7 @@ message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 
 # If no prefix is provided we install next to the binary directory.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist CACHE PATH "" FORCE)
 endif()
 
 if(WIN32)
