@@ -2,6 +2,7 @@
 
 #include "read_pipeline/read_utils.h"
 #include "splitter/splitter_utils.h"
+#include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/uuid_utils.h"
@@ -16,6 +17,7 @@
 #include <iomanip>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -197,6 +199,87 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     spdlog::trace("Detected {} potential pore regions in read {}", pore_regions.size(),
                   read.read->read_common.read_id);
     return pore_regions;
+}
+
+PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const {
+    spdlog::trace("Finding muA regions for read {}", read.read->read_common.read_id);
+
+    constexpr std::string_view muA_seq = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+    constexpr std::int64_t max_muA_edist = 11;
+    constexpr std::int64_t ignore_start = 100;
+    constexpr std::int64_t min_read_len = 200;
+    // 14bp adapter prefix that should work better for click chemistry based on previous investigation
+    constexpr std::string_view adapter_seq = "TACTTCGTTCAGTT";
+    constexpr std::int64_t max_adapter_edist = 5;
+    constexpr std::int64_t max_muA_adapter_dist = 100;
+
+    // Skip if the read is too small.
+    const auto& read_seq = read.read->read_common.seq;
+    if (read_seq.size() < min_read_len) {
+        spdlog::trace("Read too small");
+        return {};
+    }
+
+    auto match_start_range = [&](std::string_view query, std::int64_t min_start,
+                                 std::int64_t max_start,
+                                 std::int64_t max_edist) -> std::optional<PosRange> {
+        const auto max_end_pos =
+                std::min<std::int64_t>(read_seq.size(), max_start + query.size() + max_edist);
+        if (min_start + static_cast<std::int64_t>(query.size()) > max_end_pos) {
+            // Too close to the end.
+            spdlog::trace("Too close to the end");
+            return std::nullopt;
+        }
+
+        // Trim the sequence.
+        std::string_view const seq(read_seq.data() + min_start, max_end_pos - min_start);
+
+        // Search the sequence.
+        static const EdlibEqualityPair additionalEqualities[4] = {
+                {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}};
+        auto edlib_cfg = edlibNewAlignConfig(max_edist, EDLIB_MODE_HW, EDLIB_TASK_LOC,
+                                             additionalEqualities, std::size(additionalEqualities));
+        auto edlib_result =
+                edlibAlign(query.data(), query.size(), seq.data(), seq.size(), edlib_cfg);
+        assert(edlib_result.status == EDLIB_STATUS_OK);
+        auto edlib_cleanup = utils::PostCondition([&] { edlibFreeAlignResult(edlib_result); });
+
+        // Check we got a match.
+        if (edlib_result.status != EDLIB_STATUS_OK || edlib_result.editDistance == -1) {
+            spdlog::trace("No match {} {}", edlib_result.status, edlib_result.editDistance);
+            return std::nullopt;
+        }
+
+        // Build the result.
+        PosRange range;
+        range.first = min_start + edlib_result.startLocations[0];
+        range.second = min_start + edlib_result.endLocations[0] + 1;
+        if (static_cast<std::int64_t>(range.first) > max_start) {
+            spdlog::trace("Past the start");
+            return std::nullopt;
+        }
+        return range;
+    };
+
+    // Search for muA.
+    auto muA_range = match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist);
+    if (!muA_range.has_value()) {
+        spdlog::trace("No muA");
+        return {};
+    }
+
+    // Search for the adapter.
+    const auto adapter_start = std::max(
+            ignore_start, static_cast<std::int64_t>(muA_range->first) - max_muA_adapter_dist);
+    auto adapter_match =
+            match_start_range(adapter_seq, adapter_start, muA_range->first, max_adapter_edist);
+    if (!adapter_match.has_value()) {
+        spdlog::trace("No adapter");
+        return {};
+    }
+
+    spdlog::trace("Detected muA+adapter region in read {}", read.read->read_common.read_id);
+    return {*adapter_match};
 }
 
 bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
@@ -382,6 +465,9 @@ DuplexReadSplitter::build_split_finders() const {
             return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
         });
     }));
+
+    split_finders.emplace_back(std::make_pair(
+            "muA_adapter", [&](const ExtRead& read) { return find_muA_adapter_splits(read); }));
 
     if (!m_settings.simplex_mode) {
         split_finders.emplace_back(std::make_pair("PORE_FLANK", [&](const ExtRead& read) {
