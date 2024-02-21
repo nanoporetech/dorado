@@ -1,5 +1,6 @@
 #include "DuplexReadSplitter.h"
 
+#include "myers.h"
 #include "read_pipeline/read_utils.h"
 #include "splitter/splitter_utils.h"
 #include "utils/PostCondition.h"
@@ -15,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -215,65 +217,56 @@ PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const
     }
 
     auto match_start_range = [&](std::string_view query, std::int64_t min_start,
-                                 std::int64_t max_start,
-                                 std::int64_t max_edist) -> std::optional<PosRange> {
+                                 std::int64_t max_start, std::int64_t max_edist) -> PosRanges {
         const auto max_end_pos =
                 std::min<std::int64_t>(read_seq.size(), max_start + query.size() + max_edist);
         if (min_start + static_cast<std::int64_t>(query.size()) > max_end_pos) {
             // Too close to the end.
-            spdlog::trace("Too close to the end");
-            return std::nullopt;
+            return {};
         }
 
         // Trim the sequence.
         std::string_view const seq(read_seq.data() + min_start, max_end_pos - min_start);
 
         // Search the sequence.
-        static const EdlibEqualityPair additionalEqualities[4] = {
-                {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}};
-        auto edlib_cfg = edlibNewAlignConfig(max_edist, EDLIB_MODE_HW, EDLIB_TASK_LOC,
-                                             additionalEqualities, std::size(additionalEqualities));
-        auto edlib_result =
-                edlibAlign(query.data(), query.size(), seq.data(), seq.size(), edlib_cfg);
-        assert(edlib_result.status == EDLIB_STATUS_OK);
-        auto edlib_cleanup = utils::PostCondition([&] { edlibFreeAlignResult(edlib_result); });
+        const auto alignments = myers_align(query, seq, max_edist);
 
-        // Check we got a match.
-        if (edlib_result.status != EDLIB_STATUS_OK || edlib_result.editDistance == -1) {
-            spdlog::trace("No match {} {}", edlib_result.status, edlib_result.editDistance);
-            return std::nullopt;
+        // Build the results.
+        PosRanges ranges;
+        for (auto alignment : alignments) {
+            PosRange range;
+            range.first = min_start + alignment.begin;
+            range.second = min_start + alignment.end;
+            if (static_cast<std::int64_t>(range.first) > max_start) {
+                continue;
+            }
+            ranges.push_back(range);
         }
-
-        // Build the result.
-        PosRange range;
-        range.first = min_start + edlib_result.startLocations[0];
-        range.second = min_start + edlib_result.endLocations[0] + 1;
-        if (static_cast<std::int64_t>(range.first) > max_start) {
-            spdlog::trace("Past the start");
-            return std::nullopt;
-        }
-        return range;
+        return ranges;
     };
 
     // Search for muA.
-    auto muA_range = match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist);
-    if (!muA_range.has_value()) {
-        spdlog::trace("No muA");
+    auto muA_ranges = match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist);
+    if (muA_ranges.empty()) {
         return {};
     }
 
     // Search for the adapter.
-    const auto adapter_start = std::max(
-            ignore_start, static_cast<std::int64_t>(muA_range->first) - max_muA_adapter_dist);
-    auto adapter_match =
-            match_start_range(adapter_seq, adapter_start, muA_range->first, max_adapter_edist);
-    if (!adapter_match.has_value()) {
-        spdlog::trace("No adapter");
-        return {};
+    PosRanges all_adapter_ranges;
+    for (auto muA_range : muA_ranges) {
+        const auto adapter_start = std::max(
+                ignore_start, static_cast<std::int64_t>(muA_range.first) - max_muA_adapter_dist);
+        auto adapter_ranges =
+                match_start_range(adapter_seq, adapter_start, muA_range.first, max_adapter_edist);
+        std::move(adapter_ranges.begin(), adapter_ranges.end(),
+                  std::back_inserter(all_adapter_ranges));
     }
 
-    spdlog::trace("Detected muA+adapter region in read {}", read.read->read_common.read_id);
-    return {*adapter_match};
+    if (!all_adapter_ranges.empty()) {
+        spdlog::trace("Detected {} muA+adapter region(s) in read {}", all_adapter_ranges.size(),
+                      read.read->read_common.read_id);
+    }
+    return all_adapter_ranges;
 }
 
 bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
