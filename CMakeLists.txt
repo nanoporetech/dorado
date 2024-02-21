@@ -217,6 +217,8 @@ set(LIB_SOURCE_FILES
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp
     dorado/splitter/RNAReadSplitter.h
+    dorado/splitter/myers.cpp
+    dorado/splitter/myers.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
     dorado/demux/AdapterDetector.cpp
