@@ -20,13 +20,9 @@
 #include <string_view>
 #include <utility>
 
+namespace dorado::splitter {
+
 namespace {
-
-using namespace dorado;
-using namespace dorado::splitter;
-
-using PosRange = splitter::PosRange;
-using PosRanges = splitter::PosRanges;
 
 //[start, end)
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
@@ -120,8 +116,6 @@ float qscore_mean(const std::string& qstring, splitter::PosRange r) {
 }
 
 }  // namespace
-
-namespace dorado::splitter {
 
 struct DuplexReadSplitter::ExtRead {
     SimplexReadPtr read;
