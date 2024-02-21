@@ -136,7 +136,7 @@ endif()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
 
-set(LIB_SOURCE_FILES
+add_library(dorado_lib
     dorado/alignment/alignment_processing_items.cpp
     dorado/alignment/alignment_processing_items.h
     dorado/alignment/IndexFileAccess.cpp
@@ -245,9 +245,7 @@ set(LIB_SOURCE_FILES
     dorado/poly_tail/rna_poly_tail_calculator.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
- )
-
-add_library(dorado_lib ${LIB_SOURCE_FILES})
+)
 
 enable_warnings_as_errors(dorado_lib)
 
