@@ -206,7 +206,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const
     constexpr std::int64_t min_read_len = 200;
     // 14bp adapter prefix that should work better for click chemistry based on previous investigation
     constexpr std::string_view adapter_seq = "TACTTCGTTCAGTT";
-    constexpr std::int64_t max_adapter_edist = 5;
+    constexpr std::int64_t max_adapter_edist = 3;
     constexpr std::int64_t max_muA_adapter_dist = 100;
 
     // Skip if the read is too small.
