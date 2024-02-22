@@ -187,7 +187,6 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     // BasecallerNode will skip reads that have already been basecalled.
     set_read_mutator([](dorado::SimplexReadPtr& read) { read->read_common.seq.clear(); });
 
-    const int kBatchTimeoutMS = 100;
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
@@ -220,11 +219,11 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     // Create runners
     auto [runners, num_devices] = dorado::api::create_basecall_runners(
             model_config, device, default_params.num_runners, 1, batch_size,
-            default_params.chunksize, 1.f, true);
+            default_params.chunksize, 1.f, dorado::api::PipelineType::simplex);
     CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
-                                           dorado::utils::default_parameters.overlap,
-                                           kBatchTimeoutMS, model_name, 1000, "BasecallerNode", 0);
+                                           dorado::utils::default_parameters.overlap, model_name,
+                                           1000, "BasecallerNode", 0);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {

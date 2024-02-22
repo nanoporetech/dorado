@@ -16,16 +16,10 @@ MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller) : m_call
 }
 
 void MetalModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
-    if (chunk.dim() == 1) {
-        // Input has single feature dimension.
-        assert(m_caller->config().num_features == 1);
-        m_input.index_put_({chunk_idx, Ellipsis, 0}, chunk);
-    } else {
-        // Chunks are passed with timestep the innermost dimension, whereas we need
-        // channels innermost.
-        assert(m_caller->config().num_features == chunk.size(0));
-        m_input.index_put_({chunk_idx, Ellipsis, Ellipsis}, chunk.transpose(0, 1));
-    }
+    // Chunks are passed with timestep the innermost dimension, whereas we need
+    // channels innermost.
+    assert(m_caller->config().num_features == chunk.size(0));
+    m_input.index_put_({chunk_idx, Ellipsis, Ellipsis}, chunk.transpose(0, 1));
 }
 
 std::vector<decode::DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) {

@@ -483,9 +483,9 @@ int duplex(int argc, char* argv[]) {
             // Note: The memory assignment between simplex and duplex callers have been
             // performed based on empirical results considering a SUP model for simplex
             // calling.
-            auto [runners, num_devices] =
-                    api::create_basecall_runners(models.model_config, device, num_runners, 0,
-                                                 batch_size, chunk_size, 0.9f, true);
+            auto [runners, num_devices] = api::create_basecall_runners(
+                    models.model_config, device, num_runners, 0, batch_size, chunk_size, 0.9f,
+                    api::PipelineType::duplex);
 
             std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -497,9 +497,9 @@ int duplex(int argc, char* argv[]) {
             // memory footprint for both model and decode function. This will increase the
             // chances for the stereo model to use the cached allocations from the simplex
             // model.
-            std::tie(stereo_runners, std::ignore) =
-                    api::create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
-                                                 stereo_batch_size, chunk_size, 0.5f, true);
+            std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
+                    models.stereo_model_config, device, num_runners, 0, stereo_batch_size,
+                    chunk_size, 0.5f, api::PipelineType::duplex);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

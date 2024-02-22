@@ -1,6 +1,7 @@
 #pragma once
 
 #include "basecall/ModelRunnerBase.h"
+#include "caller_creation.h"
 #include "modbase/ModBaseRunner.h"
 
 #include <filesystem>
@@ -9,24 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado {
-
-namespace basecall {
-struct CRFModelConfig;
-
-#if DORADO_CUDA_BUILD
-class CudaCaller;
-#elif DORADO_METAL_BUILD
-class MetalCaller;
-#endif
-
-}  // namespace basecall
-
-namespace modbase {
-class ModBaseCaller;
-}
-
-namespace api {
+namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::CRFModelConfig& model_config,
@@ -36,7 +20,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t batch_size,
         size_t chunk_size,
         float memory_fraction,
-        bool guard_gpus);
+        PipelineType pipeline_type);
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,
@@ -52,5 +36,4 @@ basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller
 
 modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller);
 
-}  // namespace api
-}  // namespace dorado
+}  // namespace dorado::api
