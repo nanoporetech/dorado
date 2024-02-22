@@ -37,6 +37,7 @@ add_library(dorado_utils
     sequence_utils.h
     stats.cpp
     stats.h
+    stream_utils.h
     sys_stats.cpp
     sys_stats.h
     tensor_utils.cpp
