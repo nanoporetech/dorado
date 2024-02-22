@@ -197,7 +197,7 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     return pore_regions;
 }
 
-PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const {
+PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const {
     spdlog::trace("Finding muA regions for read {}", read.read->read_common.read_id);
 
     constexpr std::string_view muA_seq = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
@@ -208,6 +208,8 @@ PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const
     constexpr std::string_view adapter_seq = "TACTTCGTTCAGTT";
     constexpr std::int64_t max_adapter_edist = 3;
     constexpr std::int64_t max_muA_adapter_dist = 100;
+    constexpr std::int64_t max_spike_adapter_dist = 50;
+    constexpr float max_spike_qscore = 10;
 
     // Skip if the read is too small.
     const auto& read_seq = read.read->read_common.seq;
@@ -230,68 +232,97 @@ PosRanges DuplexReadSplitter::find_muA_adapter_splits(const ExtRead& read) const
         std::string_view const seq(read_seq.data() + min_start, max_end_pos - min_start);
 
         // Search the sequence.
-        const auto alignments = myers_align(query, seq, max_edist);
-
-        // Build the results.
-        PosRanges ranges;
-        auto add_range = [&](EdistResult alignment) {
-            PosRange range;
-            range.first = min_start + alignment.begin;
-            range.second = min_start + alignment.end;
-            ranges.push_back(range);
-        };
-        auto valid_begin = [=](std::int64_t begin) { return min_start + begin <= max_start; };
         if (best_only) {
-            // Look for the best score that is also valid.
-            auto compare_score = [=](auto& lhs, auto& rhs) {
-                auto const lhs_score = !valid_begin(lhs.begin) ? max_edist + 1 : lhs.edist;
-                auto const rhs_score = !valid_begin(rhs.begin) ? max_edist + 1 : rhs.edist;
-                return lhs_score < rhs_score;
-            };
-            auto it = std::min_element(alignments.begin(), alignments.end(), compare_score);
-            if (it != alignments.end()) {
-                add_range(*it);
-            }
-        } else {
-            for (auto alignment : alignments) {
-                if (valid_begin(alignment.begin)) {
-                    add_range(alignment);
+            auto edlib_cfg = edlibNewAlignConfig(static_cast<int>(max_edist), EDLIB_MODE_HW,
+                                                 EDLIB_TASK_LOC, nullptr, 0);
+            auto edlib_result = edlibAlign(query.data(), static_cast<int>(query.size()), seq.data(),
+                                           static_cast<int>(seq.size()), edlib_cfg);
+            assert(edlib_result.status == EDLIB_STATUS_OK);
+            auto edlib_cleanup = utils::PostCondition([&] { edlibFreeAlignResult(edlib_result); });
+
+            // Add the match if it looks good.
+            PosRanges ranges;
+            if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
+                PosRange range;
+                range.first = min_start + edlib_result.startLocations[0];
+                range.second = min_start + edlib_result.endLocations[0] + 1;
+                if (static_cast<std::int64_t>(range.first) <= max_start) {
+                    ranges.push_back(range);
                 }
             }
+            return ranges;
+
+        } else {
+            const auto alignments = myers_align(query, seq, max_edist);
+
+            // Build the results.
+            PosRanges ranges;
+            for (auto alignment : alignments) {
+                if (min_start + static_cast<std::int64_t>(alignment.begin) <= max_start) {
+                    PosRange range;
+                    range.first = min_start + alignment.begin;
+                    range.second = min_start + alignment.end;
+                    ranges.push_back(range);
+                }
+            }
+
             // Merge the ranges.
             std::sort(ranges.begin(), ranges.end());
-            ranges = merge_ranges(ranges, 0);
+            return merge_ranges(ranges, 0);
         }
-        return ranges;
     };
 
     // Search for muAs.
-    auto muA_ranges =
+    const auto muA_ranges =
             match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist, false);
     if (muA_ranges.empty()) {
         return {};
     }
 
     // Search for any adapters that are close to the muAs.
-    PosRanges all_adapter_ranges;
+    PosRanges spike_ranges;
     for (auto muA_range : muA_ranges) {
         const auto adapter_start = std::max(
                 ignore_start, static_cast<std::int64_t>(muA_range.first) - max_muA_adapter_dist);
-        auto adapter_ranges = match_start_range(adapter_seq, adapter_start, muA_range.first,
-                                                max_adapter_edist, true);
-        std::move(adapter_ranges.begin(), adapter_ranges.end(),
-                  std::back_inserter(all_adapter_ranges));
+        const auto adapter_ranges = match_start_range(adapter_seq, adapter_start, muA_range.first,
+                                                      max_adapter_edist, true);
+        if (adapter_ranges.empty()) {
+            continue;
+        }
+
+        // We only wanted the best match.
+        assert(adapter_ranges.size() == 1);
+        const auto adapter_match = adapter_ranges.front();
+        if (adapter_match.first < max_spike_adapter_dist) {
+            continue;
+        }
+
+        // Look for the spike between (the left of) the adapter and the muA, in signal space.
+        const auto spike_search_begin = adapter_match.first - max_spike_adapter_dist;
+        const auto spike_search_end = muA_range.first;
+        const auto spike_search_begin_s = spike_search_begin * read.read->read_common.model_stride;
+        const auto spike_search_end_s = spike_search_end * read.read->read_common.model_stride;
+        const auto search_span = read.data_as_float32.index(
+                {at::indexing::Slice(spike_search_begin_s, spike_search_end_s)});
+        const auto spike_peak_s = spike_search_begin_s + search_span.argmax().item().toLong();
+        // Convert back to base space.
+        const auto spike_begin = spike_peak_s / read.read->read_common.model_stride;
+        const auto spike_end = spike_begin + 1;
+
+        // Check qscore is under the threshold.
+        const auto spike_avg_qscore =
+                qscore_mean(read.read->read_common.qstring, PosRange(spike_begin, spike_end));
+        if (spike_avg_qscore > max_spike_qscore) {
+            continue;
+        }
+
+        // We have a match.
+        spike_ranges.emplace_back(spike_begin, spike_end);
     }
 
-    if (!all_adapter_ranges.empty()) {
-        // Merge the final ranges.
-        std::sort(all_adapter_ranges.begin(), all_adapter_ranges.end());
-        all_adapter_ranges = merge_ranges(all_adapter_ranges, 0);
-
-        spdlog::trace("Detected {} muA+adapter region(s) in read {}", all_adapter_ranges.size(),
-                      read.read->read_common.read_id);
-    }
-    return all_adapter_ranges;
+    spdlog::trace("Detected {} muA+adapter spike region(s) in read {}", spike_ranges.size(),
+                  read.read->read_common.read_id);
+    return spike_ranges;
 }
 
 bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
@@ -479,7 +510,7 @@ DuplexReadSplitter::build_split_finders() const {
     }));
 
     split_finders.emplace_back(std::make_pair(
-            "muA_adapter", [&](const ExtRead& read) { return find_muA_adapter_splits(read); }));
+            "muA_adapter", [&](const ExtRead& read) { return find_muA_adapter_spikes(read); }));
 
     if (!m_settings.simplex_mode) {
         split_finders.emplace_back(std::make_pair("PORE_FLANK", [&](const ExtRead& read) {

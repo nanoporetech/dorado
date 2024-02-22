@@ -24,7 +24,7 @@ private:
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
     PosRanges possible_pore_regions(const ExtRead& read) const;
-    PosRanges find_muA_adapter_splits(const ExtRead& read) const;
+    PosRanges find_muA_adapter_spikes(const ExtRead& read) const;
     bool check_nearby_adapter(const SimplexRead& read,
                               splitter::PosRange r,
                               int adapter_edist) const;
