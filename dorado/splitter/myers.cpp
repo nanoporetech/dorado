@@ -90,9 +90,14 @@ std::vector<EdistResult> myers_align(std::string_view query,
                 // |max_edist| indices away). This means that, if the edits aren't insertions, we end up finding the
                 // same sequence as |end1|, which has a better edist and hence is the only thing edlib reports.
                 // We should be safe to ignore the worse edist in those cases.
-                if (edlib_result.editDistance == static_cast<int>(edist)) {
-                    ranges.push_back(
-                            {min_match_start + edlib_result.startLocations[0], end, edist});
+                for (int i = 0; i < edlib_result.numLocations; i++) {
+                    // edlib indices are inclusive, ours are exclusive.
+                    const std::size_t edlib_end =
+                            min_match_start + edlib_result.endLocations[i] + 1;
+                    if (edlib_result.editDistance == static_cast<int>(edist) && edlib_end == end) {
+                        ranges.push_back(
+                                {min_match_start + edlib_result.startLocations[i], end, edist});
+                    }
                 }
             }
         }
