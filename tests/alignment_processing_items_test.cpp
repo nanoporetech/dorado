@@ -93,6 +93,12 @@ TEST_CASE("initialise with input file and output folder returns true", CUT_TAG) 
     CHECK(cut.initialise());
 }
 
+TEST_CASE("initialise with input file and same output folder returns false", CUT_TAG) {
+    AlignmentProcessingItems cut{(ROOT_IN_FOLDER / INPUT_SAM).string(), false,
+                                 ROOT_IN_FOLDER.string()};
+    CHECK_FALSE(cut.initialise());
+}
+
 TEST_CASE("initialise with invalid input file and output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / NON_HTS_FILE).string(), false,
                                  OUT_FOLDER.string()};
@@ -135,6 +141,24 @@ TEST_CASE("get() input file with no extension returns output with bam extension"
 TEST_CASE("initialise() with input folder and no output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, ""};
     CHECK_FALSE(cut.initialise());
+}
+
+TEST_CASE("initialise() with input folder and same output folder returns false", CUT_TAG) {
+    AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, ROOT_IN_FOLDER.string()};
+    CHECK_FALSE(cut.initialise());
+}
+
+TEST_CASE(
+        "initialise() with input folder and output folder being an existing subfolder of input "
+        "folder returns true",
+        CUT_TAG) {
+    AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, DUP_FOLDER.string()};
+    CHECK(cut.initialise());
+}
+
+TEST_CASE("initialise() with input folder and output folder returns true", CUT_TAG) {
+    AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, OUT_FOLDER.string()};
+    CHECK(cut.initialise());
 }
 
 TEST_CASE(
