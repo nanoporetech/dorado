@@ -4,8 +4,7 @@
   parallel:
     matrix:
       - SANITIZER:
-        - "address"
-        - "undefined"
+        - "address;undefined"
         - "thread"
   timeout: 1h 30m
   before_script:
@@ -30,8 +29,7 @@
   parallel:
     matrix:
       - SANITIZER:
-        - "address"
-        - "undefined"
+        - "address;undefined"
 
 # Sanitizer jobs
 
