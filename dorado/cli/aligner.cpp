@@ -87,7 +87,7 @@ int aligner(int argc, char* argv[]) {
             "parameter names are not finalized and may change.");
     parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.visible.add_argument("reads")
-            .help("An input file or a folder containing many input files (any HTS format).")
+            .help("An input file or the folder containing input file(s) (any HTS format).")
             .nargs(argparse::nargs_pattern::any)
             .default_value(std::string{});
     parser.visible.add_argument("-r", "--recursive")

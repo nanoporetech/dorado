@@ -14,7 +14,7 @@ struct AlignmentProcessingInfo {
     AlignmentProcessingInfo(std::string input_,
                             std::string output_,
                             dorado::HtsWriter::OutputMode output_mode_)
-            : input(input_), output(output_), output_mode(output_mode_) {}
+            : input(std::move(input_)), output(std::move(output_)), output_mode(output_mode_) {}
     std::string input{};
     std::string output{};
     dorado::HtsWriter::OutputMode output_mode{};
@@ -53,9 +53,9 @@ class AlignmentProcessingItems {
     bool initialise_for_folder();
 
 public:
-    AlignmentProcessingItems(const std::string& input_path,
+    AlignmentProcessingItems(std::string input_path,
                              bool recursive_input,
-                             const std::string& output_folder);
+                             std::string output_folder);
 
     bool initialise();
 

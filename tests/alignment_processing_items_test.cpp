@@ -26,7 +26,7 @@ TEST_CASE("Constructor with trivial args does not throw", CUT_TAG) {
     CHECK_NOTHROW(AlignmentProcessingItems{"", false, ""});
 }
 
-TEST_CASE("initialise with no input reads and recursive flaged returns false", CUT_TAG) {
+TEST_CASE("initialise with no input reads and recursive flagged returns false", CUT_TAG) {
     AlignmentProcessingItems cut{"", true, ""};
     CHECK_FALSE(cut.initialise());
 }
@@ -152,6 +152,8 @@ TEST_CASE(
         "initialise() with input folder and output folder being an existing subfolder of input "
         "folder returns true",
         CUT_TAG) {
+    // N.B. This isn't a requirement, this is just documenting current expected behaviour
+    // It may well make sense to prevent any possible inadvertent overwriting of input data.
     AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, DUP_FOLDER.string()};
     CHECK(cut.initialise());
 }

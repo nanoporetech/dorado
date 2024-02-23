@@ -28,37 +28,32 @@ std::set<std::string>& get_supported_compression_extensions() {
 };
 
 bool is_valid_input_file(const std::filesystem::path& input_path) {
-    try {
-        dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
-        if (hts_file) {
-            dorado::SamHdrPtr header(sam_hdr_read(hts_file.get()));
-            if (header) {
-                return true;
-            }
+    dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
+    if (hts_file) {
+        dorado::SamHdrPtr header(sam_hdr_read(hts_file.get()));
+        if (header) {
+            return true;
         }
-
-    } catch (...) {
-        // Failed check to be opened by hts so don't include it as an input file
     }
     return false;
 }
 
-std::string replace_extension(fs::path output_path) {
+fs::path replace_extension(fs::path output_path) {
     while (get_supported_compression_extensions().count(output_path.extension().string())) {
         output_path.replace_extension();
     }
-    return output_path.replace_extension("bam").string();
+    return output_path.replace_extension("bam");
 }
 
 }  // namespace
 
 namespace dorado::alignment::cli {
 
-AlignmentProcessingItems::AlignmentProcessingItems(const std::string& input_path,
+AlignmentProcessingItems::AlignmentProcessingItems(std::string input_path,
                                                    bool recursive_input,
-                                                   const std::string& output_folder)
+                                                   std::string output_folder)
         : m_input_path(std::move(input_path)),
-          m_output_folder(output_folder),
+          m_output_folder(std::move(output_folder)),
           m_recursive_input(recursive_input) {}
 
 bool AlignmentProcessingItems::check_recursive_arg_false() {
@@ -102,7 +97,7 @@ void AlignmentProcessingItems::add_to_working_files(
         const std::filesystem::path& input_relative_path) {
     auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
 
-    m_working_paths.insert({output, input_relative_path});
+    m_working_paths.insert({output.string(), input_relative_path});
 }
 
 bool AlignmentProcessingItems::try_add_to_working_files(const fs::path& input_root,
@@ -140,7 +135,7 @@ bool AlignmentProcessingItems::initialise_for_file() {
     }
 
     auto output = replace_extension(fs::path(m_output_folder) / input_file_path.filename());
-    m_processing_list.emplace_back(m_input_path, output, HtsWriter::OutputMode::BAM);
+    m_processing_list.emplace_back(m_input_path, output.string(), HtsWriter::OutputMode::BAM);
 
     return true;
 }
@@ -214,7 +209,7 @@ bool AlignmentProcessingItems::initialise_for_stdin() {
 }
 
 bool AlignmentProcessingItems::initialise() {
-    auto trcae = utils::ScopedTraceLog(__func__);
+    auto trace = utils::ScopedTraceLog(std::string{"AlignmentProcessingItems::"} + __func__);
     if (m_input_path.empty()) {
         return initialise_for_stdin();
     }
