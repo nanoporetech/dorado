@@ -318,7 +318,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
         const auto spike_peak_s = spike_search_begin_s + search_span.argmax().item().toLong();
         // Convert back to base space.
         const auto spike_begin = to_basespace(spike_peak_s);
-        const auto spike_end = spike_begin + 1;
+        const auto spike_end = spike_begin + 5;
 
         // Check qscore is under the threshold.
         const auto spike_avg_qscore =
