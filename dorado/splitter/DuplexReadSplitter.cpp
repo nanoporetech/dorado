@@ -297,16 +297,27 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
             continue;
         }
 
+        // Helpers to map to/from basespace.
+        auto from_basespace = [&](std::size_t idx) {
+            const auto it = std::lower_bound(read.move_sums.begin(), read.move_sums.end(), idx);
+            return std::distance(read.move_sums.begin(), it) * read.read->read_common.model_stride;
+        };
+        auto to_basespace = [&](std::size_t idx) {
+            idx /= read.read->read_common.model_stride;
+            // The range we're querying is valid and any found indices should lie in that range.
+            assert(idx < read.move_sums.size());
+            return read.move_sums[idx];
+        };
+
         // Look for the spike between (the left of) the adapter and the muA, in signal space.
-        const auto spike_search_begin = adapter_match.first - max_spike_adapter_dist;
-        const auto spike_search_end = muA_range.first;
-        const auto spike_search_begin_s = spike_search_begin * read.read->read_common.model_stride;
-        const auto spike_search_end_s = spike_search_end * read.read->read_common.model_stride;
+        const auto spike_search_begin_s =
+                from_basespace(adapter_match.first - max_spike_adapter_dist);
+        const auto spike_search_end_s = from_basespace(muA_range.first);
         const auto search_span = read.data_as_float32.index(
                 {at::indexing::Slice(spike_search_begin_s, spike_search_end_s)});
         const auto spike_peak_s = spike_search_begin_s + search_span.argmax().item().toLong();
         // Convert back to base space.
-        const auto spike_begin = spike_peak_s / read.read->read_common.model_stride;
+        const auto spike_begin = to_basespace(spike_peak_s);
         const auto spike_end = spike_begin + 1;
 
         // Check qscore is under the threshold.
