@@ -27,12 +27,16 @@ std::set<std::string>& get_supported_compression_extensions() {
 };
 
 bool is_valid_input_file(const std::filesystem::path& input_path) {
+    //std::unique_ptr<sam_hdr_t, void (*)(sam_hdr_t*)> the_header()
+    //std::unique_ptr the_header()
     sam_hdr_t* header{};
     htsFile* hts_file{};
-    dorado::utils::PostCondition ensure_hts_deallocation([header, hts_file] {
+    dorado::utils::PostCondition hts_deallocation_header([header] {
         if (header) {
             sam_hdr_destroy(header);
         }
+    });
+    dorado::utils::PostCondition hts_deallocation_file([hts_file] {
         if (hts_file) {
             hts_close(hts_file);
         }
