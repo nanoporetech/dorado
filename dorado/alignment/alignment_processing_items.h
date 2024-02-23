@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace dorado::alignment::cli {
+namespace dorado::alignment {
 
 struct AlignmentProcessingInfo {
     AlignmentProcessingInfo() {}
@@ -25,7 +25,7 @@ class AlignmentProcessingItems {
     const std::string m_output_folder;
     bool m_recursive_input;
 
-    std::unordered_multimap<std::string, std::filesystem::path> m_working_paths{};
+    std::unordered_map<std::string, std::vector<std::filesystem::path>> m_working_paths{};
 
     std::vector<AlignmentProcessingInfo> m_processing_list{};
 
@@ -62,4 +62,4 @@ public:
     const std::vector<AlignmentProcessingInfo>& get() const { return m_processing_list; }
 };
 
-}  // namespace dorado::alignment::cli
+}  // namespace dorado::alignment

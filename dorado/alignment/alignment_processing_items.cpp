@@ -47,7 +47,7 @@ fs::path replace_extension(fs::path output_path) {
 
 }  // namespace
 
-namespace dorado::alignment::cli {
+namespace dorado::alignment {
 
 AlignmentProcessingItems::AlignmentProcessingItems(std::string input_path,
                                                    bool recursive_input,
@@ -97,7 +97,7 @@ void AlignmentProcessingItems::add_to_working_files(
         const std::filesystem::path& input_relative_path) {
     auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
 
-    m_working_paths.insert({output.string(), input_relative_path});
+    m_working_paths[output.string()].push_back(input_relative_path);
 }
 
 bool AlignmentProcessingItems::try_add_to_working_files(const fs::path& input_root,
@@ -157,21 +157,18 @@ void AlignmentProcessingItems::add_all_valid_files() {
 
     const fs::path input_root(m_input_path);
     const fs::path output_root(m_output_folder);
-    for (std::size_t index{0}; index < m_working_paths.bucket_count(); ++index) {
-        if (m_working_paths.bucket_size(index) == 1) {
+    for (const auto& output_to_inputs_pair : m_working_paths) {
+        const auto& input_files = output_to_inputs_pair.second;
+        if (input_files.size() == 1) {
             // single unique output file name
-            const auto& input_relative_path = m_working_paths.begin(index)->second;
-            const auto input = (input_root / input_relative_path).string();
-            const auto& output = m_working_paths.begin(index)->first;
+            const auto input = (input_root / input_files[0]).string();
+            const auto& output = output_to_inputs_pair.first;
             m_processing_list.emplace_back(input, output, HtsWriter::OutputMode::BAM);
         } else {
             // duplicate output names, disambiguate by preserving input file extension and extending with '.bam'
-            for (auto duplicate_itr = m_working_paths.begin(index);
-                 duplicate_itr != m_working_paths.end(index); ++duplicate_itr) {
-                const auto& input_relative_path = duplicate_itr->second;
+            for (const auto& input_relative_path : input_files) {
                 const auto input = (input_root / input_relative_path).string();
                 const auto output = (output_root / input_relative_path).string() + ".bam";
-
                 m_processing_list.emplace_back(input, output, HtsWriter::OutputMode::BAM);
             }
         }
@@ -221,4 +218,4 @@ bool AlignmentProcessingItems::initialise() {
     return initialise_for_file();
 }
 
-}  // namespace dorado::alignment::cli
+}  // namespace dorado::alignment

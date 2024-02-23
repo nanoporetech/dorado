@@ -143,8 +143,7 @@ int aligner(int argc, char* argv[]) {
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
 
-    alignment::cli::AlignmentProcessingItems processing_items{reads, recursive_input,
-                                                              output_folder};
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder};
     if (!processing_items.initialise()) {
         return EXIT_FAILURE;
     }

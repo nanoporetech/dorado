@@ -6,7 +6,7 @@
 
 #include <filesystem>
 
-#define CUT_TAG "[dorado::aligment::cli::AlignmentProcessingItems]"
+#define CUT_TAG "[dorado::aligment::AlignmentProcessingItems]"
 
 namespace fs = std::filesystem;
 namespace {
@@ -20,7 +20,7 @@ const std::string NON_HTS_FILE{"non_hts_file.txt"};
 const std::string STDINOUT_INDICATOR{"-"};
 }  // namespace
 
-namespace dorado::alignment::cli::test {
+namespace dorado::alignment::test {
 
 TEST_CASE("Constructor with trivial args does not throw", CUT_TAG) {
     CHECK_NOTHROW(AlignmentProcessingItems{"", false, ""});
@@ -225,4 +225,4 @@ TEST_CASE(
     }
 }
 
-}  // namespace dorado::alignment::cli::test
+}  // namespace dorado::alignment::test
