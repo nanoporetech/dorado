@@ -1,6 +1,6 @@
 #include "Version.h"
 #include "alignment/IndexFileAccess.h"
-#include "alignment_processing_items.h"
+#include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
@@ -175,16 +175,7 @@ int aligner(int argc, char* argv[]) {
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
-        std::unique_ptr<HtsReader> reader;
-        try {
-            reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
-        } catch (...) {
-            // The selection of input files uses hts_open, this can give some false positives
-            // which can cause an exception in the reader, e.g. when trying to assign the header.
-            // Simply ignore the input file and continue
-            spdlog::warn("Unable to read from input file: {}", file_info.input);
-            continue;
-        }
+        auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
         if (!create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
             break;
         }

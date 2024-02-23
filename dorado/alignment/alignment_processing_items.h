@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado::alignment::cli {
@@ -24,7 +25,12 @@ class AlignmentProcessingItems {
     const std::string m_output_folder;
     bool m_recursive_input;
 
+    std::unordered_multimap<std::string, std::filesystem::path> m_working_paths{};
+
     std::vector<AlignmentProcessingInfo> m_processing_list{};
+
+    template <class ITER>
+    void create_working_file_map();
 
     template <class ITER>
     void add_all_valid_files();
@@ -33,11 +39,12 @@ class AlignmentProcessingItems {
 
     bool try_create_output_folder();
 
-    bool check_valid_output_folder(const std::string& input_folder);
+    bool check_output_folder_for_input_folder(const std::string& input_folder);
 
-    void add_file(std::filesystem::path input_root, const std::string& input_file);
+    bool try_add_to_working_files(const std::filesystem::path& input_root,
+                                  const std::filesystem::path& input_relative_path);
 
-    bool is_valid_input_file(const std::filesystem::path& input_path);
+    void add_to_working_files(const std::filesystem::path& input_relative_path);
 
     bool initialise_for_stdin();
 
