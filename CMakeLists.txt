@@ -176,6 +176,7 @@ add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
+add_subdirectory(dorado/devtools)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
