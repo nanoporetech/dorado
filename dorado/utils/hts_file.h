@@ -1,17 +1,15 @@
 #pragma once
 
+#include "types.h"
+
 #include <cstdint>
 #include <string>
-
-struct sam_hdr_t;
-struct bam1_t;
-struct htsFile;
 
 namespace dorado::utils {
 
 class HtsFile {
-    htsFile* m_file{nullptr};
-    sam_hdr_t* m_header{nullptr};
+    HtsFilePtr m_file;
+    SamHdrPtr m_header;
 
 public:
     enum class OutputMode {
