@@ -64,7 +64,7 @@ void setup(std::vector<std::string> args,
            size_t remora_batch_size,
            size_t num_remora_threads,
            float methylation_threshold_pct,
-           HtsWriter::OutputMode output_mode,
+           utils::HtsFile::OutputMode output_mode,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -475,7 +475,7 @@ int basecaller(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
-    auto output_mode = HtsWriter::OutputMode::BAM;
+    auto output_mode = utils::HtsFile::OutputMode::BAM;
 
     auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
     auto emit_sam = parser.visible.get<bool>("--emit-sam");
@@ -499,11 +499,11 @@ int basecaller(int argc, char* argv[]) {
             std::exit(EXIT_FAILURE);
         }
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
-        output_mode = HtsWriter::OutputMode::FASTQ;
+        output_mode = utils::HtsFile::OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
-        output_mode = HtsWriter::OutputMode::SAM;
+        output_mode = utils::HtsFile::OutputMode::SAM;
     } else if (utils::is_fd_pipe(stdout)) {
-        output_mode = HtsWriter::OutputMode::UBAM;
+        output_mode = utils::HtsFile::OutputMode::UBAM;
     }
 
     bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;

@@ -318,7 +318,7 @@ int duplex(int argc, char* argv[]) {
 
         bool emit_moves = false, duplex = true;
 
-        auto output_mode = HtsWriter::OutputMode::BAM;
+        auto output_mode = utils::HtsFile::OutputMode::BAM;
 
         auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
         auto emit_sam = parser.visible.get<bool>("--emit-sam");
@@ -336,11 +336,11 @@ int duplex(int argc, char* argv[]) {
             }
             spdlog::info(
                     " - Note: FASTQ output is not recommended as not all data can be preserved.");
-            output_mode = HtsWriter::OutputMode::FASTQ;
+            output_mode = utils::HtsFile::OutputMode::FASTQ;
         } else if (emit_sam || utils::is_fd_tty(stdout)) {
-            output_mode = HtsWriter::OutputMode::SAM;
+            output_mode = utils::HtsFile::OutputMode::SAM;
         } else if (utils::is_fd_pipe(stdout)) {
-            output_mode = HtsWriter::OutputMode::UBAM;
+            output_mode = utils::HtsFile::OutputMode::UBAM;
         }
 
         const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
@@ -454,7 +454,7 @@ int duplex(int argc, char* argv[]) {
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
                     default_parameters.remora_batchsize);
 
-            if (!mod_base_runners.empty() && output_mode == HtsWriter::OutputMode::FASTQ) {
+            if (!mod_base_runners.empty() && output_mode == utils::HtsFile::OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
             }
 
