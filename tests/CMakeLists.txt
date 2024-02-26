@@ -9,6 +9,7 @@ endif()
 add_executable(dorado_tests
     AdapterDetectorTest.cpp
     AlignerTest.cpp
+    alignment_processing_items_test.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp

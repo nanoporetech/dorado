@@ -1,10 +1,12 @@
 #include "Version.h"
 #include "alignment/IndexFileAccess.h"
+#include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -18,12 +20,54 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
-using namespace std::chrono_literals;
 
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+
+using namespace std::chrono_literals;
+
+namespace {
+
+std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
+        const std::string& filename,
+        const dorado::alignment::Minimap2Options& options,
+        const int num_threads) {
+    spdlog::info("> loading index {}", filename);
+
+    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(num_threads)};
+    switch (index_file_access->load_index(filename, options, num_index_construction_threads)) {
+    case dorado::alignment::IndexLoadResult::reference_file_not_found:
+        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+    case dorado::alignment::IndexLoadResult::validation_error:
+        throw std::runtime_error("AlignerNode validation error checking minimap options");
+    case dorado::alignment::IndexLoadResult::split_index_not_supported:
+        throw std::runtime_error(
+                "Dorado doesn't support split index for alignment. Please re-run with larger "
+                "index "
+                "size.");
+    case dorado::alignment::IndexLoadResult::success:
+        break;
+    }
+    return index_file_access;
+}
+
+bool create_output_folder(const std::filesystem::path& output_folder) {
+    std::error_code creation_error;
+    // N.B. No error code if folder already exists.
+    std::filesystem::create_directories(output_folder, creation_error);
+    if (creation_error) {
+        spdlog::error("Unable to create output folder {}. ErrorCode({}) {}", output_folder.string(),
+                      creation_error.value(), creation_error.message());
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 namespace dorado {
 
@@ -43,8 +87,20 @@ int aligner(int argc, char* argv[]) {
             "parameter names are not finalized and may change.");
     parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.visible.add_argument("reads")
-            .help("any HTS format.")
-            .nargs(argparse::nargs_pattern::any);
+            .help("An input file or the folder containing input file(s) (any HTS format).")
+            .nargs(argparse::nargs_pattern::any)
+            .default_value(std::string{});
+    parser.visible.add_argument("-r", "--recursive")
+            .help("If the 'reads' positional argument is a folder any subfolders will also be "
+                  "searched for input files.")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0);
+    parser.visible.add_argument("-o", "--output-dir")
+            .help("If specified output files will be written to the given folder, otherwise output "
+                  "is to stdout. "
+                  "Required if the 'reads' positional argument is a folder.")
+            .default_value(std::string{});
     parser.visible.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing.")
             .default_value(0)
@@ -78,10 +134,23 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index(parser.visible.get<std::string>("index"));
-    auto reads(parser.visible.get<std::vector<std::string>>("reads"));
+    auto reads(parser.visible.get<std::string>("reads"));
+    auto recursive_input = parser.visible.get<bool>("recursive");
+    auto output_folder = parser.visible.get<std::string>("output-dir");
+
     auto threads(parser.visible.get<int>("threads"));
+
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder};
+    if (!processing_items.initialise()) {
+        return EXIT_FAILURE;
+    }
+
+    const auto& all_files = processing_items.get();
+    spdlog::info("num files: {}", all_files.size());
+
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
@@ -91,79 +160,77 @@ int aligner(int argc, char* argv[]) {
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
-    if (reads.size() == 0) {
+    if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
             std::cout << parser.visible << std::endl;
             return 1;
         }
 #endif
-        reads.push_back("-");
-    } else if (reads.size() > 1) {
-        spdlog::error("> multi file input not yet handled");
-        return 1;
+        reads = "-";
     }
 
-    spdlog::info("> loading index {}", index);
+    auto index_file_access = load_index(index, options, aligner_threads);
 
-    HtsReader reader(reads[0], std::nullopt);
-    spdlog::debug("> input fmt: {} aligned: {}", reader.format, reader.is_aligned);
-    auto header = sam_hdr_dup(reader.header);
-    add_pg_hdr(header);
+    for (const auto& file_info : all_files) {
+        spdlog::info("processing {} -> {}", file_info.input, file_info.output);
+        auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
+        if (!create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
+            break;
+        }
 
-    auto output_mode = HtsWriter::OutputMode::BAM;
-    if (utils::is_fd_tty(stdout)) {
-        output_mode = HtsWriter::OutputMode::SAM;
-    } else if (utils::is_fd_pipe(stdout)) {
-        output_mode = HtsWriter::OutputMode::UBAM;
+        spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
+        auto header = sam_hdr_dup(reader->header);
+        add_pg_hdr(header);
+
+        PipelineDescriptor pipeline_desc;
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, file_info.output,
+                                                            file_info.output_mode, writer_threads);
+        auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
+                                                           options, aligner_threads);
+
+        // Create the Pipeline from our description.
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+        if (pipeline == nullptr) {
+            spdlog::error("Failed to create pipeline");
+            std::exit(EXIT_FAILURE);
+        }
+
+        // At present, header output file header writing relies on direct node method calls
+        // rather than the pipeline framework.
+        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+        utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
+        auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+        hts_writer_ref.set_and_write_header(header);
+
+        // Set up stats counting
+        std::vector<dorado::stats::StatsCallable> stats_callables;
+        ProgressTracker tracker(0, false);
+        stats_callables.push_back(
+                [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+        constexpr auto kStatsPeriod = 100ms;
+        auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+                kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
+
+        spdlog::info("> starting alignment");
+        reader->read(*pipeline, max_reads);
+
+        // Wait for the pipeline to complete.  When it does, we collect
+        // final stats to allow accurate summarisation.
+        auto final_stats = pipeline->terminate(DefaultFlushOptions());
+
+        // Stop the stats sampler thread before tearing down any pipeline objects.
+        stats_sampler->terminate();
+
+        tracker.update_progress_bar(final_stats);
+        tracker.summarize();
+
+        spdlog::info("> finished alignment");
+        spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
+                     hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
 
-    PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, writer_threads);
-    auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
-    auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
-                                                       options, aligner_threads);
-
-    // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
-    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
-    if (pipeline == nullptr) {
-        spdlog::error("Failed to create pipeline");
-        std::exit(EXIT_FAILURE);
-    }
-
-    // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
-    utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_and_write_header(header);
-
-    // Set up stats counting
-    std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(0, false);
-    stats_callables.push_back(
-            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-    constexpr auto kStatsPeriod = 100ms;
-    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
-
-    spdlog::info("> starting alignment");
-    reader.read(*pipeline, max_reads);
-
-    // Wait for the pipeline to complete.  When it does, we collect
-    // final stats to allow accurate summarisation.
-    auto final_stats = pipeline->terminate(DefaultFlushOptions());
-
-    // Stop the stats sampler thread before tearing down any pipeline objects.
-    stats_sampler->terminate();
-
-    tracker.update_progress_bar(final_stats);
-    tracker.summarize();
-
-    spdlog::info("> finished alignment");
-    spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
-                 hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     return 0;
 }
 

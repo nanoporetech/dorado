@@ -1,0 +1,21 @@
+0a579f20-1ab0-4e5b-91e6-30e37cf7eb96.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0c2e24dc-607a-41b6-a735-753a0dd8f27a.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0d0f1a62-54bb-4de8-a8dc-96bc2fff8afc.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0e676e85-bc2e-4b00-ad81-7ed957740357.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0e8526c7-a51e-4ef8-9446-e87a5eb6a373.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0e9ff216-cabe-4c86-a1e0-57451619e2c7.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0edabd92-04ed-4ec0-b70e-ef40d3aee22c.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+0f1836ba-30d0-4cb6-b3b4-1a9cbd61e62c.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1b6d1e4c-b5a2-4109-a09e-c4d6a243964c.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1c44c209-d909-425a-a77b-c2677dbde7e8.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1d222fe0-0f7b-446a-a0cf-ad5e7a478277.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1df0482e-389a-4ca8-8738-91f9cb8fdc50.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1e0dafc5-5581-4be1-86bf-9e153f6a49b4.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1e1f4d48-22b0-46cd-800d-93400c00e4e7.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+1ed459bd-a4e8-4f27-8a39-cff6fc21a286.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+2a3ec7cf-1cde-4ef2-ad5a-ae899e9fff27.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+2b10fd13-5df1-439b-ac19-55aa55170860.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+2db83bb4-451c-401a-8400-c5bb3a802c08.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+2e45d6df-5443-42db-a75f-11edf38304f8.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+2ec2af4d-cb37-40c8-95d6-b140e94e87c2.fast5	C:\data\dna_r10.4.1_e8.2_prom_kit14_5khz\20_reads_multi\batch_0.fast5
+some random file.

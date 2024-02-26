@@ -8,6 +8,7 @@
 #include <vector>
 
 struct bam1_t;
+struct htsFile;
 struct mm_tbuf_s;
 struct sam_hdr_t;
 
@@ -90,6 +91,11 @@ struct SamHdrDestructor {
     void operator()(sam_hdr_t *);
 };
 using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
+
+struct HtsFileDestructor {
+    void operator()(htsFile *);
+};
+using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 

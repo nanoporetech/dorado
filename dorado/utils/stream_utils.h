@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef _WIN32
 #include <io.h>
 #define NULL_DEVICE "NUL:"
@@ -18,7 +20,7 @@
 
 #include <functional>
 
-namespace ont::test_utils::streams {
+namespace dorado::utils {
 
 namespace details {
 template <class T>
@@ -74,4 +76,4 @@ public:
     }
 };
 
-}  // namespace ont::test_utils::streams
+}  // namespace dorado::utils
