@@ -51,6 +51,8 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Write BAM", TEST_GROUP) 
     int num_threads = GENERATE(1, 10);
     HtsWriter::OutputMode emit_fastq = GENERATE(
             HtsWriter::OutputMode::SAM, HtsWriter::OutputMode::BAM, HtsWriter::OutputMode::FASTQ);
+    CAPTURE(num_threads);
+    CAPTURE(emit_fastq);
     CHECK_NOTHROW(generate_bam(emit_fastq, num_threads));
 }
 
