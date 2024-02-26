@@ -41,9 +41,10 @@ private:
     size_t m_unmapped{0};
     size_t m_secondary{0};
     size_t m_supplementary{0};
-    sam_hdr_t* m_header{nullptr};
 
-    htsFile* m_file{nullptr};
+    class HtsFile;
+    std::unique_ptr<HtsFile> m_file;
+
     void input_thread_fn();
     int write(bam1_t* record);
     std::unordered_set<std::string> m_processed_read_ids;
