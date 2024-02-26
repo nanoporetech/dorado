@@ -21,7 +21,7 @@ public:
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void terminate(const FlushOptions&) override;
     void restart() override { start_input_processing(&HtsWriter::input_thread_fn, this); }
 
     int set_and_write_header(const sam_hdr_t* header);

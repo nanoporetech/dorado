@@ -115,4 +115,9 @@ stats::NamedStats HtsWriter::sample_stats() const {
     return stats;
 }
 
+void HtsWriter::terminate(const FlushOptions&) {
+    stop_input_processing();
+    m_file.reset();
+}
+
 }  // namespace dorado
