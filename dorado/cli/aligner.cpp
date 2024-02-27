@@ -175,8 +175,9 @@ int aligner(int argc, char* argv[]) {
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
-        if (!create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
-            break;
+        if (file_info.output != "-" &&
+            !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
+            return EXIT_FAILURE;
         }
 
         spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);

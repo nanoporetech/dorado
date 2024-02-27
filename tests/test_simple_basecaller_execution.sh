@@ -34,14 +34,24 @@ model_5k_v43=${output_dir}/${model_name_5k_v43}
 $dorado_bin download --model ${model_name_rna004} --directory ${output_dir}
 model_rna004=${output_dir}/${model_name_rna004}
 
+dorado_check_bam_not_empty() {
+    samtools quickcheck -u $output_dir/calls.bam
+    samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+    num_lines=$(wc -l $output_dir/calls.sam | awk '{print $1}')
+    if [[ ${num_lines} -eq "0" ]]; then
+        echo "Error: empty bam file"
+        exit 1
+    fi
+}
+
 echo dorado basecaller test stage
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
+dorado_check_bam_not_empty
 if ! uname -r | grep -q tegra; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
+    dorado_check_bam_not_empty
 fi
-samtools quickcheck -u $output_dir/calls.bam
-samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
 
 # Check that the read group has the required model info in it's header
 if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
@@ -73,15 +83,15 @@ $dorado_bin summary $output_dir/calls.bam
 
 echo redirecting stderr to stdout: check output is still valid
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
-samtools quickcheck -u $output_dir/calls.bam
-samtools view $output_dir/calls.bam > $output_dir/calls.sam
+dorado_check_bam_not_empty
 
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
+dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
+dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
-samtools quickcheck -u $output_dir/calls.bam
-samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+dorado_check_bam_not_empty
 
 echo dorado aligner options test stage
 dorado_aligner_options_test() (
