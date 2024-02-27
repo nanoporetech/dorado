@@ -331,6 +331,11 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
         spike_ranges.emplace_back(spike_begin, spike_end);
     }
 
+    // Remove duplicates.
+    std::sort(spike_ranges.begin(), spike_ranges.end());
+    auto end_it = std::unique(spike_ranges.begin(), spike_ranges.end());
+    spike_ranges.erase(end_it, spike_ranges.end());
+
     spdlog::trace("Detected {} muA+adapter spike region(s) in read {}", spike_ranges.size(),
                   read.read->read_common.read_id);
     return spike_ranges;
