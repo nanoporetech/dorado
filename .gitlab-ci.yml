@@ -103,7 +103,7 @@ variables:
 .run_dorado_cmake_cpack: &run_dorado_cmake_cpack
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
-.build_dorado: &build_dorado
+.build_and_test_dorado:
   stage: build
   script:
     - echo Dorado build stage
@@ -201,7 +201,7 @@ build:linux:x86:focal:install_deps:
   extends:
     - .linux_dependencies
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
     - .on_nightly_or_manual
 
 build:linux:x86:focal:
@@ -210,7 +210,7 @@ build:linux:x86:focal:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:linux:x86:focal:debug:
   variables:
@@ -252,7 +252,7 @@ build:linux:arm64:bionic:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .linux_arm64_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
@@ -261,18 +261,18 @@ build:linux:arm64:focal:
   extends:
     - .linux_dependencies
     - .linux_arm64_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:windows:
   extends:
     - .windows_runner
-    - .build_dorado
+    - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
@@ -288,7 +288,7 @@ build:windows:debug:
 build:windows_koi_download:
   extends:
     - .windows_runner
-    - .build_dorado
+    - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
@@ -298,14 +298,14 @@ build:macos:arm:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .macos_arm_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:macos:x64:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .macos_x64_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:ios:m1:
   variables:
@@ -315,7 +315,7 @@ build:ios:m1:
     DORADO_RUN_TESTS: "OFF"
   extends:
     - .macos_arm_runner
-    - .build_dorado
+    - .build_and_test_dorado
   script:
     # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
     - unset MACOSX_DEPLOYMENT_TARGET
@@ -331,7 +331,7 @@ build:ios:m1:
       -D DORADO_DISABLE_DORADO=ON
       -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
       -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
-    - !reference [.build_dorado, script]
+    - !reference [.build_and_test_dorado, script]
 
 build:ios_sim:m1:
   variables:
