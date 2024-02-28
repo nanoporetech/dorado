@@ -262,7 +262,12 @@ build:linux:arm64:bionic:
     - sed -i "s#$(pwd)#_BUILD_FOLDER_#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
   artifacts:
     paths:
-      - !reference [.build_and_test_dorado, artifacts, path]
+      # Can't !reference here, but it would be:
+      #- !reference [.build_and_test_dorado, artifacts, path]
+      - dist
+      - tests/*.sh
+      - tests/*.bat
+      - tests/data
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
