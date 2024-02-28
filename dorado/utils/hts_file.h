@@ -20,6 +20,8 @@ public:
 
     HtsFile(const std::string& filename, OutputMode mode, size_t threads);
     ~HtsFile();
+    HtsFile(const HtsFile&) = delete;
+    HtsFile& operator=(const HtsFile&) = delete;
 
     int set_and_write_header(const sam_hdr_t* header);
     int write(const bam1_t* record);
