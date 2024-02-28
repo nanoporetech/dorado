@@ -88,28 +88,30 @@ variables:
     PARALLEL_JOBS=$(( 8 > PARALLEL_JOBS ? 8 : PARALLEL_JOBS ))
   - echo "PARALLEL_JOBS '${PARALLEL_JOBS}'"
 
-.run_dorado_cmake_build: &run_dorado_cmake_build
+.run_dorado_cmake_build:
+  - echo Dorado build stage
+  - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
-  - export CCACHE_DIR=/data/gitlab-ci-cache
+  -   export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
   - *set_parallel_jobs
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
-.run_dorado_cmake_ctest: &run_dorado_cmake_ctest
+.run_dorado_cmake_ctest:
+  - echo Dorado test stage
   - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
-.run_dorado_cmake_cpack: &run_dorado_cmake_cpack
+.run_dorado_cmake_cpack:
+  - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
 .build_and_test_dorado:
   stage: build
   script:
-    - echo Dorado build stage
-    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
-    - *run_dorado_cmake_build
-    - *run_dorado_cmake_ctest
+    - !reference [.run_dorado_cmake_build]
+    - !reference [.run_dorado_cmake_ctest]
   artifacts:
     paths:
       - dist
@@ -119,13 +121,11 @@ variables:
     expire_in: 1 day
   interruptible: true
 
-.build_dorado_archive: &build_dorado_archive
+.build_dorado_archive:
   stage: build
   script:
-    - echo Dorado build stage
-    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"  
-    - *run_dorado_cmake_build
-    - *run_dorado_cmake_cpack
+    - !reference [.run_dorado_cmake_build]
+    - !reference [.run_dorado_cmake_cpack]
   artifacts:
     paths:
       - archive
@@ -231,7 +231,7 @@ build:linux:x86:focal_coverage:
     - .linux_runner
     - .on_nightly_or_manual
   script:
-    - *run_dorado_cmake_build
+    - !reference [.run_dorado_cmake_build]
   artifacts:
     paths:
       - build/dorado_test_coverage/*
@@ -246,13 +246,28 @@ build:linux:x86:focal:clang_tidy:
     - *set_parallel_jobs
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
+# We have to split the tegra builds into separate build+test jobs since we can't
+# test on the machines we build on.
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_arm64_runner
     - .build_and_test_dorado
+    - .linux_arm64_runner
+  script:
+    # Replace the script stage with just the build.
+    - !reference [.run_dorado_cmake_build]
+build:linux:arm64:bionic:unittests:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  stage: build
+  extends:
+    - .linux_tegra_runner
+  script:
+    - !reference [.run_dorado_cmake_ctest]
+  needs:
+    - build:linux:arm64:bionic
+  interruptible: true
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
