@@ -123,7 +123,7 @@ int HtsFile::set_and_write_header(const sam_hdr_t* const header) {
     return 0;
 }
 
-int HtsFile::write(bam1_t* const record) {
+int HtsFile::write(const bam1_t* const record) {
     // FIXME -- HtsFile is constructed in a state where attempting to write
     // will segfault, since set_and_write_header has to have been called
     // in order to set m_header.

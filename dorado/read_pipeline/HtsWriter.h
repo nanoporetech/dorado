@@ -41,7 +41,7 @@ private:
     std::unique_ptr<utils::HtsFile> m_file;
 
     void input_thread_fn();
-    int write(bam1_t* record);
+    int write(const bam1_t* record);
     std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};

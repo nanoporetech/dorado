@@ -21,8 +21,8 @@ public:
     HtsFile(const std::string& filename, OutputMode mode, size_t threads);
     ~HtsFile();
 
-    int set_and_write_header(const sam_hdr_t* const header);
-    int write(bam1_t* const record);
+    int set_and_write_header(const sam_hdr_t* header);
+    int write(const bam1_t* record);
 };
 
 }  // namespace dorado::utils
