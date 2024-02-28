@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #define TEST_GROUP "[barcode_demux]"
