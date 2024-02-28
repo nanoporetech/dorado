@@ -88,6 +88,12 @@ dorado_check_bam_not_empty
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
 dorado_check_bam_not_empty
+mkdir $output_dir/folder
+mkdir $output_dir/folder/subfolder
+cp $output_dir/calls.sam $output_dir/folder/calls.sam
+cp $output_dir/calls.sam $output_dir/folder/subfolder/calls.sam
+$dorado_bin aligner $output_dir/ref.fq $output_dir/folder > $output_dir/calls.bam
+dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
@@ -227,6 +233,8 @@ if [[ $num_demuxed_reads -ne "3" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
 fi
+$dorado_bin demux $data_dir/barcode_demux/double_end_variant/ --kit-name EXP-PBC096 --output-dir $output_dir/demux_from_folder
+samtools quickcheck -u $output_dir/demux_from_folder/EXP-PBC096_barcode04.bam
 
 echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
