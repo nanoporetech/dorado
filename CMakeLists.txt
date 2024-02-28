@@ -288,6 +288,8 @@ set(LIB_SOURCE_FILES
     dorado/poly_tail/poly_tail_config.h
     dorado/poly_tail/rna_poly_tail_calculator.cpp
     dorado/poly_tail/rna_poly_tail_calculator.h
+    dorado/summary/summary.cpp
+    dorado/summary/summary.h
  )
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})
