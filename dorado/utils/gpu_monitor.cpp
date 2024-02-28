@@ -592,7 +592,7 @@ std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
 }
 
 std::optional<std::string> get_nvidia_driver_version() {
-    static auto version = [] {
+    static auto cached_version = [] {
         std::optional<std::string> version;
 #if HAS_NVML
         version = read_version_from_nvml();
@@ -609,7 +609,7 @@ std::optional<std::string> get_nvidia_driver_version() {
 #endif  // __linux__
         return version;
     }();
-    return version;
+    return cached_version;
 }
 
 unsigned int get_device_count() {
