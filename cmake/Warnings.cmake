@@ -10,8 +10,16 @@ function(enable_warnings_as_errors TARGET_NAME)
         target_compile_definitions(${TARGET_NAME} PRIVATE
             _CRT_SECURE_NO_WARNINGS
         )
-    else
-        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Wextra -Werror -Wundef)
+    elseif(CMAKE_COMPILER_IS_GNUCXX)
+        target_compile_options(${TARGET_NAME} PRIVATE
+            -Wall -Wextra -Werror -Wundef -Wshadow
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${TARGET_NAME} PRIVATE
+            -Wall -Wextra -Werror -Wundef -Wshadow-all
+        )
+    else()
+        message(FATAL_ERROR "Unknown compiler: ${(CMAKE_CXX_COMPILER_ID}")
     endif()
 endfunction()
 

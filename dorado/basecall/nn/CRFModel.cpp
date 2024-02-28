@@ -307,7 +307,7 @@ at::Tensor ConvStackImpl::forward(at::Tensor x) {
     return x.transpose(1, 2);
 }
 
-ConvStackImpl::ConvLayer::ConvLayer(const ConvParams &params) : params(params) {}
+ConvStackImpl::ConvLayer::ConvLayer(const ConvParams &conv_params) : params(conv_params) {}
 
 #if DORADO_CUDA_BUILD
 void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm) {
