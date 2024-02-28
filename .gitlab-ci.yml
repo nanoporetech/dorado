@@ -258,12 +258,22 @@ build:linux:arm64:bionic:
   script:
     # Replace the script stage with just the build.
     - !reference [.run_dorado_cmake_build]
+    # Modify the test paths so that we can run the tests on a different machine.
+    - sed -i "s#$(pwd)#_BUILD_FOLDER_#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
+  artifacts:
+    paths:
+      - !reference [.build_and_test_dorado, artifacts, path]
+      # Need to artifact parts of the build folder for the testing job.
+      - ${BUILD_DIR}/CTestTestfile.cmake
+      - ${BUILD_DIR}/tests
 build:linux:arm64:bionic:unittests:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   stage: build
   extends:
     - .linux_tegra_runner
   script:
+    # Fixup the tests so that we can run them.
+    - sed -i "s#_BUILD_FOLDER_#$(pwd)#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
     - !reference [.run_dorado_cmake_ctest]
   needs:
     - build:linux:arm64:bionic
