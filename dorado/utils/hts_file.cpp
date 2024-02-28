@@ -6,9 +6,9 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
-#include <exception>
 #include <filesystem>
 #include <map>
+#include <stdexcept>
 
 namespace {
 
