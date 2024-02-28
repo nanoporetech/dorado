@@ -38,4 +38,10 @@ void MmTbufDestructor::operator()(mm_tbuf_t* tbuf) { mm_tbuf_destroy(tbuf); }
 
 void SamHdrDestructor::operator()(sam_hdr_t* bam) { sam_hdr_destroy(bam); }
 
+void HtsFileDestructor::operator()(htsFile* hts_file) {
+    if (hts_file) {
+        hts_close(hts_file);
+    }
+}
+
 }  // namespace dorado

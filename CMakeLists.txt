@@ -176,6 +176,7 @@ add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
+add_subdirectory(dorado/devtools)
 
 if("${CUDA_VERSION}" STREQUAL "")
   set(CUDA_VERSION ${CUDAToolkit_VERSION})
@@ -186,6 +187,8 @@ endif()
 configure_file(dorado/Version.h.in dorado/Version.h)
 
 set(LIB_SOURCE_FILES
+    dorado/alignment/alignment_processing_items.cpp
+    dorado/alignment/alignment_processing_items.h
     dorado/alignment/IndexFileAccess.cpp
     dorado/alignment/IndexFileAccess.h
     dorado/alignment/Minimap2Aligner.cpp

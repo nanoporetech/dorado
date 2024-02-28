@@ -1,8 +1,8 @@
 #include "alignment/IndexFileAccess.h"
 
-#include "StreamUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Index.h"
+#include "utils/stream_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -10,7 +10,7 @@
 
 #define TEST_GROUP "[alignment::IndexFileAccess]"
 
-using namespace ont::test_utils::streams;
+using namespace dorado::utils;
 
 namespace {
 
