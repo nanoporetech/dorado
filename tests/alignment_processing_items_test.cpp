@@ -5,6 +5,7 @@
 #include <catch2/catch.hpp>
 
 #include <filesystem>
+#include <map>
 
 #define CUT_TAG "[dorado::aligment::AlignmentProcessingItems]"
 

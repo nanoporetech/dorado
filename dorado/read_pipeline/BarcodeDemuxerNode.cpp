@@ -2,6 +2,7 @@
 
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/SampleSheet.h"
+#include "utils/hts_file.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/sam.h>
@@ -25,13 +26,7 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
     start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this);
 }
 
-BarcodeDemuxerNode::~BarcodeDemuxerNode() {
-    stop_input_processing();
-    sam_hdr_destroy(m_header);
-    for (auto& [k, f] : m_files) {
-        hts_close(f);
-    }
-}
+BarcodeDemuxerNode::~BarcodeDemuxerNode() { stop_input_processing(); }
 
 void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
@@ -62,48 +57,33 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         }
     }
     // Check of existence of file for that barcode.
-    auto res = m_files.find(bc);
-    htsFile* file = nullptr;
-    if (res != m_files.end()) {
-        file = res->second;
-    } else {
+    auto& file = m_files[bc];
+    if (!file) {
         // For new barcodes, create a new HTS file (either fastq or BAM).
         std::string filename = bc + (m_write_fastq ? ".fastq" : ".bam");
         auto filepath = m_output_dir / filename;
         auto filepath_str = filepath.string();
-        file = hts_open(filepath_str.c_str(), (m_write_fastq ? "wf" : "wb"));
-        if (!file) {
-            throw std::runtime_error("Failed to open new HTS output file at " + filepath.string());
-        }
-        if (file->format.compression == bgzf) {
-            auto bgz_res = bgzf_mt(file->fp.bgzf, m_htslib_threads, 128);
-            if (bgz_res < 0) {
-                throw std::runtime_error("Could not enable multi threading for BAM generation.");
-            }
-        }
-        m_files[bc] = file;
-        auto hts_res = sam_hdr_write(file, m_header);
-        if (hts_res < 0) {
-            throw std::runtime_error("Failed to write SAM header, error code " +
-                                     std::to_string(hts_res));
-        }
+
+        file = std::make_unique<utils::HtsFile>(
+                filepath_str,
+                m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::BAM,
+                m_htslib_threads);
+        file->set_and_write_header(m_header.get());
     }
-    auto hts_res = sam_write1(file, m_header, record);
+
+    auto hts_res = file->write(record);
     if (hts_res < 0) {
         throw std::runtime_error("Failed to write SAM record, error code " +
                                  std::to_string(hts_res));
     }
+
     m_processed_reads++;
     return hts_res;
 }
 
 void BarcodeDemuxerNode::set_header(const sam_hdr_t* const header) {
     if (header) {
-        // Avoid leaking memory if this is called twice.
-        if (m_header) {
-            sam_hdr_destroy(m_header);
-        }
-        m_header = sam_hdr_dup(header);
+        m_header.reset(sam_hdr_dup(header));
     }
 }
 
@@ -111,6 +91,11 @@ stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["demuxed_reads_written"] = m_processed_reads.load();
     return stats;
+}
+
+void BarcodeDemuxerNode::terminate(const FlushOptions&) {
+    stop_input_processing();
+    m_files.clear();
 }
 
 }  // namespace dorado

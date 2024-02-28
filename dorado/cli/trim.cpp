@@ -24,6 +24,8 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
+using OutputMode = dorado::utils::HtsFile::OutputMode;
+
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
@@ -116,18 +118,18 @@ int trim(int argc, char* argv[]) {
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
     add_pg_hdr(header.get());
 
-    auto output_mode = HtsWriter::OutputMode::BAM;
+    auto output_mode = OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
     auto emit_sam = !emit_fastq;
 
     if (emit_fastq) {
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
-        output_mode = HtsWriter::OutputMode::FASTQ;
+        output_mode = OutputMode::FASTQ;
     } else if (emit_sam || utils::is_fd_tty(stdout)) {
-        output_mode = HtsWriter::OutputMode::SAM;
+        output_mode = OutputMode::SAM;
     } else if (utils::is_fd_pipe(stdout)) {
-        output_mode = HtsWriter::OutputMode::UBAM;
+        output_mode = OutputMode::UBAM;
     }
 
     std::optional<std::string> custom_primer_file = std::nullopt;

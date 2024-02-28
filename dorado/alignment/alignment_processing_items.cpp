@@ -6,14 +6,18 @@
 #include "utils/tty_utils.h"
 #include "utils/types.h"
 
+#include <htslib/hts.h>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
+
+#include <set>
 
 namespace fs = std::filesystem;
 
 namespace {
+using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-dorado::HtsWriter::OutputMode get_stdout_output_mode() {
-    using OutputMode = dorado::HtsWriter::OutputMode;
+OutputMode get_stdout_output_mode() {
     if (dorado::utils::is_fd_tty(stdout)) {
         return OutputMode::SAM;
     } else if (dorado::utils::is_fd_pipe(stdout)) {
@@ -135,7 +139,7 @@ bool AlignmentProcessingItems::initialise_for_file() {
     }
 
     auto output = replace_extension(fs::path(m_output_folder) / input_file_path.filename());
-    m_processing_list.emplace_back(m_input_path, output.string(), HtsWriter::OutputMode::BAM);
+    m_processing_list.emplace_back(m_input_path, output.string(), OutputMode::BAM);
 
     return true;
 }
@@ -163,13 +167,13 @@ void AlignmentProcessingItems::add_all_valid_files() {
             // single unique output file name
             const auto input = (input_root / input_files[0]).string();
             const auto& output = output_to_inputs_pair.first;
-            m_processing_list.emplace_back(input, output, HtsWriter::OutputMode::BAM);
+            m_processing_list.emplace_back(input, output, OutputMode::BAM);
         } else {
             // duplicate output names, disambiguate by preserving input file extension and extending with '.bam'
             for (const auto& input_relative_path : input_files) {
                 const auto input = (input_root / input_relative_path).string();
                 const auto output = (output_root / input_relative_path).string() + ".bam";
-                m_processing_list.emplace_back(input, output, HtsWriter::OutputMode::BAM);
+                m_processing_list.emplace_back(input, output, OutputMode::BAM);
             }
         }
     }
