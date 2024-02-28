@@ -100,10 +100,10 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const 
 
     std::vector<DecodedChunk> chunk_results(num_chunks);
 
-    std::vector<std::unique_ptr<std::thread>> threads;
+    std::vector<std::thread> threads;
     threads.reserve(num_threads);
     for (int i = 0; i < num_threads; ++i) {
-        threads.emplace_back(new std::thread([&, i]() {
+        threads.emplace_back([&, i]() {
             at::InferenceMode inference_mode_guard;
 
             int t_first_chunk =
@@ -134,11 +134,11 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const 
                         std::get<2>(decode_result),
                 };
             }
-        }));
+        });
     }
 
     for (auto& thread : threads) {
-        thread->join();
+        thread.join();
     }
 
     return chunk_results;

@@ -96,16 +96,14 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto determine_encoding = [&](std::optional<at::Tensor*> stereo_features,
-                                  int current_target_cursor, int current_query_cursor,
-                                  int current_template_signal_cursor,
+    auto determine_encoding = [&](at::Tensor* stereo_features, int current_target_cursor,
+                                  int current_query_cursor, int current_template_signal_cursor,
                                   int current_complement_signal_cursor) -> int {
         size_t stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
         if (stereo_features) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
-                feature_ptrs[feature_idx] =
-                        (*stereo_features.value())[feature_idx].data_ptr<SampleType>();
+                feature_ptrs[feature_idx] = (*stereo_features)[feature_idx].data_ptr<SampleType>();
             }
         }
         for (auto alignment_entry : feature_inputs.alignment) {
@@ -204,9 +202,8 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
-    const auto encoding_tensor_size =
-            determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
-                               complement_signal_cursor);
+    const auto encoding_tensor_size = determine_encoding(
+            nullptr, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
 
     const float pad_value = 0.8f * std::min(at::min(feature_inputs.complement_signal).item<float>(),
                                             at::min(feature_inputs.template_signal).item<float>());
