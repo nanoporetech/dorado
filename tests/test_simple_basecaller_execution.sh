@@ -92,7 +92,7 @@ mkdir $output_dir/folder
 mkdir $output_dir/folder/subfolder
 cp $output_dir/calls.sam $output_dir/folder/calls.sam
 cp $output_dir/calls.sam $output_dir/folder/subfolder/calls.sam
-$dorado_bin aligner $output_dir/ref.fq $output_dir/folder > $output_dir/calls.bam
+$dorado_bin aligner $output_dir/ref.fq $output_dir/folder -o $output_dir/aligner_out
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
