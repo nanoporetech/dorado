@@ -568,15 +568,18 @@ std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
 }
 
 std::optional<std::string> get_nvidia_driver_version() {
-    std::optional<std::string> version;
+    static auto version = [] {
+        std::optional<std::string> version;
 #if HAS_NVML
-    version = read_version_from_nvml();
+        version = read_version_from_nvml();
 #endif  // HAS_NVML
 #if defined(__linux__)
-    if (!version) {
-        version = read_version_from_proc();
-    }
+        if (!version) {
+            version = read_version_from_proc();
+        }
 #endif  // __linux__
+        return version;
+    }();
     return version;
 }
 
