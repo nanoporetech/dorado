@@ -214,7 +214,8 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
     // Skip if the read is too small.
     const auto& read_seq = read.read->read_common.seq;
     if (read_seq.size() < min_read_len) {
-        spdlog::trace("Read too small");
+        spdlog::trace("Read too small: id={} size={}", read.read->read_common.read_id,
+                      read_seq.size());
         return {};
     }
 
@@ -276,6 +277,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
     const auto muA_ranges =
             match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist, false);
     if (muA_ranges.empty()) {
+        spdlog::trace("No muA found in read: id={}", read.read->read_common.read_id);
         return {};
     }
 
