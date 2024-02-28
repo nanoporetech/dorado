@@ -54,6 +54,13 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) {
     }
 }
 
+// There's quite a lot of work being done in this destructor. The intention is that when a file is closed
+// and we finalise the underlying htsFile, then and only then can we correctly read the virtual file offsets of
+// the records (since bgzf_tell doesn't give the correct values in a write-file - see bgzf_flush, etc)
+// in order to generate a map of sort coordinates to virtual file offsets. we can then jump around in the
+// file to write out the records in the sorted order. finally we can delete the unsorted file.
+// in case an error occurs, the unsorted file is left on disk, so users can recover their data.
+// TODO: Would be nice if we could find a way to do this without relying the destructor.
 HtsFile::~HtsFile() {
     auto temp_filename = std::string(m_file->fn);
     bool is_bgzf = m_file->format.compression == bgzf;
