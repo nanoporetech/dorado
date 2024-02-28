@@ -88,7 +88,7 @@ int aligner(int argc, char* argv[]) {
     parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.visible.add_argument("reads")
             .help("An input file or the folder containing input file(s) (any HTS format).")
-            .nargs(argparse::nargs_pattern::any)
+            .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
     parser.visible.add_argument("-r", "--recursive")
             .help("If the 'reads' positional argument is a folder any subfolders will also be "
@@ -143,13 +143,14 @@ int aligner(int argc, char* argv[]) {
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
 
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder};
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
+                                                         false};
     if (!processing_items.initialise()) {
         return EXIT_FAILURE;
     }
 
     const auto& all_files = processing_items.get();
-    spdlog::info("num files: {}", all_files.size());
+    spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -160,6 +161,7 @@ int aligner(int argc, char* argv[]) {
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
+    // Only allow `reads` to be empty if we're accepting input from a pipe
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
@@ -167,7 +169,6 @@ int aligner(int argc, char* argv[]) {
             return 1;
         }
 #endif
-        reads = "-";
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);

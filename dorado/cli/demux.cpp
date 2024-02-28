@@ -1,10 +1,12 @@
 #include "Version.h"
+#include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/SampleSheet.h"
+#include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
@@ -40,9 +42,18 @@ int demuxer(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Barcode demultiplexing tool. Users need to specify the kit name(s).");
     parser.add_argument("reads")
-            .help("Path to a file with reads to demultiplex. Can be in any HTS format.")
-            .nargs(argparse::nargs_pattern::any);
-    parser.add_argument("--output-dir").help("Output folder for demultiplexed reads.").required();
+            .help("An input file or the folder containing input file(s) (any HTS format).")
+            .nargs(argparse::nargs_pattern::optional)
+            .default_value(std::string{});
+    parser.add_argument("-r", "--recursive")
+            .help("If the 'reads' positional argument is a folder any subfolders will also be "
+                  "searched for input files.")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0);
+    parser.add_argument("-o", "--output-dir")
+            .help("Output folder for demultiplexed reads.")
+            .required();
     parser.add_argument("--kit-name")
             .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
                   "from: " +
@@ -113,10 +124,18 @@ int demuxer(int argc, char* argv[]) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
-    auto reads(parser.get<std::vector<std::string>>("reads"));
+    auto reads(parser.get<std::string>("reads"));
+    auto recursive_input(parser.get<bool>("recursive"));
     auto output_dir(parser.get<std::string>("output-dir"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
+
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
+    if (!processing_items.initialise()) {
+        return EXIT_FAILURE;
+    }
+    const auto& all_files = processing_items.get();
+    spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -138,6 +157,7 @@ int demuxer(int argc, char* argv[]) {
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
+    // Only allow `reads` to be empty if we're accepting input from a pipe
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
@@ -145,14 +165,21 @@ int demuxer(int argc, char* argv[]) {
             return 1;
         }
 #endif
-        reads.push_back("-");
-    } else if (reads.size() > 1) {
-        spdlog::error("> multi file input not yet handled");
-        return 1;
     }
 
-    HtsReader reader(reads[0], read_list);
+    HtsReader reader(all_files[0].input, read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
+
+    // Fold in the headers from all the other files in the input list.
+    for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
+        HtsReader header_reader(all_files[input_idx].input, read_list);
+        std::string error_msg;
+        if (!utils::sam_hdr_merge(header.get(), header_reader.header, error_msg)) {
+            spdlog::error("Unable to combine headers from all input files: " + error_msg);
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
     add_pg_hdr(header.get());
 
     auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
@@ -205,6 +232,12 @@ int demuxer(int argc, char* argv[]) {
 
     spdlog::info("> starting barcode demuxing");
     reader.read(*pipeline, max_reads);
+
+    // Barcode all the other files passed in
+    for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
+        HtsReader input_reader(all_files[input_idx].input, read_list);
+        input_reader.read(*pipeline, max_reads);
+    }
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
