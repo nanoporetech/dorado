@@ -2,7 +2,6 @@
 
 #include "types.h"
 
-#include <cstdint>
 #include <string>
 
 namespace dorado::utils {
