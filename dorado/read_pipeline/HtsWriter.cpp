@@ -15,20 +15,22 @@
 
 namespace dorado {
 
-HtsWriter::HtsWriter(const std::string& filename, utils::HtsFile::OutputMode mode, size_t threads)
+using OutputMode = dorado::utils::HtsFile::OutputMode;
+
+HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads)
         : MessageSink(10000, 1), m_file(std::make_unique<utils::HtsFile>(filename, mode, threads)) {
     start_input_processing(&HtsWriter::input_thread_fn, this);
 }
 
 HtsWriter::~HtsWriter() { stop_input_processing(); }
 
-utils::HtsFile::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
+OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
-        return utils::HtsFile::OutputMode::SAM;
+        return OutputMode::SAM;
     } else if (mode == "bam") {
-        return utils::HtsFile::OutputMode::BAM;
+        return OutputMode::BAM;
     } else if (mode == "fastq") {
-        return utils::HtsFile::OutputMode::FASTQ;
+        return OutputMode::FASTQ;
     }
     throw std::runtime_error("Unknown output mode: " + mode);
 }
