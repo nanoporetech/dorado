@@ -1,5 +1,4 @@
-#ifndef MYERS_BIT_H
-#define MYERS_BIT_H
+#pragma once
 
 #include <iosfwd>
 #include <string_view>
@@ -19,5 +18,3 @@ std::vector<EdistResult> myers_align(std::string_view query,
 void print_edists(std::ostream& os, std::string_view seq, const std::vector<size_t>& edists);
 
 }  // namespace dorado::splitter
-
-#endif
