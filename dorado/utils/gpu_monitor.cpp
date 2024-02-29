@@ -184,6 +184,7 @@ class NvmlApi final {
         if (m_Shutdown != nullptr) {
             m_Shutdown();
         }
+        clear_symbols();
         platform_close();
     }
 
