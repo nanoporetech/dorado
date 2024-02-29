@@ -123,7 +123,8 @@ endif()
 
 # Use ccache for C and C++ if it's available
 find_program(CCACHE_EXE ccache)
-if (CCACHE_EXE)
+option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
+if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
     set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(DORADO_ENABLE_PCH FALSE)
