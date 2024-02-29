@@ -97,14 +97,15 @@ int summary(int argc, char *argv[]) {
             continue;
         }
 
+        std::string run_id = "unknown";
+        std::string model = "unknown";
+
         auto rg_value = reader.get_tag<std::string>("RG");
-        if (rg_value.length() == 0) {
-            spdlog::error("> Cannot generate sequencing summary for files with no RG tags");
-            return 1;
+        if (rg_value.length() > 0) {
+            auto rg_split = rg_value.find("_");
+            run_id = rg_value.substr(0, rg_split);
+            model = rg_value.substr(rg_split + 1, rg_value.length());
         }
-        auto rg_split = rg_value.find("_");
-        auto run_id = rg_value.substr(0, rg_split);
-        auto model = rg_value.substr(rg_split + 1, rg_value.length());
 
         auto filename = reader.get_tag<std::string>("f5");
         if (filename.empty()) {
@@ -130,8 +131,11 @@ int summary(int argc, char *argv[]) {
 
         float sample_rate = num_samples / duration;
         float template_duration = (num_samples - trim_samples) / sample_rate;
-        auto exp_start_dt = read_group_exp_start_time.at(rg_value);
-        auto start_time = utils::time_difference_seconds(start_time_dt, exp_start_dt);
+        double start_time = 0.0;
+        if (!read_group_exp_start_time.empty()) {
+            auto exp_start_dt = read_group_exp_start_time.at(rg_value);
+            start_time = utils::time_difference_seconds(start_time_dt, exp_start_dt);
+        }
         auto template_start_time = start_time + (duration - template_duration);
 
         std::cout << filename << separator << read_id << separator << run_id << separator << channel

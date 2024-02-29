@@ -4,6 +4,7 @@
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "summary/summary.h"
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -79,6 +80,13 @@ int demuxer(int argc, char* argv[]) {
             .help("Output in fastq format. Default is BAM.")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--emit-summary")
+            .help("If specified, a summary file containing the details of the primary alignments "
+                  "for each "
+                  "read will be emitted to the root of the output folder.")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0);
     parser.add_argument("--barcode-both-ends")
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
@@ -115,6 +123,7 @@ int demuxer(int argc, char* argv[]) {
 
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto output_dir(parser.get<std::string>("output-dir"));
+    auto emit_summary = parser.get<bool>("emit-summary");
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
 
@@ -216,6 +225,14 @@ int demuxer(int argc, char* argv[]) {
     tracker.summarize();
 
     spdlog::info("> finished barcode demuxing");
+    if (emit_summary) {
+        spdlog::info("> generating summary file");
+        SummaryData summary(SummaryData::BARCODING_FIELDS);
+        auto summary_file = std::filesystem::path(output_dir) / "summary.txt";
+        std::ofstream summary_out(summary_file.string());
+        summary.process_tree(output_dir, summary_out);
+        spdlog::info("> summary file complete.");
+    }
 
     return 0;
 }

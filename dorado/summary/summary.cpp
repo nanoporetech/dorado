@@ -34,6 +34,8 @@ public:
     sighandler_t m_old_sigint_handler{};
 };
 
+volatile sig_atomic_t SigIntHandler::interrupt{};
+
 }  // anonymous namespace
 
 namespace dorado {
@@ -147,14 +149,15 @@ bool SummaryData::write_rows_from_reader(
             continue;
         }
 
+        std::string run_id = "unknown";
+        std::string model = "unknown";
+
         auto rg_value = reader.get_tag<std::string>("RG");
-        if (rg_value.length() == 0) {
-            spdlog::error("> Cannot generate sequencing summary for files with no RG tags");
-            return false;
+        if (rg_value.length() > 0) {
+            auto rg_split = rg_value.find("_");
+            run_id = rg_value.substr(0, rg_split);
+            model = rg_value.substr(rg_split + 1, rg_value.length());
         }
-        auto rg_split = rg_value.find("_");
-        auto run_id = rg_value.substr(0, rg_split);
-        auto model = rg_value.substr(rg_split + 1, rg_value.length());
 
         auto filename = reader.get_tag<std::string>("f5");
         if (filename.empty()) {
@@ -180,8 +183,12 @@ bool SummaryData::write_rows_from_reader(
 
         float sample_rate = num_samples / duration;
         float template_duration = (num_samples - trim_samples) / sample_rate;
-        auto exp_start_dt = read_group_exp_start_time.at(rg_value);
-        auto start_time = utils::time_difference_seconds(start_time_dt, exp_start_dt);
+        auto start_time = 0.0;
+        auto exp_start_time_iter = read_group_exp_start_time.find(rg_value);
+        if (exp_start_time_iter != read_group_exp_start_time.end()) {
+            auto exp_start_dt = exp_start_time_iter->second;
+            start_time = utils::time_difference_seconds(start_time_dt, exp_start_dt);
+        }
         auto template_start_time = start_time + (duration - template_duration);
 
         writer << filename << m_separator << read_id;
