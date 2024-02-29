@@ -68,10 +68,6 @@ static_assert(ONT_NVML_BUFFER_SIZE, "nvml buffer size must be defined");
  * Also provides a scoped wrapper around NVML API initialisation.
  */
 class NvmlApi final {
-    // Includes devices which cannot be accessed via NVML so need to check return codes
-    // on individual device specific NVML function calls.
-    unsigned int m_device_count{};
-
     // Platform specific library handling.
 #ifdef _WIN32
     HINSTANCE m_handle = nullptr;
@@ -194,27 +190,11 @@ class NvmlApi final {
     NvmlApi(const NvmlApi &) = delete;
     NvmlApi &operator=(const NvmlApi &) = delete;
 
-    void set_device_count() {
-        if (!m_handle) {
-            return;
-        }
-        auto *device_count_op = m_DeviceGetCount_v2 ? m_DeviceGetCount_v2 : m_DeviceGetCount;
-        ScopedTraceLog log{__func__};
-        auto result = device_count_op(&m_device_count);
-        if (result != NVML_SUCCESS) {
-            m_device_count = 0;
-            spdlog::warn("Call to DeviceGetCount failed: {}", ErrorString(result));
-        }
-    }
-
     // This slight design flaw is in place of having NvmlApi as a singleton.
     // Instead it is held as a member variable of the DeviceInfoCache singleton.
     // This is preferable to having dependencies between singletons.
     friend class DeviceInfoCache;
-    NvmlApi() {
-        init();
-        set_device_count();
-    }
+    NvmlApi() { init(); }
 
     ~NvmlApi() { shutdown(); }
 
@@ -289,7 +269,11 @@ public:
         return m_DeviceGetName(device, name, length);
     }
 
-    unsigned int get_device_count() { return m_device_count; }
+    nvmlReturn_t DeviceGetCount(unsigned int *count) {
+        auto *device_count_op = m_DeviceGetCount_v2 ? m_DeviceGetCount_v2 : m_DeviceGetCount;
+        ScopedTraceLog log{__func__};
+        return device_count_op(count);
+    }
 
     const char *ErrorString(nvmlReturn_t result) { return m_ErrorString(result); }
 };
@@ -429,10 +413,22 @@ class DeviceInfoCache final {
     NvmlApi m_nvml{};
     std::unique_ptr<DeviceHandles> m_device_handles;
     std::unordered_map<nvmlDevice_t, std::optional<DeviceStatusInfo>> m_device_info{};
+    // Includes devices which cannot be accessed via NVML so need to check return codes
+    // on individual device specific NVML function calls.
+    unsigned int m_device_count = 0;
 
     DeviceInfoCache() {
         if (m_nvml.is_loaded()) {
+            set_device_count();
             m_device_handles = std::make_unique<DeviceHandles>(m_nvml);
+        }
+    }
+
+    void set_device_count() {
+        auto result = m_nvml.DeviceGetCount(&m_device_count);
+        if (result != NVML_SUCCESS) {
+            m_device_count = 0;
+            spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
         }
     }
 
@@ -477,6 +473,8 @@ public:
     }
 
     NvmlApi &nvml() { return m_nvml; }
+
+    unsigned int get_device_count() { return m_device_count; }
 
     std::optional<DeviceStatusInfo> get_device_info(unsigned int device_index) {
         if (!m_nvml.is_loaded()) {
@@ -613,7 +611,7 @@ std::optional<std::string> get_nvidia_driver_version() {
 
 unsigned int get_device_count() {
 #if HAS_NVML
-    return DeviceInfoCache::instance().nvml().get_device_count();
+    return DeviceInfoCache::instance().get_device_count();
 #elif defined(DORADO_TX2)
     return 1;
 #else
