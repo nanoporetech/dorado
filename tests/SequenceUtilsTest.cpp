@@ -117,3 +117,62 @@ TEST_CASE(TEST_GROUP ": count trailing chars", TEST_GROUP) {
     auto actual = dorado::utils::count_trailing_chars(seq, 'A');
     CHECK(actual == expected);
 }
+
+TEST_CASE(TEST_GROUP "find rna polya", TEST_GROUP) {
+    // Polya                                               |here|
+    // Index                 0    5   10   15   20   25   30
+    const std::string seq = "TTTTTCCCCCTTTTTCCCCCTTTTTCCCCCAAAAATCAATCA";
+    const size_t expected_index = 30;
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find first rna polya", TEST_GROUP) {
+    // Expect to only trim the "first" polya match
+    // Polya                                              |2nd |    |1st |
+    // Index                 0    5   10   15   20   25   30   35   40
+    const std::string seq = "TTTTTCCCCCTTTTTCCCCCTTTTTCCCCCAAAAATTTTTAAAAAC";
+    const size_t expected_index = 40;
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find no rna polya", TEST_GROUP) {
+    // With no polyA expect to trim no bases
+    const std::string seq = "TTTTTCCCCCTTTTTCCCCCTTTTTCCCCC";
+    const size_t expected_index = seq.length();
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find rna polya - at start", TEST_GROUP) {
+    // Polya                 |here|
+    const std::string seq = "AAAAACCCCCTTTTTCCCCCTTTTTCCCCC";
+    const size_t expected_index = 0;
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find rna polya - straddle search area", TEST_GROUP) {
+    // PolyA continues over the maximum of 200 bases
+    const std::string seq(210, 'A');
+    const size_t expected_index = 10;
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find rna polya - outside search", TEST_GROUP) {
+    // PolyA beyond the search range
+    const std::string seq = std::string(5, 'A') + std::string(200, 'T');
+    const size_t expected_index = seq.length();
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}
+
+TEST_CASE(TEST_GROUP "find rna polya - within search", TEST_GROUP) {
+    using S = std::string;
+    const S seq = S(100, 'A') + S(155, 'C') + S(10, 'A') + S(100, 'C');
+    const size_t expected_index = 255;
+    const size_t res = dorado::utils::find_rna_polya(seq);
+    CHECK(expected_index == res);
+}

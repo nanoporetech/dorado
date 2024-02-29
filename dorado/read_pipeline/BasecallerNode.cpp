@@ -188,6 +188,7 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.model_name = m_model_name;
             read_common_data.mean_qscore_start_pos = m_mean_qscore_start_pos;
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
+            read_common_data.is_rna = m_rna;
 
             if (m_rna) {
                 std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
