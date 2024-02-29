@@ -1,6 +1,6 @@
 #include "gpu_monitor.h"
 
-#if defined(_WIN32) || (defined(__linux__) && !defined(DORADO_TX2))
+#if defined(_WIN32) || defined(__linux__)
 #define HAS_NVML 1
 #else
 #define HAS_NVML 0
@@ -419,18 +419,26 @@ class DeviceInfoCache final {
     unsigned int m_device_count = 0;
 
     DeviceInfoCache() {
+        set_device_count();
         if (m_nvml.is_loaded()) {
-            set_device_count();
             m_device_handles = std::make_unique<DeviceHandles>(m_nvml);
         }
     }
 
     void set_device_count() {
-        auto result = m_nvml.DeviceGetCount(&m_device_count);
-        if (result != NVML_SUCCESS) {
-            m_device_count = 0;
-            spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
+        if (m_nvml.is_loaded()) {
+            auto result = m_nvml.DeviceGetCount(&m_device_count);
+            if (result != NVML_SUCCESS) {
+                m_device_count = 0;
+                spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
+            }
         }
+#if defined(DORADO_TX2)
+        if (m_device_count == 0) {
+            // TX2 may not have NVML, in which case just report that we have 1.
+            m_device_count = 1;
+        }
+#endif
     }
 
     std::optional<DeviceStatusInfo> create_new_device_entry(unsigned int device_index,
@@ -634,8 +642,6 @@ std::optional<std::string> get_nvidia_driver_version() {
 unsigned int get_device_count() {
 #if HAS_NVML
     return DeviceInfoCache::instance().get_device_count();
-#elif defined(DORADO_TX2)
-    return 1;
 #else
     return 0;
 #endif  // HAS_NVML
