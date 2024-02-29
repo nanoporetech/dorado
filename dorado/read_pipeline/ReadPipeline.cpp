@@ -17,6 +17,7 @@
 #include <sstream>
 #include <stack>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
 
 using namespace std::chrono_literals;
@@ -287,6 +288,16 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
 }
 
 float ReadCommon::calculate_mean_qscore() const {
+    if (is_rna) {
+        const size_t polya_start = utils::find_rna_polya(seq);
+        spdlog::trace("calculate_mean_qscore rna - len:{} polya_start_idx: {}, polya_trim_len:{}",
+                      seq.size(), polya_start, seq.size() - polya_start);
+        if (polya_start == 0) {
+            return utils::mean_qscore_from_qstring(qstring);
+        }
+        return utils::mean_qscore_from_qstring(std::string_view{qstring}.substr(0, polya_start));
+    }
+
     // If Q-score start position is greater than the
     // read length, then calculate mean Q-score from the
     // start of the read.

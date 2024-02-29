@@ -129,6 +129,33 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
 
 namespace dorado::utils {
 
+size_t find_rna_polya(const std::string& seq) {
+    // Number of bases to search at the end of the RNA sequence
+    const size_t kSearchSize = 200;
+    // Minimum contiguous length of a polyA
+    const size_t kMinPolyASize = 5;
+
+    const size_t size = seq.size();
+    const size_t end = (kSearchSize < size) ? size - kSearchSize : size_t(0);
+    size_t polya_size = 0;
+    size_t polya_end_idx = size;
+
+    // In RNA - sequence is reversed
+    for (size_t i = size; i > end; --i) {
+        if (seq[i - 1] == 'A') {
+            if (++polya_size >= kMinPolyASize) {
+                polya_end_idx = i - 1;
+            }
+        } else if (polya_end_idx != size) {
+            break;
+        } else {
+            polya_size = 0;
+        }
+    }
+
+    return polya_end_idx;
+}
+
 float mean_qscore_from_qstring(std::string_view qstring) {
     if (qstring.empty()) {
         return 0.0f;
