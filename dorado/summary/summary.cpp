@@ -17,21 +17,18 @@ class SigIntHandler {
 public:
     SigIntHandler() {
 #ifndef _WIN32
-        m_old_sigpipe_handler = std::signal(SIGPIPE, [](int) { interrupt = 1; });
+        std::signal(SIGPIPE, [](int) { interrupt = 1; });
 #endif
-        m_old_sigint_handler = std::signal(SIGINT, [](int) { interrupt = 1; });
+        std::signal(SIGINT, [](int) { interrupt = 1; });
     }
 
     ~SigIntHandler() {
 #ifndef _WIN32
-        std::signal(SIGPIPE, m_old_sigpipe_handler);
+        std::signal(SIGPIPE, SIG_DFL);
 #endif
-        std::signal(SIGINT, m_old_sigint_handler);
+        std::signal(SIGINT, SIG_DFL);
     }
     static volatile ::sig_atomic_t interrupt;
-
-    sighandler_t m_old_sigpipe_handler{};
-    sighandler_t m_old_sigint_handler{};
 };
 
 volatile sig_atomic_t SigIntHandler::interrupt{};
