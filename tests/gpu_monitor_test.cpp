@@ -396,7 +396,6 @@ DEFINE_TEST_FIXTURE_METHOD(
 }
 
 #if !defined(__APPLE__)
-
 DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
     if (!torch::getNumGPUs()) {
         return;

@@ -1,6 +1,6 @@
 #include "gpu_monitor.h"
 
-#if defined(_WIN32) || defined(__linux__)
+#if defined(_WIN32) || (defined(__linux__) && !defined(DORADO_TX2))
 #define HAS_NVML 1
 #else
 #define HAS_NVML 0
@@ -615,6 +615,8 @@ std::optional<std::string> get_nvidia_driver_version() {
 unsigned int get_device_count() {
 #if HAS_NVML
     return DeviceInfoCache::instance().nvml().get_device_count();
+#elif defined(DORADO_TX2)
+    return 1;
 #else
     return 0;
 #endif  // HAS_NVML
