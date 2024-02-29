@@ -617,6 +617,11 @@ std::optional<std::string> get_nvidia_driver_version() {
 #if HAS_NVML
         version = read_version_from_nvml();
 #endif  // HAS_NVML
+#if defined(__linux__)
+        if (!version) {
+            version = read_version_from_proc();
+        }
+#endif  // __linux__
 #if defined(DORADO_TX2)
         if (!version) {
             version = read_version_from_tegra_release();
@@ -629,11 +634,6 @@ std::optional<std::string> get_nvidia_driver_version() {
             version = "0.0.1";
         }
 #endif  // DORADO_TX2
-#if defined(__linux__)
-        if (!version) {
-            version = read_version_from_proc();
-        }
-#endif  // __linux__
         return version;
     }();
     return cached_version;
