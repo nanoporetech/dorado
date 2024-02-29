@@ -583,7 +583,6 @@ std::vector<std::optional<DeviceStatusInfo>> get_devices_status_info() {
     const auto max_devices = get_device_count();
     for (unsigned int device_index{}; device_index < max_devices; ++device_index) {
         result.push_back(get_device_status_info(device_index));
-        auto status_info = get_device_status_info(device_index);
     }
     return result;
 #else
