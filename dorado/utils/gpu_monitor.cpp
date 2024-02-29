@@ -629,7 +629,7 @@ std::optional<std::string> get_nvidia_driver_version() {
         if (!version && running_in_docker()) {
             // The docker images we run in aren't representative of running natively on a
             // device, so we fake a version number to allow the tests to pass. On a real
-            // machine we're have grabbed the version from the tegra release file.
+            // machine we'll have grabbed the version from the tegra release file.
             spdlog::warn("Can't query version when running inside a docker container on TX2");
             version = "0.0.1";
         }
