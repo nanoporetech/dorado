@@ -91,7 +91,7 @@ bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) 
         if (!std::filesystem::is_directory(p)) {
             auto ext = std::filesystem::path(p).extension().string();
             if (ext == ".fastq" || ext == ".fq" || ext == ".sam" || ext == ".bam") {
-                files.push_back(std::filesystem::absolute(p));
+                files.push_back(std::filesystem::absolute(p).string());
             }
         }
     }
