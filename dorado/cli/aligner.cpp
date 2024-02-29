@@ -252,7 +252,7 @@ int aligner(int argc, char* argv[]) {
     if (emit_summary) {
         spdlog::info("> generating summary file");
         SummaryData summary(SummaryData::ALIGNMENT_FIELDS);
-        auto summary_file = std::filesystem::path(output_folder) / "summary.txt";
+        auto summary_file = std::filesystem::path(output_folder) / "alignment_summary.txt";
         std::ofstream summary_out(summary_file.string());
         summary.process_tree(output_folder, summary_out);
         spdlog::info("> summary file complete.");

@@ -228,7 +228,7 @@ int demuxer(int argc, char* argv[]) {
     if (emit_summary) {
         spdlog::info("> generating summary file");
         SummaryData summary(SummaryData::BARCODING_FIELDS);
-        auto summary_file = std::filesystem::path(output_dir) / "summary.txt";
+        auto summary_file = std::filesystem::path(output_dir) / "barcoding_summary.txt";
         std::ofstream summary_out(summary_file.string());
         summary.process_tree(output_dir, summary_out);
         spdlog::info("> summary file complete.");
