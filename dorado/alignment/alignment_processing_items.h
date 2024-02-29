@@ -1,6 +1,6 @@
 #pragma once
 
-#include "read_pipeline/HtsWriter.h"
+#include "utils/hts_file.h"
 
 #include <filesystem>
 #include <string>
@@ -13,11 +13,11 @@ struct AlignmentProcessingInfo {
     AlignmentProcessingInfo() {}
     AlignmentProcessingInfo(std::string input_,
                             std::string output_,
-                            dorado::HtsWriter::OutputMode output_mode_)
+                            utils::HtsFile::OutputMode output_mode_)
             : input(std::move(input_)), output(std::move(output_)), output_mode(output_mode_) {}
     std::string input{};
     std::string output{};
-    dorado::HtsWriter::OutputMode output_mode{};
+    utils::HtsFile::OutputMode output_mode{};
 };
 
 class AlignmentProcessingItems {

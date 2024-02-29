@@ -2,6 +2,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "utils/bam_utils.h"
+#include "utils/hts_file.h"
 #include "utils/stats.h"
 
 #include <catch2/catch.hpp>
@@ -13,6 +14,7 @@
 
 namespace fs = std::filesystem;
 using namespace dorado;
+using utils::HtsFile;
 
 class HtsWriterTestsFixture {
 public:
@@ -25,7 +27,7 @@ public:
     ~HtsWriterTestsFixture() { fs::remove(m_out_bam); }
 
 protected:
-    void generate_bam(HtsWriter::OutputMode mode, int num_threads) {
+    void generate_bam(HtsFile::OutputMode mode, int num_threads) {
         HtsReader reader(m_in_sam.string(), std::nullopt);
         PipelineDescriptor pipeline_desc;
         auto writer = pipeline_desc.add_node<HtsWriter>({}, m_out_bam.string(), mode, num_threads);
@@ -49,20 +51,22 @@ private:
 
 TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Write BAM", TEST_GROUP) {
     int num_threads = GENERATE(1, 10);
-    HtsWriter::OutputMode emit_fastq = GENERATE(
-            HtsWriter::OutputMode::SAM, HtsWriter::OutputMode::BAM, HtsWriter::OutputMode::FASTQ);
+    HtsFile::OutputMode emit_fastq = GENERATE(HtsFile::OutputMode::SAM, HtsFile::OutputMode::BAM,
+                                              HtsFile::OutputMode::FASTQ);
+    CAPTURE(num_threads);
+    CAPTURE(emit_fastq);
     CHECK_NOTHROW(generate_bam(emit_fastq, num_threads));
 }
 
 TEST_CASE("HtsWriterTest: Output mode conversion", TEST_GROUP) {
-    CHECK(HtsWriter::get_output_mode("sam") == HtsWriter::OutputMode::SAM);
-    CHECK(HtsWriter::get_output_mode("bam") == HtsWriter::OutputMode::BAM);
-    CHECK(HtsWriter::get_output_mode("fastq") == HtsWriter::OutputMode::FASTQ);
+    CHECK(HtsWriter::get_output_mode("sam") == HtsFile::OutputMode::SAM);
+    CHECK(HtsWriter::get_output_mode("bam") == HtsFile::OutputMode::BAM);
+    CHECK(HtsWriter::get_output_mode("fastq") == HtsFile::OutputMode::FASTQ);
     CHECK_THROWS_WITH(HtsWriter::get_output_mode("blah"), "Unknown output mode: blah");
 }
 
 TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_GROUP) {
-    CHECK_NOTHROW(generate_bam(HtsWriter::OutputMode::BAM, 1));
+    CHECK_NOTHROW(generate_bam(HtsFile::OutputMode::BAM, 1));
 
     CHECK(stats.at("unique_simplex_reads_written") == 6);
     CHECK(stats.at("split_reads_written") == 2);

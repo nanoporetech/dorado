@@ -10,48 +10,21 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
+#include <filesystem>
 #include <stdexcept>
 
 namespace dorado {
 
+using OutputMode = dorado::utils::HtsFile::OutputMode;
+
 HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads)
-        : MessageSink(10000, 1) {
-    switch (mode) {
-    case OutputMode::FASTQ:
-        m_file = hts_open(filename.c_str(), "wf");
-        break;
-    case OutputMode::BAM:
-        m_file = hts_open(filename.c_str(), "wb");
-        break;
-    case OutputMode::SAM:
-        m_file = hts_open(filename.c_str(), "w");
-        break;
-    case OutputMode::UBAM:
-        m_file = hts_open(filename.c_str(), "wb0");
-        break;
-    default:
-        throw std::runtime_error("Unknown output mode selected: " +
-                                 std::to_string(static_cast<int>(mode)));
-    }
-    if (!m_file) {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
-    if (m_file->format.compression == bgzf) {
-        auto res = bgzf_mt(m_file->fp.bgzf, int(threads), 128);
-        if (res < 0) {
-            throw std::runtime_error("Could not enable multi threading for BAM generation.");
-        }
-    }
+        : MessageSink(10000, 1), m_file(std::make_unique<utils::HtsFile>(filename, mode, threads)) {
     start_input_processing(&HtsWriter::input_thread_fn, this);
 }
 
-HtsWriter::~HtsWriter() {
-    stop_input_processing();
-    sam_hdr_destroy(m_header);
-    hts_close(m_file);
-}
+HtsWriter::~HtsWriter() { stop_input_processing(); }
 
-HtsWriter::OutputMode HtsWriter::get_output_mode(const std::string& mode) {
+OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
         return OutputMode::SAM;
     } else if (mode == "bam") {
@@ -71,7 +44,11 @@ void HtsWriter::input_thread_fn() {
         }
 
         auto aln = std::move(std::get<BamPtr>(message));
-        write(aln.get());
+        auto res = write(aln.get());
+        if (res < 0) {
+            throw std::runtime_error("Failed to write SAM record, error code " +
+                                     std::to_string(res));
+        }
 
         // For the purpose of estimating write count, we ignore duplex reads
         int64_t dx_tag = 0;
@@ -104,7 +81,7 @@ void HtsWriter::input_thread_fn() {
     }
 }
 
-int HtsWriter::write(bam1_t* const record) {
+int HtsWriter::write(const bam1_t* const record) {
     // track stats
     m_total++;
     if (record->core.flag & BAM_FUNMAP) {
@@ -125,27 +102,11 @@ int HtsWriter::write(bam1_t* const record) {
         };
     }
 
-    // FIXME -- HtsWriter is constructed in a state where attempting to write
-    // will segfault, since set_and_write_header has to have been called
-    // in order to set m_header.
-    assert(m_header);
-    auto res = sam_write1(m_file, m_header, record);
-    if (res < 0) {
-        throw std::runtime_error("Failed to write SAM record, error code " + std::to_string(res));
-    }
-    return res;
+    return m_file->write(record);
 }
 
 int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
-    if (header) {
-        // Avoid leaking memory if this is called twice.
-        if (m_header) {
-            sam_hdr_destroy(m_header);
-        }
-        m_header = sam_hdr_dup(header);
-        return sam_hdr_write(m_file, m_header);
-    }
-    return 0;
+    return m_file->set_and_write_header(header);
 }
 
 stats::NamedStats HtsWriter::sample_stats() const {
@@ -154,6 +115,11 @@ stats::NamedStats HtsWriter::sample_stats() const {
     stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
     stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());
     return stats;
+}
+
+void HtsWriter::terminate(const FlushOptions&) {
+    stop_input_processing();
+    m_file.reset();
 }
 
 }  // namespace dorado
