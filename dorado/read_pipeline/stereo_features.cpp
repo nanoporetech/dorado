@@ -12,8 +12,8 @@ using namespace at::indexing;
 namespace dorado {
 
 at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& feature_inputs) {
-    int target_cursor = static_cast<int>(feature_inputs.template_seq_start);
-    int query_cursor = static_cast<int>(feature_inputs.complement_seq_start);
+    const int target_cursor = static_cast<int>(feature_inputs.template_seq_start);
+    const int query_cursor = static_cast<int>(feature_inputs.complement_seq_start);
 
     // Edlib doesn't provide named constants for alignment array entries, so do it here.
     // static constexpr unsigned char kAlignMatch = 0;
@@ -96,15 +96,14 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
     // the buffer which helps bring down overall memory footprint.
     // 2. The mode with data copy that actually fills up the encoding tensor
     // with the right data needed for inference.
-    auto determine_encoding = [&](std::optional<at::Tensor*> stereo_features, int target_cursor,
-                                  int query_cursor, int template_signal_cursor,
-                                  int complement_signal_cursor) -> int {
+    auto determine_encoding = [&](at::Tensor* stereo_features, int current_target_cursor,
+                                  int current_query_cursor, int current_template_signal_cursor,
+                                  int current_complement_signal_cursor) -> int {
         size_t stereo_global_cursor = 0;  // Index into the stereo-encoded signal
         std::array<SampleType*, kNumFeatures> feature_ptrs;
         if (stereo_features) {
             for (int feature_idx = 0; feature_idx < kNumFeatures; ++feature_idx) {
-                feature_ptrs[feature_idx] =
-                        (*stereo_features.value())[feature_idx].data_ptr<SampleType>();
+                feature_ptrs[feature_idx] = (*stereo_features)[feature_idx].data_ptr<SampleType>();
             }
         }
         for (auto alignment_entry : feature_inputs.alignment) {
@@ -138,13 +137,13 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
 
             // If there is *not* an insertion to the query, add the nucleotide from the target cursor.
             if (alignment_entry != kAlignInsertionToQuery) {
-                add_signal(template_moves_expanded, template_signal_cursor, kFeatureTemplateSignal,
-                           template_raw_data_ptr);
+                add_signal(template_moves_expanded, current_template_signal_cursor,
+                           kFeatureTemplateSignal, template_raw_data_ptr);
             }
 
             // If there is *not* an insertion to the target, add the nucleotide from the query cursor
             if (alignment_entry != kAlignInsertionToTarget) {
-                add_signal(complement_moves_expanded, complement_signal_cursor,
+                add_signal(complement_moves_expanded, current_complement_signal_cursor,
                            kFeatureComplementSignal, flipped_complement_raw_data_ptr);
             }
 
@@ -168,26 +167,26 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
 
             if (alignment_entry != kAlignInsertionToQuery) {
                 if (stereo_features) {
-                    add_nucleotide_and_q(feature_inputs.template_seq[target_cursor],
-                                         feature_inputs.template_qstring[target_cursor],
+                    add_nucleotide_and_q(feature_inputs.template_seq[current_target_cursor],
+                                         feature_inputs.template_qstring[current_target_cursor],
                                          kFeatureTemplateFirstNucleotide, kFeatureTemplateQScore);
                 }
 
                 // Anything but a query insertion causes the target cursor to advance.
-                ++target_cursor;
+                ++current_target_cursor;
             }
 
             // Now, add the nucleotides and q scores
             if (alignment_entry != kAlignInsertionToTarget) {
                 if (stereo_features) {
-                    add_nucleotide_and_q(feature_inputs.complement_seq[query_cursor],
-                                         feature_inputs.complement_qstring.rbegin()[query_cursor],
-                                         kFeatureComplementFirstNucleotide,
-                                         kFeatureComplementQScore);
+                    add_nucleotide_and_q(
+                            feature_inputs.complement_seq[current_query_cursor],
+                            feature_inputs.complement_qstring.rbegin()[current_query_cursor],
+                            kFeatureComplementFirstNucleotide, kFeatureComplementQScore);
                 }
 
                 // Anything but a target insertion causes the query cursor to advance.
-                ++query_cursor;
+                ++current_query_cursor;
             }
 
             if (stereo_features) {
@@ -203,9 +202,8 @@ at::Tensor generate_stereo_features(const DuplexRead::StereoFeatureInputs& featu
 
     // Call the encoding lambda first without data copy to get an estimate
     // of the encoding size.
-    const auto encoding_tensor_size =
-            determine_encoding(std::nullopt, target_cursor, query_cursor, template_signal_cursor,
-                               complement_signal_cursor);
+    const auto encoding_tensor_size = determine_encoding(
+            nullptr, target_cursor, query_cursor, template_signal_cursor, complement_signal_cursor);
 
     const float pad_value = 0.8f * std::min(at::min(feature_inputs.complement_signal).item<float>(),
                                             at::min(feature_inputs.template_signal).item<float>());

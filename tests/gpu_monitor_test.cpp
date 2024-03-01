@@ -71,6 +71,13 @@ DEFINE_TEST("get_nvidia_driver_version does not have value on Apple") {
 }
 #endif  // __APPLE__
 
+#if defined(DORADO_TX2)
+DEFINE_TEST("get_nvidia_driver_version always has a value on Jetson") {
+    auto driver_version = get_nvidia_driver_version();
+    CHECK(driver_version.has_value());
+}
+#endif  // DORADO_TX2
+
 DEFINE_TEST("parse_nvidia_version_line parameterised test") {
     const struct {
         std::string_view test_name;
@@ -118,7 +125,52 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
         auto version = detail::parse_nvidia_version_line(test.line);
         CHECK(version.has_value() == test.valid);
         if (version.has_value() && test.valid) {
-            CHECK(version == test.version);
+            CHECK(version.value() == test.version);
+        }
+    }
+}
+
+DEFINE_TEST("parse_nvidia_tegra_line parameterised test") {
+    const struct {
+        std::string_view test_name;
+        std::string line;
+        bool valid;
+        std::string_view version;
+    } tests[]{
+            {
+                    "Valid version line",
+                    "# R32 (release), REVISION: 4.3, GCID: 21589087, BOARD: t186ref, EABI: "
+                    "aarch64, DATE: Fri Jun 26 04:34:27 UTC 2020",
+                    true,
+                    "32.4.3",
+            },
+            {
+                    "Extraneous parts are ignored",
+                    "# R123 (release), REVISION: 456.789",
+                    true,
+                    "123.456.789",
+            },
+            {
+                    "Invalid line",
+                    "This is not the data you're looking for",
+                    false,
+                    "",
+            },
+            {
+                    "Valid lines from a different machine",
+                    "# R28 (release), REVISION: 2.0, GCID: 10567845, BOARD: t186ref, EABI: "
+                    "aarch64, DATE: Fri Mar  2 04:57:01 UTC 2018\n",
+                    true,
+                    "28.2.0",
+            },
+    };
+
+    for (const auto &test : tests) {
+        CAPTURE(test.test_name);
+        auto version = detail::parse_nvidia_tegra_line(test.line);
+        CHECK(version.has_value() == test.valid);
+        if (version.has_value() && test.valid) {
+            CHECK(version.value() == test.version);
         }
     }
 }
@@ -344,7 +396,6 @@ DEFINE_TEST_FIXTURE_METHOD(
 }
 
 #if !defined(__APPLE__)
-
 DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
     if (!torch::getNumGPUs()) {
         return;
