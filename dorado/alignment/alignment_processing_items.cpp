@@ -55,10 +55,12 @@ namespace dorado::alignment {
 
 AlignmentProcessingItems::AlignmentProcessingItems(std::string input_path,
                                                    bool recursive_input,
-                                                   std::string output_folder)
+                                                   std::string output_folder,
+                                                   bool allow_output_to_folder_from_stdin)
         : m_input_path(std::move(input_path)),
           m_output_folder(std::move(output_folder)),
-          m_recursive_input(recursive_input) {}
+          m_recursive_input(recursive_input),
+          m_allow_output_to_folder_from_stdin(allow_output_to_folder_from_stdin) {}
 
 bool AlignmentProcessingItems::check_recursive_arg_false() {
     if (!m_recursive_input) {
@@ -198,7 +200,7 @@ bool AlignmentProcessingItems::initialise_for_folder() {
 }
 
 bool AlignmentProcessingItems::initialise_for_stdin() {
-    if (!m_output_folder.empty()) {
+    if (!m_output_folder.empty() && !m_allow_output_to_folder_from_stdin) {
         spdlog::error("--output-dir is not valid if input is stdin.");
         return false;
     }
