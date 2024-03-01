@@ -68,7 +68,7 @@ void SummaryData::set_separator(char s) { m_separator = s; }
 void SummaryData::set_fields(FieldFlags flags) {
     if (flags == 0 || flags > (GENERAL_FIELDS | BARCODING_FIELDS | ALIGNMENT_FIELDS)) {
         throw std::runtime_error(
-                "Invalid value if flags option in SummaryData::set_fields method.");
+                "Invalid value of flags option in SummaryData::set_fields method.");
     }
     m_field_flags = flags;
 }
@@ -106,7 +106,7 @@ bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) 
         auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
         bool ok = write_rows_from_reader(reader, writer, read_group_exp_start_time);
         if (!ok) {
-            spdlog::error("File " + read_file + " could not be processed. Skipping file.");
+            spdlog::error("File {} could not be processed. Skipping file.", read_file);
         }
     }
     return true;
