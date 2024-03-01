@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "summary/summary.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -101,6 +103,15 @@ int aligner(int argc, char* argv[]) {
                   "is to stdout. "
                   "Required if the 'reads' positional argument is a folder.")
             .default_value(std::string{});
+    parser.visible.add_argument("--emit-summary")
+            .help("If specified, a summary file containing the details of the primary alignments "
+                  "for each "
+                  "read will be emitted to the root of the output folder. This option requires "
+                  "that the "
+                  "'--output-dir' option is also set.")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0);
     parser.visible.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing.")
             .default_value(0)
@@ -137,6 +148,12 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.visible.get<std::string>("reads"));
     auto recursive_input = parser.visible.get<bool>("recursive");
     auto output_folder = parser.visible.get<std::string>("output-dir");
+
+    auto emit_summary = parser.visible.get<bool>("emit-summary");
+    if (emit_summary && output_folder.empty()) {
+        spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
+        return EXIT_FAILURE;
+    }
 
     auto threads(parser.visible.get<int>("threads"));
 
@@ -230,6 +247,15 @@ int aligner(int argc, char* argv[]) {
         spdlog::info("> finished alignment");
         spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
                      hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+    }
+
+    if (emit_summary) {
+        spdlog::info("> generating summary file");
+        SummaryData summary(SummaryData::ALIGNMENT_FIELDS);
+        auto summary_file = std::filesystem::path(output_folder) / "alignment_summary.txt";
+        std::ofstream summary_out(summary_file.string());
+        summary.process_tree(output_folder, summary_out);
+        spdlog::info("> summary file complete.");
     }
 
     return 0;
