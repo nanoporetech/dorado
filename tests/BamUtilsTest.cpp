@@ -297,18 +297,15 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge on identical headers", TEST_GROUP) {
             "@RG\tID:a706823101911eaf79e9538f89284a76cec07945_unknown\tDS:runid="
             "a706823101911eaf79e9538f89284a76cec07945\tPL:ONT\n";
 
-    sam_hdr_t *header_dest = sam_hdr_parse(header_1.size(), header_1.c_str());
-    sam_hdr_t *header_src = sam_hdr_dup(header_dest);
+    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+    SamHdrPtr header_src = SamHdrPtr(sam_hdr_dup(header_dest.get()));
 
     std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest, header_src, error_msg);
+    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
     CHECK(result == true);
 
-    std::string result_header = sam_hdr_str(header_dest);
+    std::string result_header = sam_hdr_str(header_dest.get());
     CHECK(result_header == header_1);
-
-    sam_hdr_destroy(header_dest);
-    sam_hdr_destroy(header_src);
 }
 
 TEST_CASE("BamUtilsTest: test sam_hdr_merge on overlapping headers", TEST_GROUP) {
@@ -335,18 +332,15 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge on overlapping headers", TEST_GROUP)
             "@RG\tID:b106823101911eaf79e9538f89284a76cec0797f_unknown\tDS:runid="
             "b106823101911eaf79e9538f89284a76cec0797f\tPL:ONT\n";
 
-    sam_hdr_t *header_dest = sam_hdr_parse(header_1.size(), header_1.c_str());
-    sam_hdr_t *header_src = sam_hdr_parse(header_2.size(), header_2.c_str());
+    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
 
     std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest, header_src, error_msg);
+    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
     CHECK(result == true);
 
-    std::string result_header = sam_hdr_str(header_dest);
+    std::string result_header = sam_hdr_str(header_dest.get());
     CHECK(result_header == expected_result);
-
-    sam_hdr_destroy(header_dest);
-    sam_hdr_destroy(header_src);
 }
 
 TEST_CASE("BamUtilsTest: test sam_hdr_merge unsets SO tag in HD line", TEST_GROUP) {
@@ -354,18 +348,15 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge unsets SO tag in HD line", TEST_GROU
     std::string header_2 = "@HD\tVN:1.6\tSO:queryname\n";
     std::string expected_result = "@HD\tVN:1.6\tSO:unknown\n";
 
-    sam_hdr_t *header_dest = sam_hdr_parse(header_1.size(), header_1.c_str());
-    sam_hdr_t *header_src = sam_hdr_parse(header_2.size(), header_2.c_str());
+    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
 
     std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest, header_src, error_msg);
+    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
     CHECK(result == true);
 
-    std::string result_header = sam_hdr_str(header_dest);
+    std::string result_header = sam_hdr_str(header_dest.get());
     CHECK(result_header == expected_result);
-
-    sam_hdr_destroy(header_dest);
-    sam_hdr_destroy(header_src);
 }
 
 TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible PG", TEST_GROUP) {
@@ -376,16 +367,13 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible PG", T
             "@HD\tVN:1.6\tSO:queryname\n"
             "@PG\tID:aligner\tPN:minimap3\tVN:2.24-r1122\n";
 
-    sam_hdr_t *header_dest = sam_hdr_parse(header_1.size(), header_1.c_str());
-    sam_hdr_t *header_src = sam_hdr_parse(header_2.size(), header_2.c_str());
+    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
 
     std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest, header_src, error_msg);
+    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
     CHECK(result == false);
     CHECK(error_msg.size() != 0);
-
-    sam_hdr_destroy(header_dest);
-    sam_hdr_destroy(header_src);
 }
 
 TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible SQ", TEST_GROUP) {
@@ -396,14 +384,11 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible SQ", T
             "@HD\tVN:1.6\tSO:queryname\n"
             "@SQ\tSN:Chicken\tLN:32000000\n";
 
-    sam_hdr_t *header_dest = sam_hdr_parse(header_1.size(), header_1.c_str());
-    sam_hdr_t *header_src = sam_hdr_parse(header_2.size(), header_2.c_str());
+    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
 
     std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest, header_src, error_msg);
+    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
     CHECK(result == false);
     CHECK(error_msg.size() != 0);
-
-    sam_hdr_destroy(header_dest);
-    sam_hdr_destroy(header_src);
 }

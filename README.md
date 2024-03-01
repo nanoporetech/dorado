@@ -172,7 +172,14 @@ To align existing basecalls, run:
 ```
 $ dorado aligner <index> <reads>  > aligned.bam
 ```
-where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a file in any HTS format.
+where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a folder or file in any HTS format.
+
+When reading from an input folder, `dorado align` also supports emitting aligned files to an output folder, which will preserve the file structure of the inputs:
+
+```
+$ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder>
+```
+
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
@@ -230,7 +237,7 @@ Existing basecalled datasets can be classified as well as demultiplexed into per
 $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bams> <reads>
 ```
 
-`<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
+`<reads>` can either be a folder or a single file in an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
