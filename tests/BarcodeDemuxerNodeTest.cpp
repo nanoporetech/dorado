@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #define TEST_GROUP "[barcode_demux]"
@@ -67,10 +68,18 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         pipeline->terminate(DefaultFlushOptions());
 
-        const std::unordered_set<std::string> expected_files = {"bc01.bam", "bc02.bam", "bc03.bam"};
+        const std::unordered_set<std::string> expected_files = {
+                "bc01.bam", "bc01.bam.bai", "bc02.bam", "bc02.bam.bai", "bc03.bam", "bc03.bam.bai",
+        };
+
+        std::unordered_set<std::string> actual_files;
 
         for (const auto& entry : fs::directory_iterator(tmp_dir)) {
-            CHECK(expected_files.find(entry.path().filename().string()) != expected_files.end());
+            actual_files.insert(entry.path().filename().string());
+        }
+
+        for (const auto& expected : expected_files) {
+            CHECK(actual_files.find(expected) != actual_files.end());
         }
     }
 

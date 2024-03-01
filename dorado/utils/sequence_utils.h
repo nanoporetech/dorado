@@ -9,6 +9,10 @@
 
 namespace dorado::utils {
 
+// Returns the polyA start index in seq. The is the polyA end index in the forward direction.
+// Used to trim the polyA from the qstring when calculating the mean.
+size_t find_rna_polya(const std::string& seq);
+
 // Calculate a mean qscore from a per-base Q string.
 float mean_qscore_from_qstring(std::string_view qstring);
 

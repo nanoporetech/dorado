@@ -127,8 +127,8 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
     }
 
     auto constant_vals = NS::TransferPtr(FunctionConstantValues::alloc()->init());
-    for (auto &[name, constant] : named_constants) {
-        const auto ns_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+    for (auto &[cname, constant] : named_constants) {
+        const auto ns_name = NS::String::string(cname.c_str(), NS::ASCIIStringEncoding);
         std::visit(overloaded{[&](int val) {
                                   constant_vals->setConstantValue(&val, DataTypeInt, ns_name);
                               },
