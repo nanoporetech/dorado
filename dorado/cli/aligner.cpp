@@ -113,7 +113,7 @@ int aligner(int argc, char* argv[]) {
             .implicit_value(true)
             .nargs(0);
     parser.visible.add_argument("-t", "--threads")
-            .help("number of threads for alignment and BAM writing.")
+            .help("number of threads for alignment and BAM writing (0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
     parser.visible.add_argument("-n", "--max-reads")
