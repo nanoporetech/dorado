@@ -28,12 +28,12 @@ struct ModBaseCallerNode::RemoraChunk {
                 at::Tensor input_signal,
                 std::vector<int8_t> kmer_data,
                 size_t position,
-                bool is_template_direction)
+                bool template_direction)
             : working_read(std::move(read)),
               signal(std::move(input_signal)),
               encoded_kmers(std::move(kmer_data)),
               context_hit(position),
-              is_template_direction(is_template_direction) {}
+              is_template_direction(template_direction) {}
 
     std::shared_ptr<WorkingRead> working_read;
     at::Tensor signal;

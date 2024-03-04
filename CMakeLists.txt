@@ -43,30 +43,7 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-function(enable_warnings_as_errors TARGET_NAME)
-    if(WIN32)
-        # W4 - warning level 4.
-        # WX - warnings as errors.
-        # external:anglebrackets - treat <header> includes as external.
-        # external:W0 - disable warnings for external code.
-        target_compile_options(${TARGET_NAME} PRIVATE
-          $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W4 /WX /external:anglebrackets /external:W0>
-        )
-        target_compile_definitions(${TARGET_NAME} PRIVATE
-            _CRT_SECURE_NO_WARNINGS
-        )
-    else()
-        target_compile_options(${TARGET_NAME} PRIVATE -Wall -Werror -Wextra -Wundef)
-    endif()
-endfunction()
-
-function(disable_warnings TARGET_NAME)
-    if(WIN32)
-        target_compile_options(${TARGET_NAME} PRIVATE
-            $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/W0>
-        )
-    endif()
-endfunction()
+include(cmake/Warnings.cmake)
 
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
@@ -123,7 +100,8 @@ endif()
 
 # Use ccache for C and C++ if it's available
 find_program(CCACHE_EXE ccache)
-if (CCACHE_EXE)
+option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
+if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
     set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(DORADO_ENABLE_PCH FALSE)
@@ -293,6 +271,8 @@ set(LIB_SOURCE_FILES
     dorado/poly_tail/poly_tail_config.h
     dorado/poly_tail/rna_poly_tail_calculator.cpp
     dorado/poly_tail/rna_poly_tail_calculator.h
+    dorado/summary/summary.cpp
+    dorado/summary/summary.h
  )
 
 add_library(dorado_lib ${LIB_SOURCE_FILES})

@@ -88,6 +88,12 @@ dorado_check_bam_not_empty
 echo dorado aligner test stage
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
 dorado_check_bam_not_empty
+mkdir $output_dir/folder
+mkdir $output_dir/folder/subfolder
+cp $output_dir/calls.sam $output_dir/folder/calls.sam
+cp $output_dir/calls.sam $output_dir/folder/subfolder/calls.sam
+$dorado_bin aligner $output_dir/ref.fq $output_dir/folder -o $output_dir/aligner_out
+dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
@@ -219,12 +225,27 @@ then
     fi
 fi
 
+echo dorado aligner output directory test stage
+$dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/basecall.sam --output-dir $output_dir/aligned --emit-summary
+num_summary_lines=$(wc -l < $output_dir/aligned/alignment_summary.txt)
+if [[ $num_summary_lines -ne "2" ]]; then
+    echo "2 lines in summary expected. Found ${num_summary_lines}"
+    exit 1
+fi
+
 echo dorado demux test stage
-$dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux
+$dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
 samtools quickcheck -u $output_dir/demux/EXP-PBC096_barcode04.bam
 num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_barcode04.bam)
 if [[ $num_demuxed_reads -ne "3" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
+    exit 1
+fi
+$dorado_bin demux $data_dir/barcode_demux/double_end_variant/ --kit-name EXP-PBC096 --output-dir $output_dir/demux_from_folder
+samtools quickcheck -u $output_dir/demux_from_folder/EXP-PBC096_barcode04.bam
+num_summary_lines=$(wc -l < $output_dir/demux/barcoding_summary.txt)
+if [[ $num_summary_lines -ne "4" ]]; then
+    echo "4 lines in summary expected. Found ${num_summary_lines}"
     exit 1
 fi
 

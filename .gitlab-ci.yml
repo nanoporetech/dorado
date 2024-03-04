@@ -88,28 +88,30 @@ variables:
     PARALLEL_JOBS=$(( 8 > PARALLEL_JOBS ? 8 : PARALLEL_JOBS ))
   - echo "PARALLEL_JOBS '${PARALLEL_JOBS}'"
 
-.run_dorado_cmake_build: &run_dorado_cmake_build
+.run_dorado_cmake_build:
+  - echo Dorado build stage
+  - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
-  - export CCACHE_DIR=/data/gitlab-ci-cache
+  -   export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
   - *set_parallel_jobs
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
-.run_dorado_cmake_ctest: &run_dorado_cmake_ctest
+.run_dorado_cmake_ctest:
+  - echo Dorado test stage
   - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
-.run_dorado_cmake_cpack: &run_dorado_cmake_cpack
+.run_dorado_cmake_cpack:
+  - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
-.build_dorado: &build_dorado
+.build_and_test_dorado:
   stage: build
   script:
-    - echo Dorado build stage
-    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
-    - *run_dorado_cmake_build
-    - *run_dorado_cmake_ctest
+    - !reference [.run_dorado_cmake_build]
+    - !reference [.run_dorado_cmake_ctest]
   artifacts:
     paths:
       - dist
@@ -119,13 +121,11 @@ variables:
     expire_in: 1 day
   interruptible: true
 
-.build_dorado_archive: &build_dorado_archive
+.build_dorado_archive:
   stage: build
   script:
-    - echo Dorado build stage
-    - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"  
-    - *run_dorado_cmake_build
-    - *run_dorado_cmake_cpack
+    - !reference [.run_dorado_cmake_build]
+    - !reference [.run_dorado_cmake_cpack]
   artifacts:
     paths:
       - archive
@@ -201,7 +201,7 @@ build:linux:x86:focal:install_deps:
   extends:
     - .linux_dependencies
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
     - .on_nightly_or_manual
 
 build:linux:x86:focal:
@@ -210,7 +210,7 @@ build:linux:x86:focal:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
 
 build:linux:x86:focal:debug:
   variables:
@@ -231,7 +231,7 @@ build:linux:x86:focal_coverage:
     - .linux_runner
     - .on_nightly_or_manual
   script:
-    - *run_dorado_cmake_build
+    - !reference [.run_dorado_cmake_build]
   artifacts:
     paths:
       - build/dorado_test_coverage/*
@@ -246,13 +246,43 @@ build:linux:x86:focal:clang_tidy:
     - *set_parallel_jobs
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
+# We have to split the tegra builds into separate build+test jobs since we can't
+# test on the machines we build on.
 build:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
+    - .build_and_test_dorado
     - .linux_arm64_runner
-    - .build_dorado
+  script:
+    # Replace the script stage with just the build.
+    - !reference [.run_dorado_cmake_build]
+    # Modify the test paths so that we can run the tests on a different machine.
+    - sed -i "s#$(pwd)#_BUILD_FOLDER_#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
+  artifacts:
+    paths:
+      # Can't !reference here, but it would be:
+      #- !reference [.build_and_test_dorado, artifacts, path]
+      - dist
+      - tests/*.sh
+      - tests/*.bat
+      - tests/data
+      # Need to artifact parts of the build folder for the testing job.
+      - ${BUILD_DIR}/CTestTestfile.cmake
+      - ${BUILD_DIR}/tests
+build:linux:arm64:bionic:unittests:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  stage: build
+  extends:
+    - .linux_tegra_runner
+  script:
+    # Fixup the tests so that we can run them.
+    - sed -i "s#_BUILD_FOLDER_#$(pwd)#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
+    - !reference [.run_dorado_cmake_ctest]
+  needs:
+    - build:linux:arm64:bionic
+  interruptible: true
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
@@ -261,18 +291,32 @@ build:linux:arm64:focal:
   extends:
     - .linux_dependencies
     - .linux_arm64_runner
-    - .build_dorado
+    - .build_and_test_dorado
+
+build:linux:arm64:focal:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:linux:arm64:focal
+    - .on_nightly_or_manual
 
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_runner
-    - .build_dorado
+    - .build_and_test_dorado
+
+build:linux:x86:focal_koi_download:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:linux:x86:focal_koi_download
+    - .on_nightly_or_manual
 
 build:windows:
   extends:
     - .windows_runner
-    - .build_dorado
+    - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
@@ -288,7 +332,7 @@ build:windows:debug:
 build:windows_koi_download:
   extends:
     - .windows_runner
-    - .build_dorado
+    - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
@@ -298,14 +342,28 @@ build:macos:arm:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .macos_arm_runner
-    - .build_dorado
+    - .build_and_test_dorado
+
+build:macos:arm:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:macos:arm
+    - .on_nightly_or_manual
 
 build:macos:x64:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .macos_x64_runner
-    - .build_dorado
+    - .build_and_test_dorado
+
+build:macos:x64:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:macos:x64
+    - .on_nightly_or_manual
 
 build:ios:m1:
   variables:
@@ -315,7 +373,7 @@ build:ios:m1:
     DORADO_RUN_TESTS: "OFF"
   extends:
     - .macos_arm_runner
-    - .build_dorado
+    - .build_and_test_dorado
   script:
     # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
     - unset MACOSX_DEPLOYMENT_TARGET
@@ -331,7 +389,7 @@ build:ios:m1:
       -D DORADO_DISABLE_DORADO=ON
       -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
       -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
-    - !reference [.build_dorado, script]
+    - !reference [.build_and_test_dorado, script]
 
 build:ios_sim:m1:
   variables:

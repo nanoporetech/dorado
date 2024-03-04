@@ -94,6 +94,7 @@ public:
 
     size_t get_raw_data_samples() const { return is_duplex ? raw_data.size(1) : raw_data.size(0); }
 
+    bool is_rna{false};
     // Track length of estimated polyA tail in bases.
     int rna_poly_tail_length{-1};
     // Track position of end of RNA adapter in signal space. If the RNA adapter is

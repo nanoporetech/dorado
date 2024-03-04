@@ -7,6 +7,7 @@
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/read_output_progress_stats.h"
+#include "summary/summary.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -89,7 +91,7 @@ int aligner(int argc, char* argv[]) {
     parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.visible.add_argument("reads")
             .help("An input file or the folder containing input file(s) (any HTS format).")
-            .nargs(argparse::nargs_pattern::any)
+            .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
     parser.visible.add_argument("-r", "--recursive")
             .help("If the 'reads' positional argument is a folder any subfolders will also be "
@@ -102,8 +104,17 @@ int aligner(int argc, char* argv[]) {
                   "is to stdout. "
                   "Required if the 'reads' positional argument is a folder.")
             .default_value(std::string{});
+    parser.visible.add_argument("--emit-summary")
+            .help("If specified, a summary file containing the details of the primary alignments "
+                  "for each "
+                  "read will be emitted to the root of the output folder. This option requires "
+                  "that the "
+                  "'--output-dir' option is also set.")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0);
     parser.visible.add_argument("-t", "--threads")
-            .help("number of threads for alignment and BAM writing.")
+            .help("number of threads for alignment and BAM writing (0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
     parser.visible.add_argument("-n", "--max-reads")
@@ -139,18 +150,25 @@ int aligner(int argc, char* argv[]) {
     auto recursive_input = parser.visible.get<bool>("recursive");
     auto output_folder = parser.visible.get<std::string>("output-dir");
 
+    auto emit_summary = parser.visible.get<bool>("emit-summary");
+    if (emit_summary && output_folder.empty()) {
+        spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
+        return EXIT_FAILURE;
+    }
+
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
 
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder};
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
+                                                         false};
     if (!processing_items.initialise()) {
         return EXIT_FAILURE;
     }
 
     const auto& all_files = processing_items.get();
-    spdlog::info("num files: {}", all_files.size());
+    spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -161,6 +179,7 @@ int aligner(int argc, char* argv[]) {
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
+    // Only allow `reads` to be empty if we're accepting input from a pipe
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
@@ -168,7 +187,6 @@ int aligner(int argc, char* argv[]) {
             return 1;
         }
 #endif
-        reads = "-";
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);
@@ -238,6 +256,15 @@ int aligner(int argc, char* argv[]) {
         //spdlog::info("> finished alignment");
         //spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
         //             hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+    }
+
+    if (emit_summary) {
+        spdlog::info("> generating summary file");
+        SummaryData summary(SummaryData::ALIGNMENT_FIELDS);
+        auto summary_file = std::filesystem::path(output_folder) / "alignment_summary.txt";
+        std::ofstream summary_out(summary_file.string());
+        summary.process_tree(output_folder, summary_out);
+        spdlog::info("> summary file complete.");
     }
 
     return 0;
