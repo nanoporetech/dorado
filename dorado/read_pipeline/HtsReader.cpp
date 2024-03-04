@@ -63,7 +63,12 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
             spdlog::debug("Processed {} reads", num_reads);
         }
     }
+    m_total_reads_pushed_to_pipeline = num_reads;
     spdlog::debug("Total reads processed: {}", num_reads);
+}
+
+std::size_t HtsReader::get_total_num_reads_pushed_to_pipeline() const {
+    return m_total_reads_pushed_to_pipeline;
 }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {

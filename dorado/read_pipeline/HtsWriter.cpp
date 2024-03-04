@@ -76,6 +76,10 @@ void HtsWriter::input_thread_fn() {
                 read_id = bam_get_qname(aln.get());
             }
 
+            if (m_processed_read_ids.count(read_id)) {
+                ++m_duplicate_read_ids_written;
+                spdlog::trace("duplicate");
+            }
             m_processed_read_ids.insert(std::move(read_id));
         }
     }
@@ -112,6 +116,7 @@ int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());
+    stats["duplicate_read_ids_written"] = static_cast<double>(m_duplicate_read_ids_written.load());
     stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
     stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());
     return stats;

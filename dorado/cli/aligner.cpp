@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/read_output_progress_stats.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
@@ -171,9 +172,9 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);
-
+    ReadOutputProgressStats progress_stats(1s, all_files.size());
     for (const auto& file_info : all_files) {
-        spdlog::info("processing {} -> {}", file_info.input, file_info.output);
+        //spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
@@ -204,17 +205,19 @@ int aligner(int argc, char* argv[]) {
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
         hts_writer_ref.set_and_write_header(header);
-
         // Set up stats counting
         std::vector<dorado::stats::StatsCallable> stats_callables;
         ProgressTracker tracker(0, false);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+        stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
+            progress_stats.update_stats(stats);
+        });
         constexpr auto kStatsPeriod = 100ms;
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
-        spdlog::info("> starting alignment");
+        //spdlog::info("> starting alignment");
         reader->read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
@@ -225,11 +228,16 @@ int aligner(int argc, char* argv[]) {
         stats_sampler->terminate();
 
         tracker.update_progress_bar(final_stats);
+        progress_stats.notify_stats_completed(final_stats);
+        progress_stats.update_reads_per_file_estimate(
+                reader->get_total_num_reads_pushed_to_pipeline());
+
+        //update_reads_per_file_estimate
         tracker.summarize();
 
-        spdlog::info("> finished alignment");
-        spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
-                     hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+        //spdlog::info("> finished alignment");
+        //spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
+        //             hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
 
     return 0;

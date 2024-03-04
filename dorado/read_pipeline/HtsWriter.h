@@ -45,6 +45,7 @@ private:
     std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};
+    std::atomic<int> m_duplicate_read_ids_written{0};
 };
 
 }  // namespace dorado
