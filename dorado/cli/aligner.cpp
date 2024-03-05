@@ -82,7 +82,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
-    cli::ArgParser parser("dorado");
+    cli::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the map-ont preset.\n"
@@ -113,6 +113,10 @@ int aligner(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true)
             .nargs(0);
+    parser.hidden.add_argument("--progress_stats_frequency")
+            .help("Frequency in seconds in which to report progress statistics")
+            .default_value(0)
+            .scan<'i', int>();
     parser.visible.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing (0=unlimited).")
             .default_value(0)
@@ -190,7 +194,10 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);
-    ReadOutputProgressStats progress_stats(1s, all_files.size());
+    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+    ReadOutputProgressStats progress_stats(
+            std::chrono::seconds{progress_stats_frequency}, all_files.size(),
+            ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
     for (const auto& file_info : all_files) {
         //spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
@@ -246,9 +253,9 @@ int aligner(int argc, char* argv[]) {
         stats_sampler->terminate();
 
         tracker.update_progress_bar(final_stats);
-        progress_stats.notify_stats_completed(final_stats);
         progress_stats.update_reads_per_file_estimate(
                 reader->get_total_num_reads_pushed_to_pipeline());
+        progress_stats.notify_stats_collector_completed(final_stats);
 
         //update_reads_per_file_estimate
         tracker.summarize();
@@ -257,6 +264,8 @@ int aligner(int argc, char* argv[]) {
         //spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
         //             hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
+
+    progress_stats.report_final_stats();
 
     if (emit_summary) {
         spdlog::info("> generating summary file");

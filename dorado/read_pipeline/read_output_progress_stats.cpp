@@ -54,12 +54,17 @@ auto get_num_reads_written(const stats::NamedStats& stats) {
 }  // namespace
 
 ReadOutputProgressStats::ReadOutputProgressStats(std::chrono::seconds interval_duration,
-                                                 std::size_t num_input_files)
+                                                 std::size_t num_input_files,
+                                                 StatsCollectionMode stats_collection_mode)
         : m_interval_duration(interval_duration),
           m_num_input_files(num_input_files),
+          m_stats_collection_mode(stats_collection_mode),
           m_monitoring_start_time(progress_clock::now()),
-          m_interval_start(m_monitoring_start_time),
-          m_next_report_time(m_monitoring_start_time + m_interval_duration) {
+          m_interval_start(m_monitoring_start_time) {
+    if (is_disabled()) {
+        return;
+    }
+    m_next_report_time = m_monitoring_start_time + m_interval_duration;
     std::ostringstream oss;
     oss << PREFIX_PROGRESS_LINE_HDR << "time elapsed(secs)"
         << ", time remaining (estimate)"
@@ -71,7 +76,11 @@ ReadOutputProgressStats::ReadOutputProgressStats(std::chrono::seconds interval_d
     spdlog::info(oss.str());
 }
 
-ReadOutputProgressStats::~ReadOutputProgressStats() {
+void ReadOutputProgressStats::report_final_stats() {
+    if (is_disabled()) {
+        return;
+    }
+
     auto current_time = progress_clock::now();
     m_interval_end = m_last_stats_completed_time;
     report_stats(0);
@@ -113,6 +122,9 @@ void ReadOutputProgressStats::report_stats(const std::size_t current_reads_writt
 }
 
 void ReadOutputProgressStats::update_stats(const stats::NamedStats& stats) {
+    if (is_disabled()) {
+        return;
+    }
     std::lock_guard lock(m_mutex);
 
     auto current_time = progress_clock::now();
@@ -128,17 +140,47 @@ void ReadOutputProgressStats::update_stats(const stats::NamedStats& stats) {
     m_interval_previous_stats_total = 0;
 }
 
-void ReadOutputProgressStats::notify_stats_completed(const stats::NamedStats& stats) {
+void ReadOutputProgressStats::notify_stats_collector_completed(const stats::NamedStats& stats) {
+    if (is_disabled()) {
+        return;
+    }
+
     m_last_stats_completed_time = progress_clock::now();
     const auto stats_reads_written = get_num_reads_written(stats);
 
     std::lock_guard lock(m_mutex);
+    // Use m_total_known_readcount instead of calculating from the given stats
+    // as m_total_known_readcount will include any duplicate ids missing from the stats.
     m_previous_stats_total += stats_reads_written;
-    m_interval_previous_stats_total += stats_reads_written - m_interval_start_count;
+    assert(m_previous_stats_total <= m_total_known_readcount &&
+           "Expected that update_reads_per_file_estimate called before "
+           "notify_stats_collector_completed");
+    // HtsWriter stats don't include any duplicate read_ids, but HtsReader will not filetr out duplicate read_ids
+    // so account for any discrepancy in this interval
+    auto duplicates_read_ids_this_interval =
+            static_cast<std::size_t>(m_total_known_readcount - m_previous_stats_total);
+    if (duplicates_read_ids_this_interval > 0) {
+        m_previous_stats_total += duplicates_read_ids_this_interval;
+    }
+
+    m_interval_previous_stats_total +=
+            stats_reads_written - m_interval_start_count + duplicates_read_ids_this_interval;
     m_interval_start_count = 0;
 }
 
-std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
+std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
+        std::size_t current_reads_count) {
+    auto estimated_total =
+            static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
+    if (current_reads_count <= estimated_total) {
+        return estimated_total;
+    }
+
+    // Assume we are halfway through
+    return current_reads_count * 2;
+}
+
+std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
         std::size_t current_reads_count) {
     if (static_cast<float>(current_reads_count) <= m_estimated_num_reads_per_file) {
         return static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
@@ -154,7 +196,19 @@ std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
     return static_cast<std::size_t>(lround(adjusted_estimated_reads_per_file * m_num_input_files));
 }
 
+std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
+        std::size_t current_reads_count) {
+    if (m_stats_collection_mode == StatsCollectionMode::single_collector) {
+        return calc_total_reads_single_collector(current_reads_count);
+    }
+    return calc_total_reads_collector_per_file(current_reads_count);
+}
+
 void ReadOutputProgressStats::update_reads_per_file_estimate(std::size_t num_reads_in_file) {
+    if (is_disabled()) {
+        return;
+    }
+
     std::lock_guard lock(m_mutex);
     assert(!is_completed() && "More files updates supplied than input files.");
     ++m_num_files_where_readcount_known;
@@ -165,6 +219,10 @@ void ReadOutputProgressStats::update_reads_per_file_estimate(std::size_t num_rea
 
 bool ReadOutputProgressStats::is_completed() const {
     return m_num_files_where_readcount_known == m_num_input_files;
+}
+
+bool ReadOutputProgressStats::is_disabled() const {
+    return m_interval_duration == std::chrono::seconds{0};
 }
 
 }  // namespace dorado
