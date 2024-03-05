@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -42,9 +43,17 @@ private:
 
     void input_thread_fn();
     int write(const bam1_t* record);
-    std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};
+
+    class ProcessReadIds {
+        mutable std::mutex m_mutex;
+        std::unordered_set<std::string> read_ids;
+
+    public:
+        std::size_t size() const;
+        void add(std::string read_id);
+    } m_processed_read_ids;
 };
 
 }  // namespace dorado

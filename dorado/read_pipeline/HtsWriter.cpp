@@ -76,7 +76,7 @@ void HtsWriter::input_thread_fn() {
                 read_id = bam_get_qname(aln.get());
             }
 
-            m_processed_read_ids.insert(std::move(read_id));
+            m_processed_read_ids.add(std::move(read_id));
         }
     }
 }
@@ -120,6 +120,16 @@ stats::NamedStats HtsWriter::sample_stats() const {
 void HtsWriter::terminate(const FlushOptions&) {
     stop_input_processing();
     m_file.reset();
+}
+
+std::size_t HtsWriter::ProcessReadIds::size() const {
+    std::lock_guard lock(m_mutex);
+    return read_ids.size();
+}
+
+void HtsWriter::ProcessReadIds::add(std::string read_id) {
+    std::lock_guard lock(m_mutex);
+    read_ids.insert(std::move(read_id));
 }
 
 }  // namespace dorado
