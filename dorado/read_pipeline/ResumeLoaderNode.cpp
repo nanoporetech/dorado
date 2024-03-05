@@ -38,6 +38,7 @@ void ResumeLoaderNode::copy_completed_reads() {
     hts_set_log_level(HTS_LOG_OFF);
 
     HtsReader reader(m_resume_file, std::nullopt);
+    spdlog::info("Resuming from file {}...", m_resume_file);
 
     // Iterate over all reads and write to sink.
     try {
