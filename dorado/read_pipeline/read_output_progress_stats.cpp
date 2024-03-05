@@ -81,7 +81,6 @@ void ReadOutputProgressStats::report_final_stats() {
         return;
     }
 
-    auto current_time = progress_clock::now();
     m_interval_end = m_last_stats_completed_time;
     report_stats(0);
 }
