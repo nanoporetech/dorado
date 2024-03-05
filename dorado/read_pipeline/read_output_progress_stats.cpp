@@ -15,11 +15,11 @@ std::string const PREFIX_PROGRESS_LINE_HDR{"[PROG_STAT_HDR] "};
 std::string const PREFIX_PROGRESS_LINE{"[PROG_STAT] "};
 
 struct ReportInfo {
-    long double time_elapsed;
-    long double time_remaining;
+    float time_elapsed;
+    float time_remaining;
     std::size_t total_reads_processed;
     std::size_t total_reads_estimate;
-    long double interval_time_elapsed;
+    float interval_time_elapsed;
     std::size_t interval_reads_processed;
 };
 
@@ -89,9 +89,9 @@ void ReadOutputProgressStats::report_stats(const std::size_t current_reads_writt
     using namespace std::chrono;
     ReportInfo info{};
     info.time_elapsed =
-            duration_cast<duration<long double>>(m_interval_end - m_monitoring_start_time).count();
+            duration_cast<duration<float>>(m_interval_end - m_monitoring_start_time).count();
     info.interval_time_elapsed =
-            duration_cast<duration<long double>>(m_interval_end - m_interval_start).count();
+            duration_cast<duration<float>>(m_interval_end - m_interval_start).count();
 
     info.interval_reads_processed =
             m_interval_previous_stats_total + current_reads_written_count - m_interval_start_count;
