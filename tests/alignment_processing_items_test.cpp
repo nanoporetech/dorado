@@ -5,6 +5,7 @@
 #include <catch2/catch.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <map>
 
 #define CUT_TAG "[dorado::aligment::AlignmentProcessingItems]"
@@ -59,6 +60,20 @@ TEST_CASE("get() with no input and no output folder specified returns stdin/stdo
 
 TEST_CASE("initialise with input file and no output folder returns true", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / INPUT_SAM).string(), false, "", false};
+    CHECK(cut.initialise());
+}
+
+TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
+    // Create basic SAM file in current directory which will be later removed.
+    std::string filename = "empty_file.sam";
+    std::ofstream outfile(filename);
+    if (outfile.is_open()) {
+        outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
+        outfile.close();
+    }
+    TempDir tmp_file(filename);
+
+    AlignmentProcessingItems cut{tmp_file.m_path, false, OUT_FOLDER.string(), false};
     CHECK(cut.initialise());
 }
 
