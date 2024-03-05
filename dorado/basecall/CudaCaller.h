@@ -87,9 +87,8 @@ private:
     std::vector<BatchDims> m_batch_dims;
 
     // Performance monitoring stats.
-    std::atomic<int64_t> m_num_batches_called = 0;
-    std::atomic<int64_t> m_model_ms = 0;
-    std::atomic<int64_t> m_decode_ms = 0;
+    std::atomic<int64_t> m_num_batches_called{0};
+    std::atomic<int64_t> m_model_decode_ms{0};
 };
 
 }  // namespace dorado::basecall

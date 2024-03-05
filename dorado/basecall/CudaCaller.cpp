@@ -155,9 +155,8 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
 
 stats::NamedStats CudaCaller::sample_stats() const {
     stats::NamedStats stats;
-    stats["batches_called"] = double(m_num_batches_called);
-    stats["model_ms"] = double(m_model_ms);
-    stats["decode_ms"] = double(m_decode_ms);
+    stats["batches_called"] = static_cast<double>(m_num_batches_called);
+    stats["model_decode_ms"] = static_cast<double>(m_model_decode_ms);
     return stats;
 }
 
@@ -409,13 +408,10 @@ void CudaCaller::cuda_thread_fn() {
         auto run_basecalling = [&]() {
             stats::Timer timer;
             auto scores = m_module->forward(task->input);
-            const auto forward_ms = timer.GetElapsedMS();
             task->out =
                     m_decoder->beam_search_part_1({scores, task->num_chunks, m_decoder_options});
             m_stream.synchronize();
-            const auto forward_plus_decode_ms = timer.GetElapsedMS();
-            m_model_ms += forward_ms;
-            m_decode_ms += forward_plus_decode_ms - forward_ms;
+            m_model_decode_ms += timer.GetElapsedMS();
         };
 
         try {
