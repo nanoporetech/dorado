@@ -199,7 +199,7 @@ int aligner(int argc, char* argv[]) {
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
     for (const auto& file_info : all_files) {
-        //spdlog::info("processing {} -> {}", file_info.input, file_info.output);
+        spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
@@ -242,7 +242,7 @@ int aligner(int argc, char* argv[]) {
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
-        //spdlog::info("> starting alignment");
+        spdlog::info("> starting alignment");
         reader->read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
@@ -257,12 +257,11 @@ int aligner(int argc, char* argv[]) {
                 reader->get_total_num_reads_pushed_to_pipeline());
         progress_stats.notify_stats_collector_completed(final_stats);
 
-        //update_reads_per_file_estimate
         tracker.summarize();
 
-        //spdlog::info("> finished alignment");
-        //spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
-        //             hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+        spdlog::info("> finished alignment");
+        spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
+                     hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
 
     progress_stats.report_final_stats();
