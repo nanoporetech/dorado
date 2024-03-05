@@ -23,7 +23,6 @@ private:
     std::mutex m_mutex;
     progress_clock::time_point m_monitoring_start_time;
     progress_clock::time_point m_interval_start;
-    progress_clock::time_point m_interval_end;
     progress_clock::time_point m_next_report_time;
     progress_clock::time_point m_last_stats_completed_time;
 
@@ -35,11 +34,12 @@ private:
     std::size_t m_total_known_readcount{};
     float m_estimated_num_reads_per_file{};
 
-    void report_stats(const std::size_t current_reads_written_count);
+    void report_stats(const std::size_t current_reads_written_count,
+                      progress_clock::time_point interval_end) const;
 
-    std::size_t calc_total_reads_single_collector(std::size_t current_reads_count);
-    std::size_t calc_total_reads_collector_per_file(std::size_t current_reads_count);
-    std::size_t get_adjusted_estimated_total_reads(std::size_t current_reads_count);
+    std::size_t calc_total_reads_single_collector(std::size_t current_reads_count) const;
+    std::size_t calc_total_reads_collector_per_file(std::size_t current_reads_count) const;
+    std::size_t get_adjusted_estimated_total_reads(std::size_t current_reads_count) const;
 
     bool is_completed() const;
     bool is_disabled() const;

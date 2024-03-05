@@ -25,11 +25,10 @@ public:
               std::optional<std::unordered_set<std::string>> read_list);
     ~HtsReader();
     bool read();
-    void read(Pipeline& pipeline, int max_reads);
+    std::size_t read(Pipeline& pipeline, int max_reads);
     template <typename T>
     T get_tag(std::string tagname);
     bool has_tag(std::string tagname);
-    std::size_t get_total_num_reads_pushed_to_pipeline() const;
 
     char* format{nullptr};
     bool is_aligned{false};
@@ -40,7 +39,6 @@ private:
     htsFile* m_file{nullptr};
 
     std::optional<std::unordered_set<std::string>> m_read_list;
-    std::size_t m_total_reads_pushed_to_pipeline{};
 };
 
 template <typename T>

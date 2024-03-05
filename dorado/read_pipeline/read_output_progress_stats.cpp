@@ -81,17 +81,16 @@ void ReadOutputProgressStats::report_final_stats() {
         return;
     }
 
-    m_interval_end = m_last_stats_completed_time;
-    report_stats(0);
+    report_stats(0, m_last_stats_completed_time);
 }
 
-void ReadOutputProgressStats::report_stats(const std::size_t current_reads_written_count) {
+void ReadOutputProgressStats::report_stats(const std::size_t current_reads_written_count,
+                                           progress_clock::time_point interval_end) const {
     using namespace std::chrono;
+    using Seconds = duration<float>;
     ReportInfo info{};
-    info.time_elapsed =
-            duration_cast<duration<float>>(m_interval_end - m_monitoring_start_time).count();
-    info.interval_time_elapsed =
-            duration_cast<duration<float>>(m_interval_end - m_interval_start).count();
+    info.time_elapsed = duration_cast<Seconds>(interval_end - m_monitoring_start_time).count();
+    info.interval_time_elapsed = duration_cast<Seconds>(interval_end - m_interval_start).count();
 
     info.interval_reads_processed =
             m_interval_previous_stats_total + current_reads_written_count - m_interval_start_count;
@@ -131,10 +130,9 @@ void ReadOutputProgressStats::update_stats(const stats::NamedStats& stats) {
         return;
     }
     auto reads_written = get_num_reads_written(stats);
-    m_interval_end = current_time;
-    report_stats(reads_written);
+    report_stats(reads_written, current_time);
     m_interval_start = current_time;
-    m_next_report_time += +m_interval_duration;
+    m_next_report_time += m_interval_duration;
     m_interval_start_count = reads_written;
     m_interval_previous_stats_total = 0;
 }
@@ -168,7 +166,7 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
 }
 
 std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
-        std::size_t current_reads_count) {
+        std::size_t current_reads_count) const {
     auto estimated_total =
             static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
     if (current_reads_count <= estimated_total) {
@@ -180,7 +178,7 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
 }
 
 std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
-        std::size_t current_reads_count) {
+        std::size_t current_reads_count) const {
     if (static_cast<float>(current_reads_count) <= m_estimated_num_reads_per_file) {
         return static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
     }
@@ -196,7 +194,7 @@ std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
 }
 
 std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
-        std::size_t current_reads_count) {
+        std::size_t current_reads_count) const {
     if (m_stats_collection_mode == StatsCollectionMode::single_collector) {
         return calc_total_reads_single_collector(current_reads_count);
     }

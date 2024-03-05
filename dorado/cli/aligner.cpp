@@ -243,7 +243,7 @@ int aligner(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        reader->read(*pipeline, max_reads);
+        auto num_reads_in_file = reader->read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
@@ -253,8 +253,7 @@ int aligner(int argc, char* argv[]) {
         stats_sampler->terminate();
 
         tracker.update_progress_bar(final_stats);
-        progress_stats.update_reads_per_file_estimate(
-                reader->get_total_num_reads_pushed_to_pipeline());
+        progress_stats.update_reads_per_file_estimate(num_reads_in_file);
         progress_stats.notify_stats_collector_completed(final_stats);
 
         tracker.summarize();

@@ -45,7 +45,7 @@ bool HtsReader::has_tag(std::string tagname) {
     return static_cast<bool>(tag);
 }
 
-void HtsReader::read(Pipeline& pipeline, int max_reads) {
+std::size_t HtsReader::read(Pipeline& pipeline, int max_reads) {
     int num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
@@ -63,12 +63,8 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
             spdlog::debug("Processed {} reads", num_reads);
         }
     }
-    m_total_reads_pushed_to_pipeline = num_reads;
     spdlog::debug("Total reads processed: {}", num_reads);
-}
-
-std::size_t HtsReader::get_total_num_reads_pushed_to_pipeline() const {
-    return m_total_reads_pushed_to_pipeline;
+    return num_reads;
 }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {

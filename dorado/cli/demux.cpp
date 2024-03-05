@@ -258,15 +258,14 @@ int demuxer(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting barcode demuxing");
-    reader.read(*pipeline, max_reads);
-    progress_stats.update_reads_per_file_estimate(reader.get_total_num_reads_pushed_to_pipeline());
+    auto num_reads_in_file = reader.read(*pipeline, max_reads);
+    progress_stats.update_reads_per_file_estimate(num_reads_in_file);
 
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader input_reader(all_files[input_idx].input, read_list);
-        input_reader.read(*pipeline, max_reads);
-        progress_stats.update_reads_per_file_estimate(
-                input_reader.get_total_num_reads_pushed_to_pipeline());
+        num_reads_in_file = input_reader.read(*pipeline, max_reads);
+        progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }
 
     // Wait for the pipeline to complete.  When it does, we collect
