@@ -41,7 +41,7 @@ private:
     std::size_t calc_total_reads_collector_per_file(std::size_t current_reads_count) const;
     std::size_t get_adjusted_estimated_total_reads(std::size_t current_reads_count) const;
 
-    bool is_completed() const;
+    bool is_known_total_number_input_reads() const;
     bool is_disabled() const;
 
 public:

@@ -100,7 +100,7 @@ void ReadOutputProgressStats::report_stats(const std::size_t current_reads_writt
     // the sum of the intervals matches the total number processed.
     info.total_reads_processed = m_previous_stats_total + current_reads_written_count;
 
-    if (is_completed()) {
+    if (is_known_total_number_input_reads()) {
         info.total_reads_estimate = info.total_reads_processed;
         info.time_remaining = 0.0;
 
@@ -167,21 +167,43 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
 
 std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
         std::size_t current_reads_count) const {
-    auto estimated_total = static_cast<std::size_t>(
-            std::lrint(m_estimated_num_reads_per_file * m_num_input_files));
-    if (current_reads_count <= estimated_total) {
-        return estimated_total;
+    // Check if we've processed more reads than we have been informed about
+    // If so the excess reads must belong to the current input file being
+    // processed by an HtsReader.
+    std::size_t current_input_file_reads = current_reads_count > m_total_known_readcount
+                                                   ? current_reads_count - m_total_known_readcount
+                                                   : 0;
+
+    spdlog::trace("num reads known: {} | processed: {} | current file: {} | estimate per file {}",
+                  m_total_known_readcount, current_reads_count, current_input_file_reads,
+                  m_estimated_num_reads_per_file);
+    // If the reads processed from the current file is less than our expected reads
+    // per file we can simply return an estimate based on this expectation
+    // per file.
+    if (static_cast<float>(current_input_file_reads) <= m_estimated_num_reads_per_file) {
+        return static_cast<std::size_t>(
+                std::lround(m_estimated_num_reads_per_file * m_num_input_files));
     }
 
-    // Assume we are halfway through
-    return current_reads_count * 2;
+    // We must adjust our estimated reads per file upwards by including the current file in
+    // the calculation.
+    const auto expected_reads_current_file = 2 * current_input_file_reads;
+    const auto count_including_current_file = m_total_known_readcount + expected_reads_current_file;
+    const auto num_known_files_including_current = m_num_files_where_readcount_known + 1;
+    const auto adjusted_estimated_reads_per_file =
+            static_cast<float>(count_including_current_file) / num_known_files_including_current;
+    spdlog::trace("ADJUSTED num reads known: {} | current file: {} | estimate per file {}",
+                  count_including_current_file, current_input_file_reads,
+                  adjusted_estimated_reads_per_file);
+    return static_cast<std::size_t>(
+            std::lround(adjusted_estimated_reads_per_file * m_num_input_files));
 }
 
 std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
         std::size_t current_reads_count) const {
     if (static_cast<float>(current_reads_count) <= m_estimated_num_reads_per_file) {
         return static_cast<std::size_t>(
-                std::lrint(m_estimated_num_reads_per_file * m_num_input_files));
+                std::lround(m_estimated_num_reads_per_file * m_num_input_files));
     }
 
     // Current file exceed reads per file estimate so recalculate assuming we're halfway through the file
@@ -192,7 +214,7 @@ std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
             static_cast<float>(m_num_files_where_readcount_known + 1);
 
     return static_cast<std::size_t>(
-            std::lrint(adjusted_estimated_reads_per_file * m_num_input_files));
+            std::lround(adjusted_estimated_reads_per_file * m_num_input_files));
 }
 
 std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
@@ -209,14 +231,18 @@ void ReadOutputProgressStats::update_reads_per_file_estimate(std::size_t num_rea
     }
 
     std::lock_guard lock(m_mutex);
-    assert(!is_completed() && "More files updates supplied than input files.");
+    assert(!is_known_total_number_input_reads() && "More files updates supplied than input files.");
     ++m_num_files_where_readcount_known;
     m_total_known_readcount += num_reads_in_file;
     m_estimated_num_reads_per_file =
             static_cast<float>(m_total_known_readcount) / m_num_files_where_readcount_known;
+
+    spdlog::trace("num known files: {}, reads input: {}, estimate per file {}",
+                  m_num_files_where_readcount_known, m_total_known_readcount,
+                  m_estimated_num_reads_per_file);
 }
 
-bool ReadOutputProgressStats::is_completed() const {
+bool ReadOutputProgressStats::is_known_total_number_input_reads() const {
     return m_num_files_where_readcount_known == m_num_input_files;
 }
 
