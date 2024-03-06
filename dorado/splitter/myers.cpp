@@ -3,6 +3,7 @@
 #include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <iomanip>
@@ -133,6 +134,15 @@ std::vector<EdistResult> myers_align(std::string_view query,
     if (current_range_end.has_value()) {
         add_match(*current_range_end, min_edist);
     }
+
+    // Deduplicate the ranges.
+    auto less = [](const EdistResult& lhs, const EdistResult& rhs) { return lhs.end < rhs.end; };
+    auto equal = [](const EdistResult& lhs, const EdistResult& rhs) {
+        return lhs.begin == rhs.begin && lhs.end == rhs.end;
+    };
+    std::sort(ranges.begin(), ranges.end(), less);
+    auto new_end = std::unique(ranges.begin(), ranges.end(), equal);
+    ranges.erase(new_end, ranges.end());
 
     return ranges;
 }
