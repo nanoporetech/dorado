@@ -65,7 +65,7 @@ TEST_CASE("initialise with input file and no output folder returns true", CUT_TA
 
 TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
     // Create basic SAM file in current directory which will be later removed.
-    std::string filename = "empty_file.sam";
+    std::string filename = "./empty_file.sam";
     std::ofstream outfile(filename);
     if (outfile.is_open()) {
         outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
@@ -73,7 +73,7 @@ TEST_CASE("initialise with input file in current directory returns true", CUT_TA
     }
     TempDir tmp_file(filename);
 
-    AlignmentProcessingItems cut{tmp_file.m_path, false, OUT_FOLDER.string(), false};
+    AlignmentProcessingItems cut{tmp_file.m_path.string(), false, OUT_FOLDER.string(), false};
     CHECK(cut.initialise());
 }
 
