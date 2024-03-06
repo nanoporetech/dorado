@@ -46,7 +46,7 @@ bool HtsReader::has_tag(std::string tagname) {
 }
 
 std::size_t HtsReader::read(Pipeline& pipeline, int max_reads) {
-    int num_reads = 0;
+    std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
             std::string read_id = bam_get_qname(record.get());

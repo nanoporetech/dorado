@@ -39,12 +39,12 @@ void show_report(const ReportInfo& info) {
 }
 
 auto get_num_reads_written(const stats::NamedStats& stats) {
-    auto size_t_stat = [&stats](const std::string& name) {
+    auto size_t_stat = [&stats](const std::string& name) -> std::size_t {
         auto res = stats.find(name);
         if (res != stats.end()) {
             return static_cast<std::size_t>(res->second);
         }
-        return std::size_t{};
+        return 0;
     };
 
     return size_t_stat("HtsWriter.unique_simplex_reads_written") +
@@ -152,7 +152,7 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
     assert(m_previous_stats_total <= m_total_known_readcount &&
            "Expected that update_reads_per_file_estimate called before "
            "notify_stats_collector_completed");
-    // HtsWriter stats don't include any duplicate read_ids, but HtsReader will not filetr out duplicate read_ids
+    // HtsWriter stats don't include any duplicate read_ids, but HtsReader will not filter out duplicate read_ids
     // so account for any discrepancy in this interval
     auto duplicates_read_ids_this_interval =
             static_cast<std::size_t>(m_total_known_readcount - m_previous_stats_total);
@@ -167,8 +167,10 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
 
 std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
         std::size_t current_reads_count) const {
-    auto estimated_total =
-            static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
+    auto estimated_total = static_cast<std::size_t>(
+            std::lrint(m_estimated_num_reads_per_file * m_num_input_files));
+    //auto estimated_total =
+    //        static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
     if (current_reads_count <= estimated_total) {
         return estimated_total;
     }
@@ -180,7 +182,8 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
 std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
         std::size_t current_reads_count) const {
     if (static_cast<float>(current_reads_count) <= m_estimated_num_reads_per_file) {
-        return static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
+        return static_cast<std::size_t>(
+                std::lrint(m_estimated_num_reads_per_file * m_num_input_files));
     }
 
     // Current file exceed reads per file estimate so recalculate assuming we're halfway through the file
@@ -190,7 +193,8 @@ std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
             total_reads_including_current /
             static_cast<float>(m_num_files_where_readcount_known + 1);
 
-    return static_cast<std::size_t>(lround(adjusted_estimated_reads_per_file * m_num_input_files));
+    return static_cast<std::size_t>(
+            std::lrint(adjusted_estimated_reads_per_file * m_num_input_files));
 }
 
 std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(

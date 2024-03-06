@@ -122,14 +122,11 @@ void HtsWriter::terminate(const FlushOptions&) {
     m_file.reset();
 }
 
-std::size_t HtsWriter::ProcessReadIds::size() const {
-    std::lock_guard lock(m_mutex);
-    return read_ids.size();
-}
+std::size_t HtsWriter::ProcessedReadIds::size() const { return m_threadsafe_count_of_reads; }
 
-void HtsWriter::ProcessReadIds::add(std::string read_id) {
-    std::lock_guard lock(m_mutex);
+void HtsWriter::ProcessedReadIds::add(std::string read_id) {
     read_ids.insert(std::move(read_id));
+    m_threadsafe_count_of_reads = read_ids.size();
 }
 
 }  // namespace dorado
