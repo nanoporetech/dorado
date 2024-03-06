@@ -46,7 +46,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(cmake/Warnings.cmake)
 
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
-set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
+set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
     CACHE PATH "Location to download 3rdparty libraries into")
 
 # We don't support GPU builds on macOS/x64
