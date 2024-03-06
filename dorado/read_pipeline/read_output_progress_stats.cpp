@@ -169,8 +169,6 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
         std::size_t current_reads_count) const {
     auto estimated_total = static_cast<std::size_t>(
             std::lrint(m_estimated_num_reads_per_file * m_num_input_files));
-    //auto estimated_total =
-    //        static_cast<std::size_t>(lround(m_estimated_num_reads_per_file * m_num_input_files));
     if (current_reads_count <= estimated_total) {
         return estimated_total;
     }

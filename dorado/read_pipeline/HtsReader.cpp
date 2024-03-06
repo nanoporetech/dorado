@@ -45,7 +45,7 @@ bool HtsReader::has_tag(std::string tagname) {
     return static_cast<bool>(tag);
 }
 
-std::size_t HtsReader::read(Pipeline& pipeline, int max_reads) {
+std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
     std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
