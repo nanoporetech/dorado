@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
@@ -81,7 +82,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 int aligner(int argc, char* argv[]) {
     utils::InitLogging();
 
-    cli::ArgParser parser("dorado");
+    cli::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the map-ont preset.\n"
@@ -112,6 +113,10 @@ int aligner(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true)
             .nargs(0);
+    parser.hidden.add_argument("--progress_stats_frequency")
+            .help("Frequency in seconds in which to report progress statistics")
+            .default_value(0)
+            .scan<'i', int>();
     parser.visible.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing (0=unlimited).")
             .default_value(0)
@@ -189,7 +194,10 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);
-
+    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+    ReadOutputProgressStats progress_stats(
+            std::chrono::seconds{progress_stats_frequency}, all_files.size(),
+            ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
@@ -222,18 +230,20 @@ int aligner(int argc, char* argv[]) {
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
         hts_writer_ref.set_and_write_header(header);
-
         // Set up stats counting
         std::vector<dorado::stats::StatsCallable> stats_callables;
         ProgressTracker tracker(0, false);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+        stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
+            progress_stats.update_stats(stats);
+        });
         constexpr auto kStatsPeriod = 100ms;
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        reader->read(*pipeline, max_reads);
+        auto num_reads_in_file = reader->read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
@@ -243,12 +253,17 @@ int aligner(int argc, char* argv[]) {
         stats_sampler->terminate();
 
         tracker.update_progress_bar(final_stats);
+        progress_stats.update_reads_per_file_estimate(num_reads_in_file);
+        progress_stats.notify_stats_collector_completed(final_stats);
+
         tracker.summarize();
 
         spdlog::info("> finished alignment");
         spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
                      hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
+
+    progress_stats.report_final_stats();
 
     if (emit_summary) {
         spdlog::info("> generating summary file");

@@ -235,6 +235,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/messages.cpp
     dorado/read_pipeline/messages.h
     dorado/read_pipeline/flush_options.h
+    dorado/read_pipeline/read_output_progress_stats.cpp
+    dorado/read_pipeline/read_output_progress_stats.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stereo_features.cpp

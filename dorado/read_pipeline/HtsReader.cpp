@@ -45,8 +45,8 @@ bool HtsReader::has_tag(std::string tagname) {
     return static_cast<bool>(tag);
 }
 
-void HtsReader::read(Pipeline& pipeline, int max_reads) {
-    int num_reads = 0;
+std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
+    std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
             std::string read_id = bam_get_qname(record.get());
@@ -64,6 +64,7 @@ void HtsReader::read(Pipeline& pipeline, int max_reads) {
         }
     }
     spdlog::debug("Total reads processed: {}", num_reads);
+    return num_reads;
 }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {

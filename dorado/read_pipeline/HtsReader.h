@@ -25,7 +25,7 @@ public:
               std::optional<std::unordered_set<std::string>> read_list);
     ~HtsReader();
     bool read();
-    void read(Pipeline& pipeline, int max_reads);
+    std::size_t read(Pipeline& pipeline, std::size_t max_reads);
     template <typename T>
     T get_tag(std::string tagname);
     bool has_tag(std::string tagname);
