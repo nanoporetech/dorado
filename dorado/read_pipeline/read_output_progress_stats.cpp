@@ -14,6 +14,10 @@ namespace {
 std::string const PREFIX_PROGRESS_LINE_HDR{"[PROG_STAT_HDR] "};
 std::string const PREFIX_PROGRESS_LINE{"[PROG_STAT] "};
 
+// Assuming we are 3/4 of the way through the current give a smoother change
+// to estimated total number of reads than assuming half.
+constexpr float ASSUMED_PERCENTAGE_THROUGH_INPUT_FILE{0.75};
+
 struct ReportInfo {
     float time_elapsed;
     float time_remaining;
@@ -50,6 +54,8 @@ auto get_num_reads_written(const stats::NamedStats& stats) {
     return size_t_stat("HtsWriter.unique_simplex_reads_written") +
            size_t_stat("BarcodeDemuxerNode.demuxed_reads_written");
 }
+
+std::size_t to_size_t(double value) { return static_cast<std::size_t>(std::llround(value)); }
 
 }  // namespace
 
@@ -101,19 +107,17 @@ void ReadOutputProgressStats::report_stats(const std::size_t current_reads_writt
     info.total_reads_processed = m_previous_stats_total + current_reads_written_count;
 
     if (is_known_total_number_input_reads()) {
-        info.total_reads_estimate = info.total_reads_processed;
-        info.time_remaining = 0.0;
-
+        info.total_reads_estimate = m_total_known_readcount;
     } else {
         info.total_reads_estimate = get_adjusted_estimated_total_reads(current_reads_written_count);
-        if (info.total_reads_processed > 0) {
-            auto estimated_total_time =
-                    info.time_elapsed *
-                    (static_cast<float>(info.total_reads_estimate) / info.total_reads_processed);
-            info.time_remaining = estimated_total_time - info.time_elapsed;
-        } else {
-            info.time_remaining = 0.0;
-        }
+    }
+    if (info.total_reads_processed > 0) {
+        auto estimated_total_time =
+                info.time_elapsed *
+                (static_cast<float>(info.total_reads_estimate) / info.total_reads_processed);
+        info.time_remaining = estimated_total_time - info.time_elapsed;
+    } else {
+        info.time_remaining = 0.0;
     }
 
     show_report(info);
@@ -181,13 +185,13 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
     // per file we can simply return an estimate based on this expectation
     // per file.
     if (static_cast<float>(current_input_file_reads) <= m_estimated_num_reads_per_file) {
-        return static_cast<std::size_t>(
-                std::lround(m_estimated_num_reads_per_file * m_num_input_files));
+        return to_size_t(m_estimated_num_reads_per_file * m_num_input_files);
     }
 
     // We must adjust our estimated reads per file upwards by including the current file in
     // the calculation.
-    const auto expected_reads_current_file = 2 * current_input_file_reads;
+    const auto expected_reads_current_file =
+            to_size_t(current_input_file_reads / ASSUMED_PERCENTAGE_THROUGH_INPUT_FILE);
     const auto count_including_current_file = m_total_known_readcount + expected_reads_current_file;
     const auto num_known_files_including_current = m_num_files_where_readcount_known + 1;
     const auto adjusted_estimated_reads_per_file =
@@ -195,26 +199,25 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
     spdlog::trace("ADJUSTED num reads known: {} | current file: {} | estimate per file {}",
                   count_including_current_file, current_input_file_reads,
                   adjusted_estimated_reads_per_file);
-    return static_cast<std::size_t>(
-            std::lround(adjusted_estimated_reads_per_file * m_num_input_files));
+    return to_size_t(adjusted_estimated_reads_per_file * m_num_input_files);
 }
 
 std::size_t ReadOutputProgressStats::calc_total_reads_collector_per_file(
         std::size_t current_reads_count) const {
     if (static_cast<float>(current_reads_count) <= m_estimated_num_reads_per_file) {
-        return static_cast<std::size_t>(
-                std::lround(m_estimated_num_reads_per_file * m_num_input_files));
+        return to_size_t(m_estimated_num_reads_per_file * m_num_input_files);
     }
 
-    // Current file exceed reads per file estimate so recalculate assuming we're halfway through the file
-    auto assumed_current_file_total_reads = current_reads_count * 2;
+    // Current file exceed reads per file estimate so recalculate including an
+    // estimate of curremnt input file size
+    auto assumed_current_file_total_reads =
+            current_reads_count / ASSUMED_PERCENTAGE_THROUGH_INPUT_FILE;
     auto total_reads_including_current = m_total_known_readcount + assumed_current_file_total_reads;
     float adjusted_estimated_reads_per_file =
             total_reads_including_current /
             static_cast<float>(m_num_files_where_readcount_known + 1);
 
-    return static_cast<std::size_t>(
-            std::lround(adjusted_estimated_reads_per_file * m_num_input_files));
+    return to_size_t(adjusted_estimated_reads_per_file * m_num_input_files);
 }
 
 std::size_t ReadOutputProgressStats::get_adjusted_estimated_total_reads(
