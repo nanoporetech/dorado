@@ -1,6 +1,7 @@
 #include "alignment/alignment_processing_items.h"
 
 #include "TestUtils.h"
+#include "utils/PostCondition.h"
 
 #include <catch2/catch.hpp>
 
@@ -63,25 +64,30 @@ TEST_CASE("initialise with input file and no output folder returns true", CUT_TA
     CHECK(cut.initialise());
 }
 
+#if !IOS
 TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
-    // Create basic SAM file in current directory which will be later removed.
-    std::string filename = "./empty_file.sam";
-    std::ofstream outfile(filename);
+    // Create basic SAM file in a temp directory and change curdir to that temp directory.
+    auto tmp_dir = TempDir(fs::temp_directory_path() / "aligner_input_from_curdir");
+    std::filesystem::create_directories(tmp_dir.m_path);
 
-    // Note: Only run this test if the file was created. This is put in place because
-    // we're not able to generate files in the curdir in the iOS simulator. On all
-    // other platforms this will be enabled.
-    // TODO: Investigate if there's a better way to skip on iOS sim or make
-    // it generate a file in curdir.
+    auto tmp_filename = "empty_file.sam";
+    auto tmp_filepath = tmp_dir.m_path / tmp_filename;
+    std::ofstream outfile(tmp_filepath.string());
+
     if (outfile.is_open()) {
         outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
         outfile.close();
-        TempDir tmp_file(filename);
-
-        AlignmentProcessingItems cut{tmp_file.m_path.string(), false, OUT_FOLDER.string(), false};
-        CHECK(cut.initialise());
+    } else {
+        CHECK(false);
     }
+
+    auto orig_cwd = fs::current_path();
+    fs::current_path(tmp_dir.m_path);
+    utils::PostCondition revert_cwd([&orig_cwd]() { fs::current_path(orig_cwd); });
+    AlignmentProcessingItems cut{tmp_filename, false, OUT_FOLDER.string(), false};
+    CHECK(cut.initialise());
 }
+#endif  // !IOS
 
 TEST_CASE("initialise with invalid input file and no output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / NON_HTS_FILE).string(), false, "", false};
