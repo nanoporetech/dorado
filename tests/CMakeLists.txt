@@ -31,9 +31,11 @@ add_executable(dorado_tests
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
+    myers_test.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     PolyACalculatorTest.cpp
+    PostConditionTest.cpp
     ReadFilterNodeTest.cpp
     ReadForwarderNodeTest.cpp
     ReadTest.cpp
