@@ -67,14 +67,20 @@ TEST_CASE("initialise with input file in current directory returns true", CUT_TA
     // Create basic SAM file in current directory which will be later removed.
     std::string filename = "./empty_file.sam";
     std::ofstream outfile(filename);
+
+    // Note: Only run this test if the file was created. This is put in place because
+    // we're not able to generate files in the curdir in the iOS simulator. On all
+    // other platforms this will be enabled.
+    // TODO: Investigate if there's a better way to skip on iOS sim or make
+    // it generate a file in curdir.
     if (outfile.is_open()) {
         outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
         outfile.close();
-    }
-    TempDir tmp_file(filename);
+        TempDir tmp_file(filename);
 
-    AlignmentProcessingItems cut{tmp_file.m_path.string(), false, OUT_FOLDER.string(), false};
-    CHECK(cut.initialise());
+        AlignmentProcessingItems cut{tmp_file.m_path.string(), false, OUT_FOLDER.string(), false};
+        CHECK(cut.initialise());
+    }
 }
 
 TEST_CASE("initialise with invalid input file and no output folder returns false", CUT_TAG) {
