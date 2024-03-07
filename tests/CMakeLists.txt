@@ -61,7 +61,7 @@ if (NOT IOS)
 endif()
 target_compile_definitions(dorado_tests
     PRIVATE
-        IOS=$<BOOL:${IOS}>
+        DORADO_IOS_BUILD=$<BOOL:${IOS}>
 )
 if (DORADO_GPU_BUILD)
     if(APPLE)
