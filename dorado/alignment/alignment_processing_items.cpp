@@ -130,7 +130,7 @@ bool AlignmentProcessingItems::initialise_for_file() {
         return true;
     }
 
-    auto input_file_path = fs::path(m_input_path);
+    auto input_file_path = fs::absolute(fs::path(m_input_path));
 
     if (!check_output_folder_for_input_folder(input_file_path.parent_path().string())) {
         return false;

@@ -59,6 +59,10 @@ if (NOT IOS)
             ModelFinderTest.cpp
     )
 endif()
+target_compile_definitions(dorado_tests
+    PRIVATE
+        DORADO_IOS_BUILD=$<BOOL:${IOS}>
+)
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)

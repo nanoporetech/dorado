@@ -1,10 +1,12 @@
 #include "alignment/alignment_processing_items.h"
 
 #include "TestUtils.h"
+#include "utils/PostCondition.h"
 
 #include <catch2/catch.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <map>
 
 #define CUT_TAG "[dorado::aligment::AlignmentProcessingItems]"
@@ -61,6 +63,28 @@ TEST_CASE("initialise with input file and no output folder returns true", CUT_TA
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / INPUT_SAM).string(), false, "", false};
     CHECK(cut.initialise());
 }
+
+#if !DORADO_IOS_BUILD
+TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
+    // Create basic SAM file in a temp directory and change curdir to that temp directory.
+    auto tmp_dir = TempDir(fs::temp_directory_path() / "aligner_input_from_curdir");
+    std::filesystem::create_directories(tmp_dir.m_path);
+
+    auto tmp_filename = "empty_file.sam";
+    auto tmp_filepath = tmp_dir.m_path / tmp_filename;
+    std::ofstream outfile(tmp_filepath.string());
+
+    REQUIRE(outfile.is_open());
+    outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
+    outfile.close();
+
+    auto orig_cwd = fs::current_path();
+    fs::current_path(tmp_dir.m_path);
+    auto revert_cwd = utils::PostCondition([&orig_cwd]() { fs::current_path(orig_cwd); });
+    AlignmentProcessingItems cut{tmp_filename, false, OUT_FOLDER.string(), false};
+    CHECK(cut.initialise());
+}
+#endif  // !DORADO_IOS_BUILD
 
 TEST_CASE("initialise with invalid input file and no output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / NON_HTS_FILE).string(), false, "", false};
