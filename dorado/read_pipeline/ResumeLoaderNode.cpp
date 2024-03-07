@@ -43,6 +43,9 @@ void ResumeLoaderNode::copy_completed_reads() {
     try {
         while (reader.read()) {
             std::string read_id;
+            // If a split read is found, use the parent read id to
+            // resume basecalling since that's the read id found in
+            // the raw dataset.
             auto pid_tag = bam_aux_get(reader.record.get(), "pi");
             if (pid_tag) {
                 read_id = std::string(bam_aux2Z(pid_tag));
