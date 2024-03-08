@@ -106,4 +106,10 @@ void check_sampling_rates_compatible(const std::string& model_name,
                                      const int config_sample_rate,
                                      const bool recursive_file_loading);
 
+// Get modified models set using `--modified-bases` or `--modified-bases-models` cli args
+std::vector<std::filesystem::path> get_non_complex_mods_models(
+        const std::filesystem::path& simplex_model_path,
+        const std::vector<std::string>& mod_bases,
+        const std::string& mod_bases_models);
+
 }  // namespace dorado
