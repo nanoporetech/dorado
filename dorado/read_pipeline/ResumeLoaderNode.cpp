@@ -43,7 +43,16 @@ void ResumeLoaderNode::copy_completed_reads() {
     // Iterate over all reads and write to sink.
     try {
         while (reader.read()) {
-            std::string read_id = bam_get_qname(reader.record);
+            std::string read_id;
+            // If a split read is found, use the parent read id to
+            // resume basecalling since that's the read id found in
+            // the raw dataset.
+            auto pid_tag = bam_aux_get(reader.record.get(), "pi");
+            if (pid_tag) {
+                read_id = std::string(bam_aux2Z(pid_tag));
+            } else {
+                read_id = bam_get_qname(reader.record);
+            }
             m_processed_read_ids.insert(read_id);
             m_sink.push_message(BamPtr(bam_dup1(reader.record.get())));
             if (is_safe_to_log && m_processed_read_ids.size() % 100 == 0) {
@@ -56,7 +65,7 @@ void ResumeLoaderNode::copy_completed_reads() {
         // properly formatted records.
     }
     std::cerr << "\r";
-    spdlog::info("> {} reads found in resume file.", m_processed_read_ids.size());
+    spdlog::info("> {} original read ids found in resume file.", m_processed_read_ids.size());
 
     hts_set_log_level(initial_hts_log_level);
 }
