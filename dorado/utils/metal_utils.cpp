@@ -174,10 +174,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
             cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
     report_error(error);
     if (!cps) {
-        auto e_code = std::to_string(((int)error->code()));
-        auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
-        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
-                                 ": error " + e_code);
+        throw std::runtime_error("Failed to build compute pipeline for " + name);
     }
 
     return cps;
