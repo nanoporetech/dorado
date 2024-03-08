@@ -110,7 +110,9 @@ int aligner(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true)
             .nargs(0);
-    parser.visible.add_argument("--bed-file").help("Optional bed-file.");
+    parser.visible.add_argument("--bed-file")
+            .help("Optional bed-file.")
+            .default_value(std::string(""));
     parser.hidden.add_argument("--progress_stats_frequency")
             .help("Frequency in seconds in which to report progress statistics")
             .default_value(0)
