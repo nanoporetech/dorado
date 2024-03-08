@@ -55,6 +55,17 @@ auto get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
+void report_error(NS::Error *error) {
+    if (error == nil) {
+        return;
+    }
+    auto safe_c_str = [](NS::String *str) {
+        return str ? str->cString(NS::ASCIIStringEncoding) : "<none>";
+    };
+    spdlog::error("code={}, domain={}, description={}", error->code(), safe_c_str(error->domain()),
+                  safe_c_str(error->localizedDescription()));
+}
+
 #if !TARGET_OS_IPHONE
 
 // Retrieves a single int64_t property associated with the given class/name.
@@ -120,7 +131,9 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
 
     if (!default_library) {
         auto lib_path = get_library_location();
+        error = nil;
         default_library = NS::TransferPtr(device->newLibrary(lib_path, &error));
+        report_error(error);
         if (!default_library) {
             throw std::runtime_error("Failed to load metallib library.");
         }
@@ -142,8 +155,10 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
     }
 
     auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
+    error = nil;
     auto kernel =
             NS::TransferPtr(default_library->newFunction(kernel_name, constant_vals.get(), &error));
+    report_error(error);
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
@@ -154,8 +169,10 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(*max_total_threads_per_tg);
     }
 
+    error = nil;
     auto cps = NS::TransferPtr(device->newComputePipelineState(
             cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
+    report_error(error);
     if (!cps) {
         auto e_code = std::to_string(((int)error->code()));
         auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
