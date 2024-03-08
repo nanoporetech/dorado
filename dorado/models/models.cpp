@@ -830,18 +830,18 @@ ModelInfo get_simplex_model_info(const std::string& model_name) {
     return matches.back();
 }
 
-std::string get_modification_model(const std::string& simplex_model,
+std::string get_modification_model(const std::filesystem::path& simplex_model_path,
                                    const std::string& modification) {
     std::string modification_model{""};
-    auto simplex_path = fs::path(simplex_model);
 
-    if (!fs::exists(simplex_path)) {
-        throw std::runtime_error{"unknown simplex model " + simplex_model};
+    if (!fs::exists(simplex_model_path)) {
+        throw std::runtime_error{
+                "Cannot find modification model for '" + modification +
+                "' reason: simplex model doesn't exist at: " + simplex_model_path.u8string()};
     }
 
-    simplex_path = fs::canonical(simplex_path);
-    auto model_dir = simplex_path.parent_path();
-    auto simplex_name = simplex_path.filename().u8string();
+    auto model_dir = simplex_model_path.parent_path();
+    auto simplex_name = simplex_model_path.filename().u8string();
 
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";
@@ -854,7 +854,8 @@ std::string get_modification_model(const std::string& simplex_model,
             }
         }
     } else {
-        throw std::runtime_error{"unknown simplex model " + simplex_name};
+        throw std::runtime_error{"Cannot find modification model for '" + modification +
+                                 "' reason: unknown simplex model " + simplex_name};
     }
 
     if (modification_model.empty()) {

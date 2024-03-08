@@ -51,9 +51,9 @@ bool download_models(const std::string& target_directory, const std::string& sel
 ModelInfo get_simplex_model_info(const std::string& model_name);
 
 // finds the matching modification model for a given modification i.e. 5mCG and a simplex model
-// is the matching modification model is not found in the same model directory as the simplex
-// model then it is downloaded.
-std::string get_modification_model(const std::string& simplex_model,
+// if the modification model is not found in the same model directory as the simplex
+// model then it is downloaded into the same directory.
+std::string get_modification_model(const std::filesystem::path& simplex_model,
                                    const std::string& modification);
 
 // get the sampling rate that the model is compatible with

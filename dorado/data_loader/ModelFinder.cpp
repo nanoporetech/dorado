@@ -280,4 +280,33 @@ void check_sampling_rates_compatible(const std::string& model_name,
     }
 }
 
+std::vector<std::filesystem::path> get_non_complex_mods_models(
+        const std::filesystem::path& simplex_model_path,
+        const std::vector<std::string>& mod_bases,
+        const std::string& mod_bases_models) {
+    if (!mod_bases.empty() && !mod_bases_models.empty()) {
+        throw std::runtime_error(
+                "CLI arguments --modified-bases and --modified-bases-models are mutually "
+                "exclusive");
+    }
+
+    std::vector<std::filesystem::path> mods_model_paths;
+
+    if (!mod_bases.empty()) {
+        // Foreach --modified-bases get the modified model of that type matched to the simplex model
+        std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
+                       [&simplex_model_path](const std::string& m) {
+                           return std::filesystem::path(
+                                   models::get_modification_model(simplex_model_path, m));
+                       });
+    } else if (!mod_bases_models.empty()) {
+        // Foreach --modified-bases-models get a path
+        const auto split = utils::split(mod_bases_models, ',');
+        std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
+                       [&](const std::string& m) { return std::filesystem::path(m); });
+    }
+
+    return mods_model_paths;
+}
+
 }  // namespace dorado
