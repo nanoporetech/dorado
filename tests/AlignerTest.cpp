@@ -135,7 +135,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -170,7 +170,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 2);
 
     // Check first alignment is primary.
@@ -209,7 +209,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -243,7 +243,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
 
     bam1_t* rec = bam_records[0].get();
@@ -271,7 +271,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     options.index_batch_size = 1'000'000'000ull;
     options.soft_clipping = GENERATE(true, false);
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 10);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 3);
 
     bam1_t* primary_rec = bam_records[0].get();
@@ -315,7 +315,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
         options.kmer_size = options.window_size = 28;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
-        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 2);
+        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 2);
         CHECK(bam_records.size() == 2);  // Generates 2 alignments.
     }
 
@@ -325,7 +325,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
         options.kmer_size = options.window_size = 5;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
-        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 2);
+        auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 2);
         CHECK(bam_records.size() == 1);  // Generates 1 alignment.
     }
 }
@@ -338,7 +338,7 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     options.kmer_size = options.window_size = 5;
     options.index_batch_size = 1000ull;
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), options, 1));
+    CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), "", options, 1));
 }
 
 SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GROUP) {
@@ -482,7 +482,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Get the sam line from BAM pipeline
     dorado::HtsReader bam_reader(query, std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(bam_reader, ref, options, 2);
+    auto bam_records = RunPipelineWithBamMessages(bam_reader, ref, "", options, 2);
     CHECK(bam_records.size() == 1);
     auto sam_line_from_bam_ptr = get_sam_line_from_bam(std::move(bam_records[0]));
 
@@ -548,7 +548,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     options.index_batch_size = 1'000'000'000ull;
     options.soft_clipping = GENERATE(true, false);
     dorado::HtsReader reader(query.string(), std::nullopt);
-    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), options, 1);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 1);
     REQUIRE(bam_records.size() == 3);
 
     bam1_t* primary_rec = bam_records[0].get();

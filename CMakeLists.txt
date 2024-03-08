@@ -166,6 +166,8 @@ configure_file(dorado/Version.h.in dorado/Version.h)
 set(LIB_SOURCE_FILES
     dorado/alignment/alignment_processing_items.cpp
     dorado/alignment/alignment_processing_items.h
+    dorado/alignment/BedFile.cpp
+    dorado/alignment/BedFile.h
     dorado/alignment/IndexFileAccess.cpp
     dorado/alignment/IndexFileAccess.h
     dorado/alignment/Minimap2Aligner.cpp

@@ -112,6 +112,7 @@ int aligner(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true)
             .nargs(0);
+    parser.visible.add_argument("--bed-file").help("Optional bed-file.");
     parser.visible.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing.")
             .default_value(0)
@@ -145,6 +146,7 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index(parser.visible.get<std::string>("index"));
+    auto bed_file(parser.visible.get<std::string>("bed-file"));
     auto reads(parser.visible.get<std::string>("reads"));
     auto recursive_input = parser.visible.get<bool>("recursive");
     auto output_folder = parser.visible.get<std::string>("output-dir");
@@ -205,7 +207,7 @@ int aligner(int argc, char* argv[]) {
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, file_info.output,
                                                             file_info.output_mode, writer_threads);
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
-                                                           options, aligner_threads);
+                                                           bed_file, options, aligner_threads);
 
         // Create the Pipeline from our description.
         std::vector<dorado::stats::StatsReporter> stats_reporters;

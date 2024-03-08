@@ -158,7 +158,7 @@ void setup(std::vector<std::string> args,
     if (enable_aligner) {
         auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
         aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access, ref,
-                                                      aligner_options,
+                                                      "", aligner_options,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
