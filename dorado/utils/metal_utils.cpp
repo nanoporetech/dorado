@@ -55,7 +55,7 @@ auto get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
-void report_error(NS::Error *error) {
+void report_error(const NS::Error *error) {
     if (error == nil) {
         return;
     }
