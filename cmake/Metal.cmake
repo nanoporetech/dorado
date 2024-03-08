@@ -19,6 +19,7 @@ foreach(source ${METAL_SOURCES})
                 -Werror
                 -Wall -Wextra -pedantic
                 -Wno-c++17-extensions # [[maybe_unused]] is C++17
+                -std=metal3.0
                 -ffast-math
                 -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
                 -o "${air_path}"
