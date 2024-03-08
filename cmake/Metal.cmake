@@ -14,7 +14,14 @@ foreach(source ${METAL_SOURCES})
     set(air_path "${CMAKE_BINARY_DIR}/${basename}.air")
     add_custom_command(
         OUTPUT "${air_path}"
-        COMMAND xcrun -sdk ${XCRUN_SDK} metal -ffast-math -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}" -o "${air_path}"
+        COMMAND
+            xcrun -sdk ${XCRUN_SDK} metal
+                -Werror
+                -Wall -Wextra -pedantic
+                -Wno-c++17-attribute-extensions # [[maybe_unused]] is C++17
+                -ffast-math
+                -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
+                -o "${air_path}"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
         COMMENT "Compiling metal kernels"
     )
@@ -23,7 +30,10 @@ endforeach()
 
 add_custom_command(
     OUTPUT default.metallib
-    COMMAND xcrun -sdk ${XCRUN_SDK} metallib ${AIR_FILES} -o ${CMAKE_BINARY_DIR}/lib/default.metallib
+    COMMAND
+        xcrun -sdk ${XCRUN_SDK} metallib
+            ${AIR_FILES}
+            -o ${CMAKE_BINARY_DIR}/lib/default.metallib
     DEPENDS ${AIR_FILES}
     COMMENT "Creating metallib"
 )
