@@ -24,6 +24,7 @@ class AlignmentProcessingItems {
     const std::string m_input_path;
     const std::string m_output_folder;
     bool m_recursive_input;
+    bool m_allow_output_to_folder_from_stdin;
 
     std::unordered_map<std::string, std::vector<std::filesystem::path>> m_working_paths{};
 
@@ -55,7 +56,8 @@ class AlignmentProcessingItems {
 public:
     AlignmentProcessingItems(std::string input_path,
                              bool recursive_input,
-                             std::string output_folder);
+                             std::string output_folder,
+                             bool allow_output_to_folder_from_stdin);
 
     bool initialise();
 

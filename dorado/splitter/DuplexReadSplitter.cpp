@@ -1,7 +1,9 @@
 #include "DuplexReadSplitter.h"
 
+#include "myers.h"
 #include "read_pipeline/read_utils.h"
 #include "splitter/splitter_utils.h"
+#include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/uuid_utils.h"
@@ -14,17 +16,15 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
+namespace dorado::splitter {
+
 namespace {
-
-using namespace dorado;
-using namespace dorado::splitter;
-
-using PosRange = splitter::PosRange;
-using PosRanges = splitter::PosRanges;
 
 //[start, end)
 std::optional<PosRange> find_best_adapter_match(const std::string& adapter,
@@ -119,8 +119,6 @@ float qscore_mean(const std::string& qstring, splitter::PosRange r) {
 
 }  // namespace
 
-namespace dorado::splitter {
-
 struct DuplexReadSplitter::ExtRead {
     SimplexReadPtr read;
     at::Tensor data_as_float32;
@@ -197,6 +195,152 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     spdlog::trace("Detected {} potential pore regions in read {}", pore_regions.size(),
                   read.read->read_common.read_id);
     return pore_regions;
+}
+
+PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const {
+    spdlog::trace("Finding muA regions for read {}", read.read->read_common.read_id);
+
+    constexpr std::string_view muA_seq = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
+    constexpr std::int64_t max_muA_edist = 11;
+    constexpr std::int64_t ignore_start = 100;
+    constexpr std::int64_t min_read_len = 200;
+    // 14bp adapter prefix that should work better for click chemistry based on previous investigation
+    constexpr std::string_view adapter_seq = "TACTTCGTTCAGTT";
+    constexpr std::int64_t max_adapter_edist = 5;
+    constexpr std::int64_t max_muA_adapter_dist = 100;
+    constexpr std::int64_t max_spike_adapter_dist = 50;
+    constexpr float max_spike_qscore = 10;
+
+    // Skip if the read is too small.
+    const auto& read_seq = read.read->read_common.seq;
+    if (read_seq.size() < min_read_len) {
+        spdlog::trace("Read too small: id={} size={}", read.read->read_common.read_id,
+                      read_seq.size());
+        return {};
+    }
+
+    auto match_start_range = [&](std::string_view query, std::int64_t min_start,
+                                 std::int64_t max_start, std::int64_t max_edist,
+                                 bool best_only) -> PosRanges {
+        const auto max_end_pos =
+                std::min<std::int64_t>(read_seq.size(), max_start + query.size() + max_edist);
+        if (min_start + static_cast<std::int64_t>(query.size()) > max_end_pos) {
+            // Too close to the end.
+            return {};
+        }
+
+        // Trim the sequence.
+        std::string_view const seq(read_seq.data() + min_start, max_end_pos - min_start);
+
+        // Search the sequence.
+        if (best_only) {
+            auto edlib_cfg = edlibNewAlignConfig(static_cast<int>(max_edist), EDLIB_MODE_HW,
+                                                 EDLIB_TASK_LOC, nullptr, 0);
+            auto edlib_result = edlibAlign(query.data(), static_cast<int>(query.size()), seq.data(),
+                                           static_cast<int>(seq.size()), edlib_cfg);
+            assert(edlib_result.status == EDLIB_STATUS_OK);
+            auto edlib_cleanup = utils::PostCondition([&] { edlibFreeAlignResult(edlib_result); });
+
+            // Add the match if it looks good.
+            PosRanges ranges;
+            if (edlib_result.status == EDLIB_STATUS_OK && edlib_result.editDistance != -1) {
+                PosRange range;
+                range.first = min_start + edlib_result.startLocations[0];
+                range.second = min_start + edlib_result.endLocations[0] + 1;
+                if (static_cast<std::int64_t>(range.first) <= max_start) {
+                    ranges.push_back(range);
+                }
+            }
+            return ranges;
+
+        } else {
+            const auto alignments = myers_align(query, seq, max_edist);
+
+            // Build the results.
+            PosRanges ranges;
+            for (auto alignment : alignments) {
+                if (min_start + static_cast<std::int64_t>(alignment.begin) <= max_start) {
+                    PosRange range;
+                    range.first = min_start + alignment.begin;
+                    range.second = min_start + alignment.end;
+                    ranges.push_back(range);
+                }
+            }
+
+            // Merge the ranges.
+            std::sort(ranges.begin(), ranges.end());
+            return merge_ranges(ranges, 0);
+        }
+    };
+
+    // Search for muAs.
+    const auto muA_ranges =
+            match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist, false);
+    if (muA_ranges.empty()) {
+        spdlog::trace("No muA found in read: id={}", read.read->read_common.read_id);
+        return {};
+    }
+
+    // Search for any adapters that are close to the muAs.
+    PosRanges spike_ranges;
+    for (auto muA_range : muA_ranges) {
+        const auto adapter_start = std::max(
+                ignore_start, static_cast<std::int64_t>(muA_range.first) - max_muA_adapter_dist);
+        const auto adapter_ranges = match_start_range(adapter_seq, adapter_start, muA_range.first,
+                                                      max_adapter_edist, true);
+        if (adapter_ranges.empty()) {
+            continue;
+        }
+
+        // We only wanted the best match.
+        assert(adapter_ranges.size() == 1);
+        const auto adapter_match = adapter_ranges.front();
+        if (adapter_match.first < max_spike_adapter_dist) {
+            continue;
+        }
+
+        // Helpers to map to/from basespace.
+        auto from_basespace = [&](std::size_t idx) {
+            const auto it = std::lower_bound(read.move_sums.begin(), read.move_sums.end(), idx);
+            return std::distance(read.move_sums.begin(), it) * read.read->read_common.model_stride;
+        };
+        auto to_basespace = [&](std::size_t idx) {
+            idx /= read.read->read_common.model_stride;
+            // The range we're querying is valid and any found indices should lie in that range.
+            assert(idx < read.move_sums.size());
+            return read.move_sums[idx];
+        };
+
+        // Look for the spike between (the left of) the adapter and the muA, in signal space.
+        const auto spike_search_begin_s =
+                from_basespace(adapter_match.first - max_spike_adapter_dist);
+        const auto spike_search_end_s = from_basespace(muA_range.first);
+        const auto search_span = read.data_as_float32.index(
+                {at::indexing::Slice(spike_search_begin_s, spike_search_end_s)});
+        const auto spike_peak_s = spike_search_begin_s + search_span.argmax().item().toLong();
+        // Convert back to base space.
+        const auto spike_begin = to_basespace(spike_peak_s);
+        const auto spike_end = spike_begin + 5;
+
+        // Check qscore is under the threshold.
+        const auto spike_avg_qscore =
+                qscore_mean(read.read->read_common.qstring, PosRange(spike_begin, spike_end));
+        if (spike_avg_qscore > max_spike_qscore) {
+            continue;
+        }
+
+        // We have a match.
+        spike_ranges.emplace_back(spike_begin, spike_end);
+    }
+
+    // Remove duplicates.
+    std::sort(spike_ranges.begin(), spike_ranges.end());
+    auto end_it = std::unique(spike_ranges.begin(), spike_ranges.end());
+    spike_ranges.erase(end_it, spike_ranges.end());
+
+    spdlog::trace("Detected {} muA+adapter spike region(s) in read {}", spike_ranges.size(),
+                  read.read->read_common.read_id);
+    return spike_ranges;
 }
 
 bool DuplexReadSplitter::check_nearby_adapter(const SimplexRead& read,
@@ -377,67 +521,59 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
 std::vector<std::pair<std::string, DuplexReadSplitter::SplitFinderF>>
 DuplexReadSplitter::build_split_finders() const {
     std::vector<std::pair<std::string, SplitFinderF>> split_finders;
-    split_finders.push_back({"PORE_ADAPTER", [&](const ExtRead& read) {
-                                 return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
-                                     return check_nearby_adapter(*read.read, r,
-                                                                 m_settings.adapter_edist);
-                                 });
-                             }});
+    split_finders.emplace_back(std::make_pair("PORE_ADAPTER", [&](const ExtRead& read) {
+        return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
+            return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
+        });
+    }));
+
+    split_finders.emplace_back(std::make_pair(
+            "muA_adapter", [&](const ExtRead& read) { return find_muA_adapter_spikes(read); }));
 
     if (!m_settings.simplex_mode) {
-        split_finders.push_back(
-                {"PORE_FLANK", [&](const ExtRead& read) {
-                     return merge_ranges(
-                             filter_ranges(read.possible_pore_regions,
-                                           [&](PosRange r) {
-                                               return check_flank_match(*read.read, r,
-                                                                        m_settings.flank_err);
-                                           }),
-                             m_settings.strand_end_flank + m_settings.strand_start_flank);
-                 }});
+        split_finders.emplace_back(std::make_pair("PORE_FLANK", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_flank_match(*read.read, r, m_settings.flank_err);
+            };
+            return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
+                                m_settings.strand_end_flank + m_settings.strand_start_flank);
+        }));
 
-        split_finders.push_back(
-                {"PORE_ALL", [&](const ExtRead& read) {
-                     return merge_ranges(
-                             filter_ranges(read.possible_pore_regions,
-                                           [&](PosRange r) {
-                                               return check_nearby_adapter(
-                                                              *read.read, r,
-                                                              m_settings.relaxed_adapter_edist) &&
-                                                      check_flank_match(
-                                                              *read.read, r,
-                                                              m_settings.relaxed_flank_err);
-                                           }),
-                             m_settings.strand_end_flank + m_settings.strand_start_flank);
-                 }});
+        split_finders.emplace_back(std::make_pair("PORE_ALL", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_nearby_adapter(*read.read, r, m_settings.relaxed_adapter_edist) &&
+                       check_flank_match(*read.read, r, m_settings.relaxed_flank_err);
+            };
+            return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
+                                m_settings.strand_end_flank + m_settings.strand_start_flank);
+        }));
 
-        split_finders.push_back(
-                {"ADAPTER_FLANK", [&](const ExtRead& read) {
-                     return filter_ranges(
-                             find_adapter_matches(m_settings.adapter, read.read->read_common.seq,
-                                                  m_settings.adapter_edist,
-                                                  m_settings.expect_adapter_prefix),
-                             [&](PosRange r) {
-                                 return check_flank_match(*read.read, {r.first, r.first},
-                                                          m_settings.flank_err);
-                             });
-                 }});
+        split_finders.emplace_back(std::make_pair("ADAPTER_FLANK", [&](const ExtRead& read) {
+            auto filter = [&](PosRange r) {
+                return check_flank_match(*read.read, {r.first, r.first}, m_settings.flank_err);
+            };
+            return filter_ranges(
+                    find_adapter_matches(m_settings.adapter, read.read->read_common.seq,
+                                         m_settings.adapter_edist,
+                                         m_settings.expect_adapter_prefix),
+                    filter);
+        }));
 
-        split_finders.push_back({"ADAPTER_MIDDLE", [&](const ExtRead& read) {
-                                     if (auto split = identify_middle_adapter_split(*read.read)) {
-                                         return PosRanges{*split};
-                                     } else {
-                                         return PosRanges();
-                                     }
-                                 }});
+        split_finders.emplace_back(std::make_pair("ADAPTER_MIDDLE", [&](const ExtRead& read) {
+            if (auto split = identify_middle_adapter_split(*read.read)) {
+                return PosRanges{*split};
+            } else {
+                return PosRanges();
+            }
+        }));
 
-        split_finders.push_back({"SPLIT_MIDDLE", [&](const ExtRead& read) {
-                                     if (auto split = identify_extra_middle_split(*read.read)) {
-                                         return PosRanges{*split};
-                                     } else {
-                                         return PosRanges();
-                                     }
-                                 }});
+        split_finders.emplace_back(std::make_pair("SPLIT_MIDDLE", [&](const ExtRead& read) {
+            if (auto split = identify_extra_middle_split(*read.read)) {
+                return PosRanges{*split};
+            } else {
+                return PosRanges();
+            }
+        }));
     }
 
     return split_finders;

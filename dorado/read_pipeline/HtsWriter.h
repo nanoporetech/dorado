@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -42,9 +43,23 @@ private:
 
     void input_thread_fn();
     int write(const bam1_t* record);
-    std::unordered_set<std::string> m_processed_read_ids;
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};
+
+    // Expected usage:
+    //  single writer thread calling add()
+    //  many threads may concurrently call size().
+    class ProcessedReadIds {
+        std::unordered_set<std::string> read_ids;
+        std::atomic<std::size_t> m_threadsafe_count_of_reads{};
+
+    public:
+        // Thread safe access to count of unique read-ids
+        std::size_t size() const;
+
+        // Not thread safe for concurrent calls.
+        void add(std::string read_id);
+    } m_processed_read_ids;
 };
 
 }  // namespace dorado

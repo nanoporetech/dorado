@@ -51,7 +51,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_index_file_access(std::move(index_file_access)) {
     auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
     for (const auto& entry : header_sequence_records) {
-        m_header_sequences_for_bam_messages.emplace_back(entry.first, entry.second);
+        m_header_sequences_for_bam_messages.emplace_back(entry.first);
     }
     if (!bed_file.empty()) {
         m_bed_file_for_bam_messages.load(bed_file);
@@ -119,7 +119,7 @@ void AlignerNode::input_thread_fn() {
                     alignment::Minimap2Aligner(m_index_for_bam_messages).align(read.get(), tbuf);
             for (auto& record : records) {
                 if (!m_bed_file_for_bam_messages.filename().empty() &&
-                    (record->core.flag & 4) != 0) {
+                    !(record->core.flag & BAM_FUNMAP)) {
                     auto ref_id = record->core.tid;
                     add_bed_hits_to_record(m_header_sequences_for_bam_messages.at(ref_id), record);
                 }

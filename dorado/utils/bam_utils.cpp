@@ -130,6 +130,86 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
     }
 }
 
+bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
+    auto get_pg_id = [](std::string& str) {
+        size_t start_pos = str.find("ID:");
+        size_t end_pos = str.find("\t", start_pos);
+        return end_pos == std::string::npos ? str.substr(start_pos)
+                                            : str.substr(start_pos, end_pos - start_pos);
+    };
+
+    // Gather information about the target header.
+    std::set<std::string> dest_lines;
+    std::vector<std::string> dest_references;
+    std::map<std::string, std::string> dest_programs;
+    auto dest_stream = std::stringstream{sam_hdr_str(dest_header)};
+    for (std::string header_line; std::getline(dest_stream, header_line);) {
+        dest_lines.insert(header_line);
+        std::string_view header_type = std::string_view(header_line).substr(0, 3);
+        if (header_type == "@SQ") {
+            dest_references.push_back(header_line);
+            continue;
+        }
+        if (header_type == "@PG") {
+            std::string ID = get_pg_id(header_line);
+            dest_programs[ID] = header_line;
+            continue;
+        }
+    }
+
+    // Parse the source header to check if it's compatible with the destination header.
+    std::vector<std::string> source_references;
+    std::map<std::string, std::string> source_programs;
+    const char* source_header_cstr = sam_hdr_str(source_header);
+    // If the source file has no header, simply return true.
+    if (!source_header_cstr) {
+        return true;
+    }
+    auto source_stream = std::stringstream{sam_hdr_str(source_header)};
+    for (std::string header_line; std::getline(source_stream, header_line);) {
+        std::string_view header_type = std::string_view(header_line).substr(0, 3);
+        if (header_type == "@SQ") {
+            source_references.push_back(header_line);
+            continue;
+        }
+        if (header_type == "@PG") {
+            std::string ID = get_pg_id(header_line);
+            source_programs[ID] = header_line;
+            continue;
+        }
+    }
+
+    if (source_references != dest_references) {
+        error_msg = "Could not merge BAM headers as @SQ lines are not equal.";
+        return false;
+    }
+
+    for (auto& source_program : source_programs) {
+        if (dest_programs.find(source_program.first) != dest_programs.end() &&
+            dest_programs[source_program.first] != source_program.second) {
+            error_msg = "Could not merge BAM headers as @PG lines for " + source_program.first +
+                        " are not equal.";
+            return false;
+        }
+    }
+
+    // Now we've validated that the headers are compatible, we can proceed with the copy across.
+    sam_hdr_update_line(dest_header, "HD", NULL, NULL, "SO", "unknown", NULL);
+    source_stream = std::stringstream{sam_hdr_str(source_header)};
+    for (std::string header_line; std::getline(source_stream, header_line);) {
+        std::string_view header_type = std::string_view(header_line).substr(0, 3);
+        if (header_type == "@HD" || header_type == "@SQ") {
+            // Don't copy these across - they are already there
+            continue;
+        }
+        if (dest_lines.find(header_line) == dest_lines.end()) {
+            sam_hdr_add_lines(dest_header, header_line.c_str(), 0);
+        }
+    }
+
+    return true;
+}
+
 std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key) {
     if (header == nullptr) {
         throw std::invalid_argument("header cannot be nullptr");

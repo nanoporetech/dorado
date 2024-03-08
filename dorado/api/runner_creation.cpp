@@ -71,10 +71,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
                 spdlog::warn("- set batch size to {}", runners.back()->batch_size());
             }
         }
-    } else {
-        throw std::runtime_error(std::string("Unsupported device: ") + device);
     }
-#elif DORADO_CUDA_BUILD
+#endif  // DORADO_METAL_BUILD
+#if DORADO_CUDA_BUILD
     else {
         auto devices = dorado::utils::parse_cuda_device_string(device);
         num_devices = devices.size();
@@ -107,6 +106,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
     }
 #else
+    else {
+        throw std::runtime_error("Unsupported device: " + device);
+    }
     (void)num_gpu_runners;
 #endif
 

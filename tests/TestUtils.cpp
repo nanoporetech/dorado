@@ -31,7 +31,7 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     if (!std::filesystem::exists(data_path)) {
         std::cerr << "Datapath " << data_path
                   << " does not exist, exiting.\n"
-                     "Unit tests must be run from the build working directory inside dorado"
+                     "Unit tests must be run from the root directory of the dorado checkout"
                   << std::endl;
         exit(1);
     }

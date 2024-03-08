@@ -14,16 +14,3 @@ cmake.lock
 CMakeSettings.json
 _CPack_Packages
 tests/test_output
-dorado/3rdparty/hdf5-1.10.*
-dorado/3rdparty/hdf5-1.12.*
-dorado/3rdparty/htslib-win
-dorado/3rdparty/koi
-dorado/3rdparty/koi_lib
-dorado/3rdparty/libkoi-*
-dorado/3rdparty/metal-cpp
-dorado/3rdparty/pod5-*
-dorado/3rdparty/openssl-win
-dorado/3rdparty/openssl3-*
-dorado/3rdparty/torch-*
-dorado/3rdparty/vbz_plugin
-dorado/3rdparty/zlib-1.2.*

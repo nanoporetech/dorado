@@ -293,11 +293,25 @@ build:linux:arm64:focal:
     - .linux_arm64_runner
     - .build_and_test_dorado
 
+build:linux:arm64:focal:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:linux:arm64:focal
+    - .on_nightly_or_manual
+
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_runner
     - .build_and_test_dorado
+
+build:linux:x86:focal_koi_download:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:linux:x86:focal_koi_download
+    - .on_nightly_or_manual
 
 build:windows:
   extends:
@@ -330,12 +344,26 @@ build:macos:arm:
     - .macos_arm_runner
     - .build_and_test_dorado
 
+build:macos:arm:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:macos:arm
+    - .on_nightly_or_manual
+
 build:macos:x64:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .macos_x64_runner
     - .build_and_test_dorado
+
+build:macos:x64:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - build:macos:x64
+    - .on_nightly_or_manual
 
 build:ios:m1:
   variables:

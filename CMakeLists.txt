@@ -46,7 +46,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(cmake/Warnings.cmake)
 
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
-set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty
+set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
     CACHE PATH "Location to download 3rdparty libraries into")
 
 # We don't support GPU builds on macOS/x64
@@ -100,7 +100,8 @@ endif()
 
 # Use ccache for C and C++ if it's available
 find_program(CCACHE_EXE ccache)
-if (CCACHE_EXE)
+option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
+if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
     set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
     set(DORADO_ENABLE_PCH FALSE)
@@ -115,36 +116,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 endif()
 
-# Bring in spdlog
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/spdlog)
-# Avoid namespace clashes with static torch.
-target_compile_definitions(spdlog PUBLIC
-    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
-    "FMT_END_NAMESPACE=}}"
-)
-
-# ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
-set(ELZIP_DECOMPRESS_ONLY ON)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/elzip)
-
-option(ONT_MM2_EXE "Build minimap2 exe" OFF)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/ont-minimap2 EXCLUDE_FROM_ALL)
-message(STATUS "build minimap2 exe: ${ONT_MM2_EXE}")
-message(STATUS "build minimap2 lib: ${ONT_MM2_LIB}")
-if (ONT_MM2_EXE)
-    install(TARGETS minimap2_exe)
-    add_custom_target(testing_deps ALL DEPENDS minimap2_exe)
-endif()
-# Disable warnings from minimap source
-disable_warnings(minimap2)
-
-set(BUILD_TESTING OFF)
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/edlib EXCLUDE_FROM_ALL)
-# Disable warnings from edlib source
-disable_warnings(edlib)
-set(BUILD_TESTING ON)
-
-add_subdirectory(${DORADO_3RD_PARTY_SOURCE}/date EXCLUDE_FROM_ALL)
+# Bring in 3rdparty libs
+add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
@@ -163,7 +136,7 @@ endif()
 
 configure_file(dorado/Version.h.in dorado/Version.h)
 
-set(LIB_SOURCE_FILES
+add_library(dorado_lib
     dorado/alignment/alignment_processing_items.cpp
     dorado/alignment/alignment_processing_items.h
     dorado/alignment/BedFile.cpp
@@ -236,6 +209,8 @@ set(LIB_SOURCE_FILES
     dorado/read_pipeline/messages.cpp
     dorado/read_pipeline/messages.h
     dorado/read_pipeline/flush_options.h
+    dorado/read_pipeline/read_output_progress_stats.cpp
+    dorado/read_pipeline/read_output_progress_stats.h
     dorado/read_pipeline/read_utils.cpp
     dorado/read_pipeline/read_utils.h
     dorado/read_pipeline/stereo_features.cpp
@@ -246,6 +221,8 @@ set(LIB_SOURCE_FILES
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp
     dorado/splitter/RNAReadSplitter.h
+    dorado/splitter/myers.cpp
+    dorado/splitter/myers.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
     dorado/demux/AdapterDetector.cpp
@@ -272,9 +249,7 @@ set(LIB_SOURCE_FILES
     dorado/poly_tail/rna_poly_tail_calculator.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
- )
-
-add_library(dorado_lib ${LIB_SOURCE_FILES})
+)
 
 enable_warnings_as_errors(dorado_lib)
 

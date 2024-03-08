@@ -31,9 +31,11 @@ add_executable(dorado_tests
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
+    myers_test.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     PolyACalculatorTest.cpp
+    PostConditionTest.cpp
     ReadFilterNodeTest.cpp
     ReadForwarderNodeTest.cpp
     ReadTest.cpp
@@ -59,6 +61,10 @@ if (NOT IOS)
             ModelFinderTest.cpp
     )
 endif()
+target_compile_definitions(dorado_tests
+    PRIVATE
+        DORADO_IOS_BUILD=$<BOOL:${IOS}>
+)
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)

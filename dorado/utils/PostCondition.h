@@ -1,19 +1,24 @@
 #pragma once
-#include <functional>
+
+#include <utility>
 
 namespace dorado::utils {
 
+namespace detail {
+template <typename Func>
 class PostCondition {
 public:
-    PostCondition(std::function<void()> func) : m_func(func) {}
-    ~PostCondition() {
-        if (m_func) {
-            m_func();
-        }
-    }
+    PostCondition(Func&& func) : m_func(std::move(func)) {}
+    ~PostCondition() { m_func(); }
 
 private:
-    std::function<void()> m_func;
+    Func m_func;
 };
+}  // namespace detail
+
+template <typename Func>
+[[nodiscard]] auto PostCondition(Func function) {
+    return detail::PostCondition(std::move(function));
+}
 
 }  // namespace dorado::utils
