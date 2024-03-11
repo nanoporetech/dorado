@@ -322,9 +322,11 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             handle_cuda_result(cudaEventSynchronize(stop));
             float ms = 0;
             handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
-            time = std::min(time, ms / batch_size);
+            auto time_this_iteration = ms / batch_size;
+            time = std::min(time, time_this_iteration);
             handle_cuda_result(cudaEventDestroy(start));
             handle_cuda_result(cudaEventDestroy(stop));
+            spdlog::debug("iteration:{}, ms/chunk {:8f} ms", i, time_this_iteration);
         }
 
         spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size, time);
