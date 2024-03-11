@@ -2,7 +2,9 @@
 
 #include <catch2/catch.hpp>
 
+#include <cstdint>
 #include <cstdlib>
+#include <optional>
 
 #define TEST_GROUP "[seq_utils]"
 
@@ -175,4 +177,48 @@ TEST_CASE(TEST_GROUP "find rna polya - within search", TEST_GROUP) {
     const size_t expected_index = 255;
     const size_t res = dorado::utils::find_rna_polya(seq);
     CHECK(expected_index == res);
+}
+
+TEST_CASE("Test sequence to move table index", TEST_GROUP) {
+    SECTION("Happy path") {
+        // ----------------   seq index:   0, 1,  ,  ,  , 2, 3, 4,  ,  , 5,  , 6, 7,
+        // ---------------- moves index:   0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16
+        const std::vector<uint8_t> move = {1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0};
+        const size_t seq_size = move_cum_sums(move).back();
+
+        auto [seq_index, expected] = GENERATE(table<size_t, int64_t>({
+                std::make_tuple(0, 0),
+                std::make_tuple(1, 1),
+                std::make_tuple(2, 5),
+                std::make_tuple(3, 6),
+                std::make_tuple(4, 7),
+                std::make_tuple(5, 10),
+                std::make_tuple(6, 12),
+                std::make_tuple(7, 13),
+        }));
+
+        CAPTURE(seq_index);
+        const auto res = sequence_to_move_table_index(move, seq_index, seq_size);
+        CHECK(expected == res);
+    }
+
+    SECTION("Empty moves") {
+        const std::vector<uint8_t> move = {};
+        const auto res = sequence_to_move_table_index(move, 0, 0);
+        CHECK(res < 0);
+    }
+
+    SECTION("Bad sequence index") {
+        const std::vector<uint8_t> move = {0, 1, 0, 1, 0};
+        const size_t seq_size = move_cum_sums(move).back();
+        const auto res = sequence_to_move_table_index(move, seq_size + 1, seq_size);
+        CHECK(res < 0);
+    }
+
+    SECTION("Bad sequence size") {
+        const std::vector<uint8_t> move = {0, 1, 0, 1, 0};
+        const size_t bad_seq_size = move.size() + 1;
+        const auto res = sequence_to_move_table_index(move, 0, bad_seq_size);
+        CHECK(res < 0);
+    }
 }
