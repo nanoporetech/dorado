@@ -101,7 +101,7 @@ float extract_mask_score(std::string_view barcode,
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto score = result.editDistance;
-    spdlog::trace("{} {} position {}", debug_prefix, score, result.startLocations[0]);
+    spdlog::trace("{} {}", debug_prefix, score);
     spdlog::trace("\n{}", utils::alignment_to_str(barcode.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return score;
@@ -135,11 +135,10 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
 
 // Helper to extract left buffer from a flank.
 std::string extract_left_buffer(const std::string& flank, int buffer) {
-    return flank.substr(std::max(0lu, flank.length() - buffer));
+    return flank.substr(std::max(0, static_cast<int>(flank.length()) - buffer));
 }
 
 std::string extract_right_buffer(const std::string& flank, int buffer) {
-    ;
     return flank.substr(0, buffer);
 }
 
@@ -266,21 +265,8 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
             use_leading_flank = false;
         }
 
-        // Update left and right buffer lengths based on the actual flank regions of the
-        // chosen kit.
-        m_left_buffer =
-                std::min({m_scoring_params.flank_left_pad, int(kit_info.top_front_flank.length()),
-                          int(kit_info.top_rear_flank.length())});
-        m_right_buffer =
-                std::min({m_scoring_params.flank_right_pad, int(kit_info.top_rear_flank.length()),
-                          int(kit_info.top_front_flank.length())});
-        if (!kit_info.barcodes2.empty()) {
-            m_left_buffer = std::min({int(m_left_buffer), int(kit_info.bottom_front_flank.length()),
-                                      int(kit_info.bottom_rear_flank.length())});
-            m_right_buffer =
-                    std::min({int(m_right_buffer), int(kit_info.bottom_rear_flank.length()),
-                              int(kit_info.bottom_front_flank.length())});
-        }
+        m_left_buffer = m_scoring_params.flank_left_pad;
+        m_right_buffer = m_scoring_params.flank_right_pad;
 
         BarcodeCandidateKit candidate;
         candidate.kit = kit_name;
