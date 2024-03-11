@@ -3,6 +3,7 @@
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
 #include "read_pipeline/HtsReader.h"
+#include "read_pipeline/read_utils.h"
 
 #include <ATen/ATen.h>
 #include <catch2/catch.hpp>
@@ -10,6 +11,8 @@
 
 #include <filesystem>
 #include <random>
+#include <string>
+#include <vector>
 
 using Catch::Matchers::Equals;
 using Slice = at::indexing::Slice;
@@ -190,4 +193,41 @@ TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     CHECK(bam_aux2i(bam_aux_get(trimmed_record.get(), "MN")) == seqlen);
     CHECK_THAT(bam_aux2Z(bam_aux_get(trimmed_record.get(), "MM")),
                Equals("C+h?,28,24;C+m?,28,24;"));
+}
+
+std::string to_qstr(std::vector<int8_t> qscore) {
+    std::string qstr;
+    for (size_t i = 0; i < qscore.size(); ++i) {
+        qstr += static_cast<char>(qscore[i] + 33);
+    }
+    return qstr;
+}
+
+TEST_CASE("Test find_mux_change_trim_seq_index", TEST_GROUP) {
+    SECTION("Trim simple") {
+        std::vector<int8_t> vec(50, 50);
+        for (size_t i = 40; i < vec.size(); ++i) {
+            vec[i] = 1;
+        }
+        CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == 39);
+    }
+
+    SECTION("Trim all") {
+        std::vector<int8_t> vec(50, 1);
+        CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == -1);
+    }
+
+    SECTION("Trim skip single high base") {
+        std::vector<int8_t> vec(50, 50);
+        for (size_t i = 30; i < vec.size(); ++i) {
+            vec[i] = 1;
+        }
+        vec[vec.size() - 1] = 50;
+        CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == 29);
+    }
+
+    SECTION("Trim nothing") {
+        std::vector<int8_t> vec(120, 50);
+        CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == 119);
+    }
 }

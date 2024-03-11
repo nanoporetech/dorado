@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -23,6 +24,11 @@ inline int base_to_int(char c) { return 0b11 & ((c >> 2) ^ (c >> 1)); }
 // Convert a sequence string to integer representation
 // No checking is performed on the input
 std::vector<int> sequence_to_ints(const std::string& sequence);
+
+// Find the move table index for a given sequence index
+int64_t sequence_to_move_table_index(const std::vector<uint8_t>& move_vals,
+                                     int64_t sequence_index,
+                                     int64_t sequence_size);
 
 // Convert move table to vector of indices
 std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
