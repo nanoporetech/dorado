@@ -17,13 +17,13 @@ namespace {
 
 std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         dorado::alignment::IndexFileAccess& index_file_access,
-        const std::string& filename,
+        const std::string& index_file,
         const dorado::alignment::Minimap2Options& options,
         const int threads) {
     int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(threads)};
-    switch (index_file_access.load_index(filename, options, num_index_construction_threads)) {
+    switch (index_file_access.load_index(index_file, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+        throw std::runtime_error("AlignerNode reference path does not exist: " + index_file);
     case dorado::alignment::IndexLoadResult::validation_error:
         throw std::runtime_error("AlignerNode validation error checking minimap options");
     case dorado::alignment::IndexLoadResult::split_index_not_supported:
@@ -33,7 +33,7 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
     case dorado::alignment::IndexLoadResult::success:
         break;
     }
-    return index_file_access.get_index(filename, options);
+    return index_file_access.get_index(index_file, options);
 }
 
 }  // namespace
@@ -145,7 +145,7 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, dorado::BamP
     char direction = (bam_is_rev(record.get())) ? '-' : '+';
     int bed_hits = 0;
     for (const auto& entry : m_bed_file_for_bam_messages.entries(genome)) {
-        if (!(entry.start > genome_end || entry.end < genome_start) &&
+        if (!(entry.start >= genome_end || entry.end <= genome_start) &&
             (entry.strand == direction || entry.strand == '.')) {
             bed_hits++;
         }
