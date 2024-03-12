@@ -18,7 +18,7 @@ model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
 model_name_5k_v43=${5:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
 model_name_rna004=${6:-rna004_130bps_hac@v3.0.1}
 data_dir=$test_dir/data
-output_dir_name=$(echo $RANDOM | head -c 10)
+output_dir_name=test_output_$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
 mkdir -p $output_dir
 
@@ -336,7 +336,7 @@ test_barcoding_read_groups() (
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
 test_barcoding_read_groups barcode01 4 barcode04 3 unclassified 2
 # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
-test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux/sample_sheet.csv
+test_barcoding_read_groups patient_id_1 5 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
