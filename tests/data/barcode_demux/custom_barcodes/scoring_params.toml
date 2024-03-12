@@ -6,3 +6,5 @@ min_barcode_score_dist = 3
 min_separation_only_dist = 5
 flank_left_pad = 5
 flank_right_pad = 10
+front_barcode_window = 150
+rear_barcode_window = 150

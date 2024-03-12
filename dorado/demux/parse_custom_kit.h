@@ -15,6 +15,8 @@ struct BarcodeKitScoringParams {
     int min_separation_only_dist = 6;
     int flank_left_pad = 5;
     int flank_right_pad = 10;
+    int front_barcode_window = 175;
+    int rear_barcode_window = 175;
 };
 
 std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(

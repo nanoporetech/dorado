@@ -47,6 +47,8 @@ min_barcode_score_dist = 3
 min_separation_only_dist = 6
 flank_left_pad = 5
 flank_right_pad = 10
+front_barcode_window = 175
+rear_barcode_window = 175
 ```
 
 #### Arrangement Options
@@ -91,6 +93,8 @@ If a candidate meets one of the above conditions and the location of the start/e
 | barcode_end_proximity | Proximity of the end of the barcode construct to the ends of the read required for classification. |
 | flank_left_pad | Number of bases to use from preceding flank during barcode alignment. |
 | flank_right_pad | Number of bases to use from succeeding flank during barcode alignment. |
+| front_barcode_window | Number of bases at the front of the read within which to look for barcodes. |
+| rear_barcode_window | Number of bases at the rear of the read within which to look for barcodes. |
 
 For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases is typically good. Note that errors from this padding region are also part of the barcode alignment score. Therefore a bigger padding region may require a higher `max_barcode_cost` for classification.
 

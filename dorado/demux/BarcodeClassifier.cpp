@@ -146,7 +146,6 @@ std::string extract_right_buffer(const std::string& flank, int buffer) {
 
 namespace demux {
 
-const int TRIM_LENGTH = 175;
 const BarcodeScoreResult UNCLASSIFIED{};
 
 struct BarcodeClassifier::BarcodeCandidateKit {
@@ -267,6 +266,8 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         m_left_buffer = m_scoring_params.flank_left_pad;
         m_right_buffer = m_scoring_params.flank_right_pad;
+        m_front_barcode_window = m_scoring_params.front_barcode_window;
+        m_rear_barcode_window = m_scoring_params.rear_barcode_window;
 
         BarcodeCandidateKit candidate;
         candidate.kit = kit_name;
@@ -380,9 +381,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
-    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
-    int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
-    std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
+    std::string_view read_top = read_seq.substr(0, m_front_barcode_window);
+    int bottom_start = std::max(0, (int)read_seq.length() - m_rear_barcode_window);
+    std::string_view read_bottom = read_seq.substr(bottom_start, m_rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -541,9 +542,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
-    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
-    int bottom_start = std::max(0, (int)read_seq.length() - TRIM_LENGTH);
-    std::string_view read_bottom = read_seq.substr(bottom_start, TRIM_LENGTH);
+    std::string_view read_top = read_seq.substr(0, m_front_barcode_window);
+    int bottom_start = std::max(0, (int)read_seq.length() - m_rear_barcode_window);
+    std::string_view read_bottom = read_seq.substr(bottom_start, m_rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -622,7 +623,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
-    std::string_view read_top = read_seq.substr(0, TRIM_LENGTH);
+    std::string_view read_top = read_seq.substr(0, m_front_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();

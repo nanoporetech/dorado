@@ -57,6 +57,8 @@ private:
 
     int m_left_buffer;
     int m_right_buffer;
+    int m_front_barcode_window;
+    int m_rear_barcode_window;
 };
 
 }  // namespace demux
