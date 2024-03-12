@@ -64,15 +64,15 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     // Warmup
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     for (const auto &batch_dim : m_batch_dims) {
-        auto input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
-        auto scores = m_module->forward(input);
-        m_decoder->beam_search_part_1({scores, batch_dim.N, m_decoder_options});
         spdlog::info("{} using chunk size {}, batch size {}", m_device, batch_dim.T_in,
                      batch_dim.N);
         spdlog::debug("{} Model memory {:.2f}GB", m_device,
                       (crfmodel_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
         spdlog::debug("{} Decode memory {:.2f}GB", m_device,
                       (decode_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
+        auto input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
+        auto scores = m_module->forward(input);
+        m_decoder->beam_search_part_1({scores, batch_dim.N, m_decoder_options});
     }
     m_stream.synchronize();
 
@@ -322,9 +322,11 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             handle_cuda_result(cudaEventSynchronize(stop));
             float ms = 0;
             handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
-            time = std::min(time, ms / batch_size);
+            auto time_this_iteration = ms / batch_size;
+            time = std::min(time, time_this_iteration);
             handle_cuda_result(cudaEventDestroy(start));
             handle_cuda_result(cudaEventDestroy(stop));
+            spdlog::debug("iteration:{}, ms/chunk {:8f} ms", i, time_this_iteration);
         }
 
         spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size, time);

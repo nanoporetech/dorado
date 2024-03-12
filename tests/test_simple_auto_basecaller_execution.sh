@@ -58,10 +58,15 @@ set -e
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
+echo dorado basecaller mixed model complex and --modified-bases
+$dorado_bin basecaller $model_complex $pod5_dir -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
+samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
+samtools view -h $output_dir/calls.bam | grep "MN:i:"
+
 echo redirecting stderr to stdout: check output is still valid
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} --emit-moves > $output_dir/calls.bam 2>&1
 samtools quickcheck -u $output_dir/calls.bam
-samtools view $output_dir/calls.bam > $output_dir/calls.sam
 
 echo dorado aligner test stage
 $dorado_bin basecaller $model_complex $pod5_dir -b ${batch} --emit-fastq > $output_dir/ref.fq
@@ -69,8 +74,6 @@ $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} --reference $output_dir/ref.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
-samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
-
 
 if ! uname -r | grep -q tegra; then
     echo dorado duplex basespace test stage
@@ -94,7 +97,6 @@ if ! uname -r | grep -q tegra; then
         exit 1
     fi
 fi
-
 
 set +e
 if ls .temp_dorado_model-* ; then 

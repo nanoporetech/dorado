@@ -76,6 +76,7 @@ ModelFinder get_model_finder(const std::string& model_arg,
         const auto model_info = ModelFinder::get_simplex_model_info(model_name);
 
         // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
+        // There are no mods variants if model_arg is a path
         const auto inferred_selection = ModelSelection{
                 models::to_string(model_info.simplex.variant), model_info.simplex, {}};
 
@@ -128,25 +129,18 @@ DuplexModels load_models(const std::string& model_arg,
             check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
                                             recursive_file_loading);
         }
-        if (!mod_bases.empty()) {
-            std::transform(
-                    mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
-                    [&model_arg](const std::string& m) {
-                        return std::filesystem::path(models::get_modification_model(model_arg, m));
-                    });
-        } else if (!mod_bases_models.empty()) {
-            const auto split = utils::split(mod_bases_models, ',');
-            std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
-                           [&](const std::string& m) { return std::filesystem::path(m); });
-        }
+        mods_model_paths =
+                dorado::get_non_complex_mods_models(model_path, mod_bases, mod_bases_models);
 
     } else {
         try {
             model_path = model_finder.fetch_simplex_model();
             stereo_model_path = model_finder.fetch_stereo_model();
+            // Either get the mods from the model complex or resolve from --modified-bases args
             mods_model_paths = inferred_selection.has_mods_variant()
                                        ? model_finder.fetch_mods_models()
-                                       : std::vector<std::filesystem::path>{};
+                                       : dorado::get_non_complex_mods_models(model_path, mod_bases,
+                                                                             mod_bases_models);
         } catch (const std::exception&) {
             utils::clean_temporary_models(model_finder.downloaded_models());
             throw;

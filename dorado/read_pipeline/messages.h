@@ -16,6 +16,7 @@
 namespace dorado {
 
 namespace details {
+
 struct Attributes {
     uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
@@ -23,6 +24,8 @@ struct Attributes {
     std::string start_time{};    //Read acquisition start time
     std::string fast5_filename{};
     uint64_t num_samples;
+    // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
+    bool is_end_reason_mux_change{false};
 };
 }  // namespace details
 

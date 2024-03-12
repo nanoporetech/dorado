@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunnerBase.h"
+#include "read_utils.h"
 #include "stitch.h"
 #include "utils/stats.h"
 
@@ -202,6 +203,9 @@ void BasecallerNode::working_reads_manager() {
 
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();
+
+            // Trim reads which are affected by mux change and unblocking
+            utils::mux_change_trim_read(read_common_data);
 
             // Cleanup the working read.
             {

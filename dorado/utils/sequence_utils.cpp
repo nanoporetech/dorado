@@ -6,13 +6,17 @@
 #include <edlib.h>
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <numeric>
+#include <optional>
 #include <vector>
 
 namespace {
@@ -187,6 +191,54 @@ std::vector<int> sequence_to_ints(const std::string& sequence) {
     std::transform(std::begin(sequence), std::end(sequence),
                    std::back_insert_iterator<std::vector<int>>(sequence_ints), &base_to_int);
     return sequence_ints;
+}
+
+int64_t sequence_to_move_table_index(const std::vector<uint8_t>& move_vals,
+                                     int64_t sequence_index,
+                                     int64_t sequence_size) {
+    const int64_t moves_sz = static_cast<int64_t>(move_vals.size());
+    // Check out-of-bounds and input consistency
+    const bool oob_moves = sequence_index >= moves_sz;
+    const bool oob_seq = sequence_index >= sequence_size;
+    const bool size_invalid = sequence_size > moves_sz;
+
+    if (move_vals.empty() || oob_moves || oob_seq || size_invalid) {
+        spdlog::trace(
+                "sequence_to_move_table_index - bad input "
+                "seq_index:{} seq_size:{} move.size:{} - reason empty_moves: {} "
+                "oob_moves: {} oob_seq {} size_invalid: {}",
+                sequence_index, sequence_size, moves_sz, move_vals.empty(), oob_moves, oob_seq,
+                size_invalid);
+        return -1;
+    }
+
+    if (sequence_index <= sequence_size / 2) {
+        // Start with -1 because as soon as the first move_val==1 is encountered,
+        // we have moved to the first base.
+        int64_t seq_base_pos = -1;
+        for (int64_t i = 0; i < moves_sz; i++) {
+            if (move_vals[i] == 1) {
+                seq_base_pos++;
+                // seq_base_pos always > 0
+                if (seq_base_pos == sequence_index) {
+                    return i;
+                }
+            }
+        }
+    } else {
+        // Start with size because as soon as the first move_val==1 is encountered,
+        // we have moved to the last index (size - 1).
+        int64_t seq_base_pos = sequence_size;
+        for (int64_t i = moves_sz - 1; i >= 0; --i) {
+            if (move_vals[i] == 1) {
+                seq_base_pos--;
+                if (seq_base_pos == sequence_index) {
+                    return i;
+                }
+            }
+        }
+    }
+    return -1;
 }
 
 // Convert a move table to an array of the indices of the start/end of each base in the signal

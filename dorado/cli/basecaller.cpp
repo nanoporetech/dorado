@@ -462,14 +462,6 @@ int basecaller(int argc, char* argv[]) {
 
     const ModelSelection model_selection = cli::parse_model_argument(model_arg);
 
-    auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
-    if (std::count(ways.begin(), ways.end(), true) > 1) {
-        spdlog::error(
-                "Only one of --modified-bases, --modified-bases-models, or modified models set "
-                "via models argument can be used at once");
-        std::exit(EXIT_FAILURE);
-    };
-
     auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
         spdlog::error("--modified-bases-threshold must be between 0 and 1.");
@@ -564,30 +556,34 @@ int basecaller(int argc, char* argv[]) {
         custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
     }
 
+    // Assert that only one of --modified-bases, --modified-bases-models or mods model complex is set
+    auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
+    if (std::count(ways.begin(), ways.end(), true) > 1) {
+        spdlog::error(
+                "Only one of --modified-bases, --modified-bases-models, or modified models set "
+                "via models argument can be used at once");
+        std::exit(EXIT_FAILURE);
+    };
+
     fs::path model_path;
     std::vector<fs::path> mods_model_paths;
     std::set<fs::path> temp_download_paths;
 
     if (model_selection.is_path()) {
         model_path = fs::path(model_arg);
-
-        if (mod_bases.size() > 0) {
-            std::transform(mod_bases.begin(), mod_bases.end(), std::back_inserter(mods_model_paths),
-                           [&model_arg](std::string m) {
-                               return fs::path(models::get_modification_model(model_arg, m));
-                           });
-        } else if (mod_bases_models.size() > 0) {
-            const auto split = utils::split(mod_bases_models, ',');
-            std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
-                           [&](std::string m) { return fs::path(m); });
-        }
-
+        mods_model_paths =
+                dorado::get_non_complex_mods_models(model_path, mod_bases, mod_bases_models);
     } else {
         auto model_finder = cli::model_finder(model_selection, data, recursive, true);
         try {
             model_path = model_finder.fetch_simplex_model();
             if (model_selection.has_mods_variant()) {
+                // Get mods models from complex - we assert above that there's only one method
                 mods_model_paths = model_finder.fetch_mods_models();
+            } else {
+                // Get mods models from args
+                mods_model_paths = dorado::get_non_complex_mods_models(model_path, mod_bases,
+                                                                       mod_bases_models);
             }
             temp_download_paths = model_finder.downloaded_models();
         } catch (std::exception& e) {

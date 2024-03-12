@@ -120,7 +120,10 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
         if (ext == ".fast5") {
             if (!issued_fast5_warn) {
                 spdlog::warn(
-                        "FAST5 support is unoptimized and will result in poor performance. "
+                        "Deprecation Warning: FAST5 support in Dorado will be dropped in an "
+                        "upcoming "
+                        "release. "
+                        "FAST5 loading is unoptimized and will result in poor performance. "
                         "Please convert your dataset to POD5: "
                         "https://pod5-file-format.readthedocs.io/en/latest/docs/"
                         "tools.html#pod5-convert-fast5");
@@ -215,6 +218,20 @@ SimplexReadPtr process_pod5_read(
     new_read->read_common.position_id = run_info_data->sequencer_position;
     new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
+
+    pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
+    char end_reason_string_value[200];
+    size_t end_reason_string_value_size = sizeof(end_reason_string_value);
+
+    pod5_error_t pod5_ret =
+            pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
+                                end_reason_string_value, &end_reason_string_value_size);
+    if (pod5_ret != POD5_OK) {
+        spdlog::error("Failed to get read end_reason {} {}", row, pod5_get_error_string());
+    } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
+               end_reason_value == POD5_END_REASON_MUX_CHANGE) {
+        new_read->read_common.attributes.is_end_reason_mux_change = true;
+    }
 
     // Determine the time sorted predecessor of the read
     // if that information is available (primarily used for offline
