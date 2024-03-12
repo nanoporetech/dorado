@@ -39,9 +39,9 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::optional<std::string> &custom_seqs);
 
 struct BarcodeScoreResult {
-    float score = -1.f;
-    float top_score = -1.f;
-    float bottom_score = -1.f;
+    int score = -1;
+    int top_score = -1;
+    int bottom_score = -1;
     float flank_score = -1.f;
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;

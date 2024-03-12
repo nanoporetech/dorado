@@ -94,10 +94,10 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
 
 // Helper function to globally align a barcode to a region
 // within the read.
-float extract_mask_score(std::string_view barcode,
-                         std::string_view read,
-                         const EdlibAlignConfig& config,
-                         const char* debug_prefix) {
+int extract_barcode_score(std::string_view barcode,
+                          std::string_view read,
+                          const EdlibAlignConfig& config,
+                          const char* debug_prefix) {
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto score = result.editDistance;
@@ -472,10 +472,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 
         // Calculate barcode scores for v1.
         auto top_mask_result_score_v1 =
-                extract_mask_score(barcode1, top_mask_v1, mask_config, "top window v1");
+                extract_barcode_score(barcode1, top_mask_v1, mask_config, "top window v1");
 
-        auto bottom_mask_result_score_v1 =
-                extract_mask_score(barcode2_rev, bottom_mask_v1, mask_config, "bottom window v1");
+        auto bottom_mask_result_score_v1 = extract_barcode_score(barcode2_rev, bottom_mask_v1,
+                                                                 mask_config, "bottom window v1");
 
         BarcodeScoreResult v1;
         v1.top_score = top_mask_result_score_v1;
@@ -491,10 +491,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 
         // Calculate barcode scores for v2.
         auto top_mask_result_score_v2 =
-                extract_mask_score(barcode2, top_mask_v2, mask_config, "top window v2");
+                extract_barcode_score(barcode2, top_mask_v2, mask_config, "top window v2");
 
-        auto bottom_mask_result_score_v2 =
-                extract_mask_score(barcode1_rev, bottom_mask_v2, mask_config, "bottom window v2");
+        auto bottom_mask_result_score_v2 = extract_barcode_score(barcode1_rev, bottom_mask_v2,
+                                                                 mask_config, "bottom window v2");
 
         BarcodeScoreResult v2;
         v2.top_score = top_mask_result_score_v2;
@@ -584,10 +584,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         }
         spdlog::trace("Checking barcode {}", barcode_name);
 
-        auto top_mask_score = extract_mask_score(barcode, top_mask, mask_config, "top window");
+        auto top_mask_score = extract_barcode_score(barcode, top_mask, mask_config, "top window");
 
         auto bottom_mask_score =
-                extract_mask_score(barcode_rev, bottom_mask, mask_config, "bottom window");
+                extract_barcode_score(barcode_rev, bottom_mask, mask_config, "bottom window");
 
         BarcodeScoreResult res;
         res.barcode_name = barcode_name;
@@ -651,7 +651,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         }
         spdlog::trace("Checking barcode {}", barcode_name);
 
-        auto top_mask_score = extract_mask_score(barcode, top_mask, mask_config, "top window");
+        auto top_mask_score = extract_barcode_score(barcode, top_mask, mask_config, "top window");
 
         BarcodeScoreResult res;
         res.barcode_name = barcode_name;
@@ -661,7 +661,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         res.bottom_flank_score = -1.f;
         res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
         res.top_score = top_mask_score;
-        res.bottom_score = -1.f;
+        res.bottom_score = -1;
         res.score = res.top_score;
         res.use_top = true;
         res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
