@@ -245,6 +245,7 @@ build:linux:x86:focal:clang_tidy:
     - apt update && apt install -y clang clang-tidy
     - *set_parallel_jobs
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
+  interruptible: true
 
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
@@ -271,6 +272,7 @@ build:linux:arm64:bionic:
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
+
 build:linux:arm64:bionic:unittests:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   stage: build
