@@ -31,15 +31,14 @@ bool BedFile::load(const std::string & bed_filename) {
         std::string bed_line;
         std::getline(file_stream, bed_line);
 
-        if (bed_line.substr(0, std::string("#").length()) == std::string("#")) {
+        if (utils::starts_with(bed_line, "#")) {
             continue;
         }
         // Remove whitespace from end of the line
         utils::rtrim(bed_line);
         // check for header markers and ignore if present
         if (reading_header) {
-            if (bed_line.substr(0, std::string("browser").length()) == std::string("browser") ||
-                bed_line.substr(0, std::string("track").length()) == std::string("track")) {
+            if (utils::starts_with(bed_line, "browser") || utils::starts_with(bed_line, "track")) {
                 continue;
             }
             reading_header = false;

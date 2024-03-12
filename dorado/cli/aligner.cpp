@@ -111,7 +111,8 @@ int aligner(int argc, char* argv[]) {
             .implicit_value(true)
             .nargs(0);
     parser.visible.add_argument("--bed-file")
-            .help("Optional bed-file.")
+            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
+                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
             .default_value(std::string(""));
     parser.hidden.add_argument("--progress_stats_frequency")
             .help("Frequency in seconds in which to report progress statistics")

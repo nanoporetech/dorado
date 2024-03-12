@@ -1,6 +1,5 @@
 #pragma once
 
-#include <future>
 #include <map>
 #include <string>
 #include <vector>
@@ -25,16 +24,16 @@ private:
 
 public:
     BedFile() = default;
-    BedFile(BedFile &&other) = delete;
-    BedFile(const BedFile &) = delete;
-    BedFile &operator=(const BedFile &) = delete;
+    BedFile(BedFile&& other) = delete;
+    BedFile(const BedFile&) = delete;
+    BedFile& operator=(const BedFile&) = delete;
     ~BedFile() = default;
 
-    bool load(const std::string &index_filename);
+    bool load(const std::string& index_filename);
 
-    const Entries &entries(const std::string &genome) const;
+    const Entries& entries(const std::string& genome) const;
 
-    const std::string &filename() const;
+    const std::string& filename() const;
 };
 
 }  // namespace dorado::alignment

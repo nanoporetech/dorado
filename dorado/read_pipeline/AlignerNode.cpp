@@ -139,14 +139,14 @@ void AlignerNode::input_thread_fn() {
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
-void AlignerNode::add_bed_hits_to_record(const std::string& genome, dorado::BamPtr& record) {
+void AlignerNode::add_bed_hits_to_record(const std::string& genome, BamPtr& record) {
     size_t genome_start = record->core.pos;
     size_t genome_end = bam_endpos(record.get());
     char direction = (bam_is_rev(record.get())) ? '-' : '+';
     int bed_hits = 0;
-    for (const auto& entry : m_bed_file_for_bam_messages.entries(genome)) {
-        if (!(entry.start >= genome_end || entry.end <= genome_start) &&
-            (entry.strand == direction || entry.strand == '.')) {
+    for (const auto& interval : m_bed_file_for_bam_messages.entries(genome)) {
+        if (!(interval.start >= genome_end || interval.end <= genome_start) &&
+            (interval.strand == direction || interval.strand == '.')) {
             bed_hits++;
         }
     }
