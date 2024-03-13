@@ -78,7 +78,7 @@ void serialise_tensor(const at::Tensor& t, const std::string& path) {
 std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
                                      const std::vector<std::string>& tensors) {
     auto weights = std::vector<at::Tensor>();
-    for (auto tensor : tensors) {
+    for (const auto& tensor : tensors) {
         auto path = dir / tensor;
         torch::load(weights, path.string());
     }

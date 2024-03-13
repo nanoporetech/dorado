@@ -1034,7 +1034,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 }
 
 void DataLoader::initialise_read(ReadCommon& read_common) const {
-    for (auto initialiser : m_read_initialisers) {
+    for (const auto& initialiser : m_read_initialisers) {
         initialiser(read_common);
     }
 }

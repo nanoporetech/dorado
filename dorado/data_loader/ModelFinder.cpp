@@ -158,7 +158,7 @@ fs::path ModelFinder::fetch_stereo_model() {
 std::vector<fs::path> ModelFinder::fetch_mods_models() {
     const auto model_names = get_mods_model_names();
     std::vector<fs::path> paths;
-    for (auto name : model_names) {
+    for (const auto& name : model_names) {
         paths.push_back(fetch_model(name, "modification"));
     }
     return paths;

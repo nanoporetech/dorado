@@ -104,7 +104,7 @@ private:
     std::vector<ReadInitialiserF> m_read_initialisers;
 
     // Issue warnings if read is potentially problematic
-    inline void check_read(const SimplexReadPtr& read);
+    void check_read(const SimplexReadPtr& read);
     // A flag to warn only once if the data chemsitry is known
     std::atomic<bool> m_log_unknown_chemistry{true};
 };
