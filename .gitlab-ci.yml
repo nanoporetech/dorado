@@ -14,6 +14,9 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'push'
     - if: $CI_PIPELINE_SOURCE == 'web'
 
+default:
+  interruptible: true
+
 stages:
   - pre-flight
   - build
@@ -119,7 +122,6 @@ variables:
       - tests/*.bat
       - tests/data
     expire_in: 1 day
-  interruptible: true
 
 .build_dorado_archive:
   stage: build
@@ -130,7 +132,6 @@ variables:
     paths:
       - archive
     expire_in: 1 day
-  interruptible: true
 
 .sign_dorado:macos:
   script:
@@ -192,7 +193,6 @@ pre-commit:
     - pre-commit run --all-files
   tags:
     - linux
-  interruptible: true
 
 # Build stages
 
@@ -271,6 +271,7 @@ build:linux:arm64:bionic:
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
+
 build:linux:arm64:bionic:unittests:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
   stage: build
@@ -282,7 +283,6 @@ build:linux:arm64:bionic:unittests:
     - !reference [.run_dorado_cmake_ctest]
   needs:
     - build:linux:arm64:bionic
-  interruptible: true
 
 build:linux:arm64:focal:
   image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
@@ -487,7 +487,6 @@ build_archive:macos:x64:
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
-  interruptible: true
 
 .test_dorado_windows: &test_dorado_windows
   stage: test
@@ -495,7 +494,6 @@ build_archive:macos:x64:
     GIT_STRATEGY: none
   script:
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
-  interruptible: true
 
 .test_archive: &test_archive
   stage: test
@@ -507,7 +505,6 @@ build_archive:macos:x64:
     - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
-  interruptible: true
 
 # Test stages
 
@@ -638,7 +635,6 @@ test:model_download:linux:x86:focal:
     - build:linux:x86:focal
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
-  interruptible: true
 
 # MLHub
 
@@ -649,7 +645,6 @@ test:model_download:linux:x86:focal:
   needs: []
   variables:
     GIT_STRATEGY: none
-  interruptible: true
 
 # MLHub - Single read eval
 .mlhub_sre:

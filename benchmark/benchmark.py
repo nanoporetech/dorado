@@ -30,14 +30,18 @@ REF_MAP = {}
 
 def run_cmd(cmd: List[str], stderr=sp.PIPE, stdout=sp.DEVNULL):
     logging.info("Running cmd: %s", " ".join(cmd))
-    return sp.run(
-        " ".join(cmd),
-        shell=True,
-        text=True,
-        stderr=stderr,
-        stdout=stdout,
-        check=True,
-    )
+    try:
+        return sp.run(
+            " ".join(cmd),
+            shell=True,
+            text=True,
+            stderr=stderr,
+            stdout=stdout,
+            check=True,
+        )
+    except sp.CalledProcessError as e:
+        print(e.stderr)
+        raise e
 
 
 @dataclass
