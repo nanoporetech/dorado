@@ -198,7 +198,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     auto bh_tag_type = *(char*)bh_tag_ptr;
     CHECK(bh_tag_type == 'i');
     int32_t bh_tag_value = 0;
-    std::copy(bh_tag_ptr + 1, bh_tag_ptr + 5, &bh_tag_value);
+    memcpy(&bh_tag_value, bh_tag_ptr + 1, 4);
     CHECK(bh_tag_value == 3);
 }
 
