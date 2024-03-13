@@ -66,7 +66,7 @@ protected:
                                                 const SimplexRead& read,
                                                 float num_samples_per_base) const;
 
-    PolyTailConfig m_config;
+    const PolyTailConfig m_config;
 };
 
 class PolyTailCalculatorFactory {
