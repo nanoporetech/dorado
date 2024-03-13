@@ -759,6 +759,7 @@ const std::vector<ModelInfo>& modified_models() { return modified::models; }
 namespace {
 std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
     std::vector<std::string> v;
+    v.reserve(infos.size());
     for (const auto& item : infos) {
         v.push_back(std::string(item.name));
     }

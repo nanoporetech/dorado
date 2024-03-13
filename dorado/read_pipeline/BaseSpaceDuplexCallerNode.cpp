@@ -71,6 +71,7 @@ void BaseSpaceDuplexCallerNode::worker_thread() {
     cxxpool::thread_pool pool{m_num_worker_threads};
     std::vector<std::future<void>> futures;
 
+    futures.reserve(m_template_complement_map.size());
     for (const auto& key : m_template_complement_map) {
         futures.push_back(pool.push([key, this] { return basespace(key.first, key.second); }));
     }
