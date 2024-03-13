@@ -50,11 +50,11 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)) {
     auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
-    for (const auto& entry : header_sequence_records) {
-        m_header_sequences_for_bam_messages.emplace_back(entry.first);
-    }
     if (!bed_file.empty()) {
         m_bed_file_for_bam_messages.load(bed_file);
+        for (const auto& entry : header_sequence_records) {
+            m_header_sequences_for_bam_messages.emplace_back(entry.first);
+        }
     }
     start_input_processing(&AlignerNode::input_thread_fn, this);
 }

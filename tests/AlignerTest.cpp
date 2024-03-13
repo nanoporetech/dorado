@@ -160,6 +160,48 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     }
 }
 
+TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed file", TEST_GROUP) {
+    using Catch::Matchers::Contains;
+
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = aligner_test_dir / "target.fq";
+    auto query = aligner_test_dir / "target.fq";
+    auto bed = aligner_test_dir / "target.bed";
+
+    auto options = dorado::alignment::dflt_options;
+    options.kmer_size = options.window_size = 15;
+    options.index_batch_size = 1'000'000'000ull;
+    dorado::HtsReader reader(query.string(), std::nullopt);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), bed.string(), options, 10);
+    REQUIRE(bam_records.size() == 1);
+
+    bam1_t* rec = bam_records[0].get();
+    bam1_t* in_rec = reader.record.get();
+
+    // Check input/output reads are matching.
+    std::string orig_read = dorado::utils::extract_sequence(in_rec);
+    std::string aligned_read = dorado::utils::extract_sequence(rec);
+
+    // Check quals are matching.
+    std::vector<uint8_t> orig_qual = dorado::utils::extract_quality(in_rec);
+    std::vector<uint8_t> aligned_qual = dorado::utils::extract_quality(rec);
+    CHECK(orig_qual == aligned_qual);
+
+    // Check aux tags.
+    uint32_t l_aux = bam_get_l_aux(rec);
+    std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
+    std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli", "bhi"};
+    for (auto tag : tags) {
+        CHECK_THAT(aux, Contains(tag));
+    }
+    auto bh_tag_ptr = bam_aux_get(rec, "bh");
+    auto bh_tag_type = *(char*)bh_tag_ptr;
+    CHECK(bh_tag_type == 'i');
+    int32_t bh_tag_value = 0;
+    std::copy(bh_tag_ptr + 1, bh_tag_ptr + 5, &bh_tag_value);
+    CHECK(bh_tag_value == 3);
+}
+
 TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary alignment", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
