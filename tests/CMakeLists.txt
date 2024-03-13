@@ -225,3 +225,9 @@ endforeach()
 if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
     set_source_files_properties(TrimTest.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
+
+# Create a dynamic library that checks that all symbols are available.
+# If this fails to link then we're not providing all of the libs for the symbols
+# that we use.
+add_library(dorado_symbol_test SHARED symbol_test.cpp)
+target_link_libraries(dorado_symbol_test PUBLIC dorado_lib dorado_models_lib)
