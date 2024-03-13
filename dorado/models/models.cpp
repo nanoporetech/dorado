@@ -817,7 +817,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
 }
 
 ModelInfo get_simplex_model_info(const std::string& model_name) {
-    const auto simplex_model_infos = simplex_models();
+    const auto& simplex_model_infos = simplex_models();
     auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
     std::vector<ModelInfo> matches;
     std::copy_if(simplex_model_infos.begin(), simplex_model_infos.end(),
@@ -876,7 +876,7 @@ std::string get_modification_model(const std::filesystem::path& simplex_model_pa
 }
 
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
-    const auto chemistries = chemistry_kits();
+    const auto& chemistries = chemistry_kits();
     const ModelInfo model_info = get_simplex_model_info(model_name);
     auto iter = chemistries.find(model_info.chemistry);
     if (iter != chemistries.end()) {
