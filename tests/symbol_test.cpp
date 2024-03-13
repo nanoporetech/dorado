@@ -76,7 +76,7 @@ void reference_all_public_functions() {
     // api/pipeline_creation.h
     force_reference(&dorado::api::create_simplex_pipeline);
     // api/runner_creation.h
-    force_reference(&dorado::api::create_basecall_runner);
+    force_reference(&dorado::api::create_basecall_runners);
     // basecall/CRFModelConfig.h
     force_reference(&dorado::basecall::load_crf_model_config);
     // basecall/ModelRunner.h
