@@ -1,6 +1,7 @@
 # Disable all default warnings, then enable only the ones we want to check for.
 Checks: '-*,
-fuchsia-default-arguments-declarations
+fuchsia-default-arguments-declarations,
+performance-*,
 '
 WarningsAsErrors: '*'
 
