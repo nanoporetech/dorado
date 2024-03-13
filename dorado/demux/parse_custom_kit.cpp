@@ -137,6 +137,12 @@ BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file
     if (config.contains("flank_right_pad")) {
         params.flank_right_pad = toml::find<int>(config, "flank_right_pad");
     }
+    if (config.contains("front_barcode_window")) {
+        params.front_barcode_window = toml::find<int>(config, "front_barcode_window");
+    }
+    if (config.contains("rear_barcode_window")) {
+        params.rear_barcode_window = toml::find<int>(config, "rear_barcode_window");
+    }
 
     return params;
 }
