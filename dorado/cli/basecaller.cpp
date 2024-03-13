@@ -227,14 +227,14 @@ void setup(const std::vector<std::string>& args,
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim, std::move(custom_primer_file));
+                !primer_no_trim, custom_primer_file);
     }
     if (barcode_enabled) {
         std::vector<std::string> kit_as_vector{barcode_kit};
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, kit_as_vector,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
-                std::move(custom_kit), std::move(custom_barcode_file));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes), custom_kit,
+                custom_barcode_file);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -685,10 +685,9 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::string>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
-              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
-              std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
-              model_selection);
+              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"), custom_kit,
+              custom_barcode_seqs, custom_primer_file, resume_parser,
+              parser.visible.get<bool>("--estimate-poly-a"), polya_config, model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

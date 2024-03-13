@@ -8,3 +8,6 @@ WarningsAsErrors: '*'
 # clang-tidy's regex doesn't support negative lookahead, so we have to list all the places to
 # check rather than "not 3rdparty" -_-
 HeaderFilterRegex: 'dorado/(alignment|cli|data_loader|decode|demux|modbase|models|nn|read_pipeline|splitter|utils)'
+
+CheckOptions:
+  performance-move-const-arg.CheckTriviallyCopyableMove: false

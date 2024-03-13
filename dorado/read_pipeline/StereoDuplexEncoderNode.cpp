@@ -56,16 +56,16 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                 &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
     edlibFreeAlignResult(edlib_result);
 
-    stereo_feature_inputs.template_seq_start = std::move(template_read.seq_start);
-    stereo_feature_inputs.template_seq = std::move(template_read.read_common.seq);
-    stereo_feature_inputs.template_qstring = std::move(template_read.read_common.qstring);
-    stereo_feature_inputs.template_moves = std::move(template_read.read_common.moves);
-    stereo_feature_inputs.template_signal = std::move(template_read.read_common.raw_data);
+    stereo_feature_inputs.template_seq_start = template_read.seq_start;
+    stereo_feature_inputs.template_seq = template_read.read_common.seq;
+    stereo_feature_inputs.template_qstring = template_read.read_common.qstring;
+    stereo_feature_inputs.template_moves = template_read.read_common.moves;
+    stereo_feature_inputs.template_signal = template_read.read_common.raw_data;
 
-    stereo_feature_inputs.complement_seq_start = std::move(complement_read.seq_start);
-    stereo_feature_inputs.complement_seq = std::move(complement_sequence_reverse_complement);
-    stereo_feature_inputs.complement_qstring = std::move(complement_read.read_common.qstring);
-    stereo_feature_inputs.complement_moves = std::move(complement_read.read_common.moves);
+    stereo_feature_inputs.complement_seq_start = complement_read.seq_start;
+    stereo_feature_inputs.complement_seq = complement_sequence_reverse_complement;
+    stereo_feature_inputs.complement_qstring = complement_read.read_common.qstring;
+    stereo_feature_inputs.complement_moves = complement_read.read_common.moves;
     stereo_feature_inputs.complement_signal = at::flip(complement_read.read_common.raw_data, 0);
 
     read->read_common.read_id =
