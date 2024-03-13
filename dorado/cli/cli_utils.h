@@ -87,7 +87,7 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std
 inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
     size_t first_pos = 0, pos = 0;
     std::vector<int> tokens;
-    while ((pos = version.find(".", first_pos)) != std::string::npos) {
+    while ((pos = version.find('.', first_pos)) != std::string::npos) {
         tokens.emplace_back(std::stoi(version.substr(first_pos, pos)));
         first_pos = pos + 1;
     }

@@ -154,7 +154,7 @@ void strip_alignment_data_from_header(sam_hdr_t* hdr) {
 bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
     auto get_pg_id = [](std::string& str) {
         size_t start_pos = str.find("ID:");
-        size_t end_pos = str.find("\t", start_pos);
+        size_t end_pos = str.find('\t', start_pos);
         return end_pos == std::string::npos ? str.substr(start_pos)
                                             : str.substr(start_pos, end_pos - start_pos);
     };

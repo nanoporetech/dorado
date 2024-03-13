@@ -503,7 +503,7 @@ std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
     CHECK(!line.empty());
     CHECK(dorado::utils::starts_with(line, ">"));
     line = line.substr(1);
-    auto read_id = line.substr(0, line.find_first_of(" "));
+    auto read_id = line.substr(0, line.find_first_of(' '));
 
     std::string sequence;
     while (std::getline(query_input_stream, sequence)) {
