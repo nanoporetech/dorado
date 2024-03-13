@@ -57,7 +57,7 @@ std::vector<std::string> SummaryData::s_alignment_fields = {
         "alignment_length",         "alignment_num_aligned",     "alignment_num_correct",
         "alignment_num_insertions", "alignment_num_deletions",   "alignment_num_substitutions",
         "alignment_mapq",           "alignment_strand_coverage", "alignment_identity",
-        "alignment_accuracy"};
+        "alignment_accuracy",       "alignment_bed_hits"};
 
 SummaryData::SummaryData() = default;
 
@@ -218,6 +218,7 @@ bool SummaryData::write_rows_from_reader(
             float strand_coverage = 0.0;
             float alignment_identity = 0.0;
             float alignment_accurary = 0.0;
+            int alignment_bed_hits = 0;
 
             if (reader.is_aligned && !(reader.record->core.flag & BAM_FUNMAP)) {
                 alignment_mapq = static_cast<int>(reader.record->core.qual);
@@ -244,6 +245,7 @@ bool SummaryData::write_rows_from_reader(
                 alignment_identity =
                         alignment_num_correct / static_cast<float>(alignment_counts.matches);
                 alignment_accurary = alignment_num_correct / static_cast<float>(alignment_length);
+                alignment_bed_hits = reader.get_tag<int>("bh");
             }
 
             writer << m_separator << alignment_genome << m_separator << alignment_genome_start
@@ -254,7 +256,8 @@ bool SummaryData::write_rows_from_reader(
                    << alignment_num_insertions << m_separator << alignment_num_deletions
                    << m_separator << alignment_num_substitutions << m_separator << alignment_mapq
                    << m_separator << strand_coverage << m_separator << alignment_identity
-                   << m_separator << alignment_accurary;
+                   << m_separator << alignment_accurary << m_separator << alignment_bed_hits;
+            ;
         }
         writer << '\n';
     }

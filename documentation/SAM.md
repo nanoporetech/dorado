@@ -42,6 +42,7 @@
 | pi:Z:  | parent read id for a split read                            |
 | sp:i:  | start coordinate of split read in parent read signal       |
 | pt:i:  | estimated poly(A/T) tail length in cDNA and dRNA reads     |
+| bh:i:  | number of detected bedfile hits _(only if alignment was performed with a specified bed-file)_ |
 | MN:i:  | Length of sequence at the time MM and ML were produced     |
 
 #### Modified Base Tags

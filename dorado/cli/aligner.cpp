@@ -101,18 +101,19 @@ int aligner(int argc, char* argv[]) {
             .nargs(0);
     parser.visible.add_argument("-o", "--output-dir")
             .help("If specified output files will be written to the given folder, otherwise output "
-                  "is to stdout. "
-                  "Required if the 'reads' positional argument is a folder.")
+                  "is to stdout. Required if the 'reads' positional argument is a folder.")
             .default_value(std::string{});
     parser.visible.add_argument("--emit-summary")
             .help("If specified, a summary file containing the details of the primary alignments "
-                  "for each "
-                  "read will be emitted to the root of the output folder. This option requires "
-                  "that the "
-                  "'--output-dir' option is also set.")
+                  "for each read will be emitted to the root of the output folder. This option "
+                  "requires that the '--output-dir' option is also set.")
             .default_value(false)
             .implicit_value(true)
             .nargs(0);
+    parser.visible.add_argument("--bed-file")
+            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
+                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
+            .default_value(std::string(""));
     parser.hidden.add_argument("--progress_stats_frequency")
             .help("Frequency in seconds in which to report progress statistics")
             .default_value(0)
@@ -150,6 +151,7 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index(parser.visible.get<std::string>("index"));
+    auto bed_file(parser.visible.get<std::string>("bed-file"));
     auto reads(parser.visible.get<std::string>("reads"));
     auto recursive_input = parser.visible.get<bool>("recursive");
     auto output_folder = parser.visible.get<std::string>("output-dir");
@@ -214,7 +216,7 @@ int aligner(int argc, char* argv[]) {
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, file_info.output,
                                                             file_info.output_mode, writer_threads);
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
-                                                           options, aligner_threads);
+                                                           bed_file, options, aligner_threads);
 
         // Create the Pipeline from our description.
         std::vector<dorado::stats::StatsReporter> stats_reporters;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -38,6 +39,11 @@ inline bool ends_with(std::string_view str, std::string_view suffix) {
         return false;
     }
     return str.substr(str.length() - suffix.length()) == suffix;
+}
+
+inline void rtrim(std::string& s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base(),
+            s.end());
 }
 
 }  // namespace dorado::utils
