@@ -44,7 +44,7 @@ static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
 
 struct ArgParser {
     ArgParser(std::string program_name)
-            : visible(program_name, DORADO_VERSION, argparse::default_arguments::help),
+            : visible(std::move(program_name), DORADO_VERSION, argparse::default_arguments::help),
               hidden(HIDDEN_PROGRAM_NAME){};
     argparse::ArgumentParser visible;
     argparse::ArgumentParser hidden;
@@ -62,7 +62,9 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
     return std::make_pair(aligner_threads, writer_threads);
 }
 
-inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std::string device) {
+inline void add_pg_hdr(sam_hdr_t* hdr,
+                       const std::vector<std::string>& args,
+                       const std::string& device) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
     std::stringstream pg;

@@ -45,22 +45,25 @@ public:
                     ReadOrder traversal_order);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
-            std::filesystem::path data_path,
+            const std::filesystem::path& data_path,
             std::string model_name,
             std::string modbase_model_names,
             bool recursive_file_loading);
 
-    static int get_num_reads(std::filesystem::path data_path,
+    static int get_num_reads(const std::filesystem::path& data_path,
                              std::optional<std::unordered_set<std::string>> read_list,
                              const std::unordered_set<std::string>& ignore_read_list,
                              bool recursive_file_loading);
 
-    static bool is_read_data_present(std::filesystem::path data_path, bool recursive_file_loading);
+    static bool is_read_data_present(const std::filesystem::path& data_path,
+                                     bool recursive_file_loading);
 
-    static uint16_t get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading);
+    static uint16_t get_sample_rate(const std::filesystem::path& data_path,
+                                    bool recursive_file_loading);
 
-    static std::set<models::ChemistryKey> get_sequencing_chemistry(std::filesystem::path data_path,
-                                                                   bool recursive_file_loading);
+    static std::set<models::ChemistryKey> get_sequencing_chemistry(
+            const std::filesystem::path& data_path,
+            bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
@@ -81,7 +84,7 @@ private:
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
-    void load_read_channels(std::filesystem::path data_path, bool recursive_file_loading);
+    void load_read_channels(const std::filesystem::path& data_path, bool recursive_file_loading);
 
     void initialise_read(ReadCommon& read) const;
 

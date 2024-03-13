@@ -27,8 +27,8 @@ public:
     bool read();
     std::size_t read(Pipeline& pipeline, std::size_t max_reads);
     template <typename T>
-    T get_tag(std::string tagname);
-    bool has_tag(std::string tagname);
+    T get_tag(const char* tagname);
+    bool has_tag(const char* tagname);
 
     char* format{nullptr};
     bool is_aligned{false};
@@ -42,9 +42,9 @@ private:
 };
 
 template <typename T>
-T HtsReader::get_tag(std::string tagname) {
+T HtsReader::get_tag(const char* tagname) {
     T tag_value{};
-    uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
+    uint8_t* tag = bam_aux_get(record.get(), tagname);
 
     if (!tag) {
         return tag_value;

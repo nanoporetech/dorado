@@ -68,7 +68,7 @@ __attribute__((target("avx2,f16c"))) void convert_f32_to_f16_impl(c10::Half* con
 
 namespace dorado::utils {
 
-void serialise_tensor(at::Tensor t, const std::string& path) {
+void serialise_tensor(const at::Tensor& t, const std::string& path) {
     auto bytes = torch::jit::pickle_save(t);
     std::ofstream fout(path);
     fout.write(bytes.data(), bytes.size());
@@ -86,7 +86,7 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
     return weights;
 }
 
-at::Tensor quantile(const at::Tensor t, const at::Tensor q) {
+at::Tensor quantile(const at::Tensor& t, const at::Tensor& q) {
     assert(q.dtype() == at::ScalarType::Float);
 
     auto tmp = t.clone();
@@ -107,7 +107,7 @@ at::Tensor quantile(const at::Tensor t, const at::Tensor q) {
     return res;
 }
 
-at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q) {
+at::Tensor quantile_counting(const at::Tensor& t, const at::Tensor& q) {
     assert(q.dtype() == at::ScalarType::Float);
 
     auto p = t.data_ptr<int16_t>();

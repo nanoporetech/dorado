@@ -43,7 +43,7 @@ struct ConvStackImpl : torch::nn::Module {
 
 struct LinearCRFImpl : torch::nn::Module {
     LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale);
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 #if DORADO_CUDA_BUILD
     void reserve_working_memory(WorkingMemory &wm);
     void run_koi(WorkingMemory &wm);
@@ -97,7 +97,7 @@ struct CRFModelImpl : torch::nn::Module {
     at::Tensor run_koi(at::Tensor in);
 #endif
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
     ConvStack convs{nullptr};
     LSTMStack rnns{nullptr};
     LinearCRF linear1{nullptr}, linear2{nullptr};

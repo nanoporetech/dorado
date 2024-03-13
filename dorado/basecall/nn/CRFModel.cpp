@@ -429,7 +429,7 @@ LinearCRFImpl::LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_
     }
 };
 
-at::Tensor LinearCRFImpl::forward(at::Tensor x) {
+at::Tensor LinearCRFImpl::forward(const at::Tensor &x) {
     utils::ScopedProfileRange spr("linear", 2);
     // Input x is [N, T, C], contiguity optional
     auto scores = linear(x);
@@ -791,7 +791,7 @@ at::Tensor CRFModelImpl::run_koi(at::Tensor in) {
 }
 #endif
 
-at::Tensor CRFModelImpl::forward(at::Tensor x) {
+at::Tensor CRFModelImpl::forward(const at::Tensor &x) {
     utils::ScopedProfileRange spr("nn_forward", 1);
     if (x.device() == torch::kCPU) {
         // Output is [T, N, C], which CPU decoding requires.

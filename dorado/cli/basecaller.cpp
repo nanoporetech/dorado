@@ -85,7 +85,7 @@ using namespace std::chrono_literals;
 using namespace dorado::models;
 namespace fs = std::filesystem;
 
-void setup(std::vector<std::string> args,
+void setup(const std::vector<std::string>& args,
            const fs::path& model_path,
            const std::string& data_path,
            const std::vector<fs::path>& remora_models,
@@ -102,7 +102,7 @@ void setup(std::vector<std::string> args,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           std::string read_list_file_path,
+           const std::string& read_list_file_path,
            bool recursive_file_loading,
            const alignment::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
@@ -425,11 +425,12 @@ int basecaller(int argc, char* argv[]) {
             .action([](const std::string& value) {
                 const auto& mods = models::modified_model_variants();
                 if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                    spdlog::error(
-                            "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(
-                                    std::next(mods.begin()), mods.end(), mods[0],
-                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                    spdlog::error("'{}' is not a supported modification please select from {}",
+                                  value,
+                                  std::accumulate(std::next(mods.begin()), mods.end(), mods[0],
+                                                  [](std::string const& a, std::string const& b) {
+                                                      return a + ", " + b;
+                                                  }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;

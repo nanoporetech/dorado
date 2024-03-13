@@ -38,7 +38,7 @@ struct UnpaddedConvolutionImpl : Module {
         activation = register_module("activation", SiLU());
     }
 
-    at::Tensor forward(at::Tensor x) { return activation(conv(x)); }
+    at::Tensor forward(const at::Tensor& x) { return activation(conv(x)); }
 
     Conv1d conv{nullptr};
     SiLU activation{nullptr};
@@ -184,7 +184,7 @@ struct ModBaseConvLSTMModelImpl : Module {
         return z;
     }
 
-    void load_state_dict(std::vector<at::Tensor> weights) {
+    void load_state_dict(const std::vector<at::Tensor>& weights) {
         utils::load_state_dict(*this, weights, {});
     }
 

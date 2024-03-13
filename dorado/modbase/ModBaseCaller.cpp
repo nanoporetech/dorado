@@ -25,7 +25,9 @@ namespace dorado::modbase {
 
 struct ModBaseCaller::ModBaseTask {
     ModBaseTask(at::Tensor input_sigs_, at::Tensor input_seqs_, int num_chunks_)
-            : input_sigs(input_sigs_), input_seqs(input_seqs_), num_chunks(num_chunks_) {}
+            : input_sigs(std::move(input_sigs_)),
+              input_seqs(std::move(input_seqs_)),
+              num_chunks(num_chunks_) {}
     at::Tensor input_sigs;
     at::Tensor input_seqs;
     std::mutex mut;

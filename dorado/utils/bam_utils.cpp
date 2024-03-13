@@ -324,7 +324,7 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
     return counts;
 }
 
-std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
                                                             const std::vector<std::string>& keys) {
     std::map<std::string, std::string> pg_keys;
     auto file = hts_open(filename.c_str(), "r");

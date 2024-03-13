@@ -10,7 +10,7 @@
 namespace dorado::utils {
 
 // Serialise Torch tensor to disk.
-void serialise_tensor(at::Tensor t, const std::string& path);
+void serialise_tensor(const at::Tensor& t, const std::string& path);
 // Load serialised tensor from disk.
 std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
                                      const std::vector<std::string>& tensors);
@@ -18,12 +18,12 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
 // Computes the q-th quantiles of each row of the input tensor `t`
 // using a partial sort as opposed a full sort per torch::quantiles
 // Only `interpolation='lower'` is currently implemented.
-at::Tensor quantile(const at::Tensor t, const at::Tensor q);
+at::Tensor quantile(const at::Tensor& t, const at::Tensor& q);
 
 // Computes the q-th quantiles of each row of the input tensor `t`
 // using a counting sort which is extremely fast for low range integers.
 // Only `interpolation='lower'` is currently implemented.
-at::Tensor quantile_counting(const at::Tensor t, const at::Tensor q);
+at::Tensor quantile_counting(const at::Tensor& t, const at::Tensor& q);
 
 // Converts count float elements pointed to by src to half precision, with
 // the result pointed to by dest.

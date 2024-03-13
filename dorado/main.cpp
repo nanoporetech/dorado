@@ -40,7 +40,7 @@ using entry_ptr = std::function<int(int, char**)>;
 
 namespace {
 
-void usage(const std::vector<std::string> commands) {
+void usage(const std::vector<std::string>& commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:" << std::endl;
 
