@@ -1,9 +1,12 @@
 #include "Version.h"
 #include "cli/cli.h"
 #include "utils/locale_utils.h"
+#include "utils/log_utils.h"
+#include "utils/string_utils.h"
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
+#include <spdlog/spdlog.h>
 
 #include <functional>
 #include <iostream>
@@ -53,6 +56,7 @@ void usage(const std::vector<std::string> commands) {
 int main(int argc, char* argv[]) {
     // Load logging settings from environment/command-line.
     spdlog::cfg::load_env_levels();
+    dorado::utils::InitLogging();
 
     dorado::utils::ensure_user_locale_may_be_set();
 
@@ -77,6 +81,9 @@ int main(int argc, char* argv[]) {
         usage(keys);
         return 0;
     }
+
+    // Log cmd
+    spdlog::info("Running: {}", dorado::utils::join(arguments, " "));
 
     const auto subcommand = arguments[0];
 

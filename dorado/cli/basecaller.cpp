@@ -286,7 +286,6 @@ void setup(std::vector<std::string> args,
 }
 
 int basecaller(int argc, char* argv[]) {
-    utils::InitLogging();
     utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
     torch::set_num_threads(1);

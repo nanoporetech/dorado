@@ -35,8 +35,6 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 }  // anonymous namespace
 
 int trim(int argc, char* argv[]) {
-    utils::InitLogging();
-
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Adapter/primer trimming tool.");
     parser.add_argument("reads")

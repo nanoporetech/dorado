@@ -165,7 +165,6 @@ using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
-    utils::InitLogging();
     utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
