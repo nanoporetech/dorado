@@ -18,12 +18,16 @@ namespace dorado {
 namespace utils {
 class SampleSheet;
 }
+
 class BarcodeDemuxerNode : public MessageSink {
 public:
+    using HtsFiles = std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>>;
+
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        bool write_fastq,
-                       std::unique_ptr<const utils::SampleSheet> sample_sheet);
+                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                       HtsFiles& hts_files);
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -38,7 +42,7 @@ private:
     SamHdrPtr m_header;
     std::atomic<int> m_processed_reads{0};
 
-    std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>> m_files;
+    HtsFiles& m_files;
     std::unique_ptr<std::thread> m_worker;
     void input_thread_fn();
     int write(bam1_t* record);

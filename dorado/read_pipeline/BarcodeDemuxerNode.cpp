@@ -16,10 +16,12 @@ namespace dorado {
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
-                                       std::unique_ptr<const utils::SampleSheet> sample_sheet)
+                                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                       HtsFiles& hts_files)
         : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
+          m_files(hts_files),
           m_write_fastq(write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
@@ -93,9 +95,6 @@ stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
     return stats;
 }
 
-void BarcodeDemuxerNode::terminate(const FlushOptions&) {
-    stop_input_processing();
-    m_files.clear();
-}
+void BarcodeDemuxerNode::terminate(const FlushOptions&) { stop_input_processing(); }
 
 }  // namespace dorado

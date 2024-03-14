@@ -204,10 +204,12 @@ int demuxer(int argc, char* argv[]) {
         allowed_barcodes = sample_sheet->get_barcode_values();
     }
 
+    BarcodeDemuxerNode::HtsFiles hts_files;
+
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet));
+            std::move(sample_sheet), hts_files);
 
     if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
@@ -272,6 +274,9 @@ int demuxer(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
+    for (auto& [bc, hts_file] : hts_files) {
+        hts_file->finalise();
+    }
 
     stats_sampler->terminate();
 
