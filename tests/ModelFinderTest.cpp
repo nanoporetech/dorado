@@ -56,9 +56,8 @@ TEST_CASE(TEST_TAG "  ModelFinder get_simplex_model_name", TEST_TAG) {
     SECTION("get_simplex_model_name all") {
         // given the model definitions the same model can be found
         for (const auto& mi : simplex_models()) {
-            const auto variant = to_string(mi.simplex.variant);
-            const auto ver = to_string(mi.simplex.ver);
-            const auto complex = variant + "@" + ver;
+            const auto complex =
+                    to_string(mi.simplex.variant).append("@").append(to_string(mi.simplex.ver));
             const auto mf = MF{mi.chemistry, MS{complex, mi.simplex}, false};
             CAPTURE(mi.name);
             CAPTURE(complex);

@@ -424,10 +424,7 @@ void CudaCaller::cuda_thread_fn() {
                 c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
         auto print_stat = [](c10::cuda::CUDACachingAllocator::StatArray &st) {
-            std::string s("");
-            s += "aggregate current " + std::to_string(st[0].current);
-            s += "\n";
-            return s;
+            return "aggregate current " + std::to_string(st[0].current);
         };
         spdlog::trace(
                 "allocation {}, segment {}, active {}, inactive_split {}, alloc_bytes {}, "

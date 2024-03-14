@@ -127,8 +127,12 @@ std::string ModelComplexParser::parse_version(const std::string& version) {
             }
             nums.push_back(value);
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to parse model version: '" + version +
-                                     ", invalid part: '" + value + "' - " + e.what());
+            throw std::runtime_error(std::string("Failed to parse model version: '")
+                                             .append(version)
+                                             .append(", invalid part: '")
+                                             .append(value)
+                                             .append("' - ")
+                                             .append(e.what()));
         }
     }
 

@@ -574,7 +574,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                             spdlog::error("Failed to free run info");
                         }
 
-                        std::string id = run_id + "_" + model_name;
+                        std::string id = std::string(run_id).append("_").append(model_name);
                         read_groups[id] = ReadGroup{
                                 run_id,
                                 model_name,

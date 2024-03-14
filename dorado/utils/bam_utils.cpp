@@ -339,7 +339,10 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
-            throw std::runtime_error("Required key " + k + " not found in header of " + filename);
+            throw std::runtime_error(std::string("Required key ")
+                                             .append(k)
+                                             .append(" not found in header of ")
+                                             .append(filename));
         }
         pg_keys[k] = std::string(val.s);
     }
