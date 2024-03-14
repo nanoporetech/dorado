@@ -50,6 +50,7 @@ add_executable(dorado_tests
     StringUtilsTest.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
+    TrimRapidAdapterTest.cpp
     TrimTest.cpp
 )
 if (NOT IOS)

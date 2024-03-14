@@ -220,29 +220,37 @@ std::vector<std::string> ModelFinder::get_mods_for_simplex_model() const {
 }
 
 Chemistry ModelFinder::inspect_chemistry(const std::string& data, bool recursive_file_loading) {
-    const ChemistryMap& kit_map = models::chemistry_map();
-    std::vector<ChemistryKey> data_chemistries =
+    std::set<ChemistryKey> data_chemistries =
             DataLoader::get_sequencing_chemistry(data, recursive_file_loading);
+
+    if (data_chemistries.empty()) {
+        throw std::runtime_error(
+                "Failed to determine sequencing chemistry from data. Please select a model by "
+                "path");
+    }
 
     std::set<Chemistry> found;
     for (const auto& dc : data_chemistries) {
-        const auto it = kit_map.find(dc);
-        if (it == kit_map.end()) {
-            const auto& [fc, kit, sampling_rate] = dc;
-            spdlog::error("No supported chemistry for Flowcell:'{}', Kit:'{}' and Sampling Rate:{}",
-                          to_string(fc), to_string(kit), sampling_rate);
-            throw std::runtime_error("Could not resolve chemistry from data");
+        const auto chemistry = models::get_chemistry(dc);
+        if (chemistry == models::Chemistry::UNKNOWN) {
+            spdlog::error("No supported chemistry found for {}", to_string(dc));
+            spdlog::error(
+                    "This is typically seen when using prototype kits. Please download an "
+                    "appropriate model for your data and select it by model path");
+
+            throw std::runtime_error("Could not resolve chemistry from data: Unknown chemistry");
         }
-        found.insert(it->second);
+        found.insert(chemistry);
     }
     if (found.empty()) {
-        throw std::runtime_error("Could not resolve chemistry from data");
+        throw std::runtime_error("Could not resolve chemistry from data: No data");
     }
     if (found.size() > 1) {
         spdlog::error("Multiple sequencing chemistries found in data");
         for (auto f : found) {
             spdlog::error("Found: {}", to_string(f));
         }
+
         throw std::runtime_error("Could not uniquely resolve chemistry from inhomogeneous data");
     }
     return *std::begin(found);

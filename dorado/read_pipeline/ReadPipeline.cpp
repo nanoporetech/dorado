@@ -288,7 +288,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
 }
 
 float ReadCommon::calculate_mean_qscore() const {
-    if (is_rna) {
+    if (is_rna_model) {
         const size_t polya_start = utils::find_rna_polya(seq);
         spdlog::trace("calculate_mean_qscore rna - len:{} polya_start_idx: {}, polya_trim_len:{}",
                       seq.size(), polya_start, seq.size() - polya_start);

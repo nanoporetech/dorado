@@ -1,5 +1,6 @@
 #include "DataLoader.h"
 
+#include "models/kits.h"
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/PostCondition.h"
@@ -151,6 +152,14 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
     return pod5_entries;
 }
 
+// Parses pod5 run_info data into a ChemistryKey which is used to lookup the sequencing chemistry
+models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_data) {
+    const auto fc = models::flowcell_code(run_info_data->flow_cell_product_code);
+    const auto kit = models::kit_code(run_info_data->sequencing_kit);
+    const auto key = models::ChemistryKey(fc, kit, run_info_data->sample_rate);
+    return key;
+}
+
 // TODO: Replace the const * to read_by_channel and read_id_to_index
 // with const &. Initial attempt led to a big performance drop
 // when doing so. This needs further investigation.
@@ -218,6 +227,11 @@ SimplexReadPtr process_pod5_read(
     new_read->read_common.position_id = run_info_data->sequencer_position;
     new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
+
+    // Get the condition_info from the run_info_data to determine if the sequencing kit
+    // used has a rapid adapter and which one.
+    const auto condition_info = models::ConditionInfo(get_chemistry_key(run_info_data));
+    new_read->read_common.rapid_chemistry = condition_info.rapid_chemistry();
 
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
     char end_reason_string_value[200];
@@ -690,10 +704,9 @@ uint16_t DataLoader::get_sample_rate(std::filesystem::path data_path, bool recur
     }
 }
 
-std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
-        std::filesystem::path data_path,
-        bool recursive_file_loading) {
-    std::vector<models::ChemistryKey> chemistries = {};
+std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistry(std::filesystem::path data_path,
+                                                                    bool recursive_file_loading) {
+    std::set<models::ChemistryKey> chemistries;
 
     auto iterate_directory = [&](const auto& iterator) {
         for (const auto& entry : iterator) {
@@ -744,18 +757,9 @@ std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
                                 "index {}: {}",
                                 file_path.c_str(), ri_idx, pod5_get_error_string());
                     } else {
-                        const auto fpc = std::string(run_info_data->flow_cell_product_code);
-                        const auto sk = std::string(run_info_data->sequencing_kit);
-                        const auto sr = run_info_data->sample_rate;
-                        spdlog::trace(
-                                "POD5: {} flowcell_product_code: '{}' sequencing_kit: '{}' "
-                                "sample_rate: {}",
-                                file_path.c_str(), fpc, sk, sr);
-
-                        const auto fc = models::flowcell_code(fpc);
-                        const auto kit = models::kit_code(sk);
-
-                        chemistries.push_back(models::ChemistryKey(fc, kit, sr));
+                        const auto chemistry_key = get_chemistry_key(run_info_data);
+                        spdlog::trace("POD5: {} {}", file_path.c_str(), to_string(chemistry_key));
+                        chemistries.insert(chemistry_key);
                     }
                     if (pod5_free_run_info(run_info_data) != POD5_OK) {
                         spdlog::error(
@@ -769,14 +773,7 @@ std::vector<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
     };
 
     iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
-
-    if (chemistries.empty()) {
-        throw std::runtime_error(
-                "Failed to determine sequencing chemistry from data. "
-                "Please select a model by path");
-    } else {
-        return chemistries;
-    }
+    return chemistries;
 }
 
 void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,

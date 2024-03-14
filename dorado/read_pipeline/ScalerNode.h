@@ -3,7 +3,9 @@
 #include "basecall/CRFModelConfig.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
+#include "utils/trim_rapid_adapter.h"
 
+#include <atomic>
 #include <string>
 
 namespace dorado {
@@ -12,7 +14,8 @@ class ScalerNode : public MessageSink {
 public:
     ScalerNode(const basecall::SignalNormalisationParams& config,
                basecall::SampleType model_type,
-               bool trim_adapter,
+               bool trim_rna_adapter,
+               const utils::rapid::Settings& m_rapid_settings,
                int num_worker_threads,
                size_t max_reads);
     ~ScalerNode() { stop_input_processing(); }
@@ -26,7 +29,11 @@ private:
 
     const basecall::SignalNormalisationParams m_scaling_params;
     const basecall::SampleType m_model_type;
-    const bool m_trim_adapter;
+    const bool m_trim_rna_adapter;
+    const utils::rapid::Settings m_rapid_settings;
+
+    // A flag to warn only once if the basecall model and read SampleType differ
+    std::atomic<bool> m_log_once_inconsistent_read_model{true};
 };
 
 }  // namespace dorado

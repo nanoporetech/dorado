@@ -57,9 +57,8 @@ public:
 
     static uint16_t get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading);
 
-    static std::vector<models::ChemistryKey> get_sequencing_chemistry(
-            std::filesystem::path data_path,
-            bool recursive_file_loading);
+    static std::set<models::ChemistryKey> get_sequencing_chemistry(std::filesystem::path data_path,
+                                                                   bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
