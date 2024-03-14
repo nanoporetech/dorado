@@ -166,14 +166,16 @@ std::vector<fs::path> ModelFinder::fetch_mods_models() {
 }
 
 fs::path ModelFinder::fetch_model(const std::string& model_name, const std::string& description) {
-    const auto local_path = fs::current_path() / model_name;
+    // clang-tidy warns about performance-no-automatic-move if |local_path| is const. It should be treated as such though.
+    /*const*/ auto local_path = fs::current_path() / model_name;
     if (fs::exists(local_path)) {
         spdlog::debug("Found existing {} model: {}", description, model_name);
         return local_path;
     }
 
     const fs::path temp_dir = utils::get_downloads_path(std::nullopt);
-    const fs::path temp_model_dir = temp_dir / model_name;
+    // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
+    /*const*/ fs::path temp_model_dir = temp_dir / model_name;
     if (models::download_models(temp_dir.u8string(), model_name)) {
         m_downloaded_models.emplace(temp_dir);
     } else {
