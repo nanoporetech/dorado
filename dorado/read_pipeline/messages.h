@@ -1,5 +1,6 @@
 #pragma once
 
+#include "models/kits.h"
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
@@ -27,6 +28,7 @@ struct Attributes {
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
 };
+
 }  // namespace details
 
 class ClientInfo;
@@ -97,7 +99,12 @@ public:
 
     size_t get_raw_data_samples() const { return is_duplex ? raw_data.size(1) : raw_data.size(0); }
 
-    bool is_rna{false};
+    // `True` if the basecall model is an RNA model
+    bool is_rna_model{false};
+
+    // The rapid chemistry adapter type if any - sourced from the read info data
+    models::RapidChemistry rapid_chemistry{models::RapidChemistry::UNKNOWN};
+
     // Track length of estimated polyA tail in bases.
     int rna_poly_tail_length{-1};
     // Track position of end of RNA adapter in signal space. If the RNA adapter is

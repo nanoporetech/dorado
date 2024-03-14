@@ -57,9 +57,10 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         current_node_handle = rna_splitter_node;
     }
 
-    auto scaler_node = pipeline_desc.add_node<ScalerNode>({}, model_config.signal_norm_params,
-                                                          model_config.sample_type, trim_adapter,
-                                                          scaler_node_threads, 1000);
+    auto trim_rapid_adapter_settings = utils::rapid::get_settings();
+    auto scaler_node = pipeline_desc.add_node<ScalerNode>(
+            {}, model_config.signal_norm_params, model_config.sample_type, trim_adapter,
+            trim_rapid_adapter_settings, scaler_node_threads, 1000);
     if (current_node_handle != PipelineDescriptor::InvalidNodeHandle) {
         pipeline_desc.add_node_sink(current_node_handle, scaler_node);
     } else {
@@ -171,9 +172,13 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
             {splitter_node}, std::move(runners), adjusted_simplex_overlap, model_name, 1000,
             "BasecallerNode", mean_qscore_start_pos);
 
+    // TODO: Do we want to trim rapid adapters in duplex?
+
+    utils::rapid::Settings trim_rapid_adapter_settings;
+    trim_rapid_adapter_settings.active = false;
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
             {basecaller_node}, model_config.signal_norm_params, basecall::SampleType::DNA, false,
-            scaler_node_threads, 1000);
+            trim_rapid_adapter_settings, scaler_node_threads, 1000);
 
     // if we've been provided a source node, connect it to the start of our pipeline
     if (source_node_handle != PipelineDescriptor::InvalidNodeHandle) {

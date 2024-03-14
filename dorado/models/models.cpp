@@ -24,7 +24,7 @@ bool model_info_is_similar(const ModelInfo& info,
                            const Chemistry chemistry,
                            const ModelVariantPair model,
                            const ModsVariantPair mods) {
-    if (chemistry != Chemistry::NONE && chemistry != info.chemistry) {
+    if (chemistry != Chemistry::UNKNOWN && chemistry != info.chemistry) {
         return false;
     }
 
@@ -65,7 +65,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
                     const Chemistry& chemistry,
                     const ModelVariantPair& model,
                     const ModsVariantPair& mods) {
-    if (Chemistry::NONE == chemistry) {
+    if (chemistry == Chemistry::UNKNOWN) {
         throw std::runtime_error("Cannot get model without chemistry");
     }
 
@@ -138,7 +138,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
                      const ModelVariantPair& model,
                      const ModsVariantPair& mods,
                      bool suggestions) {
-    if (Chemistry::NONE == chemistry) {
+    if (Chemistry::UNKNOWN == chemistry) {
         throw std::runtime_error("Cannot get model without chemistry");
     }
     const auto matches = find_models(models, chemistry, model, mods);
@@ -159,7 +159,7 @@ std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
                                    const Chemistry& chemistry,
                                    const ModelVariantPair& model,
                                    const ModsVariantPair& mods) {
-    if (Chemistry::NONE == chemistry) {
+    if (Chemistry::UNKNOWN == chemistry) {
         throw std::logic_error("Cannot get models without chemistry");
     }
 

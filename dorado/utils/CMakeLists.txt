@@ -50,6 +50,8 @@ add_library(dorado_utils
     time_utils.h
     torch_utils.cpp
     torch_utils.h
+    trim_rapid_adapter.cpp
+    trim_rapid_adapter.h
     trim.cpp
     trim.h
     tty_utils.h
@@ -94,6 +96,7 @@ target_include_directories(dorado_utils
     ${TORCH_INCLUDE_DIRS}
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
+    ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_utils

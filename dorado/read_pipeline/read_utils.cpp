@@ -45,6 +45,7 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->read_common.num_trimmed_samples = read.read_common.num_trimmed_samples;
 
+    copy->read_common.is_rna_model = read.read_common.is_rna_model;
     copy->read_common.attributes = read.read_common.attributes;
 
     copy->start_sample = read.start_sample;

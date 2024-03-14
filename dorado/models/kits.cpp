@@ -10,7 +10,7 @@ using KC = KitCode;
 
 template <typename Code, typename Info>
 Code get_code(const std::string& str,
-              const std::string& description,
+              Code default_value,
               const std::unordered_map<Code, Info>& codes) {
     auto s = str;
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
@@ -18,7 +18,7 @@ Code get_code(const std::string& str,
                            [&s](auto&& kv) { return kv.second.name == s; });
 
     if (it == std::end(codes)) {
-        throw std::runtime_error("Unknown " + description + ": " + str);
+        return default_value;
     }
     return it->first;
 }
@@ -60,6 +60,7 @@ const std::unordered_map<Flowcell, FlowcellInfo> codes_map = {
         {FC::FLO_PRO114M,   {"FLO-PRO114M",   }},
         {FC::FLO_PRO114HD,  {"FLO-PRO114HD",  }}, 
         {FC::FLO_PRO114M,   {"FLO-PRO114M",   }},
+        {FC::UNKNOWN,       {"__UNKNOWN_FLOWCELL__", }}, 
 };
 // clang-format on
 
@@ -68,7 +69,7 @@ const std::unordered_map<Flowcell, FlowcellInfo> codes_map = {
 const std::unordered_map<Flowcell, FlowcellInfo>& flowcell_codes() { return flowcell::codes_map; }
 
 Flowcell flowcell_code(const std::string& code) {
-    return get_code(code, "flowcell_product_code", flowcell_codes());
+    return get_code(code, Flowcell::UNKNOWN, flowcell_codes());
 }
 
 FlowcellInfo flowcell_info(const Flowcell& fc) {
@@ -78,6 +79,9 @@ FlowcellInfo flowcell_info(const Flowcell& fc) {
 std::string to_string(const Flowcell& fc) { return flowcell_info(fc).name; }
 
 namespace kit {
+
+const ProtocolInfo not_rapid{true, RapidChemistry::NONE};
+const ProtocolInfo rapid_v1{true, RapidChemistry::V1};
 
 const std::unordered_map<KitCode, KitInfo> codes_map = {
         {KC::SQK_CS9109, {"SQK-CS9109", 400}},
@@ -124,53 +128,55 @@ const std::unordered_map<KitCode, KitInfo> codes_map = {
         {KC::VSK_VSK004, {"VSK-VSK004", 400}},
 
         // Barcoding Kits
-        {KC::SQK_16S024, {"SQK-16S024", 400, true}},
-        {KC::SQK_16S114_24, {"SQK-16S114-24", 400, true}},
-        {KC::SQK_16S114_24_260, {"SQK-16S114-24-260", 260, true}},
-        {KC::SQK_LWB001, {"SQK-LWB001", 400, true}},
-        {KC::SQK_MLK111_96_XL, {"SQK-MLK111-96-XL", 400, true}},
-        {KC::SQK_MLK114_96_XL, {"SQK-MLK114-96-XL", 400, true}},
-        {KC::SQK_MLK114_96_XL_260, {"SQK-MLK114-96-XL-260", 260, true}},
-        {KC::SQK_NBD111_24, {"SQK-NBD111-24", 400, true}},
-        {KC::SQK_NBD111_96, {"SQK-NBD111-96", 400, true}},
-        {KC::SQK_NBD112_24, {"SQK-NBD112-24", 250, true}},
-        {KC::SQK_NBD112_96, {"SQK-NBD112-96", 250, true}},
-        {KC::SQK_NBD114_24, {"SQK-NBD114-24", 400, true}},
-        {KC::SQK_NBD114_24_260, {"SQK-NBD114-24-260", 260, true}},
-        {KC::SQK_NBD114_96, {"SQK-NBD114-96", 400, true}},
-        {KC::SQK_NBD114_96_260, {"SQK-NBD114-96-260", 260, true}},
-        {KC::SQK_PBK004, {"SQK-PBK004", 400, true}},
-        {KC::SQK_PCB109, {"SQK-PCB109", 400, true}},
-        {KC::SQK_PCB110, {"SQK-PCB110", 400, true}},
-        {KC::SQK_PCB111_24, {"SQK-PCB111-24", 400, true}},
-        {KC::SQK_PCB114_24, {"SQK-PCB114-24", 400, true}},
-        {KC::SQK_PCB114_24_260, {"SQK-PCB114-24-260", 260, true}},
-        {KC::SQK_RAB201, {"SQK-RAB201", 400, true}},
-        {KC::SQK_RAB204, {"SQK-RAB204", 400, true}},
-        {KC::SQK_RBK001, {"SQK-RBK001", 400, true}},
-        {KC::SQK_RBK004, {"SQK-RBK004", 400, true}},
-        {KC::SQK_RBK110_96, {"SQK-RBK110-96", 400, true}},
-        {KC::SQK_RBK111_24, {"SQK-RBK111-24", 400, true}},
-        {KC::SQK_RBK111_96, {"SQK-RBK111-96", 400, true}},
-        {KC::SQK_RBK114_24, {"SQK-RBK114-24", 400, true}},
-        {KC::SQK_RBK114_24_260, {"SQK-RBK114-24-260", 260, true}},
-        {KC::SQK_RBK114_96, {"SQK-RBK114-96", 400, true}},
-        {KC::SQK_RBK114_96_260, {"SQK-RBK114-96-260", 260, true}},
-        {KC::SQK_RLB001, {"SQK-RLB001", 400, true}},
-        {KC::SQK_RPB004, {"SQK-RPB004", 400, true}},
-        {KC::SQK_RPB114_24, {"SQK-RPB114-24", 400, true}},
-        {KC::SQK_RPB114_24_260, {"SQK-RPB114-24-260", 260, true}},
-        {KC::VSK_PTC001, {"VSK-PTC001", 400, true}},
-        {KC::VSK_VMK001, {"VSK-VMK001", 400, true}},
-        {KC::VSK_VMK004, {"VSK-VMK004", 400, true}},
-        {KC::VSK_VPS001, {"VSK-VPS001", 400, true}},
+        {KC::SQK_16S024, {"SQK-16S024", 400, not_rapid}},
+        {KC::SQK_16S114_24, {"SQK-16S114-24", 400, not_rapid}},
+        {KC::SQK_16S114_24_260, {"SQK-16S114-24-260", 260, not_rapid}},
+        {KC::SQK_LWB001, {"SQK-LWB001", 400, not_rapid}},
+        {KC::SQK_MLK111_96_XL, {"SQK-MLK111-96-XL", 400, not_rapid}},
+        {KC::SQK_MLK114_96_XL, {"SQK-MLK114-96-XL", 400, not_rapid}},
+        {KC::SQK_MLK114_96_XL_260, {"SQK-MLK114-96-XL-260", 260, not_rapid}},
+        {KC::SQK_NBD111_24, {"SQK-NBD111-24", 400, not_rapid}},
+        {KC::SQK_NBD111_96, {"SQK-NBD111-96", 400, not_rapid}},
+        {KC::SQK_NBD112_24, {"SQK-NBD112-24", 250, not_rapid}},
+        {KC::SQK_NBD112_96, {"SQK-NBD112-96", 250, not_rapid}},
+        {KC::SQK_NBD114_24, {"SQK-NBD114-24", 400, not_rapid}},
+        {KC::SQK_NBD114_24_260, {"SQK-NBD114-24-260", 260, not_rapid}},
+        {KC::SQK_NBD114_96, {"SQK-NBD114-96", 400, not_rapid}},
+        {KC::SQK_NBD114_96_260, {"SQK-NBD114-96-260", 260, not_rapid}},
+        {KC::SQK_PBK004, {"SQK-PBK004", 400, not_rapid}},
+        {KC::SQK_PCB109, {"SQK-PCB109", 400, not_rapid}},
+        {KC::SQK_PCB110, {"SQK-PCB110", 400, not_rapid}},
+        {KC::SQK_PCB111_24, {"SQK-PCB111-24", 400, not_rapid}},
+        {KC::SQK_PCB114_24, {"SQK-PCB114-24", 400, not_rapid}},
+        {KC::SQK_PCB114_24_260, {"SQK-PCB114-24-260", 260, not_rapid}},
+        {KC::SQK_RAB201, {"SQK-RAB201", 400, not_rapid}},
+        {KC::SQK_RAB204, {"SQK-RAB204", 400, not_rapid}},
+        {KC::SQK_RBK001, {"SQK-RBK001", 400, rapid_v1}},
+        {KC::SQK_RBK004, {"SQK-RBK004", 400, rapid_v1}},
+        {KC::SQK_RBK110_96, {"SQK-RBK110-96", 400, rapid_v1}},
+        {KC::SQK_RBK111_24, {"SQK-RBK111-24", 400, rapid_v1}},
+        {KC::SQK_RBK111_96, {"SQK-RBK111-96", 400, rapid_v1}},
+        {KC::SQK_RBK114_24, {"SQK-RBK114-24", 400, rapid_v1}},
+        {KC::SQK_RBK114_24_260, {"SQK-RBK114-24-260", 260, rapid_v1}},
+        {KC::SQK_RBK114_96, {"SQK-RBK114-96", 400, rapid_v1}},
+        {KC::SQK_RBK114_96_260, {"SQK-RBK114-96-260", 260, rapid_v1}},
+        {KC::SQK_RLB001, {"SQK-RLB001", 400, not_rapid}},
+        {KC::SQK_RPB004, {"SQK-RPB004", 400, rapid_v1}},
+        {KC::SQK_RPB114_24, {"SQK-RPB114-24", 400, rapid_v1}},
+        {KC::SQK_RPB114_24_260, {"SQK-RPB114-24-260", 260, rapid_v1}},
+        {KC::VSK_PTC001, {"VSK-PTC001", 400, not_rapid}},
+        {KC::VSK_VMK001, {"VSK-VMK001", 400, not_rapid}},
+        {KC::VSK_VMK004, {"VSK-VMK004", 400, not_rapid}},
+        {KC::VSK_VPS001, {"VSK-VPS001", 400, not_rapid}},
+
+        {KC::UNKNOWN, {"__UNKNOWN_KIT__", 1, {false, RapidChemistry::UNKNOWN}}},
 };
 
 }  // namespace kit
 
 const std::unordered_map<KitCode, KitInfo>& kit_codes() { return kit::codes_map; }
 
-KitCode kit_code(const std::string& kit) { return get_code(kit, "sequencing_kit", kit_codes()); }
+KitCode kit_code(const std::string& kit) { return get_code(kit, KitCode::UNKNOWN, kit_codes()); }
 KitInfo kit_info(const KitCode& kit) { return get_info(kit, "sequencing_kit", kit_codes()); }
 std::string to_string(const KitCode& kit) { return kit_info(kit).name; }
 
@@ -361,6 +367,7 @@ const std::unordered_map<Chemistry, std::string> codes_map = {
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ, "dna_r10.4.1_e8.2_400bps_5khz"},
         {Chemistry::RNA002_70BPS, "rna002_70bps"},
         {Chemistry::RNA004_130BPS, "rna004_130bps"},
+        {Chemistry::UNKNOWN, "__UNKNOWN_CHEMISTRY__"},
 };
 
 /*
@@ -368,12 +375,15 @@ Mapping of Chemistry to the complete set of sequencing kits associated with that
 The cross product of a chemistry's set of flowcells and kits is generated at runtime
 */
 const std::unordered_map<Chemistry, ChemistryKits> kit_map = {
-        {Chemistry::DNA_R9_4_1_E8, {4000, kit_sets::kit10::sets}},
-        {Chemistry::DNA_R10_4_1_E8_2_260BPS, {4000, kit_sets::kit14::sets_260bps}},
-        {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ, {4000, kit_sets::kit14::sets_400bps}},
-        {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ, {5000, kit_sets::kit14::sets_400bps_5khz}},
-        {Chemistry::RNA002_70BPS, {3000, kit_sets::rna002::sets}},
-        {Chemistry::RNA004_130BPS, {4000, kit_sets::rna004::sets}},
+        {Chemistry::UNKNOWN, {1, SampleType::DNA, {}}},
+        {Chemistry::DNA_R9_4_1_E8, {4000, SampleType::DNA, kit_sets::kit10::sets}},
+        {Chemistry::DNA_R10_4_1_E8_2_260BPS, {4000, SampleType::DNA, kit_sets::kit14::sets_260bps}},
+        {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ,
+         {4000, SampleType::DNA, kit_sets::kit14::sets_400bps}},
+        {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+         {5000, SampleType::DNA, kit_sets::kit14::sets_400bps_5khz}},
+        {Chemistry::RNA002_70BPS, {3000, SampleType::RNA002, kit_sets::rna002::sets}},
+        {Chemistry::RNA004_130BPS, {4000, SampleType::RNA004, kit_sets::rna004::sets}},
 };
 
 // Crate a map of flowcell and sequencing kit pairs to categorical chemistry
@@ -393,11 +403,25 @@ static ChemistryMap chemistry_map = [] {
 
 }  // namespace chemistry
 
+std::string to_string(const ChemistryKey& ck) {
+    const auto [fc, kc, sr] = ck;
+    return "flowcell_code: '" + to_string(fc) + "' sequencing_kit: '" + to_string(kc) +
+           "' sample_rate: " + std::to_string(sr);
+}
+
 const std::unordered_map<Chemistry, std::string>& chemistry_variants() {
     return chemistry::codes_map;
 }
 const std::unordered_map<Chemistry, ChemistryKits>& chemistry_kits() { return chemistry::kit_map; }
 
 const ChemistryMap& chemistry_map() { return chemistry::chemistry_map; }
+
+Chemistry get_chemistry(const ChemistryKey& key) {
+    const auto& map = chemistry_map();
+    auto it = map.find(key);
+    return it == map.end() ? Chemistry::UNKNOWN : it->second;
+}
+
+KitInfo ConditionInfo::get_kit_info() const { return kit_info(m_kit); };
 
 }  // namespace dorado::models

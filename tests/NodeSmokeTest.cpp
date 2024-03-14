@@ -14,6 +14,7 @@
 #include "read_pipeline/ScalerNode.h"
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
+#include "utils/trim_rapid_adapter.h"
 
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
@@ -155,15 +156,17 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     auto model_type =
             GENERATE(dorado::basecall::SampleType::DNA, dorado::basecall::SampleType::RNA002,
                      dorado::basecall::SampleType::RNA004);
-    auto trim_adapter = GENERATE(true, false);
+    auto trim_rna_adapter = GENERATE(true, false);
+    dorado::utils::rapid::Settings trim_rapid_adapter;
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
 
     set_pipeline_restart(pipeline_restart);
 
     // Scaler node expects i16 input
-    set_read_mutator([](dorado::SimplexReadPtr& read) {
+    set_read_mutator([model_type](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
+        read->read_common.is_rna_model = model_type != dorado::basecall::SampleType::DNA;
     });
 
     dorado::basecall::SignalNormalisationParams config;
@@ -172,7 +175,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_adapter, 2, 1000);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_rna_adapter, trim_rapid_adapter, 2,
+                                       1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {

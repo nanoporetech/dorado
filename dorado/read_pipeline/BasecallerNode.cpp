@@ -189,9 +189,9 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.model_name = m_model_name;
             read_common_data.mean_qscore_start_pos = m_mean_qscore_start_pos;
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
-            read_common_data.is_rna = m_rna;
+            read_common_data.is_rna_model = m_is_rna_model;
 
-            if (m_rna) {
+            if (m_is_rna_model) {
                 std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
                 std::reverse(read_common_data.qstring.begin(), read_common_data.qstring.end());
             }
@@ -341,7 +341,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
           m_model_runners(std::move(model_runners)),
           m_overlap(overlap),
           m_model_stride(m_model_runners.front()->model_stride()),
-          m_rna(is_rna_model(m_model_runners.front()->config())),
+          m_is_rna_model(is_rna_model(m_model_runners.front()->config())),
           m_model_name(std::move(model_name)),
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),

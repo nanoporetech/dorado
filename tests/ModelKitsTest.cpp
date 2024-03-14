@@ -34,7 +34,8 @@ TEST_CASE(TEST_TAG " FlowcellCode enumeration", TEST_TAG) {
         CHECK(to_string(Flowcell::FLO_PRO114) == "FLO-PRO114");
         CHECK(to_string(Flowcell::FLO_PRO114HD) == "FLO-PRO114HD");
         CHECK(to_string(Flowcell::FLO_PRO114M) == "FLO-PRO114M");
-        CHECK(fcs.size() == 19);
+        CHECK(to_string(Flowcell::UNKNOWN) == "__UNKNOWN_FLOWCELL__");
+        CHECK(fcs.size() == static_cast<size_t>(Flowcell::UNKNOWN) + 1);
     }
 
     SECTION("FlowcellCode self consistent") {
@@ -45,6 +46,9 @@ TEST_CASE(TEST_TAG " FlowcellCode enumeration", TEST_TAG) {
 
     SECTION("FlowcellCodes contain no underscores") {
         for (const auto& fc : fcs) {
+            if (fc.first == Flowcell::UNKNOWN) {
+                continue;
+            }
             const auto& name = fc.second.name;
             CHECK(std::count(name.begin(), name.end(), '_') == 0);
         }
@@ -146,11 +150,16 @@ TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
         CHECK(to_string(KitCode::VSK_VMK001) == "VSK-VMK001");
         CHECK(to_string(KitCode::VSK_VMK004) == "VSK-VMK004");
         CHECK(to_string(KitCode::VSK_VPS001) == "VSK-VPS001");
-        CHECK(kits.size() == 82);
+
+        CHECK(to_string(KitCode::UNKNOWN) == "__UNKNOWN_KIT__");
+        CHECK(kits.size() == static_cast<size_t>(KitCode::UNKNOWN) + 1);
     }
 
     SECTION("KitCode contain no underscores") {
         for (const auto& kit : kits) {
+            if (kit.first == KitCode::UNKNOWN) {
+                continue;
+            }
             const auto& name = kit.second.name;
             CHECK(std::count(name.begin(), name.end(), '_') == 0);
         }
@@ -166,6 +175,8 @@ TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
                 CHECK(kit.second.speed == 70);
             } else if (dorado::utils::ends_with(kit.second.name, "RNA004")) {
                 CHECK(kit.second.speed == 130);
+            } else if (dorado::utils::ends_with(kit.second.name, "__UNKNOWN_KIT__")) {
+                continue;
             } else {
                 CHECK(kit.second.speed == 400);
             }

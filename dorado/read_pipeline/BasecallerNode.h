@@ -60,7 +60,7 @@ private:
     // Stride of the model in the runners
     size_t m_model_stride;
     // Whether the model is for rna
-    bool m_rna;
+    bool m_is_rna_model;
     // model_name
     std::string m_model_name;
     // Mean Q-score start position from model properties.

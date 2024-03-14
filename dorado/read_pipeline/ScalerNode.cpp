@@ -1,14 +1,17 @@
 #include "ScalerNode.h"
 
 #include "basecall/CRFModelConfig.h"
+#include "models/kits.h"
 #include "utils/tensor_utils.h"
 #include "utils/trim.h"
+#include "utils/trim_rapid_adapter.h"
 
 #include <ATen/ATen.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
@@ -129,12 +132,14 @@ void ScalerNode::input_thread_fn() {
 
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        bool is_rna = (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
+        bool is_rna_model =
+                (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
+
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (is_rna) {
+        if (is_rna_model) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            if (m_trim_adapter) {
+            if (m_trim_rna_adapter) {
                 read->read_common.raw_data =
                         read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
                 read->read_common.rna_adapter_end_signal_pos = 0;
@@ -142,6 +147,24 @@ void ScalerNode::input_thread_fn() {
                 // If RNA adapter isn't trimmed, track where the adapter signal is ending
                 // so it can be used during polyA estimation.
                 read->read_common.rna_adapter_end_signal_pos = trim_start;
+            }
+        }
+
+        // Activate rapid adapter trimming when while basecalling DNA where the sequencing kit
+        // has a rapid adapter
+        bool trim_rapid_adapter = !is_rna_model && m_rapid_settings.active &&
+                                  read->read_common.rapid_chemistry == models::RapidChemistry::V1;
+
+        if (trim_rapid_adapter) {
+            const auto trim_rapid_adapter_idx = utils::rapid::find_rapid_adapter_trim_pos(
+                    read->read_common.raw_data, m_rapid_settings);
+            if (trim_rapid_adapter_idx < 0) {
+                spdlog::trace("ScalerNode: {} rapid_adapter_trim - failed",
+                              read->read_common.read_id);
+            } else {
+                spdlog::trace("ScalerNode: {} rapid_adapter_trim - trim_index: {}",
+                              read->read_common.read_id, trim_rapid_adapter_idx);
+                trim_start = static_cast<int>(trim_rapid_adapter_idx);
             }
         }
 
@@ -189,14 +212,14 @@ void ScalerNode::input_thread_fn() {
         }
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
-        if (!is_rna) {
-            if (m_scaling_params.standarisation.standardise) {
+        if (!is_rna_model) {
+            if (trim_start == 0 && m_scaling_params.standarisation.standardise) {
                 // Constant trimming level for standardised scaling
                 // In most cases kit14 trim algorithm returns 10, so bypassing the heuristic
                 // and applying 10 for pA scaled data.
                 // TODO: may need refinement in the future
                 trim_start = 10;
-            } else {
+            } else if (trim_start == 0) {
                 // 8000 value may be changed in future. Currently this is found to work well.
                 int max_samples = std::min(
                         8000, static_cast<int>(read->read_common.get_raw_data_samples() / 2));
@@ -222,13 +245,15 @@ void ScalerNode::input_thread_fn() {
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        SampleType model_type,
-                       bool trim_adapter,
+                       bool trim_rna_adapter,
+                       const utils::rapid::Settings& rapid_settings,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads, num_worker_threads),
           m_scaling_params(config),
           m_model_type(model_type),
-          m_trim_adapter(trim_adapter) {
+          m_trim_rna_adapter(trim_rna_adapter),
+          m_rapid_settings(rapid_settings) {
     start_input_processing(&ScalerNode::input_thread_fn, this);
 }
 

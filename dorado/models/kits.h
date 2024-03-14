@@ -32,6 +32,7 @@ enum class Flowcell {
     FLO_PRO114,
     FLO_PRO114HD,
     FLO_PRO114M,
+    UNKNOWN,
 };
 
 // Struct containing Flowcell information used for identification / filtering etc.
@@ -132,18 +133,29 @@ enum class KitCode {
     VSK_PTC001,
     VSK_VMK001,
     VSK_VMK004,
-    VSK_VPS001
+    VSK_VPS001,
+    UNKNOWN,
+};
+
+enum class RapidChemistry { UNKNOWN, NONE, V1 };
+
+/*
+Sequencing Kit protocol information 
+*/
+struct ProtocolInfo {
+    bool is_barcoding{false};
+    RapidChemistry rapid_chemistry{RapidChemistry::NONE};
 };
 
 using MotorSpeed = uint16_t;
 /*
-Sequencing and barcode sequencing Kit information with string name matching the minknow / pod5
-representation (using hyphens). Flags are used to set properties on the kits
+Sequencing Kit information with string name matching the minknow / pod5
+representation (using hyphens).
 */
 struct KitInfo {
     std::string name;
     MotorSpeed speed;
-    bool is_barcoding_kit = false;
+    ProtocolInfo protocol{};
 };
 
 const std::unordered_map<KitCode, KitInfo>& kit_codes();
@@ -158,6 +170,12 @@ using KitSet = std::pair<std::vector<Flowcell>, std::vector<KitCode>>;
 using KitSets = std::vector<KitSet>;
 using SamplingRate = uint16_t;
 
+enum class SampleType {
+    DNA,
+    RNA002,
+    RNA004,
+};
+
 /*
 The KitSets  are used to generate supported combinations
 of flowcell and sequencing / barcoding kits. The cross-product of each pair of vectors 
@@ -167,18 +185,19 @@ Combined with other metadata, each pair make keys for mapping to known chemistri
 */
 struct ChemistryKits {
     const SamplingRate sampling_rate;
+    const SampleType sample_type;
     const KitSets kit_sets;
 };
 
 // Enumeration of chemistries
 enum class Chemistry {
-    NONE,
     DNA_R9_4_1_E8,
     DNA_R10_4_1_E8_2_260BPS,
     DNA_R10_4_1_E8_2_400BPS_4KHZ,
     DNA_R10_4_1_E8_2_400BPS_5KHZ,
     RNA002_70BPS,
     RNA004_130BPS,
+    UNKNOWN,
 };
 
 std::string to_string(const Chemistry& chemistry);
@@ -190,5 +209,35 @@ using ChemistryKey = std::tuple<Flowcell, KitCode, SamplingRate>;
 using ChemistryMap = std::map<ChemistryKey, Chemistry>;
 
 const ChemistryMap& chemistry_map();
+Chemistry get_chemistry(const ChemistryKey& key);
+
+std::string to_string(const ChemistryKey& ck);
+
+class ConditionInfo {
+public:
+    ConditionInfo(const ChemistryKey& key)
+            : m_flowcell(std::get<0>(key)),
+              m_kit(std::get<1>(key)),
+              m_kit_info(get_kit_info()),
+              m_chemistry(get_chemistry(key)),
+              m_sampling_rate(std::get<2>(key)){};
+
+    inline Flowcell flowcell() const { return m_flowcell; }
+    inline KitCode kit() const { return m_kit; }
+    inline Chemistry chemistry() const { return m_chemistry; }
+    inline SamplingRate sampling_rate() const { return m_sampling_rate; }
+    inline RapidChemistry rapid_chemistry() const { return m_kit_info.protocol.rapid_chemistry; }
+    // `True` if sequencing kit is a barcoding kit
+    inline bool is_barcoding_kit() const { return m_kit_info.protocol.is_barcoding; }
+
+private:
+    KitInfo get_kit_info() const;
+
+    Flowcell m_flowcell;
+    KitCode m_kit;
+    KitInfo m_kit_info;
+    Chemistry m_chemistry;
+    SamplingRate m_sampling_rate;
+};
 
 }  // namespace dorado::models
