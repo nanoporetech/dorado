@@ -211,9 +211,10 @@ int aligner(int argc, char* argv[]) {
         dorado::utils::strip_sq_hdr(header);
         add_pg_hdr(header);
 
+        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads);
+
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, file_info.output,
-                                                            file_info.output_mode, writer_threads);
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
                                                            bed_file, options, aligner_threads);
 
@@ -249,6 +250,7 @@ int aligner(int argc, char* argv[]) {
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
         auto final_stats = pipeline->terminate(DefaultFlushOptions());
+        hts_file.finalise();
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();

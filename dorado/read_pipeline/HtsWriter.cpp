@@ -17,8 +17,7 @@ namespace dorado {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-HtsWriter::HtsWriter(const std::string& filename, OutputMode mode, size_t threads)
-        : MessageSink(10000, 1), m_file(std::make_unique<utils::HtsFile>(filename, mode, threads)) {
+HtsWriter::HtsWriter(utils::HtsFile& file) : MessageSink(10000, 1), m_file(file) {
     start_input_processing(&HtsWriter::input_thread_fn, this);
 }
 
@@ -102,11 +101,11 @@ int HtsWriter::write(const bam1_t* const record) {
         };
     }
 
-    return m_file->write(record);
+    return m_file.write(record);
 }
 
 int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
-    return m_file->set_and_write_header(header);
+    return m_file.set_and_write_header(header);
 }
 
 stats::NamedStats HtsWriter::sample_stats() const {
@@ -117,10 +116,7 @@ stats::NamedStats HtsWriter::sample_stats() const {
     return stats;
 }
 
-void HtsWriter::terminate(const FlushOptions&) {
-    stop_input_processing();
-    m_file.reset();
-}
+void HtsWriter::terminate(const FlushOptions&) { stop_input_processing(); }
 
 std::size_t HtsWriter::ProcessedReadIds::size() const { return m_threadsafe_count_of_reads; }
 

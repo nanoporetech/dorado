@@ -18,7 +18,7 @@ namespace dorado {
 
 class HtsWriter : public MessageSink {
 public:
-    HtsWriter(const std::string& filename, utils::HtsFile::OutputMode mode, size_t threads);
+    HtsWriter(utils::HtsFile& file);
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
@@ -39,7 +39,7 @@ private:
     size_t m_secondary{0};
     size_t m_supplementary{0};
 
-    std::unique_ptr<utils::HtsFile> m_file;
+    utils::HtsFile& m_file;
 
     void input_thread_fn();
     int write(const bam1_t* record);

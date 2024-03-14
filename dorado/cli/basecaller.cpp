@@ -150,9 +150,10 @@ void setup(std::vector<std::string> args,
     cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
+    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
-                                                        thread_allocations.writer_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -268,6 +269,7 @@ void setup(std::vector<std::string> args,
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
+    hts_file.finalise();
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
     stats_sampler->terminate();

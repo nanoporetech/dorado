@@ -358,19 +358,21 @@ int duplex(int argc, char* argv[]) {
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
+        utils::HtsFile hts_file("-", output_mode, 4);
+
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
             converted_reads_sink = hts_writer;
         } else {
             auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -546,6 +548,7 @@ int duplex(int argc, char* argv[]) {
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
         final_stats = pipeline->terminate(DefaultFlushOptions());
+        hts_file.finalise();
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();

@@ -135,8 +135,10 @@ int trim(int argc, char* argv[]) {
         custom_primer_file = parser.get<std::string>("--primer-sequences");
     }
 
+    utils::HtsFile hts_file("-", output_mode, trim_writer_threads);
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, trim_writer_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
                                                 !parser.get<bool>("--no-trim-primers"),
@@ -171,6 +173,7 @@ int trim(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
+    hts_file.finalise();
 
     stats_sampler->terminate();
 
