@@ -210,7 +210,7 @@ void setup(std::vector<std::string> args,
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_writer_ref.set_and_write_header(hdr.get());
+    hts_file.set_and_write_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {

@@ -136,6 +136,7 @@ int trim(int argc, char* argv[]) {
     }
 
     utils::HtsFile hts_file("-", output_mode, trim_writer_threads);
+    hts_file.set_and_write_header(header.get());
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
@@ -151,11 +152,6 @@ int trim(int argc, char* argv[]) {
         spdlog::error("Failed to create pipeline");
         std::exit(EXIT_FAILURE);
     }
-
-    // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_and_write_header(header.get());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;

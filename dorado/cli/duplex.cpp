@@ -424,8 +424,7 @@ int duplex(int argc, char* argv[]) {
             }
 
             // Write header as no read group info is needed.
-            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-            hts_writer_ref.set_and_write_header(hdr.get());
+            hts_file.set_and_write_header(hdr.get());
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -525,13 +524,12 @@ int duplex(int argc, char* argv[]) {
 
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
-            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             if (!ref.empty()) {
                 const auto& aligner_ref =
                         dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_writer_ref.set_and_write_header(hdr.get());
+            hts_file.set_and_write_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 

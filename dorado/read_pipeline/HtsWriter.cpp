@@ -104,10 +104,6 @@ int HtsWriter::write(const bam1_t* const record) {
     return m_file.write(record);
 }
 
-int HtsWriter::set_and_write_header(const sam_hdr_t* const header) {
-    return m_file.set_and_write_header(header);
-}
-
 stats::NamedStats HtsWriter::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());

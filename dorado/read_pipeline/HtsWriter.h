@@ -11,7 +11,6 @@
 #include <thread>
 #include <unordered_set>
 
-struct sam_hdr_t;
 struct bam1_t;
 
 namespace dorado {
@@ -25,7 +24,6 @@ public:
     void terminate(const FlushOptions&) override;
     void restart() override { start_input_processing(&HtsWriter::input_thread_fn, this); }
 
-    int set_and_write_header(const sam_hdr_t* header);
     size_t get_total() const { return m_total; }
     size_t get_primary() const { return m_primary; }
     size_t get_unmapped() const { return m_unmapped; }
