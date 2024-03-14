@@ -382,7 +382,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         const BarcodeCandidateKit& candidate,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
     std::string_view read_top = read_seq.substr(0, m_front_barcode_window);
-    int bottom_start = std::max(0, (int)read_seq.length() - m_rear_barcode_window);
+    int bottom_start = std::max(0, static_cast<int>(read_seq.length()) - m_rear_barcode_window);
     std::string_view read_bottom = read_seq.substr(bottom_start, m_rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
@@ -411,30 +411,38 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     // Fetch barcode mask locations for variant 1
     auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
             top_context_v1, read_top, barcode_len, placement_config, "top score v1");
-    auto top_start_idx_v1 = std::max(0, top_bc_loc_v1 - m_left_buffer - barcode_len);
-    auto top_end_idx_v1 = top_bc_loc_v1 + m_right_buffer;
+    auto top_start_idx_v1 = std::max(
+            0, top_bc_loc_v1 - static_cast<int>(top_context_v1_left_buffer.length()) - barcode_len);
+    auto top_end_idx_v1 = top_bc_loc_v1 + static_cast<int>(top_context_v1_right_buffer.length());
     std::string_view top_mask_v1 =
             read_top.substr(top_start_idx_v1, top_end_idx_v1 - top_start_idx_v1);
 
     auto [bottom_result_v1, bottom_flank_score_v1, bottom_bc_loc_v1] = extract_flank_fit(
             bottom_context_v1, read_bottom, barcode_len, placement_config, "bottom score v1");
-    auto bottom_start_idx_v1 = std::max(0, bottom_bc_loc_v1 - m_left_buffer - barcode_len);
-    auto bottom_end_idx_v1 = bottom_bc_loc_v1 + m_right_buffer;
+    auto bottom_start_idx_v1 = std::max(
+            0, bottom_bc_loc_v1 - static_cast<int>(bottom_context_v1_left_buffer.length()) -
+                       barcode_len);
+    auto bottom_end_idx_v1 =
+            bottom_bc_loc_v1 + static_cast<int>(bottom_context_v1_right_buffer.length());
     std::string_view bottom_mask_v1 =
             read_bottom.substr(bottom_start_idx_v1, bottom_end_idx_v1 - bottom_start_idx_v1);
 
     // Fetch barcode mask locations for variant 2
     auto [top_result_v2, top_flank_score_v2, top_bc_loc_v2] = extract_flank_fit(
             top_context_v2, read_top, barcode_len, placement_config, "top score v2");
-    auto top_start_idx_v2 = std::max(0, top_bc_loc_v2 - m_left_buffer - barcode_len);
-    auto top_end_idx_v2 = top_bc_loc_v2 + m_right_buffer;
+    auto top_start_idx_v2 = std::max(
+            0, top_bc_loc_v2 - static_cast<int>(top_context_v2_left_buffer.length()) - barcode_len);
+    auto top_end_idx_v2 = top_bc_loc_v2 + static_cast<int>(top_context_v2_right_buffer.length());
     std::string_view top_mask_v2 =
             read_top.substr(top_start_idx_v2, top_end_idx_v2 - top_start_idx_v2);
 
     auto [bottom_result_v2, bottom_flank_score_v2, bottom_bc_loc_v2] = extract_flank_fit(
             bottom_context_v2, read_bottom, barcode_len, placement_config, "bottom score v2");
-    auto bottom_start_idx_v2 = std::max(0, bottom_bc_loc_v2 - m_left_buffer - barcode_len);
-    auto bottom_end_idx_v2 = bottom_bc_loc_v2 + m_right_buffer;
+    auto bottom_start_idx_v2 = std::max(
+            0, bottom_bc_loc_v2 - static_cast<int>(bottom_context_v2_left_buffer.length()) -
+                       barcode_len);
+    auto bottom_end_idx_v2 =
+            bottom_bc_loc_v2 + static_cast<int>(bottom_context_v2_right_buffer.length());
     std::string_view bottom_mask_v2 =
             read_bottom.substr(bottom_start_idx_v2, bottom_end_idx_v2 - bottom_start_idx_v2);
 
@@ -543,7 +551,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         const BarcodeCandidateKit& candidate,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
     std::string_view read_top = read_seq.substr(0, m_front_barcode_window);
-    int bottom_start = std::max(0, (int)read_seq.length() - m_rear_barcode_window);
+    int bottom_start = std::max(0, static_cast<int>(read_seq.length()) - m_rear_barcode_window);
     std::string_view read_bottom = read_seq.substr(bottom_start, m_rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
@@ -563,14 +571,16 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_context, read_top, barcode_len, placement_config, "top score");
-    auto top_start_idx = std::max(0, top_bc_loc - m_left_buffer - barcode_len);
-    auto top_end_idx = top_bc_loc + m_right_buffer;
+    auto top_start_idx =
+            std::max(0, top_bc_loc - static_cast<int>(top_left_buffer.length()) - barcode_len);
+    auto top_end_idx = top_bc_loc + static_cast<int>(top_right_buffer.length());
     std::string_view top_mask = read_top.substr(top_start_idx, top_end_idx - top_start_idx);
 
     auto [bottom_result, bottom_flank_score, bottom_bc_loc] = extract_flank_fit(
             bottom_context, read_bottom, barcode_len, placement_config, "bottom score");
-    auto bottom_start_idx = std::max(0, bottom_bc_loc - m_left_buffer - barcode_len);
-    auto bottom_end_idx = bottom_bc_loc + m_right_buffer;
+    auto bottom_start_idx = std::max(
+            0, bottom_bc_loc - static_cast<int>(bottom_left_buffer.length()) - barcode_len);
+    auto bottom_end_idx = bottom_bc_loc + static_cast<int>(bottom_right_buffer.length());
     std::string_view bottom_mask =
             read_bottom.substr(bottom_start_idx, bottom_end_idx - bottom_start_idx);
 
@@ -632,11 +642,14 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
 
     std::string_view top_context = candidate.top_context;
     int barcode_len = int(candidate.barcodes1[0].length());
+    const auto& top_left_buffer = candidate.top_context_left_buffer;
+    const auto& top_right_buffer = candidate.top_context_right_buffer;
 
     auto [top_result, top_flank_score, top_bc_loc] =
             extract_flank_fit(top_context, read_top, barcode_len, placement_config, "top score");
-    auto start_idx = std::max(0, top_bc_loc - m_left_buffer - barcode_len);
-    auto end_idx = top_bc_loc + m_right_buffer;
+    auto start_idx =
+            std::max(0, top_bc_loc - static_cast<int>(top_left_buffer.length()) - barcode_len);
+    auto end_idx = top_bc_loc + static_cast<int>(top_right_buffer.length());
     std::string_view top_mask = read_top.substr(start_idx, end_idx - start_idx);
 
     spdlog::trace("BC location {}", top_bc_loc);
