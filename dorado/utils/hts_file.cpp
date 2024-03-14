@@ -54,7 +54,13 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) {
     }
 }
 
-HtsFile::~HtsFile() { finalise(); }
+HtsFile::~HtsFile() {
+    if (!m_finalised) {
+        spdlog::error("finalise() not called on a HtsFile.");
+        // Can't throw in a dtor, and this is a logic_error rather than being data dependent.
+        std::abort();
+    }
+}
 
 // When we close the underlying htsFile, then and only then can we correctly read the virtual file offsets of
 // the records (since bgzf_tell doesn't give the correct values in a write-file - see bgzf_flush, etc)
