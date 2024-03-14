@@ -31,6 +31,8 @@ void add_rg_hdr(sam_hdr_t* hdr,
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
+void strip_sq_hdr(sam_hdr_t* hdr);
+
 /**
  * @brief Merges lines from source_header into dest_header if they aren't already present.
  *
