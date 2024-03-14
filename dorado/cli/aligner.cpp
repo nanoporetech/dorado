@@ -210,6 +210,7 @@ int aligner(int argc, char* argv[]) {
 
         spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
         auto header = sam_hdr_dup(reader->header);
+        dorado::utils::strip_sq_hdr(header);
         add_pg_hdr(header);
 
         PipelineDescriptor pipeline_desc;

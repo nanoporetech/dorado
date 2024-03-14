@@ -130,6 +130,8 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
     }
 }
 
+void strip_sq_hdr(sam_hdr_t* hdr) { sam_hdr_remove_except(hdr, "SQ", nullptr, nullptr); }
+
 bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
     auto get_pg_id = [](std::string& str) {
         size_t start_pos = str.find("ID:");
