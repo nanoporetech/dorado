@@ -422,7 +422,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
 
     edlibFreeAlignResult(edlib_result);
 
-    return {old_moves_offset, target_start - 1, new_moves};
+    return std::make_tuple(old_moves_offset, target_start - 1, std::move(new_moves));
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
