@@ -576,15 +576,16 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
 
                         std::string id = std::string(run_id).append("_").append(model_name);
                         read_groups[id] = ReadGroup{
-                                run_id,
+                                std::move(run_id),
                                 model_name,
                                 modbase_model_names,
-                                flowcell_id,
-                                device_id,
+                                std::move(flowcell_id),
+                                std::move(device_id),
                                 utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                sample_id,
-                                position_id,
-                                experiment_id};
+                                std::move(sample_id),
+                                std::move(position_id),
+                                std::move(experiment_id),
+                        };
                     }
                     if (pod5_close_and_free_reader(file) != POD5_OK) {
                         spdlog::error("Failed to close and free POD5 reader");
