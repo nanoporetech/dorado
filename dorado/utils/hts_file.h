@@ -9,6 +9,7 @@ namespace dorado::utils {
 class HtsFile {
     HtsFilePtr m_file;
     SamHdrPtr m_header;
+    bool m_finalised{false};
 
 public:
     enum class OutputMode {
@@ -25,6 +26,8 @@ public:
 
     int set_and_write_header(const sam_hdr_t* header);
     int write(const bam1_t* record);
+
+    void finalise();
 };
 
 }  // namespace dorado::utils
