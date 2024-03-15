@@ -211,7 +211,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
 
     // Draw it.
     m_progress_bar.set_progress(total_progress);
-#ifndef WIN32
+#ifdef __linux__
     std::cerr << "\033[K";
 #endif  // WIN32
     std::cerr << "\r";
