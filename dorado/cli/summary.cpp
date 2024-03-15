@@ -18,8 +18,6 @@ namespace dorado {
 volatile sig_atomic_t interrupt = 0;
 
 int summary(int argc, char *argv[]) {
-    utils::InitLogging();
-
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_argument("reads").help("SAM/BAM file produced by dorado basecaller.");
     parser.add_argument("-s", "--separator").default_value(std::string("\t"));

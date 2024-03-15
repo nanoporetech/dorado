@@ -80,8 +80,6 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 }
 
 int aligner(int argc, char* argv[]) {
-    utils::InitLogging();
-
     cli::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"

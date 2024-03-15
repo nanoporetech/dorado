@@ -39,8 +39,6 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 }  // anonymous namespace
 
 int demuxer(int argc, char* argv[]) {
-    utils::InitLogging();
-
     cli::ArgParser parser("dorado demux");
     parser.visible.add_description(
             "Barcode demultiplexing tool. Users need to specify the kit name(s).");

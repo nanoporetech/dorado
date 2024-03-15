@@ -112,8 +112,6 @@ std::vector<std::string> get_model_names(const ModelSelection& model_selection,
 using namespace models;
 
 int download(int argc, char* argv[]) {
-    utils::InitLogging();
-
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
 
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
