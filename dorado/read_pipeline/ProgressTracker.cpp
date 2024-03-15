@@ -21,6 +21,11 @@ ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_proces
 ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::summarize() const {
+    // Don't output anything if stderr is not a tty.
+    if (!utils::is_fd_tty(stderr)) {
+        return;
+    }
+
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
@@ -197,6 +202,11 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
                 100 * (1 - m_post_processing_percentage) + progress * m_post_processing_percentage;
     } else {
         total_progress = progress * (1 - m_post_processing_percentage);
+    }
+
+    // Don't output the progress bar if stderr is not a tty.
+    if (!utils::is_fd_tty(stderr)) {
+        return;
     }
 
     // Draw it.
