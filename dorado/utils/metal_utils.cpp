@@ -55,6 +55,25 @@ auto get_library_location() {
     return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
 }
 
+void report_error(const NS::Error *error, const char *function) {
+    if (error == nil) {
+        return;
+    }
+    auto safe_c_str = [](NS::String *str) {
+        return str ? str->cString(NS::ASCIIStringEncoding) : "<none>";
+    };
+    spdlog::error("function={}, code={}, domain={}, description={}", function, error->code(),
+                  safe_c_str(error->domain()), safe_c_str(error->localizedDescription()));
+}
+
+#define wrap_func_with_err(func_with_err, ...)             \
+    ({                                                     \
+        NS::Error *error_ = nil;                           \
+        auto result = func_with_err(__VA_ARGS__, &error_); \
+        report_error(error_, #func_with_err);              \
+        result;                                            \
+    })
+
 #if !TARGET_OS_IPHONE
 
 // Retrieves a single int64_t property associated with the given class/name.
@@ -115,12 +134,11 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const std::optional<int> max_total_threads_per_tg) {
-    NS::Error *error;
     auto default_library = NS::TransferPtr(device->newDefaultLibrary());
 
     if (!default_library) {
         auto lib_path = get_library_location();
-        default_library = NS::TransferPtr(device->newLibrary(lib_path, &error));
+        default_library = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
         if (!default_library) {
             throw std::runtime_error("Failed to load metallib library.");
         }
@@ -142,8 +160,8 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
     }
 
     auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
-    auto kernel =
-            NS::TransferPtr(default_library->newFunction(kernel_name, constant_vals.get(), &error));
+    auto kernel = NS::TransferPtr(
+            wrap_func_with_err(default_library->newFunction, kernel_name, constant_vals.get()));
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
@@ -154,13 +172,11 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         cp_descriptor->setMaxTotalThreadsPerThreadgroup(*max_total_threads_per_tg);
     }
 
-    auto cps = NS::TransferPtr(device->newComputePipelineState(
-            cp_descriptor.get(), MTL::PipelineOptionNone, nullptr, &error));
+    auto cps =
+            NS::TransferPtr(wrap_func_with_err(device->newComputePipelineState, cp_descriptor.get(),
+                                               MTL::PipelineOptionNone, nullptr));
     if (!cps) {
-        auto e_code = std::to_string(((int)error->code()));
-        auto e_str = error->domain()->cString(NS::ASCIIStringEncoding);
-        throw std::runtime_error("failed to build compute pipeline for " + name + " - " + e_str +
-                                 ": error " + e_code);
+        throw std::runtime_error("Failed to build compute pipeline for " + name);
     }
 
     return cps;

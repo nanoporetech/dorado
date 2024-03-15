@@ -57,12 +57,12 @@ typedef float ftype_out;
 
 #define MAX_LAYER_SIZE 512
 #define KERNEL_INDEX_INPUTS \
-    uint tid [[thread_index_in_threadgroup]], \
-    uint gid [[threadgroup_position_in_grid]], \
-    uint sid [[simdgroup_index_in_threadgroup]], \
-    uint simdgroups [[simdgroups_per_threadgroup]], \
-    uint threadgroups [[threadgroups_per_grid]], \
-    uint threads [[threads_per_threadgroup]]
+    [[maybe_unused]] uint tid [[thread_index_in_threadgroup]], \
+    [[maybe_unused]] uint gid [[threadgroup_position_in_grid]], \
+    [[maybe_unused]] uint sid [[simdgroup_index_in_threadgroup]], \
+    [[maybe_unused]] uint simdgroups [[simdgroups_per_threadgroup]], \
+    [[maybe_unused]] uint threadgroups [[threadgroups_per_grid]], \
+    [[maybe_unused]] uint threads [[threads_per_threadgroup]]
 
 struct ScanArgs {
     int T;
@@ -290,12 +290,12 @@ kernel void conv(
 */
 
 struct RowMajor {
-    static int inner(int r, int c) { return c; }
-    static int outer(int r, int c) { return r; }
+    static int inner(int /* r */, int c) { return c; }
+    static int outer(int r, int /* c */) { return r; }
 };
 struct ColMajor {
-    static int inner(int r, int c) { return r; }
-    static int outer(int r, int c) { return c; }
+    static int inner(int r, int /* c */) { return r; }
+    static int outer(int /* r */, int c) { return c; }
 };
 // 2D matrix layouts using 8x8 tiles. Note that RowMajor/ColMajor apply to the order of tiles, *NOT* within tiles
 // RC == RowMajor: layout RrCc, where: R = row / 8; r = row % 8; C = col / 8; c = col % 8
@@ -321,13 +321,13 @@ struct MatLayoutRowMajor {
     using TileBlockConst = TileBlock<RowMajor, device const FTYPE*, FTYPE>;
     using TileBlock = TileBlock<RowMajor, device FTYPE*, FTYPE>;
     using ftype = FTYPE;
-    static TileBlock tnc_block(device FTYPE* const ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+    static TileBlock tnc_block(device FTYPE* const ptr, int /* T */, int N, int C, int t, int n_blk, int c_blk) {
         return TileBlock(ptr, C, t * N + n_blk * SIMD_TILES_N * TILE_SIZE, c_blk * SIMD_TILES_C * TILE_SIZE);
     }
-    static TileBlockConst tnc_block(device const FTYPE* const ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+    static TileBlockConst tnc_block(device const FTYPE* const ptr, int /* T */, int N, int C, int t, int n_blk, int c_blk) {
         return TileBlockConst(ptr, C, t * N + n_blk * SIMD_TILES_N * TILE_SIZE, c_blk * SIMD_TILES_C * TILE_SIZE);
     }
-    static void zero_initial_state(device FTYPE* const ptr, int, int, int, uint, uint, uint, uint) {}
+    static void zero_initial_state(device FTYPE* const, int, int, int, uint, uint, uint, uint) {}
 };
 
 // The memory layout of LSTM input/output matrices matches a contiguous tensor of sizes [T+3, C/8, 8, N/8, 8],
@@ -396,10 +396,10 @@ struct MatLayoutLSTM {
     using TileBlockConst = TileBlock<ColMajor, device const FTYPE*, FTYPE>;
     using TileBlock = TileBlock<ColMajor, device FTYPE*, FTYPE>;
     using ftype = FTYPE;
-    static TileBlock tnc_block(device FTYPE* const ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+    static TileBlock tnc_block(device FTYPE* const ptr, int /* T */, int N, int C, int t, int n_blk, int c_blk) {
         return TileBlock(ptr, N, n_blk * SIMD_TILES_N * TILE_SIZE, (t+T_OFFSET) * C + c_blk * SIMD_TILES_C * TILE_SIZE);
     }
-    static TileBlockConst tnc_block(device const FTYPE* const ptr, int T, int N, int C, int t, int n_blk, int c_blk) {
+    static TileBlockConst tnc_block(device const FTYPE* const ptr, int /* T */, int N, int C, int t, int n_blk, int c_blk) {
         return TileBlockConst(ptr, N, n_blk * SIMD_TILES_N * TILE_SIZE, (t+T_OFFSET) * C + c_blk * SIMD_TILES_C * TILE_SIZE);
     }
 
