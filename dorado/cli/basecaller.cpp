@@ -28,6 +28,7 @@
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
+#include "utils/tty_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>

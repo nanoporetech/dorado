@@ -7,6 +7,7 @@
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
 
