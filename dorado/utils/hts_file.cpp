@@ -147,6 +147,7 @@ int HtsFile::write(const bam1_t* const record) {
     // will segfault, since set_and_write_header has to have been called
     // in order to set m_header.
     assert(m_header);
+    ++m_num_records;
     return sam_write1(m_file.get(), m_header.get(), record);
 }
 

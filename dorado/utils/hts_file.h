@@ -9,6 +9,7 @@ namespace dorado::utils {
 class HtsFile {
     HtsFilePtr m_file;
     SamHdrPtr m_header;
+    size_t m_num_records{0};
     bool m_finalised{false};
     bool m_finalise_is_noop;
 
