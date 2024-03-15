@@ -52,6 +52,8 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) {
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
+
+    m_finalise_is_noop = filename == "-" || m_file->format.compression != bgzf;
 }
 
 HtsFile::~HtsFile() {
@@ -74,12 +76,11 @@ void HtsFile::finalise() {
     }
 
     auto temp_filename = std::string(m_file->fn);
-    bool is_bgzf = m_file->format.compression == bgzf;
 
     m_header.reset();
     m_file.reset();
 
-    if (temp_filename == std::string("-") || !is_bgzf) {
+    if (finalise_is_noop()) {
         return;
     }
 
