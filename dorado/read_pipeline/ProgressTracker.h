@@ -2,7 +2,7 @@
 
 #include "utils/stats.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <indicators/progress_bar.hpp>
 #else
 #include <indicators/block_progress_bar.hpp>
@@ -57,7 +57,7 @@ private:
 
     const bool m_duplex;
 
-#ifdef WIN32
+#ifdef _WIN32
     indicators::ProgressBar m_progress_bar {
 #else
     indicators::BlockProgressBar m_progress_bar{
