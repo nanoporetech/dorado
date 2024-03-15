@@ -43,7 +43,7 @@ private:
     int m_num_poly_a_not_called{0};
     int m_avg_poly_a_tail_lengths{0};
 
-    int m_num_reads_expected;
+    const int m_num_reads_expected;
 
     std::map<std::string, size_t> m_barcode_count;
     std::map<int, int> m_poly_a_tail_length_count;
@@ -51,7 +51,7 @@ private:
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     std::chrono::time_point<std::chrono::system_clock> m_end_time;
 
-    bool m_duplex;
+    const bool m_duplex;
 
 #ifdef WIN32
     indicators::ProgressBar m_progress_bar {
