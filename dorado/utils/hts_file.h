@@ -2,6 +2,7 @@
 
 #include "types.h"
 
+#include <functional>
 #include <string>
 
 namespace dorado::utils {
@@ -21,6 +22,8 @@ public:
         FASTQ,
     };
 
+    using ProgressCallback = std::function<void(size_t percentage)>;
+
     HtsFile(const std::string& filename, OutputMode mode, size_t threads);
     ~HtsFile();
     HtsFile(const HtsFile&) = delete;
@@ -30,7 +33,7 @@ public:
     int write(const bam1_t* record);
 
     bool finalise_is_noop() const { return m_finalise_is_noop; }
-    void finalise();
+    void finalise(const ProgressCallback& progress_callback);
 };
 
 }  // namespace dorado::utils

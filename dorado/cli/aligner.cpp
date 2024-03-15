@@ -232,9 +232,12 @@ int aligner(int argc, char* argv[]) {
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
         hts_file.set_and_write_header(header);
+
+        // All progress reporting is in the post-processing part.
+        ProgressTracker tracker(0, false, 1.f);
+
         // Set up stats counting
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        ProgressTracker tracker(0, false);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
@@ -250,14 +253,16 @@ int aligner(int argc, char* argv[]) {
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
         auto final_stats = pipeline->terminate(DefaultFlushOptions());
-        hts_file.finalise();
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();
-
         tracker.update_progress_bar(final_stats);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
         progress_stats.notify_stats_collector_completed(final_stats);
+
+        // Report progress during output file finalisation.
+        hts_file.finalise(
+                [&](size_t progress) { tracker.update_post_processing_progress(progress); });
 
         tracker.summarize();
 

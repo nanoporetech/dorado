@@ -20,7 +20,7 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    ProgressTracker(int total_reads, bool duplex, float post_processing_percentage = 0);
+    ProgressTracker(int total_reads, bool duplex, float post_processing_percentage);
     ~ProgressTracker();
 
     void summarize() const;

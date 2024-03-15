@@ -387,7 +387,7 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex);
+        ProgressTracker tracker(int(num_reads), duplex, hts_file.finalise_is_noop() ? 0.f : 0.5f);
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
@@ -547,12 +547,15 @@ int duplex(int argc, char* argv[]) {
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
         final_stats = pipeline->terminate(DefaultFlushOptions());
-        hts_file.finalise();
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();
-
         tracker.update_progress_bar(final_stats);
+
+        // Report progress during output file finalisation.
+        hts_file.finalise(
+                [&](size_t progress) { tracker.update_post_processing_progress(progress); });
+
         tracker.summarize();
         if (!dump_stats_file.empty()) {
             std::ofstream stats_file(dump_stats_file);

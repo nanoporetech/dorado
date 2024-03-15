@@ -237,9 +237,11 @@ int demuxer(int argc, char* argv[]) {
             dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
     demux_writer_ref.set_header(header.get());
 
+    // All progress reporting is in the post-processing part.
+    ProgressTracker tracker(0, false, 1.f);
+
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
@@ -274,13 +276,24 @@ int demuxer(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-    for (auto& [bc, hts_file] : hts_files) {
-        hts_file->finalise();
+    stats_sampler->terminate();
+    tracker.update_progress_bar(final_stats);
+
+    // Finalise each file that was created.
+    {
+        const size_t num_files = hts_files.size();
+        size_t current_file_idx = 0;
+        for (auto& [bc, hts_file] : hts_files) {
+            hts_file->finalise([&](size_t progress) {
+                // Give each file the same contribution to the total progress.
+                const float total_progress =
+                        static_cast<float>(current_file_idx * 100 + progress) / num_files;
+                tracker.update_post_processing_progress(total_progress);
+            });
+            ++current_file_idx;
+        }
     }
 
-    stats_sampler->terminate();
-
-    tracker.update_progress_bar(final_stats);
     tracker.summarize();
     progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();

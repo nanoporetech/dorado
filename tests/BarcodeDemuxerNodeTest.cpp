@@ -69,8 +69,9 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         }
 
         pipeline->terminate(DefaultFlushOptions());
+
         for (auto& [bc, hts_file] : hts_files) {
-            hts_file->finalise();
+            hts_file->finalise([](size_t) { /* noop */ });
         }
 
         const std::unordered_set<std::string> expected_files = {

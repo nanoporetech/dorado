@@ -252,8 +252,8 @@ void setup(std::vector<std::string> args,
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
+    ProgressTracker tracker(int(num_reads), false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(int(num_reads), false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -270,14 +270,17 @@ void setup(std::vector<std::string> args,
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-    hts_file.finalise();
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
-    stats_sampler->terminate();
-
     // Then update progress tracking one more time from this thread, to
     // allow accurate summarisation.
+    stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
+
+    // Report progress during output file finalisation.
+    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
+
+    // Give the user a nice summary.
     tracker.summarize();
     if (!dump_stats_file.empty()) {
         std::ofstream stats_file(dump_stats_file);

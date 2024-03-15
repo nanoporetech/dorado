@@ -155,8 +155,8 @@ int trim(int argc, char* argv[]) {
     }
 
     // Set up stats counting
+    ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -170,7 +170,7 @@ int trim(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-    hts_file.finalise();
+    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
 
     stats_sampler->terminate();
 
