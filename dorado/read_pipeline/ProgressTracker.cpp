@@ -11,8 +11,10 @@
 
 namespace dorado {
 
-ProgressTracker::ProgressTracker(int total_reads, bool duplex)
-        : m_num_reads_expected(total_reads), m_duplex(duplex) {
+ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
+        : m_num_reads_expected(total_reads),
+          m_duplex(duplex),
+          m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }
 
@@ -146,12 +148,8 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
                                                                     m_num_simplex_reads_filtered) /
                                                  m_num_reads_expected);
         if (progress > 0 && progress > m_last_progress_written) {
-            m_progress_bar.set_progress(size_t(progress));
-#ifndef WIN32
-            std::cerr << "\033[K";
-#endif  // WIN32
             m_last_progress_written = progress;
-            std::cerr << "\r";
+            internal_set_progress(progress, false);
         }
     } else {
         std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
@@ -179,6 +177,34 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
             }
         }
     }
+}
+
+void ProgressTracker::update_post_processing_progress(float progress) {
+    if (progress > m_last_post_processing_progress) {
+        m_last_post_processing_progress = progress;
+        internal_set_progress(progress, true);
+    }
+}
+
+void ProgressTracker::internal_set_progress(float progress, bool post_processing) {
+    // Sanity clamp.
+    progress = std::min(progress, 100.f);
+
+    // Map progress to total progress.
+    float total_progress;
+    if (post_processing) {
+        total_progress =
+                100 * (1 - m_post_processing_percentage) + progress * m_post_processing_percentage;
+    } else {
+        total_progress = progress * (1 - m_post_processing_percentage);
+    }
+
+    // Draw it.
+    m_progress_bar.set_progress(total_progress);
+#ifndef WIN32
+    std::cerr << "\033[K";
+#endif  // WIN32
+    std::cerr << "\r";
 }
 
 }  // namespace dorado

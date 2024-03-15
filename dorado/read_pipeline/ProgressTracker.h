@@ -20,11 +20,15 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    ProgressTracker(int total_reads, bool duplex);
+    ProgressTracker(int total_reads, bool duplex, float post_processing_percentage = 0);
     ~ProgressTracker();
 
     void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
+    void update_post_processing_progress(float progress);
+
+private:
+    void internal_set_progress(float progress, bool post_processing);
 
 private:
     int64_t m_num_bases_processed{0};
@@ -65,6 +69,10 @@ private:
     };
 
     float m_last_progress_written = -1.f;
+
+    // What % of time is going to be spent in post-processing.
+    const float m_post_processing_percentage;
+    float m_last_post_processing_progress = -1.f;
 };
 
 }  // namespace dorado
