@@ -7,6 +7,17 @@
 
 namespace dorado::barcode_kits {
 
+struct BarcodeKitScoringParams {
+    int max_barcode_cost = 9;
+    int barcode_end_proximity = 75;
+    int min_barcode_score_dist = 3;
+    int min_separation_only_dist = 6;
+    int flank_left_pad = 5;
+    int flank_right_pad = 10;
+    int front_barcode_window = 175;
+    int rear_barcode_window = 175;
+};
+
 struct KitInfo {
     std::string name;
     bool double_ends;
@@ -17,6 +28,7 @@ struct KitInfo {
     std::string bottom_rear_flank;
     std::vector<std::string> barcodes;
     std::vector<std::string> barcodes2;
+    BarcodeKitScoringParams scoring_params;
 };
 
 const std::unordered_map<std::string, KitInfo>& get_kit_infos();

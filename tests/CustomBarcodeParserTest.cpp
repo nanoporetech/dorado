@@ -1,5 +1,6 @@
 #include "TestUtils.h"
 #include "demux/parse_custom_kit.h"
+#include "utils/barcode_kits.h"
 
 #include <catch2/catch.hpp>
 
@@ -118,7 +119,9 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_params_file = data_dir / "scoring_params.toml";
 
-    auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
+    dorado::barcode_kits::BarcodeKitScoringParams default_params;
+    auto scoring_params =
+            dorado::demux::parse_scoring_params(test_params_file.string(), default_params);
 
     CHECK(scoring_params.max_barcode_cost == 10);
     CHECK(scoring_params.barcode_end_proximity == 75);
@@ -134,9 +137,9 @@ TEST_CASE("Parse default scoring params", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_params_file = data_dir / "test_kit_single_ended.toml";
 
-    dorado::demux::BarcodeKitScoringParams default_params;
-
-    auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
+    dorado::barcode_kits::BarcodeKitScoringParams default_params;
+    auto scoring_params =
+            dorado::demux::parse_scoring_params(test_params_file.string(), default_params);
 
     CHECK(scoring_params.max_barcode_cost == default_params.max_barcode_cost);
     CHECK(scoring_params.barcode_end_proximity == default_params.barcode_end_proximity);

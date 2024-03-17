@@ -110,10 +110,12 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
     return std::make_pair(kit_name, new_kit);
 }
 
-BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file) {
+dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
+        const std::string& arrangement_file,
+        const dorado::barcode_kits::BarcodeKitScoringParams& base_params) {
     const toml::value config_toml = toml::parse(arrangement_file);
 
-    BarcodeKitScoringParams params{};
+    auto params = base_params;
     if (!config_toml.contains("scoring")) {
         return params;
     }

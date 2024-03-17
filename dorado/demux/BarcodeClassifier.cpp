@@ -133,6 +133,29 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
     return kit_map;
 }
 
+dorado::barcode_kits::BarcodeKitScoringParams set_scoring_params(
+        const std::vector<std::string>& kit_names,
+        const std::optional<std::string>& custom_kit) {
+    dorado::barcode_kits::BarcodeKitScoringParams params{};
+
+    if (!kit_names.empty()) {
+        // If it is one of the pre-defined kits, override the default scoring
+        // params with whatever is set for that specific kit.
+        const auto& kit_name = kit_names[0];
+        const auto& kit_info_map = barcode_kits::get_kit_infos();
+        auto prebuilt_kit_iter = kit_info_map.find(kit_name);
+        if (prebuilt_kit_iter != kit_info_map.end()) {
+            params = prebuilt_kit_iter->second.scoring_params;
+        }
+    }
+    if (custom_kit) {
+        // If a custom kit is passed, parse it for any scoring
+        // params that need to override the default params.
+        return dorado::demux::parse_scoring_params(*custom_kit, params);
+    } else {
+        return params;
+    }
+}
 // Helper to extract left buffer from a flank.
 std::string extract_left_buffer(const std::string& flank, int buffer) {
     return flank.substr(std::max(0, static_cast<int>(flank.length()) - buffer));
@@ -181,8 +204,7 @@ BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
         : m_custom_kit(process_custom_kit(custom_kit)),
           m_custom_seqs(custom_barcodes ? parse_custom_sequences(*custom_barcodes)
                                         : std::unordered_map<std::string, std::string>{}),
-          m_scoring_params(custom_kit ? parse_scoring_params(*custom_kit)
-                                      : BarcodeKitScoringParams{}),
+          m_scoring_params(set_scoring_params(kit_names, custom_kit)),
           m_barcode_candidates(generate_candidates(kit_names)) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
@@ -449,6 +471,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     // Find the best variant of the two.
     int total_v1_score = top_result_v1.editDistance + bottom_result_v1.editDistance;
     int total_v2_score = top_result_v2.editDistance + bottom_result_v2.editDistance;
+    spdlog::trace("total v1 edit dist {}, total v2 edit dis {}", total_v1_score, total_v2_score);
 
     std::string_view top_mask, bottom_mask;
     if (total_v1_score < total_v2_score) {
