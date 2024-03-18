@@ -518,38 +518,44 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
     return subreads;
 }
 
-std::vector<std::pair<std::string, DuplexReadSplitter::SplitFinderF>>
-DuplexReadSplitter::build_split_finders() const {
-    std::vector<std::pair<std::string, SplitFinderF>> split_finders;
-    split_finders.emplace_back(std::make_pair("PORE_ADAPTER", [&](const ExtRead& read) {
-        return filter_ranges(read.possible_pore_regions, [&](PosRange r) {
+std::vector<DuplexReadSplitter::ExtRead> DuplexReadSplitter::apply_split_finders(
+        ExtRead orig_read) const {
+    const bool is_rapid = orig_read.read->read_common.rapid_chemistry == models::RapidChemistry::V1;
+
+    std::vector<ExtRead> split_reads;
+    split_reads.push_back(std::move(orig_read));
+
+    apply_split_finder(split_reads, "PORE_ADAPTER", [this](const ExtRead& read) {
+        return filter_ranges(read.possible_pore_regions, [this, &read](PosRange r) {
             return check_nearby_adapter(*read.read, r, m_settings.adapter_edist);
         });
-    }));
+    });
 
-    split_finders.emplace_back(std::make_pair(
-            "muA_adapter", [&](const ExtRead& read) { return find_muA_adapter_spikes(read); }));
+    if (is_rapid) {
+        apply_split_finder(split_reads, "muA_adapter",
+                           [this](const ExtRead& read) { return find_muA_adapter_spikes(read); });
+    }
 
     if (!m_settings.simplex_mode) {
-        split_finders.emplace_back(std::make_pair("PORE_FLANK", [&](const ExtRead& read) {
-            auto filter = [&](PosRange r) {
+        apply_split_finder(split_reads, "PORE_FLANK", [this](const ExtRead& read) {
+            auto filter = [this, &read](PosRange r) {
                 return check_flank_match(*read.read, r, m_settings.flank_err);
             };
             return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
                                 m_settings.strand_end_flank + m_settings.strand_start_flank);
-        }));
+        });
 
-        split_finders.emplace_back(std::make_pair("PORE_ALL", [&](const ExtRead& read) {
-            auto filter = [&](PosRange r) {
+        apply_split_finder(split_reads, "PORE_ALL", [this](const ExtRead& read) {
+            auto filter = [this, &read](PosRange r) {
                 return check_nearby_adapter(*read.read, r, m_settings.relaxed_adapter_edist) &&
                        check_flank_match(*read.read, r, m_settings.relaxed_flank_err);
             };
             return merge_ranges(filter_ranges(read.possible_pore_regions, filter),
                                 m_settings.strand_end_flank + m_settings.strand_start_flank);
-        }));
+        });
 
-        split_finders.emplace_back(std::make_pair("ADAPTER_FLANK", [&](const ExtRead& read) {
-            auto filter = [&](PosRange r) {
+        apply_split_finder(split_reads, "ADAPTER_FLANK", [this](const ExtRead& read) {
+            auto filter = [this, &read](PosRange r) {
                 return check_flank_match(*read.read, {r.first, r.first}, m_settings.flank_err);
             };
             return filter_ranges(
@@ -557,26 +563,51 @@ DuplexReadSplitter::build_split_finders() const {
                                          m_settings.adapter_edist,
                                          m_settings.expect_adapter_prefix),
                     filter);
-        }));
+        });
 
-        split_finders.emplace_back(std::make_pair("ADAPTER_MIDDLE", [&](const ExtRead& read) {
+        apply_split_finder(split_reads, "ADAPTER_MIDDLE", [this](const ExtRead& read) {
             if (auto split = identify_middle_adapter_split(*read.read)) {
                 return PosRanges{*split};
             } else {
                 return PosRanges();
             }
-        }));
+        });
 
-        split_finders.emplace_back(std::make_pair("SPLIT_MIDDLE", [&](const ExtRead& read) {
+        apply_split_finder(split_reads, "SPLIT_MIDDLE", [this](const ExtRead& read) {
             if (auto split = identify_extra_middle_split(*read.read)) {
                 return PosRanges{*split};
             } else {
                 return PosRanges();
             }
-        }));
+        });
     }
 
-    return split_finders;
+    return split_reads;
+}
+
+template <typename SplitFinder>
+void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
+                                            const char* description,
+                                            const SplitFinder& split_finder) const {
+    spdlog::trace("Running {}", description);
+
+    std::vector<ExtRead> split_round_result;
+    split_round_result.reserve(to_split.size());
+    for (auto& read : to_split) {
+        auto spacers = split_finder(read);
+        spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
+                      read.read->read_common.read_id);
+
+        if (spacers.empty()) {
+            split_round_result.push_back(std::move(read));
+        } else {
+            for (auto& sr : subreads(std::move(read.read), spacers)) {
+                split_round_result.push_back(create_ext_read(std::move(sr)));
+            }
+        }
+    }
+
+    to_split.swap(split_round_result);
 }
 
 std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) const {
@@ -595,33 +626,13 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) 
         return split_result;
     }
 
-    std::vector<ExtRead> to_split;
-    to_split.push_back(create_ext_read(std::move(init_read)));
-    for (const auto& [description, split_f] : m_split_finders) {
-        spdlog::trace("Running {}", description);
-        std::vector<ExtRead> split_round_result;
-        for (auto& r : to_split) {
-            auto spacers = split_f(r);
-            spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
-                          read_id);
-
-            if (spacers.empty()) {
-                split_round_result.push_back(std::move(r));
-            } else {
-                for (auto& sr : subreads(std::move(r.read), spacers)) {
-                    split_round_result.push_back(create_ext_read(std::move(sr)));
-                }
-            }
-        }
-        to_split = std::move(split_round_result);
-    }
-
+    std::vector<ExtRead> found_splits = apply_split_finders(create_ext_read(std::move(init_read)));
     std::vector<SimplexReadPtr> split_result;
     size_t subread_id = 0;
-    for (auto& ext_read : to_split) {
+    for (auto& ext_read : found_splits) {
         if (!ext_read.read->read_common.parent_read_id.empty()) {
             ext_read.read->read_common.subread_id = subread_id++;
-            ext_read.read->read_common.split_count = to_split.size();
+            ext_read.read->read_common.split_count = found_splits.size();
             const auto subread_uuid =
                     utils::derive_uuid(ext_read.read->read_common.parent_read_id,
                                        std::to_string(ext_read.read->read_common.subread_id));
@@ -659,9 +670,7 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) 
 }
 
 DuplexReadSplitter::DuplexReadSplitter(DuplexSplitSettings settings)
-        : m_settings(std::move(settings)) {
-    m_split_finders = build_split_finders();
-}
+        : m_settings(std::move(settings)) {}
 
 DuplexReadSplitter::~DuplexReadSplitter() {}
 
