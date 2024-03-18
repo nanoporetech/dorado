@@ -128,12 +128,6 @@ add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
 
-if("${CUDA_VERSION}" STREQUAL "")
-  set(CUDA_VERSION ${CUDAToolkit_VERSION})
-else()
-  message(STATUS "CUDA VERSION ALREADY SET TO ${CUDA_VERSION}")
-endif()
-
 configure_file(
     dorado/dorado_version.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated/dorado_version.h
