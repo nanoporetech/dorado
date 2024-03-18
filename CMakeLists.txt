@@ -134,7 +134,7 @@ else()
   message(STATUS "CUDA VERSION ALREADY SET TO ${CUDA_VERSION}")
 endif()
 
-configure_file(dorado/Version.h.in dorado/Version.h)
+configure_file(dorado/dorado_version.h.in dorado/dorado_version.h)
 
 add_library(dorado_lib
     dorado/alignment/alignment_processing_items.cpp

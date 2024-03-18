@@ -1,5 +1,5 @@
 #include "../utils/tensor_utils.h"
-#include "Version.h"
+#include "dorado_version.h"
 
 #include <ATen/ATen.h>
 #include <argparse.hpp>

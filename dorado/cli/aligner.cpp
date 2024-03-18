@@ -1,7 +1,7 @@
-#include "Version.h"
 #include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
+#include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
