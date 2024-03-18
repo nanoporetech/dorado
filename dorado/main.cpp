@@ -14,6 +14,10 @@
 #include <string>
 #include <vector>
 
+#ifndef __APPLE__
+#include <cuda.h>
+#endif
+
 #ifdef __linux__
 extern "C" {
 // There's a bug in GLIBC < 2.25 (Bug 11941) which can trigger an assertion/
