@@ -182,6 +182,11 @@ void ProgressTracker::update_post_processing_progress(float progress) {
 }
 
 void ProgressTracker::internal_set_progress(float progress, bool post_processing) {
+    // The progress bar uses escape sequences that only TTYs understand.
+    if (!utils::is_fd_tty(stderr)) {
+        return;
+    }
+
     // Sanity clamp.
     progress = std::min(progress, 100.f);
 
@@ -192,11 +197,6 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
                 100 * (1 - m_post_processing_percentage) + progress * m_post_processing_percentage;
     } else {
         total_progress = progress * (1 - m_post_processing_percentage);
-    }
-
-    // The progress bar uses escape sequences that only TTYs understand.
-    if (!utils::is_fd_tty(stderr)) {
-        return;
     }
 
     // Draw it.
