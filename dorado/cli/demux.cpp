@@ -278,8 +278,9 @@ int demuxer(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
 
     // Finalise the files that were created.
-    demux_writer_ref.finalise_hts_files(
-            [&](size_t progress) { tracker.update_post_processing_progress(progress); });
+    demux_writer_ref.finalise_hts_files([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
 
     tracker.summarize();
     progress_stats.notify_stats_collector_completed(final_stats);
