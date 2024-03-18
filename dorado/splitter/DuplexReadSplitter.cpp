@@ -588,6 +588,7 @@ void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
     spdlog::trace("Running {}", description);
 
     std::vector<ExtRead> split_round_result;
+    split_round_result.reserve(to_split.size());
     for (auto& read : to_split) {
         auto spacers = split_finder(read);
         spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
