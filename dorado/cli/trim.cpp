@@ -170,11 +170,11 @@ int trim(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
-
     stats_sampler->terminate();
-
     tracker.update_progress_bar(final_stats);
+
+    // Report progress during output file finalisation.
+    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");
