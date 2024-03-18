@@ -43,15 +43,13 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
     auto tmp_dir = fs::temp_directory_path() / "dorado_demuxer";
 
     {
-        BarcodeDemuxerNode::HtsFiles hts_files;
-
         // Creating local scope for the pipeline because on windows
         // the temporary directory is still being considered open unless
         // the pipeline object is closed. This needs to be looked at.
         // TODO: Address open file issue on windows.
         dorado::PipelineDescriptor pipeline_desc;
-        auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, false,
-                                                                  nullptr, hts_files);
+        auto demuxer =
+                pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, false, nullptr);
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -70,9 +68,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         pipeline->terminate(DefaultFlushOptions());
 
-        for (auto& [bc, hts_file] : hts_files) {
-            hts_file->finalise([](size_t) { /* noop */ });
-        }
+        demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ });
 
         const std::unordered_set<std::string> expected_files = {
                 "bc01.bam", "bc01.bam.bai", "bc02.bam", "bc02.bam.bai", "bc03.bam", "bc03.bam.bai",

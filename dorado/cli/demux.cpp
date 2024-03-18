@@ -204,12 +204,10 @@ int demuxer(int argc, char* argv[]) {
         allowed_barcodes = sample_sheet->get_barcode_values();
     }
 
-    BarcodeDemuxerNode::HtsFiles hts_files;
-
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet), hts_files);
+            std::move(sample_sheet));
 
     if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
@@ -279,20 +277,9 @@ int demuxer(int argc, char* argv[]) {
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
 
-    // Finalise each file that was created.
-    {
-        const size_t num_files = hts_files.size();
-        size_t current_file_idx = 0;
-        for (auto& [bc, hts_file] : hts_files) {
-            hts_file->finalise([&](size_t progress) {
-                // Give each file the same contribution to the total progress.
-                const float total_progress =
-                        static_cast<float>(current_file_idx * 100 + progress) / num_files;
-                tracker.update_post_processing_progress(total_progress);
-            });
-            ++current_file_idx;
-        }
-    }
+    // Finalise the files that were created.
+    demux_writer_ref.finalise_hts_files(
+            [&](size_t progress) { tracker.update_post_processing_progress(progress); });
 
     tracker.summarize();
     progress_stats.notify_stats_collector_completed(final_stats);

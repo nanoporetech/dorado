@@ -16,12 +16,10 @@ namespace dorado {
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
-                                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
-                                       HtsFiles& hts_files)
+                                       std::unique_ptr<const utils::SampleSheet> sample_sheet)
         : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
-          m_files(hts_files),
           m_write_fastq(write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
@@ -87,6 +85,23 @@ void BarcodeDemuxerNode::set_header(const sam_hdr_t* const header) {
     if (header) {
         m_header.reset(sam_hdr_dup(header));
     }
+}
+
+void BarcodeDemuxerNode::finalise_hts_files(
+        const utils::HtsFile::ProgressCallback& progress_callback) {
+    const size_t num_files = m_files.size();
+    size_t current_file_idx = 0;
+    for (auto& [bc, hts_file] : m_files) {
+        hts_file->finalise([&](size_t progress) {
+            // Give each file/barcode the same contribution to the total progress.
+            const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
+            progress_callback(total_progress);
+        });
+        ++current_file_idx;
+    }
+
+    m_files.clear();
+    progress_callback(100);
 }
 
 stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
