@@ -58,7 +58,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
     // the end of top barcode end value because that's the position
     // in the sequence where the barcode ends. So the actual sequence
     // because from one after that.
-    if (res.top_score >= 0 && res.bottom_score >= 0) {
+    if (res.top_penalty >= 0 && res.bottom_penalty >= 0) {
         float top_flank_score = res.top_flank_score;
         if (top_flank_score > kFlankScoreThres) {
             trim_interval.first = res.top_barcode_pos.second + 1;

@@ -253,7 +253,7 @@ echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
 samtools quickcheck -u $output_dir/custom_demux/SQK-RPB004_barcode01.bam
 num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/SQK-RPB004_barcode01.bam)
-if [[ $num_demuxed_reads -ne "3" ]]; then
+if [[ $num_demuxed_reads -ne "2" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
 fi
@@ -335,7 +335,7 @@ test_barcoding_read_groups() (
 
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
 test_barcoding_read_groups barcode01 4 barcode04 3 unclassified 2
-# There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
+# There should be 5 reads with BC01 aliased to patient_id_1, and 4 unclassified groups.
 test_barcoding_read_groups patient_id_1 5 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
 
 # Test demux only on a pre-classified BAM file

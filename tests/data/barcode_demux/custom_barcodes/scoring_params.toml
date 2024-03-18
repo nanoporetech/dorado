@@ -1,8 +1,8 @@
 [scoring]
 
-max_barcode_cost = 10
+max_barcode_penalty = 10
 barcode_end_proximity = 75
-min_barcode_score_dist = 3
+min_barcode_penalty_dist = 3
 min_separation_only_dist = 5
 flank_left_pad = 5
 flank_right_pad = 10

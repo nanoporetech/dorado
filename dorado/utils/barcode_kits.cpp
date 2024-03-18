@@ -111,9 +111,9 @@ const std::vector<std::string> RBK_1_96 = {
 const BarcodeKitScoringParams DEFAULT_PARAMS{};
 
 const BarcodeKitScoringParams RBK114_PARAMS{
-        .max_barcode_cost = 12,
+        .max_barcode_penalty = 12,
         .barcode_end_proximity = 75,
-        .min_barcode_score_dist = 3,
+        .min_barcode_penalty_dist = 3,
         .min_separation_only_dist = 6,
         .flank_left_pad = 5,
         .flank_right_pad = 10,

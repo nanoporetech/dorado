@@ -8,9 +8,9 @@
 namespace dorado::barcode_kits {
 
 struct BarcodeKitScoringParams {
-    int max_barcode_cost = 9;
+    int max_barcode_penalty = 9;
     int barcode_end_proximity = 75;
-    int min_barcode_score_dist = 3;
+    int min_barcode_penalty_dist = 3;
     int min_separation_only_dist = 6;
     int flank_left_pad = 5;
     int flank_right_pad = 10;
