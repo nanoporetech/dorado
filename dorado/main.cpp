@@ -1,5 +1,5 @@
-#include "Version.h"
 #include "cli/cli.h"
+#include "dorado_version.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -13,6 +13,10 @@
 #include <map>
 #include <string>
 #include <vector>
+
+#ifndef __APPLE__
+#include <cuda.h>
+#endif
 
 #ifdef __linux__
 extern "C" {

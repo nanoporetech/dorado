@@ -1,5 +1,5 @@
-#include "Version.h"
 #include "cli/cli_utils.h"
+#include "dorado_version.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"

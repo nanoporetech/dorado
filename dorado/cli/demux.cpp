@@ -1,6 +1,6 @@
-#include "Version.h"
 #include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
+#include "dorado_version.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
 #include "read_pipeline/HtsReader.h"

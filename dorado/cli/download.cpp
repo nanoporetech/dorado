@@ -1,6 +1,6 @@
-#include "Version.h"
 #include "cli/cli_utils.h"
 #include "data_loader/ModelFinder.h"
+#include "dorado_version.h"
 #include "models/kits.h"
 #include "models/models.h"
 #include "utils/fs_utils.h"
