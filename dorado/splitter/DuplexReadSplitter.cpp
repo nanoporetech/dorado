@@ -520,6 +520,8 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
 
 std::vector<DuplexReadSplitter::ExtRead> DuplexReadSplitter::apply_split_finders(
         ExtRead orig_read) const {
+    const bool is_rapid = orig_read.read->read_common.rapid_chemistry == models::RapidChemistry::V1;
+
     std::vector<ExtRead> split_reads;
     split_reads.push_back(std::move(orig_read));
 
@@ -529,8 +531,10 @@ std::vector<DuplexReadSplitter::ExtRead> DuplexReadSplitter::apply_split_finders
         });
     });
 
-    apply_split_finder(split_reads, "muA_adapter",
-                       [&](const ExtRead& read) { return find_muA_adapter_spikes(read); });
+    if (is_rapid) {
+        apply_split_finder(split_reads, "muA_adapter",
+                           [&](const ExtRead& read) { return find_muA_adapter_spikes(read); });
+    }
 
     if (!m_settings.simplex_mode) {
         apply_split_finder(split_reads, "PORE_FLANK", [&](const ExtRead& read) {
