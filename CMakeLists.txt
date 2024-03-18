@@ -134,7 +134,10 @@ else()
   message(STATUS "CUDA VERSION ALREADY SET TO ${CUDA_VERSION}")
 endif()
 
-configure_file(dorado/dorado_version.h.in dorado/dorado_version.h)
+configure_file(
+    dorado/dorado_version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated/dorado_version.h
+)
 
 add_library(dorado_lib
     dorado/alignment/alignment_processing_items.cpp
@@ -261,7 +264,7 @@ set_target_properties(dorado_lib
 
 target_include_directories(dorado_lib
     PUBLIC
-        ${CMAKE_CURRENT_BINARY_DIR}/dorado
+        ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
         ${POD5_INCLUDE}
 )
