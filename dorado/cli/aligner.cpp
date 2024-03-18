@@ -261,8 +261,9 @@ int aligner(int argc, char* argv[]) {
         progress_stats.notify_stats_collector_completed(final_stats);
 
         // Report progress during output file finalisation.
-        hts_file.finalise(
-                [&](size_t progress) { tracker.update_post_processing_progress(progress); });
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
 
         tracker.summarize();
 

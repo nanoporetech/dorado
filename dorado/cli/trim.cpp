@@ -174,7 +174,9 @@ int trim(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
 
     // Report progress during output file finalisation.
-    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");

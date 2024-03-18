@@ -278,7 +278,9 @@ void setup(std::vector<std::string> args,
     tracker.update_progress_bar(final_stats);
 
     // Report progress during output file finalisation.
-    hts_file.finalise([&](size_t progress) { tracker.update_post_processing_progress(progress); });
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
 
     // Give the user a nice summary.
     tracker.summarize();
