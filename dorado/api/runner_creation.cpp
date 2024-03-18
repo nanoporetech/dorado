@@ -86,9 +86,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         std::vector<std::future<std::shared_ptr<basecall::CudaCaller>>> futures;
 
         for (auto device_string : devices) {
-            futures.push_back(pool.push(create_cuda_caller, model_config, int(chunk_size),
-                                        int(batch_size), device_string, memory_fraction,
-                                        pipeline_type));
+            futures.push_back(pool.push(create_cuda_caller, std::cref(model_config),
+                                        int(chunk_size), int(batch_size), device_string,
+                                        memory_fraction, pipeline_type));
         }
 
         for (auto& caller : futures) {
