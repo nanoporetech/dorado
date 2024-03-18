@@ -160,16 +160,13 @@ models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_d
     return key;
 }
 
-// TODO: Replace the const * to read_by_channel and read_id_to_index
-// with const &. Initial attempt led to a big performance drop
-// when doing so. This needs further investigation.
 SimplexReadPtr process_pod5_read(
         size_t row,
         Pod5ReadRecordBatch* batch,
         Pod5FileReader* file,
         const std::string& path,
-        const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>* reads_by_channel,
-        const std::unordered_map<std::string, size_t>* read_id_to_index) {
+        const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
+        const std::unordered_map<std::string, size_t>& read_id_to_index) {
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -250,10 +247,10 @@ SimplexReadPtr process_pod5_read(
     // Determine the time sorted predecessor of the read
     // if that information is available (primarily used for offline
     // duplex runs).
-    if (reads_by_channel->find(read_data.channel) != reads_by_channel->end()) {
+    if (reads_by_channel.find(read_data.channel) != reads_by_channel.end()) {
         auto& read_id = new_read->read_common.read_id;
-        const auto& v = reads_by_channel->at(read_data.channel);
-        auto read_id_iter = v.begin() + read_id_to_index->at(read_id);
+        const auto& v = reads_by_channel.at(read_data.channel);
+        auto read_id_iter = v.begin() + read_id_to_index.at(read_id);
 
         if (read_id_iter != v.begin()) {
             new_read->prev_read = std::prev(read_id_iter)->read_id;
@@ -848,8 +845,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
-                                            &m_reads_by_channel, &m_read_id_to_index));
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, std::cref(path),
+                                            std::cref(m_reads_by_channel),
+                                            std::cref(m_read_id_to_index)));
             }
         }
 
@@ -905,8 +903,9 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, int(row), m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, path,
-                                            &m_reads_by_channel, &m_read_id_to_index));
+                futures.push_back(pool.push(process_pod5_read, row, batch, file, std::cref(path),
+                                            std::cref(m_reads_by_channel),
+                                            std::cref(m_read_id_to_index)));
             }
         }
 
