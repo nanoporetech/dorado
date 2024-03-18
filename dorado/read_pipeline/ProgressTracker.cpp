@@ -21,11 +21,6 @@ ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_proces
 ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::summarize() const {
-    // Don't output anything if stderr is not a tty.
-    if (!utils::is_fd_tty(stderr)) {
-        return;
-    }
-
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
@@ -140,11 +135,6 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_poly_a_not_called = int(fetch_stat("PolyACalculator.reads_not_estimated"));
     m_avg_poly_a_tail_lengths = int(fetch_stat("PolyACalculator.average_tail_length"));
 
-    // don't output progress bar if stderr is not a tty
-    if (!utils::is_fd_tty(stderr)) {
-        return;
-    }
-
     if (m_num_reads_expected != 0) {
         // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
         // because of the read splitting. That needs to be handled properly.
@@ -204,7 +194,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
         total_progress = progress * (1 - m_post_processing_percentage);
     }
 
-    // Don't output the progress bar if stderr is not a tty.
+    // The progress bar uses escape sequences that only TTYs understand.
     if (!utils::is_fd_tty(stderr)) {
         return;
     }
