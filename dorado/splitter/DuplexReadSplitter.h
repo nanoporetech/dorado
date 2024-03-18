@@ -20,7 +20,6 @@ public:
 
 private:
     struct ExtRead;
-    using SplitFinderF = std::function<splitter::PosRanges(const ExtRead&)>;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;
     PosRanges possible_pore_regions(const ExtRead& read) const;
@@ -36,10 +35,13 @@ private:
     std::vector<SimplexReadPtr> subreads(SimplexReadPtr read,
                                          const splitter::PosRanges& spacers) const;
 
-    std::vector<std::pair<std::string, SplitFinderF>> build_split_finders() const;
+    std::vector<ExtRead> apply_split_finders(ExtRead read) const;
+    template <typename SplitFinder>
+    void apply_split_finder(std::vector<ExtRead>& to_split,
+                            const char* description,
+                            const SplitFinder& split_finder) const;
 
     const DuplexSplitSettings m_settings;
-    std::vector<std::pair<std::string, SplitFinderF>> m_split_finders;
 };
 
 }  // namespace dorado::splitter
