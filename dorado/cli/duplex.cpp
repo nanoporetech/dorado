@@ -479,7 +479,7 @@ int duplex(int argc, char* argv[]) {
             // calling.
             auto [runners, num_devices] = api::create_basecall_runners(
                     models.model_config, device, num_runners, 0, batch_size, chunk_size, 0.9f,
-                    api::PipelineType::duplex);
+                    api::PipelineType::duplex, 0.f);
 
             std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -493,7 +493,7 @@ int duplex(int argc, char* argv[]) {
             // model.
             std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
                     models.stereo_model_config, device, num_runners, 0, stereo_batch_size,
-                    chunk_size, 0.5f, api::PipelineType::duplex);
+                    chunk_size, 0.5f, api::PipelineType::duplex, 0.f);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

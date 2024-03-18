@@ -27,7 +27,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t batch_size,
         size_t chunk_size,
         float memory_fraction,
-        PipelineType pipeline_type) {
+        PipelineType pipeline_type,
+        float batch_size_time_penalty) {
 #ifdef __APPLE__
     (void)pipeline_type;
 #endif
@@ -88,7 +89,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         for (auto device_string : devices) {
             futures.push_back(pool.push(create_cuda_caller, std::cref(model_config),
                                         int(chunk_size), int(batch_size), device_string,
-                                        memory_fraction, pipeline_type));
+                                        memory_fraction, pipeline_type, batch_size_time_penalty));
         }
 
         for (auto& caller : futures) {
@@ -110,6 +111,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         throw std::runtime_error("Unsupported device: " + device);
     }
     (void)num_gpu_runners;
+    (void)batch_size_time_penalty;
 #endif
 
     auto adjusted_chunk_size = runners.front()->chunk_size();
