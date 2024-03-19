@@ -155,24 +155,15 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
             is_seq_reversed ? utils::reverse_complement(seq) : seq, modbase_str, modbase_probs,
             is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
                             : trim_interval);
-    auto n_cigar = input_record->core.n_cigar;
-    std::vector<uint32_t> ops;
-    uint32_t ref_pos_consumed = 0;
-    if (n_cigar > 0) {
-        auto cigar_arr = bam_get_cigar(input_record);
-        ops = utils::trim_cigar(n_cigar, cigar_arr, trim_interval);
-        ref_pos_consumed =
-                ops.empty() ? 0 : utils::ref_pos_consumed(n_cigar, cigar_arr, trim_interval.first);
-    }
 
     // Create a new bam record to hold the trimmed read.
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
-             bam_get_qname(input_record), input_record->core.flag, input_record->core.tid,
-             input_record->core.pos + ref_pos_consumed, input_record->core.qual, ops.size(),
-             ops.empty() ? NULL : ops.data(), input_record->core.mtid, input_record->core.mpos,
-             input_record->core.isize, trimmed_seq.size(), trimmed_seq.data(),
-             trimmed_qual.empty() ? NULL : (char*)trimmed_qual.data(), bam_get_l_aux(input_record));
+             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/,
+             trimmed_seq.size(), trimmed_seq.data(),
+             trimmed_qual.empty() ? nullptr : (char*)trimmed_qual.data(),
+             bam_get_l_aux(input_record));
     memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
     out_record->l_data += bam_get_l_aux(input_record);
 
@@ -197,6 +188,8 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
 
     bam_aux_update_int(out_record, "ts", ts);
     bam_aux_update_int(out_record, "ns", ns);
+
+    utils::remove_alignment_tags_from_record(out_record);
 
     return BamPtr(out_record);
 }

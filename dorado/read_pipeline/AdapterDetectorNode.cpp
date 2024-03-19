@@ -39,6 +39,10 @@ void AdapterDetectorNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
+            // If the read is a secondary or supplementary read, ignore it.
+            if (read->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
+                continue;
+            }
             process_read(read);
             send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
