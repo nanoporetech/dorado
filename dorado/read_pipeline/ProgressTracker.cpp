@@ -9,6 +9,21 @@
 #include <iomanip>
 #include <sstream>
 
+namespace {
+
+void erase_progress_bar_line() {
+    // Don't write escape codes unless it's a TTY.
+    if (dorado::utils::is_fd_tty(stderr)) {
+        // Erase the current line so that we remove the previous description.
+#ifndef _WIN32
+        // I would use indicators::erase_progress_bar_line() here, but it hardcodes stdout.
+        std::cerr << "\r\033[K";
+#endif
+    }
+}
+
+}  // namespace
+
 namespace dorado {
 
 ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
@@ -21,18 +36,12 @@ ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_proces
 ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::set_description(const std::string& desc) {
-    // Don't write escape codes unless it's a TTY.
-    if (utils::is_fd_tty(stderr)) {
-        // Erase the current line so that we remove the previous description.
-#ifndef _WIN32
-        // I would use indicators::erase_line() here, but it hardcodes stdout.
-        std::cerr << "\r\033[K";
-#endif
-    }
+    erase_progress_bar_line();
     m_progress_bar.set_option(indicators::option::PostfixText{desc});
 }
 
 void ProgressTracker::summarize() const {
+    erase_progress_bar_line();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
