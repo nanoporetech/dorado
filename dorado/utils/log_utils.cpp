@@ -76,12 +76,14 @@ void InitLogging() {
 }
 
 void SetVerboseLogging(VerboseLogLevel level) {
-    if (is_safe_to_log()) {
-        if (level >= VerboseLogLevel::trace) {
-            spdlog::set_level(spdlog::level::trace);
-        } else if (level <= VerboseLogLevel::debug) {
-            spdlog::set_level(spdlog::level::debug);
-        }
+    if (!is_safe_to_log() || level == VerboseLogLevel::none) {
+        return;
+    }
+
+    if (level == VerboseLogLevel::debug) {
+        spdlog::set_level(spdlog::level::debug);
+    } else {
+        spdlog::set_level(spdlog::level::trace);
     }
 }
 
@@ -93,7 +95,7 @@ void EnsureInfoLoggingEnabled(VerboseLogLevel level) {
     case VerboseLogLevel::debug:
         spdlog::set_level(spdlog::level::debug);
         break;
-    case VerboseLogLevel::trace:
+    default:
         spdlog::set_level(spdlog::level::trace);
         break;
     };

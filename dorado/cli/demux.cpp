@@ -137,9 +137,7 @@ int demuxer(int argc, char* argv[]) {
     if (progress_stats_frequency > 0) {
         utils::EnsureInfoLoggingEnabled(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     } else {
-        if (parser.visible.get<bool>("--verbose")) {
-            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
-        }
+        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
     auto reads(parser.visible.get<std::string>("reads"));

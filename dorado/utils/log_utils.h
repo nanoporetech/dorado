@@ -5,7 +5,7 @@ namespace dorado::utils {
 // Initialises the default logger to point to stderr.
 void InitLogging();
 
-enum class VerboseLogLevel {
+enum class VerboseLogLevel : int {
     none = 0,
     debug = 1,
     trace = 2,
