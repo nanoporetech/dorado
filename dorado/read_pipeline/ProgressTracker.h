@@ -23,6 +23,8 @@ public:
     ProgressTracker(int total_reads, bool duplex, float post_processing_percentage);
     ~ProgressTracker();
 
+    void set_description(const std::string& desc);
+
     void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
     void update_post_processing_progress(float progress);
