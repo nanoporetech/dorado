@@ -235,6 +235,7 @@ int aligner(int argc, char* argv[]) {
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);
+        tracker.set_description("Aligning");
 
         // Set up stats counting
         std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -261,6 +262,7 @@ int aligner(int argc, char* argv[]) {
         progress_stats.notify_stats_collector_completed(final_stats);
 
         // Report progress during output file finalisation.
+        tracker.set_description("Sorting output files");
         hts_file.finalise([&](size_t progress) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
         });

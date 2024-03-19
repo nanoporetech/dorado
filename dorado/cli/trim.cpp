@@ -156,6 +156,7 @@ int trim(int argc, char* argv[]) {
 
     // Set up stats counting
     ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    tracker.set_description("Trimming");
     std::vector<dorado::stats::StatsCallable> stats_callables;
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
@@ -174,6 +175,7 @@ int trim(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
 
     // Report progress during output file finalisation.
+    tracker.set_description("Sorting output files");
     hts_file.finalise([&](size_t progress) {
         tracker.update_post_processing_progress(static_cast<float>(progress));
     });
