@@ -15,6 +15,7 @@
 #include <cassert>
 #include <chrono>
 #include <limits>
+#include <map>
 
 using namespace std::chrono_literals;
 
@@ -168,22 +169,29 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (m_config.out_features.has_value()) {
         auto out_features = m_config.out_features.value();
-        std::unordered_map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
-        crfmodel_bytes_per_chunk_timestep = out_features_map[out_features];
-        if (crfmodel_bytes_per_chunk_timestep == 0) {
-            spdlog::warn("Failed to set GPU memory requirements. Unexpected model out_features {}.",
-                         out_features);
+        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
+        auto it = out_features_map.upper_bound(out_features - 1);
+        if (it == out_features_map.end()) {
+            spdlog::error(
+                    "Failed to set GPU memory requirements. Unexpected model out_features {}.",
+                    out_features);
             return {0, 0};
+        } else if (it->first != out_features) {
+            spdlog::warn("Unexpected model out_features {}. Estimating GPU memory requirements.");
         }
+        crfmodel_bytes_per_chunk_timestep = it->second;
     } else {
-        std::unordered_map<int, int64_t> insize_map{
+        const std::map<int, int64_t> insize_map{
                 {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-        crfmodel_bytes_per_chunk_timestep = insize_map[m_config.lstm_size];
-        if (crfmodel_bytes_per_chunk_timestep == 0) {
-            spdlog::warn("Failed to set GPU memory requirements. Unexpected model insize {}.",
-                         m_config.lstm_size);
+        auto it = insize_map.upper_bound(m_config.lstm_size - 1);
+        if (it == insize_map.end()) {
+            spdlog::error("Failed to set GPU memory requirements. Unexpected model insize {}.",
+                          m_config.lstm_size);
             return {0, 0};
+        } else if (it->first != m_config.lstm_size) {
+            spdlog::warn("Unexpected model insize {}. Estimating GPU memory requirements.");
         }
+        crfmodel_bytes_per_chunk_timestep = it->second;
     }
 
     // Determine size of working memory for decoder divided by (batch_size * chunk_size)
