@@ -40,7 +40,6 @@ private:
     utils::HtsFile& m_file;
 
     void input_thread_fn();
-    int write(const bam1_t* record);
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};
 

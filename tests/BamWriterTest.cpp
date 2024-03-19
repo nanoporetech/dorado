@@ -75,3 +75,30 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_G
     CHECK(stats.at("unique_simplex_reads_written") == 6);
     CHECK(stats.at("split_reads_written") == 2);
 }
+
+TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
+    fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto input_fastq = bam_test_dir / "fastq_with_tags.fq";
+    auto tmp_dir = TempDir(fs::temp_directory_path() / "writer_test");
+    std::filesystem::create_directories(tmp_dir.m_path);
+    auto out_fastq = tmp_dir.m_path / "output.fq";
+
+    // Read input file to check all tags are reads.
+    HtsReader reader(input_fastq.string(), std::nullopt);
+    {
+        // Write with tags into temporary folder.
+        HtsWriter writer(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
+        while (reader.read()) {
+            CHECK(bam_aux_get(reader.record.get(), "RG") != nullptr);
+            CHECK(bam_aux_get(reader.record.get(), "st") != nullptr);
+            writer.write(reader.record.get());
+        }
+    }
+
+    // Read temporary file to make sure tags were correctly set.
+    HtsReader new_fastq_reader(out_fastq.string(), std::nullopt);
+    while (new_fastq_reader.read()) {
+        CHECK(bam_aux_get(new_fastq_reader.record.get(), "RG") != nullptr);
+        CHECK(bam_aux_get(new_fastq_reader.record.get(), "st") != nullptr);
+    }
+}
