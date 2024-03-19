@@ -77,12 +77,26 @@ void InitLogging() {
 
 void SetVerboseLogging(VerboseLogLevel level) {
     if (is_safe_to_log()) {
-        if (level >= VerboseLogLevel::TRACE) {
+        if (level >= VerboseLogLevel::trace) {
             spdlog::set_level(spdlog::level::trace);
-        } else if (level <= VerboseLogLevel::DEBUG) {
+        } else if (level <= VerboseLogLevel::debug) {
             spdlog::set_level(spdlog::level::debug);
         }
     }
+}
+
+void EnsureInfoLoggingEnabled(VerboseLogLevel level) {
+    switch (level) {
+    case VerboseLogLevel::none:
+        spdlog::set_level(spdlog::level::info);
+        break;
+    case VerboseLogLevel::debug:
+        spdlog::set_level(spdlog::level::debug);
+        break;
+    case VerboseLogLevel::trace:
+        spdlog::set_level(spdlog::level::trace);
+        break;
+    };
 }
 
 }  // namespace dorado::utils
