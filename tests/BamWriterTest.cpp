@@ -14,6 +14,7 @@
 
 namespace fs = std::filesystem;
 using namespace dorado;
+using Catch::Matchers::Equals;
 using utils::HtsFile;
 
 class HtsWriterTestsFixture {
@@ -88,17 +89,21 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     {
         // Write with tags into temporary folder.
         HtsWriter writer(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
-        while (reader.read()) {
-            CHECK(bam_aux_get(reader.record.get(), "RG") != nullptr);
-            CHECK(bam_aux_get(reader.record.get(), "st") != nullptr);
-            writer.write(reader.record.get());
-        }
+        reader.read();
+        CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "RG")),
+                   Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."
+                          "3.0"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "st")),
+                   Equals("2023-06-22T07:17:48.308+00:00"));
+        writer.write(reader.record.get());
     }
 
     // Read temporary file to make sure tags were correctly set.
     HtsReader new_fastq_reader(out_fastq.string(), std::nullopt);
-    while (new_fastq_reader.read()) {
-        CHECK(bam_aux_get(new_fastq_reader.record.get(), "RG") != nullptr);
-        CHECK(bam_aux_get(new_fastq_reader.record.get(), "st") != nullptr);
-    }
+    new_fastq_reader.read();
+    CHECK_THAT(
+            bam_aux2Z(bam_aux_get(new_fastq_reader.record.get(), "RG")),
+            Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4.3.0"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(new_fastq_reader.record.get(), "st")),
+               Equals("2023-06-22T07:17:48.308+00:00"));
 }
