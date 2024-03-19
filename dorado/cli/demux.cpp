@@ -133,7 +133,10 @@ int demuxer(int argc, char* argv[]) {
         std::exit(1);
     }
 
-    if (parser.visible.get<bool>("--verbose")) {
+    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+    if (progress_stats_frequency > 0) {
+        utils::EnsureInfoLoggingEnabled(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
+    } else {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
@@ -241,7 +244,6 @@ int demuxer(int argc, char* argv[]) {
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
-    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::single_collector);

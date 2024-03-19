@@ -145,6 +145,12 @@ int aligner(int argc, char* argv[]) {
 
     if (parser.visible.get<bool>("--verbose")) {
         mm_verbose = 3;
+    }
+
+    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+    if (progress_stats_frequency > 0) {
+        utils::EnsureInfoLoggingEnabled(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
+    } else {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
@@ -194,7 +200,7 @@ int aligner(int argc, char* argv[]) {
     }
 
     auto index_file_access = load_index(index, options, aligner_threads);
-    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
