@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace dorado::demux {
+namespace dorado::barcode_kits {
 
 struct BarcodeKitScoringParams {
     float min_soft_barcode_threshold = 0.7f;
@@ -19,11 +19,8 @@ struct BarcodeKitScoringParams {
 std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
         const std::string& arrangement_file);
 
-std::unordered_map<std::string, std::string> parse_custom_sequences(
-        const std::string& sequences_file);
-
 BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file);
 
 bool check_normalized_id_pattern(const std::string& pattern);
 
-}  // namespace dorado::demux
+}  // namespace dorado::barcode_kits

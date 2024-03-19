@@ -230,10 +230,10 @@ add_library(dorado_lib
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
+    dorado/demux/parse_custom_sequences.cpp
+    dorado/demux/parse_custom_sequences.h
     dorado/demux/Trimmer.cpp
     dorado/demux/Trimmer.h
-    dorado/demux/parse_custom_kit.cpp
-    dorado/demux/parse_custom_kit.h
     dorado/poly_tail/dna_poly_tail_calculator.cpp
     dorado/poly_tail/dna_poly_tail_calculator.h
     dorado/poly_tail/plasmid_poly_tail_calculator.cpp

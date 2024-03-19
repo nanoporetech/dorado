@@ -27,5 +27,4 @@ std::string barcode_kits_list_str();
 std::string normalize_barcode_name(const std::string& barcode_name);
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name);
-
 }  // namespace dorado::barcode_kits
