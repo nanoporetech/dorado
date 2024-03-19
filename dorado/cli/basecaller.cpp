@@ -128,7 +128,7 @@ void setup(std::vector<std::string> args,
 
     auto [runners, num_devices] =
             api::create_basecall_runners(model_config, device, num_runners, 0, batch_size,
-                                         chunk_size, 1.f, api::PipelineType::simplex);
+                                         chunk_size, 1.f, api::PipelineType::simplex, 0.f);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
