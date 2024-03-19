@@ -537,10 +537,6 @@ void remove_alignment_tags_from_record(bam1_t* record) {
             aux_ptr = bam_aux_next(record, aux_ptr);
         }
     }
-    if (errno != ENOENT) {
-        throw std::runtime_error("Could not clear alignment tags for read " +
-                                 std::string(bam_get_qname(record)));
-    }
 }
 
 }  // namespace dorado::utils
