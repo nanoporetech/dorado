@@ -194,4 +194,11 @@ kstring_t allocate_kstring();
  */
 void remove_alignment_tags_from_record(bam1_t* record);
 
+/*
+ * Strip SQ lines from BAM header.
+ *
+ * @param header BAM header.
+ */
+void remove_sq_lines_from_header(sam_hdr_t* header);
+
 }  // namespace dorado::utils

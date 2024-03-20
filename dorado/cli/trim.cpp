@@ -4,6 +4,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -116,6 +117,10 @@ int trim(int argc, char* argv[]) {
     HtsReader reader(reads[0], read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
     add_pg_hdr(header.get());
+    // Always remove alignment information from input header
+    // because at minimum the adapters are trimmed, which
+    // invalidates the alignment record.
+    utils::remove_sq_lines_from_header(header.get());
 
     auto output_mode = OutputMode::BAM;
 

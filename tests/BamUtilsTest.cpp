@@ -405,3 +405,25 @@ TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
 
     CHECK(bam_aux_first(record) == nullptr);
 }
+
+TEST_CASE("BamUtilsTest: test removal of SQ rows from header", TEST_GROUP) {
+    SECTION("Test header with SQ row") {
+        std::string header_1 =
+                "@HD\tVN:1.6\tSO:coordinate\n"
+                "@SQ\tSN:Lambda\tLN:48400\n";
+        SamHdrPtr header = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
+
+        CHECK(sam_hdr_count_lines(header.get(), "SQ") == 1);
+        utils::remove_sq_lines_from_header(header.get());
+        CHECK(sam_hdr_count_lines(header.get(), "SQ") == 0);
+    }
+
+    SECTION("Test header without SQ row") {
+        std::string header_2 = "@HD\tVN:1.6\tSO:queryname\n";
+
+        SamHdrPtr header = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
+
+        utils::remove_sq_lines_from_header(header.get());
+        CHECK(sam_hdr_count_lines(header.get(), "SQ") == 0);
+    }
+}
