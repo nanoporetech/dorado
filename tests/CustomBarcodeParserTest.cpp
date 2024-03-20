@@ -140,6 +140,7 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
     CHECK(scoring_params.flank_right_pad == 10);
     CHECK(scoring_params.front_barcode_window == 150);
     CHECK(scoring_params.rear_barcode_window == 150);
+    CHECK(scoring_params.min_flank_score == Approx(0.5f));
 }
 
 TEST_CASE("Parse default scoring params", "[barcode_demux]") {

@@ -82,8 +82,9 @@ The classification heuristic applied by Dorado is the following -
 Once barcodes are sorted by barcode penalty, the top candidate is checked against the following rules -
 1. Is the barcode penalty below `max_barcode_penalty` and the distance between top 2 barcode penalties greater than `min_barcode_penalty_dist`?.
 2. Is the barcode penalty above `max_barcode_penalty` but the distance between top 2 barcodes penalties greater then `min_separation_only_dist`?
+3. Is the flank score below the `min_flank_score`?
 
-If a candidate meets one of the above conditions and the location of the start/end of the barcode construct is within `barcode_end_proximity` bases of the ends of the read, then it is considered a hit.
+If a candidate meets (1) or (2) AND (3), and the location of the start/end of the barcode construct is within `barcode_end_proximity` bases of the ends of the read, then it is considered a hit.
 
 | Scoring option | Description |
 | -- | -- |
@@ -95,6 +96,7 @@ If a candidate meets one of the above conditions and the location of the start/e
 | flank_right_pad | Number of bases to use from succeeding flank during barcode alignment. |
 | front_barcode_window | Number of bases at the front of the read within which to look for barcodes. |
 | rear_barcode_window | Number of bases at the rear of the read within which to look for barcodes. |
+| min_flank_score | Minimum score for the flank alignment. Score here is 1.f - (edit distance) / flank_length |
 
 For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases is typically good. Note that errors from this padding region are also part of the barcode alignment penalty. Therefore a bigger padding region may require a higher `max_barcode_cost` for classification.
 

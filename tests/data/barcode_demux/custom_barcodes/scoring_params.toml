@@ -8,3 +8,4 @@ flank_left_pad = 5
 flank_right_pad = 10
 front_barcode_window = 150
 rear_barcode_window = 150
+min_flank_score = 0.5

@@ -16,6 +16,7 @@ struct BarcodeKitScoringParams {
     int flank_right_pad = 10;
     int front_barcode_window = 175;
     int rear_barcode_window = 175;
+    float min_flank_score = 0.6f;
 };
 
 struct KitInfo {

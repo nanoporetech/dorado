@@ -153,6 +153,9 @@ dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
     if (config.contains("rear_barcode_window")) {
         params.rear_barcode_window = toml::find<int>(config, "rear_barcode_window");
     }
+    if (config.contains("min_flank_score")) {
+        params.min_flank_score = toml::find<float>(config, "min_flank_score");
+    }
 
     return params;
 }

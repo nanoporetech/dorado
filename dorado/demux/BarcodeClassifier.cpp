@@ -165,6 +165,25 @@ std::string extract_right_buffer(const std::string& flank, int buffer) {
     return flank.substr(0, buffer);
 }
 
+// Helper to pick the top or bottom window in a barcode. The one
+// with lower penalty and higher flank score is preferred. If both
+// are not satisfied by one of the windows, then just decide based
+// on the barcode penalty.
+std::tuple<bool, int, float> pick_top_or_bottom(int top_penalty,
+                                                float top_flank_score,
+                                                int bottom_penalty,
+                                                float bottom_flank_score) {
+    if (top_penalty <= bottom_penalty && top_flank_score >= bottom_flank_score) {
+        return {true, top_penalty, top_flank_score};
+    } else if (bottom_penalty <= top_penalty && bottom_flank_score >= top_flank_score) {
+        return {false, bottom_penalty, bottom_flank_score};
+    } else if (top_penalty <= bottom_penalty) {
+        return {true, top_penalty, top_flank_score};
+    } else {
+        return {false, bottom_penalty, bottom_flank_score};
+    }
+}
+
 }  // namespace
 
 namespace demux {
@@ -471,17 +490,6 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     spdlog::trace("total v1 edit dist {}, total v2 edit dis {}", total_v1_penalty,
                   total_v2_penalty);
 
-    std::string_view top_mask, bottom_mask;
-    if (total_v1_penalty < total_v2_penalty) {
-        top_mask = top_mask_v1;
-        bottom_mask = bottom_mask_v1;
-        spdlog::trace("best variant v1");
-    } else {
-        top_mask = top_mask_v2;
-        bottom_mask = bottom_mask_v2;
-        spdlog::trace("best variant v2");
-    }
-
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
         const auto barcode1 =
@@ -510,14 +518,13 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         BarcodeScoreResult v1;
         v1.top_penalty = top_mask_result_penalty_v1;
         v1.bottom_penalty = bottom_mask_result_penalty_v1;
-        v1.penalty = std::min(v1.top_penalty, v1.bottom_penalty);
-        v1.use_top = v1.top_penalty < v1.bottom_penalty;
+        v1.top_flank_score = top_flank_score_v1;
+        v1.bottom_flank_score = bottom_flank_score_v1;
+        std::tie(v1.use_top, v1.penalty, v1.flank_score) = pick_top_or_bottom(
+                v1.top_penalty, v1.top_flank_score, v1.bottom_penalty, v1.bottom_flank_score);
         v1.barcode_score =
                 v1.use_top ? (1.f - static_cast<float>(v1.top_penalty) / barcode1.length())
                            : (1.f - static_cast<float>(v1.bottom_penalty) / barcode2_rev.length());
-        v1.top_flank_score = top_flank_score_v1;
-        v1.bottom_flank_score = bottom_flank_score_v1;
-        v1.flank_score = v1.use_top ? top_flank_score_v1 : bottom_flank_score_v1;
         v1.top_barcode_pos = {top_result_v1.startLocations[0], top_result_v1.endLocations[0]};
         v1.bottom_barcode_pos = {bottom_start + bottom_result_v1.startLocations[0],
                                  bottom_start + bottom_result_v1.endLocations[0]};
@@ -532,20 +539,30 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         BarcodeScoreResult v2;
         v2.top_penalty = top_mask_result_penalty_v2;
         v2.bottom_penalty = bottom_mask_result_penalty_v2;
-        v2.penalty = std::min(v2.top_penalty, v2.bottom_penalty);
+        v2.top_flank_score = top_flank_score_v2;
+        v2.bottom_flank_score = bottom_flank_score_v2;
+        std::tie(v2.use_top, v2.penalty, v2.flank_score) = pick_top_or_bottom(
+                v2.top_penalty, v2.top_flank_score, v2.bottom_penalty, v2.bottom_flank_score);
         v2.barcode_score =
                 v2.use_top ? (1.f - static_cast<float>(v2.top_penalty) / barcode2.length())
                            : (1.f - static_cast<float>(v2.bottom_penalty) / barcode1_rev.length());
-        v2.use_top = v2.top_penalty < v2.bottom_penalty;
-        v2.top_flank_score = top_flank_score_v2;
-        v2.bottom_flank_score = bottom_flank_score_v2;
-        v2.flank_score = v2.use_top ? top_flank_score_v2 : bottom_flank_score_v2;
         v2.top_barcode_pos = {top_result_v2.startLocations[0], top_result_v2.endLocations[0]};
         v2.bottom_barcode_pos = {bottom_start + bottom_result_v2.startLocations[0],
                                  bottom_start + bottom_result_v2.endLocations[0]};
 
-        // The best penalty is the higher penalty between the 2 variants.
-        const bool var1_is_best = v1.penalty < v2.penalty;
+        // The best variant is the one with lower penalty for both barcode
+        // and flanks. If that's not clear, then just use the barcode score
+        // penalty to decide.
+        bool var1_is_best = true;
+        if (v1.penalty <= v2.penalty && total_v1_penalty <= total_v2_penalty) {
+            var1_is_best = true;
+        } else if (v2.penalty <= v1.penalty && total_v2_penalty <= total_v1_penalty) {
+            var1_is_best = false;
+        } else if (v1.penalty <= v2.penalty) {
+            var1_is_best = true;
+        } else {
+            var1_is_best = false;
+        }
         BarcodeScoreResult res = var1_is_best ? v1 : v2;
         res.variant = var1_is_best ? "var1" : "var2";
         res.barcode_name = barcode_name;
@@ -636,14 +653,13 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         res.barcode_kit = candidate.barcode_kit;
         res.top_penalty = top_mask_penalty;
         res.bottom_penalty = bottom_mask_penalty;
-        res.penalty = std::min(res.top_penalty, res.bottom_penalty);
-        res.use_top = res.top_penalty < res.bottom_penalty;
+        res.top_flank_score = top_flank_score;
+        res.bottom_flank_score = bottom_flank_score;
+        std::tie(res.use_top, res.penalty, res.flank_score) = pick_top_or_bottom(
+                res.top_penalty, res.top_flank_score, res.bottom_penalty, res.bottom_flank_score);
         res.barcode_score =
                 res.use_top ? (1.f - static_cast<float>(res.top_penalty) / barcode.length())
                             : (1.f - static_cast<float>(res.bottom_penalty) / barcode_rev.length());
-        res.top_flank_score = top_flank_score;
-        res.bottom_flank_score = bottom_flank_score;
-        res.flank_score = res.use_top ? res.top_flank_score : res.bottom_flank_score;
         res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
         res.bottom_barcode_pos = {bottom_start + bottom_result.startLocations[0],
                                   bottom_start + bottom_result.endLocations[0]};
@@ -793,8 +809,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
     spdlog::trace("Scores: {}", d.str());
     auto best_result = results.begin();
-    auto are_penalties_acceptable = [this](const auto& penalty) {
-        return penalty.penalty <= m_scoring_params.max_barcode_penalty;
+    auto are_penalties_acceptable = [this](const auto& proposal) {
+        // If barcode penalty is 0, it's a perfect match. Consider it a pass.
+        return (proposal.penalty == 0) ||
+               ((proposal.penalty <= m_scoring_params.max_barcode_penalty) &&
+                (proposal.flank_score >= m_scoring_params.min_flank_score));
     };
 
     BarcodeScoreResult out = UNCLASSIFIED;

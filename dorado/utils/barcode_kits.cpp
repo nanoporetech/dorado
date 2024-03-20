@@ -119,6 +119,7 @@ const BarcodeKitScoringParams RBK114_PARAMS{
         /*flank_right_pad*/ 10,
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
+        /*min_flank_score*/ 0.0f,
 };
 
 // Some arrangement names are just aliases of each other. This is because they were released
