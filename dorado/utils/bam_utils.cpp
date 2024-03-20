@@ -522,9 +522,9 @@ void remove_alignment_tags_from_record(bam1_t* record) {
     // Iterate through all tags and check against known set
     // of tags to remove.
     static const std::set<std::pair<std::string, char>> tags_to_remove = {
-            {"SA", 'Z'}, {"NM", 'i'}, {"ms", 'i'}, {"AS", 'i'}, {"nn", 'i'},
-            {"ts", 'A'}, {"de", 'f'}, {"dv", 'f'}, {"tp", 'A'}, {"cm", 'i'},
-            {"s1", 'i'}, {"s2", 'i'}, {"MD", 'Z'}, {"zd", 'i'}, {"rl", 'i'}};
+            {"SA", 'Z'}, {"NM", 'i'}, {"ms", 'i'}, {"AS", 'i'}, {"nn", 'i'}, {"ts", 'A'},
+            {"de", 'f'}, {"dv", 'f'}, {"tp", 'A'}, {"cm", 'i'}, {"s1", 'i'}, {"s2", 'i'},
+            {"MD", 'Z'}, {"zd", 'i'}, {"rl", 'i'}, {"bh", 'i'}};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {
