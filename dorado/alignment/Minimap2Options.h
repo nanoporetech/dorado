@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <tuple>
 
 namespace dorado::alignment {
@@ -13,8 +14,8 @@ struct Minimap2IndexOptions {
 };
 
 inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return std::tie(l.kmer_size, l.window_size, l.index_batch_size) <
-           std::tie(r.kmer_size, r.window_size, r.index_batch_size);
+    return std::tie(l.kmer_size, l.window_size, l.index_batch_size, l.mm2_preset) <
+           std::tie(r.kmer_size, r.window_size, r.index_batch_size, r.mm2_preset);
 }
 
 inline bool operator>(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
@@ -30,8 +31,8 @@ inline bool operator>=(const Minimap2IndexOptions& l, const Minimap2IndexOptions
 }
 
 inline bool operator==(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return std::tie(l.kmer_size, l.window_size, l.index_batch_size) ==
-           std::tie(r.kmer_size, r.window_size, r.index_batch_size);
+    return std::tie(l.kmer_size, l.window_size, l.index_batch_size, l.mm2_preset) ==
+           std::tie(r.kmer_size, r.window_size, r.index_batch_size, r.mm2_preset);
 }
 
 inline bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
