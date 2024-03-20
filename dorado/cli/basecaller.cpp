@@ -24,6 +24,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
@@ -149,7 +150,18 @@ void setup(std::vector<std::string> args,
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
+    if (custom_kit) {
+        auto custom_kit_info = barcode_kits::parse_custom_arrangement(*custom_kit);
+        if (!custom_kit_info) {
+            spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
+            std::exit(EXIT_FAILURE);
+        }
+        auto [kit_name, kit_info] = *custom_kit_info;
+        utils::add_rg_hdr_for_custom_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
+                                                 sample_sheet.get());
+    } else {
+        utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
+    }
 
     utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
 
@@ -606,6 +618,7 @@ int basecaller(int argc, char* argv[]) {
     spdlog::info("> Creating basecall pipeline");
 
     try {
+        /* clang format off */
         setup(args, model_path, data, mods_model_paths, parser.visible.get<std::string>("-x"),
               parser.visible.get<std::string>("--reference"), parser.visible.get<int>("-c"),
               parser.visible.get<int>("-o"), parser.visible.get<int>("-b"),
@@ -625,6 +638,7 @@ int basecaller(int argc, char* argv[]) {
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
               resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
               polya_config.empty() ? nullptr : &polya_config, model_selection);
+        /* clang format on */
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

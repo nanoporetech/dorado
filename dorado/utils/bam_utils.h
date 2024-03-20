@@ -1,4 +1,5 @@
 #pragma once
+#include "barcode_kits.h"
 #include "types.h"
 
 #include <map>
@@ -28,6 +29,13 @@ void add_rg_hdr(sam_hdr_t* hdr,
                 const std::unordered_map<std::string, ReadGroup>& read_groups,
                 const std::vector<std::string>& barcode_kits,
                 const utils::SampleSheet* const sample_sheet);
+
+void add_rg_hdr_for_custom_barcode_kit(
+        sam_hdr_t* hdr,
+        const std::unordered_map<std::string, ReadGroup>& read_groups,
+        const std::string& kit_name,
+        const barcode_kits::KitInfo& kit_info,
+        const utils::SampleSheet* const sample_sheet);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
