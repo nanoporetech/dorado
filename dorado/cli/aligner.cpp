@@ -217,9 +217,10 @@ int aligner(int argc, char* argv[]) {
         dorado::utils::strip_sq_hdr(header);
         add_pg_hdr(header);
 
+        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads);
+
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, file_info.output,
-                                                            file_info.output_mode, writer_threads);
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
                                                            bed_file, options, aligner_threads);
 
@@ -236,10 +237,14 @@ int aligner(int argc, char* argv[]) {
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-        hts_writer_ref.set_and_write_header(header);
+        hts_file.set_and_write_header(header);
+
+        // All progress reporting is in the post-processing part.
+        ProgressTracker tracker(0, false, 1.f);
+        tracker.set_description("Aligning");
+
         // Set up stats counting
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        ProgressTracker tracker(0, false);
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
         stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
@@ -258,10 +263,15 @@ int aligner(int argc, char* argv[]) {
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();
-
         tracker.update_progress_bar(final_stats);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
         progress_stats.notify_stats_collector_completed(final_stats);
+
+        // Report progress during output file finalisation.
+        tracker.set_description("Sorting output files");
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
 
         tracker.summarize();
 

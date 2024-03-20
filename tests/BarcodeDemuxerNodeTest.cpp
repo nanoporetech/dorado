@@ -68,6 +68,8 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         pipeline->terminate(DefaultFlushOptions());
 
+        demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ });
+
         const std::unordered_set<std::string> expected_files = {
                 "bc01.bam", "bc01.bam.bai", "bc02.bam", "bc02.bam.bai", "bc03.bam", "bc03.bam.bai",
         };

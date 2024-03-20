@@ -18,8 +18,11 @@ namespace dorado {
 namespace utils {
 class SampleSheet;
 }
+
 class BarcodeDemuxerNode : public MessageSink {
 public:
+    using HtsFiles = std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>>;
+
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        bool write_fastq,
@@ -32,13 +35,17 @@ public:
 
     void set_header(const sam_hdr_t* header);
 
+    // Finalisation must occur before destruction of this node.
+    // Note that this isn't safe to call until after this node has been terminated.
+    void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback);
+
 private:
     std::filesystem::path m_output_dir;
     int m_htslib_threads;
     SamHdrPtr m_header;
     std::atomic<int> m_processed_reads{0};
 
-    std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>> m_files;
+    HtsFiles m_files;
     std::unique_ptr<std::thread> m_worker;
     void input_thread_fn();
     int write(bam1_t* record);

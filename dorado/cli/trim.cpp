@@ -7,6 +7,7 @@
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -135,8 +136,11 @@ int trim(int argc, char* argv[]) {
         custom_primer_file = parser.get<std::string>("--primer-sequences");
     }
 
+    utils::HtsFile hts_file("-", output_mode, trim_writer_threads);
+    hts_file.set_and_write_header(header.get());
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, trim_writer_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
                                                 !parser.get<bool>("--no-trim-primers"),
@@ -150,14 +154,10 @@ int trim(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
-    // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-    hts_writer_ref.set_and_write_header(header.get());
-
     // Set up stats counting
+    ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    tracker.set_description("Trimming");
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -171,10 +171,14 @@ int trim(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-
     stats_sampler->terminate();
-
     tracker.update_progress_bar(final_stats);
+
+    // Report progress during output file finalisation.
+    tracker.set_description("Sorting output files");
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");

@@ -238,9 +238,12 @@ int demuxer(int argc, char* argv[]) {
             dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
     demux_writer_ref.set_header(header.get());
 
+    // All progress reporting is in the post-processing part.
+    ProgressTracker tracker(0, false, 1.f);
+    tracker.set_description("Demuxing");
+
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(0, false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
 
@@ -274,10 +277,15 @@ int demuxer(int argc, char* argv[]) {
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
-
     stats_sampler->terminate();
-
     tracker.update_progress_bar(final_stats);
+
+    // Finalise the files that were created.
+    tracker.set_description("Sorting output files");
+    demux_writer_ref.finalise_hts_files([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
+
     tracker.summarize();
     progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();

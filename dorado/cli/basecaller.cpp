@@ -28,6 +28,7 @@
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
+#include "utils/tty_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -150,9 +151,10 @@ void setup(std::vector<std::string> args,
     cli::add_pg_hdr(hdr.get(), args);
     utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
 
+    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
+
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode,
-                                                        thread_allocations.writer_threads);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -209,7 +211,7 @@ void setup(std::vector<std::string> args,
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_writer_ref.set_and_write_header(hdr.get());
+    hts_file.set_and_write_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -250,8 +252,10 @@ void setup(std::vector<std::string> args,
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
+    ProgressTracker tracker(int(num_reads), false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    tracker.set_description("Basecalling");
+
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    ProgressTracker tracker(int(num_reads), false);
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
     constexpr auto kStatsPeriod = 100ms;
@@ -270,11 +274,18 @@ void setup(std::vector<std::string> args,
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
-    stats_sampler->terminate();
-
     // Then update progress tracking one more time from this thread, to
     // allow accurate summarisation.
+    stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
+
+    // Report progress during output file finalisation.
+    tracker.set_description("Sorting output files");
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
+
+    // Give the user a nice summary.
     tracker.summarize();
     if (!dump_stats_file.empty()) {
         std::ofstream stats_file(dump_stats_file);
