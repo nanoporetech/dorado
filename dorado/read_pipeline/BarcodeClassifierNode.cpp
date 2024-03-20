@@ -122,9 +122,11 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
         int seqlen = irecord->core.l_qseq;
         auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
 
-        if (trim_interval.second - trim_interval.first < seqlen) {
+        if (trim_interval.second - trim_interval.first <= seqlen) {
             read = Trimmer::trim_sequence(std::move(read), trim_interval);
         }
+
+        utils::remove_alignment_tags_from_record(read.get());
     }
 }
 

@@ -202,7 +202,8 @@ int demuxer(int argc, char* argv[]) {
     if (!no_trim) {
         // Remove SQ lines from header since alignment information
         // is invalidated after trimming.
-        utils::remove_sq_lines_from_header(header.get());
+        utils::strip_sq_hdr(header.get());
+        sam_hdr_remove_tag_id(header.get(), "HD", NULL, NULL, "SO");
     }
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");

@@ -189,8 +189,6 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     bam_aux_update_int(out_record, "ts", ts);
     bam_aux_update_int(out_record, "ns", ns);
 
-    utils::remove_alignment_tags_from_record(out_record);
-
     return BamPtr(out_record);
 }
 

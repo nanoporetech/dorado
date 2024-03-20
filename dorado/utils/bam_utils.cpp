@@ -539,10 +539,4 @@ void remove_alignment_tags_from_record(bam1_t* record) {
     }
 }
 
-void remove_sq_lines_from_header(sam_hdr_t* header) {
-    if (sam_hdr_remove_lines(header, "SQ", NULL, NULL) != 0) {
-        spdlog::warn("Unable to remove @SQ rows from header.");
-    }
-}
-
 }  // namespace dorado::utils

@@ -120,7 +120,8 @@ int trim(int argc, char* argv[]) {
     // Always remove alignment information from input header
     // because at minimum the adapters are trimmed, which
     // invalidates the alignment record.
-    utils::remove_sq_lines_from_header(header.get());
+    utils::strip_sq_hdr(header.get());
+    sam_hdr_remove_tag_id(header.get(), "HD", NULL, NULL, "SO");
 
     auto output_mode = OutputMode::BAM;
 
