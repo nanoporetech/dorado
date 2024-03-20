@@ -3,6 +3,7 @@
 #include "models/kits.h"
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
@@ -229,6 +230,7 @@ SimplexReadPtr process_pod5_read(
     // used has a rapid adapter and which one.
     const auto condition_info = models::ConditionInfo(get_chemistry_key(run_info_data));
     new_read->read_common.rapid_chemistry = condition_info.rapid_chemistry();
+    new_read->read_common.chemistry = condition_info.chemistry();
 
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
     char end_reason_string_value[200];
@@ -853,6 +855,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
         for (auto& v : futures) {
             auto read = v.get();
+            check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
@@ -911,6 +914,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
+            check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
@@ -1020,6 +1024,15 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
             m_pipeline.push_message(std::move(new_read));
             m_loaded_read_count++;
         }
+    }
+}
+
+void DataLoader::check_read(const SimplexReadPtr& read) {
+    if (read->read_common.chemistry == models::Chemistry::UNKNOWN &&
+        m_log_unknown_chemistry.exchange(false)) {
+        spdlog::warn(
+                "Could not determine sequencing Chemistry from read data - "
+                "some features might be disabled");
     }
 }
 
