@@ -43,7 +43,7 @@ protected:
         auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
         stats = writer_ref.sample_stats();
 
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](size_t) { /* noop */ }, num_threads);
     }
 
     stats::NamedStats stats;
