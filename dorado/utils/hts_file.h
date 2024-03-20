@@ -28,13 +28,14 @@ public:
 
     bool finalise_is_noop() const { return m_finalise_is_noop; }
     void finalise(const ProgressCallback& progress_callback, int writer_threads);
+
 private:
     HtsFilePtr m_file;
     SamHdrPtr m_header;
     size_t m_num_records{0};
     bool m_finalised{false};
     bool m_finalise_is_noop;
-    OutputMode m_mode;
+    const OutputMode m_mode;
 };
 
 }  // namespace dorado::utils

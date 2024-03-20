@@ -88,7 +88,8 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     HtsReader reader(input_fastq.string(), std::nullopt);
     {
         // Write with tags into temporary folder.
-        HtsWriter writer(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
+        utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
+        HtsWriter writer(hts_file);
         reader.read();
         CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "RG")),
                    Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."
@@ -96,6 +97,7 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "st")),
                    Equals("2023-06-22T07:17:48.308+00:00"));
         writer.write(reader.record.get());
+        hts_file.finalise([](size_t) { /* noop */ }, 2);
     }
 
     // Read temporary file to make sure tags were correctly set.
