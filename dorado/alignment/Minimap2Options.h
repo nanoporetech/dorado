@@ -9,6 +9,7 @@ struct Minimap2IndexOptions {
     short kmer_size;
     short window_size;
     uint64_t index_batch_size;
+    std::string mm2_preset;
 };
 
 inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
@@ -87,7 +88,7 @@ inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-static constexpr Minimap2Options dflt_options{{15, 10, 16000000000ull},
-                                              {5, 500, 20000, false, false, true},
-                                              false};
+static const Minimap2Options dflt_options{{15, 10, 16000000000ull, "lr:hq"},
+                                          {5, 500, 20000, false, false, true},
+                                          false};
 }  // namespace dorado::alignment

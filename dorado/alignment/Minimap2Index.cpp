@@ -101,8 +101,10 @@ bool Minimap2Index::initialise(Minimap2Options options) {
     m_mapping_options = std::make_optional<mm_mapopt_t>();
 
     mm_set_opt(0, &m_index_options.value(), &m_mapping_options.value());
-    // Setting options to map-ont default till relevant args are exposed.
-    mm_set_opt("map-ont", &m_index_options.value(), &m_mapping_options.value());
+    if (mm_set_opt(options.mm2_preset.c_str(), &m_index_options.value(),
+                   &m_mapping_options.value()) != 0) {
+        throw std::runtime_error("Cannot set mm2 options with preset: " + options.mm2_preset);
+    }
 
     set_index_options(options);
     set_mapping_options(options);
