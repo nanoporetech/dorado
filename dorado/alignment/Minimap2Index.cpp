@@ -103,7 +103,8 @@ bool Minimap2Index::initialise(Minimap2Options options) {
     mm_set_opt(0, &m_index_options.value(), &m_mapping_options.value());
     if (mm_set_opt(options.mm2_preset.c_str(), &m_index_options.value(),
                    &m_mapping_options.value()) != 0) {
-        throw std::runtime_error("Cannot set mm2 options with preset: " + options.mm2_preset);
+        spdlog::error("Cannot set mm2 options with preset: {}", options.mm2_preset);
+        return false;
     }
 
     set_index_options(options);
