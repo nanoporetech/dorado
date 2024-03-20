@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunnerBase.h"
+#include "models/kits.h"
 #include "read_utils.h"
 #include "stitch.h"
 #include "utils/stats.h"
@@ -204,8 +205,12 @@ void BasecallerNode::working_reads_manager() {
             // Chunks have ownership of the working read, so destroy them to avoid a leak.
             working_read->called_chunks.clear();
 
-            // Trim reads which are affected by mux change and unblocking
-            utils::mux_change_trim_read(read_common_data);
+            // Do not trim R9.4.1 data to avoid changes to legacy products
+            // Check here to avoid adding models lib as a dependency of utils
+            if (read_common_data.chemistry != models::Chemistry::DNA_R9_4_1_E8) {
+                // Trim reads which are affected by mux change and unblocking
+                utils::mux_change_trim_read(read_common_data);
+            }
 
             // Cleanup the working read.
             {
