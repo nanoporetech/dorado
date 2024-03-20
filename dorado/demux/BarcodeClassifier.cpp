@@ -512,6 +512,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         v1.bottom_penalty = bottom_mask_result_penalty_v1;
         v1.penalty = std::min(v1.top_penalty, v1.bottom_penalty);
         v1.use_top = v1.top_penalty < v1.bottom_penalty;
+        v1.barcode_score =
+                v1.use_top ? (1.f - static_cast<float>(v1.top_penalty) / barcode1.length())
+                           : (1.f - static_cast<float>(v1.bottom_penalty) / barcode2_rev.length());
         v1.top_flank_score = top_flank_score_v1;
         v1.bottom_flank_score = bottom_flank_score_v1;
         v1.flank_score = v1.use_top ? top_flank_score_v1 : bottom_flank_score_v1;
@@ -530,6 +533,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         v2.top_penalty = top_mask_result_penalty_v2;
         v2.bottom_penalty = bottom_mask_result_penalty_v2;
         v2.penalty = std::min(v2.top_penalty, v2.bottom_penalty);
+        v2.barcode_score =
+                v2.use_top ? (1.f - static_cast<float>(v2.top_penalty) / barcode2.length())
+                           : (1.f - static_cast<float>(v2.bottom_penalty) / barcode1_rev.length());
         v2.use_top = v2.top_penalty < v2.bottom_penalty;
         v2.top_flank_score = top_flank_score_v2;
         v2.bottom_flank_score = bottom_flank_score_v2;
@@ -632,6 +638,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         res.bottom_penalty = bottom_mask_penalty;
         res.penalty = std::min(res.top_penalty, res.bottom_penalty);
         res.use_top = res.top_penalty < res.bottom_penalty;
+        res.barcode_score =
+                res.use_top ? (1.f - static_cast<float>(res.top_penalty) / barcode.length())
+                            : (1.f - static_cast<float>(res.bottom_penalty) / barcode_rev.length());
         res.top_flank_score = top_flank_score;
         res.bottom_flank_score = bottom_flank_score;
         res.flank_score = res.use_top ? res.top_flank_score : res.bottom_flank_score;
@@ -703,6 +712,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         res.bottom_penalty = -1;
         res.penalty = res.top_penalty;
         res.use_top = true;
+        res.barcode_score = 1.f - static_cast<float>(res.top_penalty) / barcode.length();
         res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
 
         results.push_back(res);
