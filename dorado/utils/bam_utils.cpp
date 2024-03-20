@@ -63,11 +63,11 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
     return rg.str();
 }
 
-void emit_read_groups_for_barcode_kit(sam_hdr_t* hdr,
-                                      const std::unordered_map<std::string, ReadGroup>& read_groups,
-                                      const std::string& kit_name,
-                                      const barcode_kits::KitInfo& kit_info,
-                                      const utils::SampleSheet* const sample_sheet) {
+void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
+                             const std::unordered_map<std::string, ReadGroup>& read_groups,
+                             const std::string& kit_name,
+                             const barcode_kits::KitInfo& kit_info,
+                             const utils::SampleSheet* const sample_sheet) {
     const auto& barcode_sequences = barcode_kits::get_barcodes();
     for (const auto& barcode_name : kit_info.barcodes) {
         const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
@@ -103,43 +103,20 @@ kstring_t allocate_kstring() {
     return str;
 }
 
-void add_rg_hdr(sam_hdr_t* hdr,
-                const std::unordered_map<std::string, ReadGroup>& read_groups,
-                const std::vector<std::string>& barcode_kits,
-                const utils::SampleSheet* const sample_sheet) {
-    // Emit read group headers without a barcode arrangement.
+void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
     for (const auto& read_group : read_groups) {
         const std::string read_group_tags = read_group_to_string(read_group.second);
         emit_read_group(hdr, read_group_tags, read_group.first, {});
-    }
-
-    // Emit read group headers for each barcode arrangement.
-    const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
-    for (const auto& kit_name : barcode_kits) {
-        auto kit_iter = barcode_kit_infos.find(kit_name);
-        if (kit_iter == barcode_kit_infos.end()) {
-            throw std::runtime_error(kit_name +
-                                     " is not a valid barcode kit name. Please run the help "
-                                     "command to find out available barcode kits.");
-        }
-        emit_read_groups_for_barcode_kit(hdr, read_groups, kit_name, kit_iter->second,
-                                         sample_sheet);
     }
 }
 
-void add_rg_hdr_for_custom_barcode_kit(
-        sam_hdr_t* hdr,
-        const std::unordered_map<std::string, ReadGroup>& read_groups,
-        const std::string& kit_name,
-        const barcode_kits::KitInfo& kit_info,
-        const utils::SampleSheet* const sample_sheet) {
-    // Emit read group headers without a barcode arrangement.
-    for (const auto& read_group : read_groups) {
-        const std::string read_group_tags = read_group_to_string(read_group.second);
-        emit_read_group(hdr, read_group_tags, read_group.first, {});
-    }
-
-    emit_read_groups_for_barcode_kit(hdr, read_groups, kit_name, kit_info, sample_sheet);
+void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
+                                     const std::unordered_map<std::string, ReadGroup>& read_groups,
+                                     const std::string& kit_name,
+                                     const barcode_kits::KitInfo& kit_info,
+                                     const utils::SampleSheet* const sample_sheet) {
+    add_rg_headers(hdr, read_groups);
+    add_barcode_kit_rg_hdrs(hdr, read_groups, kit_name, kit_info, sample_sheet);
 }
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {

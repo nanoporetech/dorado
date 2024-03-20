@@ -48,6 +48,31 @@
 
 namespace dorado {
 
+namespace {
+
+const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
+    const auto kit_info = barcode_kits::get_kit_info(kit_name);
+    if (!kit_info) {
+        spdlog::error(
+                "{} is not a valid barcode kit name. Please run the help "
+                "command to find out available barcode kits.");
+        std::exit(EXIT_FAILURE);
+    }
+    return *kit_info;
+}
+
+std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
+        const std::string& custom_kit_file) {
+    auto custom_kit_info = barcode_kits::parse_custom_arrangement(custom_kit_file);
+    if (!custom_kit_info) {
+        spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
+        std::exit(EXIT_FAILURE);
+    }
+    return *custom_kit_info;
+}
+
+}  // namespace
+
 using dorado::utils::default_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
@@ -151,16 +176,13 @@ void setup(std::vector<std::string> args,
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
     if (custom_kit) {
-        auto custom_kit_info = barcode_kits::parse_custom_arrangement(*custom_kit);
-        if (!custom_kit_info) {
-            spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
-            std::exit(EXIT_FAILURE);
-        }
-        auto [kit_name, kit_info] = *custom_kit_info;
-        utils::add_rg_hdr_for_custom_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
-                                                 sample_sheet.get());
+        auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
+                                               sample_sheet.get());
     } else {
-        utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
+        const auto kit_info = get_barcode_kit_info(barcode_kits[0]);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kits[0], kit_info,
+                                               sample_sheet.get());
     }
 
     utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);

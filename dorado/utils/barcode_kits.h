@@ -20,8 +20,10 @@ struct KitInfo {
 };
 
 const std::unordered_map<std::string, KitInfo>& get_kit_infos();
+const KitInfo* get_kit_info(const std::string& kit_name);
 const std::unordered_map<std::string, std::string>& get_barcodes();
 const std::unordered_set<std::string>& get_barcode_identifiers();
+
 std::string barcode_kits_list_str();
 
 std::string normalize_barcode_name(const std::string& barcode_name);

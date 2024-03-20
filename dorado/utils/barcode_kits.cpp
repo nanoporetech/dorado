@@ -788,6 +788,15 @@ const std::unordered_map<std::string, std::string> barcodes = {
 
 const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_info_map; }
 
+const KitInfo* get_kit_info(const std::string& kit_name) {
+    const auto& barcode_kit_infos = get_kit_infos();
+    auto kit_iter = get_kit_infos().find(kit_name);
+    if (kit_iter == barcode_kit_infos.end()) {
+        return nullptr;
+    }
+    return &kit_iter->second;
+}
+
 const std::unordered_map<std::string, std::string>& get_barcodes() { return barcodes; }
 
 const std::unordered_set<std::string>& get_barcode_identifiers() {

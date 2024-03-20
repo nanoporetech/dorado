@@ -462,8 +462,7 @@ int duplex(int argc, char* argv[]) {
                                                             recursive_file_loading);
             read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
                                                            recursive_file_loading));
-            std::vector<std::string> barcode_kits;
-            utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, nullptr);
+            utils::add_rg_headers(hdr.get(), read_groups);
 
             int batch_size(parser.visible.get<int>("-b"));
             int chunk_size(parser.visible.get<int>("-c"));
