@@ -92,11 +92,13 @@ void BarcodeDemuxerNode::finalise_hts_files(
     const size_t num_files = m_files.size();
     size_t current_file_idx = 0;
     for (auto& [bc, hts_file] : m_files) {
-        hts_file->finalise([&](size_t progress) {
-            // Give each file/barcode the same contribution to the total progress.
-            const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
-            progress_callback(total_progress);
-        });
+        hts_file->finalise(
+                [&](size_t progress) {
+                    // Give each file/barcode the same contribution to the total progress.
+                    const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
+                    progress_callback(total_progress);
+                },
+                m_htslib_threads);
         ++current_file_idx;
     }
 

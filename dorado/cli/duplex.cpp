@@ -359,7 +359,8 @@ int duplex(int argc, char* argv[]) {
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
-        utils::HtsFile hts_file("-", output_mode, 4);
+        constexpr int WRITER_THREADS = 4;
+        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
@@ -555,9 +556,11 @@ int duplex(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         tracker.set_description("Sorting output files");
-        hts_file.finalise([&](size_t progress) {
-            tracker.update_post_processing_progress(static_cast<float>(progress));
-        });
+        hts_file.finalise(
+                [&](size_t progress) {
+                    tracker.update_post_processing_progress(static_cast<float>(progress));
+                },
+                WRITER_THREADS);
 
         tracker.summarize();
         if (!dump_stats_file.empty()) {

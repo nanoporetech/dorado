@@ -33,7 +33,7 @@ public:
     int write(const bam1_t* record);
 
     bool finalise_is_noop() const { return m_finalise_is_noop; }
-    void finalise(const ProgressCallback& progress_callback);
+    void finalise(const ProgressCallback& progress_callback, int writer_threads);
 };
 
 }  // namespace dorado::utils
