@@ -26,6 +26,7 @@
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
+#include "utils/tty_utils.h"
 #include "utils/types.h"
 
 #include <htslib/sam.h>
@@ -358,19 +359,21 @@ int duplex(int argc, char* argv[]) {
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), args);
 
+        utils::HtsFile hts_file("-", output_mode, 4);
+
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
             converted_reads_sink = hts_writer;
         } else {
             auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, "-", output_mode, 4);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -384,7 +387,8 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex);
+        ProgressTracker tracker(int(num_reads), duplex, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+        tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
                 [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
@@ -422,8 +426,7 @@ int duplex(int argc, char* argv[]) {
             }
 
             // Write header as no read group info is needed.
-            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-            hts_writer_ref.set_and_write_header(hdr.get());
+            hts_file.set_and_write_header(hdr.get());
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -479,7 +482,7 @@ int duplex(int argc, char* argv[]) {
             // calling.
             auto [runners, num_devices] = api::create_basecall_runners(
                     models.model_config, device, num_runners, 0, batch_size, chunk_size, 0.9f,
-                    api::PipelineType::duplex);
+                    api::PipelineType::duplex, 0.f);
 
             std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -493,7 +496,7 @@ int duplex(int argc, char* argv[]) {
             // model.
             std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
                     models.stereo_model_config, device, num_runners, 0, stereo_batch_size,
-                    chunk_size, 0.5f, api::PipelineType::duplex);
+                    chunk_size, 0.5f, api::PipelineType::duplex, 0.f);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 
@@ -523,13 +526,12 @@ int duplex(int argc, char* argv[]) {
 
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
-            auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
             if (!ref.empty()) {
                 const auto& aligner_ref =
                         dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_writer_ref.set_and_write_header(hdr.get());
+            hts_file.set_and_write_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 
@@ -549,8 +551,14 @@ int duplex(int argc, char* argv[]) {
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();
-
         tracker.update_progress_bar(final_stats);
+
+        // Report progress during output file finalisation.
+        tracker.set_description("Sorting output files");
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
+
         tracker.summarize();
         if (!dump_stats_file.empty()) {
             std::ofstream stats_file(dump_stats_file);

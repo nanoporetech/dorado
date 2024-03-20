@@ -184,6 +184,7 @@ add_library(dorado_lib
     dorado/read_pipeline/PairingNode.h
     dorado/read_pipeline/PolyACalculatorNode.cpp
     dorado/read_pipeline/PolyACalculatorNode.h
+    dorado/read_pipeline/ProgressTracker.cpp
     dorado/read_pipeline/ProgressTracker.h
     dorado/read_pipeline/ReadFilterNode.cpp
     dorado/read_pipeline/ReadFilterNode.h

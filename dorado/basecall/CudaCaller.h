@@ -27,7 +27,8 @@ public:
                int batch_size,
                const std::string &device,
                float memory_limit_fraction,
-               PipelineType pipeline_type);
+               PipelineType pipeline_type,
+               float batch_size_time_penalty);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -56,7 +57,10 @@ private:
     }
 
     std::pair<int64_t, int64_t> calculate_memory_requirements() const;
-    void determine_batch_dims(float memory_limit_fraction, int batch_size, int chunk_size);
+    void determine_batch_dims(float memory_limit_fraction,
+                              int batch_size,
+                              int chunk_size,
+                              float batch_size_time_penalty);
 
     void start_threads();
     void cuda_thread_fn();

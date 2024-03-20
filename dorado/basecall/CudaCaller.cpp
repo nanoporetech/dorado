@@ -15,6 +15,7 @@
 #include <cassert>
 #include <chrono>
 #include <limits>
+#include <map>
 
 using namespace std::chrono_literals;
 
@@ -37,7 +38,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
                        int batch_size,
                        const std::string &device,
                        float memory_limit_fraction,
-                       PipelineType pipeline_type)
+                       PipelineType pipeline_type,
+                       float batch_size_time_penalty)
         : m_config(model_config),
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
@@ -54,7 +56,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     at::InferenceMode guard;
     m_module = load_crf_model(model_config, m_options);
 
-    determine_batch_dims(memory_limit_fraction, batch_size, chunk_size);
+    determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -167,22 +169,29 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (m_config.out_features.has_value()) {
         auto out_features = m_config.out_features.value();
-        std::unordered_map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
-        crfmodel_bytes_per_chunk_timestep = out_features_map[out_features];
-        if (crfmodel_bytes_per_chunk_timestep == 0) {
-            spdlog::warn("Failed to set GPU memory requirements. Unexpected model out_features {}.",
-                         out_features);
+        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
+        auto it = out_features_map.upper_bound(out_features - 1);
+        if (it == out_features_map.end()) {
+            spdlog::error(
+                    "Failed to set GPU memory requirements. Unexpected model out_features {}.",
+                    out_features);
             return {0, 0};
+        } else if (it->first != out_features) {
+            spdlog::warn("Unexpected model out_features {}. Estimating GPU memory requirements.");
         }
+        crfmodel_bytes_per_chunk_timestep = it->second;
     } else {
-        std::unordered_map<int, int64_t> insize_map{
+        const std::map<int, int64_t> insize_map{
                 {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
-        crfmodel_bytes_per_chunk_timestep = insize_map[m_config.lstm_size];
-        if (crfmodel_bytes_per_chunk_timestep == 0) {
-            spdlog::warn("Failed to set GPU memory requirements. Unexpected model insize {}.",
-                         m_config.lstm_size);
+        auto it = insize_map.upper_bound(m_config.lstm_size - 1);
+        if (it == insize_map.end()) {
+            spdlog::error("Failed to set GPU memory requirements. Unexpected model insize {}.",
+                          m_config.lstm_size);
             return {0, 0};
+        } else if (it->first != m_config.lstm_size) {
+            spdlog::warn("Unexpected model insize {}. Estimating GPU memory requirements.");
         }
+        crfmodel_bytes_per_chunk_timestep = it->second;
     }
 
     // Determine size of working memory for decoder divided by (batch_size * chunk_size)
@@ -197,7 +206,8 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
 
 void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                       int requested_batch_size,
-                                      int requested_chunk_size) {
+                                      int requested_chunk_size,
+                                      float batch_size_time_penalty) {
     c10::cuda::CUDAGuard device_guard(m_options.device());
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
@@ -307,6 +317,11 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     max_batch_size = std::min(max_batch_size, max_batch_size_limit);
     spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,
                   granularity);
+
+    // Times and corresponding batch sizes.
+    std::vector<std::pair<float, int>> times_and_batch_sizes;
+    times_and_batch_sizes.reserve(max_batch_size / granularity);
+
     for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
         auto input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
 
@@ -332,16 +347,32 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size, time);
         if (time < best_time) {
             best_time = time;
-            for (size_t i = 0; i < m_batch_dims.size(); ++i) {
-                if (batch_size <= max_batch_sizes[i]) {
-                    m_batch_dims[i].N = batch_size;
-                }
-            }
+            times_and_batch_sizes.emplace_back(time, batch_size);
         }
 
         // Clear the cache each time. Without this, intermittent cuda memory allocation errors
         // are seen on windows laptop NVIDIA RTX A5500 Laptop GPU. See JIRA issue DOR-466
         c10::cuda::CUDACachingAllocator::emptyCache();
+    }
+
+    // Find the first batch size that was under the threshold.
+    const float threshold_time = best_time * (1 + batch_size_time_penalty);
+    auto under_threshold = [threshold_time](auto pair) { return pair.first <= threshold_time; };
+    auto chosen_batch = std::find_if(times_and_batch_sizes.begin(), times_and_batch_sizes.end(),
+                                     under_threshold);
+    if (chosen_batch == times_and_batch_sizes.end()) {
+        // This should be impossible.
+        // Sanity check only, to avoid segfault or misleading behavior if there is a bug.
+        throw std::out_of_range("Error in batch size selection algorithm.");
+    }
+
+    const int best_batch_size = chosen_batch->second;
+    spdlog::debug("Chosen batch size {}: {}, time per chunk {:8f} ms", m_device, best_batch_size,
+                  chosen_batch->first);
+    for (size_t i = 0; i < m_batch_dims.size(); ++i) {
+        if (best_batch_size <= max_batch_sizes[i]) {
+            m_batch_dims[i].N = best_batch_size;
+        }
     }
 }
 

@@ -29,17 +29,21 @@ public:
 protected:
     void generate_bam(HtsFile::OutputMode mode, int num_threads) {
         HtsReader reader(m_in_sam.string(), std::nullopt);
-        PipelineDescriptor pipeline_desc;
-        auto writer = pipeline_desc.add_node<HtsWriter>({}, m_out_bam.string(), mode, num_threads);
-        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
-        auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
-        writer_ref.set_and_write_header(reader.header);
+        utils::HtsFile hts_file(m_out_bam.string(), mode, num_threads);
+        hts_file.set_and_write_header(reader.header);
+
+        PipelineDescriptor pipeline_desc;
+        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
         pipeline->terminate(DefaultFlushOptions());
+
+        auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
         stats = writer_ref.sample_stats();
-        pipeline.reset();
+
+        hts_file.finalise([](size_t) { /* noop */ });
     }
 
     stats::NamedStats stats;

@@ -87,15 +87,29 @@ void BarcodeDemuxerNode::set_header(const sam_hdr_t* const header) {
     }
 }
 
+void BarcodeDemuxerNode::finalise_hts_files(
+        const utils::HtsFile::ProgressCallback& progress_callback) {
+    const size_t num_files = m_files.size();
+    size_t current_file_idx = 0;
+    for (auto& [bc, hts_file] : m_files) {
+        hts_file->finalise([&](size_t progress) {
+            // Give each file/barcode the same contribution to the total progress.
+            const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
+            progress_callback(total_progress);
+        });
+        ++current_file_idx;
+    }
+
+    m_files.clear();
+    progress_callback(100);
+}
+
 stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["demuxed_reads_written"] = m_processed_reads.load();
     return stats;
 }
 
-void BarcodeDemuxerNode::terminate(const FlushOptions&) {
-    stop_input_processing();
-    m_files.clear();
-}
+void BarcodeDemuxerNode::terminate(const FlushOptions&) { stop_input_processing(); }
 
 }  // namespace dorado
