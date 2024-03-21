@@ -82,6 +82,10 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
     std::string barcode1_pattern = toml::find<std::string>(config, "barcode1_pattern");
     new_kit.top_front_flank = toml::find<std::string>(config, "mask1_front");
     new_kit.top_rear_flank = toml::find<std::string>(config, "mask1_rear");
+    if (new_kit.top_front_flank.empty() && new_kit.top_rear_flank.empty()) {
+        throw std::runtime_error(
+                "At least one of mask1_front or mask1_rear needs to be specified.");
+    }
     fill_bc_sequences(barcode1_pattern, new_kit.barcodes);
 
     // If any of the 2nd barcode settings are set, ensure ALL second barcode
@@ -97,6 +101,10 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
         // Fetch barcode 2 context (flanks + sequences).
         new_kit.bottom_front_flank = toml::find<std::string>(config, "mask2_front");
         new_kit.bottom_rear_flank = toml::find<std::string>(config, "mask2_rear");
+        if (new_kit.bottom_front_flank.empty() && new_kit.bottom_rear_flank.empty()) {
+            throw std::runtime_error(
+                    "At least one of mask2_front or mask2_rear needs to be specified.");
+        }
         std::string barcode2_pattern = toml::find<std::string>(config, "barcode2_pattern");
 
         fill_bc_sequences(barcode2_pattern, new_kit.barcodes2);
@@ -110,29 +118,43 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
     return std::make_pair(kit_name, new_kit);
 }
 
-BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file) {
+dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
+        const std::string& arrangement_file,
+        const dorado::barcode_kits::BarcodeKitScoringParams& base_params) {
     const toml::value config_toml = toml::parse(arrangement_file);
 
-    BarcodeKitScoringParams params{};
+    auto params = base_params;
     if (!config_toml.contains("scoring")) {
         return params;
     }
 
     const auto& config = toml::find(config_toml, "scoring");
-    if (config.contains("min_soft_barcode_threshold")) {
-        params.min_soft_barcode_threshold = toml::find<float>(config, "min_soft_barcode_threshold");
+    if (config.contains("max_barcode_penalty")) {
+        params.max_barcode_penalty = toml::find<int>(config, "max_barcode_penalty");
     }
-    if (config.contains("min_hard_barcode_threshold")) {
-        params.min_hard_barcode_threshold = toml::find<float>(config, "min_hard_barcode_threshold");
+    if (config.contains("barcode_end_proximity")) {
+        params.barcode_end_proximity = toml::find<int>(config, "barcode_end_proximity");
     }
-    if (config.contains("min_soft_flank_threshold")) {
-        params.min_soft_flank_threshold = toml::find<float>(config, "min_soft_flank_threshold");
+    if (config.contains("min_barcode_penalty_dist")) {
+        params.min_barcode_penalty_dist = toml::find<int>(config, "min_barcode_penalty_dist");
     }
-    if (config.contains("min_hard_flank_threshold")) {
-        params.min_hard_flank_threshold = toml::find<float>(config, "min_hard_flank_threshold");
+    if (config.contains("min_separation_only_dist")) {
+        params.min_separation_only_dist = toml::find<int>(config, "min_separation_only_dist");
     }
-    if (config.contains("min_barcode_score_dist")) {
-        params.min_barcode_score_dist = toml::find<float>(config, "min_barcode_score_dist");
+    if (config.contains("flank_left_pad")) {
+        params.flank_left_pad = toml::find<int>(config, "flank_left_pad");
+    }
+    if (config.contains("flank_right_pad")) {
+        params.flank_right_pad = toml::find<int>(config, "flank_right_pad");
+    }
+    if (config.contains("front_barcode_window")) {
+        params.front_barcode_window = toml::find<int>(config, "front_barcode_window");
+    }
+    if (config.contains("rear_barcode_window")) {
+        params.rear_barcode_window = toml::find<int>(config, "rear_barcode_window");
+    }
+    if (config.contains("min_flank_score")) {
+        params.min_flank_score = toml::find<float>(config, "min_flank_score");
     }
 
     return params;

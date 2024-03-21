@@ -113,6 +113,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
     auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
                                     m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
+    spdlog::trace("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
     m_num_records++;
     {

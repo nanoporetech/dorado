@@ -1,5 +1,6 @@
 #include "TestUtils.h"
 #include "demux/parse_custom_kit.h"
+#include "utils/barcode_kits.h"
 
 #include <catch2/catch.hpp>
 
@@ -101,6 +102,15 @@ TEST_CASE("Parse kit with incomplete double ended settings", "[barcode_demux]") 
                               "mask2_front mask2_rear and barcode2_pattern must all be set"));
 }
 
+TEST_CASE("Parse kit with no flanks", "[barcode_demux]") {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
+    const auto test_file = data_dir / "flank_free_arrangement.toml";
+
+    CHECK_THROWS_WITH(dorado::demux::parse_custom_arrangement(test_file.string()),
+                      Catch::Matchers::Contains(
+                              "At least one of mask1_front or mask1_rear needs to be specified"));
+}
+
 TEST_CASE("Parse custom barcode sequences", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_sequences = data_dir / "test_sequences.fasta";
@@ -118,32 +128,35 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_params_file = data_dir / "scoring_params.toml";
 
-    auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
+    dorado::barcode_kits::BarcodeKitScoringParams default_params;
+    auto scoring_params =
+            dorado::demux::parse_scoring_params(test_params_file.string(), default_params);
 
-    CHECK(scoring_params.min_soft_barcode_threshold == Approx(0.1f));
-    CHECK(scoring_params.min_hard_barcode_threshold == Approx(0.2f));
-    CHECK(scoring_params.min_soft_flank_threshold == Approx(0.3f));
-    CHECK(scoring_params.min_hard_flank_threshold == Approx(0.4f));
-    CHECK(scoring_params.min_barcode_score_dist == Approx(0.5));
+    CHECK(scoring_params.max_barcode_penalty == 10);
+    CHECK(scoring_params.barcode_end_proximity == 75);
+    CHECK(scoring_params.min_barcode_penalty_dist == 3);
+    CHECK(scoring_params.min_separation_only_dist == 5);
+    CHECK(scoring_params.flank_left_pad == 5);
+    CHECK(scoring_params.flank_right_pad == 10);
+    CHECK(scoring_params.front_barcode_window == 150);
+    CHECK(scoring_params.rear_barcode_window == 150);
+    CHECK(scoring_params.min_flank_score == Approx(0.5f));
 }
 
 TEST_CASE("Parse default scoring params", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_params_file = data_dir / "test_kit_single_ended.toml";
 
-    dorado::demux::BarcodeKitScoringParams default_params;
+    dorado::barcode_kits::BarcodeKitScoringParams default_params;
+    auto scoring_params =
+            dorado::demux::parse_scoring_params(test_params_file.string(), default_params);
 
-    auto scoring_params = dorado::demux::parse_scoring_params(test_params_file.string());
-
-    CHECK(scoring_params.min_soft_barcode_threshold ==
-          Approx(default_params.min_soft_barcode_threshold));
-    CHECK(scoring_params.min_hard_barcode_threshold ==
-          Approx(default_params.min_hard_barcode_threshold));
-    CHECK(scoring_params.min_soft_flank_threshold ==
-          Approx(default_params.min_soft_flank_threshold));
-    CHECK(scoring_params.min_hard_flank_threshold ==
-          Approx(default_params.min_hard_flank_threshold));
-    CHECK(scoring_params.min_barcode_score_dist == Approx(default_params.min_barcode_score_dist));
+    CHECK(scoring_params.max_barcode_penalty == default_params.max_barcode_penalty);
+    CHECK(scoring_params.barcode_end_proximity == default_params.barcode_end_proximity);
+    CHECK(scoring_params.min_barcode_penalty_dist == default_params.min_barcode_penalty_dist);
+    CHECK(scoring_params.min_separation_only_dist == default_params.min_separation_only_dist);
+    CHECK(scoring_params.flank_left_pad == default_params.flank_left_pad);
+    CHECK(scoring_params.flank_right_pad == default_params.flank_right_pad);
 }
 
 TEST_CASE("Check for normalized id pattern", "[barcode_demux]") {
