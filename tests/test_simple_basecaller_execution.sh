@@ -335,8 +335,8 @@ test_barcoding_read_groups() (
 
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
 test_barcoding_read_groups barcode01 4 barcode04 3 unclassified 2
-# There should be 5 reads with BC01 aliased to patient_id_1, and 4 unclassified groups.
-test_barcoding_read_groups patient_id_1 5 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
+# There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
+test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux/sample_sheet.csv
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
