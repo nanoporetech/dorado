@@ -29,19 +29,6 @@ PolyTailConfig prepare_config(std::istream& is) {
             config.front_primer = toml::find<std::string>(anchors, "front_primer");
             config.rear_primer = toml::find<std::string>(anchors, "rear_primer");
         }
-
-        if (anchors.contains("plasmid_front_flank") || anchors.contains("plasmid_rear_flank")) {
-            if (!(anchors.contains("plasmid_front_flank") &&
-                  anchors.contains("plasmid_rear_flank"))) {
-                throw std::runtime_error(
-                        "Both plasmid_front_flank and plasmid_rear_flank must be provided in "
-                        "the PolyA configuration file.");
-            }
-            config.plasmid_front_flank = toml::find<std::string>(anchors, "plasmid_front_flank");
-            config.plasmid_rear_flank = toml::find<std::string>(anchors, "plasmid_rear_flank");
-            config.is_plasmid = true;
-            config.flank_threshold = 10;  // reduced default for plasmids
-        }
     }
 
     if (config_toml.contains("threshold")) {
