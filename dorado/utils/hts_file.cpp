@@ -183,9 +183,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
             spdlog::error("Failed to build index for file {}", filepath.string());
             return;
         }
-        if (std::filesystem::exists(temp_filename)) {
-            std::filesystem::remove(temp_filename);
-        }
+        std::filesystem::remove(temp_filename);
     } else {
         // No sorting was required, so just rename the file.
         std::filesystem::rename(temp_filename, filepath);
