@@ -136,21 +136,25 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     std::string seq = utils::extract_sequence(input_record);
     std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
-    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : 0;
-    int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : 0;
+    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : -1;
+    int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : -1;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.
     auto trimmed_seq = utils::trim_sequence(seq, trim_interval);
     auto trimmed_qual = utils::trim_quality(qual, trim_interval);
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
-    ts += positions_trimmed * stride;
-    // After sequence trimming, the number of samples corresponding to the sequence is the size of
-    // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
-    // front of the read as well.
-    // |---------------------- ns ------------------|
-    // |----ts----|--------moves signal-------------|
-    ns = int(trimmed_moves.size() * stride) + ts;
+    if (ts >= 0) {
+        ts += positions_trimmed * stride;
+    }
+    if (ns >= 0) {
+        // After sequence trimming, the number of samples corresponding to the sequence is the size of
+        // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
+        // front of the read as well.
+        // |---------------------- ns ------------------|
+        // |----ts----|--------moves signal-------------|
+        ns = int(trimmed_moves.size() * stride) + ts;
+    }
     auto [trimmed_modbase_str, trimmed_modbase_probs] = utils::trim_modbase_info(
             is_seq_reversed ? utils::reverse_complement(seq) : seq, modbase_str, modbase_probs,
             is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
@@ -186,8 +190,12 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
         bam_aux_update_int(out_record, "MN", trimmed_seq.length());
     }
 
-    bam_aux_update_int(out_record, "ts", ts);
-    bam_aux_update_int(out_record, "ns", ns);
+    if (ts >= 0) {
+        bam_aux_update_int(out_record, "ts", ts);
+    }
+    if (ns >= 0) {
+        bam_aux_update_int(out_record, "ns", ns);
+    }
 
     return BamPtr(out_record);
 }
