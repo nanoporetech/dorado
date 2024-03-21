@@ -195,8 +195,8 @@ int aligner(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << std::endl;
-            return 1;
+            std::cout << parser.visible << '\n';
+            return EXIT_FAILURE;
         }
 #endif
     }

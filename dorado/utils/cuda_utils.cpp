@@ -247,7 +247,7 @@ void print_cuda_alloc_info(const std::string &label) {
     print_stat_array(stats.reserved_bytes, "Rs");
     print_stat_array(stats.active_bytes, "Act");
     print_stat_array(stats.inactive_split_bytes, "In");
-    std::cerr << std::endl;
+    std::cerr << '\n' << std::flush;
 }
 
 // Note that in general the torch caching allocator may be consuming

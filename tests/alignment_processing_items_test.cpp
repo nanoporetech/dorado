@@ -73,7 +73,7 @@ TEST_CASE("initialise with input file in current directory returns true", CUT_TA
     std::ofstream outfile(tmp_filepath.string());
 
     REQUIRE(outfile.is_open());
-    outfile << "@HD\tVN:1.6\tSO:unknown" << std::endl;
+    outfile << "@HD\tVN:1.6\tSO:unknown\n";
     outfile.close();
 
     auto orig_cwd = fs::current_path();

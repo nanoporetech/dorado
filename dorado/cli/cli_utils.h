@@ -82,7 +82,7 @@ inline void add_pg_hdr(sam_hdr_t* hdr,
     (void)device;
 #endif
 
-    pg << std::endl;
+    pg << '\n';
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
 

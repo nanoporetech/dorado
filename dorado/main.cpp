@@ -42,17 +42,16 @@ namespace {
 
 void usage(const std::vector<std::string>& commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
-              << "Positional arguments:" << std::endl;
+              << "Positional arguments:\n";
 
     for (const auto& command : commands) {
-        std::cerr << command << std::endl;
+        std::cerr << command << '\n';
     }
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
               << "-v --version            prints version information and exits\n"
-              << "-vv                     prints verbose version information and exits"
-              << std::endl;
+              << "-vv                     prints verbose version information and exits\n";
 }
 
 }  // namespace
@@ -93,15 +92,15 @@ int main(int argc, char* argv[]) {
     const auto subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
-        std::cerr << DORADO_VERSION << std::endl;
+        std::cerr << DORADO_VERSION << '\n';
     } else if (subcommand == "-vv") {
 #ifdef __APPLE__
-        std::cerr << "dorado:   " << DORADO_VERSION << std::endl;
+        std::cerr << "dorado:   " << DORADO_VERSION << '\n';
 #else
-        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << std::endl;
+        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
 #endif
-        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << std::endl;
-        std::cerr << "minimap2: " << MM_VERSION << std::endl;
+        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << '\n';
+        std::cerr << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);

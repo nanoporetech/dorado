@@ -15,7 +15,7 @@ int benchmark(int argc, char* argv[]) {
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        std::cerr << e.what() << '\n';
         std::cerr << parser;
         std::exit(1);
     }
@@ -23,7 +23,7 @@ int benchmark(int argc, char* argv[]) {
     std::vector<size_t> sizes{1000, 1000, 2000, 3000, 4000, 10000, 100000, 1000000, 10000000};
 
     for (auto n : sizes) {
-        std::cerr << "samples : " << n << std::endl;
+        std::cerr << "samples : " << n << '\n';
 
         // generate some input
         auto x = at::randint(0, 2047, n);
@@ -38,7 +38,7 @@ int benchmark(int argc, char* argv[]) {
 
         std::cerr << "torch:quant  "
                   << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
-                  << duration << "us" << std::endl;
+                  << duration << "us" << '\n';
 
         // nth_element
         start = std::chrono::system_clock::now();
@@ -49,7 +49,7 @@ int benchmark(int argc, char* argv[]) {
 
         std::cerr << "nth_element  "
                   << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
-                  << duration << "us" << std::endl;
+                  << duration << "us" << '\n';
 
         x = x.to(at::ScalarType::Short);
 
@@ -61,8 +61,8 @@ int benchmark(int argc, char* argv[]) {
 
         std::cerr << "counting     "
                   << " q20=" << res[0].item<int>() << " q90=" << res[1].item<int>() << " "
-                  << duration << "us" << std::endl
-                  << std::endl;
+                  << duration << "us" << '\n'
+                  << '\n';
     }
 
     return 0;

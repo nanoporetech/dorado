@@ -104,7 +104,7 @@ int trim(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser << std::endl;
+            std::cout << parser << '\n';
             std::exit(EXIT_FAILURE);
         }
 #endif
