@@ -376,3 +376,16 @@ TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible SQ", T
     CHECK(result == false);
     CHECK(error_msg.size() != 0);
 }
+
+TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
+    fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
+    auto sam = bam_utils_test_dir / "aligned_record.bam";
+
+    HtsReader reader(sam.string(), std::nullopt);
+    REQUIRE(reader.read());  // Parse first and only record.
+    auto record = reader.record.get();
+
+    utils::remove_alignment_tags_from_record(record);
+
+    CHECK(bam_aux_first(record) == nullptr);
+}

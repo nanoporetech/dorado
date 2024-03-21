@@ -147,7 +147,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.barcode_name == "unclassified");
-        CHECK(single_end_res.barcode_name == "BC15");
+        CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 

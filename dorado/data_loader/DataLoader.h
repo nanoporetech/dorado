@@ -1,5 +1,6 @@
 #pragma once
 #include "models/models.h"
+#include "read_pipeline/messages.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -75,6 +76,7 @@ private:
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
     void load_read_channels(std::filesystem::path data_path, bool recursive_file_loading);
+
     Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
     std::string m_device;
@@ -87,6 +89,11 @@ private:
     std::unordered_map<int, std::vector<ReadSortInfo>> m_reads_by_channel;
     std::unordered_map<std::string, size_t> m_read_id_to_index;
     int m_max_channel{0};
+
+    // Issue warnings if read is potentially problematic
+    inline void check_read(const SimplexReadPtr& read);
+    // A flag to warn only once if the data chemsitry is known
+    std::atomic<bool> m_log_unknown_chemistry{true};
 };
 
 }  // namespace dorado

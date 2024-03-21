@@ -8,18 +8,12 @@
 
 namespace dorado::barcode_kits {
 
-struct BarcodeKitScoringParams {
-    float min_soft_barcode_threshold = 0.7f;
-    float min_hard_barcode_threshold = 0.6f;
-    float min_soft_flank_threshold = 0.7f;
-    float min_hard_flank_threshold = 0.6f;
-    float min_barcode_score_dist = 0.25f;
-};
-
 std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
         const std::string& arrangement_file);
 
-BarcodeKitScoringParams parse_scoring_params(const std::string& arrangement_file);
+BarcodeKitScoringParams parse_scoring_params(
+        const std::string& arrangement_file,
+        const dorado::barcode_kits::BarcodeKitScoringParams& default_params);
 
 bool check_normalized_id_pattern(const std::string& pattern);
 

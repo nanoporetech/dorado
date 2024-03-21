@@ -22,7 +22,7 @@ const std::string RBK_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA
 const std::string RBK4_FRONT = "GCTTGGGTGTTTAACC";
 const std::string RBK4_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
 
-const std::string RBK4_kit14_FRONT = "C";
+const std::string RBK4_kit14_FRONT = "GCTTGGGTGTTTAACC";
 const std::string RBK4_kit14_REAR = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
 
 const std::string RLB_FRONT = "CCGTGAC";
@@ -106,50 +106,69 @@ const std::vector<std::string> RBK_1_96 = {
         "BC78", "BC79", "BC80", "BC81",  "BC82",  "BC83",  "BC84",  "BC85", "BC86", "BC87",  "BC88",
         "BC89", "BC90", "BC91", "BC92",  "BC93",  "BC94",  "BC95",  "BC96"};
 
+// Kit specific scoring parameters.
+
+const BarcodeKitScoringParams DEFAULT_PARAMS{};
+
+const BarcodeKitScoringParams RBK114_PARAMS{
+        /*max_barcode_penalty*/ 12,
+        /*barcode_end_proximity*/ 75,
+        /*min_barcode_penalty_dist*/ 3,
+        /*min_separation_only_dist*/ 6,
+        /*flank_left_pad*/ 5,
+        /*flank_right_pad*/ 10,
+        /*front_barcode_window*/ 175,
+        /*rear_barcode_window*/ 175,
+        /*min_flank_score*/ 0.0f,
+};
+
 // Some arrangement names are just aliases of each other. This is because they were released
 // as part of different kits, but they map to the same underlying arrangement.
 const KitInfo kit_16S = {
         "16S",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
-        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24, BC_1_24,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24, BC_1_24,       DEFAULT_PARAMS,
 };
 
 const KitInfo kit_lwb = {
         "LWB",         true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
-        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12, BC_1_12,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12, BC_1_12,       DEFAULT_PARAMS,
 };
 
 const KitInfo kit_lwb24 = {
         "LWB24",       true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
-        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24, BC_1_24,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24, BC_1_24,       DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb12 = {
-        "NB12", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_12, NB_1_12,
+        "NB12",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_12, NB_1_12,      DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb24 = {
-        "NB24", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_24, NB_1_24,
+        "NB24",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_24, NB_1_24,      DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb96 = {
-        "NB96", true, true, NB_1st_FRONT, NB_1st_REAR, NB_2nd_FRONT, NB_2nd_REAR, NB_1_96, NB_1_96,
+        "NB96",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_96, NB_1_96,      DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rab = {
         "RAB",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
-        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12, BC_1_12,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12, BC_1_12,       DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rbk96 = {
-        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96, {},
+        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96, {}, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rbk4 = {
-        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12, {},
+        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12, {}, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rlb = {
-        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A, {},
+        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A, {}, DEFAULT_PARAMS,
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
@@ -180,6 +199,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  NB_2nd_REAR,
                  NB_13_24,
                  NB_13_24,
+                 DEFAULT_PARAMS,
          }},
         // NB24
         {"SQK-NBD111-24", kit_nb24},
@@ -202,6 +222,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  BC_2nd_REAR,
                  BC_1_12,
                  BC_1_12,
+                 DEFAULT_PARAMS,
          }},
         // PCR96
         {"EXP-PBC096",
@@ -215,6 +236,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  BC_2nd_REAR,
                  BC_1_96,
                  BC_1_96,
+                 DEFAULT_PARAMS,
          }},
         // RAB
         {"SQK-RAB204", kit_rab},
@@ -231,6 +253,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  BC_1_12,
                  {},
+                 DEFAULT_PARAMS,
          }},
         // RBK096
         {"SQK-RBK110-96", kit_rbk96},
@@ -247,6 +270,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  RBK_1_96,
                  {},
+                 RBK114_PARAMS,
          }},
         // RBK24
         {"SQK-RBK111-24",
@@ -260,6 +284,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  BC_1_24,
                  {},
+                 DEFAULT_PARAMS,
          }},
         // RBK24_kit14
         {"SQK-RBK114-24",
@@ -273,6 +298,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  BC_1_24,
                  {},
+                 RBK114_PARAMS,
          }},
         //  RBK4
         {"SQK-RBK004", kit_rbk4},
@@ -293,6 +319,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  BC2_1_24,
                  {},
+                 DEFAULT_PARAMS,
          }},
         // VMK
         {"VSK-VMK001",
@@ -306,18 +333,22 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "",
                  {"BC01", "BC02", "BC03", "BC04"},
                  {},
+                 DEFAULT_PARAMS,
          }},
         // VMK4
         {"VSK-VMK004",
-         {"VMK4",
-          false,
-          false,
-          RBK4_FRONT,
-          RBK4_REAR,
-          "",
-          "",
-          {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10"},
-          {}}},
+         {
+                 "VMK4",
+                 false,
+                 false,
+                 RBK4_FRONT,
+                 RBK4_REAR,
+                 "",
+                 "",
+                 {"BC01", "BC02", "BC03", "BC04", "BC05", "BC06", "BC07", "BC08", "BC09", "BC10"},
+                 {},
+                 DEFAULT_PARAMS,
+         }},
         {"TWIST-ALL",
          {
                  "PGx",
@@ -359,6 +390,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                   "AG10R_79", "AH10R_80", "AA11R_81", "AB11R_82", "AC11R_83", "AD11R_84",
                   "AE11R_85", "AF11R_86", "AG11R_87", "AH11R_88", "AA12R_89", "AB12R_90",
                   "AC12R_91", "AD12R_92", "AE12R_93", "AF12R_94", "AG12R_95", "AH12R_96"},
+                 DEFAULT_PARAMS,
          }},
 };
 

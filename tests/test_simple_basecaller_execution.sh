@@ -18,7 +18,7 @@ model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
 model_name_5k_v43=${5:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
 model_name_rna004=${6:-rna004_130bps_hac@v3.0.1}
 data_dir=$test_dir/data
-output_dir_name=$(echo $RANDOM | head -c 10)
+output_dir_name=test_output_$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
 mkdir -p $output_dir
 
@@ -253,7 +253,7 @@ echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
 samtools quickcheck -u $output_dir/custom_demux/SQK-RPB004_barcode01.bam
 num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/SQK-RPB004_barcode01.bam)
-if [[ $num_demuxed_reads -ne "3" ]]; then
+if [[ $num_demuxed_reads -ne "2" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
 fi

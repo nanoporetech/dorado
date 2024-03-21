@@ -203,6 +203,12 @@ void add_minimap2_arguments(ArgParser& parser, const Options& dflt) {
                   "specified as NUM,[NUM]")
             .default_value(to_size(dflt.bandwidth) + "," + to_size(dflt.bandwidth_long));
 
+    // Setting options to lr:hq which is appropriate for high quality nanopore reads.
+    parser.visible.add_argument("--mm2-preset")
+            .help("minimap2 preset for indexing and mapping. Alias for the -x "
+                  "option in minimap2.")
+            .default_value(dflt.mm2_preset);
+
     parser.hidden.add_argument("--secondary-seq")
             .help("minimap2 output seq/qual for secondary and supplementary alignments")
             .default_value(false)
@@ -251,6 +257,7 @@ Options process_minimap2_arguments(const ArgParser& parser, const Options& dflt)
         throw std::runtime_error("Wrong number of arguments for option '-r'.");
     }
     res.soft_clipping = parser.visible.get<bool>("Y");
+    res.mm2_preset = parser.visible.get<std::string>("mm2-preset");
     res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
     res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
     return res;

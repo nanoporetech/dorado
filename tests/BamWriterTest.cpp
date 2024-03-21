@@ -14,6 +14,7 @@
 
 namespace fs = std::filesystem;
 using namespace dorado;
+using Catch::Matchers::Equals;
 using utils::HtsFile;
 
 class HtsWriterTestsFixture {
@@ -43,7 +44,7 @@ protected:
         auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
         stats = writer_ref.sample_stats();
 
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](size_t) { /* noop */ }, num_threads);
     }
 
     stats::NamedStats stats;
@@ -74,4 +75,37 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_G
 
     CHECK(stats.at("unique_simplex_reads_written") == 6);
     CHECK(stats.at("split_reads_written") == 2);
+}
+
+TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
+    fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto input_fastq = bam_test_dir / "fastq_with_tags.fq";
+    auto tmp_dir = TempDir(fs::temp_directory_path() / "writer_test");
+    std::filesystem::create_directories(tmp_dir.m_path);
+    auto out_fastq = tmp_dir.m_path / "output.fq";
+
+    // Read input file to check all tags are reads.
+    HtsReader reader(input_fastq.string(), std::nullopt);
+    {
+        // Write with tags into temporary folder.
+        utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
+        HtsWriter writer(hts_file);
+        reader.read();
+        CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "RG")),
+                   Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."
+                          "3.0"));
+        CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "st")),
+                   Equals("2023-06-22T07:17:48.308+00:00"));
+        writer.write(reader.record.get());
+        hts_file.finalise([](size_t) { /* noop */ }, 2);
+    }
+
+    // Read temporary file to make sure tags were correctly set.
+    HtsReader new_fastq_reader(out_fastq.string(), std::nullopt);
+    new_fastq_reader.read();
+    CHECK_THAT(
+            bam_aux2Z(bam_aux_get(new_fastq_reader.record.get(), "RG")),
+            Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4.3.0"));
+    CHECK_THAT(bam_aux2Z(bam_aux_get(new_fastq_reader.record.get(), "st")),
+               Equals("2023-06-22T07:17:48.308+00:00"));
 }

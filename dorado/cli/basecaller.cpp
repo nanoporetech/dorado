@@ -319,9 +319,11 @@ void setup(std::vector<std::string> args,
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
+    hts_file.finalise(
+            [&](size_t progress) {
+                tracker.update_post_processing_progress(static_cast<float>(progress));
+            },
+            thread_allocations.writer_threads);
 
     // Give the user a nice summary.
     tracker.summarize();

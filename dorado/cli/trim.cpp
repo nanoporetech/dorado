@@ -4,6 +4,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -116,6 +117,11 @@ int trim(int argc, char* argv[]) {
     HtsReader reader(reads[0], read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
     add_pg_hdr(header.get());
+    // Always remove alignment information from input header
+    // because at minimum the adapters are trimmed, which
+    // invalidates the alignment record.
+    utils::strip_sq_hdr(header.get());
+    sam_hdr_remove_tag_id(header.get(), "HD", NULL, NULL, "SO");
 
     auto output_mode = OutputMode::BAM;
 
@@ -176,9 +182,11 @@ int trim(int argc, char* argv[]) {
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
+    hts_file.finalise(
+            [&](size_t progress) {
+                tracker.update_post_processing_progress(static_cast<float>(progress));
+            },
+            trim_writer_threads);
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");

@@ -1,0 +1,8 @@
+[arrangement]
+name = "test-kit"
+kit = "BC"
+mask1_front = ""
+mask1_rear = ""
+barcode1_pattern = "BC%02i"
+first_index = 1
+last_index = 2

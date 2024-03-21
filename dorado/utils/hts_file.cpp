@@ -22,10 +22,12 @@ uint64_t calculate_sorting_key(bam1_t* const record) {
 
 namespace dorado::utils {
 
-HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) {
+HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) : m_mode(mode) {
     switch (mode) {
     case OutputMode::FASTQ:
         m_file.reset(hts_open(filename.c_str(), "wf"));
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
         break;
     case OutputMode::BAM: {
         auto file = filename;
@@ -71,7 +73,7 @@ HtsFile::~HtsFile() {
 // in order to generate a map of sort coordinates to virtual file offsets. we can then jump around in the
 // file to write out the records in the sorted order. finally we can delete the unsorted file.
 // in case an error occurs, the unsorted file is left on disk, so users can recover their data.
-void HtsFile::finalise(const ProgressCallback& progress_callback) {
+void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_threads) {
     assert(progress_callback);
 
     // Rough divisions of how far through we are at the start of each section.
@@ -111,6 +113,15 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     {
         HtsFilePtr in_file(hts_open(temp_filename.c_str(), "rb"));
         HtsFilePtr out_file(hts_open(filepath.string().c_str(), "wb"));
+
+        if (bgzf_mt(in_file->fp.bgzf, writer_threads, 128) < 0) {
+            spdlog::error("Could not enable multi threading for BAM reading.");
+            return;
+        }
+        if (bgzf_mt(out_file->fp.bgzf, writer_threads, 128) < 0) {
+            spdlog::error("Could not enable multi threading for BAM generation.");
+            return;
+        }
 
         SamHdrPtr in_header(sam_hdr_read(in_file.get()));
         SamHdrPtr out_header(sam_hdr_dup(in_header.get()));
@@ -182,7 +193,9 @@ int HtsFile::write(const bam1_t* const record) {
     // FIXME -- HtsFile is constructed in a state where attempting to write
     // will segfault, since set_and_write_header has to have been called
     // in order to set m_header.
-    assert(m_header);
+    if (m_mode != OutputMode::FASTQ) {
+        assert(m_header);
+    }
     ++m_num_records;
     return sam_write1(m_file.get(), m_header.get(), record);
 }
