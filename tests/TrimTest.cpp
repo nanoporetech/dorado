@@ -195,6 +195,25 @@ TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
                Equals("C+h?,28,24;C+m?,28,24;"));
 }
 
+TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
+    const auto data_dir = fs::path(get_data_dir("trimmer"));
+    const auto bam_file = data_dir / "reverse_strand_record.bam";
+    HtsReader reader(bam_file.string(), std::nullopt);
+    reader.read();
+    auto &record = reader.record;
+
+    Trimmer trimmer;
+    const std::pair<int, int> trim_interval = {72, 647};
+    auto trimmed_record = trimmer.trim_sequence(std::move(record), trim_interval);
+
+    CHECK(trimmed_record->core.pos == -1);
+    CHECK(trimmed_record->core.tid == -1);
+    CHECK(trimmed_record->core.flag == 4);
+    CHECK(trimmed_record->core.n_cigar == 0);
+    CHECK(trimmed_record->core.mtid == -1);
+    CHECK(trimmed_record->core.mpos == -1);
+}
+
 std::string to_qstr(std::vector<int8_t> qscore) {
     std::string qstr;
     for (size_t i = 0; i < qscore.size(); ++i) {
