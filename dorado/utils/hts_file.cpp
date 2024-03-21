@@ -110,6 +110,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
     std::filesystem::path filepath(temp_filename);
     filepath.replace_extension("");
 
+    bool file_is_mapped = false;
     {
         HtsFilePtr in_file(hts_open(temp_filename.c_str(), "rb"));
         if (bgzf_mt(in_file->fp.bgzf, writer_threads, 128) < 0) {
@@ -118,8 +119,9 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
         }
 
         SamHdrPtr in_header(sam_hdr_read(in_file.get()));
-        if (sam_hdr_nref(in_header.get()) > 0) {
-            // We don't need to sort the file if it is unaligned.
+        file_is_mapped = (sam_hdr_nref(in_header.get()) > 0);
+        if (file_is_mapped) {
+            // We only need to sort and index the file if contains mapped reads.
             HtsFilePtr out_file(hts_open(filepath.string().c_str(), "wb"));
             if (bgzf_mt(out_file->fp.bgzf, writer_threads, 128) < 0) {
                 spdlog::error("Could not enable multi threading for BAM generation.");
@@ -172,21 +174,21 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
                 update_progress(percent_start_writing, percent_start_indexing, processed_records,
                                 m_num_records);
             }
-        } else {
-            // Bam file is unaligned, so we can just rename the temporary file.
-            std::filesystem::rename(temp_filename, filepath);
         }
     }
 
-    progress_callback(percent_start_indexing);
-    if (sam_index_build(filepath.string().c_str(), 0) < 0) {
-        spdlog::error("Failed to build index for file {}", filepath.string());
-        return;
-    }
-
-    // Remove the temporary file (unless it was already renamed).
-    if (std::filesystem::exists(temp_filename)) {
-        std::filesystem::remove(temp_filename);
+    if (file_is_mapped) {
+        progress_callback(percent_start_indexing);
+        if (sam_index_build(filepath.string().c_str(), 0) < 0) {
+            spdlog::error("Failed to build index for file {}", filepath.string());
+            return;
+        }
+        if (std::filesystem::exists(temp_filename)) {
+            std::filesystem::remove(temp_filename);
+        }
+    } else {
+        // No sorting was required, so just rename the file.
+        std::filesystem::rename(temp_filename, filepath);
     }
 }
 

@@ -131,7 +131,10 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
     }
 }
 
-void strip_sq_hdr(sam_hdr_t* hdr) { sam_hdr_remove_except(hdr, "SQ", nullptr, nullptr); }
+void strip_alignment_data_from_header(sam_hdr_t* hdr) {
+    sam_hdr_remove_except(hdr, "SQ", nullptr, nullptr);
+    sam_hdr_remove_tag_id(hdr, "HD", NULL, NULL, "SO");
+}
 
 bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
     auto get_pg_id = [](std::string& str) {

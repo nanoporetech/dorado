@@ -31,7 +31,8 @@ void add_rg_hdr(sam_hdr_t* hdr,
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
-void strip_sq_hdr(sam_hdr_t* hdr);
+/// Remove SO tag and any SQ lines from the header.
+void strip_alignment_data_from_header(sam_hdr_t* hdr);
 
 /**
  * @brief Merges lines from source_header into dest_header if they aren't already present.

@@ -214,8 +214,7 @@ int aligner(int argc, char* argv[]) {
 
         spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
         auto header = sam_hdr_dup(reader->header);
-        dorado::utils::strip_sq_hdr(header);
-        sam_hdr_remove_tag_id(header, "HD", NULL, NULL, "SO");
+        dorado::utils::strip_alignment_data_from_header(header);
 
         add_pg_hdr(header);
 
