@@ -2,6 +2,107 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.6.0] (25 Mar 2024)
+
+This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates minimap2 version and the default mapping preset. In addition, several bug fixes and quality of life updates have been included.
+
+## Backwards incompatible changes
+1. New scoring parameters for barcode classification to support a new classification algorithm. Older scoring config files will no longer be compatible.
+2. Default mapping preset for `dorado aligner` has been updated to `lr:hq`.
+3. `dorado trim` and `dorado demux` (when run with trimming enabled) will output unaligned records (i.e. any alignment information such as tags and headers will be removed). Output of `dorado demux --no-trim` will be sorted and indexed by default.
+
+* ddac0efe88c2340800a9e42dbc7d9c36ec1c2ed6 - Skip bam sorting if unaligned
+* dc22d7f21215082796e972760db68cbaa3faf242 - Update method for barcode classification
+* bacd354210f74373946a0f4d248162bb22e88063 - Strip trimmed BAM record of any alignment information
+* a0f9462761df979540826d4725a2414a68db9503 - Add RG/st tags to FASTQ
+* ff330f6e82c24e41f77148cba1d8e3fe76fbb405 - Disable mux change trim for r9.4.1
+* 9b49ae5e2be1df596c0aaed821c63dfb0add5a9c - Update mm2 version
+* c0075a0a63420b09efe4c3cb8594b3557f4bc9f6 - Added threading for compression to bam sorting
+* c06dfa1c92d7fae98c7a000cf126cb4a13cbfa8c - Draw a progress bar during sorting and indexing
+* c487361e50f6a90ede0b3cb261b5a7238dded930 - Ensure aligner and demux logging is enabled progress stats requested
+* 079ad0b6cb89d6a400af49d38f033b46de1fbcc3 - Round up the model sizes if they're not an exact match
+* dab78dcf96e84fe7bc8607fdc69511c7b9d12d54 - Only enable muA splitting for rapid kits
+* 993151566ed69c1cf86cab9d1ec1758c62d31948 - Rename Version.h to be less generic
+* 8084a22c80f983145f225b02b5dee327668e36cf - Fix passing arguments by reference to cxxpool tasks
+* e3442ec2633238ca6bfd073c9e817b6b6c14728c - Log errors reported by metal + enable warnings
+* e61cfe4ac28be6e06ea42721eeee2e7693527638 - Log dorado cmdline into log file
+* 3cf15fa02edd65d036cd830970719cb15d8c7e99 - Rapid adapter Trimming
+* c73a2c674afc9ada4eea1632408693169e3e3ffc - Update torch and add missing symbols test
+* 12c5a3e23dff454f28a6c27ce24afbba62414e72 - Strip SQ lines from header before aligning
+* 246b9b995360a384e1b122a7ef477f43acc29843 - Add bed file support to aligner
+* ab379ba17a438cba3cd4686067b7794073684515 - Add spdlog debug message for each iteration in determin_batch_size
+* 9d3af872b2aa4ddda4044c8a52113b765abd0701 - End reason mux_change trimming
+* 13ba5af85aecfd7c651b249a127cf1b3243c1aec - Add deprecation warning for FAST5
+* bdc05e37dd6eea975615d37f246c1529fa8144c7 - Fix issue where using simplex-only model complex and --modified-bases
+* b31e5c88b71913ae9f6900fdd2938ae58e84ead6 - Fix resume loading for split reads 
+* 392900332620a21da1b6e86f264c0459b163511c - Perform an allocation-less matmul when using torch
+* 00eaba68c89d5c1348e24040556ff801c3e19ab2 - Fix UB in CPU builds
+* b40d0015618d3ef355445d35ea7a1ebeb2029101 - Improve RBK splitting
+* e8fb085897feeda7dd101b201f856d64e33b125c - Skip barcode trimming when running polyA estimation
+* 851023f049cfb29978e345fe6a15091a2479e40e - Progress stats reporting
+* 62b53928e6e2111a7a3f9d90cd4090053c6134d2 - Handle input file in current directory
+* de59f33492f75ecb6777b372c9f0a0382a65a768 - Move default download path into the build folder
+* ba1e3a7e78da229f26967a2b5b36be405277a0da - Fix CudaCaller stats reporting
+* a92778e3318bd7366f22c0d3275ff6f2e3f39037 - Add non-ccache builds to CI
+* c4598901d764f073a18232f02039a618d1d94d3c - Support for dorado demux reading from a folder and a --recursive option
+* 043be27da86dff809d20671fd9b16421562e99e7 - Improve threads argument help message
+* d994a4d5232226ddac68eac60a14de5db087cf5c - Demux and aligner --emit-summary option
+* 67e646b45008e24a6403ee43756aad74088658aa - Add a way to get the driver version on mk1c
+* ae47155115e5f22475f424e8da3553312315cf53 - RNA PolyA QScore trim
+* f0b829d5eb5e1e56b96d6d8a7749445fa3d0f4d2 - Sort and index bgzf file output
+* 98763daba089be12708479ade687c8146f2ca245 - Fix aligner writing to stdout
+* ac4b3f75ba2d8768cbdef87744ca2a8af02540a4 - Aligner support for input and output folders 
+* 28bacb83d233460b6e8a8b91af86e9602a454eb4 - Fix up BUILD_SHARED_LIBS and CMAKE_INSTALL_PREFIX 
+* e65eaf4d4dee3d85d5eee007013c9a8815f4aaa2 - Implement multiple chunk sizes in CudaCaller
+* b4fdb2453b8719f36eb2f99ce5814a110f7b300f - Fix fully trimmed modbases
+* b23e0da1de7d0a2a2338462fe7768d70a355b612 - Nvml caching
+* 7801e8b4a5e7be34520bf6fa7e51af48fb257401 - Add read metadata to avoid need for basecall server access to caller config
+* e9a65203ca589a2ab149d9de31375f4b28d3803a - Fix Apple build PCH problem
+* 77c55999499f72ff56fdfa792745dd0b1b0d00bd - Allow the memory fraction to be specified in the metal callers
+* f844f353f7b3a5b0a117ef3e5a0a5f52fe7985ef - Get iOS builds working in CI
+* bbe6ad6964944158236a369f4e723c7e5f21330f - Fix check setting to user locale
+* 68b6666cfaeb8271d5e2f73a8947bd36f8564e48 - Added barcode kit name to barcoding results object
+* b5dc9f846bbc6f487a1f971824690c3a0f5fe3e4 - Koi update 
+* 8d5007d1eec0a38c02cff99555ec8b578d781012 - Extend GPU status data retrieved via NVML
+* d7defcc424f566ff3a8de193262da0531cdd4fe5 - Log a warning message if running on Apple Silicon with less than 16GB RAM
+* ad22eedff93531d0ee85235f8bd710cd18e27dc4 - Fix RNA adapter trim during polyA
+* 69a625df444f089ba9923ddc8d579576385f9676 - Clarify ns definition in docs
+* 8c3ceb8eaf04ced2bf0e1b3fd9e1e66a851eb4ec - Custom primer support
+* ec106d65eed2592683a8d30f936318721369b427 - Modbase streams fix
+* c40ba615d5a99403bfd00fe861ec80910dfa0dfe - Remove index_is_no_seq
+* f3e87cd89b8ac31ba9f64cec55015f233a2a6ca1 - Update minimap and reinstate test
+* 74b4b536f621ec31d795f4559c9fdd205fd71fc7 - Bring back macOS modbase performance 
+* e48bfea8e6ca38dc0e76a7ebc379096a6598445b - Split the windows compatibility functions
+* c0aa7516ab06f0ffdf8d3b9f2f6699b4c922b0d5 - Prepend updated torch split settings
+* c12df72d72e7f6cf44b36cdd4e46fe747ba02dc9 - Update Mac builds to XCode 14.2
+* 9f9d2d7b75585769e21cdd39feb5d072f0c0a38b - Reduce MetalLinearTest run time
+* 4359f3e03c8579f9cb3084071deca1e54577e010 - Create basecall DMA stream from the caller device instead of the cpu tensor
+* f1b55ead4778487b43dc633915d2dd0c68ac70b8 - Fix hemimethylation segfault
+* 190818a993a4018b8ee162d6b3b27b4cb91fcde7 - Fix detection of RAD primer 
+* 5dcea6afa65b2528119a32d64b6055c28ae71a37 - Improve batchsize selection logging
+* 30c800805fd99f94cb42cdb3f399c9fd1e699f9d - Updated model version compatibility table
+* 6f283a5f6876df767b09ee4c4ec4d6e268731b9d - Prevent CUDA OOM due to small allocations
+* a0018557c21f5a942fb597adf6c4e657df3b6737 - Fix negative numbers in SA tag for hard-clipped records
+* c9c5ad0ea395bd528c99680daa73208df4b09165 - Update POD5 version
+* 0fa2c2f7f964942287548ecc3afc439a9c530b5c - Fix Cuda oom during batch size calc
+* 5177e87e407798c9c3aa48c8fdcc3b66b846aa0b - Add util to rename threads in the debugger 
+* 8dfd180d526bf426624d2129bf1a495d1e1d43dc - Consolidate pipeline node input thread handling
+* 401882331baf86d7a3e4b8e5a018389a8363cfbb - Update DEV.md to install the correct package
+* 12329e5c3f808cb9ace728c424d34f9e4a78a0df - Fix custom barcode documentation
+* 59a445b75c05000c0e5b371f83e8b60034859ce5 - Correctly trim modbase tags for reverse strand alignments
+* b40650736b976d889c7cf93dfa9b7c2b601d3cf8 - Fixed alignment to include the rl:i tag when processing ReadCommon messages
+* 8b325b88ef14227e1878ac6d2185c47c9e63ab89 - Inherit barcoding_info and adapter_info from parent read when splitting
+* 3c1cd85e992de18cf3c37df3227689c9a0b5f61b - Only require standardisation params if active
+* 7506d44333d980e2d381a4731608fe3137354975 - Add support for TWIST barcodes
+* 899c4a2ce1458e913203556f51b2068ecd49f1f7 - Add adapter/primer trim interval to read message
+* 901f700e00c76158a11aa4fa34425c107fa15a18 - Improve error reporting when the device string is invalid for CUDA devices
+* faf3c13c755b7e7c4ba372d7f36ee64cb3e49c8c - Free dangling pod5 pointers
+* 6eabb172fbcd9ad8eacb4c77f4d5b4c76d078efc - Add 6mA model to README
+* b6077db36f18947c27cfba1d2d3b95bca3a014a7 - Add @v0 to the model lookup table
+* 17d27b8ce3c0ed42a324ad619a6588ae56bce397 - API to create runners from callers
+* 0451ee242f4c0782e9fdffb1f49a7bfefdc993b0 - Replace GPU macros
+* bee7f6d221337f8121153722ac5be9a99897aff5 - Refactor model class interfaces
+
 # [0.5.2] (18 Jan 2024)
 
 This release of Dorado fixes a bug causing malformed CIGAR strings, prevents crashing when calling modifications with duplex, and improves adapter and primer trimming support.
