@@ -146,6 +146,7 @@ int demuxer(int argc, char* argv[]) {
     auto emit_summary = parser.visible.get<bool>("emit-summary");
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
+    auto no_trim(parser.visible.get<bool>("--no-trim"));
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -198,6 +199,12 @@ int demuxer(int argc, char* argv[]) {
     }
 
     add_pg_hdr(header.get());
+    if (!no_trim) {
+        // Remove SQ lines from header since alignment information
+        // is invalidated after trimming.
+        utils::strip_sq_hdr(header.get());
+        sam_hdr_remove_tag_id(header.get(), "HD", NULL, NULL, "SO");
+    }
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
@@ -219,9 +226,8 @@ int demuxer(int argc, char* argv[]) {
         }
         pipeline_desc.add_node<BarcodeClassifierNode>(
                 {demux_writer}, demux_threads, kit_names,
-                parser.visible.get<bool>("--barcode-both-ends"),
-                parser.visible.get<bool>("--no-trim"), std::move(allowed_barcodes),
-                std::move(custom_kit), std::move(custom_barcode_file));
+                parser.visible.get<bool>("--barcode-both-ends"), no_trim,
+                std::move(allowed_barcodes), std::move(custom_kit), std::move(custom_barcode_file));
     }
 
     // Create the Pipeline from our description.

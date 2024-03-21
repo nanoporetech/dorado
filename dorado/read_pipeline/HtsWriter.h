@@ -24,6 +24,7 @@ public:
     void terminate(const FlushOptions&) override;
     void restart() override { start_input_processing(&HtsWriter::input_thread_fn, this); }
 
+    int write(const bam1_t* record);
     size_t get_total() const { return m_total; }
     size_t get_primary() const { return m_primary; }
     size_t get_unmapped() const { return m_unmapped; }
@@ -40,7 +41,6 @@ private:
     utils::HtsFile& m_file;
 
     void input_thread_fn();
-    int write(const bam1_t* record);
     std::atomic<int> m_duplex_reads_written{0};
     std::atomic<int> m_split_reads_written{0};
 

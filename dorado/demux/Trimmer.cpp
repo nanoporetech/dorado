@@ -136,43 +136,38 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
     std::string seq = utils::extract_sequence(input_record);
     std::vector<uint8_t> qual = utils::extract_quality(input_record);
     auto [stride, move_vals] = utils::extract_move_table(input_record);
-    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : 0;
-    int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : 0;
+    int ts = bam_aux_get(input_record, "ts") ? int(bam_aux2i(bam_aux_get(input_record, "ts"))) : -1;
+    int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : -1;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
     // Actually trim components.
     auto trimmed_seq = utils::trim_sequence(seq, trim_interval);
     auto trimmed_qual = utils::trim_quality(qual, trim_interval);
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
-    ts += positions_trimmed * stride;
-    // After sequence trimming, the number of samples corresponding to the sequence is the size of
-    // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
-    // front of the read as well.
-    // |---------------------- ns ------------------|
-    // |----ts----|--------moves signal-------------|
-    ns = int(trimmed_moves.size() * stride) + ts;
+    if (ts >= 0) {
+        ts += positions_trimmed * stride;
+    }
+    if (ns >= 0) {
+        // After sequence trimming, the number of samples corresponding to the sequence is the size of
+        // the new move table * stride. However, the ns tag includes the number of samples trimmed from the
+        // front of the read as well.
+        // |---------------------- ns ------------------|
+        // |----ts----|--------moves signal-------------|
+        ns = int(trimmed_moves.size() * stride) + ts;
+    }
     auto [trimmed_modbase_str, trimmed_modbase_probs] = utils::trim_modbase_info(
             is_seq_reversed ? utils::reverse_complement(seq) : seq, modbase_str, modbase_probs,
             is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
                             : trim_interval);
-    auto n_cigar = input_record->core.n_cigar;
-    std::vector<uint32_t> ops;
-    uint32_t ref_pos_consumed = 0;
-    if (n_cigar > 0) {
-        auto cigar_arr = bam_get_cigar(input_record);
-        ops = utils::trim_cigar(n_cigar, cigar_arr, trim_interval);
-        ref_pos_consumed =
-                ops.empty() ? 0 : utils::ref_pos_consumed(n_cigar, cigar_arr, trim_interval.first);
-    }
 
     // Create a new bam record to hold the trimmed read.
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
-             bam_get_qname(input_record), input_record->core.flag, input_record->core.tid,
-             input_record->core.pos + ref_pos_consumed, input_record->core.qual, ops.size(),
-             ops.empty() ? NULL : ops.data(), input_record->core.mtid, input_record->core.mpos,
-             input_record->core.isize, trimmed_seq.size(), trimmed_seq.data(),
-             trimmed_qual.empty() ? NULL : (char*)trimmed_qual.data(), bam_get_l_aux(input_record));
+             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/,
+             trimmed_seq.size(), trimmed_seq.data(),
+             trimmed_qual.empty() ? nullptr : (char*)trimmed_qual.data(),
+             bam_get_l_aux(input_record));
     memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
     out_record->l_data += bam_get_l_aux(input_record);
 
@@ -195,8 +190,12 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
         bam_aux_update_int(out_record, "MN", trimmed_seq.length());
     }
 
-    bam_aux_update_int(out_record, "ts", ts);
-    bam_aux_update_int(out_record, "ns", ns);
+    if (ts >= 0) {
+        bam_aux_update_int(out_record, "ts", ts);
+    }
+    if (ns >= 0) {
+        bam_aux_update_int(out_record, "ns", ns);
+    }
 
     return BamPtr(out_record);
 }

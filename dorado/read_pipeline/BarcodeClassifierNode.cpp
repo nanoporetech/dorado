@@ -66,6 +66,12 @@ void BarcodeClassifierNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
+            // If the read is a secondary or supplementary read, ignore it if
+            // we're setup to trim reads.
+            if (m_default_barcoding_info->trim &&
+                (read->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                continue;
+            }
             barcode(read);
             send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
@@ -118,9 +124,11 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
         int seqlen = irecord->core.l_qseq;
         auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
 
-        if (trim_interval.second - trim_interval.first < seqlen) {
+        if (trim_interval.second - trim_interval.first <= seqlen) {
             read = Trimmer::trim_sequence(std::move(read), trim_interval);
         }
+
+        utils::remove_alignment_tags_from_record(read.get());
     }
 }
 

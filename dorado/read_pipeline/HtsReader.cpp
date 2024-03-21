@@ -22,6 +22,8 @@ HtsReader::HtsReader(const std::string& filename,
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
+    // If input format is FASTX, read tags from the query name line.
+    hts_set_opt(m_file, FASTQ_OPT_AUX, "1");
     format = hts_format_description(hts_get_format(m_file));
     header = sam_hdr_read(m_file);
     if (!header) {

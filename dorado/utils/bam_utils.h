@@ -187,4 +187,11 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
  */
 kstring_t allocate_kstring();
 
+/*
+ * Remove any alignment related tags from a BAM record.
+ *
+ * @param record BAM record.
+ */
+void remove_alignment_tags_from_record(bam1_t* record);
+
 }  // namespace dorado::utils
