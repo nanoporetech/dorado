@@ -252,7 +252,12 @@ void setup(std::vector<std::string> args,
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
-    ProgressTracker tracker(int(num_reads), false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    float post_processing_percentage = 0.0f;
+    if (!hts_file.finalise_is_noop()) {
+        // If we're doing alignment, post-processing takes longer due to bam file sorting.
+        post_processing_percentage = ref.empty() ? 0.9f : 0.5f;
+    }
+    ProgressTracker tracker(int(num_reads), false, post_processing_percentage);
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;

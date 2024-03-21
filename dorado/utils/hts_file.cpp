@@ -110,7 +110,6 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
     std::filesystem::path filepath(temp_filename);
     filepath.replace_extension("");
 
-    size_t progress_for_indexing = percent_start_indexing;
     {
         HtsFilePtr in_file(hts_open(temp_filename.c_str(), "rb"));
         if (bgzf_mt(in_file->fp.bgzf, writer_threads, 128) < 0) {
@@ -176,11 +175,10 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
         } else {
             // Bam file is unaligned, so we can just rename the temporary file.
             std::filesystem::rename(temp_filename, filepath);
-            progress_for_indexing = percent_start_sorting;
         }
     }
 
-    progress_callback(progress_for_indexing);
+    progress_callback(percent_start_indexing);
     if (sam_index_build(filepath.string().c_str(), 0) < 0) {
         spdlog::error("Failed to build index for file {}", filepath.string());
         return;
