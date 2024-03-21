@@ -110,75 +110,84 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
     std::filesystem::path filepath(temp_filename);
     filepath.replace_extension("");
 
+    bool file_is_mapped = false;
     {
         HtsFilePtr in_file(hts_open(temp_filename.c_str(), "rb"));
-        HtsFilePtr out_file(hts_open(filepath.string().c_str(), "wb"));
-
         if (bgzf_mt(in_file->fp.bgzf, writer_threads, 128) < 0) {
             spdlog::error("Could not enable multi threading for BAM reading.");
             return;
         }
-        if (bgzf_mt(out_file->fp.bgzf, writer_threads, 128) < 0) {
-            spdlog::error("Could not enable multi threading for BAM generation.");
-            return;
-        }
 
         SamHdrPtr in_header(sam_hdr_read(in_file.get()));
-        SamHdrPtr out_header(sam_hdr_dup(in_header.get()));
-        sam_hdr_change_HD(out_header.get(), "SO", "coordinate");
-        if (sam_hdr_write(out_file.get(), out_header.get()) < 0) {
-            spdlog::error("Failed to write header for sorted bam file {}", out_file->fn);
+        file_is_mapped = (sam_hdr_nref(in_header.get()) > 0);
+        if (file_is_mapped) {
+            // We only need to sort and index the file if contains mapped reads.
+            HtsFilePtr out_file(hts_open(filepath.string().c_str(), "wb"));
+            if (bgzf_mt(out_file->fp.bgzf, writer_threads, 128) < 0) {
+                spdlog::error("Could not enable multi threading for BAM generation.");
+                return;
+            }
+
+            SamHdrPtr out_header(sam_hdr_dup(in_header.get()));
+            sam_hdr_change_HD(out_header.get(), "SO", "coordinate");
+            if (sam_hdr_write(out_file.get(), out_header.get()) < 0) {
+                spdlog::error("Failed to write header for sorted bam file {}", out_file->fn);
+                return;
+            }
+
+            size_t read_records = 0;
+            progress_callback(percent_start_sorting);
+
+            BamPtr record(bam_init1());
+
+            std::multimap<uint64_t, int64_t> record_map;
+            auto pos = bgzf_tell(in_file->fp.bgzf);
+            while ((sam_read1(in_file.get(), in_header.get(), record.get()) >= 0)) {
+                auto sorting_key = calculate_sorting_key(record.get());
+                record_map.insert({sorting_key, pos});
+                pos = bgzf_tell(in_file->fp.bgzf);
+
+                ++read_records;
+                update_progress(percent_start_sorting, percent_start_writing, read_records,
+                                m_num_records);
+            }
+
+            size_t processed_records = 0;
+            progress_callback(percent_start_writing);
+
+            for (auto [sorting_key, record_offset] : record_map) {
+                if (bgzf_seek(in_file->fp.bgzf, record_offset, SEEK_SET) < 0) {
+                    spdlog::error("Failed to seek in file {}, record offset {}", in_file->fn,
+                                  record_offset);
+                    return;
+                }
+                if (sam_read1(in_file.get(), in_header.get(), record.get()) < 0) {
+                    spdlog::error("Failed to read from temporary file {}", in_file->fn);
+                    return;
+                }
+                if (sam_write1(out_file.get(), out_header.get(), record.get()) < 0) {
+                    spdlog::error("Failed to write to sorted file {}", out_file->fn);
+                    return;
+                }
+
+                processed_records++;
+                update_progress(percent_start_writing, percent_start_indexing, processed_records,
+                                m_num_records);
+            }
+        }
+    }
+
+    if (file_is_mapped) {
+        progress_callback(percent_start_indexing);
+        if (sam_index_build(filepath.string().c_str(), 0) < 0) {
+            spdlog::error("Failed to build index for file {}", filepath.string());
             return;
         }
-
-        size_t read_records = 0;
-        progress_callback(percent_start_sorting);
-
-        BamPtr record(bam_init1());
-
-        std::multimap<uint64_t, int64_t> record_map;
-        auto pos = bgzf_tell(in_file->fp.bgzf);
-        while ((sam_read1(in_file.get(), in_header.get(), record.get()) >= 0)) {
-            auto sorting_key = calculate_sorting_key(record.get());
-            record_map.insert({sorting_key, pos});
-            pos = bgzf_tell(in_file->fp.bgzf);
-
-            ++read_records;
-            update_progress(percent_start_sorting, percent_start_writing, read_records,
-                            m_num_records);
-        }
-
-        size_t processed_records = 0;
-        progress_callback(percent_start_writing);
-
-        for (auto [sorting_key, record_offset] : record_map) {
-            if (bgzf_seek(in_file->fp.bgzf, record_offset, SEEK_SET) < 0) {
-                spdlog::error("Failed to seek in file {}, record offset {}", in_file->fn,
-                              record_offset);
-                return;
-            }
-            if (sam_read1(in_file.get(), in_header.get(), record.get()) < 0) {
-                spdlog::error("Failed to read from temporary file {}", in_file->fn);
-                return;
-            }
-            if (sam_write1(out_file.get(), out_header.get(), record.get()) < 0) {
-                spdlog::error("Failed to write to sorted file {}", out_file->fn);
-                return;
-            }
-
-            processed_records++;
-            update_progress(percent_start_writing, percent_start_indexing, processed_records,
-                            m_num_records);
-        }
+        std::filesystem::remove(temp_filename);
+    } else {
+        // No sorting was required, so just rename the file.
+        std::filesystem::rename(temp_filename, filepath);
     }
-
-    progress_callback(percent_start_indexing);
-    if (sam_index_build(filepath.string().c_str(), 0) < 0) {
-        spdlog::error("Failed to build index for file {}", filepath.string());
-        return;
-    }
-
-    std::filesystem::remove(temp_filename);
 }
 
 int HtsFile::set_and_write_header(const sam_hdr_t* const header) {
