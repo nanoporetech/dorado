@@ -106,7 +106,6 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Only one primer is provided") {
-        auto path = (tmp_dir.m_path / "only_one_primer.toml").string();
         const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
@@ -117,7 +116,6 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Parse all supported configs") {
-        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
         const toml::value data{{"anchors",
                                 toml::table{
 
