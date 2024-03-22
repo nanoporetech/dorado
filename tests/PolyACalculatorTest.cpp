@@ -106,7 +106,6 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Only one primer is provided") {
-        auto path = (tmp_dir.m_path / "only_one_primer.toml").string();
         const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
@@ -116,23 +115,11 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
                           "configuration file.");
     }
 
-    SECTION("Only one plasmid flank is provided") {
-        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
-        const toml::value data{{"anchors", toml::table{{"plasmid_rear_flank", "ACTG"}}}};
-        const std::string fmt = toml::format(data);
-        std::stringstream buffer(fmt);
-
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(buffer),
-                          "Both plasmid_front_flank and plasmid_rear_flank must be provided in the "
-                          "PolyA configuration file.");
-    }
-
     SECTION("Parse all supported configs") {
-        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
-        const toml::value data{{"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
-                                                       {"plasmid_rear_flank", "ACTG"},
-                                                       {"front_primer", "AAAAAA"},
-                                                       {"rear_primer", "GGGGGG"}}},
+        const toml::value data{{"anchors",
+                                toml::table{
+
+                                        {"front_primer", "AAAAAA"}, {"rear_primer", "GGGGGG"}}},
                                {"tail", toml::table{{"tail_interrupt_length", 10}}}};
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
@@ -142,11 +129,6 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         CHECK(config.rc_front_primer == "TTTTTT");
         CHECK(config.rear_primer == "GGGGGG");
         CHECK(config.rc_rear_primer == "CCCCCC");
-        CHECK(config.plasmid_front_flank == "CGTA");
-        CHECK(config.rc_plasmid_front_flank == "TACG");
-        CHECK(config.plasmid_rear_flank == "ACTG");
-        CHECK(config.rc_plasmid_rear_flank == "CAGT");
-        CHECK(config.is_plasmid);  // Since the plasmid flanks were specified
         CHECK(config.tail_interrupt_length == 10);
     }
 }
