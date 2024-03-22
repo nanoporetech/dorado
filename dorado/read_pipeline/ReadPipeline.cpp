@@ -24,7 +24,16 @@ using namespace std::chrono_literals;
 
 namespace dorado {
 
-ReadCommon::ReadCommon() : client_info(std::make_shared<DefaultClientInfo>()) {}
+namespace {
+
+std::shared_ptr<ClientInfo> get_default_client_info() {
+    static std::shared_ptr<ClientInfo> default_client_info = std::make_shared<DefaultClientInfo>();
+    return default_client_info;
+}
+
+}  // namespace
+
+ReadCommon::ReadCommon() : client_info(get_default_client_info()) {}
 
 std::string ReadCommon::generate_read_group() const {
     std::string read_group;
