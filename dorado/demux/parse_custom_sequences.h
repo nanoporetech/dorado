@@ -1,8 +1,5 @@
 #pragma once
 
-#include "utils/barcode_kits.h"
-
-#include <optional>
 #include <string>
 #include <unordered_map>
 

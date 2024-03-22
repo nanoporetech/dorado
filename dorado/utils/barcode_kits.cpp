@@ -822,7 +822,7 @@ const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_inf
 
 const KitInfo* get_kit_info(const std::string& kit_name) {
     const auto& barcode_kit_infos = get_kit_infos();
-    auto kit_iter = get_kit_infos().find(kit_name);
+    auto kit_iter = barcode_kit_infos.find(kit_name);
     if (kit_iter == barcode_kit_infos.end()) {
         return nullptr;
     }

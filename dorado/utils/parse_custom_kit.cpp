@@ -1,7 +1,5 @@
 #include "parse_custom_kit.h"
 
-//#include "utils/bam_utils.h"
-//#include "utils/types.h"
 #include "utils/barcode_kits.h"
 
 #include <htslib/sam.h>
