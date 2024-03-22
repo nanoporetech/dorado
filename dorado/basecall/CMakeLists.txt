@@ -14,6 +14,8 @@ add_library(dorado_basecall STATIC
     decode/Decoder.h
     nn/CRFModel.cpp
     nn/CRFModel.h
+    nn/TxModel.cpp
+    nn/TxModel.h
 )
 
 if (DORADO_GPU_BUILD)

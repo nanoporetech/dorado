@@ -71,6 +71,8 @@ enum SampleType {
     RNA004,
 };
 
+namespace tx {
+
 struct TxEncoderParams {
     //  The number of expected features in the encoder/decoder inputs
     int d_model;
@@ -108,6 +110,14 @@ struct CRFEncoderParams {
     std::string to_string() const;
 };
 
+struct Params {
+    BasecallerParams basecaller;
+    TxEncoderParams tx;
+    CRFEncoderParams crf;
+};
+
+}  // namespace tx
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale = 1.0f;
@@ -141,14 +151,12 @@ struct CRFModelConfig {
     std::vector<ConvParams> convs;
 
     // Tx Model Params
-    std::optional<BasecallerParams> basecaller = std::nullopt;
-    std::optional<CRFEncoderParams> crf_encoder = std::nullopt;
-    std::optional<TxEncoderParams> tx_encoder = std::nullopt;
+    std::optional<tx::Params> tx = std::nullopt;
 
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }
     // True if this model config describes a transormer model
-    bool is_tx_model() const { return tx_encoder.has_value(); };
+    bool is_tx_model() const { return tx.has_value(); };
 
     std::string to_string() const;
 };
@@ -160,5 +168,9 @@ CRFModelConfig load_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);
+
+namespace tx {
+CRFModelConfig load_tx_model_config(const std::filesystem::path& path);
+}
 
 }  // namespace dorado::basecall

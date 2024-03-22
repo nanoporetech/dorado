@@ -50,6 +50,229 @@ std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
     return utils::load_tensors(dir, tensors);
 }
 
+std::vector<torch::Tensor> load_tx_model_weights(const std::filesystem::path &dir) {
+    auto tensors = std::vector<std::string>{
+            // convs 1-4
+            "0.conv.0.conv.weight.tensor",
+            "0.conv.0.conv.bias.tensor",
+            "0.conv.1.conv.weight.tensor",
+            "0.conv.1.conv.bias.tensor",
+            "0.conv.2.conv.weight.tensor",
+            "0.conv.2.conv.bias.tensor",
+            "0.conv.3.conv.weight.tensor",
+            "0.conv.3.conv.bias.tensor",
+            "0.conv.4.conv.weight.tensor",
+            "0.conv.4.conv.bias.tensor",
+
+            // tx 0
+            "0.transformer_encoder.0.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.0.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.0.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.0.ff.w12.weight.tensor",
+            "0.transformer_encoder.0.ff.w3.weight.tensor",
+            "0.transformer_encoder.0.norm1.weight.tensor",
+            "0.transformer_encoder.0.norm1.bias.tensor",
+            "0.transformer_encoder.0.norm2.weight.tensor",
+            "0.transformer_encoder.0.norm2.bias.tensor",
+
+            // tx 1
+            "0.transformer_encoder.1.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.1.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.1.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.1.ff.w12.weight.tensor",
+            "0.transformer_encoder.1.ff.w3.weight.tensor",
+            "0.transformer_encoder.1.norm1.weight.tensor",
+            "0.transformer_encoder.1.norm1.bias.tensor",
+            "0.transformer_encoder.1.norm2.weight.tensor",
+            "0.transformer_encoder.1.norm2.bias.tensor",
+
+            // tx 2
+            "0.transformer_encoder.2.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.2.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.2.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.2.ff.w12.weight.tensor",
+            "0.transformer_encoder.2.ff.w3.weight.tensor",
+            "0.transformer_encoder.2.norm1.weight.tensor",
+            "0.transformer_encoder.2.norm1.bias.tensor",
+            "0.transformer_encoder.2.norm2.weight.tensor",
+            "0.transformer_encoder.2.norm2.bias.tensor",
+
+            // tx 3
+            "0.transformer_encoder.3.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.3.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.3.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.3.ff.w12.weight.tensor",
+            "0.transformer_encoder.3.ff.w3.weight.tensor",
+            "0.transformer_encoder.3.norm1.weight.tensor",
+            "0.transformer_encoder.3.norm1.bias.tensor",
+            "0.transformer_encoder.3.norm2.weight.tensor",
+            "0.transformer_encoder.3.norm2.bias.tensor",
+
+            // tx 4
+            "0.transformer_encoder.4.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.4.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.4.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.4.ff.w12.weight.tensor",
+            "0.transformer_encoder.4.ff.w3.weight.tensor",
+            "0.transformer_encoder.4.norm1.weight.tensor",
+            "0.transformer_encoder.4.norm1.bias.tensor",
+            "0.transformer_encoder.4.norm2.weight.tensor",
+            "0.transformer_encoder.4.norm2.bias.tensor",
+
+            // tx 5
+            "0.transformer_encoder.5.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.5.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.5.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.5.ff.w12.weight.tensor",
+            "0.transformer_encoder.5.ff.w3.weight.tensor",
+            "0.transformer_encoder.5.norm1.weight.tensor",
+            "0.transformer_encoder.5.norm1.bias.tensor",
+            "0.transformer_encoder.5.norm2.weight.tensor",
+            "0.transformer_encoder.5.norm2.bias.tensor",
+
+            // tx 6
+            "0.transformer_encoder.6.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.6.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.6.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.6.ff.w12.weight.tensor",
+            "0.transformer_encoder.6.ff.w3.weight.tensor",
+            "0.transformer_encoder.6.norm1.weight.tensor",
+            "0.transformer_encoder.6.norm1.bias.tensor",
+            "0.transformer_encoder.6.norm2.weight.tensor",
+            "0.transformer_encoder.6.norm2.bias.tensor",
+
+            // tx 7
+            "0.transformer_encoder.7.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.7.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.7.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.7.ff.w12.weight.tensor",
+            "0.transformer_encoder.7.ff.w3.weight.tensor",
+            "0.transformer_encoder.7.norm1.weight.tensor",
+            "0.transformer_encoder.7.norm1.bias.tensor",
+            "0.transformer_encoder.7.norm2.weight.tensor",
+            "0.transformer_encoder.7.norm2.bias.tensor",
+
+            // tx 8
+            "0.transformer_encoder.8.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.8.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.8.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.8.ff.w12.weight.tensor",
+            "0.transformer_encoder.8.ff.w3.weight.tensor",
+            "0.transformer_encoder.8.norm1.weight.tensor",
+            "0.transformer_encoder.8.norm1.bias.tensor",
+            "0.transformer_encoder.8.norm2.weight.tensor",
+            "0.transformer_encoder.8.norm2.bias.tensor",
+
+            // tx 9
+            "0.transformer_encoder.9.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.9.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.9.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.9.ff.w12.weight.tensor",
+            "0.transformer_encoder.9.ff.w3.weight.tensor",
+            "0.transformer_encoder.9.norm1.weight.tensor",
+            "0.transformer_encoder.9.norm1.bias.tensor",
+            "0.transformer_encoder.9.norm2.weight.tensor",
+            "0.transformer_encoder.9.norm2.bias.tensor",
+
+            // tx 10
+            "0.transformer_encoder.10.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.10.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.10.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.10.ff.w12.weight.tensor",
+            "0.transformer_encoder.10.ff.w3.weight.tensor",
+            "0.transformer_encoder.10.norm1.weight.tensor",
+            "0.transformer_encoder.10.norm1.bias.tensor",
+            "0.transformer_encoder.10.norm2.weight.tensor",
+            "0.transformer_encoder.10.norm2.bias.tensor",
+
+            // tx 11
+            "0.transformer_encoder.11.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.11.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.11.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.11.ff.w12.weight.tensor",
+            "0.transformer_encoder.11.ff.w3.weight.tensor",
+            "0.transformer_encoder.11.norm1.weight.tensor",
+            "0.transformer_encoder.11.norm1.bias.tensor",
+            "0.transformer_encoder.11.norm2.weight.tensor",
+            "0.transformer_encoder.11.norm2.bias.tensor",
+
+            // tx 12
+            "0.transformer_encoder.12.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.12.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.12.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.12.ff.w12.weight.tensor",
+            "0.transformer_encoder.12.ff.w3.weight.tensor",
+            "0.transformer_encoder.12.norm1.weight.tensor",
+            "0.transformer_encoder.12.norm1.bias.tensor",
+            "0.transformer_encoder.12.norm2.weight.tensor",
+            "0.transformer_encoder.12.norm2.bias.tensor",
+
+            // tx 13
+            "0.transformer_encoder.13.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.13.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.13.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.13.ff.w12.weight.tensor",
+            "0.transformer_encoder.13.ff.w3.weight.tensor",
+            "0.transformer_encoder.13.norm1.weight.tensor",
+            "0.transformer_encoder.13.norm1.bias.tensor",
+            "0.transformer_encoder.13.norm2.weight.tensor",
+            "0.transformer_encoder.13.norm2.bias.tensor",
+
+            // tx 14
+            "0.transformer_encoder.14.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.14.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.14.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.14.ff.w12.weight.tensor",
+            "0.transformer_encoder.14.ff.w3.weight.tensor",
+            "0.transformer_encoder.14.norm1.weight.tensor",
+            "0.transformer_encoder.14.norm1.bias.tensor",
+            "0.transformer_encoder.14.norm2.weight.tensor",
+            "0.transformer_encoder.14.norm2.bias.tensor",
+
+            // tx 15
+            "0.transformer_encoder.15.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.15.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.15.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.15.ff.w12.weight.tensor",
+            "0.transformer_encoder.15.ff.w3.weight.tensor",
+            "0.transformer_encoder.15.norm1.weight.tensor",
+            "0.transformer_encoder.15.norm1.bias.tensor",
+            "0.transformer_encoder.15.norm2.weight.tensor",
+            "0.transformer_encoder.15.norm2.bias.tensor",
+
+            // tx 16
+            "0.transformer_encoder.16.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.16.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.16.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.16.ff.w12.weight.tensor",
+            "0.transformer_encoder.16.ff.w3.weight.tensor",
+            "0.transformer_encoder.16.norm1.weight.tensor",
+            "0.transformer_encoder.16.norm1.bias.tensor",
+            "0.transformer_encoder.16.norm2.weight.tensor",
+            "0.transformer_encoder.16.norm2.bias.tensor",
+
+            // tx 17
+            "0.transformer_encoder.17.self_attn.in_proj.weight.tensor",
+            "0.transformer_encoder.17.self_attn.out_proj.weight.tensor",
+            "0.transformer_encoder.17.self_attn.out_proj.bias.tensor",
+            "0.transformer_encoder.17.ff.w12.weight.tensor",
+            "0.transformer_encoder.17.ff.w3.weight.tensor",
+            "0.transformer_encoder.17.norm1.weight.tensor",
+            "0.transformer_encoder.17.norm1.bias.tensor",
+            "0.transformer_encoder.17.norm2.weight.tensor",
+            "0.transformer_encoder.17.norm2.bias.tensor",
+
+            // tx decoder
+            "0.transformer_decoder.linear.weight.tensor",
+            "0.transformer_decoder.linear.bias.tensor",
+
+            // linear CRF
+            "0.crf.linear.weight.tensor",
+    };
+
+    return utils::load_tensors(dir, tensors);
+}
+
 ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
@@ -63,6 +286,28 @@ ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
     auto module = AnyModule(model);
     auto holder = ModuleHolder<AnyModule>(module);
     return holder;
+}
+
+ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
+                                      const at::TensorOptions &options) {
+    // auto model = nn::TxModel(model_config);
+    // auto state_dict = load_tx_model_weights(model_config.model_path);
+    // model->load_state_dict(state_dict);
+    // model->to(options.dtype().toScalarType());
+    // model->to(options.device());
+    // model->eval();
+
+    // auto module = AnyModule(model);
+    auto holder = ModuleHolder<AnyModule>(module);
+    return holder;
+}
+
+ModuleHolder<AnyModule> load_model(const CRFModelConfig &model_config,
+                                   const torch::TensorOptions &options) {
+    if (model_config.is_tx_model()) {
+        return load_tx_model(model_config, options);
+    }
+    return load_crf_model(model_config, options);
 }
 
 size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
