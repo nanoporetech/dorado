@@ -90,7 +90,7 @@ void setup(std::vector<std::string> args,
            bool estimate_poly_a,
            const std::string* const polya_config,
            const ModelSelection& model_selection) {
-    const auto model_config = basecall::load_crf_model_config(model_path);
+    const auto model_config = basecall::load_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 

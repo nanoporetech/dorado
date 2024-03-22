@@ -18,7 +18,7 @@ namespace fs = std::filesystem;
 
 TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/dna_r9.4.1_e8_hac@v3.3"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == true);
@@ -79,7 +79,7 @@ TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
 TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_260bps_fast@v4.0.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == false);
@@ -140,7 +140,7 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
 TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.2.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == true);
@@ -201,7 +201,7 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
 TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.3.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == false);
@@ -260,7 +260,7 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) {
 TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.3.0_quantile"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == false);
@@ -319,7 +319,7 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT_TAG) 
 
 TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/rna002_70bps_fast@v3"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == true);
@@ -378,7 +378,7 @@ TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
 
 TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/rna004_130bps_sup@v3.0.1"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const CRFModelConfig config = load_model_config(path);
 
     CHECK(config.model_path == path);
     CHECK(config.bias == true);

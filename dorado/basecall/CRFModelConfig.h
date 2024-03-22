@@ -71,6 +71,43 @@ enum SampleType {
     RNA004,
 };
 
+struct TxEncoderParams {
+    //  The number of expected features in the encoder/decoder inputs
+    int d_model;
+    // The number of heads in the multi-head attention (MHA) models
+    int nhead;
+    // The number of transformer layers
+    int depth;
+    // Linear upsample scale factor
+    int scale_factor;
+
+    // The dimension of the feedforward model
+    int dim_feedforward() const { return int(d_model * (2.0f / 3.0f) / 32) * 32; }
+    // The deepnorm normalisation alpha parameter
+    float deepnorm_alpha() const { return float(pow(float(2 * depth), 0.25f)); }
+    // The deepnorm normalisation beta constant
+    float deepnorm_beta() const { return float(pow(float(8 * depth), -0.25f)); }
+
+    std::string to_string() const;
+};
+
+struct BasecallerParams {
+    int batchsize;
+    int chunksize;
+    int overlap;
+
+    std::string to_string() const;
+};
+
+struct CRFEncoderParams {
+    int output_stride;
+    int n_base;
+    int state_len;
+    std::optional<float> blank_score;
+
+    std::string to_string() const;
+};
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale = 1.0f;
@@ -103,10 +140,23 @@ struct CRFModelConfig {
     // convolution layer params
     std::vector<ConvParams> convs;
 
+    // Tx Model Params
+    std::optional<BasecallerParams> basecaller = std::nullopt;
+    std::optional<CRFEncoderParams> crf_encoder = std::nullopt;
+    std::optional<TxEncoderParams> tx_encoder = std::nullopt;
+
+    // True if this model config describes a LSTM model
+    bool is_lstm_model() const { return !is_tx_model(); }
+    // True if this model config describes a transormer model
+    bool is_tx_model() const { return tx_encoder.has_value(); };
+
     std::string to_string() const;
 };
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
+// True if this config at path describes a transformer model
+bool is_tx_model_config(const std::filesystem::path& path);
+
+CRFModelConfig load_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);
