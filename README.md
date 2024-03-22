@@ -117,6 +117,8 @@ The `--no-trim-primers` option can be used to prevent the trimming of primer seq
 
 If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification.
 
+The output of `dorado trim` will always be unaligned records, regardless of whether the input is aligned/sorted or not.
+
 #### Custom Primer Trimming
 
 The software automatically searches for primer sequences used in ONT kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a fasta file containing the primer sequences you want to search for. The record names of the sequences do not matter. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for. 
@@ -240,6 +242,8 @@ $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bam
 `<reads>` can either be a folder or a single file in an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of dorado basecalling).
 
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
+
+If the input file is aligned/sorted and `--no-trim` is chosen, each of the output barcode-specific BAM files will also be sorted and indexed. However, if trimming is enabled (which is the default), the alignment information is removed and the output BAMs are unaligned. This is done because the alignment tags and positions are invalidated once a sequence is altered.
 
 Here is an example output folder
 
