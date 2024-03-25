@@ -4,12 +4,12 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.6.0] (25 Mar 2024)
 
-This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates minimap2 version and the default mapping preset. In addition, several bug fixes and quality of life updates have been included.
+This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates minimap2 version and the default mapping preset. In addition, several bug fixes and quality of life updates have been included as well.
 
 ## Backwards incompatible changes
 1. New scoring parameters for barcode classification to support a new classification algorithm. Older scoring config files will no longer be compatible.
 2. Default mapping preset for `dorado aligner` has been updated to `lr:hq`.
-3. `dorado trim` and `dorado demux` (when run with trimming enabled) will output unaligned records (i.e. any alignment information such as tags and headers will be removed). Output of `dorado demux --no-trim` will be sorted and indexed by default.
+3. `dorado trim` and `dorado demux` (when run with trimming enabled) will output unaligned records (i.e. any alignment information such as tags and headers will be removed). Note that output of `dorado demux --no-trim` will be sorted and indexed if the input file is aligned.
 
 * ddac0efe88c2340800a9e42dbc7d9c36ec1c2ed6 - Skip bam sorting if unaligned
 * dc22d7f21215082796e972760db68cbaa3faf242 - Update method for barcode classification
