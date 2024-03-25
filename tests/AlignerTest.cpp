@@ -1,13 +1,14 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Aligner.h"
+#include "fake_client_info.h"
 #include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
+#include "utils/types.h"
 
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
@@ -25,19 +26,6 @@ using Catch::Matchers::Equals;
 namespace fs = std::filesystem;
 
 namespace {
-
-class TestClientInfo : public dorado::ClientInfo {
-    const dorado::AlignmentInfo m_align_info;
-
-public:
-    TestClientInfo(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
-
-    int32_t client_id() const override { return 1; }
-
-    const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
-
-    bool is_disconnected() const override { return false; }
-};
 
 std::unordered_map<std::string, std::string> get_tags_from_sam_line_fields(
         const std::vector<std::string>& fields) {
@@ -92,7 +80,9 @@ protected:
         create_pipeline(index_file_access, 2);
 
         dorado::ReadCommon read_common{};
-        read_common.client_info = std::make_shared<TestClientInfo>(client_align_info);
+        auto client_info = std::make_shared<dorado::FakeClientInfo>();
+        client_info->set_alignment_info(client_align_info);
+        read_common.client_info = client_info;
         read_common.read_id = std::move(read_id);
         read_common.seq = std::move(sequence);
 

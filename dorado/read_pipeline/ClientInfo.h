@@ -15,11 +15,14 @@ struct AlignmentInfo {
     std::string reference_file;
 };
 
+struct BarcodingInfo;
+
 class ClientInfo {
 public:
     virtual ~ClientInfo() = default;
 
     virtual const AlignmentInfo& alignment_info() const = 0;
+    virtual const BarcodingInfo& barcoding_info() const = 0;
     virtual int32_t client_id() const = 0;
     virtual bool is_disconnected() const = 0;
 };

@@ -2,6 +2,7 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "fake_client_info.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
@@ -210,7 +211,9 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     if (use_per_read_barcoding) {
-        read->read_common.barcoding_info = barcoding_info;
+        auto client_info = std::make_shared<dorado::FakeClientInfo>();
+        client_info->set_barcoding_info(*barcoding_info);
+        read->read_common.client_info = client_info;
     }
 
     std::vector<uint8_t> moves;

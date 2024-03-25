@@ -1,5 +1,6 @@
 #include "BarcodeClassifierNode.h"
 
+#include "ClientInfo.h"
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
 #include "utils/SampleSheet.h"
@@ -12,6 +13,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -84,17 +86,15 @@ void BarcodeClassifierNode::input_thread_fn() {
     }
 }
 
-std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
-        const SimplexRead& read) const {
+const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(const SimplexRead& read) const {
     if (m_default_barcoding_info && (!m_default_barcoding_info->kit_name.empty() ||
                                      m_default_barcoding_info->custom_kit.has_value())) {
-        return m_default_barcoding_info;
+        return m_default_barcoding_info.get();
     }
 
-    if (read.read_common.barcoding_info &&
-        (!read.read_common.barcoding_info->kit_name.empty() ||
-         read.read_common.barcoding_info->custom_kit.has_value())) {
-        return read.read_common.barcoding_info;
+    if (!read.read_common.client_info->barcoding_info().kit_name.empty() ||
+        read.read_common.client_info->barcoding_info().custom_kit.has_value()) {
+        return &read.read_common.client_info->barcoding_info();
     }
 
     return nullptr;

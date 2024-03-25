@@ -23,6 +23,7 @@ add_executable(dorado_tests
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
+    fake_client_info.h
     gpu_monitor_test.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
