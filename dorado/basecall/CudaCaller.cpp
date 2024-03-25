@@ -375,7 +375,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         const int max_size = max_batch_sizes[i];
         for (auto it = times_and_batch_sizes.begin(); it != largest_usable_batch; ++it) {
             const int batch_size = it->second;
-            if (batch_size < max_size) {
+            if (batch_size <= max_size) {
                 final_size = batch_size;
             }
         }
