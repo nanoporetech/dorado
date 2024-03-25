@@ -24,6 +24,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
@@ -46,6 +47,32 @@
 #include <thread>
 
 namespace dorado {
+
+namespace {
+
+const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
+    const auto kit_info = barcode_kits::get_kit_info(kit_name);
+    if (!kit_info) {
+        spdlog::error(
+                "{} is not a valid barcode kit name. Please run the help "
+                "command to find out available barcode kits.",
+                kit_name);
+        std::exit(EXIT_FAILURE);
+    }
+    return *kit_info;
+}
+
+std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
+        const std::string& custom_kit_file) {
+    auto custom_kit_info = barcode_kits::parse_custom_arrangement(custom_kit_file);
+    if (!custom_kit_info) {
+        spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
+        std::exit(EXIT_FAILURE);
+    }
+    return *custom_kit_info;
+}
+
+}  // namespace
 
 using dorado::utils::default_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
@@ -77,7 +104,7 @@ void setup(std::vector<std::string> args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
-           const std::vector<std::string>& barcode_kits,
+           const std::string& barcode_kit,
            bool barcode_both_ends,
            bool barcode_no_trim,
            bool adapter_no_trim,
@@ -135,7 +162,7 @@ void setup(std::vector<std::string> args,
                                                     recursive_file_loading);
 
     const bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
-    const bool barcode_enabled = !barcode_kits.empty() || custom_kit;
+    const bool barcode_enabled = !barcode_kit.empty() || custom_kit;
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             barcode_enabled, adapter_trimming_enabled);
@@ -149,7 +176,17 @@ void setup(std::vector<std::string> args,
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    utils::add_rg_hdr(hdr.get(), read_groups, barcode_kits, sample_sheet.get());
+    if (custom_kit) {
+        auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
+                                               sample_sheet.get());
+    } else if (!barcode_kit.empty()) {
+        const auto kit_info = get_barcode_kit_info(barcode_kit);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
+                                               sample_sheet.get());
+    } else {
+        utils::add_rg_headers(hdr.get(), read_groups);
+    }
 
     utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
 
@@ -178,8 +215,9 @@ void setup(std::vector<std::string> args,
                 !primer_no_trim, std::move(custom_primer_file));
     }
     if (barcode_enabled) {
+        std::vector<std::string> kit_as_vector{barcode_kit};
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
-                {current_sink_node}, thread_allocations.barcoder_threads, barcode_kits,
+                {current_sink_node}, thread_allocations.barcoder_threads, kit_as_vector,
                 barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
                 std::move(custom_kit), std::move(custom_barcode_file));
     }
@@ -405,7 +443,8 @@ int basecaller(int argc, char* argv[]) {
 
     parser.visible.add_argument("--kit-name")
             .help("Enable barcoding with the provided kit name. Choose from: " +
-                  dorado::barcode_kits::barcode_kits_list_str() + ".");
+                  dorado::barcode_kits::barcode_kits_list_str() + ".")
+            .default_value(std::string{});
     parser.visible.add_argument("--barcode-both-ends")
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
             .default_value(false)
@@ -624,7 +663,7 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),
               parser.visible.get<std::string>("--resume-from"),
-              parser.visible.get<std::vector<std::string>>("--kit-name"),
+              parser.visible.get<std::string>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),

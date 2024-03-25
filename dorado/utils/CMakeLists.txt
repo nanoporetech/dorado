@@ -30,6 +30,8 @@ add_library(dorado_utils
     module_utils.h
     parameters.cpp
     parameters.h
+    parse_custom_kit.cpp
+    parse_custom_kit.h
     PostCondition.h
     SampleSheet.cpp
     SampleSheet.h
@@ -59,7 +61,7 @@ add_library(dorado_utils
     types.h
     uuid_utils.cpp
     uuid_utils.h
-)
+ )
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
