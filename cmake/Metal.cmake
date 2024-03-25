@@ -15,6 +15,8 @@ foreach(source ${METAL_SOURCES})
     add_custom_command(
         OUTPUT "${air_path}"
         COMMAND
+            ${CMAKE_COMMAND} -E env
+                MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             xcrun -sdk ${XCRUN_SDK} metal
                 -Werror
                 -Wall -Wextra -pedantic
@@ -32,6 +34,8 @@ endforeach()
 add_custom_command(
     OUTPUT default.metallib
     COMMAND
+        ${CMAKE_COMMAND} -E env
+            MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
         xcrun -sdk ${XCRUN_SDK} metallib
             ${AIR_FILES}
             -o ${CMAKE_BINARY_DIR}/lib/default.metallib
