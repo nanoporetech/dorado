@@ -20,7 +20,7 @@ using utils::HtsFile;
 class HtsWriterTestsFixture {
 public:
     HtsWriterTestsFixture()
-            : m_out_path(TempDir(fs::temp_directory_path() / "hts_writer_output")),
+            : m_out_path(tests::make_temp_dir("hts_writer_output")),
               m_out_bam(m_out_path.m_path / "out.bam"),
               m_in_sam(fs::path(get_data_dir("bam_reader") / "small.sam")) {
         std::filesystem::create_directories(m_out_path.m_path);
@@ -80,8 +80,7 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_G
 TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
     auto input_fastq = bam_test_dir / "fastq_with_tags.fq";
-    auto tmp_dir = TempDir(fs::temp_directory_path() / "writer_test");
-    std::filesystem::create_directories(tmp_dir.m_path);
+    auto tmp_dir = make_temp_dir("writer_test");
     auto out_fastq = tmp_dir.m_path / "output.fq";
 
     // Read input file to check all tags are reads.

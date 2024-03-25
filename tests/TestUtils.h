@@ -31,14 +31,28 @@ std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path);
 
 // Wrapper around a temporary directory since one doesn't exist in the standard
 struct TempDir {
+private:
+    // Force devs to use the function instead of creating their own TempDirs
+    friend TempDir make_temp_dir(const std::string& prefix);
     TempDir(std::filesystem::path path) : m_path(std::move(path)) {}
-    ~TempDir() { std::filesystem::remove_all(m_path); }
+
+public:
+    ~TempDir() {
+        if (!m_path.empty()) {
+            std::filesystem::remove_all(m_path);
+        }
+    }
+
+    TempDir(TempDir&& other) { std::swap(m_path, other.m_path); }
+    TempDir& operator=(TempDir&& other) = delete;
 
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 
     std::filesystem::path m_path;
 };
+
+TempDir make_temp_dir(const std::string& prefix);
 
 class TraceLogger {
 public:

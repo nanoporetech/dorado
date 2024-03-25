@@ -129,26 +129,11 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 // Download a model to a temporary directory
 TempDir download_model(const std::string& model) {
     // Create a new directory to download the model to
-#ifdef _WIN32
-    std::filesystem::path path;
-    while (true) {
-        char temp[L_tmpnam];
-        const char* name = std::tmpnam(temp);
-        if (std::filesystem::create_directories(name)) {
-            path = std::filesystem::canonical(name);
-            break;
-        }
-    }
-#else
-    // macOS (rightfully) complains about tmpnam() usage, so make use of mkdtemp() on platforms that support it
-    std::string temp = (std::filesystem::temp_directory_path() / "model_XXXXXXXXXX").string();
-    const char* name = mkdtemp(temp.data());
-    auto path = std::filesystem::canonical(name);
-#endif
+    auto temp_dir = make_temp_dir("model");
 
     // Download it
-    REQUIRE(dorado::models::download_models(path.string(), model));
-    return TempDir(std::move(path));
+    REQUIRE(dorado::models::download_models(temp_dir.m_path.string(), model));
+    return temp_dir;
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
