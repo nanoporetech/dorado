@@ -341,7 +341,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             time = std::min(time, time_this_iteration);
             handle_cuda_result(cudaEventDestroy(start));
             handle_cuda_result(cudaEventDestroy(stop));
-            spdlog::debug("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
+            spdlog::trace("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
                           time_this_iteration);
         }
 
@@ -373,7 +373,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         // Pick the largest batch size under the max.
         int &final_size = m_batch_dims[i].N;
         const int max_size = max_batch_sizes[i];
-        for (auto it = times_and_batch_sizes.begin(); it != largest_usable_batch; ++it) {
+        for (auto it = times_and_batch_sizes.begin(); it != std::next(largest_usable_batch); ++it) {
             const int batch_size = it->second;
             if (batch_size <= max_size) {
                 final_size = batch_size;
