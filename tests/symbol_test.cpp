@@ -7,7 +7,7 @@
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
-#include "demux/parse_custom_kit.h"
+#include "demux/parse_custom_sequences.h"
 #include "modbase/ModBaseModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "models/models.h"
@@ -22,6 +22,7 @@
 #include "utils/barcode_kits.h"
 #include "utils/gpu_monitor.h"
 #include "utils/parameters.h"
+#include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/time_utils.h"
@@ -81,8 +82,8 @@ void reference_all_public_functions() {
     force_reference(&dorado::basecall::load_crf_model_config);
     // basecall/ModelRunner.h
     force_reference(&dorado::basecall::ModelRunner::accept_chunk);
-    // demux/parse_custom_kit.h
-    force_reference(&dorado::demux::parse_custom_arrangement);
+    // demux/parse_custom_sequences.h
+    force_reference(&dorado::demux::parse_custom_sequences);
     // modbase/ModBaseModelConfig.h
     force_reference(&dorado::modbase::load_modbase_model_config);
     // modbase/ModBaseRunner.h
@@ -107,6 +108,9 @@ void reference_all_public_functions() {
     force_reference(&dorado::utils::shallow_copy_read);
     // utils/barcode_kits.h
     force_reference(&dorado::barcode_kits::get_kit_infos);
+    // utils/parse_custom_kit.h
+    force_reference(&dorado::barcode_kits::parse_custom_arrangement);
+
 #if DORADO_CUDA_BUILD
     // utils/cuda_utils.h
     force_reference(&dorado::utils::acquire_gpu_lock);

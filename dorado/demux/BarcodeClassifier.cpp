@@ -1,8 +1,9 @@
 #include "BarcodeClassifier.h"
 
-#include "parse_custom_kit.h"
+#include "parse_custom_sequences.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -124,7 +125,7 @@ std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_ki
         const std::optional<std::string>& custom_kit) {
     std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
     if (custom_kit) {
-        auto custom_arrangement = demux::parse_custom_arrangement(*custom_kit);
+        auto custom_arrangement = dorado::barcode_kits::parse_custom_arrangement(*custom_kit);
         if (custom_arrangement) {
             const auto& [kit_name, kit_info] = *custom_arrangement;
             kit_map[kit_name] = kit_info;
@@ -151,7 +152,7 @@ dorado::barcode_kits::BarcodeKitScoringParams set_scoring_params(
     if (custom_kit) {
         // If a custom kit is passed, parse it for any scoring
         // params that need to override the default params.
-        return dorado::demux::parse_scoring_params(*custom_kit, params);
+        return barcode_kits::parse_scoring_params(*custom_kit, params);
     } else {
         return params;
     }
