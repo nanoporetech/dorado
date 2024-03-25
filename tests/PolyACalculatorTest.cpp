@@ -96,8 +96,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
 }
 
 TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
-    auto tmp_dir = TempDir(fs::temp_directory_path() / "polya_test");
-    std::filesystem::create_directories(tmp_dir.m_path);
+    auto tmp_dir = make_temp_dir("polya_test");
 
     SECTION("Check failure with non-existent file.") {
         const std::string missing_file = "foo_bar_baz";
