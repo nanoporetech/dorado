@@ -122,6 +122,18 @@ const BarcodeKitScoringParams RBK114_PARAMS{
         /*min_flank_score*/ 0.0f,
 };
 
+const BarcodeKitScoringParams TWIST_PARAMS{
+        /*max_barcode_penalty*/ 5,
+        /*barcode_end_proximity*/ 75,
+        /*min_barcode_penalty_dist*/ 2,
+        /*min_separation_only_dist*/ 6,
+        /*flank_left_pad*/ 10,
+        /*flank_right_pad*/ 10,
+        /*front_barcode_window*/ 175,
+        /*rear_barcode_window*/ 175,
+        /*min_flank_score*/ 0.5f,
+};
+
 // Some arrangement names are just aliases of each other. This is because they were released
 // as part of different kits, but they map to the same underlying arrangement.
 const KitInfo kit_16S = {
@@ -390,7 +402,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                   "AG10R_79", "AH10R_80", "AA11R_81", "AB11R_82", "AC11R_83", "AD11R_84",
                   "AE11R_85", "AF11R_86", "AG11R_87", "AH11R_88", "AA12R_89", "AB12R_90",
                   "AC12R_91", "AD12R_92", "AE12R_93", "AF12R_94", "AG12R_95", "AH12R_96"},
-                 DEFAULT_PARAMS,
+                 TWIST_PARAMS,
          }},
 };
 
