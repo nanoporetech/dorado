@@ -44,7 +44,8 @@ TempDir make_temp_dir(const std::string& prefix) {
     while (true) {
         char temp[L_tmpnam];
         const char* name = std::tmpnam(temp);
-        auto filename = prefix + std::string("_") + std::string(name);
+        auto filename = std::filesystem::path(name);
+        filename.replace_filename(prefix + std::string("_") + filename.filename().string());
         if (std::filesystem::create_directories(filename)) {
             path = std::filesystem::canonical(filename);
             break;
