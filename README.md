@@ -254,6 +254,12 @@ SQK-RPB004_barcode03.bam
 unclassified.bam
 ```
 
+#### Demuxing mapped reads
+
+If the input data files containing mapping data, this information can be preserved in the output files. To do this, you must use the `--no-trim` option. Trimming the barcodes will invalidate any mapping information that may be contained in the input files, and therefore the application will exclude any mapping information if `--no-trim` is not specified.
+
+It is also possible to get the demux application to sort and index any output bam files that contain mapped reads. To enable this use the `--sort-bam` option. If you use this option then you must also use the `--no-trim option`, as trimming will prevent any mapping information from being included in the output files. Index files (.bai extension) will only be created for bam files that contain mapped reads and were sorted. Note that for large datasets sorting the output files may take a few minutes.
+
 #### Using a sample sheet
 
 Dorado is able to use a sample sheet to restrict the barcode classifications to only those present, and to apply aliases to the detected classifications. This is enabled by passing the path to a sample sheet to the `--sample-sheet` argument when using the `basecaller` or `demux` commands. See [here](documentation/SampleSheets.md) for more information.
