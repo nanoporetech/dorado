@@ -88,8 +88,14 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
         const std::string KIT_NAME{"SQK-RAB204"};
         auto kit_info = dorado::barcode_kits::get_kit_info(KIT_NAME);
         dorado::SamHdrPtr sam_header(sam_hdr_init());
+
+        std::string const CUSTOM_BARCODE_NAME{"BC01"};
+        std::string const CUSTOM_BARCODE_SEQUENCE{"AAA"};
+        std::unordered_map<std::string, std::string> custom_barcodes{
+                {CUSTOM_BARCODE_NAME, CUSTOM_BARCODE_SEQUENCE}};
+
         dorado::utils::add_rg_headers_with_barcode_kit(sam_header.get(), read_groups, KIT_NAME,
-                                                       *kit_info, nullptr);
+                                                       *kit_info, custom_barcodes, nullptr);
 
         // Check the IDs of the groups are all there.
         const size_t total_groups = read_groups.size() * (kit_info->barcodes.size() + 1);
@@ -108,8 +114,18 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
                                              KIT_NAME, barcode_name);
                 const auto &barcode_seq = barcode_seqs.at(barcode_name);
                 CHECK(has_read_group_header(sam_header.get(), full_id.c_str()));
-                CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);
+                if (barcode_name != CUSTOM_BARCODE_NAME) {
+                    CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);
+                }
             }
+
+            // The custom barcode sequence should be present in the barcode tag
+            const auto custom_full_id = id + "_" +
+                                        dorado::barcode_kits::generate_standard_barcode_name(
+                                                KIT_NAME, CUSTOM_BARCODE_NAME);
+            auto actual_barcode_tag_sequence =
+                    get_barcode_tag(sam_header.get(), custom_full_id.c_str());
+            CHECK(actual_barcode_tag_sequence == CUSTOM_BARCODE_SEQUENCE);
         }
     }
 }
