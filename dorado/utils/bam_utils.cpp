@@ -73,7 +73,7 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
     auto get_barcode_sequence =
             [&custom_sequences,
              barcode_sequences = barcode_kits::get_barcodes()](const std::string& barcode_name) {
-                // Prefer user specified custiom sequences
+                // Prefer user specified custom sequences
                 auto sequence_itr = custom_sequences.find(barcode_name);
                 if (sequence_itr != custom_sequences.end()) {
                     return sequence_itr->second;
