@@ -4,6 +4,7 @@
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
+#include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
 #include "models/kits.h"
 #include "models/models.h"
@@ -176,14 +177,21 @@ void setup(std::vector<std::string> args,
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args);
-    if (custom_kit) {
-        auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
-        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
-                                               sample_sheet.get());
-    } else if (!barcode_kit.empty()) {
-        const auto kit_info = get_barcode_kit_info(barcode_kit);
-        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
-                                               sample_sheet.get());
+
+    if (barcode_enabled) {
+        std::unordered_map<std::string, std::string> custom_barcodes{};
+        if (custom_barcode_file) {
+            custom_barcodes = demux::parse_custom_sequences(*custom_barcode_file);
+        }
+        if (custom_kit) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
+                                                   custom_barcodes, sample_sheet.get());
+        } else {
+            const auto kit_info = get_barcode_kit_info(barcode_kit);
+            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
+                                                   custom_barcodes, sample_sheet.get());
+        }
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
