@@ -8,6 +8,7 @@ if (IOS)
 else()
     set(XCRUN_SDK macosx)
 endif()
+string(TOUPPER ${XCRUN_SDK} XCRUN_SDK_UPPER)
 
 foreach(source ${METAL_SOURCES})
     get_filename_component(basename "${source}" NAME_WE)
@@ -16,7 +17,7 @@ foreach(source ${METAL_SOURCES})
         OUTPUT "${air_path}"
         COMMAND
             ${CMAKE_COMMAND} -E env
-                MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+                ${XCRUN_SDK_UPPER}_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             xcrun -sdk ${XCRUN_SDK} metal
                 -Werror
                 -Wall -Wextra -pedantic
@@ -35,7 +36,7 @@ add_custom_command(
     OUTPUT default.metallib
     COMMAND
         ${CMAKE_COMMAND} -E env
-            MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+            ${XCRUN_SDK_UPPER}_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
         xcrun -sdk ${XCRUN_SDK} metallib
             ${AIR_FILES}
             -o ${CMAKE_BINARY_DIR}/lib/default.metallib
