@@ -274,7 +274,7 @@ int aligner(int argc, char* argv[]) {
                 [&](size_t progress) {
                     tracker.update_post_processing_progress(static_cast<float>(progress));
                 },
-                writer_threads);
+                writer_threads, true);
 
         tracker.summarize();
 

@@ -185,7 +185,7 @@ int trim(int argc, char* argv[]) {
             [&](size_t progress) {
                 tracker.update_post_processing_progress(static_cast<float>(progress));
             },
-            trim_writer_threads);
+            trim_writer_threads, false);
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");
