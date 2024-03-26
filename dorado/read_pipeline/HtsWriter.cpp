@@ -9,10 +9,6 @@
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
-#if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
-#endif
-
 #include <cassert>
 #include <filesystem>
 #include <stdexcept>

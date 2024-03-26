@@ -76,6 +76,8 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std
     if (!gpu_string.empty()) {
         pg << "\tDS:gpu:" << gpu_string;
     }
+#else
+    (void)device;
 #endif
 
     pg << std::endl;

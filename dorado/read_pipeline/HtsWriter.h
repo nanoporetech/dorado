@@ -38,9 +38,9 @@ private:
     size_t m_secondary{0};
     size_t m_supplementary{0};
 
-    std::string m_gpu_names{};
-
     utils::HtsFile& m_file;
+
+    std::string m_gpu_names{};
 
     void input_thread_fn();
     std::atomic<int> m_duplex_reads_written{0};
