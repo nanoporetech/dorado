@@ -205,6 +205,27 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
     return results;
 }
 
+std::string get_cuda_gpu_names(std::string device_string) {
+    auto dev_info = utils::get_cuda_device_info(device_string);
+    std::set<std::string> gpu_strs;
+    std::string gpu_names;
+
+    for (auto &dev : dev_info) {
+        if (dev.in_use) {
+            gpu_strs.insert(dev.device_properties.name);
+        }
+    }
+
+    for (auto &gpu_id : gpu_strs) {
+        if (!gpu_names.empty()) {
+            gpu_names += "|";
+        }
+        gpu_names += gpu_id;
+    }
+
+    return gpu_names;
+}
+
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
     static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
 

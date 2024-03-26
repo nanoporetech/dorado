@@ -21,6 +21,10 @@
 #endif  // _WIN32
 #include "data_loader/ModelFinder.h"
 
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
+
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -58,7 +62,7 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
     return std::make_pair(aligner_threads, writer_threads);
 }
 
-inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
+inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std::string device) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
 
     std::stringstream pg;
@@ -66,6 +70,14 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args) {
     for (const auto& arg : args) {
         pg << " " << arg;
     }
+
+#if DORADO_CUDA_BUILD
+    auto gpu_string = utils::get_cuda_gpu_names(device);
+    if (!gpu_string.empty()) {
+        pg << "\tDS:gpu:" << gpu_string;
+    }
+#endif
+
     pg << std::endl;
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }

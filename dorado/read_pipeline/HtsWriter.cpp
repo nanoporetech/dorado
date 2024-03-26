@@ -9,6 +9,10 @@
 #include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
+
 #include <cassert>
 #include <filesystem>
 #include <stdexcept>
@@ -17,7 +21,11 @@ namespace dorado {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-HtsWriter::HtsWriter(utils::HtsFile& file) : MessageSink(10000, 1), m_file(file) {
+HtsWriter::HtsWriter(utils::HtsFile& file, std::string gpu_names)
+        : MessageSink(10000, 1), m_file(file), m_gpu_names(gpu_names) {
+    if (!m_gpu_names.empty()) {
+        m_gpu_names = "gpu:" + m_gpu_names;
+    }
     start_input_processing(&HtsWriter::input_thread_fn, this);
 }
 
@@ -43,6 +51,14 @@ void HtsWriter::input_thread_fn() {
         }
 
         auto aln = std::move(std::get<BamPtr>(message));
+
+        if (m_file.get_output_mode() == utils::HtsFile::OutputMode::FASTQ) {
+            if (!m_gpu_names.empty()) {
+                bam_aux_append(aln.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
+                               (uint8_t*)m_gpu_names.c_str());
+            }
+        }
+
         auto res = write(aln.get());
         if (res < 0) {
             throw std::runtime_error("Failed to write SAM record, error code " +

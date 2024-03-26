@@ -145,7 +145,7 @@ int trim(int argc, char* argv[]) {
     hts_file.set_and_write_header(header.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
                                                 !parser.get<bool>("--no-trim-primers"),
