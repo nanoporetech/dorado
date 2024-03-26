@@ -29,7 +29,7 @@ public:
     bool finalise_is_noop() const { return m_finalise_is_noop; }
     void finalise(const ProgressCallback& progress_callback,
                   int writer_threads,
-                  bool sort_if_mapped = true);
+                  bool sort_if_mapped);
 
 private:
     HtsFilePtr m_file;

@@ -288,7 +288,7 @@ void setup(std::vector<std::string> args,
             [&](size_t progress) {
                 tracker.update_post_processing_progress(static_cast<float>(progress));
             },
-            thread_allocations.writer_threads);
+            thread_allocations.writer_threads, true);
 
     // Give the user a nice summary.
     tracker.summarize();

@@ -560,7 +560,7 @@ int duplex(int argc, char* argv[]) {
                 [&](size_t progress) {
                     tracker.update_post_processing_progress(static_cast<float>(progress));
                 },
-                WRITER_THREADS);
+                WRITER_THREADS, true);
 
         tracker.summarize();
         if (!dump_stats_file.empty()) {
