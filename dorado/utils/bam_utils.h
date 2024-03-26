@@ -27,11 +27,13 @@ struct AlignmentOps {
 
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
 
-void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
-                                     const std::unordered_map<std::string, ReadGroup>& read_groups,
-                                     const std::string& kit_name,
-                                     const barcode_kits::KitInfo& kit_info,
-                                     const utils::SampleSheet* const sample_sheet);
+void add_rg_headers_with_barcode_kit(
+        sam_hdr_t* hdr,
+        const std::unordered_map<std::string, ReadGroup>& read_groups,
+        const std::string& kit_name,
+        const barcode_kits::KitInfo& kit_info,
+        const std::unordered_map<std::string, std::string>& custom_sequences,
+        const utils::SampleSheet* const sample_sheet);
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 

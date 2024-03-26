@@ -68,10 +68,25 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
                              const std::unordered_map<std::string, ReadGroup>& read_groups,
                              const std::string& kit_name,
                              const barcode_kits::KitInfo& kit_info,
+                             const std::unordered_map<std::string, std::string>& custom_sequences,
                              const utils::SampleSheet* const sample_sheet) {
-    const auto& barcode_sequences = barcode_kits::get_barcodes();
+    auto get_barcode_sequence =
+            [&custom_sequences,
+             barcode_sequences = barcode_kits::get_barcodes()](const std::string& barcode_name) {
+                // Prefer user specified custiom sequences
+                auto sequence_itr = custom_sequences.find(barcode_name);
+                if (sequence_itr != custom_sequences.end()) {
+                    return sequence_itr->second;
+                }
+                sequence_itr = barcode_sequences.find(barcode_name);
+                if (sequence_itr != barcode_sequences.end()) {
+                    return sequence_itr->second;
+                }
+                throw std::runtime_error("Unrecognised barcode name: " + barcode_name);
+            };
+
     for (const auto& barcode_name : kit_info.barcodes) {
-        const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
+        const auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
         const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
         for (const auto& read_group : read_groups) {
             std::string alias;
@@ -111,13 +126,15 @@ void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGr
     }
 }
 
-void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
-                                     const std::unordered_map<std::string, ReadGroup>& read_groups,
-                                     const std::string& kit_name,
-                                     const barcode_kits::KitInfo& kit_info,
-                                     const utils::SampleSheet* const sample_sheet) {
+void add_rg_headers_with_barcode_kit(
+        sam_hdr_t* hdr,
+        const std::unordered_map<std::string, ReadGroup>& read_groups,
+        const std::string& kit_name,
+        const barcode_kits::KitInfo& kit_info,
+        const std::unordered_map<std::string, std::string>& custom_sequences,
+        const utils::SampleSheet* const sample_sheet) {
     add_rg_headers(hdr, read_groups);
-    add_barcode_kit_rg_hdrs(hdr, read_groups, kit_name, kit_info, sample_sheet);
+    add_barcode_kit_rg_hdrs(hdr, read_groups, kit_name, kit_info, custom_sequences, sample_sheet);
 }
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
