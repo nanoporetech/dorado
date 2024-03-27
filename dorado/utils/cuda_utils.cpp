@@ -210,13 +210,13 @@ std::string get_cuda_gpu_names(std::string device_string) {
     std::set<std::string> gpu_strs;
     std::string gpu_names;
 
-    for (auto &dev : dev_info) {
+    for (const auto &dev : dev_info) {
         if (dev.in_use) {
             gpu_strs.insert(dev.device_properties.name);
         }
     }
 
-    for (auto &gpu_id : gpu_strs) {
+    for (const auto &gpu_id : gpu_strs) {
         if (!gpu_names.empty()) {
             gpu_names += "|";
         }

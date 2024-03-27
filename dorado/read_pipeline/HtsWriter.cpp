@@ -18,7 +18,7 @@ namespace dorado {
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
 HtsWriter::HtsWriter(utils::HtsFile& file, std::string gpu_names)
-        : MessageSink(10000, 1), m_file(file), m_gpu_names(gpu_names) {
+        : MessageSink(10000, 1), m_file(file), m_gpu_names(std::move(gpu_names)) {
     if (!m_gpu_names.empty()) {
         m_gpu_names = "gpu:" + m_gpu_names;
     }
