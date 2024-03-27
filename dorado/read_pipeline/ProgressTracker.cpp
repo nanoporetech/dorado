@@ -16,7 +16,7 @@ void erase_progress_bar_line() {
     if (dorado::utils::is_fd_tty(stderr)) {
         // Erase the current line so that we remove the previous description.
 #ifndef _WIN32
-        // I would use indicators::erase_progress_bar_line() here, but it hardcodes stdout.
+        // I would use indicators::erase_line() here, but it hardcodes stdout.
         std::cerr << "\r\033[K";
 #endif
     }
@@ -29,6 +29,11 @@ namespace dorado {
 ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_duplex(duplex),
+          m_progress_bar(indicators::option::Stream{std::cerr},
+                         indicators::option::BarWidth{30},
+                         indicators::option::ShowElapsedTime{true},
+                         indicators::option::ShowRemainingTime{true},
+                         indicators::option::ShowPercentage{true}),
           m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }

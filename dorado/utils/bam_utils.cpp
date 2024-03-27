@@ -21,6 +21,8 @@
 const char seq_nt16_str[] = "=ACMGRSVTWYHKDBN";
 #endif  // _WIN32
 
+namespace dorado::utils {
+
 namespace {
 
 // Convert the 4bit encoded sequence in a bam1_t structure
@@ -33,9 +35,83 @@ std::string convert_nt16_to_str(uint8_t* bseq, size_t slen) {
     return seq;
 }
 
-}  // namespace
+void emit_read_group(sam_hdr_t* hdr,
+                     const std::string& read_group_line,
+                     const std::string& id,
+                     const std::string& additional_tags) {
+    auto line = "@RG\tID:" + id + '\t' + read_group_line + additional_tags + '\n';
+    sam_hdr_add_lines(hdr, line.c_str(), 0);
+}
 
-namespace dorado::utils {
+std::string read_group_to_string(const dorado::ReadGroup& read_group) {
+    auto value_or_unknown = [](std::string_view s) { return s.empty() ? "unknown" : s; };
+    std::ostringstream rg;
+    {
+        rg << "PU:" << value_or_unknown(read_group.flowcell_id) << "\t";
+        rg << "PM:" << value_or_unknown(read_group.device_id) << "\t";
+        rg << "DT:" << value_or_unknown(read_group.exp_start_time) << "\t";
+        rg << "PL:"
+           << "ONT"
+           << "\t";
+        rg << "DS:"
+           << "basecall_model=" << value_or_unknown(read_group.basecalling_model)
+           << (read_group.modbase_models.empty() ? ""
+                                                 : (" modbase_models=" + read_group.modbase_models))
+           << " runid=" << value_or_unknown(read_group.run_id) << "\t";
+        rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
+        rg << "SM:" << value_or_unknown(read_group.sample_id);
+    }
+    return rg.str();
+}
+
+void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
+                             const std::unordered_map<std::string, ReadGroup>& read_groups,
+                             const std::string& kit_name,
+                             const barcode_kits::KitInfo& kit_info,
+                             const std::unordered_map<std::string, std::string>& custom_sequences,
+                             const utils::SampleSheet* const sample_sheet) {
+    auto get_barcode_sequence =
+            [&custom_sequences,
+             barcode_sequences = barcode_kits::get_barcodes()](const std::string& barcode_name) {
+                // Prefer user specified custom sequences
+                auto sequence_itr = custom_sequences.find(barcode_name);
+                if (sequence_itr != custom_sequences.end()) {
+                    return sequence_itr->second;
+                }
+                sequence_itr = barcode_sequences.find(barcode_name);
+                if (sequence_itr != barcode_sequences.end()) {
+                    return sequence_itr->second;
+                }
+                throw std::runtime_error("Unrecognised barcode name: " + barcode_name);
+            };
+
+    for (const auto& barcode_name : kit_info.barcodes) {
+        const auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
+        const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+        for (const auto& read_group : read_groups) {
+            std::string alias;
+            auto id = read_group.first + '_';
+            if (sample_sheet) {
+                if (!sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
+                    continue;
+                }
+
+                alias = sample_sheet->get_alias(
+                        read_group.second.flowcell_id, read_group.second.position_id,
+                        read_group.second.experiment_id, normalized_barcode_name);
+            }
+            if (!alias.empty()) {
+                id += alias;
+            } else {
+                id += barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
+            }
+            const std::string read_group_tags = read_group_to_string(read_group.second);
+            emit_read_group(hdr, read_group_tags, id, additional_tags);
+        }
+    }
+}
+
+}  // namespace
 
 kstring_t allocate_kstring() {
     kstring_t str = {0, 0, NULL};
@@ -43,83 +119,22 @@ kstring_t allocate_kstring() {
     return str;
 }
 
-void add_rg_hdr(sam_hdr_t* hdr,
-                const std::unordered_map<std::string, ReadGroup>& read_groups,
-                const std::vector<std::string>& barcode_kits,
-                const utils::SampleSheet* const sample_sheet) {
-    const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
-    const auto& barcode_sequences = barcode_kits::get_barcodes();
-
-    // Convert a ReadGroup to a string
-    auto to_string = [](const ReadGroup& read_group) {
-        // Lambda function to return "unknown" if string is empty
-        auto value_or_unknown = [](std::string_view s) { return s.empty() ? "unknown" : s; };
-        std::ostringstream rg;
-        {
-            rg << "PU:" << value_or_unknown(read_group.flowcell_id) << "\t";
-            rg << "PM:" << value_or_unknown(read_group.device_id) << "\t";
-            rg << "DT:" << value_or_unknown(read_group.exp_start_time) << "\t";
-            rg << "PL:"
-               << "ONT"
-               << "\t";
-            rg << "DS:"
-               << "basecall_model=" << value_or_unknown(read_group.basecalling_model)
-               << (read_group.modbase_models.empty()
-                           ? ""
-                           : (" modbase_models=" + read_group.modbase_models))
-               << " runid=" << value_or_unknown(read_group.run_id) << "\t";
-            rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
-            rg << "SM:" << value_or_unknown(read_group.sample_id);
-        }
-        return std::move(rg).str();
-    };
-
-    auto emit_read_group = [hdr](const std::string& read_group_line, const std::string& id,
-                                 const std::string& additional_tags) {
-        auto line = "@RG\tID:" + id + '\t' + read_group_line + additional_tags + '\n';
-        sam_hdr_add_lines(hdr, line.c_str(), 0);
-    };
-
-    // Emit read group headers without a barcode arrangement.
+void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
     for (const auto& read_group : read_groups) {
-        const std::string read_group_tags = to_string(read_group.second);
-        emit_read_group(read_group_tags, read_group.first, {});
+        const std::string read_group_tags = read_group_to_string(read_group.second);
+        emit_read_group(hdr, read_group_tags, read_group.first, {});
     }
+}
 
-    // Emit read group headers for each barcode arrangement.
-    for (const auto& kit_name : barcode_kits) {
-        auto kit_iter = barcode_kit_infos.find(kit_name);
-        if (kit_iter == barcode_kit_infos.end()) {
-            throw std::runtime_error(kit_name +
-                                     " is not a valid barcode kit name. Please run the help "
-                                     "command to find out available barcode kits.");
-        }
-        const auto& kit_info = kit_iter->second;
-        for (const auto& barcode_name : kit_info.barcodes) {
-            const auto additional_tags = "\tBC:" + barcode_sequences.at(barcode_name);
-            const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
-            for (const auto& read_group : read_groups) {
-                std::string alias;
-                auto id = read_group.first + '_';
-                if (sample_sheet) {
-                    if (!sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
-                        continue;
-                    }
-
-                    alias = sample_sheet->get_alias(
-                            read_group.second.flowcell_id, read_group.second.position_id,
-                            read_group.second.experiment_id, normalized_barcode_name);
-                }
-                if (!alias.empty()) {
-                    id += alias;
-                } else {
-                    id += barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
-                }
-                const std::string read_group_tags = to_string(read_group.second);
-                emit_read_group(read_group_tags, id, additional_tags);
-            }
-        }
-    }
+void add_rg_headers_with_barcode_kit(
+        sam_hdr_t* hdr,
+        const std::unordered_map<std::string, ReadGroup>& read_groups,
+        const std::string& kit_name,
+        const barcode_kits::KitInfo& kit_info,
+        const std::unordered_map<std::string, std::string>& custom_sequences,
+        const utils::SampleSheet* const sample_sheet) {
+    add_rg_headers(hdr, read_groups);
+    add_barcode_kit_rg_hdrs(hdr, read_groups, kit_name, kit_info, custom_sequences, sample_sheet);
 }
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {

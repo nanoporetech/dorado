@@ -19,13 +19,12 @@ using utils::HtsFile;
 
 class HtsWriterTestsFixture {
 public:
-    HtsWriterTestsFixture() {
-        fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
-        m_in_sam = aligner_test_dir / "small.sam";
-        m_out_bam = fs::temp_directory_path() / "out.bam";
+    HtsWriterTestsFixture()
+            : m_out_path(tests::make_temp_dir("hts_writer_output")),
+              m_out_bam(m_out_path.m_path / "out.bam"),
+              m_in_sam(fs::path(get_data_dir("bam_reader") / "small.sam")) {
+        std::filesystem::create_directories(m_out_path.m_path);
     }
-
-    ~HtsWriterTestsFixture() { fs::remove(m_out_bam); }
 
 protected:
     void generate_bam(HtsFile::OutputMode mode, int num_threads) {
@@ -50,8 +49,9 @@ protected:
     stats::NamedStats stats;
 
 private:
-    fs::path m_in_sam;
+    TempDir m_out_path;
     fs::path m_out_bam;
+    fs::path m_in_sam;
 };
 
 TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Write BAM", TEST_GROUP) {
@@ -80,8 +80,7 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_G
 TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
     auto input_fastq = bam_test_dir / "fastq_with_tags.fq";
-    auto tmp_dir = TempDir(fs::temp_directory_path() / "writer_test");
-    std::filesystem::create_directories(tmp_dir.m_path);
+    auto tmp_dir = make_temp_dir("writer_test");
     auto out_fastq = tmp_dir.m_path / "output.fq";
 
     // Read input file to check all tags are reads.

@@ -67,9 +67,7 @@ TEST_CASE("initialise with input file and no output folder returns true", CUT_TA
 #if !DORADO_IOS_BUILD
 TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
     // Create basic SAM file in a temp directory and change curdir to that temp directory.
-    auto tmp_dir = TempDir(fs::temp_directory_path() / "aligner_input_from_curdir");
-    std::filesystem::create_directories(tmp_dir.m_path);
-
+    auto tmp_dir = tests::make_temp_dir("aligner_input_from_curdir");
     auto tmp_filename = "empty_file.sam";
     auto tmp_filepath = tmp_dir.m_path / tmp_filename;
     std::ofstream outfile(tmp_filepath.string());

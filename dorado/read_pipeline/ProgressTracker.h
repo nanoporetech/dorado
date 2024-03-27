@@ -60,15 +60,10 @@ private:
     const bool m_duplex;
 
 #ifdef _WIN32
-    indicators::ProgressBar m_progress_bar {
+    indicators::ProgressBar m_progress_bar;
 #else
-    indicators::BlockProgressBar m_progress_bar{
+    indicators::BlockProgressBar m_progress_bar;
 #endif
-        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
-                indicators::option::ShowElapsedTime{true},
-                indicators::option::ShowRemainingTime{true},
-                indicators::option::ShowPercentage{true},
-    };
 
     float m_last_progress_written = -1.f;
 
