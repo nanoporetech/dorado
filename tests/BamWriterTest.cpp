@@ -34,7 +34,7 @@ protected:
         hts_file.set_and_write_header(reader.header);
 
         PipelineDescriptor pipeline_desc;
-        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
@@ -88,7 +88,7 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     {
         // Write with tags into temporary folder.
         utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
-        HtsWriter writer(hts_file);
+        HtsWriter writer(hts_file, "");
         reader.read();
         CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "RG")),
                    Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."

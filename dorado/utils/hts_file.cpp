@@ -28,6 +28,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) :
         m_file.reset(hts_open(filename.c_str(), "wf"));
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
         break;
     case OutputMode::BAM: {
         auto file = filename;
