@@ -30,9 +30,9 @@ public:
     void update_post_processing_progress(float progress);
 
     // Disable the update of progress information during processing
-    // This is useful since progres is not reported using spdlog
+    // This is useful since progress is not reported using spdlog
     // so it may interleave.
-    // Note, summarize will not be disbaled as it uses spdlog to report.
+    // Note, summarize will not be disabled as it uses spdlog to report.
     void disable_progress_reporting();
 
 private:

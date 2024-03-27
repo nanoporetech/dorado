@@ -90,6 +90,7 @@ ReadOutputProgressStats::~ReadOutputProgressStats() {
         std::lock_guard lock(m_mutex);
         m_is_finished = true;
     }
+    join_report_thread();
 }
 
 void ReadOutputProgressStats::join_report_thread() {
