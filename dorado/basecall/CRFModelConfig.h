@@ -83,6 +83,9 @@ struct TxEncoderParams {
     // Linear upsample scale factor
     int scale_factor;
 
+    // Pair of ints defining (possibly asymmetric) sliding attention window mask
+    std::pair<int, int> attn_window;
+
     // The dimension of the feedforward model
     int dim_feedforward() const { return int(d_model * (2.0f / 3.0f) / 32) * 32; }
     // The deepnorm normalisation alpha parameter
