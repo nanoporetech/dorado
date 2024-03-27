@@ -250,7 +250,7 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
 
     if (m_stats_collection_mode == StatsCollectionMode::collector_per_input_file) {
         // entering post processing so capture read stats
-        m_post_processing_stats = std::make_optional<StatsForPostProcessing>();
+        m_post_processing_stats = StatsForPostProcessing{};  // make_optional not working with clang
         m_post_processing_stats->interval_reads_processed =
                 m_interval_previous_stat_collectors_total;
         m_post_processing_stats->total_reads_processed = m_previous_stat_collectors_total;
