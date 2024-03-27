@@ -221,7 +221,7 @@ int aligner(int argc, char* argv[]) {
         utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads);
 
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
                                                            bed_file, options, aligner_threads);
 

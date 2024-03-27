@@ -17,7 +17,7 @@ namespace dorado {
 
 class HtsWriter : public MessageSink {
 public:
-    HtsWriter(utils::HtsFile& file);
+    HtsWriter(utils::HtsFile& file, std::string gpu_names);
     ~HtsWriter();
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
@@ -39,6 +39,8 @@ private:
     size_t m_supplementary{0};
 
     utils::HtsFile& m_file;
+
+    std::string m_gpu_names{};
 
     void input_thread_fn();
     std::atomic<int> m_duplex_reads_written{0};

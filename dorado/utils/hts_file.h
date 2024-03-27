@@ -31,6 +31,8 @@ public:
                   int writer_threads,
                   bool sort_if_mapped);
 
+    OutputMode get_output_mode() const { return m_mode; }
+
 private:
     HtsFilePtr m_file;
     SamHdrPtr m_header;

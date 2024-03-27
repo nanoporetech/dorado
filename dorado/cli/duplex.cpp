@@ -18,6 +18,9 @@
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
 #include "utils/duplex_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
@@ -357,7 +360,7 @@ int duplex(int argc, char* argv[]) {
         spdlog::debug("> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());
-        cli::add_pg_hdr(hdr.get(), args);
+        cli::add_pg_hdr(hdr.get(), args, device);
 
         constexpr int WRITER_THREADS = 4;
         utils::HtsFile hts_file("-", output_mode, WRITER_THREADS);
@@ -366,15 +369,19 @@ int duplex(int argc, char* argv[]) {
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
+        std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+        gpu_names = utils::get_cuda_gpu_names(device);
+#endif
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
             auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
