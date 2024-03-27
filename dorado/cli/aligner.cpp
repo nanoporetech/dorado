@@ -204,6 +204,8 @@ int aligner(int argc, char* argv[]) {
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
+    progress_stats.set_post_processing_percentage(0.5f);
+    progress_stats.start();
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
@@ -242,6 +244,9 @@ int aligner(int argc, char* argv[]) {
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);
+        if (progress_stats_frequency > 0) {
+            tracker.disable_progress_reporting();
+        }
         tracker.set_description("Aligning");
 
         // Set up stats counting
@@ -273,9 +278,10 @@ int aligner(int argc, char* argv[]) {
         hts_file.finalise(
                 [&](size_t progress) {
                     tracker.update_post_processing_progress(static_cast<float>(progress));
+                    progress_stats.update_post_processing_progress(static_cast<float>(progress));
                 },
                 writer_threads, true);
-
+        progress_stats.notify_post_processing_completed();
         tracker.summarize();
 
         spdlog::info("> finished alignment");

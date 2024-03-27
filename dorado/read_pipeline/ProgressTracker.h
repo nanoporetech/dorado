@@ -29,6 +29,12 @@ public:
     void update_progress_bar(const stats::NamedStats& stats);
     void update_post_processing_progress(float progress);
 
+    // Disable the update of progress information during processing
+    // This is useful since progres is not reported using spdlog
+    // so it may interleave.
+    // Note, summarize will not be disbaled as it uses spdlog to report.
+    void disable_progress_reporting();
+
 private:
     void internal_set_progress(float progress, bool post_processing);
 
@@ -60,16 +66,23 @@ private:
     const bool m_duplex;
 
 #ifdef _WIN32
-    indicators::ProgressBar m_progress_bar;
+    indicators::ProgressBar m_progress_bar {
 #else
-    indicators::BlockProgressBar m_progress_bar;
+    indicators::BlockProgressBar m_progress_bar{
 #endif
+        indicators::option::Stream{std::cerr}, indicators::option::BarWidth{30},
+                indicators::option::ShowElapsedTime{true},
+                indicators::option::ShowRemainingTime{true},
+                indicators::option::ShowPercentage{true},
+    };
 
     float m_last_progress_written = -1.f;
 
     // What % of time is going to be spent in post-processing.
     const float m_post_processing_percentage;
     float m_last_post_processing_progress = -1.f;
+
+    bool m_is_progress_reporting_disabled{false};
 };
 
 }  // namespace dorado
