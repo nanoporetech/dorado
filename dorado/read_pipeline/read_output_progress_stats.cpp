@@ -101,6 +101,10 @@ void ReadOutputProgressStats::join_report_thread() {
 }
 
 void ReadOutputProgressStats::start() {
+    if (is_disabled()) {
+        return;
+    }
+
     m_reporting_thread = std::thread([this] {
         std::unique_lock lock(m_mutex);
         m_monitoring_start_time = progress_clock::now();
