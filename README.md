@@ -165,6 +165,8 @@ $ dorado duplex hac,5mCG_5hmCG pod5s/ > duplex.bam
 ```
 More information on how hemi-methylation calls are represented can be found in [page 7 of the SAM specification document (version aa7440d)](https://samtools.github.io/hts-specs/SAMtags.pdf) and [Modkit documentation](https://nanoporetech.github.io/modkit/intro_pileup_hemi.html).
 
+Note that duplex basecalling is currently non-determinisitic in nature, i.e. duplex rates and the duplex reads generated can vary from run to run. This variation is expected to be small - within 2-3% of each other. We plan to address this in a future release.
+
 ### Alignment
 
 Dorado supports aligning existing basecalls or producing aligned output directly.
@@ -182,6 +184,7 @@ When reading from an input folder, `dorado align` also supports emitting aligned
 $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder>
 ```
 
+An alignment summary containing alignment statistics for each read can be generated with the `--emit-summary` option. The file will be saved in the `--output-dir` folder.
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
@@ -257,6 +260,8 @@ SQK-RPB004_barcode03.bam
 ...
 unclassified.bam
 ```
+
+A summary file listing each read and its classified barcode can be generated with the `--emit-summary` option in `dorado demux`. The file will be saved in the `--output-dir` folder.
 
 #### Demuxing mapped reads
 
