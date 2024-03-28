@@ -259,6 +259,9 @@ int demuxer(int argc, char* argv[]) {
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(0, false, 1.f);
+    if (progress_stats_frequency > 0) {
+        tracker.disable_progress_reporting();
+    }
     tracker.set_description("Demuxing");
 
     // Set up stats counting
@@ -269,6 +272,9 @@ int demuxer(int argc, char* argv[]) {
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::single_collector);
+    progress_stats.set_post_processing_percentage(0.4f);
+    progress_stats.start();
+
     stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
         progress_stats.update_stats(stats);
     });
@@ -298,17 +304,18 @@ int demuxer(int argc, char* argv[]) {
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
+    progress_stats.notify_stats_collector_completed(final_stats);
 
     // Finalise the files that were created.
     tracker.set_description("Sorting output files");
     demux_writer_ref.finalise_hts_files(
             [&](size_t progress) {
                 tracker.update_post_processing_progress(static_cast<float>(progress));
+                progress_stats.update_post_processing_progress(static_cast<float>(progress));
             },
             sort_bam);
 
     tracker.summarize();
-    progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();
 
     spdlog::info("> finished barcode demuxing");
