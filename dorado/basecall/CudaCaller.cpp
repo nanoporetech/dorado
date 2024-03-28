@@ -341,7 +341,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             time = std::min(time, time_this_iteration);
             handle_cuda_result(cudaEventDestroy(start));
             handle_cuda_result(cudaEventDestroy(stop));
-            spdlog::debug("iteration:{}, ms/chunk {:8f} ms", i, time_this_iteration);
+            spdlog::trace("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
+                          time_this_iteration);
         }
 
         spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size, time);
@@ -358,21 +359,27 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     // Find the first batch size that was under the threshold.
     const float threshold_time = best_time * (1 + batch_size_time_penalty);
     auto under_threshold = [threshold_time](auto pair) { return pair.first <= threshold_time; };
-    auto chosen_batch = std::find_if(times_and_batch_sizes.begin(), times_and_batch_sizes.end(),
-                                     under_threshold);
-    if (chosen_batch == times_and_batch_sizes.end()) {
+    auto largest_usable_batch = std::find_if(times_and_batch_sizes.begin(),
+                                             times_and_batch_sizes.end(), under_threshold);
+    if (largest_usable_batch == times_and_batch_sizes.end()) {
         // This should be impossible.
         // Sanity check only, to avoid segfault or misleading behavior if there is a bug.
         throw std::out_of_range("Error in batch size selection algorithm.");
     }
+    spdlog::debug("Largest batch size for {}: {}, time per chunk {:8f} ms", m_device,
+                  largest_usable_batch->second, largest_usable_batch->first);
 
-    const int best_batch_size = chosen_batch->second;
-    spdlog::debug("Chosen batch size {}: {}, time per chunk {:8f} ms", m_device, best_batch_size,
-                  chosen_batch->first);
     for (size_t i = 0; i < m_batch_dims.size(); ++i) {
-        if (best_batch_size <= max_batch_sizes[i]) {
-            m_batch_dims[i].N = best_batch_size;
+        // Pick the largest batch size under the max.
+        int &final_size = m_batch_dims[i].N;
+        const int max_size = max_batch_sizes[i];
+        for (auto it = times_and_batch_sizes.begin(); it != std::next(largest_usable_batch); ++it) {
+            const int batch_size = it->second;
+            if (batch_size <= max_size) {
+                final_size = batch_size;
+            }
         }
+        spdlog::debug("Final batch size for {}[{}]: {}", m_device, i, final_size);
     }
 }
 
