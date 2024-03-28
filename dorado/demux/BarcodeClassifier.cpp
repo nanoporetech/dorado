@@ -745,6 +745,10 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const std::vector<BarcodeCandidateKit>& candidates,
         bool barcode_both_ends,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
+    if (read_seq.length() == 0) {
+        return UNCLASSIFIED;
+    }
+
     const std::string_view fwd = read_seq;
 
     // First find best barcode kit.
