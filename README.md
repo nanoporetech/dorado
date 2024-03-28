@@ -19,10 +19,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.5.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-linux-x64.tar.gz)
- - [dorado-0.5.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-linux-arm64.tar.gz)
- - [dorado-0.5.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-osx-arm64.zip)
- - [dorado-0.5.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.5.2-win64.zip)
+ - [dorado-0.6.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-linux-x64.tar.gz)
+ - [dorado-0.6.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-linux-arm64.tar.gz)
+ - [dorado-0.6.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-osx-arm64.zip)
+ - [dorado-0.6.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-win64.zip)
 
 ## Platforms
 
@@ -117,11 +117,13 @@ The `--no-trim-primers` option can be used to prevent the trimming of primer seq
 
 If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification.
 
-#### Custom Primer Trimming
+The output of `dorado trim` will always be unaligned records, regardless of whether the input is aligned/sorted or not.
 
-The software automatically searches for primer sequences used in ONT kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a fasta file containing the primer sequences you want to search for. The record names of the sequences do not matter. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for. 
+#### Custom primer trimming
 
-### RNA Adapter trimming
+The software automatically searches for primer sequences used in Oxford Nanopore kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a FASTA file containing the primer sequences you want to search for. The record names of the sequences do not matter. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for.
+
+### RNA adapter trimming
 
 Adapters for RNA002 and RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
 
@@ -163,6 +165,7 @@ $ dorado duplex hac,5mCG_5hmCG pod5s/ > duplex.bam
 ```
 More information on how hemi-methylation calls are represented can be found in [page 7 of the SAM specification document (version aa7440d)](https://samtools.github.io/hts-specs/SAMtags.pdf) and [Modkit documentation](https://nanoporetech.github.io/modkit/intro_pileup_hemi.html).
 
+
 ### Alignment
 
 Dorado supports aligning existing basecalls or producing aligned output directly.
@@ -174,12 +177,13 @@ $ dorado aligner <index> <reads>  > aligned.bam
 ```
 where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a folder or file in any HTS format.
 
-When reading from an input folder, `dorado align` also supports emitting aligned files to an output folder, which will preserve the file structure of the inputs:
+When reading from an input folder, `dorado aligner` also supports emitting aligned files to an output folder, which will preserve the file structure of the inputs:
 
 ```
 $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder>
 ```
 
+An alignment summary containing alignment statistics for each read can be generated with the `--emit-summary` option. The file will be saved in the `--output-dir` folder.
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
@@ -223,7 +227,7 @@ $ dorado demux --output-dir <output-dir> --no-classify <input-bam>
 ```
 This will output a BAM file per barcode in the `output-dir`.
 
-The barcode information is reflected in the BAM `RG` header too. Therefore demuxing is also possible through `samtools split`. e.g.
+The barcode information is reflected in the BAM `RG` header too. Therefore demultiplexing is also possible through `samtools split`. e.g.
 ```
 $ samtools split -u <output-dir>/unclassified.bam -f "<output-dir>/<prefix>_%!.bam" <input-bam>
 ```
@@ -241,6 +245,8 @@ $ dorado demux --kit-name <kit-name> --output-dir <output-folder-for-demuxed-bam
 
 This results in multiple BAM files being generated in the output folder, one per barcode (formatted as `KITNAME_BARCODEXX.bam`) and one for all unclassified reads. As with the in-line mode, `--no-trim` and `--barcode-both-ends` are also available as additional options.
 
+If the input file is aligned/sorted and `--no-trim` is chosen, each of the output barcode-specific BAM files will also be sorted and indexed. However, if trimming is enabled (which is the default), the alignment information is removed and the output BAMs are unaligned. This is done because the alignment tags and positions are invalidated once a sequence is altered.
+
 Here is an example output folder
 
 ```
@@ -254,11 +260,13 @@ SQK-RPB004_barcode03.bam
 unclassified.bam
 ```
 
-#### Demuxing mapped reads
+A summary file listing each read and its classified barcode can be generated with the `--emit-summary` option in `dorado demux`. The file will be saved in the `--output-dir` folder.
+
+#### Demultiplexing mapped reads
 
 If the input data files contain mapping data, this information can be preserved in the output files. To do this, you must use the `--no-trim` option. Trimming the barcodes will invalidate any mapping information that may be contained in the input files, and therefore the application will exclude any mapping information if `--no-trim` is not specified.
 
-It is also possible to get the demux application to sort and index any output bam files that contain mapped reads. To enable this use the `--sort-bam` option. If you use this option then you must also use the `--no-trim` option, as trimming will prevent any mapping information from being included in the output files. Index files (.bai extension) will only be created for bam files that contain mapped reads and were sorted. Note that for large datasets sorting the output files may take a few minutes.
+It is also possible to get `dorado demux` to sort and index any output bam files that contain mapped reads. To enable this, use the `--sort-bam` option. If you use this option then you must also use the `--no-trim` option, as trimming will prevent any mapping information from being included in the output files. Index files (.bai extension) will only be created for BAM files that contain mapped reads and were sorted. Note that for large datasets sorting the output files may take a few minutes.
 
 #### Using a sample sheet
 
