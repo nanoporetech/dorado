@@ -209,6 +209,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                       int requested_chunk_size,
                                       float batch_size_time_penalty) {
     c10::cuda::CUDAGuard device_guard(m_options.device());
+    c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
 
