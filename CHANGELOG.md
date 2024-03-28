@@ -6,7 +6,7 @@ All notable changes to Dorado will be documented in this file.
 
 This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates the minimap2 version and default mapping preset. It also adds GPU information to the output BAM or FASTQ and includes several other improvements and bug fixes.
 
-## New features highlights
+## New feature highlights
 
 1. `--emit-summary` option to generate summary files from `dorado demux` and `dorado aligner`.
 2. Support for loading inputs from/saving outputs to a folder for`dorado demux` and `dorado aligner`
@@ -16,7 +16,7 @@ This release of Dorado improves performance for short read basecalling and RBK b
 ## Changes to default behavior
 
 1. Default mapping preset for `dorado aligner` updated to `lr:hq`.
-2. `dorado trim` and `dorado demux` to output unaligned records by default (i.e. all alignment information such as tags and headers removed).
+2. `dorado trim` and `dorado demux` now output unaligned records by default (i.e. all alignment information such as tags and headers removed).
 
 ## Backwards incompatible changes
 
