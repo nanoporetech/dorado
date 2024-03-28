@@ -6,6 +6,7 @@
 #include "utils/module_utils.h"
 
 #include <ATen/core/TensorBody.h>
+#include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
 #include <torch/nn/modules/container/parameterlist.h>
 
@@ -79,10 +80,11 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const basecall::CRFModelConfig &config);
+    TxEncoderStackImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x) { return stack->forward(x); };
-    at::Tensor build_attn_window_mask(const basecall::CRFModelConfig &config) const;
+    at::Tensor build_attn_window_mask(const basecall::CRFModelConfig &config,
+                                      const at::TensorOptions &options) const;
 
     const at::Tensor attn_window_mask;
     torch::nn::Sequential stack{nullptr};
@@ -91,7 +93,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const basecall::tx::TxEncoderParams &params);
+    LinearUpsampleImpl(const basecall::tx::EncoderUpsampleParams &params);
 
     at::Tensor forward(at::Tensor x);
 
@@ -112,7 +114,7 @@ struct LinearScaledCRFImpl : torch::nn::Module {
 TORCH_MODULE(LinearScaledCRF);
 
 struct TxModelImpl : torch::nn::Module {
-    explicit TxModelImpl(const basecall::CRFModelConfig &config);
+    explicit TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights, {});
@@ -124,6 +126,8 @@ struct TxModelImpl : torch::nn::Module {
     TxEncoderStack tx_encoder{nullptr};
     LinearUpsample tx_decoder{nullptr};
     LinearScaledCRF crf{nullptr};
+
+    const at::TensorOptions m_options;
 };
 
 TORCH_MODULE(TxModel);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <toml/value.hpp>
+
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -71,23 +73,29 @@ enum SampleType {
     RNA004,
 };
 
+struct BasecallerParams {
+    size_t batchsize;
+    size_t chunksize;
+    size_t overlap;
+
+    std::string to_string() const;
+};
+
 namespace tx {
 
 struct TxEncoderParams {
-    //  The number of expected features in the encoder/decoder inputs
-    int d_model;
+    // The number of expected features in the encoder/decoder inputs
+    int d_model{-1};
     // The number of heads in the multi-head attention (MHA) models
-    int nhead;
+    int nhead{-1};
     // The number of transformer layers
-    int depth;
-    // Linear upsample scale factor
-    int scale_factor;
+    int depth{-1};
+    // The dimension of the feedforward model
+    int dim_feedforward{-1};
 
     // Pair of ints defining (possibly asymmetric) sliding attention window mask
-    std::pair<int, int> attn_window;
+    std::pair<int, int> attn_window{-1, -1};
 
-    // The dimension of the feedforward model
-    int dim_feedforward() const { return int(d_model * (2.0f / 3.0f) / 32) * 32; }
     // The deepnorm normalisation alpha parameter
     float deepnorm_alpha() const { return float(pow(float(2 * depth), 0.25f)); }
     // The deepnorm normalisation beta constant
@@ -96,27 +104,33 @@ struct TxEncoderParams {
     std::string to_string() const;
 };
 
-struct BasecallerParams {
-    int batchsize;
-    int chunksize;
-    int overlap;
+struct EncoderUpsampleParams {
+    // The number of expected features in the encoder/decoder inputs
+    int d_model;
+    // Linear upsample scale factor
+    int scale_factor;
 
     std::string to_string() const;
 };
 
 struct CRFEncoderParams {
-    int output_stride;
+    int insize;
     int n_base;
     int state_len;
-    std::optional<float> blank_score;
+    float scale;
+    float blank_score;
+    bool expand_blanks;
 
     std::string to_string() const;
 };
 
 struct Params {
-    BasecallerParams basecaller;
     TxEncoderParams tx;
+    EncoderUpsampleParams upsample;
     CRFEncoderParams crf;
+
+    // Self consistency check
+    void check() const;
 };
 
 }  // namespace tx
@@ -153,6 +167,9 @@ struct CRFModelConfig {
     // convolution layer params
     std::vector<ConvParams> convs;
 
+    // Basecaller params
+    BasecallerParams basecaller;
+
     // Tx Model Params
     std::optional<tx::Params> tx = std::nullopt;
 
@@ -164,10 +181,13 @@ struct CRFModelConfig {
     std::string to_string() const;
 };
 
+std::optional<toml::value> toml_get(const toml::value& value,
+                                    const std::vector<std::string>& fields);
+
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);
 
-CRFModelConfig load_model_config(const std::filesystem::path& path);
+CRFModelConfig load_model_config(const std::filesystem::path& path, const BasecallerParams& bcp);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);

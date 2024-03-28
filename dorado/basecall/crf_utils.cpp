@@ -255,7 +255,7 @@ ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
 
 ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
                                       const at::TensorOptions &options) {
-    auto model = nn::TxModel(model_config);
+    auto model = nn::TxModel(model_config, options);
     auto state_dict = load_tx_model_weights(model_config.model_path);
     model->load_state_dict(state_dict);
     model->to(options.dtype().toScalarType());
