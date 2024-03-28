@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.6.0] (28 Mar 2024)
+# [0.6.0] (1 April 2024)
 
 This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates the minimap2 version and default mapping preset. It also adds GPU information to the output BAM or FASTQ and includes several other improvements and bug fixes.
 
@@ -22,7 +22,7 @@ This release of Dorado improves performance for short read basecalling and RBK b
 
 1. New scoring parameters for barcode classification to support an updated classification algorithm. Older scoring config files will no longer be compatible.
 
-All key changes are listed below:
+## All key changes
 
 * dc22d7f21215082796e972760db68cbaa3faf242 - Update method for barcode classification
 * e65eaf4d4dee3d85d5eee007013c9a8815f4aaa2 - Improve basecalling speed on short reads
