@@ -20,7 +20,7 @@ This release of Dorado improves performance for short read basecalling and RBK b
 
 ## Backwards incompatible changes
 
-1. New scoring parameters for barcode classification to support an updated classification algorithm. Older scoring config files no longer be compatible.
+1. New scoring parameters for barcode classification to support an updated classification algorithm. Older scoring config files will no longer be compatible.
 
 All key changes are listed below:
 
