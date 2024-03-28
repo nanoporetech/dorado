@@ -39,7 +39,7 @@ variables:
     - osx_arm64
     - xcode-14.2
   variables:
-    MACOSX_DEPLOYMENT_TARGET: "12.0"
+    MACOSX_DEPLOYMENT_TARGET: "11.0"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
