@@ -1,6 +1,7 @@
 #include "plasmid_poly_tail_calculator.h"
 
 #include "read_pipeline/messages.h"
+#include "utils/PostCondition.h"
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>
@@ -14,7 +15,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     const std::string& rear_flank = m_config.plasmid_rear_flank;
     const std::string& front_flank_rc = m_config.rc_plasmid_front_flank;
     const std::string& rear_flank_rc = m_config.rc_plasmid_rear_flank;
-    const int threshold = m_config.flank_threshold;
+    const float threshold = m_config.flank_threshold;
 
     std::string_view seq_view = std::string_view(read.read_common.seq);
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
@@ -22,23 +23,38 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     align_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult fwd_v1 = edlibAlign(front_flank.data(), int(front_flank.length()),
-                                         seq_view.data(), int(seq_view.length()), align_config);
-    EdlibAlignResult fwd_v2 = edlibAlign(rear_flank.data(), int(rear_flank.length()),
-                                         seq_view.data(), int(seq_view.length()), align_config);
+    EdlibAlignResult fwd_front = edlibAlign(front_flank.data(), int(front_flank.length()),
+                                            seq_view.data(), int(seq_view.length()), align_config);
+    EdlibAlignResult fwd_rear = edlibAlign(rear_flank.data(), int(rear_flank.length()),
+                                           seq_view.data(), int(seq_view.length()), align_config);
 
     // Check for reverse strand.
-    EdlibAlignResult rev_v1 = edlibAlign(rear_flank_rc.data(), int(rear_flank_rc.length()),
-                                         seq_view.data(), int(seq_view.length()), align_config);
-    EdlibAlignResult rev_v2 = edlibAlign(front_flank_rc.data(), int(front_flank_rc.length()),
-                                         seq_view.data(), int(seq_view.length()), align_config);
+    EdlibAlignResult rev_front = edlibAlign(rear_flank_rc.data(), int(rear_flank_rc.length()),
+                                            seq_view.data(), int(seq_view.length()), align_config);
+    EdlibAlignResult rev_rear = edlibAlign(front_flank_rc.data(), int(front_flank_rc.length()),
+                                           seq_view.data(), int(seq_view.length()), align_config);
 
-    auto scores = {fwd_v1.editDistance, fwd_v2.editDistance, rev_v1.editDistance,
-                   rev_v2.editDistance};
+    auto clear_edlib_results =
+            utils::PostCondition([&fwd_front, &fwd_rear, &rev_front, &rev_rear]() {
+                edlibFreeAlignResult(fwd_front);
+                edlibFreeAlignResult(fwd_rear);
+                edlibFreeAlignResult(rev_front);
+                edlibFreeAlignResult(rev_rear);
+            });
+
+    float fwd_front_score = fwd_front.editDistance / float(front_flank.length());
+    float fwd_rear_score = fwd_rear.editDistance / float(rear_flank.length());
+    float rev_front_score = rev_front.editDistance / float(rear_flank_rc.length());
+    float rev_rear_score = rev_rear.editDistance / float(front_flank_rc.length());
+
+    spdlog::trace("Flank scores: fwd_front {} fwd_rear {}, rev_front {}, rev_rear {}",
+                  fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score);
+
+    auto scores = {fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score};
 
     if (std::none_of(std::begin(scores), std::end(scores),
                      [threshold](auto val) { return val < threshold; })) {
-        spdlog::trace("{} flank edit distance too high {}", read.read_common.read_id,
+        spdlog::trace("{} flank score too high {}", read.read_common.read_id,
                       *std::min_element(std::begin(scores), std::end(scores)));
         return {false, -1, 0, false};
     }
@@ -46,42 +62,54 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     bool fwd = std::distance(std::begin(scores),
                              std::min_element(std::begin(scores), std::end(scores))) < 2;
 
-    EdlibAlignResult& front_result = fwd ? fwd_v1 : rev_v1;
-    EdlibAlignResult& rear_result = fwd ? fwd_v2 : rev_v2;
+    float front_result_score = fwd ? fwd_front_score : rev_front_score;
+    float rear_result_score = fwd ? fwd_rear_score : rev_rear_score;
+    EdlibAlignResult& front_result = fwd ? fwd_front : rev_front;
+    EdlibAlignResult& rear_result = fwd ? fwd_rear : rev_rear;
 
     // good flank detection with the front and rear in order is the only configuration
     // where we can be sure we haven't cleaved the tail
-    bool whole_tail = front_result.editDistance < threshold &&
-                      rear_result.editDistance < threshold &&
-                      front_result.endLocations[0] < rear_result.startLocations[0];
+    bool split_tail = front_result_score < threshold && rear_result_score < threshold &&
+                      rear_result.endLocations[0] < front_result.startLocations[0];
 
-    int base_anchor = front_result.endLocations[0];
-    if (front_result.editDistance - rear_result.editDistance > threshold) {
-        // front sequence cleaved?
-        base_anchor = rear_result.startLocations[0];
+    if (split_tail) {
+        spdlog::trace("{} split tail found - not supported yet", read.read_common.read_id);
+        return {false, -1, 0, false};
     }
 
+    int base_anchor = -1;
     size_t trailing_tail_bases = 0;
     if (fwd) {
-        if (fwd_v1.editDistance < threshold) {
+        if (fwd_front_score < fwd_rear_score) {
+            base_anchor = front_result.endLocations[0];
+            spdlog::trace("Using fwd front flank as anchor");
+        } else {
+            base_anchor = rear_result.startLocations[0];
+            spdlog::trace("Using fwd rear flank as anchor");
+        }
+
+        if (fwd_front_score < threshold) {
             trailing_tail_bases += dorado::utils::count_trailing_chars(front_flank, 'A');
         }
-        if (fwd_v2.editDistance < threshold) {
+        if (fwd_rear_score < threshold) {
             trailing_tail_bases += dorado::utils::count_leading_chars(rear_flank, 'A');
         }
     } else {
-        if (rev_v1.editDistance < threshold) {
+        if (rev_front_score < rev_rear_score) {
+            base_anchor = front_result.endLocations[0];
+            spdlog::trace("Using rev front flank as anchor");
+        } else {
+            base_anchor = rear_result.startLocations[0];
+            spdlog::trace("Using rev rear flank as anchor");
+        }
+
+        if (rev_front_score < threshold) {
             trailing_tail_bases += dorado::utils::count_trailing_chars(rear_flank_rc, 'T');
         }
-        if (rev_v2.editDistance < threshold) {
+        if (rev_rear_score < threshold) {
             trailing_tail_bases += dorado::utils::count_leading_chars(front_flank_rc, 'T');
         }
     }
-
-    edlibFreeAlignResult(fwd_v1);
-    edlibFreeAlignResult(fwd_v2);
-    edlibFreeAlignResult(rev_v1);
-    edlibFreeAlignResult(rev_v2);
 
     const auto stride = read.read_common.model_stride;
     const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
@@ -89,7 +117,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
                                                             read.read_common.seq.size() + 1);
     int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
-    return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), !whole_tail};
+    return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), split_tail};
 }
 
 }  // namespace dorado::poly_tail
