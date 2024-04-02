@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,12 +32,12 @@ struct BarcodingInfo {
 };
 
 std::shared_ptr<const BarcodingInfo> create_barcoding_info(
-        const std::vector<std::string> &kit_names,
+        const std::vector<std::string>& kit_names,
         bool barcode_both_ends,
         bool trim_barcode,
         BarcodingInfo::FilterSet allowed_barcodes,
-        const std::optional<std::string> &custom_kit,
-        const std::optional<std::string> &custom_seqs);
+        const std::optional<std::string>& custom_kit,
+        const std::optional<std::string>& custom_seqs);
 
 struct BarcodeScoreResult {
     int penalty = -1;
@@ -79,22 +80,62 @@ struct ReadGroup {
 };
 
 struct BamDestructor {
-    void operator()(bam1_t *);
+    void operator()(bam1_t*);
 };
-using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
+
+class BamMessagePtr {
+    std::unique_ptr<bam1_t, BamDestructor> m_bam;
+
+public:
+    BamMessagePtr() : m_bam() {}
+    BamMessagePtr(bam1_t* bam_data) : m_bam(bam_data) {}
+    BamMessagePtr(BamMessagePtr&& rhs) : m_bam(std::move(rhs.m_bam)) {}
+
+    void swap(BamMessagePtr& rhs) { m_bam.swap(rhs.m_bam); }
+    bam1_t* release() { return m_bam.release(); }
+    void reset(bam1_t* p = nullptr) { m_bam.reset(p); }
+    bam1_t* get() const { return m_bam.get(); }
+    bam1_t& operator*() const { return *m_bam; }
+    const std::unique_ptr<bam1_t, BamDestructor>& operator->() const { return m_bam; }
+    BamMessagePtr& operator=(BamMessagePtr&& other) {
+        m_bam = std::exchange(other.m_bam, nullptr);
+        return *this;
+    }
+
+    friend bool operator<(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam < rhs.m_bam;
+    }
+    friend bool operator<=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam <= rhs.m_bam;
+    }
+    friend bool operator>(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam > rhs.m_bam;
+    }
+    friend bool operator>=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam >= rhs.m_bam;
+    }
+    friend bool operator==(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam == rhs.m_bam;
+    }
+    friend bool operator!=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
+        return lhs.m_bam != rhs.m_bam;
+    }
+};
+
+using BamPtr = BamMessagePtr;
 
 struct MmTbufDestructor {
-    void operator()(mm_tbuf_s *);
+    void operator()(mm_tbuf_s*);
 };
 using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
 
 struct SamHdrDestructor {
-    void operator()(sam_hdr_t *);
+    void operator()(sam_hdr_t*);
 };
 using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 struct HtsFileDestructor {
-    void operator()(htsFile *);
+    void operator()(htsFile*);
 };
 using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
 
