@@ -3,6 +3,7 @@
 #include "dna_poly_tail_calculator.h"
 #include "plasmid_poly_tail_calculator.h"
 #include "poly_tail_config.h"
+#include "read_pipeline/messages.h"
 #include "rna_poly_tail_calculator.h"
 #include "utils/sequence_utils.h"
 

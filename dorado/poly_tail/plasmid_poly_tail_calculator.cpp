@@ -1,5 +1,6 @@
 #include "plasmid_poly_tail_calculator.h"
 
+#include "read_pipeline/messages.h"
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>

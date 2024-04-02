@@ -1,11 +1,15 @@
 #pragma once
 
 #include "poly_tail_config.h"
-#include "read_pipeline/messages.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace dorado {
+class SimplexRead;
+}
 
 namespace dorado::poly_tail {
 

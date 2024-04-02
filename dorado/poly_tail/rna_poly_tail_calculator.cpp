@@ -1,5 +1,6 @@
 #include "rna_poly_tail_calculator.h"
 
+#include "read_pipeline/messages.h"
 #include "utils/math_utils.h"
 
 #include <algorithm>
