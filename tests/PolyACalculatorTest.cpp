@@ -37,7 +37,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, is_rna, 1000, nullptr);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, is_rna, 1000, "");
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -69,7 +69,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, false, 1000, &config);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, false, 1000, config);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -100,7 +100,7 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
 
     SECTION("Check failure with non-existent file.") {
         const std::string missing_file = "foo_bar_baz";
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&missing_file),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(missing_file),
                           "Failed to open file foo_bar_baz");
     }
 

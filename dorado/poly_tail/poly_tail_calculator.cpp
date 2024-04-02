@@ -233,7 +233,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
 
 std::unique_ptr<PolyTailCalculator> PolyTailCalculatorFactory::create(
         bool is_rna,
-        const std::string* const config_file) {
+        const std::string& config_file) {
     auto config = prepare_config(config_file);
     if (is_rna) {
         return std::make_unique<RNAPolyTailCalculator>(std::move(config));

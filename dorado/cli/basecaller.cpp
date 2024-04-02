@@ -119,7 +119,7 @@ void setup(std::vector<std::string> args,
            const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
-           const std::string* const polya_config,
+           const std::string& polya_config,
            const ModelSelection& model_selection) {
     const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
@@ -682,8 +682,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
-              polya_config.empty() ? nullptr : &polya_config, model_selection);
+              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
+              model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

@@ -12,7 +12,7 @@ public:
     struct PolyTailSettings {
         bool active{false};
         bool is_rna{false};
-        const std::string* config_file{nullptr};
+        std::string config_file{};
     };
 
     DefaultClientInfo() = default;

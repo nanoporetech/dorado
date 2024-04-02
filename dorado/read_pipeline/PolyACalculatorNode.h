@@ -17,7 +17,7 @@ public:
     PolyACalculatorNode(size_t num_worker_threads,
                         bool is_rna,
                         size_t max_reads,
-                        const std::string *const config_file);
+                        const std::string &config_file);
     ~PolyACalculatorNode() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;
