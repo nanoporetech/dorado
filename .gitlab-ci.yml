@@ -209,6 +209,7 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
+    - .linux_dependencies
     - .linux_runner
     - .build_and_test_dorado
 
