@@ -37,7 +37,8 @@ public:
 
     // Finalisation must occur before destruction of this node.
     // Note that this isn't safe to call until after this node has been terminated.
-    void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback);
+    void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback,
+                            bool sort_bam);
 
 private:
     std::filesystem::path m_output_dir;

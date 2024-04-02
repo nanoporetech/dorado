@@ -88,7 +88,8 @@ void BarcodeDemuxerNode::set_header(const sam_hdr_t* const header) {
 }
 
 void BarcodeDemuxerNode::finalise_hts_files(
-        const utils::HtsFile::ProgressCallback& progress_callback) {
+        const utils::HtsFile::ProgressCallback& progress_callback,
+        bool sort_if_mapped) {
     const size_t num_files = m_files.size();
     size_t current_file_idx = 0;
     for (auto& [bc, hts_file] : m_files) {
@@ -98,7 +99,7 @@ void BarcodeDemuxerNode::finalise_hts_files(
                     const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
                     progress_callback(total_progress);
                 },
-                m_htslib_threads);
+                m_htslib_threads, sort_if_mapped);
         ++current_file_idx;
     }
 

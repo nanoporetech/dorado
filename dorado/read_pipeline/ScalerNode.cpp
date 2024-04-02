@@ -147,6 +147,8 @@ void ScalerNode::input_thread_fn() {
                 // If RNA adapter isn't trimmed, track where the adapter signal is ending
                 // so it can be used during polyA estimation.
                 read->read_common.rna_adapter_end_signal_pos = trim_start;
+                // Since we're not actualy trimming the signal, reset the trim value to 0.
+                trim_start = 0;
             }
         }
 

@@ -145,7 +145,7 @@ int trim(int argc, char* argv[]) {
     hts_file.set_and_write_header(header.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads, true,
                                                 !parser.get<bool>("--no-trim-primers"),
@@ -185,7 +185,7 @@ int trim(int argc, char* argv[]) {
             [&](size_t progress) {
                 tracker.update_post_processing_progress(static_cast<float>(progress));
             },
-            trim_writer_threads);
+            trim_writer_threads, false);
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");

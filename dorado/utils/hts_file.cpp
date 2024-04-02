@@ -28,6 +28,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads) :
         m_file.reset(hts_open(filename.c_str(), "wf"));
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
         break;
     case OutputMode::BAM: {
         auto file = filename;
@@ -73,7 +74,9 @@ HtsFile::~HtsFile() {
 // in order to generate a map of sort coordinates to virtual file offsets. we can then jump around in the
 // file to write out the records in the sorted order. finally we can delete the unsorted file.
 // in case an error occurs, the unsorted file is left on disk, so users can recover their data.
-void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_threads) {
+void HtsFile::finalise(const ProgressCallback& progress_callback,
+                       int writer_threads,
+                       bool sort_if_mapped) {
     assert(progress_callback);
 
     // Rough divisions of how far through we are at the start of each section.
@@ -120,7 +123,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
 
         SamHdrPtr in_header(sam_hdr_read(in_file.get()));
         file_is_mapped = (sam_hdr_nref(in_header.get()) > 0);
-        if (file_is_mapped) {
+        if (file_is_mapped && sort_if_mapped) {
             // We only need to sort and index the file if contains mapped reads.
             HtsFilePtr out_file(hts_open(filepath.string().c_str(), "wb"));
             if (bgzf_mt(out_file->fp.bgzf, writer_threads, 128) < 0) {
@@ -177,7 +180,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback, int writer_thr
         }
     }
 
-    if (file_is_mapped) {
+    if (file_is_mapped && sort_if_mapped) {
         progress_callback(percent_start_indexing);
         if (sam_index_build(filepath.string().c_str(), 0) < 0) {
             spdlog::error("Failed to build index for file {}", filepath.string());

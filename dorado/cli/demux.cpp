@@ -107,7 +107,15 @@ int demuxer(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--no-trim")
-            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .help("Skip barcode trimming. If this option is not chosen, trimming is enabled. "
+                  "Note that you should use this option if your input data is mapped and you "
+                  "want to preserve the mapping in the output files, as trimming will result "
+                  "in any mapping information from the input file(s) being discarded.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.visible.add_argument("--sort-bam")
+            .help("Sort any BAM output files that contain mapped reads. Using this option "
+                  "requires that the --no-trim option is also set.")
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--barcode-arrangement")
@@ -133,6 +141,13 @@ int demuxer(int argc, char* argv[]) {
         std::exit(1);
     }
 
+    auto no_trim(parser.visible.get<bool>("--no-trim"));
+    auto sort_bam(parser.visible.get<bool>("--sort-bam"));
+    if (sort_bam && !no_trim) {
+        spdlog::error("If --sort-bam is specified then --no-trim must also be specified.");
+        std::exit(1);
+    }
+
     auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
     if (progress_stats_frequency > 0) {
         utils::EnsureInfoLoggingEnabled(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
@@ -146,7 +161,6 @@ int demuxer(int argc, char* argv[]) {
     auto emit_summary = parser.visible.get<bool>("emit-summary");
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto no_trim(parser.visible.get<bool>("--no-trim"));
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -245,6 +259,9 @@ int demuxer(int argc, char* argv[]) {
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(0, false, 1.f);
+    if (progress_stats_frequency > 0) {
+        tracker.disable_progress_reporting();
+    }
     tracker.set_description("Demuxing");
 
     // Set up stats counting
@@ -255,6 +272,9 @@ int demuxer(int argc, char* argv[]) {
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::single_collector);
+    progress_stats.set_post_processing_percentage(0.4f);
+    progress_stats.start();
+
     stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
         progress_stats.update_stats(stats);
     });
@@ -284,15 +304,18 @@ int demuxer(int argc, char* argv[]) {
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
+    progress_stats.notify_stats_collector_completed(final_stats);
 
     // Finalise the files that were created.
     tracker.set_description("Sorting output files");
-    demux_writer_ref.finalise_hts_files([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
+    demux_writer_ref.finalise_hts_files(
+            [&](size_t progress) {
+                tracker.update_post_processing_progress(static_cast<float>(progress));
+                progress_stats.update_post_processing_progress(static_cast<float>(progress));
+            },
+            sort_bam);
 
     tracker.summarize();
-    progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();
 
     spdlog::info("> finished barcode demuxing");
