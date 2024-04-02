@@ -28,6 +28,7 @@ void PolyACalculatorNode::input_thread_fn() {
         const auto& calculator = read->read_common.client_info->poly_a_calculator();
         if (!calculator) {
             send_message_to_sink(std::move(read));
+            num_not_called++;
             continue;
         }
 
