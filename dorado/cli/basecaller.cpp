@@ -11,6 +11,7 @@
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -221,8 +222,7 @@ void setup(std::vector<std::string> args,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config), 1000, polya_config);
+                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
@@ -321,6 +321,12 @@ void setup(std::vector<std::string> args,
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
+
+    DefaultClientInfo::PolyTailSettings polytail_settings{estimate_poly_a,
+                                                          is_rna_model(model_config), polya_config};
+    auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
+    auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };
+    loader.add_read_initialiser(func);
 
     // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);

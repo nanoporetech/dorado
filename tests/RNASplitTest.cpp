@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "splitter/RNAReadSplitter.h"
 
@@ -27,6 +28,7 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     const auto signal_path = std::filesystem::path(get_data_dir("rna_split")) / "signal.tensor";
     torch::load(read->read_common.raw_data, signal_path.string());
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     dorado::splitter::RNASplitSettings splitter_settings;
     dorado::splitter::RNAReadSplitter splitter_node(splitter_settings);

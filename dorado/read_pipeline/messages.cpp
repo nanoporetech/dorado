@@ -1,6 +1,5 @@
 #include "messages.h"
 
-#include "DefaultClientInfo.h"
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
@@ -20,8 +19,6 @@ uint64_t SimplexRead::get_end_time_ms() const {
            ((end_sample - start_sample) * 1000) /
                    read_common.sample_rate;  //TODO get rid of the trimmed thing?
 }
-
-ReadCommon::ReadCommon() : client_info(std::make_shared<DefaultClientInfo>()) {}
 
 std::string ReadCommon::generate_read_group() const {
     std::string read_group;

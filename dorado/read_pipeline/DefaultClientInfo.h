@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ClientInfo.h"
+#include "poly_tail/poly_tail_calculator.h"
 
 namespace dorado {
 
@@ -17,7 +18,7 @@ public:
 
     DefaultClientInfo() = default;
     DefaultClientInfo(const PolyTailSettings& polytail_settings);
-    ~DefaultClientInfo();
+    ~DefaultClientInfo() = default;
 
     const AlignmentInfo& alignment_info() const override { return empty_alignment_info; }
     const std::unique_ptr<const poly_tail::PolyTailCalculator>& poly_a_calculator() const override {

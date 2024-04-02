@@ -2,6 +2,7 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
@@ -33,6 +34,8 @@ auto make_read(int delay_ms, std::string seq) {
             dorado::utils::get_string_timestamp_from_unix_time(read->read_common.start_time_ms);
     read->read_common.qstring = std::string(seq.length(), '~');
     read->read_common.seq = std::move(seq);
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+
     return read;
 }
 
