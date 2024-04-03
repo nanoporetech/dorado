@@ -135,10 +135,13 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
-                                             "\" from device string " + device_string +
-                                             ", there are " + std::to_string(num_devices) +
-                                             " visible CUDA devices.");
+                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
+                                                     .append(device_id)
+                                                     .append("\" from device string ")
+                                                     .append(device_string)
+                                                     .append(", there are ")
+                                                     .append(std::to_string(num_devices))
+                                                     .append(" visible CUDA devices."));
                 }
                 devices.push_back("cuda:" + device_id);
             }

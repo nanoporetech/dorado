@@ -94,7 +94,7 @@ struct CRFModelImpl : torch::nn::Module {
     explicit CRFModelImpl(const CRFModelConfig &config);
     void load_state_dict(const std::vector<at::Tensor> &weights);
 #if DORADO_CUDA_BUILD
-    at::Tensor run_koi(at::Tensor in);
+    at::Tensor run_koi(const at::Tensor &in);
 #endif
 
     at::Tensor forward(const at::Tensor &x);

@@ -27,7 +27,8 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path root_path("./tests/data/");
 #endif
 
-    const auto data_path = root_path / sub_dir;
+    // clang-tidy warns about performance-no-automatic-move if |data_path| is const. It should be treated as such though.
+    /*const*/ auto data_path = root_path / sub_dir;
     if (!std::filesystem::exists(data_path)) {
         std::cerr << "Datapath " << data_path
                   << " does not exist, exiting.\n"

@@ -24,7 +24,8 @@ namespace dorado::basecall {
 static constexpr float GB = 1.0e9f;
 
 struct CudaCaller::NNTask {
-    NNTask(at::Tensor input_, int num_chunks_) : input(input_), num_chunks(num_chunks_) {}
+    NNTask(at::Tensor input_, int num_chunks_)
+            : input(std::move(input_)), num_chunks(num_chunks_) {}
     at::Tensor input;
     int num_chunks;
     decode::DecodeData out;

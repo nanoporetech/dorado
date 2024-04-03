@@ -509,7 +509,7 @@ void DataLoader::load_read_channels(const std::filesystem::path& data_path,
                     // Store the read_id in the channel's list.
                     ReadID read_id;
                     std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
-                    channel_to_read_id[channel].push_back(std::move(read_id));
+                    channel_to_read_id[channel].push_back(read_id);
 
                     char read_id_tmp[POD5_READ_ID_LEN];
                     if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {

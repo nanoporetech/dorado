@@ -75,7 +75,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without mods variant: {}", matches.size(), description,
                          to_string(mods.variant));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - mods variant: {}", m.name, to_string(m.mods.variant));
             }
         }
@@ -86,7 +86,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without mods version: {}", matches.size(), description,
                          to_string(mods.ver));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - mods version: {}", m.name, to_string(m.mods.ver));
             }
         }
@@ -102,7 +102,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without model variant: {}", matches.size(),
                          description, to_string(model.variant));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - model variant: {}", m.name, to_string(m.simplex.variant));
             }
         }
@@ -113,7 +113,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without model version: {}", matches.size(),
                          description, to_string(model.ver));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - model version: {}", m.name, to_string(m.simplex.ver));
             }
         }

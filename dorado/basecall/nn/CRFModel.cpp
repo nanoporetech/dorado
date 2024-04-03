@@ -754,7 +754,7 @@ void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
 }
 
 #if DORADO_CUDA_BUILD
-at::Tensor CRFModelImpl::run_koi(at::Tensor in) {
+at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
     // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
 

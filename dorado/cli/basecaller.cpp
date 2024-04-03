@@ -192,7 +192,7 @@ void setup(const std::vector<std::string>& args,
             utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
                                                    custom_barcodes, sample_sheet.get());
         } else {
-            const auto kit_info = get_barcode_kit_info(barcode_kit);
+            const auto& kit_info = get_barcode_kit_info(barcode_kit);
             utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
                                                    custom_barcodes, sample_sheet.get());
         }
