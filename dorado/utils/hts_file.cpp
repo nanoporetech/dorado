@@ -83,8 +83,9 @@ uint64_t HtsFile::calculate_sorting_key(const bam1_t* record) {
 
 void HtsFile::set_buffer_size(size_t buff_size) {
     if (buff_size < MINIMUM_BUFFER_SIZE) {
-        throw std::runtime_error(
-                "The buffer size for sorted BAM output must be at least 100,000,000 (100 MB).");
+        throw std::runtime_error("The buffer size for sorted BAM output must be at least " +
+                                 std::to_string(MINIMUM_BUFFER_SIZE) + " (" +
+                                 std::to_string(MINIMUM_BUFFER_SIZE / 1000) + " KB).");
     }
     m_buffer_size = buff_size;
     m_bam_buffer.resize(m_buffer_size);
