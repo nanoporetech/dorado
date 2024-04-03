@@ -9,6 +9,7 @@
     -   time git submodule update --init --recursive
     -   pushd dorado
     -     time git checkout ${CI_COMMIT_SHA}
+    -     time git submodule update --init --recursive
     -   popd
     - popd
     # Do the build
