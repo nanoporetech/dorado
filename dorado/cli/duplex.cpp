@@ -10,6 +10,7 @@
 #include "models/models.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/DuplexReadTaggingNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -406,6 +407,11 @@ int duplex(int argc, char* argv[]) {
 
         constexpr auto kStatsPeriod = 100ms;
 
+        auto default_client_info = std::make_shared<DefaultClientInfo>();
+        auto client_info_init_func = [default_client_info](ReadCommon& read) {
+            read.client_info = default_client_info;
+        };
+
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
                 spdlog::error("The --pairs argument is required for the basespace model.");
@@ -419,6 +425,10 @@ int duplex(int argc, char* argv[]) {
 
             spdlog::info("> Loading reads");
             auto read_map = read_bam(reads, read_list_from_pairs);
+
+            for (auto& [key, read] : read_map) {
+                client_info_init_func(read->read_common);
+            }
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -541,6 +551,7 @@ int duplex(int argc, char* argv[]) {
             hts_file.set_and_write_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
+            loader.add_read_initialiser(client_info_init_func);
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);

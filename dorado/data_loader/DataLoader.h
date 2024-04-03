@@ -6,6 +6,7 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -70,12 +71,19 @@ public:
         uint32_t read_number;
     };
 
+    using ReadInitialiserF = std::function<void(ReadCommon&)>;
+    void add_read_initialiser(ReadInitialiserF func) {
+        m_read_initialisers.push_back(std::move(func));
+    }
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
     void load_read_channels(std::filesystem::path data_path, bool recursive_file_loading);
+
+    void initialise_read(ReadCommon& read) const;
 
     Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
@@ -89,6 +97,8 @@ private:
     std::unordered_map<int, std::vector<ReadSortInfo>> m_reads_by_channel;
     std::unordered_map<std::string, size_t> m_read_id_to_index;
     int m_max_channel{0};
+
+    std::vector<ReadInitialiserF> m_read_initialisers;
 
     // Issue warnings if read is potentially problematic
     inline void check_read(const SimplexReadPtr& read);

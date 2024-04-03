@@ -3,6 +3,7 @@
 #include "dna_poly_tail_calculator.h"
 #include "plasmid_poly_tail_calculator.h"
 #include "poly_tail_config.h"
+#include "read_pipeline/messages.h"
 #include "rna_poly_tail_calculator.h"
 #include "utils/sequence_utils.h"
 
@@ -233,7 +234,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
 
 std::unique_ptr<PolyTailCalculator> PolyTailCalculatorFactory::create(
         bool is_rna,
-        const std::string* const config_file) {
+        const std::string& config_file) {
     auto config = prepare_config(config_file);
     if (is_rna) {
         return std::make_unique<RNAPolyTailCalculator>(std::move(config));

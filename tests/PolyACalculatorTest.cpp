@@ -1,6 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "poly_tail/poly_tail_config.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "utils/sequence_utils.h"
 
@@ -37,7 +38,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, is_rna, 1000, nullptr);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, 1000);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -52,6 +53,9 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
+    dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
+
     // Push a Read type.
     pipeline->push_message(std::move(read));
 
@@ -69,7 +73,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, false, 1000, &config);
+    pipeline_desc.add_node<PolyACalculatorNode>({sink}, 2, 1000);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -84,6 +88,9 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     read->read_common.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
+    dorado::DefaultClientInfo::PolyTailSettings settings{true, false, config};
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
+
     // Push a Read type.
     pipeline->push_message(std::move(read));
 
@@ -100,7 +107,7 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
 
     SECTION("Check failure with non-existent file.") {
         const std::string missing_file = "foo_bar_baz";
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(&missing_file),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(missing_file),
                           "Failed to open file foo_bar_baz");
     }
 

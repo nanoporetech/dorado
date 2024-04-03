@@ -1,11 +1,15 @@
 #pragma once
 
 #include "poly_tail_config.h"
-#include "read_pipeline/messages.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace dorado {
+class SimplexRead;
+}
 
 namespace dorado::poly_tail {
 
@@ -67,8 +71,7 @@ protected:
 
 class PolyTailCalculatorFactory {
 public:
-    static std::unique_ptr<PolyTailCalculator> create(bool is_rna,
-                                                      const std::string* const config_file);
+    static std::unique_ptr<PolyTailCalculator> create(bool is_rna, const std::string& config_file);
 };
 
 }  // namespace dorado::poly_tail

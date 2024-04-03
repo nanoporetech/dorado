@@ -1,6 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Aligner.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/HtsReader.h"
@@ -28,11 +29,17 @@ namespace {
 
 class TestClientInfo : public dorado::ClientInfo {
     const dorado::AlignmentInfo m_align_info;
+    const std::unique_ptr<const dorado::poly_tail::PolyTailCalculator> m_calculator;
 
 public:
     TestClientInfo(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
 
     int32_t client_id() const override { return 1; }
+
+    const std::unique_ptr<const dorado::poly_tail::PolyTailCalculator>& poly_a_calculator()
+            const override {
+        return m_calculator;
+    };
 
     const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
 
