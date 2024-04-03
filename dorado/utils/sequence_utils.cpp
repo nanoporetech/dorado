@@ -265,24 +265,24 @@ OverlapResult compute_overlap(const std::string& query_seq, const std::string& t
     OverlapResult overlap_result = {false, 0, 0, 0, 0};
 
     // Add mm2 based overlap check.
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
+    mm_idxopt_t idx_opt;
+    mm_mapopt_t map_opt;
+    mm_set_opt(0, &idx_opt, &map_opt);
+    mm_set_opt("map-hifi", &idx_opt, &map_opt);
 
     std::vector<const char*> seqs = {query_seq.c_str()};
     std::vector<const char*> names = {"query"};
-    mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
-                                   seqs.data(), names.data());
-    mm_mapopt_update(&m_map_opt, m_index);
+    mm_idx_t* index =
+            mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs.data(), names.data());
+    mm_mapopt_update(&map_opt, index);
 
     MmTbufPtr mbuf = MmTbufPtr(mm_tbuf_init());
 
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, int(target_seq.length()), target_seq.c_str(), &hits,
-                            mbuf.get(), &m_map_opt, "target");
+    mm_reg1_t* reg = mm_map(index, int(target_seq.length()), target_seq.c_str(), &hits, mbuf.get(),
+                            &map_opt, "target");
 
-    mm_idx_destroy(m_index);
+    mm_idx_destroy(index);
 
     if (hits > 0) {
         int32_t target_start = 0;

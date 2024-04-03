@@ -111,26 +111,25 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
     PairingResult pair_result = {false, 0, 0, 0, 0};
     const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
     nvtx3::scoped_range loop{nvtx_id};
+
     // Add mm2 based overlap check.
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
+    mm_idxopt_t idx_opt;
+    mm_mapopt_t map_opt;
+    mm_set_opt(0, &idx_opt, &map_opt);
+    mm_set_opt("map-hifi", &idx_opt, &map_opt);
 
     std::vector<const char*> seqs = {temp.read_common.seq.c_str()};
     std::vector<const char*> names = {temp.read_common.read_id.c_str()};
-    mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
-                                   seqs.data(), names.data());
-    mm_mapopt_update(&m_map_opt, m_index);
+    mm_idx_t* index =
+            mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs.data(), names.data());
+    mm_mapopt_update(&map_opt, index);
 
     mm_tbuf_t* tbuf = m_tbufs[tid].get();
-
     int hits = 0;
-    mm_reg1_t* reg =
-            mm_map(m_index, int(comp.read_common.seq.length()), comp.read_common.seq.c_str(), &hits,
-                   tbuf, &m_map_opt, comp.read_common.read_id.c_str());
+    mm_reg1_t* reg = mm_map(index, int(comp.read_common.seq.length()), comp.read_common.seq.c_str(),
+                            &hits, tbuf, &map_opt, comp.read_common.read_id.c_str());
 
-    mm_idx_destroy(m_index);
+    mm_idx_destroy(index);
 
     // When there are multiple hits, pick the primary alignment.
     if (hits > 0) {
