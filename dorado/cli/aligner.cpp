@@ -218,7 +218,7 @@ int aligner(int argc, char* argv[]) {
 
         add_pg_hdr(header);
 
-        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads);
+        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, false);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
@@ -238,7 +238,7 @@ int aligner(int argc, char* argv[]) {
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-        hts_file.set_and_write_header(header);
+        hts_file.set_header(header);
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);
@@ -270,11 +270,9 @@ int aligner(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         tracker.set_description("Sorting output files");
-        hts_file.finalise(
-                [&](size_t progress) {
-                    tracker.update_post_processing_progress(static_cast<float>(progress));
-                },
-                writer_threads);
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
 
         tracker.summarize();
 

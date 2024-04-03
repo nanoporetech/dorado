@@ -67,8 +67,8 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         file = std::make_unique<utils::HtsFile>(
                 filepath_str,
                 m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::BAM,
-                m_htslib_threads);
-        file->set_and_write_header(m_header.get());
+                m_htslib_threads, false);
+        file->set_header(m_header.get());
     }
 
     auto hts_res = file->write(record);
@@ -92,13 +92,11 @@ void BarcodeDemuxerNode::finalise_hts_files(
     const size_t num_files = m_files.size();
     size_t current_file_idx = 0;
     for (auto& [bc, hts_file] : m_files) {
-        hts_file->finalise(
-                [&](size_t progress) {
-                    // Give each file/barcode the same contribution to the total progress.
-                    const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
-                    progress_callback(total_progress);
-                },
-                m_htslib_threads);
+        hts_file->finalise([&](size_t progress) {
+            // Give each file/barcode the same contribution to the total progress.
+            const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
+            progress_callback(total_progress);
+        });
         ++current_file_idx;
     }
 

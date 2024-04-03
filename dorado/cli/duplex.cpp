@@ -360,7 +360,7 @@ int duplex(int argc, char* argv[]) {
         cli::add_pg_hdr(hdr.get(), args);
 
         constexpr int WRITER_THREADS = 4;
-        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS);
+        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS, false);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
@@ -427,7 +427,7 @@ int duplex(int argc, char* argv[]) {
             }
 
             // Write header as no read group info is needed.
-            hts_file.set_and_write_header(hdr.get());
+            hts_file.set_header(hdr.get());
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -531,7 +531,7 @@ int duplex(int argc, char* argv[]) {
                         dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_file.set_and_write_header(hdr.get());
+            hts_file.set_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
 
@@ -555,11 +555,9 @@ int duplex(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         tracker.set_description("Sorting output files");
-        hts_file.finalise(
-                [&](size_t progress) {
-                    tracker.update_post_processing_progress(static_cast<float>(progress));
-                },
-                WRITER_THREADS);
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
 
         tracker.summarize();
         if (!dump_stats_file.empty()) {
