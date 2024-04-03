@@ -1,0 +1,38 @@
+# Build jobs for testing ont_core compatibility
+
+.test_ont_core_compatibility:
+  stage: build
+  script:
+    # Clone the repo
+    - time git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@${ONT_CORE_REPO_URL} ont_core_cpp
+    - pushd ont_core_cpp
+    -   time git submodule update --init --recursive
+    -   pushd dorado
+    -     time git checkout ${CI_COMMIT_SHA}
+    -     time git submodule update --init --recursive
+    -   popd
+    - popd
+    # Do the build
+    - !reference [.set_parallel_jobs]
+    - !reference [.setup_ccache]
+    - cmake --preset ${BUILD_PRESET} -S ont_core_cpp -B ${BUILD_DIR}
+    - cmake --build ${BUILD_DIR} -j ${PARALLEL_JOBS}
+    # Run the tests
+    - ctest --test-dir ${BUILD_DIR} --output-on-failure --verbose
+
+build:linux:x86:focal:ont_core:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_PRESET: "linux-x64-gpu-conan_gcc9-dorado-release"
+  extends:
+    - .linux_runner
+    - .test_ont_core_compatibility
+    - .on_nightly_or_manual
+
+build:macos:arm:ont_core:
+  variables:
+    BUILD_PRESET: "macos-aarch64-cpu-conan-dorado-release"
+  extends:
+    - .macos_arm_runner
+    - .test_ont_core_compatibility
+    - .on_nightly_or_manual
