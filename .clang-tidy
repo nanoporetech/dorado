@@ -11,4 +11,4 @@ HeaderFilterRegex: 'dorado/(alignment|cli|data_loader|decode|demux|modbase|model
 
 CheckOptions:
   - key:    performance-move-const-arg.CheckTriviallyCopyableMove
-    value:  false
+    value:  0
