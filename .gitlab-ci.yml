@@ -1,6 +1,7 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
   - local: .gitlab/benchmarks-ci.yml
+  - local: .gitlab/build-ont_core.yml
 
 workflow:
   rules:
