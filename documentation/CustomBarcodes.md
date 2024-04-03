@@ -17,7 +17,7 @@ A double-ended barcode with different flanks and barcode sequences for front and
 
 ## Specification Format
 
-The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTQ` file.
+The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTA` file.
 
 ### Arrangement File
 

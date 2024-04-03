@@ -278,7 +278,7 @@ In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado
 
 ### Poly(A) tail estimation
 
-Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences and estimation of interrupted tails can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
+Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag.
 
 Note that if this option is used, then adapter/primer/barcode trimming will be automatically **disabled** for DNA.
 
