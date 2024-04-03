@@ -407,8 +407,7 @@ int duplex(int argc, char* argv[]) {
 
         constexpr auto kStatsPeriod = 100ms;
 
-        DefaultClientInfo::PolyTailSettings polytail_settings;
-        auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
+        auto default_client_info = std::make_shared<DefaultClientInfo>();
         auto client_info_init_func = [default_client_info](ReadCommon& read) {
             read.client_info = default_client_info;
         };
