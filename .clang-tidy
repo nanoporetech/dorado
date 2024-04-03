@@ -10,4 +10,5 @@ WarningsAsErrors: '*'
 HeaderFilterRegex: 'dorado/(alignment|cli|data_loader|decode|demux|modbase|models|nn|read_pipeline|splitter|utils)'
 
 CheckOptions:
-  performance-move-const-arg.CheckTriviallyCopyableMove: false
+  - key:    performance-move-const-arg.CheckTriviallyCopyableMove
+    value:  false
