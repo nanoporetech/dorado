@@ -22,6 +22,9 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -176,7 +179,7 @@ void setup(std::vector<std::string> args,
     }
 
     SamHdrPtr hdr(sam_hdr_init());
-    cli::add_pg_hdr(hdr.get(), args);
+    cli::add_pg_hdr(hdr.get(), args, device);
 
     if (barcode_enabled) {
         std::unordered_map<std::string, std::string> custom_barcodes{};
@@ -199,7 +202,11 @@ void setup(std::vector<std::string> args,
     utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+    std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+    gpu_names = utils::get_cuda_gpu_names(device);
+#endif
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {

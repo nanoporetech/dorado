@@ -59,6 +59,8 @@ public:
         }
     };
 
+    OutputMode get_output_mode() const { return m_mode; }
+
 private:
     std::string m_filename;
     HtsFilePtr m_file;

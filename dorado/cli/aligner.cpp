@@ -34,6 +34,8 @@ using namespace std::chrono_literals;
 
 namespace {
 
+constexpr size_t BAM_BUFFER_SIZE = 1000000000;  // 1 GB
+
 std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         const std::string& filename,
         const dorado::alignment::Minimap2Options& options,
@@ -204,6 +206,8 @@ int aligner(int argc, char* argv[]) {
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
+    progress_stats.set_post_processing_percentage(0.5f);
+    progress_stats.start();
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
@@ -218,10 +222,14 @@ int aligner(int argc, char* argv[]) {
 
         add_pg_hdr(header);
 
-        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, false);
-
+        bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
+                         file_info.output != "-");
+        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, sort_bam);
+        if (sort_bam) {
+            hts_file.set_buffer_size(BAM_BUFFER_SIZE);
+        }
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
                                                            bed_file, options, aligner_threads);
 
@@ -242,6 +250,9 @@ int aligner(int argc, char* argv[]) {
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);
+        if (progress_stats_frequency > 0) {
+            tracker.disable_progress_reporting();
+        }
         tracker.set_description("Aligning");
 
         // Set up stats counting
@@ -274,6 +285,7 @@ int aligner(int argc, char* argv[]) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
         });
 
+        progress_stats.notify_post_processing_completed();
         tracker.summarize();
 
         spdlog::info("> finished alignment");

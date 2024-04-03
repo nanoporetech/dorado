@@ -26,7 +26,8 @@ public:
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        bool write_fastq,
-                       std::unique_ptr<const utils::SampleSheet> sample_sheet);
+                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                       bool sort_bam);
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -50,6 +51,7 @@ private:
     void input_thread_fn();
     int write(bam1_t* record);
     bool m_write_fastq{false};
+    bool m_sort_bam{false};
     std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 

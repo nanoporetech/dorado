@@ -16,7 +16,7 @@ void erase_progress_bar_line() {
     if (dorado::utils::is_fd_tty(stderr)) {
         // Erase the current line so that we remove the previous description.
 #ifndef _WIN32
-        // I would use indicators::erase_line() here, but it hardcodes stdout.
+        // I would use indicators::erase_progress_bar_line() here, but it hardcodes stdout.
         std::cerr << "\r\033[K";
 #endif
     }
@@ -29,11 +29,6 @@ namespace dorado {
 ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_duplex(duplex),
-          m_progress_bar(indicators::option::Stream{std::cerr},
-                         indicators::option::BarWidth{30},
-                         indicators::option::ShowElapsedTime{true},
-                         indicators::option::ShowRemainingTime{true},
-                         indicators::option::ShowPercentage{true}),
           m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }
@@ -41,12 +36,17 @@ ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_proces
 ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::set_description(const std::string& desc) {
-    erase_progress_bar_line();
-    m_progress_bar.set_option(indicators::option::PostfixText{desc});
+    if (!m_is_progress_reporting_disabled) {
+        erase_progress_bar_line();
+        m_progress_bar.set_option(indicators::option::PostfixText{desc});
+    }
 }
 
 void ProgressTracker::summarize() const {
-    erase_progress_bar_line();
+    if (!m_is_progress_reporting_disabled) {
+        erase_progress_bar_line();
+    }
+
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
@@ -173,8 +173,10 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
             internal_set_progress(progress, false);
         }
     } else {
-        std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
-        std::cerr << "\r";
+        if (!m_is_progress_reporting_disabled) {
+            std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
+            std::cerr << "\r";
+        }
     }
 
     // Collect per barcode stats.
@@ -209,7 +211,7 @@ void ProgressTracker::update_post_processing_progress(float progress) {
 
 void ProgressTracker::internal_set_progress(float progress, bool post_processing) {
     // The progress bar uses escape sequences that only TTYs understand.
-    if (!utils::is_fd_tty(stderr)) {
+    if (m_is_progress_reporting_disabled || !utils::is_fd_tty(stderr)) {
         return;
     }
 
@@ -233,5 +235,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
 #endif
     std::cerr << "\r";
 }
+
+void ProgressTracker::disable_progress_reporting() { m_is_progress_reporting_disabled = true; }
 
 }  // namespace dorado

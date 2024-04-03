@@ -11,17 +11,27 @@
 #include <stdexcept>
 #include <string>
 
+namespace {
+constexpr size_t BAM_BUFFER_SIZE =
+        20000000;  // 20 MB per barcode classification. So roughly 2 GB for 96 barcodes.
+}
+
 namespace dorado {
 
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
-                                       std::unique_ptr<const utils::SampleSheet> sample_sheet)
+                                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                       bool sort_bam)
         : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
           m_write_fastq(write_fastq),
+          m_sort_bam(sort_bam),
           m_sample_sheet(std::move(sample_sheet)) {
+    if (write_fastq) {
+        sort_bam = false;
+    }
     std::filesystem::create_directories(m_output_dir);
     start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this);
 }
@@ -67,7 +77,10 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         file = std::make_unique<utils::HtsFile>(
                 filepath_str,
                 m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::BAM,
-                m_htslib_threads, false);
+                m_htslib_threads, m_sort_bam);
+        if (m_sort_bam) {
+            file->set_buffer_size(BAM_BUFFER_SIZE);
+        }
         file->set_header(m_header.get());
     }
 

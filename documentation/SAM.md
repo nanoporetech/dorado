@@ -4,7 +4,7 @@
 
 ```
 @HD     VN:1.6  SO:unknown
-@PG     ID:basecaller   PN:dorado       VN:0.2.4+3fc2b0f        CL:dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5/
+@PG     ID:basecaller   PN:dorado       VN:0.2.4+3fc2b0f        CL:dorado basecaller dna_r10.4.1_e8.2_400bps_hac@v4.1.0 pod5/        DS:gpu:Quadro GV100
 ```
 
 #### Read Group Header
