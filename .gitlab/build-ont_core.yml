@@ -4,7 +4,7 @@
   stage: build
   script:
     # Clone the repo
-    - time git clone --depth 1 ${ONT_CORE_REPO_URL} ont_core_cpp
+    - time git clone --depth 1 https://gitlab-ci-token:${GITLAB_CI_TOKEN}@${ONT_CORE_REPO_URL} ont_core_cpp
     - pushd ont_core_cpp
     -   time git submodule update --init --recursive
     -   pushd dorado
