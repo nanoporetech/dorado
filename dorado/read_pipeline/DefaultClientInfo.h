@@ -21,8 +21,8 @@ public:
     ~DefaultClientInfo() = default;
 
     const AlignmentInfo& alignment_info() const override { return empty_alignment_info; }
-    const std::unique_ptr<const poly_tail::PolyTailCalculator>& poly_a_calculator() const override {
-        return m_poly_a_calculator;
+    const poly_tail::PolyTailCalculator* poly_a_calculator() const override {
+        return m_poly_a_calculator.get();
     };
 
     int32_t client_id() const override { return -1; }
