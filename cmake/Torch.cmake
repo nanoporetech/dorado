@@ -283,14 +283,6 @@ if (USING_STATIC_TORCH_LIB)
         )
 
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # Older versions of cmake don't have the static_nocallback target for cuFFT that Torch needs, so we
-        # make it ourselves.
-        if (TARGET CUDA::cufft_static_nocallback)
-            set(ont_cufft_static_libs CUDA::cufft_static_nocallback)
-        else()
-            set(ont_cufft_static_libs ${CUDAToolkit_TARGET_DIR}/lib64/libcufft_static_nocallback.a)
-        endif()
-
         # Some CUDA lib symbols have internal linkage, so they must be part of the helper lib too
         set(ont_cuda_internal_linkage_libs CUDA::culibos CUDA::cudart_static)
         if (TARGET CUDA::cupti_static)
@@ -387,7 +379,7 @@ if (USING_STATIC_TORCH_LIB)
                 CUDA::cudart_static
                 CUDA::cublas_static
                 CUDA::cublasLt_static
-                ${ont_cufft_static_libs}
+                CUDA::cufft_static_nocallback
                 CUDA::cusolver_static
                 CUDA::cusparse_static
                 ${ont_cuda_internal_linkage_libs}
