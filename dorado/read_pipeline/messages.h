@@ -35,8 +35,6 @@ class ClientInfo;
 
 class ReadCommon {
 public:
-    ReadCommon();
-
     at::Tensor raw_data;  // Loaded from source file
 
     int model_stride{-1};  // The down sampling factor of the model

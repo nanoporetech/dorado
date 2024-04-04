@@ -855,6 +855,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
         for (auto& v : futures) {
             auto read = v.get();
+            initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
@@ -914,6 +915,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
+            initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
@@ -1021,9 +1023,16 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=
                                     m_allowed_read_ids->end())) {
+            initialise_read(new_read->read_common);
             m_pipeline.push_message(std::move(new_read));
             m_loaded_read_count++;
         }
+    }
+}
+
+void DataLoader::initialise_read(ReadCommon& read_common) const {
+    for (auto initialiser : m_read_initialisers) {
+        initialiser(read_common);
     }
 }
 

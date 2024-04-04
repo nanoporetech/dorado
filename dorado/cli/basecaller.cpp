@@ -11,6 +11,7 @@
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -119,7 +120,7 @@ void setup(std::vector<std::string> args,
            const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
-           const std::string* const polya_config,
+           const std::string& polya_config,
            const ModelSelection& model_selection) {
     const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
@@ -221,8 +222,7 @@ void setup(std::vector<std::string> args,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config), 1000, polya_config);
+                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
@@ -321,6 +321,12 @@ void setup(std::vector<std::string> args,
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
+
+    DefaultClientInfo::PolyTailSettings polytail_settings{estimate_poly_a,
+                                                          is_rna_model(model_config), polya_config};
+    auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
+    auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };
+    loader.add_read_initialiser(func);
 
     // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);
@@ -680,8 +686,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
-              polya_config.empty() ? nullptr : &polya_config, model_selection);
+              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
+              model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/ReadSplitNode.h"
@@ -49,6 +50,7 @@ auto make_read() {
     torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
     read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     read->prev_read = "prev";
     read->next_read = "next";
@@ -195,6 +197,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.raw_data =
             at::zeros(read->read_common.seq.length() * 10).to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -244,6 +247,8 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
     read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+
     dorado::PipelineDescriptor pipeline_desc;
 
     std::vector<dorado::Message> messages;

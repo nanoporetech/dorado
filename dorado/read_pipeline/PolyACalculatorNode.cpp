@@ -1,5 +1,7 @@
 #include "PolyACalculatorNode.h"
 
+#include "ClientInfo.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -23,18 +25,25 @@ void PolyACalculatorNode::input_thread_fn() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        auto signal_info = m_calculator->determine_signal_anchor_and_strand(*read);
+        const auto& calculator = read->read_common.client_info->poly_a_calculator();
+        if (!calculator) {
+            send_message_to_sink(std::move(read));
+            num_not_called++;
+            continue;
+        }
+
+        auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
 
         if (signal_info.signal_anchor >= 0) {
-            int num_bases = m_calculator->calculate_num_bases(*read, signal_info);
+            int num_bases = calculator->calculate_num_bases(*read, signal_info);
             if (signal_info.split_tail) {
                 auto split_bases = std::max(
-                        0, m_calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0,
-                                                                     0, signal_info.split_tail}));
+                        0, calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
+                                                                   signal_info.split_tail}));
                 num_bases += split_bases;
             }
 
-            if (num_bases > 0 && num_bases < m_calculator->max_tail_length()) {
+            if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
                 ++num_called;
@@ -55,12 +64,8 @@ void PolyACalculatorNode::input_thread_fn() {
     }
 }
 
-PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads,
-                                         bool is_rna,
-                                         size_t max_reads,
-                                         const std::string* const config_file)
-        : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
-          m_calculator(poly_tail::PolyTailCalculatorFactory::create(is_rna, config_file)) {
+PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_reads)
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {
     start_input_processing(&PolyACalculatorNode::input_thread_fn, this);
 }
 
