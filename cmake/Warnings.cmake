@@ -19,7 +19,7 @@ function(enable_warnings_as_errors TARGET_NAME)
             -Wall -Wextra -Werror -Wundef -Wshadow-all
         )
     else()
-        message(FATAL_ERROR "Unknown compiler: ${(CMAKE_CXX_COMPILER_ID}")
+        message(FATAL_ERROR "Unknown compiler: ${CMAKE_CXX_COMPILER_ID}")
     endif()
 endfunction()
 
