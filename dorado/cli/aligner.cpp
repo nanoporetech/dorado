@@ -283,9 +283,9 @@ int aligner(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         if (!hts_file.finalise_is_noop()) {
-            spdlog::info("> merging temp files");
+            spdlog::info("> merging temporary BAM files");
         }
-        tracker.set_description("Merging temp files");
+        tracker.set_description("Merging temporary BAM files");
         hts_file.finalise([&](size_t progress) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
             progress_stats.update_post_processing_progress(static_cast<float>(progress));
