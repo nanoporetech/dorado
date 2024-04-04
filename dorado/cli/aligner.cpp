@@ -279,8 +279,13 @@ int aligner(int argc, char* argv[]) {
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
         progress_stats.notify_stats_collector_completed(final_stats);
 
+        spdlog::info("> finished alignment");
+
         // Report progress during output file finalisation.
-        tracker.set_description("Merging sorted output files");
+        if (!hts_file.finalise_is_noop()) {
+            spdlog::info("> merging temp files");
+        }
+        tracker.set_description("Merging temp files");
         hts_file.finalise([&](size_t progress) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
         });
@@ -288,7 +293,6 @@ int aligner(int argc, char* argv[]) {
         progress_stats.notify_post_processing_completed();
         tracker.summarize();
 
-        spdlog::info("> finished alignment");
         spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
                      hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }
