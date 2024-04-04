@@ -25,8 +25,7 @@ public:
     virtual ~ClientInfo() = default;
 
     virtual const AlignmentInfo& alignment_info() const = 0;
-    virtual const std::unique_ptr<const poly_tail::PolyTailCalculator>& poly_a_calculator()
-            const = 0;
+    virtual const poly_tail::PolyTailCalculator* poly_a_calculator() const = 0;
 
     virtual int32_t client_id() const = 0;
     virtual bool is_disconnected() const = 0;
