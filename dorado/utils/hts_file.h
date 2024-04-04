@@ -33,6 +33,24 @@ public:
     void finalise(const ProgressCallback& progress_callback);
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
+    OutputMode get_output_mode() const { return m_mode; }
+
+private:
+    std::string m_filename;
+    HtsFilePtr m_file;
+    SamHdrPtr m_header;
+    size_t m_num_records{0};
+    int m_threads{0};
+    bool m_finalised{false};
+    bool m_finalise_is_noop;
+    bool m_sort_bam;
+    const OutputMode m_mode;
+
+    std::vector<std::byte> m_bam_buffer;
+    std::multimap<uint64_t, int64_t> m_buffer_map;
+    std::vector<std::string> m_temp_files;
+    int64_t m_current_buffer_offset{0};
+
     struct ProgressUpdater {
         const ProgressCallback* m_progress_callback{nullptr};
         size_t m_from{0}, m_to{0}, m_max{0}, m_last_progress{0};
@@ -59,29 +77,10 @@ public:
         }
     };
 
-    OutputMode get_output_mode() const { return m_mode; }
-
-private:
-    std::string m_filename;
-    HtsFilePtr m_file;
-    SamHdrPtr m_header;
-    size_t m_num_records{0};
-    int m_threads{0};
-    bool m_finalised{false};
-    bool m_finalise_is_noop;
-    bool m_sort_bam{false};
-    const OutputMode m_mode;
-
-    std::vector<uint8_t> m_bam_buffer;
-    std::multimap<uint64_t, int64_t> m_buffer_map;
-    std::vector<std::string> m_temp_files;
-    int64_t m_current_buffer_offset{0};
-    size_t m_buffer_size{0};
-
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);
-    int cache_record(const bam1_t* record);
-    bool merge_temp_files(ProgressUpdater& update_progress);
+    void cache_record(const bam1_t* record);
+    bool merge_temp_files(ProgressUpdater& update_progress) const;
 };
 
 }  // namespace dorado::utils

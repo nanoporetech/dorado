@@ -222,8 +222,8 @@ int aligner(int argc, char* argv[]) {
 
         add_pg_hdr(header);
 
-        bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
-                         file_info.output != "-");
+        const bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
+                               file_info.output != "-");
         utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, sort_bam);
         if (sort_bam) {
             hts_file.set_buffer_size(BAM_BUFFER_SIZE);
@@ -288,6 +288,7 @@ int aligner(int argc, char* argv[]) {
         tracker.set_description("Merging temp files");
         hts_file.finalise([&](size_t progress) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
+            progress_stats.update_post_processing_progress(static_cast<float>(progress));
         });
 
         progress_stats.notify_post_processing_completed();

@@ -50,8 +50,8 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void input_thread_fn();
     int write(bam1_t* record);
-    bool m_write_fastq{false};
-    bool m_sort_bam{false};
+    const bool m_write_fastq;
+    const bool m_sort_bam;
     std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 

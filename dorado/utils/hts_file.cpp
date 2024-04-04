@@ -19,54 +19,56 @@ constexpr size_t MINIMUM_BUFFER_SIZE = 100000ul;  // The smallest allowed buffer
 }  // namespace
 
 bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& header2) {
-    std::string header_str1(sam_hdr_str(header1.get()));
-    std::string header_str2(sam_hdr_str(header2.get()));
-    return (header_str1 == header_str2);
+    return (strcmp(sam_hdr_str(header1.get()), sam_hdr_str(header2.get())) == 0);
 }
 
 namespace dorado::utils {
 
 HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, bool sort_bam)
-        : m_filename(filename), m_threads(int(threads)), m_sort_bam(sort_bam), m_mode(mode) {
-    switch (mode) {
+        : m_filename(filename),
+          m_threads(int(threads)),
+          m_finalise_is_noop(true),
+          m_sort_bam(sort_bam),
+          m_mode(mode) {
+    switch (m_mode) {
     case OutputMode::FASTQ:
         m_file.reset(hts_open(m_filename.c_str(), "wf"));
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
         break;
-    case OutputMode::BAM: {
-        auto file = m_filename;
-        if (file != "-" && m_sort_bam) {
+    case OutputMode::BAM:
+        if (m_filename != "-" && m_sort_bam) {
             // We're doing sorted BAM output. We need to indicate this for the
             // finalise method.
             m_finalise_is_noop = false;
-            return;
+        } else {
+            m_file.reset(hts_open(m_filename.c_str(), "wb"));
         }
-        m_file.reset(hts_open(file.c_str(), "wb"));
-    } break;
+        break;
     case OutputMode::SAM:
-        m_file.reset(hts_open(filename.c_str(), "w"));
+        m_file.reset(hts_open(m_filename.c_str(), "w"));
         break;
     case OutputMode::UBAM:
-        m_file.reset(hts_open(filename.c_str(), "wb0"));
+        m_file.reset(hts_open(m_filename.c_str(), "wb0"));
         break;
     default:
         throw std::runtime_error("Unknown output mode selected: " +
-                                 std::to_string(static_cast<int>(mode)));
-    }
-    if (!m_file) {
-        throw std::runtime_error("Could not open file: " + filename);
+                                 std::to_string(static_cast<int>(m_mode)));
     }
 
-    if (m_file->format.compression == bgzf) {
-        auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
-        if (res < 0) {
-            throw std::runtime_error("Could not enable multi threading for BAM generation.");
+    if (m_finalise_is_noop) {
+        if (!m_file) {
+            throw std::runtime_error("Could not open file: " + m_filename);
+        }
+
+        if (m_file->format.compression == bgzf) {
+            auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
+            if (res < 0) {
+                throw std::runtime_error("Could not enable multi threading for BAM generation.");
+            }
         }
     }
-
-    m_finalise_is_noop = true;
 }
 
 HtsFile::~HtsFile() {
@@ -87,8 +89,7 @@ void HtsFile::set_buffer_size(size_t buff_size) {
                                  std::to_string(MINIMUM_BUFFER_SIZE) + " (" +
                                  std::to_string(MINIMUM_BUFFER_SIZE / 1000) + " KB).");
     }
-    m_buffer_size = buff_size;
-    m_bam_buffer.resize(m_buffer_size);
+    m_bam_buffer.resize(buff_size);
 }
 
 void HtsFile::flush_temp_file(const bam1_t* last_record) {
@@ -134,8 +135,10 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
                 throw std::out_of_range("Index out of bounds in BAM record buffer.");
             }
         }
-        if (write_to_file(record) < 0) {
-            throw std::runtime_error("Error writing to BAM temporary file.");
+        auto res = write_to_file(record);
+        if (res < 0) {
+            throw std::runtime_error("Error writing to BAM temporary file, error code " +
+                                     std::to_string(res));
         }
     }
     m_file.reset();
@@ -219,7 +222,8 @@ int HtsFile::write(const bam1_t* record) {
     if (m_file) {
         return write_to_file(record);
     }
-    return cache_record(record);
+    cache_record(record);
+    return 0;
 }
 
 int HtsFile::write_to_file(const bam1_t* record) {
@@ -232,15 +236,15 @@ int HtsFile::write_to_file(const bam1_t* record) {
     return sam_write1(m_file.get(), m_header.get(), record);
 }
 
-int HtsFile::cache_record(const bam1_t* record) {
+void HtsFile::cache_record(const bam1_t* record) {
     size_t bytes_required = sizeof(bam1_t) + size_t(record->l_data);
     if (m_current_buffer_offset + bytes_required > m_bam_buffer.size()) {
         // This record won't fit in the buffer, so flush the current buffer, plus this record, to the file.
         flush_temp_file(record);
-        return 0;
+        return;
     }
     auto sorting_key = calculate_sorting_key(record);
-    m_buffer_map.insert({sorting_key, int64_t(m_current_buffer_offset)});
+    m_buffer_map.insert({sorting_key, m_current_buffer_offset});
 
     // Copy the contents of the bam1_t struct into the memory buffer.
     bam1_t* buffer_entry = reinterpret_cast<bam1_t*>(m_bam_buffer.data() + m_current_buffer_offset);
@@ -251,22 +255,25 @@ int HtsFile::cache_record(const bam1_t* record) {
     memcpy(m_bam_buffer.data() + m_current_buffer_offset, record->data, record->l_data);
 
     // We have to tell our buffered object where its copy of the data is.
-    buffer_entry->data = m_bam_buffer.data() + m_current_buffer_offset;
+    buffer_entry->data = reinterpret_cast<uint8_t*>(m_bam_buffer.data() + m_current_buffer_offset);
 
-    // Round up our buffer offset so that the next entry will be 8-byte aligned.
+    // When we write the cached records, we will use a pointer cast to treat the cached record as a bam1_t
+    // object, so we need to round up our buffer offset so that the next entry will be properly aligned.
     m_current_buffer_offset += size_t(record->l_data);
-    m_current_buffer_offset = ((m_current_buffer_offset + 7) / 8) * 8;
-    return 0;
+    auto alignment = alignof(bam1_t);
+    m_current_buffer_offset = ((m_current_buffer_offset + alignment - 1) / alignment) * alignment;
 }
 
-bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) {
+bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
     // This code assumes the headers for the files are all the same. This will be
     // true if the temp-files were created by this class, but it means that this
     // function is not suitable for generic merging of BAM files.
-    std::vector<HtsFilePtr> in_files(m_temp_files.size());
-    std::vector<BamPtr> top_records(m_temp_files.size());
+    const size_t num_temp_files = m_temp_files.size();
+    std::vector<HtsFilePtr> in_files(num_temp_files);
+    std::vector<BamPtr> top_records(num_temp_files);
+    std::vector<uint64_t> top_record_scores(num_temp_files);
     SamHdrPtr header{};
-    for (size_t i = 0; i < m_temp_files.size(); ++i) {
+    for (size_t i = 0; i < num_temp_files; ++i) {
         in_files[i].reset(hts_open(m_temp_files[i].c_str(), "rb"));
         if (bgzf_mt(in_files[i]->fp.bgzf, m_threads, 128) < 0) {
             spdlog::error("Could not enable multi threading for BAM reading.");
@@ -287,9 +294,11 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) {
         top_records[i].reset(bam_init1());
         auto res = sam_read1(in_files[i].get(), header.get(), top_records[i].get());
         if (res < 0) {
-            spdlog::error("Could not read first record from file " + m_temp_files[i]);
+            spdlog::error("Could not read first record from file {}, error code {}",
+                          m_temp_files[i], res);
             return false;
         }
+        top_record_scores[i] = calculate_sorting_key(top_records[i].get());
     }
 
     // Open the output file, and write the header.
@@ -308,13 +317,13 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) {
 
     size_t processed_records = 0;
     size_t files_done = 0;
-    while (files_done < m_temp_files.size()) {
+    while (files_done < num_temp_files) {
         // Find the next file to write a record from.
         uint64_t best_score = std::numeric_limits<uint64_t>::max();
         int best_index = -1;
-        for (size_t i = 0; i < m_temp_files.size(); ++i) {
+        for (size_t i = 0; i < num_temp_files; ++i) {
             if (top_records[i]) {
-                auto score = calculate_sorting_key(top_records[i].get());
+                auto score = top_record_scores[i];
                 if (best_index == -1 || score < best_score) {
                     best_score = score;
                     best_index = int(i);
@@ -327,8 +336,9 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) {
         }
 
         // Write the record.
-        if (sam_write1(out_file.get(), out_header.get(), top_records[best_index].get()) < 0) {
-            spdlog::error("Failed to write to sorted file {}", out_file->fn);
+        auto res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
+        if (res < 0) {
+            spdlog::error("Failed to write to sorted file {}, error code {}", out_file->fn, res);
             return false;
         }
         ++processed_records;
@@ -336,20 +346,23 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) {
 
         // Load the next record for the file.
         top_records[best_index].reset(bam_init1());
-        auto res =
-                sam_read1(in_files[best_index].get(), header.get(), top_records[best_index].get());
-        if (res == -1) {
+        res = sam_read1(in_files[best_index].get(), header.get(), top_records[best_index].get());
+        if (res >= 0) {
+            top_record_scores[best_index] = calculate_sorting_key(top_records[best_index].get());
+        } else if (res == -1) {
             // EOF reached. Close the file and mark that this file is done.
             top_records[best_index].reset();
             in_files[best_index].reset();
             ++files_done;
         } else if (res < -1) {
-            spdlog::error("Error reading record from file {}", in_files[best_index]->fn);
+            spdlog::error("Error reading record from file {}, error code {}",
+                          in_files[best_index]->fn, res);
             return false;
         }
     }
 
-    // Remove the temporary files.
+    // If we got this far, merging was successful, so remove the temporary files.
+    // If we returned early due to a merging failure, the temporary files will remain.
     for (const auto& temp_file : m_temp_files) {
         std::filesystem::remove(temp_file);
     }
