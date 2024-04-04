@@ -24,8 +24,7 @@ using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-RMSNormImpl::RMSNormImpl(int layer_num_, int hidden_size_)
-        : layer_num(layer_num_), hidden_size(hidden_size_) {
+RMSNormImpl::RMSNormImpl(int lrno_, int hidden_size_) : lrno(lrno_), hidden_size(hidden_size_) {
     weight = at::ones({hidden_size});
     register_parameter("weight", weight, false);
 }
@@ -35,8 +34,7 @@ at::Tensor RMSNormImpl::forward(at::Tensor x) {
     return x * rstd * weight;
 }
 
-GatedMLPImpl::GatedMLPImpl(int layer_num_, int in_features, int hidden_features)
-        : layer_num(layer_num_) {
+GatedMLPImpl::GatedMLPImpl(int lrno_, int in_features, int hidden_features) : lrno(lrno_) {
     fc1 = register_module("fc1",
                           Linear(LinearOptions(in_features, 2 * hidden_features).bias(false)));
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
@@ -44,19 +42,22 @@ GatedMLPImpl::GatedMLPImpl(int layer_num_, int in_features, int hidden_features)
 
 at::Tensor GatedMLPImpl::forward(at::Tensor x) {
     const at::Tensor fc1_ = fc1(x);
-    dump_tensor(fc1_,
-                "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn.ff.fc1");
     const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
     const at::Tensor out = fc2(functional::silu(gate).mul(y));
-    dump_tensor(out,
-                "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn.ff.fc2");
+
+    if (lrno == 0) {
+        dump_tensor(fc1_,
+                    "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc1");
+        dump_tensor(out,
+                    "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc2");
+    }
     return out;
 }
 
-RotaryEmbeddingImpl::RotaryEmbeddingImpl(int layer_num_, int dim_, int theta_, int max_seq_len_)
-        : layer_num(layer_num_), dim(dim_), theta(theta_), max_seq_len(max_seq_len_) {
+RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_, int dim_, int theta_, int max_seq_len_)
+        : lrno(lrno_), dim(dim_), theta(theta_), max_seq_len(max_seq_len_) {
     const at::Tensor inv_freq = torch::full({1}, theta, torch::kFloat32)
                                         .pow(torch::arange(0, dim, 2)
                                                      .index({Slice{Idx::None, dim / 2}})
@@ -104,7 +105,7 @@ at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
     // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim) =
     //         (sin_buf * qk_evens) + (cos_buf * qk_odds);
 
-    if (layer_num == 0) {
+    if (lrno == 0) {
         spdlog::debug(shape(cos_buf, name + ".cos_buf"));
         spdlog::debug(shape(sin_buf, name + ".sin_buf"));
         spdlog::debug(shape(qkv, name + ".qkv"));
@@ -114,13 +115,13 @@ at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
     return out;
 }
 
-MultiHeadAttentionImpl::MultiHeadAttentionImpl(int layer_num_,
+MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
                                                int d_model_,
                                                int nhead_,
                                                bool qkv_bias_,
                                                bool out_bias_,
                                                const at::Tensor &attn_window_mask_)
-        : layer_num(layer_num_),
+        : lrno(lrno_),
           d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
@@ -128,8 +129,8 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int layer_num_,
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     // TODO: can max_seq_len 1000 -> attn_window.size()?
-    rotary_emb = register_module(
-            "rotary_emb", RotaryEmbedding(layer_num, head_dim, 10000, attn_window_mask.size(0)));
+    rotary_emb = register_module("rotary_emb",
+                                 RotaryEmbedding(lrno, head_dim, 10000, attn_window_mask.size(0)));
 };
 
 at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
@@ -137,8 +138,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const long int T = x.size(1);
     const long int C = x.size(2);
 
-    const std::string name =
-            "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn";
+    const std::string name = "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn";
     spdlog::debug(shape(x, name + ".x"));
 
     at::Tensor qkv;
@@ -147,14 +147,18 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("QKV", 2);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
-        spdlog::debug(shape(qkv, name + ".qkv"));
-        dump_tensor(qkv, name + ".qkv");
+        if (lrno == 0) {
+            spdlog::debug(shape(qkv, name + ".qkv"));
+            dump_tensor(qkv, name + ".qkv");
+        }
     }
     {
         utils::ScopedProfileRange spr("ROTE", 2);
         qkv = rotary_emb(qkv);
-        spdlog::debug(shape(qkv, name + ".rotary_emb"));
-        dump_tensor(qkv, name + ".rotary_emb");
+        if (lrno == 0) {
+            spdlog::debug(shape(qkv, name + ".rotary_emb"));
+            dump_tensor(qkv, name + ".rotary_emb");
+        }
     }
     {
         utils::ScopedProfileRange spr("MEA", 2);
@@ -165,35 +169,38 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
                               .permute({0, 1, 3, 2, 4})
                               .reshape({N, T, C});
 
-        spdlog::debug(shape(attn_output, name + ".attn_output"));
-        dump_tensor(attn_output, name + ".attn_output");
+        if (lrno == 0) {
+            spdlog::debug(shape(attn_output, name + ".attn_output"));
+            dump_tensor(attn_output, name + ".attn_output");
+        }
     }
     {
         utils::ScopedProfileRange spr("OUTP", 2);
         x = out_proj(attn_output);
-        spdlog::debug(shape(x, name + ".out_proj"));
-        dump_tensor(x, name + ".out_proj");
+        if (lrno == 0) {
+            spdlog::debug(shape(x, name + ".out_proj"));
+            dump_tensor(x, name + ".out_proj");
+        }
     }
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const int layer_num_,
+TxEncoderImpl::TxEncoderImpl(int lrno_,
                              const TxEncoderParams &params,
                              const at::Tensor &attn_window_mask_)
-        : layer_num(layer_num_), attn_window_mask(attn_window_mask_) {
-    self_attn =
-            register_module("self_attn", MultiHeadAttention(layer_num, params.d_model, params.nhead,
-                                                            false, true, attn_window_mask));
-    ff = register_module("ff", GatedMLP(layer_num, params.d_model, params.dim_feedforward));
-    norm1 = register_module("norm1", RMSNorm(layer_num, params.d_model));
-    norm2 = register_module("norm2", RMSNorm(layer_num, params.d_model));
+        : lrno(lrno_), attn_window_mask(attn_window_mask_) {
+    self_attn = register_module("self_attn", MultiHeadAttention(lrno, params.d_model, params.nhead,
+                                                                false, true, attn_window_mask));
+    ff = register_module("ff", GatedMLP(lrno, params.d_model, params.dim_feedforward));
+    norm1 = register_module("norm1", RMSNorm(lrno, params.d_model));
+    norm2 = register_module("norm2", RMSNorm(lrno, params.d_model));
 
     const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha());
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
-    const std::string t_name = "m.encoder.transformer_encoder_" + std::to_string(layer_num);
+    const std::string t_name = "m.encoder.transformer_encoder_" + std::to_string(lrno);
     spdlog::debug(shape(x, t_name + ".x"));
     at::Tensor attn, f;
     {
@@ -275,8 +282,7 @@ at::Tensor LinearScaledCRFImpl::forward(at::Tensor x) {
 
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
-    const auto conv_params = config.convs;
-    convs = register_module("convs", basecall::nn::ConvStack(conv_params));
+    convs = register_module("convs", basecall::nn::ConvStack(config.convs));
 
     const auto tx_enc_params = config.tx->tx;
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config, m_options));
