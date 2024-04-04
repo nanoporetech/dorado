@@ -3,22 +3,14 @@
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
 #include "spdlog/spdlog.h"
+#include "tensor_utils.h"
 #include "utils/gpu_profiling.h"
 
-#include <ATen/core/TensorBody.h>
-#include <ATen/ops/empty.h>
-#include <ATen/ops/full.h>
-#include <ATen/ops/mean.h>
-#include <ATen/ops/ones.h>
-#include <ATen/ops/pow.h>
-#include <ATen/ops/sqrt.h>
-#include <ATen/ops/tensor.h>
-#include <ATen/ops/tril.h>
-#include <ATen/ops/triu.h>
-#include <c10/core/ScalarType.h>
-#include <c10/core/TensorOptions.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/ops/cat.h>
 #include <torch/nn.h>
 
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -32,20 +24,8 @@ using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-std::string shape(const at::Tensor &t, const std::string &name) {
-    std::string str = name + ".shape()={";
-    const auto &sz = t.sizes();
-    for (size_t i = 0; i < sz.size(); ++i) {
-        if (i != 0) {
-            str += ", ";
-        }
-        str += std::to_string(sz[i]);
-    }
-    str += "}";
-    return str;
-}
-
-RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
+RMSNormImpl::RMSNormImpl(int layer_num_, int hidden_size_)
+        : layer_num(layer_num_), hidden_size(hidden_size_) {
     weight = at::ones({hidden_size});
     register_parameter("weight", weight, false);
 }
@@ -55,21 +35,28 @@ at::Tensor RMSNormImpl::forward(at::Tensor x) {
     return x * rstd * weight;
 }
 
-GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
+GatedMLPImpl::GatedMLPImpl(int layer_num_, int in_features, int hidden_features)
+        : layer_num(layer_num_) {
     fc1 = register_module("fc1",
                           Linear(LinearOptions(in_features, 2 * hidden_features).bias(false)));
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
 };
 
 at::Tensor GatedMLPImpl::forward(at::Tensor x) {
-    const std::vector<at::Tensor> chunks = fc1(x).chunk(2, -1);
+    const at::Tensor fc1_ = fc1(x);
+    dump_tensor(fc1_,
+                "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn.ff.fc1");
+    const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
-    return fc2(functional::silu(gate).mul(y));
+    const at::Tensor out = fc2(functional::silu(gate).mul(y));
+    dump_tensor(out,
+                "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn.ff.fc2");
+    return out;
 }
 
-RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_, int theta_, int max_seq_len_)
-        : dim(dim_), theta(theta_), max_seq_len(max_seq_len_) {
+RotaryEmbeddingImpl::RotaryEmbeddingImpl(int layer_num_, int dim_, int theta_, int max_seq_len_)
+        : layer_num(layer_num_), dim(dim_), theta(theta_), max_seq_len(max_seq_len_) {
     const at::Tensor inv_freq = torch::full({1}, theta, torch::kFloat32)
                                         .pow(torch::arange(0, dim, 2)
                                                      .index({Slice{Idx::None, dim / 2}})
@@ -77,133 +64,164 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_, int theta_, int max_seq_len_)
                                                      .div(dim))
                                         .reciprocal();
 
-    const at::Tensor freqs = torch::arange(max_seq_len).reshape({max_seq_len, 1, 1}) * inv_freq;
+    // freqs.shape := {max_seq_len, 1, 1, dim/2}
+    const at::Tensor freqs = torch::arange(max_seq_len).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
 
     register_buffer("cos_freqs", torch::cos(freqs));
     register_buffer("sin_freqs", torch::sin(freqs));
 };
 
-at::Tensor RotaryEmbeddingImpl::forward(at::Tensor x) {
-    const long int seq_len = x.size(1);
+at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
+    const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
+    // Expected shape: N, seq_len, 3, nhead, head_dim
+    const long int seq_len = qkv.size(1);
 
-    at::Tensor out = x.clone();
+    using Slices = std::vector<Idx::TensorIndex>;
+    // The slice of the qk tensors := qkv[..., :2, :, :dim]
+    const Slices qk = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(Idx::None, dim)};
+
+    // evens := x[..., : dim/2]  odds := x[..., dim/2:dim]
+    const Slices evens = {Idx::Ellipsis, Slice(Idx::None, dim / 2)};
+    const Slices odds = {Idx::Ellipsis, Slice(dim / 2, dim)};
 
     const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
     const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
 
-    const at::Tensor evens = x.index({Idx::Ellipsis, Slice{Idx::None, dim, 2}});
-    const at::Tensor odds = x.index({Idx::Ellipsis, Slice{1, dim, 2}});
+    at::Tensor out = qkv.clone();
 
-    out.index({Idx::Ellipsis, Slice{Idx::None, dim, 2}}) = (cos_buf * evens) - (sin_buf * odds);
-    out.index({Idx::Ellipsis, Slice{1, dim, 2}}) = (sin_buf * evens) + (cos_buf * odds);
+    // const at::Tensor qk_evens = qkv.slice(/*dim=*/2, /*start=*/0, /*end=*/2)
+    //                                     .slice(/*dim=*/4, /*start=*/0, /*end=*/dim / 2);
+    // const at::Tensor qk_odds = qkv.slice(/*dim=*/2, /*start=*/0, /*end=*/2)
+    //                                    .slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim);
 
+    const at::Tensor qk_evens = qkv.index(qk).index(evens);
+    const at::Tensor qk_odds = qkv.index(qk).index(odds);
+
+    out.index(qk).index(evens) = (cos_buf * qk_evens) - (sin_buf * qk_odds);
+    out.index(qk).index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
+    // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/0, /*end=*/dim / 2) =
+    //         (cos_buf * qk_evens) - (sin_buf * qk_odds);
+    // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim) =
+    //         (sin_buf * qk_evens) + (cos_buf * qk_odds);
+
+    if (layer_num == 0) {
+        spdlog::debug(shape(cos_buf, name + ".cos_buf"));
+        spdlog::debug(shape(sin_buf, name + ".sin_buf"));
+        spdlog::debug(shape(qkv, name + ".qkv"));
+        spdlog::debug(shape(qk_evens, name + ".qk_evens"));
+        spdlog::debug(shape(qk_odds, name + ".qk_odds"));
+    }
     return out;
 }
 
-MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
+MultiHeadAttentionImpl::MultiHeadAttentionImpl(int layer_num_,
+                                               int d_model_,
                                                int nhead_,
                                                bool qkv_bias_,
                                                bool out_bias_,
                                                const at::Tensor &attn_window_mask_)
-        : d_model(d_model_),
+        : layer_num(layer_num_),
+          d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
           attn_window_mask(attn_window_mask_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     // TODO: can max_seq_len 1000 -> attn_window.size()?
-    rotary_emb = register_module("rotary_emb",
-                                 RotaryEmbedding(head_dim / 2, 10000, attn_window_mask.size(0)));
+    rotary_emb = register_module(
+            "rotary_emb", RotaryEmbedding(layer_num, head_dim, 10000, attn_window_mask.size(0)));
 };
 
 at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
-    spdlog::debug(shape(x, "MHA.x"));
     const long int N = x.size(0);
     const long int T = x.size(1);
     const long int C = x.size(2);
 
-    std::vector<at::Tensor> qkv;
+    const std::string name =
+            "m.encoder.transformer_encoder_" + std::to_string(layer_num) + ".self_attn";
+    spdlog::debug(shape(x, name + ".x"));
+
+    at::Tensor qkv;
     at::Tensor attn_output;
     {
         utils::ScopedProfileRange spr("QKV", 2);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
-
-        qkv = wqkv(x).view({N, T, 3, nhead, head_dim}).permute({0, 1, 3, 4, 2}).chunk(3, -1);
-        // qkv = wqkv(x).view({N, T, nhead, 3 * head_dim}).chunk(3, -1);
-
-        // N, T, 8, 192 -> N, T, 8, 64
-        // qkv[0].size := N, T, nhead(8), head_dim(64)
-        spdlog::debug(shape(qkv[0].squeeze(), "MHA.qkv[0]"));
+        qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
+        spdlog::debug(shape(qkv, name + ".qkv"));
+        dump_tensor(qkv, name + ".qkv");
     }
     {
         utils::ScopedProfileRange spr("ROTE", 2);
-        qkv[0] = rotary_emb(qkv[0].squeeze());
-        qkv[1] = rotary_emb(qkv[1].squeeze());
-        qkv[2] = qkv[2].squeeze();
+        qkv = rotary_emb(qkv);
+        spdlog::debug(shape(qkv, name + ".rotary_emb"));
+        dump_tensor(qkv, name + ".rotary_emb");
     }
     {
-        // if (qkv[0].size(1) != attn_window_mask.size(0)) {
-        //     spdlog::error("attn_window_mask size error: attn={} qkv[0].size(1)={}",
-        //                   attn_window_mask.size(0), qkv[0].size(1));
-        //     spdlog::error("N: {} T: {} C: {}", N, T, C);
-        //     const auto &sz = qkv[0].sizes();
-        //     for (size_t i = 0; i < sz.size(); ++i) {
-        //         spdlog::error("qkv[0].size({})={}", i, sz[i]);
-        //     }
-        // }
         utils::ScopedProfileRange spr("MEA", 2);
+        // NT3HD -> N3HTD -> N[1]HTD
+        const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
+        // spdlog::debug(shape(attn_window_mask, "MHA.attn_mask"));
+        attn_output = at::scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
+                              .permute({0, 1, 3, 2, 4})
+                              .reshape({N, T, C});
 
-        spdlog::debug(shape(qkv[0], "MHA.qkv[0].post"));
-        spdlog::debug(shape(qkv[0].permute({0, 2, 1, 3}), "MHA.qkv[0].permute({0, 2, 1, 3})"));
-        spdlog::debug(shape(attn_window_mask, "MHA.attn_mask"));
-        attn_output = at::scaled_dot_product_attention(
-                // permute := N, nhead(8), T, head_dim(64)
-                qkv[0].permute({0, 2, 1, 3}), qkv[1].permute({0, 2, 1, 3}),
-                qkv[2].permute({0, 2, 1, 3}), attn_window_mask);
+        spdlog::debug(shape(attn_output, name + ".attn_output"));
+        dump_tensor(attn_output, name + ".attn_output");
     }
     {
         utils::ScopedProfileRange spr("OUTP", 2);
-        x = out_proj(attn_output.permute({0, 2, 1, 3}).reshape({N, T, C}));
-        spdlog::debug(shape(x, "MHA.out_proj"));
+        x = out_proj(attn_output);
+        spdlog::debug(shape(x, name + ".out_proj"));
+        dump_tensor(x, name + ".out_proj");
     }
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params, const at::Tensor &attn_window_mask_)
-        : attn_window_mask(attn_window_mask_) {
-    self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
-                                                                true, attn_window_mask));
-    ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
-    norm1 = register_module("norm1", RMSNorm(params.d_model));
-    norm2 = register_module("norm2", RMSNorm(params.d_model));
+TxEncoderImpl::TxEncoderImpl(const int layer_num_,
+                             const TxEncoderParams &params,
+                             const at::Tensor &attn_window_mask_)
+        : layer_num(layer_num_), attn_window_mask(attn_window_mask_) {
+    self_attn =
+            register_module("self_attn", MultiHeadAttention(layer_num, params.d_model, params.nhead,
+                                                            false, true, attn_window_mask));
+    ff = register_module("ff", GatedMLP(layer_num, params.d_model, params.dim_feedforward));
+    norm1 = register_module("norm1", RMSNorm(layer_num, params.d_model));
+    norm2 = register_module("norm2", RMSNorm(layer_num, params.d_model));
 
     const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha());
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
-    spdlog::debug(shape(x, "TxEncoder.x"));
+    const std::string t_name = "m.encoder.transformer_encoder_" + std::to_string(layer_num);
+    spdlog::debug(shape(x, t_name + ".x"));
     at::Tensor attn, f;
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
-        spdlog::debug(shape(attn, "TxEncoder.attn"));
+        spdlog::debug(shape(attn, t_name + ".self_attn"));
+        dump_tensor(attn, t_name + ".self_attn");
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
         x = norm1(attn + (x * named_buffers()["deepnorm_alpha"]));
-        spdlog::debug(shape(x, "TxEncoder.norm1"));
+        spdlog::debug(shape(x, t_name + ".norm1"));
+        dump_tensor(x, t_name + ".norm1");
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
         f = ff(x);
-        spdlog::debug(shape(f, "TxEncoder.ff"));
+        spdlog::debug(shape(f, t_name + ".ff"));
+        dump_tensor(f, t_name + ".ff");
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
         x = norm2(f + (x * named_buffers()["deepnorm_alpha"]));
-        spdlog::debug(shape(x, "TxEncoder.norm2"));
+        spdlog::debug(shape(x, t_name + ".norm2"));
+        dump_tensor(x, t_name + ".norm2");
     }
+
+    dump_tensor(x, t_name);
     return x;
 }
 
@@ -214,7 +232,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
     stack = Sequential();
     for (int i = 0; i < tx_enc_params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(tx_enc_params, attn_window_mask)));
+                                         TxEncoder(i, tx_enc_params, attn_window_mask)));
     }
 };
 
@@ -222,6 +240,7 @@ at::Tensor TxEncoderStackImpl::build_attn_window_mask(const basecall::CRFModelCo
                                                       const at::TensorOptions &options) const {
     const int size =
             config.basecaller.chunksize / (config.stride * config.tx->upsample.scale_factor);
+    // const int size = config.basecaller.chunksize / config.stride;
     const auto [win_upper, win_lower] = config.tx->tx.attn_window;
 
     at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
@@ -267,27 +286,31 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
 
 at::Tensor TxModelImpl::forward(at::Tensor x) {
     spdlog::debug(shape(x, "TxModel.x"));
-
+    dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);
         h = convs->forward(x);
-        spdlog::debug(shape(h, "TxModel.convs.h"));
+        spdlog::debug(shape(h, "m.encoder.conv"));
+        dump_tensor(h, "m.encoder.conv");
     }
     {
         utils::ScopedProfileRange spr("TransEnc", 1);
         h = tx_encoder(h);
-        spdlog::debug(shape(h, "TxModel.tx_encoder.h"));
+        spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
+        dump_tensor(h, "m.encoder.transformer_encoder");
     }
     {
         utils::ScopedProfileRange spr("TransDec", 1);
         h = tx_decoder(h);
-        spdlog::debug(shape(h, "TxModel.tx_decoder.h"));
+        spdlog::debug(shape(h, "m.encoder.upsample"));
+        dump_tensor(h, "m.encoder.upsample");
     }
     {
         utils::ScopedProfileRange spr("CRF", 1);
         h = crf(h);
-        spdlog::debug(shape(h, "TxModel.crf.h"));
+        spdlog::debug(shape(h, "m.encoder.crf"));
+        dump_tensor(h, "m.encoder.crf");
     }
     return h;
 }

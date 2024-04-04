@@ -460,8 +460,8 @@ std::string CRFEncoderParams::to_string() const {
     str += " n_base:" + std::to_string(n_base);
     str += " state_len:" + std::to_string(state_len);
     str += " scale:" + std::to_string(scale);
-    str += " blank_score:" + std::to_string(blank_score);
-    str += " expand_blanks:" + std::to_string(expand_blanks);
+    // str += " blank_score:" + std::to_string(blank_score);
+    // str += " expand_blanks:" + std::to_string(expand_blanks);
     str += "}";
     return str;
 }
@@ -502,8 +502,8 @@ CRFEncoderParams parse_crf_encoder_params(const toml::value &cfg) {
     params.n_base = toml::find<int>(crf, "n_base");
     params.state_len = toml::find<int>(crf, "state_len");
     params.scale = toml::find<float>(crf, "scale");
-    params.blank_score = toml::find<float>(crf, "blank_score");
-    params.expand_blanks = toml::find<bool>(crf, "expand_blanks");
+    // params.blank_score = toml::find<float>(crf, "blank_score");
+    // params.expand_blanks = toml::find<bool>(crf, "expand_blanks");
     return params;
 }
 

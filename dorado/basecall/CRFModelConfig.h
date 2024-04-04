@@ -118,8 +118,8 @@ struct CRFEncoderParams {
     int n_base;
     int state_len;
     float scale;
-    float blank_score;
-    bool expand_blanks;
+    // float blank_score;
+    // bool expand_blanks;
 
     std::string to_string() const;
 };

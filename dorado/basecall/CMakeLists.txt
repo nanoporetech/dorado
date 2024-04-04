@@ -16,6 +16,8 @@ add_library(dorado_basecall STATIC
     nn/CRFModel.h
     nn/TxModel.cpp
     nn/TxModel.h
+    nn/tensor_utils.cpp
+    nn/tensor_utils.h
 )
 
 if (DORADO_GPU_BUILD)

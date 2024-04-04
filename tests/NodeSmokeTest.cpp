@@ -35,7 +35,7 @@
 #endif
 
 namespace fs = std::filesystem;
-
+const auto bcp = dorado::basecall::BasecallerParams{64, 9996, 100};
 namespace {
 
 // Fixture for smoke testing nodes
@@ -179,7 +179,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
-    auto model_config = dorado::basecall::load_model_config(model_path);
+    auto model_config = dorado::basecall::load_model_config(model_path, bcp);
 
     // Use a fixed batch size otherwise we slow down CI autobatchsizing.
     std::size_t batch_size = 128;
@@ -240,7 +240,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
     const std::size_t model_stride =
-            dorado::basecall::load_model_config(model_dir.m_path / model_name).stride;
+            dorado::basecall::load_model_config(model_dir.m_path / model_name, bcp).stride;
 
     // Create runners
     std::string device;
