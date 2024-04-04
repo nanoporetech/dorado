@@ -187,8 +187,8 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     } else {
         // Otherwise merge the temp files.
         progress_callback(percent_start_merging);
-        ProgressUpdater update_progress(progress_callback, percent_start_merging, m_num_records,
-                                        percent_start_indexing);
+        ProgressUpdater update_progress(progress_callback, percent_start_merging,
+                                        percent_start_indexing, m_num_records);
         if (!merge_temp_files(update_progress)) {
             spdlog::error("Merging of temporary files failed. Skipping indexing.");
             return;
@@ -198,7 +198,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     // Index the final file.
     if (file_is_mapped) {
         progress_callback(percent_start_indexing);
-        if (sam_index_build(m_filename.c_str(), 0) < 0) {
+        if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
             spdlog::error("Failed to build index for file {}", m_filename);
         }
     }
