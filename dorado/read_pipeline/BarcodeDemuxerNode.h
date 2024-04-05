@@ -26,7 +26,8 @@ public:
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        bool write_fastq,
-                       std::unique_ptr<const utils::SampleSheet> sample_sheet);
+                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                       bool sort_bam);
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -37,8 +38,7 @@ public:
 
     // Finalisation must occur before destruction of this node.
     // Note that this isn't safe to call until after this node has been terminated.
-    void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback,
-                            bool sort_bam);
+    void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback);
 
 private:
     std::filesystem::path m_output_dir;
@@ -50,7 +50,8 @@ private:
     std::unique_ptr<std::thread> m_worker;
     void input_thread_fn();
     int write(bam1_t* record);
-    bool m_write_fastq{false};
+    const bool m_write_fastq;
+    const bool m_sort_bam;
     std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 

@@ -34,6 +34,8 @@ using namespace std::chrono_literals;
 
 namespace {
 
+constexpr size_t BAM_BUFFER_SIZE = 1000000000;  // 1 GB
+
 std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         const std::string& filename,
         const dorado::alignment::Minimap2Options& options,
@@ -220,8 +222,12 @@ int aligner(int argc, char* argv[]) {
 
         add_pg_hdr(header);
 
-        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads);
-
+        const bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
+                               file_info.output != "-");
+        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, sort_bam);
+        if (sort_bam) {
+            hts_file.set_buffer_size(BAM_BUFFER_SIZE);
+        }
         PipelineDescriptor pipeline_desc;
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
@@ -240,7 +246,7 @@ int aligner(int argc, char* argv[]) {
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-        hts_file.set_and_write_header(header);
+        hts_file.set_header(header);
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);
@@ -273,18 +279,21 @@ int aligner(int argc, char* argv[]) {
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
         progress_stats.notify_stats_collector_completed(final_stats);
 
+        spdlog::info("> finished alignment");
+
         // Report progress during output file finalisation.
-        tracker.set_description("Sorting output files");
-        hts_file.finalise(
-                [&](size_t progress) {
-                    tracker.update_post_processing_progress(static_cast<float>(progress));
-                    progress_stats.update_post_processing_progress(static_cast<float>(progress));
-                },
-                writer_threads, true);
+        if (!hts_file.finalise_is_noop()) {
+            spdlog::info("> merging temporary BAM files");
+        }
+        tracker.set_description("Merging temporary BAM files");
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+            progress_stats.update_post_processing_progress(static_cast<float>(progress));
+        });
+
         progress_stats.notify_post_processing_completed();
         tracker.summarize();
 
-        spdlog::info("> finished alignment");
         spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
                      hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
     }

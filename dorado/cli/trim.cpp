@@ -141,8 +141,8 @@ int trim(int argc, char* argv[]) {
         custom_primer_file = parser.get<std::string>("--primer-sequences");
     }
 
-    utils::HtsFile hts_file("-", output_mode, trim_writer_threads);
-    hts_file.set_and_write_header(header.get());
+    utils::HtsFile hts_file("-", output_mode, trim_writer_threads, false);
+    hts_file.set_header(header.get());
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
@@ -181,11 +181,9 @@ int trim(int argc, char* argv[]) {
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise(
-            [&](size_t progress) {
-                tracker.update_post_processing_progress(static_cast<float>(progress));
-            },
-            trim_writer_threads, false);
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
     tracker.summarize();
 
     spdlog::info("> finished adapter/primer trimming");

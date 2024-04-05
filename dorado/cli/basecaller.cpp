@@ -200,7 +200,7 @@ void setup(std::vector<std::string> args,
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
+    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
     std::string gpu_names{};
@@ -264,7 +264,7 @@ void setup(std::vector<std::string> args,
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_file.set_and_write_header(hdr.get());
+    hts_file.set_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -343,11 +343,9 @@ void setup(std::vector<std::string> args,
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise(
-            [&](size_t progress) {
-                tracker.update_post_processing_progress(static_cast<float>(progress));
-            },
-            thread_allocations.writer_threads, true);
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
 
     // Give the user a nice summary.
     tracker.summarize();

@@ -49,7 +49,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         // TODO: Address open file issue on windows.
         dorado::PipelineDescriptor pipeline_desc;
         auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.m_path.string(), 8,
-                                                                  false, nullptr);
+                                                                  false, nullptr, true);
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -68,7 +68,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         pipeline->terminate(DefaultFlushOptions());
 
-        demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ }, true);
+        demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ });
 
         const std::unordered_set<std::string> expected_files = {
                 "bc01.bam", "bc01.bam.bai", "bc02.bam", "bc02.bam.bai", "bc03.bam", "bc03.bam.bai",

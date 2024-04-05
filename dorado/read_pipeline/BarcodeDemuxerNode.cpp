@@ -11,16 +11,23 @@
 #include <stdexcept>
 #include <string>
 
+namespace {
+constexpr size_t BAM_BUFFER_SIZE =
+        20000000;  // 20 MB per barcode classification. So roughly 2 GB for 96 barcodes.
+}
+
 namespace dorado {
 
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
-                                       std::unique_ptr<const utils::SampleSheet> sample_sheet)
+                                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                       bool sort_bam)
         : MessageSink(10000, 1),
           m_output_dir(output_dir),
           m_htslib_threads(int(htslib_threads)),
           m_write_fastq(write_fastq),
+          m_sort_bam(sort_bam && !write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
     start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this);
@@ -67,8 +74,11 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         file = std::make_unique<utils::HtsFile>(
                 filepath_str,
                 m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::BAM,
-                m_htslib_threads);
-        file->set_and_write_header(m_header.get());
+                m_htslib_threads, m_sort_bam);
+        if (m_sort_bam) {
+            file->set_buffer_size(BAM_BUFFER_SIZE);
+        }
+        file->set_header(m_header.get());
     }
 
     auto hts_res = file->write(record);
@@ -88,18 +98,15 @@ void BarcodeDemuxerNode::set_header(const sam_hdr_t* const header) {
 }
 
 void BarcodeDemuxerNode::finalise_hts_files(
-        const utils::HtsFile::ProgressCallback& progress_callback,
-        bool sort_if_mapped) {
+        const utils::HtsFile::ProgressCallback& progress_callback) {
     const size_t num_files = m_files.size();
     size_t current_file_idx = 0;
     for (auto& [bc, hts_file] : m_files) {
-        hts_file->finalise(
-                [&](size_t progress) {
-                    // Give each file/barcode the same contribution to the total progress.
-                    const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
-                    progress_callback(total_progress);
-                },
-                m_htslib_threads, sort_if_mapped);
+        hts_file->finalise([&](size_t progress) {
+            // Give each file/barcode the same contribution to the total progress.
+            const size_t total_progress = (current_file_idx * 100 + progress) / num_files;
+            progress_callback(total_progress);
+        });
         ++current_file_idx;
     }
 

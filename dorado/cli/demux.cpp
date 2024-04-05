@@ -230,7 +230,7 @@ int demuxer(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet));
+            std::move(sample_sheet), sort_bam);
 
     if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
@@ -308,12 +308,10 @@ int demuxer(int argc, char* argv[]) {
 
     // Finalise the files that were created.
     tracker.set_description("Sorting output files");
-    demux_writer_ref.finalise_hts_files(
-            [&](size_t progress) {
-                tracker.update_post_processing_progress(static_cast<float>(progress));
-                progress_stats.update_post_processing_progress(static_cast<float>(progress));
-            },
-            sort_bam);
+    demux_writer_ref.finalise_hts_files([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+        progress_stats.update_post_processing_progress(static_cast<float>(progress));
+    });
 
     tracker.summarize();
     progress_stats.report_final_stats();
