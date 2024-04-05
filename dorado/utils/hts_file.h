@@ -51,31 +51,7 @@ private:
     std::vector<std::string> m_temp_files;
     int64_t m_current_buffer_offset{0};
 
-    struct ProgressUpdater {
-        const ProgressCallback* m_progress_callback{nullptr};
-        size_t m_from{0}, m_to{0}, m_max{0}, m_last_progress{0};
-        ProgressUpdater() = default;
-        ProgressUpdater(const ProgressCallback& progress_callback,
-                        size_t from,
-                        size_t to,
-                        size_t max)
-                : m_progress_callback(&progress_callback),
-                  m_from(from),
-                  m_to(to),
-                  m_max(max),
-                  m_last_progress(0) {}
-
-        void operator()(size_t count) {
-            if (!m_progress_callback) {
-                return;
-            }
-            const size_t new_progress = m_from + (m_to - m_from) * std::min(count, m_max) / m_max;
-            if (new_progress != m_last_progress) {
-                m_last_progress = new_progress;
-                m_progress_callback->operator()(new_progress);
-            }
-        }
-    };
+    struct ProgressUpdater;
 
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);
