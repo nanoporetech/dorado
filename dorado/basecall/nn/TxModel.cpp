@@ -47,12 +47,12 @@ at::Tensor GatedMLPImpl::forward(at::Tensor x) {
     const at::Tensor &gate = chunks[1];
     const at::Tensor out = fc2(functional::silu(gate).mul(y));
 
-    if (lrno == 0) {
-        dump_tensor(fc1_,
-                    "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc1");
-        dump_tensor(out,
-                    "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc2");
-    }
+    // if (lrno == 0) {
+    //     dump_tensor(fc1_,
+    //                 "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc1");
+    //     dump_tensor(out,
+    //                 "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc2");
+    // }
     return out;
 }
 
@@ -105,13 +105,13 @@ at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
     // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim) =
     //         (sin_buf * qk_evens) + (cos_buf * qk_odds);
 
-    if (lrno == 0) {
-        spdlog::debug(shape(cos_buf, name + ".cos_buf"));
-        spdlog::debug(shape(sin_buf, name + ".sin_buf"));
-        spdlog::debug(shape(qkv, name + ".qkv"));
-        spdlog::debug(shape(qk_evens, name + ".qk_evens"));
-        spdlog::debug(shape(qk_odds, name + ".qk_odds"));
-    }
+    // if (lrno == 0) {
+    //     spdlog::debug(shape(cos_buf, name + ".cos_buf"));
+    //     spdlog::debug(shape(sin_buf, name + ".sin_buf"));
+    //     spdlog::debug(shape(qkv, name + ".qkv"));
+    //     spdlog::debug(shape(qk_evens, name + ".qk_evens"));
+    //     spdlog::debug(shape(qk_odds, name + ".qk_odds"));
+    // }
     return out;
 }
 
@@ -139,7 +139,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const long int C = x.size(2);
 
     const std::string name = "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn";
-    spdlog::debug(shape(x, name + ".x"));
+    // spdlog::debug(shape(x, name + ".x"));
 
     at::Tensor qkv;
     at::Tensor attn_output;
@@ -147,18 +147,18 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("QKV", 2);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
-        if (lrno == 0) {
-            spdlog::debug(shape(qkv, name + ".qkv"));
-            dump_tensor(qkv, name + ".qkv");
-        }
+        // if (lrno == 0) {
+        //     spdlog::debug(shape(qkv, name + ".qkv"));
+        //     dump_tensor(qkv, name + ".qkv");
+        // }
     }
     {
         utils::ScopedProfileRange spr("ROTE", 2);
         qkv = rotary_emb(qkv);
-        if (lrno == 0) {
-            spdlog::debug(shape(qkv, name + ".rotary_emb"));
-            dump_tensor(qkv, name + ".rotary_emb");
-        }
+        // if (lrno == 0) {
+        //     spdlog::debug(shape(qkv, name + ".rotary_emb"));
+        //     dump_tensor(qkv, name + ".rotary_emb");
+        // }
     }
     {
         utils::ScopedProfileRange spr("MEA", 2);
@@ -169,18 +169,18 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
                               .permute({0, 1, 3, 2, 4})
                               .reshape({N, T, C});
 
-        if (lrno == 0) {
-            spdlog::debug(shape(attn_output, name + ".attn_output"));
-            dump_tensor(attn_output, name + ".attn_output");
-        }
+        // if (lrno == 0) {
+        //     spdlog::debug(shape(attn_output, name + ".attn_output"));
+        //     dump_tensor(attn_output, name + ".attn_output");
+        // }
     }
     {
         utils::ScopedProfileRange spr("OUTP", 2);
         x = out_proj(attn_output);
-        if (lrno == 0) {
-            spdlog::debug(shape(x, name + ".out_proj"));
-            dump_tensor(x, name + ".out_proj");
-        }
+        // if (lrno == 0) {
+        //     spdlog::debug(shape(x, name + ".out_proj"));
+        //     dump_tensor(x, name + ".out_proj");
+        // }
     }
     return x;
 };
@@ -201,34 +201,34 @@ TxEncoderImpl::TxEncoderImpl(int lrno_,
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     const std::string t_name = "m.encoder.transformer_encoder_" + std::to_string(lrno);
-    spdlog::debug(shape(x, t_name + ".x"));
+    // spdlog::debug(shape(x, t_name + ".x"));
     at::Tensor attn, f;
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
-        spdlog::debug(shape(attn, t_name + ".self_attn"));
-        dump_tensor(attn, t_name + ".self_attn");
+        // spdlog::debug(shape(attn, t_name + ".self_attn"));
+        // dump_tensor(attn, t_name + ".self_attn");
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
         x = norm1(attn + (x * named_buffers()["deepnorm_alpha"]));
-        spdlog::debug(shape(x, t_name + ".norm1"));
-        dump_tensor(x, t_name + ".norm1");
+        // spdlog::debug(shape(x, t_name + ".norm1"));
+        // dump_tensor(x, t_name + ".norm1");
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
         f = ff(x);
-        spdlog::debug(shape(f, t_name + ".ff"));
-        dump_tensor(f, t_name + ".ff");
+        // spdlog::debug(shape(f, t_name + ".ff"));
+        // dump_tensor(f, t_name + ".ff");
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
         x = norm2(f + (x * named_buffers()["deepnorm_alpha"]));
-        spdlog::debug(shape(x, t_name + ".norm2"));
-        dump_tensor(x, t_name + ".norm2");
+        // spdlog::debug(shape(x, t_name + ".norm2"));
+        // dump_tensor(x, t_name + ".norm2");
     }
 
-    dump_tensor(x, t_name);
+    // dump_tensor(x, t_name);
     return x;
 }
 
@@ -254,7 +254,7 @@ at::Tensor TxEncoderStackImpl::build_attn_window_mask(const basecall::CRFModelCo
     mask *= at::tril(mask, win_lower);
     mask = mask.to(at::kBool).to(options.device());
 
-    spdlog::debug(shape(mask, "TxEncoderStack.mask"));
+    // spdlog::debug(shape(mask, "TxEncoderStack.mask"));
     return mask;
 };
 
@@ -291,32 +291,32 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
 }
 
 at::Tensor TxModelImpl::forward(at::Tensor x) {
-    spdlog::debug(shape(x, "TxModel.x"));
-    dump_tensor(x, "TxModel.x");
+    // spdlog::debug(shape(x, "TxModel.x"));
+    // dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);
         h = convs->forward(x);
-        spdlog::debug(shape(h, "m.encoder.conv"));
-        dump_tensor(h, "m.encoder.conv");
+        // spdlog::debug(shape(h, "m.encoder.conv"));
+        // dump_tensor(h, "m.encoder.conv");
     }
     {
         utils::ScopedProfileRange spr("TransEnc", 1);
         h = tx_encoder(h);
-        spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
-        dump_tensor(h, "m.encoder.transformer_encoder");
+        // spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
+        // dump_tensor(h, "m.encoder.transformer_encoder");
     }
     {
         utils::ScopedProfileRange spr("TransDec", 1);
         h = tx_decoder(h);
-        spdlog::debug(shape(h, "m.encoder.upsample"));
-        dump_tensor(h, "m.encoder.upsample");
+        // spdlog::debug(shape(h, "m.encoder.upsample"));
+        // dump_tensor(h, "m.encoder.upsample");
     }
     {
         utils::ScopedProfileRange spr("CRF", 1);
         h = crf(h);
-        spdlog::debug(shape(h, "m.encoder.crf"));
-        dump_tensor(h, "m.encoder.crf");
+        // spdlog::debug(shape(h, "m.encoder.crf"));
+        // dump_tensor(h, "m.encoder.crf");
     }
     return h;
 }
