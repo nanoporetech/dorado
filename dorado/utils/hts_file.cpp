@@ -153,7 +153,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
             if (size_t(offset) + sizeof(bam1_t) > m_bam_buffer.size()) {
                 throw std::out_of_range("Index out of bounds in BAM record buffer.");
             }
-            record = reinterpret_cast<bam1_t*>(m_bam_buffer.data() + offset);
+            record = std::launder(reinterpret_cast<bam1_t*>(m_bam_buffer.data() + offset));
             if (size_t(offset) + sizeof(bam1_t) + size_t(record->l_data) > m_bam_buffer.size()) {
                 throw std::out_of_range("Index out of bounds in BAM record buffer.");
             }
@@ -270,15 +270,17 @@ void HtsFile::cache_record(const bam1_t* record) {
     m_buffer_map.insert({sorting_key, m_current_buffer_offset});
 
     // Copy the contents of the bam1_t struct into the memory buffer.
-    bam1_t* buffer_entry = reinterpret_cast<bam1_t*>(m_bam_buffer.data() + m_current_buffer_offset);
-    memcpy(buffer_entry, record, sizeof(bam1_t));
+    auto record_buff = m_bam_buffer.data() + m_current_buffer_offset;
+    memcpy(record_buff, record, sizeof(bam1_t));
+    m_current_buffer_offset += sizeof(bam1_t);
 
     // The data pointed to by the bam1_t::data field is then copied immediately after the struct contents.
-    m_current_buffer_offset += sizeof(bam1_t);
     memcpy(m_bam_buffer.data() + m_current_buffer_offset, record->data, record->l_data);
 
     // We have to tell our buffered object where its copy of the data is.
-    buffer_entry->data = reinterpret_cast<uint8_t*>(m_bam_buffer.data() + m_current_buffer_offset);
+    bam1_t* buffer_entry = std::launder(reinterpret_cast<bam1_t*>(record_buff));
+    buffer_entry->data =
+            std::launder(reinterpret_cast<uint8_t*>(m_bam_buffer.data() + m_current_buffer_offset));
 
     // When we write the cached records, we will use a pointer cast to treat the cached record as a bam1_t
     // object, so we need to round up our buffer offset so that the next entry will be properly aligned.
