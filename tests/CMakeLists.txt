@@ -7,6 +7,7 @@ endif()
 
 # dorado_tests
 add_executable(dorado_tests
+    FastxRandomReaderTest.cpp
     AdapterDetectorTest.cpp
     AlignerTest.cpp
     alignment_processing_items_test.cpp

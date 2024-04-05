@@ -21,6 +21,7 @@ public:
     void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
     void align(dorado::ReadCommon& read_common, mm_tbuf_t* buf);
+    std::tuple<mm_reg1_t*, int> get_mapping(bam1_t* record, mm_tbuf_t* buf);
 
     HeaderSequenceRecords get_sequence_records_for_header() const;
 

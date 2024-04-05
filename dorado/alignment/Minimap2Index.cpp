@@ -74,6 +74,27 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
+    if (mapping_options.cs) {
+        m_mapping_options->flag |= MM_F_OUT_CS | MM_F_CIGAR;
+        if (*mapping_options.cs == "short") {
+            m_mapping_options->flag &= ~MM_F_OUT_CS_LONG;
+        } else if (*mapping_options.cs == "long") {
+            m_mapping_options->flag |= MM_F_OUT_CS_LONG;
+        } else if (*mapping_options.cs == "none") {
+            m_mapping_options->flag &= ~MM_F_OUT_CS;
+        } else {
+            spdlog::warn("Unrecognized options for --cs={}", mapping_options.cs);
+        }
+    }
+    if (imapping_options.dual) {
+        if (*mapping_options.dual == "yes") {
+            m_mapping_options->flag &= ~MM_F_NO_DUAL;
+        } else if (*mapping_options.dual == "no") {
+            m_mapping_options->flag |= MM_F_NO_DUAL;
+        } else {
+            spdlog::warn("Unrecognized options for --dual={}", mapping_options.dual);
+        }
+    }
 
     // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
     m_mapping_options->cap_kalloc = 100'000'000;

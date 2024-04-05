@@ -47,6 +47,12 @@ struct Minimap2MappingOptions {
     std::optional<bool> soft_clipping;
     bool secondary_seq;  // Not available to be set by the user, hence not optional
     std::optional<bool> print_secondary;
+    std::optional<int> occ_dist;
+    std::optional<int> min_chain_score;
+    std::optional<int> zdrop;
+    std::optional<int> zdrop_inv;
+    std::optional<std::string> cs;
+    std::optional<std::string> dual;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
@@ -97,4 +103,9 @@ static const Minimap2Options dflt_options{
         {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, std::nullopt},
         false};
 
+{std::nullopt, std::nullopt, std::nullopt, DEFAULT_MM_PRESET},
+        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false,        std::nullopt,
+         std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt},
+        false
+};
 }  // namespace dorado::alignment

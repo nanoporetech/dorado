@@ -210,15 +210,40 @@ public:
     std::shared_ptr<ClientInfo> client_info;
 };
 
+struct Overlap {
+    int qid;
+    int qlen;
+    int qstart;
+    int qend;
+    bool fwd;
+    int tstart;
+    int tend;
+};
+
+// Overlaps for error correction
+struct CorrectionAlignments {
+    std::string read_name;
+    std::string read_seq;
+    std::vector<Overlap> overlaps;
+    std::vector<std::vector<CigarOp>> cigars;
+    std::vector<std::string> seqs;
+    std::vector<std::vector<uint8_t>> quals;
+};
+
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a SimplexReadPtr object, which represents a single Simplex read
 // - a DuplexReadPtr object, which represents a single Duplex read
 // - a BamMessage object, composite class holding a BamPtr (which represents a raw BAM alignment record) and ClientInfo
 // - a ReadPair object, which represents a pair of reads for duplex calling
+// - a CorrectionAlignments, which holds alignment information per read to be corrected
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message =
-        std::variant<SimplexReadPtr, BamMessage, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+using Message = std::variant<SimplexReadPtr,
+                             BamMessage,
+                             ReadPair,
+                             CacheFlushMessage,
+                             DuplexReadPtr,
+                             CorrectionAlignments>;
 
 bool is_read_message(const Message& message);
 

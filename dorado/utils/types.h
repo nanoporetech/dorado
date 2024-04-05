@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 struct bam1_t;
@@ -185,6 +186,14 @@ struct ModBaseInfo {
     std::string long_names;
     std::string context;
     std::array<size_t, 4> base_counts{};
+};
+
+// Enum for handling CIGAR ops
+enum CigarOpType { INS = 0, DEL, MATCH, MISMATCH };
+
+struct CigarOp {
+    CigarOpType op;
+    uint32_t len;
 };
 
 }  // namespace dorado
