@@ -40,9 +40,18 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 
 // Result of overlapping two reads
-using OverlapResult = std::tuple<bool, uint32_t, uint32_t, uint32_t, uint32_t>;
-
-OverlapResult compute_overlap(const std::string& query_seq, const std::string& target_seq);
+struct OverlapResult {
+    int32_t target_start;
+    int32_t target_end;
+    int32_t query_start;
+    int32_t query_end;
+    uint8_t mapq;
+    bool rev;
+};
+std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
+                                             const std::string& query_name,
+                                             const std::string& target_seq,
+                                             const std::string& target_name);
 
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.
