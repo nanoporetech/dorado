@@ -274,6 +274,10 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
     mm_set_opt(0, &idx_opt, &map_opt);
     mm_set_opt("map-hifi", &idx_opt, &map_opt);
 
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    map_opt.cap_kalloc = 100'000'000;
+    map_opt.max_sw_mat = 50'000'000;
+
     const char* seqs[] = {query_seq.c_str()};
     const char* names[] = {query_name.c_str()};
     mm_idx_t* index = mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs, names);

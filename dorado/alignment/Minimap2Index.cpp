@@ -71,6 +71,10 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
+
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    m_mapping_options->cap_kalloc = 100'000'000;
+    m_mapping_options->max_sw_mat = 50'000'000;
 }
 
 bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {
