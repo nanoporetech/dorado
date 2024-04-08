@@ -264,7 +264,8 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
                                              const std::string& query_name,
                                              const std::string& target_seq,
-                                             const std::string& target_name) {
+                                             const std::string& target_name,
+                                             MmTbufPtr& working_buffer) {
     std::optional<OverlapResult> overlap_result;
 
     // Add mm2 based overlap check.
@@ -278,11 +279,13 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
     mm_idx_t* index = mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs, names);
     mm_mapopt_update(&map_opt, index);
 
-    MmTbufPtr mbuf = MmTbufPtr(mm_tbuf_init());
+    if (!working_buffer) {
+        working_buffer = MmTbufPtr(mm_tbuf_init());
+    }
 
     int hits = 0;
-    mm_reg1_t* reg = mm_map(index, int(target_seq.length()), target_seq.c_str(), &hits, mbuf.get(),
-                            &map_opt, target_name.c_str());
+    mm_reg1_t* reg = mm_map(index, int(target_seq.length()), target_seq.c_str(), &hits,
+                            working_buffer.get(), &map_opt, target_name.c_str());
 
     mm_idx_destroy(index);
 
@@ -316,7 +319,9 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves) {
     // We are going to compute the overlap between the two reads
-    const auto overlap_result = compute_overlap(query_sequence, "query", target_sequence, "target");
+    MmTbufPtr working_buffer;
+    const auto overlap_result =
+            compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
 
     const auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
     // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed

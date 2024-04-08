@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -48,10 +50,13 @@ struct OverlapResult {
     uint8_t mapq;
     bool rev;
 };
+// |working_buffer| will be allocated if an empty one is passed in,
+// allowing it to be reused in future calls by the caller.
 std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
                                              const std::string& query_name,
                                              const std::string& target_seq,
-                                             const std::string& target_name);
+                                             const std::string& target_name,
+                                             MmTbufPtr& working_buffer);
 
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.

@@ -1,6 +1,7 @@
 #include "PairingNode.h"
 
 #include "ClientInfo.h"
+#include "utils/sequence_utils.h"
 
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
@@ -112,43 +113,18 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
     const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
     nvtx3::scoped_range loop{nvtx_id};
 
-    // Add mm2 based overlap check.
-    mm_idxopt_t idx_opt;
-    mm_mapopt_t map_opt;
-    mm_set_opt(0, &idx_opt, &map_opt);
-    mm_set_opt("map-hifi", &idx_opt, &map_opt);
+    MmTbufPtr& working_buffer = m_tbufs[tid];
+    const auto overlap_result =
+            utils::compute_overlap(temp.read_common.seq, temp.read_common.read_id,
+                                   comp.read_common.seq, comp.read_common.read_id, working_buffer);
 
-    std::vector<const char*> seqs = {temp.read_common.seq.c_str()};
-    std::vector<const char*> names = {temp.read_common.read_id.c_str()};
-    mm_idx_t* index =
-            mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs.data(), names.data());
-    mm_mapopt_update(&map_opt, index);
-
-    mm_tbuf_t* tbuf = m_tbufs[tid].get();
-    int hits = 0;
-    mm_reg1_t* reg = mm_map(index, int(comp.read_common.seq.length()), comp.read_common.seq.c_str(),
-                            &hits, tbuf, &map_opt, comp.read_common.read_id.c_str());
-
-    mm_idx_destroy(index);
-
-    // When there are multiple hits, pick the primary alignment.
-    if (hits > 0) {
-        uint8_t mapq = 0;
-        int32_t temp_start = 0;
-        int32_t temp_end = 0;
-        int32_t comp_start = 0;
-        int32_t comp_end = 0;
-        bool rev = false;
-
-        auto best_map = std::max_element(
-                reg, reg + hits,
-                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
-        mapq = best_map->mapq;
-        temp_start = best_map->rs;
-        temp_end = best_map->re;
-        comp_start = best_map->qs;
-        comp_end = best_map->qe;
-        rev = best_map->rev;
+    if (overlap_result) {
+        const uint8_t mapq = overlap_result->mapq;
+        const int32_t temp_start = overlap_result->target_start;
+        const int32_t temp_end = overlap_result->target_end;
+        const int32_t comp_start = overlap_result->query_start;
+        const int32_t comp_end = overlap_result->query_end;
+        const bool rev = overlap_result->rev;
 
         const int kMinMapQ = 50;
         const float kMinOverlapFraction = 0.8f;
@@ -169,24 +145,18 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
                 (meets_mapq && meets_length && rev && ends_anchored && meets_min_overlap_length);
 
         spdlog::trace(
-                "hits {}, mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
+                "mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
                 "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
                 "comp start {} comp end {}, {} and {}",
-                hits, mapq, temp_end - temp_start, overlap_frac, delta,
-                temp.read_common.seq.length(), comp.read_common.seq.length(), rev ? "-" : "+", cond,
-                !allow_rejection, temp_start, temp_end, comp_start, comp_end,
-                temp.read_common.read_id, comp.read_common.read_id);
+                mapq, temp_end - temp_start, overlap_frac, delta, temp.read_common.seq.length(),
+                comp.read_common.seq.length(), rev ? "-" : "+", cond, !allow_rejection, temp_start,
+                temp_end, comp_start, comp_end, temp.read_common.read_id, comp.read_common.read_id);
 
         if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;
             pair_result = {true, temp_start, temp_end, comp_start, comp_end};
         }
     }
-
-    for (int i = 0; i < hits; ++i) {
-        free(reg[i].p);
-    }
-    free(reg);
 
     return pair_result;
 }
