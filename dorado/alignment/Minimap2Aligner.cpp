@@ -204,13 +204,6 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         bam1_t* record = bam_init1();
 
         // Set properties of the BAM record.
-        // NOTE: Passing bam_get_qname(irecord) + l_qname into bam_set1
-        // was causing the generated string to have some extra
-        // null characters. Not sure why yet. Using string_view
-        // resolved that issue, which is okay to use since it doesn't
-        // copy any data and we know the underlying string is null
-        // terminated.
-        // TODO: See if bam_get_qname(irecord) usage can be fixed.
         bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
                  cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
                  irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
