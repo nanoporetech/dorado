@@ -5,8 +5,10 @@ set(METAL_SOURCES dorado/basecall/metal/nn.metal)
 
 if (IOS)
     set(XCRUN_SDK ${SDK_NAME})
+    set(METAL_STD_VERSION "ios-metal2.3") # iOS 14
 else()
     set(XCRUN_SDK macosx)
+    set(METAL_STD_VERSION "macos-metal2.3") # macOS 11.0
 endif()
 string(TOUPPER ${XCRUN_SDK} XCRUN_SDK_UPPER)
 
@@ -22,7 +24,7 @@ foreach(source ${METAL_SOURCES})
                 -Werror
                 -Wall -Wextra -pedantic
                 -Wno-c++17-extensions # [[maybe_unused]] is C++17
-                -std=metal3.0
+                -std=${METAL_STD_VERSION}
                 -ffast-math
                 -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
                 -o "${air_path}"
