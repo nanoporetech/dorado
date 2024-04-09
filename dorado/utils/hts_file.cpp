@@ -97,8 +97,6 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, b
 HtsFile::~HtsFile() {
     if (!m_finalised) {
         spdlog::error("finalise() not called on a HtsFile.");
-        // Can't throw in a dtor, and this is a logic_error rather than being data dependent.
-        std::abort();
     }
 }
 
