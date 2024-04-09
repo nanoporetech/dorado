@@ -174,8 +174,6 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
 // users can recover their data.
 void HtsFile::finalise(const ProgressCallback& progress_callback) {
     assert(progress_callback);
-
-    // Rough divisions of how far through we are at the start of each section.
     progress_callback(0);
     auto on_return = utils::PostCondition([&] { progress_callback(100); });
 
@@ -207,6 +205,16 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         // We only have 1 temporary file, so just rename it.
         std::filesystem::rename(m_temp_files.back(), m_filename);
         m_temp_files.clear();
+        if (file_is_mapped) {
+            // We still need to index the sorted BAM file.
+            // We can't update the progress while this is ongoing, so it's just going to
+            // say 50% complete until it finishes.
+            constexpr size_t percent_start_indexing = 50;
+            progress_callback(percent_start_indexing);
+            if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
+                spdlog::error("Failed to build index for file {}", m_filename);
+            }
+        }
     } else {
         // Otherwise merge the temp files.
         constexpr size_t percent_start_merging = 5;
@@ -216,17 +224,6 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         if (!merge_temp_files(update_progress)) {
             spdlog::error("Merging of temporary files failed.");
             return;
-        }
-    }
-
-    if (file_is_mapped && num_temp_files == 1) {
-        // We still need to index the sorted BAM file.
-        // We can't update the progress while this is ongoing, so it's just going to
-        // say 50% complete until it finishes.
-        constexpr size_t percent_start_indexing = 50;
-        progress_callback(percent_start_indexing);
-        if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
-            spdlog::error("Failed to build index for file {}", m_filename);
         }
     }
 }
