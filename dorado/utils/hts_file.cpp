@@ -174,10 +174,6 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
 // users can recover their data.
 void HtsFile::finalise(const ProgressCallback& progress_callback) {
     assert(progress_callback);
-
-    // Rough divisions of how far through we are at the start of each section.
-    constexpr size_t percent_start_merging = 5;
-    constexpr size_t percent_start_indexing = 50;
     progress_callback(0);
     auto on_return = utils::PostCondition([&] { progress_callback(100); });
 
@@ -204,26 +200,30 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         return;
     }
 
-    if (m_temp_files.size() == 1) {
+    size_t num_temp_files = m_temp_files.size();
+    if (num_temp_files == 1) {
         // We only have 1 temporary file, so just rename it.
         std::filesystem::rename(m_temp_files.back(), m_filename);
         m_temp_files.clear();
+        if (file_is_mapped) {
+            // We still need to index the sorted BAM file.
+            // We can't update the progress while this is ongoing, so it's just going to
+            // say 50% complete until it finishes.
+            constexpr size_t percent_start_indexing = 50;
+            progress_callback(percent_start_indexing);
+            if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
+                spdlog::error("Failed to build index for file {}", m_filename);
+            }
+        }
     } else {
         // Otherwise merge the temp files.
+        constexpr size_t percent_start_merging = 5;
         progress_callback(percent_start_merging);
-        ProgressUpdater update_progress(progress_callback, percent_start_merging,
-                                        percent_start_indexing, m_num_records);
+        ProgressUpdater update_progress(progress_callback, percent_start_merging, 100,
+                                        m_num_records);
         if (!merge_temp_files(update_progress)) {
-            spdlog::error("Merging of temporary files failed. Skipping indexing.");
+            spdlog::error("Merging of temporary files failed.");
             return;
-        }
-    }
-
-    // Index the final file.
-    if (file_is_mapped) {
-        progress_callback(percent_start_indexing);
-        if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
-            spdlog::error("Failed to build index for file {}", m_filename);
         }
     }
 }
@@ -338,6 +338,14 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         return false;
     }
 
+    // Initialise for indexing.
+    std::string idx_fname = m_filename + ".bai";
+    auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
+    if (res < 0) {
+        spdlog::error("Could not initialize output file for indexing, error code {}", res);
+        return false;
+    }
+
     size_t processed_records = 0;
     size_t files_done = 0;
     while (files_done < num_temp_files) {
@@ -359,7 +367,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         }
 
         // Write the record.
-        auto res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
+        res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
         if (res < 0) {
             spdlog::error("Failed to write to sorted file {}, error code {}", out_file->fn, res);
             return false;
@@ -383,6 +391,14 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
             return false;
         }
     }
+
+    // Write the index file.
+    res = sam_idx_save(out_file.get());
+    if (res < 0) {
+        spdlog::error("Could not write index file, error code {}", res);
+        return false;
+    }
+    out_file.reset();
 
     // If we got this far, merging was successful, so remove the temporary files.
     // If we returned early due to a merging failure, the temporary files will remain.
