@@ -1,5 +1,6 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
+#include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
@@ -123,13 +124,20 @@ int correct(int argc, char* argv[]) {
     // 5. Corrected reads will be written out FASTA or BAM format.
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
+    // 3. Window generation will chunk up the alignments into
+    // multiple windows and create tensors for downstream inference.
+    // 4. The inference node will run the model on the tensors, decode
+    // the output, and convert each window into its corrected read and stitch
+    // adjacent windows together.
+    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, 1);
+
     // 2. These will go into an Alignment node with the
     // same fastq as an index to perform all-vs-all alignment
     // for reach read. Each alignment is expected to generate
     // multiple aligned records, which will all be packaged
     // and sent into a window generation node.
     auto aligner =
-            pipeline_desc.add_node<ErrorCorrectionMapperNode>({hts_writer}, reads[0], threads);
+            pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0], threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

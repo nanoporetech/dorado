@@ -211,13 +211,16 @@ public:
 };
 
 struct Overlap {
+    // This tracks the read against which query was aligned.
     int qid;
-    int qlen;
     int qstart;
     int qend;
-    bool fwd;
+    int qlen;
+    // This is the query itself.
     int tstart;
     int tend;
+    int tlen;
+    bool fwd;
 };
 
 // Overlaps for error correction
@@ -228,6 +231,7 @@ struct CorrectionAlignments {
     std::vector<std::vector<CigarOp>> cigars;
     std::vector<std::string> seqs;
     std::vector<std::vector<uint8_t>> quals;
+    std::vector<std::string> qnames;
 };
 
 // The Message type is a std::variant that can hold different types of message objects.

@@ -36,7 +36,8 @@ private:
 
     CorrectionAlignments extract_alignments(const mm_reg1_t* reg,
                                             int hits,
-                                            const hts_io::FastxRandomReader* reader);
+                                            const hts_io::FastxRandomReader* reader,
+                                            const std::string& qread);
 };
 
 }  // namespace dorado

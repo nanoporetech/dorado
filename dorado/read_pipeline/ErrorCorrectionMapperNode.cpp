@@ -19,7 +19,7 @@
 
 namespace {
 
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar, bool fwd) {
     std::vector<dorado::CigarOp> cigar_ops;
     cigar_ops.reserve(n_cigar);
     for (uint32_t i = 0; i < n_cigar; i++) {
@@ -28,12 +28,15 @@ std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar
         if (op == MM_CIGAR_MATCH) {
             cigar_ops.push_back({dorado::CigarOpType::MATCH, len});
         } else if (op == MM_CIGAR_INS) {
-            cigar_ops.push_back({dorado::CigarOpType::INS, len});
-        } else if (op == MM_CIGAR_DEL) {
             cigar_ops.push_back({dorado::CigarOpType::DEL, len});
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops.push_back({dorado::CigarOpType::INS, len});
         } else {
             throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
         }
+    }
+    if (!fwd) {
+        std::reverse(cigar_ops.begin(), cigar_ops.end());
     }
     return cigar_ops;
 }
@@ -85,9 +88,11 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
             auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
-            auto alignments = extract_alignments(reg, hits, fastx_reader.get());
-            alignments.read_name = bam_get_qname(read.get());
-            alignments.read_seq = std::move(utils::extract_sequence(read.get()));
+            const std::string read_name = bam_get_qname(read.get());
+            const std::string read_seq = utils::extract_sequence(read.get());
+            auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
+            alignments.read_name = std::move(read_name);
+            alignments.read_seq = std::move(read_seq);
             send_message_to_sink(std::move(alignments));
         } else {
             send_message_to_sink(std::move(message));
@@ -100,7 +105,8 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
 CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
         const mm_reg1_t* reg,
         int hits,
-        const hts_io::FastxRandomReader* reader) {
+        const hts_io::FastxRandomReader* reader,
+        const std::string& qread) {
     dorado::CorrectionAlignments alignments;
     for (int j = 0; j < hits; j++) {
         Overlap ovlp;
@@ -116,11 +122,18 @@ CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
         ovlp.tend = aln->qe;
 
         const std::string qname(m_index->index()->seq[aln->rid].name);
+
+        //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
+        //    continue;
         alignments.seqs.push_back(reader->fetch_seq(qname));
         alignments.quals.push_back(reader->fetch_qual(qname));
+        alignments.qnames.push_back(qname);
+
+        ovlp.qlen = (int)alignments.seqs.back().length();
+        ovlp.tlen = (int)qread.length();
 
         size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        alignments.cigars.push_back(parse_cigar(aln->p->cigar, n_cigar));
+        alignments.cigars.push_back(parse_cigar(aln->p->cigar, n_cigar, ovlp.fwd));
 
         alignments.overlaps.push_back(std::move(ovlp));
     }

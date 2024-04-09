@@ -179,6 +179,8 @@ add_library(dorado_lib
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
     dorado/read_pipeline/ErrorCorrectionMapperNode.h
+    dorado/read_pipeline/CorrectionNode.cpp
+    dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/HtsReader.cpp
