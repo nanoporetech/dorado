@@ -34,7 +34,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-constexpr size_t BAM_BUFFER_SIZE = 2000000000;  // 1 GB
+constexpr size_t BAM_BUFFER_SIZE = 20000000;  // 1 GB
 
 std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         const std::string& filename,
