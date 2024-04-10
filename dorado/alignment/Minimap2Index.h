@@ -14,7 +14,7 @@ namespace dorado::alignment {
 
 class Minimap2Index {
     Minimap2Options m_options;
-    std::shared_ptr<mm_idx_t> m_index;
+    std::shared_ptr<const mm_idx_t> m_index;
     std::optional<mm_idxopt_t> m_index_options{};
     std::optional<mm_mapopt_t> m_mapping_options{};
 

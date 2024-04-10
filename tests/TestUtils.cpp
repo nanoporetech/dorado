@@ -38,6 +38,28 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     return data_path;
 }
 
+TempDir make_temp_dir(const std::string& prefix) {
+#ifdef _WIN32
+    std::filesystem::path path;
+    while (true) {
+        char temp[L_tmpnam];
+        const char* name = std::tmpnam(temp);
+        auto filename = std::filesystem::path(name);
+        filename.replace_filename(prefix + std::string("_") + filename.filename().string());
+        if (std::filesystem::create_directories(filename)) {
+            path = std::filesystem::canonical(filename);
+            break;
+        }
+    }
+#else
+    // macOS (rightfully) complains about tmpnam() usage, so make use of mkdtemp() on platforms that support it
+    std::string temp = (std::filesystem::temp_directory_path() / (prefix + "_XXXXXXXXXX")).string();
+    const char* name = mkdtemp(temp.data());
+    auto path = std::filesystem::canonical(name);
+#endif
+    return TempDir(std::move(path));
+}
+
 std::string ReadFileIntoString(const std::filesystem::path& path) {
     const auto num_bytes = std::filesystem::file_size(path);
     std::string content;

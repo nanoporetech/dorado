@@ -40,7 +40,7 @@ std::vector<BamPtr> create_bam_reader(const std::string& bc) {
 TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
-    auto tmp_dir = fs::temp_directory_path() / "dorado_demuxer";
+    auto tmp_dir = make_temp_dir("dorado_demuxer");
 
     {
         // Creating local scope for the pipeline because on windows
@@ -48,8 +48,8 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         // the pipeline object is closed. This needs to be looked at.
         // TODO: Address open file issue on windows.
         dorado::PipelineDescriptor pipeline_desc;
-        auto demuxer =
-                pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.string(), 8, false, nullptr);
+        auto demuxer = pipeline_desc.add_node<BarcodeDemuxerNode>({}, tmp_dir.m_path.string(), 8,
+                                                                  false, nullptr, true);
 
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -76,7 +76,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
 
         std::unordered_set<std::string> actual_files;
 
-        for (const auto& entry : fs::directory_iterator(tmp_dir)) {
+        for (const auto& entry : fs::directory_iterator(tmp_dir.m_path)) {
             actual_files.insert(entry.path().filename().string());
         }
 
@@ -84,6 +84,4 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
             CHECK(actual_files.find(expected) != actual_files.end());
         }
     }
-
-    fs::remove_all(tmp_dir);
 }

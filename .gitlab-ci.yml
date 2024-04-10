@@ -1,6 +1,7 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
   - local: .gitlab/benchmarks-ci.yml
+  - local: .gitlab/build-ont_core.yml
 
 workflow:
   rules:
@@ -39,7 +40,7 @@ variables:
     - osx_arm64
     - xcode-14.2
   variables:
-    MACOSX_DEPLOYMENT_TARGET: "12.3"
+    MACOSX_DEPLOYMENT_TARGET: "11.0"
 
 .macos_x64_runner: &macos_x64_runner
   tags:
@@ -91,14 +92,17 @@ variables:
     PARALLEL_JOBS=$(( 8 > PARALLEL_JOBS ? 8 : PARALLEL_JOBS ))
   - echo "PARALLEL_JOBS '${PARALLEL_JOBS}'"
 
-.run_dorado_cmake_build:
-  - echo Dorado build stage
-  - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
+.setup_ccache:
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
   -   export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
-  - *set_parallel_jobs
+
+.run_dorado_cmake_build:
+  - echo Dorado build stage
+  - !reference [.set_parallel_jobs]
+  - !reference [.setup_ccache]
+  - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
   - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
@@ -209,6 +213,7 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
+    - .linux_dependencies
     - .linux_runner
     - .build_and_test_dorado
 
@@ -285,7 +290,7 @@ build:linux:arm64:bionic:unittests:
     - build:linux:arm64:bionic
 
 build:linux:arm64:focal:
-  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -428,7 +433,7 @@ build_archive:linux:arm64:bionic:
     - .on_nightly_or_manual
 
 build_archive:linux:arm64:focal:
-  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
     - .linux_dependencies
     - .linux_arm64_runner
@@ -545,7 +550,7 @@ test:linux:arm64:bionic:
     - build:linux:arm64:bionic
 
 test:linux:arm64:focal:
-  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
     - .linux_dependencies
     - .linux_orin_runner
@@ -614,7 +619,7 @@ test_archive:linux:arm64:18.04:
     - build_archive:linux:arm64:bionic
 
 test_archive:linux:arm64:20.04:
-  image: nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
     - .linux_dependencies
     - .linux_orin_runner

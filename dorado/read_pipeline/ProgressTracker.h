@@ -29,6 +29,12 @@ public:
     void update_progress_bar(const stats::NamedStats& stats);
     void update_post_processing_progress(float progress);
 
+    // Disable the update of progress information during processing
+    // This is useful since progress is not reported using spdlog
+    // so it may interleave.
+    // Note, summarize will not be disabled as it uses spdlog to report.
+    void disable_progress_reporting();
+
 private:
     void internal_set_progress(float progress, bool post_processing);
 
@@ -75,6 +81,8 @@ private:
     // What % of time is going to be spent in post-processing.
     const float m_post_processing_percentage;
     float m_last_post_processing_progress = -1.f;
+
+    bool m_is_progress_reporting_disabled{false};
 };
 
 }  // namespace dorado

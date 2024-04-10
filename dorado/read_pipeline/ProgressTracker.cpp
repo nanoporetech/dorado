@@ -36,12 +36,17 @@ ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_proces
 ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::set_description(const std::string& desc) {
-    erase_progress_bar_line();
-    m_progress_bar.set_option(indicators::option::PostfixText{desc});
+    if (!m_is_progress_reporting_disabled) {
+        erase_progress_bar_line();
+        m_progress_bar.set_option(indicators::option::PostfixText{desc});
+    }
 }
 
 void ProgressTracker::summarize() const {
-    erase_progress_bar_line();
+    if (!m_is_progress_reporting_disabled) {
+        erase_progress_bar_line();
+    }
+
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
@@ -168,8 +173,10 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
             internal_set_progress(progress, false);
         }
     } else {
-        std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
-        std::cerr << "\r";
+        if (!m_is_progress_reporting_disabled) {
+            std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
+            std::cerr << "\r";
+        }
     }
 
     // Collect per barcode stats.
@@ -204,7 +211,7 @@ void ProgressTracker::update_post_processing_progress(float progress) {
 
 void ProgressTracker::internal_set_progress(float progress, bool post_processing) {
     // The progress bar uses escape sequences that only TTYs understand.
-    if (!utils::is_fd_tty(stderr)) {
+    if (m_is_progress_reporting_disabled || !utils::is_fd_tty(stderr)) {
         return;
     }
 
@@ -228,5 +235,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
 #endif
     std::cerr << "\r";
 }
+
+void ProgressTracker::disable_progress_reporting() { m_is_progress_reporting_disabled = true; }
 
 }  // namespace dorado

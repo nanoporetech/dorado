@@ -6,6 +6,7 @@
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -65,6 +66,7 @@ protected:
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read->read_common.attributes.fast5_filename = "test.fast5";
+        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
         return read;
     }
 
@@ -129,26 +131,11 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 // Download a model to a temporary directory
 TempDir download_model(const std::string& model) {
     // Create a new directory to download the model to
-#ifdef _WIN32
-    std::filesystem::path path;
-    while (true) {
-        char temp[L_tmpnam];
-        const char* name = std::tmpnam(temp);
-        if (std::filesystem::create_directories(name)) {
-            path = std::filesystem::canonical(name);
-            break;
-        }
-    }
-#else
-    // macOS (rightfully) complains about tmpnam() usage, so make use of mkdtemp() on platforms that support it
-    std::string temp = (std::filesystem::temp_directory_path() / "model_XXXXXXXXXX").string();
-    const char* name = mkdtemp(temp.data());
-    auto path = std::filesystem::canonical(name);
-#endif
+    auto temp_dir = make_temp_dir("model");
 
     // Download it
-    REQUIRE(dorado::models::download_models(path.string(), model));
-    return TempDir(std::move(path));
+    REQUIRE(dorado::models::download_models(temp_dir.m_path.string(), model));
+    return temp_dir;
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
@@ -391,13 +378,15 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    set_read_mutator([](dorado::SimplexReadPtr& read) {
+    set_read_mutator([is_rna](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
+        dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
+        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
     });
 
-    run_smoke_test<dorado::PolyACalculatorNode>(8, is_rna, 1000, nullptr);
+    run_smoke_test<dorado::PolyACalculatorNode>(8, 1000);
 }
 
 }  // namespace

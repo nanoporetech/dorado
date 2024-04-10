@@ -67,11 +67,11 @@ PolyTailConfig prepare_config(std::istream& is) {
     return config;
 }
 
-PolyTailConfig prepare_config(const std::string* const config_file) {
-    if (config_file != nullptr) {
-        std::ifstream file(*config_file);  // Open the file for reading
+PolyTailConfig prepare_config(const std::string& config_file) {
+    if (!config_file.empty()) {
+        std::ifstream file(config_file);  // Open the file for reading
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file " + *config_file);
+            throw std::runtime_error("Failed to open file " + config_file);
         }
 
         // Read the file contents into a string

@@ -261,44 +261,52 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
     return seq_to_sig_map;
 }
 
-OverlapResult compute_overlap(const std::string& query_seq, const std::string& target_seq) {
-    OverlapResult overlap_result = {false, 0, 0, 0, 0};
+std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
+                                             const std::string& query_name,
+                                             const std::string& target_seq,
+                                             const std::string& target_name,
+                                             MmTbufPtr& working_buffer) {
+    std::optional<OverlapResult> overlap_result;
 
     // Add mm2 based overlap check.
-    mm_idxopt_t m_idx_opt;
-    mm_mapopt_t m_map_opt;
-    mm_set_opt(0, &m_idx_opt, &m_map_opt);
-    mm_set_opt("map-hifi", &m_idx_opt, &m_map_opt);
+    mm_idxopt_t idx_opt;
+    mm_mapopt_t map_opt;
+    mm_set_opt(0, &idx_opt, &map_opt);
+    mm_set_opt("map-hifi", &idx_opt, &map_opt);
 
-    std::vector<const char*> seqs = {query_seq.c_str()};
-    std::vector<const char*> names = {"query"};
-    mm_idx_t* m_index = mm_idx_str(m_idx_opt.w, m_idx_opt.k, 0, m_idx_opt.bucket_bits, 1,
-                                   seqs.data(), names.data());
-    mm_mapopt_update(&m_map_opt, m_index);
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    map_opt.cap_kalloc = 100'000'000;
+    map_opt.max_sw_mat = 50'000'000;
 
-    MmTbufPtr mbuf = MmTbufPtr(mm_tbuf_init());
+    const char* seqs[] = {query_seq.c_str()};
+    const char* names[] = {query_name.c_str()};
+    mm_idx_t* index = mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs, names);
+    mm_mapopt_update(&map_opt, index);
+
+    if (!working_buffer) {
+        working_buffer = MmTbufPtr(mm_tbuf_init());
+    }
 
     int hits = 0;
-    mm_reg1_t* reg = mm_map(m_index, int(target_seq.length()), target_seq.c_str(), &hits,
-                            mbuf.get(), &m_map_opt, "target");
+    mm_reg1_t* reg = mm_map(index, int(target_seq.length()), target_seq.c_str(), &hits,
+                            working_buffer.get(), &map_opt, target_name.c_str());
 
-    mm_idx_destroy(m_index);
+    mm_idx_destroy(index);
 
     if (hits > 0) {
-        int32_t target_start = 0;
-        int32_t target_end = 0;
-        int32_t query_start = 0;
-        int32_t query_end = 0;
+        OverlapResult result;
 
         auto best_map = std::max_element(
                 reg, reg + hits,
                 [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
-        target_start = best_map->rs;
-        target_end = best_map->re;
-        query_start = best_map->qs;
-        query_end = best_map->qe;
+        result.target_start = best_map->rs;
+        result.target_end = best_map->re;
+        result.query_start = best_map->qs;
+        result.query_end = best_map->qe;
+        result.mapq = best_map->mapq;
+        result.rev = best_map->rev;
 
-        overlap_result = {true, target_start, target_end, query_start, query_end};
+        overlap_result = result;
     }
 
     for (int i = 0; i < hits; ++i) {
@@ -314,15 +322,21 @@ OverlapResult compute_overlap(const std::string& query_seq, const std::string& t
 std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves) {
-    auto [is_overlap, query_start, query_end, target_start, target_end] = compute_overlap(
-            query_sequence,
-            target_sequence);  // We are going to compute the overlap between the two reads
+    // We are going to compute the overlap between the two reads
+    MmTbufPtr working_buffer;
+    const auto overlap_result =
+            compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
 
     const auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
     // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
-    if (!is_overlap) {
+    if (!overlap_result) {
         return failed_realignment;
     }
+    auto query_start = overlap_result->query_start;
+    auto target_start = overlap_result->target_start;
+    const auto query_end = overlap_result->query_end;
+    const auto target_end = overlap_result->target_end;
+
     // Advance the query and target position.
     ++query_start;
     ++target_start;

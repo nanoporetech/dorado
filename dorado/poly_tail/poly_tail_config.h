@@ -23,7 +23,7 @@ struct PolyTailConfig {
 // Prepare the PolyA configuration struct. If a configuration
 // file is available, parse it to extract parameters. Otherwise
 // prepare the default configuration.
-PolyTailConfig prepare_config(const std::string* const config_file);
+PolyTailConfig prepare_config(const std::string& config_file);
 
 // Overloaded function that parses the configuration passed
 // in as an input stream.

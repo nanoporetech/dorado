@@ -4,12 +4,14 @@
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
+#include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
 #include "models/kits.h"
 #include "models/models.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -21,6 +23,9 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -115,7 +120,7 @@ void setup(std::vector<std::string> args,
            const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
-           const std::string* const polya_config,
+           const std::string& polya_config,
            const ModelSelection& model_selection) {
     const auto model_config = basecall::load_crf_model_config(model_path);
     const std::string model_name = models::extract_model_name_from_path(model_path);
@@ -175,23 +180,34 @@ void setup(std::vector<std::string> args,
     }
 
     SamHdrPtr hdr(sam_hdr_init());
-    cli::add_pg_hdr(hdr.get(), args);
-    if (custom_kit) {
-        auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
-        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
-                                               sample_sheet.get());
-    } else if (!barcode_kit.empty()) {
-        const auto kit_info = get_barcode_kit_info(barcode_kit);
-        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
-                                               sample_sheet.get());
+    cli::add_pg_hdr(hdr.get(), args, device);
+
+    if (barcode_enabled) {
+        std::unordered_map<std::string, std::string> custom_barcodes{};
+        if (custom_barcode_file) {
+            custom_barcodes = demux::parse_custom_sequences(*custom_barcode_file);
+        }
+        if (custom_kit) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
+                                                   custom_barcodes, sample_sheet.get());
+        } else {
+            const auto kit_info = get_barcode_kit_info(barcode_kit);
+            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
+                                                   custom_barcodes, sample_sheet.get());
+        }
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads);
+    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+    std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+    gpu_names = utils::get_cuda_gpu_names(device);
+#endif
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -206,8 +222,7 @@ void setup(std::vector<std::string> args,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(),
-                is_rna_model(model_config), 1000, polya_config);
+                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
@@ -249,7 +264,7 @@ void setup(std::vector<std::string> args,
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_file.set_and_write_header(hdr.get());
+    hts_file.set_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -307,6 +322,12 @@ void setup(std::vector<std::string> args,
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
 
+    DefaultClientInfo::PolyTailSettings polytail_settings{estimate_poly_a,
+                                                          is_rna_model(model_config), polya_config};
+    auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
+    auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };
+    loader.add_read_initialiser(func);
+
     // Run pipeline.
     loader.load_reads(data_path, recursive_file_loading, ReadOrder::UNRESTRICTED);
 
@@ -322,11 +343,9 @@ void setup(std::vector<std::string> args,
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise(
-            [&](size_t progress) {
-                tracker.update_post_processing_progress(static_cast<float>(progress));
-            },
-            thread_allocations.writer_threads);
+    hts_file.finalise([&](size_t progress) {
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
 
     // Give the user a nice summary.
     tracker.summarize();
@@ -667,8 +686,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
               no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
               std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
-              polya_config.empty() ? nullptr : &polya_config, model_selection);
+              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
+              model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

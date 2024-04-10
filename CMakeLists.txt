@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
@@ -165,6 +165,7 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/DefaultClientInfo.cpp
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h

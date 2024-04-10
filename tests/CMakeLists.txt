@@ -25,6 +25,7 @@ add_executable(dorado_tests
     DuplexSplitTest.cpp
     fake_client_info.h
     gpu_monitor_test.cpp
+    HtsFileTest.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
     Minimap2IndexTest.cpp

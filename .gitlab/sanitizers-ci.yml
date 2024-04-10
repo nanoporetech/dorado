@@ -38,17 +38,22 @@ sanitize:linux:x86:focal:
     - build:linux:x86:focal
     - .sanitizer_common_linux
   before_script:
-    # Setup sanitizers
-    - !reference [.sanitizer_common, before_script]
+    # Run both base setups
+    - !reference ["build:linux:x86:focal", before_script]
+    - !reference [.sanitizer_common_linux, before_script]
     # We need to modify ASAN_OPTIONS for the following reasons:
     #   protect_shadow_gap - CUDA maps the same memory region as ASAN, so tell it to move the shadow
     #   detect_leaks - LeakSanitizer errors out for some reason
     - export ASAN_OPTIONS=${ASAN_OPTIONS}:protect_shadow_gap=0:detect_leaks=0
 
-sanitize:linux:arm64:bionic:
+sanitize:linux:arm64:focal:
   extends:
-    - build:linux:arm64:bionic
+    - build:linux:arm64:focal
     - .sanitizer_common_linux
+  before_script:
+    # Run both base setups
+    - !reference ["build:linux:arm64:focal", before_script]
+    - !reference [.sanitizer_common_linux, before_script]
   retry:
     max: 1
     when:

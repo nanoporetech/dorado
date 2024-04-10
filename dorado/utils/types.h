@@ -43,6 +43,8 @@ struct BarcodeScoreResult {
     int penalty = -1;
     int top_penalty = -1;
     int bottom_penalty = -1;
+    float top_barcode_score = -1.f;
+    float bottom_barcode_score = -1.f;
     float barcode_score = -1.f;
     float flank_score = -1.f;
     float top_flank_score = -1.f;

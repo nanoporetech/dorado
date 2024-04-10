@@ -523,9 +523,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         v1.bottom_flank_score = bottom_flank_score_v1;
         std::tie(v1.use_top, v1.penalty, v1.flank_score) = pick_top_or_bottom(
                 v1.top_penalty, v1.top_flank_score, v1.bottom_penalty, v1.bottom_flank_score);
-        v1.barcode_score =
-                v1.use_top ? (1.f - static_cast<float>(v1.top_penalty) / barcode1.length())
-                           : (1.f - static_cast<float>(v1.bottom_penalty) / barcode2_rev.length());
+        v1.top_barcode_score = (1.f - static_cast<float>(v1.top_penalty) / barcode1.length());
+        v1.bottom_barcode_score =
+                (1.f - static_cast<float>(v1.bottom_penalty) / barcode2_rev.length());
+        v1.barcode_score = v1.use_top ? v1.top_barcode_score : v1.bottom_barcode_score;
         v1.top_barcode_pos = {top_result_v1.startLocations[0], top_result_v1.endLocations[0]};
         v1.bottom_barcode_pos = {bottom_start + bottom_result_v1.startLocations[0],
                                  bottom_start + bottom_result_v1.endLocations[0]};
@@ -544,9 +545,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         v2.bottom_flank_score = bottom_flank_score_v2;
         std::tie(v2.use_top, v2.penalty, v2.flank_score) = pick_top_or_bottom(
                 v2.top_penalty, v2.top_flank_score, v2.bottom_penalty, v2.bottom_flank_score);
-        v2.barcode_score =
-                v2.use_top ? (1.f - static_cast<float>(v2.top_penalty) / barcode2.length())
-                           : (1.f - static_cast<float>(v2.bottom_penalty) / barcode1_rev.length());
+        v2.top_barcode_score = (1.f - static_cast<float>(v2.top_penalty) / barcode2.length());
+        v2.bottom_barcode_score =
+                (1.f - static_cast<float>(v2.bottom_penalty) / barcode1_rev.length());
+        v2.barcode_score = v2.use_top ? v2.top_barcode_score : v2.bottom_barcode_score;
         v2.top_barcode_pos = {top_result_v2.startLocations[0], top_result_v2.endLocations[0]};
         v2.bottom_barcode_pos = {bottom_start + bottom_result_v2.startLocations[0],
                                  bottom_start + bottom_result_v2.endLocations[0]};
@@ -658,9 +660,10 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         res.bottom_flank_score = bottom_flank_score;
         std::tie(res.use_top, res.penalty, res.flank_score) = pick_top_or_bottom(
                 res.top_penalty, res.top_flank_score, res.bottom_penalty, res.bottom_flank_score);
-        res.barcode_score =
-                res.use_top ? (1.f - static_cast<float>(res.top_penalty) / barcode.length())
-                            : (1.f - static_cast<float>(res.bottom_penalty) / barcode_rev.length());
+        res.top_barcode_score = (1.f - static_cast<float>(res.top_penalty) / barcode.length());
+        res.bottom_barcode_score =
+                (1.f - static_cast<float>(res.bottom_penalty) / barcode_rev.length());
+        res.barcode_score = res.use_top ? res.top_barcode_score : res.bottom_barcode_score;
         res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
         res.bottom_barcode_pos = {bottom_start + bottom_result.startLocations[0],
                                   bottom_start + bottom_result.endLocations[0]};
@@ -729,7 +732,8 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         res.bottom_penalty = -1;
         res.penalty = res.top_penalty;
         res.use_top = true;
-        res.barcode_score = 1.f - static_cast<float>(res.top_penalty) / barcode.length();
+        res.top_barcode_score = 1.f - static_cast<float>(res.top_penalty) / barcode.length();
+        res.barcode_score = res.top_barcode_score;
         res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
 
         results.push_back(res);
@@ -745,6 +749,10 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const std::vector<BarcodeCandidateKit>& candidates,
         bool barcode_both_ends,
         const BarcodingInfo::FilterSet& allowed_barcodes) const {
+    if (read_seq.length() == 0) {
+        return UNCLASSIFIED;
+    }
+
     const std::string_view fwd = read_seq;
 
     // First find best barcode kit.

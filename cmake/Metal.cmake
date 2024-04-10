@@ -5,9 +5,12 @@ set(METAL_SOURCES dorado/basecall/metal/nn.metal)
 
 if (IOS)
     set(XCRUN_SDK ${SDK_NAME})
+    set(METAL_STD_VERSION "ios-metal2.3") # iOS 14
 else()
     set(XCRUN_SDK macosx)
+    set(METAL_STD_VERSION "macos-metal2.3") # macOS 11.0
 endif()
+string(TOUPPER ${XCRUN_SDK} XCRUN_SDK_UPPER)
 
 foreach(source ${METAL_SOURCES})
     get_filename_component(basename "${source}" NAME_WE)
@@ -15,11 +18,13 @@ foreach(source ${METAL_SOURCES})
     add_custom_command(
         OUTPUT "${air_path}"
         COMMAND
+            ${CMAKE_COMMAND} -E env
+                ${XCRUN_SDK_UPPER}_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             xcrun -sdk ${XCRUN_SDK} metal
                 -Werror
                 -Wall -Wextra -pedantic
                 -Wno-c++17-extensions # [[maybe_unused]] is C++17
-                -std=metal3.0
+                -std=${METAL_STD_VERSION}
                 -ffast-math
                 -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
                 -o "${air_path}"
@@ -32,6 +37,8 @@ endforeach()
 add_custom_command(
     OUTPUT default.metallib
     COMMAND
+        ${CMAKE_COMMAND} -E env
+            ${XCRUN_SDK_UPPER}_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
         xcrun -sdk ${XCRUN_SDK} metallib
             ${AIR_FILES}
             -o ${CMAKE_BINARY_DIR}/lib/default.metallib

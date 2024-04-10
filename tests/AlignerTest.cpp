@@ -27,6 +27,23 @@ namespace fs = std::filesystem;
 
 namespace {
 
+class TestClientInfo : public dorado::ClientInfo {
+    const dorado::AlignmentInfo m_align_info;
+
+public:
+    TestClientInfo(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
+
+    int32_t client_id() const override { return 1; }
+
+    const dorado::poly_tail::PolyTailCalculator* poly_a_calculator() const override {
+        return nullptr;
+    };
+
+    const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
+
+    bool is_disconnected() const override { return false; }
+};
+
 std::unordered_map<std::string, std::string> get_tags_from_sam_line_fields(
         const std::vector<std::string>& fields) {
     // returns tags TAG:TYPE:VALUE as kvps of TAG:TYPE to VALUE
