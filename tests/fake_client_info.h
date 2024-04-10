@@ -20,6 +20,7 @@ public:
 
     const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
     const dorado::BarcodingInfo& barcoding_info() const override { return m_barcoding_info; }
+    const poly_tail::PolyTailCalculator* poly_a_calculator() const override { return nullptr; }
 
     bool is_disconnected() const override { return false; }
 };
