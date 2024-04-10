@@ -7,8 +7,15 @@
 #include "utils/gpu_profiling.h"
 
 #include <ATen/TensorIndexing.h>
+#include <ATen/ops/arange.h>
 #include <ATen/ops/cat.h>
+#include <ATen/ops/rsqrt.h>
+#include <c10/core/ScalarType.h>
+#include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
+#include <torch/nn/functional/padding.h>
+#include <torch/nn/options/padding.h>
+#include <torch/types.h>
 
 #include <filesystem>
 #include <stdexcept>
@@ -30,8 +37,9 @@ RMSNormImpl::RMSNormImpl(int lrno_, int hidden_size_) : lrno(lrno_), hidden_size
 }
 
 at::Tensor RMSNormImpl::forward(at::Tensor x) {
-    at::Tensor rstd = torch::rsqrt(x.square().mean(-1, true) + eps);
-    return x * rstd * weight;
+    x = x.to(torch::kFloat32);
+    at::Tensor rstd = torch::rsqrt(x.square().mean(-1, true, torch::kFloat32) + eps);
+    return (x * rstd * weight).to(torch::kHalf);
 }
 
 GatedMLPImpl::GatedMLPImpl(int lrno_, int in_features, int hidden_features) : lrno(lrno_) {
@@ -48,89 +56,143 @@ at::Tensor GatedMLPImpl::forward(at::Tensor x) {
     const at::Tensor out = fc2(functional::silu(gate).mul(y));
 
     // if (lrno == 0) {
-    //     dump_tensor(fc1_,
-    //                 "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc1");
-    //     dump_tensor(out,
-    //                 "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn.ff.fc2");
+    // dump_tensor(fc1_, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc1");
+    // dump_tensor(out, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc2");
     // }
     return out;
 }
 
-RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_, int dim_, int theta_, int max_seq_len_)
-        : lrno(lrno_), dim(dim_), theta(theta_), max_seq_len(max_seq_len_) {
-    const at::Tensor inv_freq = torch::full({1}, theta, torch::kFloat32)
-                                        .pow(torch::arange(0, dim, 2)
-                                                     .index({Slice{Idx::None, dim / 2}})
-                                                     .to(torch::kFloat32)
-                                                     .div(dim))
-                                        .reciprocal();
+RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_,
+                                         int dim_,
+                                         float theta_,
+                                         int max_seq_len_,
+                                         const at::TensorOptions &options_)
+        : lrno(lrno_), dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
+    // To maintain precision we use float32 here
+    const at::Tensor inv_freq =
+            torch::pow(theta, torch::arange(0, dim, 2, options.dtype(torch::kFloat32)) / dim)
+                    .reciprocal();
+
+    // torch::full({1}, theta, options.dtype(torch::kFloat32))
+    //         .pow(torch::arange(0, dim, 2, options.dtype(torch::kFloat32))
+    //                      .index({Slice{Idx::None, dim / 2}})
+    //                      .div(dim))
+    //         .reciprocal();
 
     // freqs.shape := {max_seq_len, 1, 1, dim/2}
-    const at::Tensor freqs = torch::arange(max_seq_len).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
+    const at::Tensor freqs = torch::arange(max_seq_len, options.dtype(torch::kFloat32))
+                                     .reshape({max_seq_len, 1, 1, 1}) *
+                             inv_freq;
 
-    register_buffer("cos_freqs", torch::cos(freqs));
-    register_buffer("sin_freqs", torch::sin(freqs));
+    // dump_tensor(freqs, "m.encoder.transformer_encoder_" + std::to_string(lrno) +
+    //                            ".self_attn.rotary_emb.freqs");
+    // dump_tensor(inv_freq, "m.encoder.transformer_encoder_" + std::to_string(lrno) +
+    //                               ".self_attn.rotary_emb.inv_freqs");
+
+    register_buffer("cos_freqs", torch::cos(freqs).to(options.dtype(torch::kHalf)));
+    register_buffer("sin_freqs", torch::sin(freqs).to(options.dtype(torch::kHalf)));
 };
 
-at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
-    const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
-    // Expected shape: N, seq_len, 3, nhead, head_dim
-    const long int seq_len = qkv.size(1);
+at::Tensor RotaryEmbeddingImpl::forward(torch::Tensor qkv) {
+    auto qkv_sizes = qkv.sizes();
+    // int64_t batch = qkv_sizes[0];
+    int64_t seq_len = qkv_sizes[1];
+    int64_t _three = qkv_sizes[2];
+    int64_t _nhead = qkv_sizes[3];
+    int64_t head_dim = qkv_sizes[4];
 
-    using Slices = std::vector<Idx::TensorIndex>;
-    // The slice of the qk tensors := qkv[..., :2, :, :dim]
-    const Slices qk = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(Idx::None, dim)};
+    TORCH_CHECK(_three == 3, "Expected the third dimension to be 3");
+    TORCH_CHECK(_nhead == 8, "Expected the fourth dimension to be 8");
+    TORCH_CHECK(head_dim == 64, "Expected the fifth dimension to be 64");
 
-    // evens := x[..., : dim/2]  odds := x[..., dim/2:dim]
-    const Slices evens = {Idx::Ellipsis, Slice(Idx::None, dim / 2)};
-    const Slices odds = {Idx::Ellipsis, Slice(dim / 2, dim)};
+    if (head_dim > dim) {
+        throw std::invalid_argument("RotaryEmbedding dim " + std::to_string(dim) +
+                                    " is larger than head_dim " + std::to_string(head_dim));
+    }
 
-    const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
-    const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
+    TORCH_CHECK(head_dim == dim, "Head dimension must equal embedding dimension");
 
-    at::Tensor out = qkv.clone();
+    auto out = qkv.clone();
 
-    // const at::Tensor qk_evens = qkv.slice(/*dim=*/2, /*start=*/0, /*end=*/2)
-    //                                     .slice(/*dim=*/4, /*start=*/0, /*end=*/dim / 2);
-    // const at::Tensor qk_odds = qkv.slice(/*dim=*/2, /*start=*/0, /*end=*/2)
-    //                                    .slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim);
+    // Assuming _cos_cached and _sin_cached are tensors of appropriate size and content
+    auto cos_buf = named_buffers()["cos_freqs"].index(
+            {torch::indexing::Slice(torch::indexing::None, seq_len)});
+    auto sin_buf = named_buffers()["sin_freqs"].index(
+            {torch::indexing::Slice(torch::indexing::None, seq_len)});
 
-    const at::Tensor qk_evens = qkv.index(qk).index(evens);
-    const at::Tensor qk_odds = qkv.index(qk).index(odds);
+    auto qk_evens =
+            qkv.index({torch::indexing::Ellipsis, torch::indexing::Slice(torch::indexing::None, 2),
+                       torch::indexing::Slice(),
+                       torch::indexing::Slice(torch::indexing::None, dim / 2)})
+                    .to(torch::kFloat32);
+    auto qk_odds =
+            qkv.index({torch::indexing::Ellipsis, torch::indexing::Slice(torch::indexing::None, 2),
+                       torch::indexing::Slice(), torch::indexing::Slice(dim / 2, dim)})
+                    .to(torch::kFloat32);
 
-    out.index(qk).index(evens) = (cos_buf * qk_evens) - (sin_buf * qk_odds);
-    out.index(qk).index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
-    // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/0, /*end=*/dim / 2) =
-    //         (cos_buf * qk_evens) - (sin_buf * qk_odds);
-    // out.slice(/*dim=*/2, /*start=*/0, /*end=*/2).slice(/*dim=*/4, /*start=*/dim / 2, /*end=*/dim) =
-    //         (sin_buf * qk_evens) + (cos_buf * qk_odds);
+    out.index_put_(
+            {torch::indexing::Ellipsis, torch::indexing::Slice(torch::indexing::None, 2),
+             torch::indexing::Slice(), torch::indexing::Slice(torch::indexing::None, dim / 2)},
+            (cos_buf * qk_evens) - (sin_buf * qk_odds));
+    out.index_put_({torch::indexing::Ellipsis, torch::indexing::Slice(torch::indexing::None, 2),
+                    torch::indexing::Slice(), torch::indexing::Slice(dim / 2, dim)},
+                   (sin_buf * qk_evens) + (cos_buf * qk_odds));
 
-    // if (lrno == 0) {
-    //     spdlog::debug(shape(cos_buf, name + ".cos_buf"));
-    //     spdlog::debug(shape(sin_buf, name + ".sin_buf"));
-    //     spdlog::debug(shape(qkv, name + ".qkv"));
-    //     spdlog::debug(shape(qk_evens, name + ".qk_evens"));
-    //     spdlog::debug(shape(qk_odds, name + ".qk_odds"));
-    // }
     return out;
 }
+
+// at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
+//     const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
+//     // Expected shape: N, seq_len, 3, nhead, head_dim
+//     const long int seq_len = qkv.size(1);
+
+//     const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
+//     const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
+
+//     // if (lrno == 0) {
+//     //     dump_tensor(cos_buf, "m.encoder.transformer_encoder_" + std::to_string(lrno) +
+//     //                                  ".self_attn.rotary_emb.cos");
+//     //     dump_tensor(sin_buf, "m.encoder.transformer_encoder_" + std::to_string(lrno) +
+//     //                                  ".self_attn.rotary_emb.sin");
+//     //
+
+//     if (cos_buf.dtype() != torch::kHalf || sin_buf.dtype() != torch::kHalf) {
+//         spdlog::error("expected cos_buf and sin_buf dtype == half");
+//     }
+
+//     at::Tensor out = qkv.clone();
+
+//     using Slices = std::vector<Idx::TensorIndex>;
+//     const Slices evens = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(Idx::None, dim / 2)};
+//     const Slices odds = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(dim / 2, dim)};
+
+//     const at::Tensor qk_evens = qkv.index(evens).to(torch::kFloat32);
+//     const at::Tensor qk_odds = qkv.index(odds).to(torch::kFloat32);
+
+//     out.index(evens) = (cos_buf * qk_evens) - (sin_buf * qk_odds);
+//     out.index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
+
+//     return out.to(torch::kHalf);
+// }
 
 MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
                                                int d_model_,
                                                int nhead_,
                                                bool qkv_bias_,
                                                bool out_bias_,
-                                               const at::Tensor &attn_window_mask_)
+                                               const at::Tensor &attn_window_mask_,
+                                               const at::TensorOptions &options_)
         : lrno(lrno_),
           d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
-          attn_window_mask(attn_window_mask_) {
+          attn_window_mask(attn_window_mask_),
+          options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     // TODO: can max_seq_len 1000 -> attn_window.size()?
-    rotary_emb = register_module("rotary_emb",
-                                 RotaryEmbedding(lrno, head_dim, 10000, attn_window_mask.size(0)));
+    rotary_emb = register_module("rotary_emb", RotaryEmbedding(lrno, head_dim, 10000.0,
+                                                               attn_window_mask.size(0), options));
 };
 
 at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
@@ -149,7 +211,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
         // if (lrno == 0) {
         //     spdlog::debug(shape(qkv, name + ".qkv"));
-        //     dump_tensor(qkv, name + ".qkv");
+        dump_tensor(qkv, name + ".qkv");
         // }
     }
     {
@@ -157,7 +219,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         qkv = rotary_emb(qkv);
         // if (lrno == 0) {
         //     spdlog::debug(shape(qkv, name + ".rotary_emb"));
-        //     dump_tensor(qkv, name + ".rotary_emb");
+        dump_tensor(qkv, name + ".rotary_emb");
         // }
     }
     {
@@ -171,7 +233,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 
         // if (lrno == 0) {
         //     spdlog::debug(shape(attn_output, name + ".attn_output"));
-        //     dump_tensor(attn_output, name + ".attn_output");
+        // dump_tensor(attn_output, name + ".attn_output");
         // }
     }
     {
@@ -179,7 +241,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         x = out_proj(attn_output);
         // if (lrno == 0) {
         //     spdlog::debug(shape(x, name + ".out_proj"));
-        //     dump_tensor(x, name + ".out_proj");
+        // dump_tensor(x, name + ".out_proj");
         // }
     }
     return x;
@@ -187,15 +249,17 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 
 TxEncoderImpl::TxEncoderImpl(int lrno_,
                              const TxEncoderParams &params,
-                             const at::Tensor &attn_window_mask_)
-        : lrno(lrno_), attn_window_mask(attn_window_mask_) {
-    self_attn = register_module("self_attn", MultiHeadAttention(lrno, params.d_model, params.nhead,
-                                                                false, true, attn_window_mask));
+                             const at::Tensor &attn_window_mask_,
+                             const at::TensorOptions &options_)
+        : lrno(lrno_), attn_window_mask(attn_window_mask_), options(options_) {
+    self_attn = register_module("self_attn",
+                                MultiHeadAttention(lrno, params.d_model, params.nhead, false, true,
+                                                   attn_window_mask, options));
     ff = register_module("ff", GatedMLP(lrno, params.d_model, params.dim_feedforward));
     norm1 = register_module("norm1", RMSNorm(lrno, params.d_model));
     norm2 = register_module("norm2", RMSNorm(lrno, params.d_model));
 
-    const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha());
+    const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha);
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
@@ -207,7 +271,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
         // spdlog::debug(shape(attn, t_name + ".self_attn"));
-        // dump_tensor(attn, t_name + ".self_attn");
+        dump_tensor(attn, t_name + ".self_attn");
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
@@ -228,7 +292,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         // dump_tensor(x, t_name + ".norm2");
     }
 
-    // dump_tensor(x, t_name);
+    dump_tensor(x, t_name);
     return x;
 }
 
@@ -239,7 +303,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
     stack = Sequential();
     for (int i = 0; i < tx_enc_params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(i, tx_enc_params, attn_window_mask)));
+                                         TxEncoder(i, tx_enc_params, attn_window_mask, options)));
     }
 };
 
@@ -260,8 +324,9 @@ at::Tensor TxEncoderStackImpl::build_attn_window_mask(const basecall::CRFModelCo
 
 LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
-    linear = register_module("linear",
-                             Linear(LinearOptions(params.d_model, scale_factor * params.d_model)));
+    linear = register_module(
+            "linear",
+            Linear(LinearOptions(params.d_model, scale_factor * params.d_model).bias(true)));
 };
 at::Tensor LinearUpsampleImpl::forward(at::Tensor x) {
     const long int N = x.size(0);
@@ -271,52 +336,73 @@ at::Tensor LinearUpsampleImpl::forward(at::Tensor x) {
     return out;
 };
 
-LinearScaledCRFImpl::LinearScaledCRFImpl(int insize, int outsize, bool bias) {
-    linear = register_module("linear", Linear(LinearOptions(insize, outsize).bias(bias)));
+LinearScaledCRFImpl::LinearScaledCRFImpl(const tx::CRFEncoderParams &params) {
+    m_params = params;
+    linear = register_module(
+            "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
 };
 
 at::Tensor LinearScaledCRFImpl::forward(at::Tensor x) {
     utils::ScopedProfileRange spr("linscale", 2);
-    return linear(x) * 5.0f;
+
+    x = linear(x) * m_params.scale;
+    // if (m_params.expand_blanks) {
+    //     assert(!m_params.permute.empty());
+    //     const long int N = x.size(0);
+    //     const long int T = x.size(1);
+    //     const long int C = x.size(2);
+    //     const auto opts = torch::nn::functional::PadFuncOptions({1, 0}).value(m_params.blank_score);
+    //     return functional::pad(
+    //                    x.permute({1, 0, 2}).view({T, N, C / m_params.n_base, m_params.n_base}),
+    //                    opts)
+    //             .view({T, N, -1})
+    //             .permute({1, 0, 2});
+    // }
+    return x;
 }
 
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
 
-    const auto tx_enc_params = config.tx->tx;
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config, m_options));
     tx_decoder = register_module("transformer_decoder", LinearUpsample(config.tx->upsample));
-    crf = register_module("crf", LinearScaledCRF(tx_enc_params.d_model, 4096, false));
+    crf = register_module("crf", LinearScaledCRF(config.tx->crf));
 }
 
 at::Tensor TxModelImpl::forward(at::Tensor x) {
     // spdlog::debug(shape(x, "TxModel.x"));
-    // dump_tensor(x, "TxModel.x");
+    dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);
         h = convs->forward(x);
-        // spdlog::debug(shape(h, "m.encoder.conv"));
-        // dump_tensor(h, "m.encoder.conv");
+        spdlog::debug(shape(h, "m.encoder.conv"));
+        dump_tensor(h, "m.encoder.conv");
     }
     {
         utils::ScopedProfileRange spr("TransEnc", 1);
         h = tx_encoder(h);
-        // spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
-        // dump_tensor(h, "m.encoder.transformer_encoder");
+        spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
+        dump_tensor(h, "m.encoder.transformer_encoder");
     }
     {
         utils::ScopedProfileRange spr("TransDec", 1);
         h = tx_decoder(h);
-        // spdlog::debug(shape(h, "m.encoder.upsample"));
-        // dump_tensor(h, "m.encoder.upsample");
+        spdlog::debug(shape(h, "m.encoder.upsample"));
+        dump_tensor(h, "m.encoder.upsample");
     }
     {
         utils::ScopedProfileRange spr("CRF", 1);
         h = crf(h);
-        // spdlog::debug(shape(h, "m.encoder.crf"));
-        // dump_tensor(h, "m.encoder.crf");
+        spdlog::debug(shape(h, "m.encoder.crf"));
+        dump_tensor(h, "m.encoder.crf");
+    }
+
+    spdlog::debug("h.is_contiguous()={}", h.is_contiguous());
+    if (!h.is_contiguous()) {
+        h = h.contiguous();
+        spdlog::debug("after h.is_contiguous()={}", h.is_contiguous());
     }
     return h;
 }

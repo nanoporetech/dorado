@@ -169,7 +169,7 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (m_config.out_features.has_value()) {
         auto out_features = m_config.out_features.value();
-        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
+        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}, {4096, 34848}};
         auto it = out_features_map.upper_bound(out_features - 1);
         if (it == out_features_map.end()) {
             spdlog::error(
@@ -248,10 +248,10 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             // TODO: determine the best set of chunk sizes
 
             // TODO: ABSOLUTELY DON'T LEAVE THIS IN - 0.5 -> 1.0
-            for (float fraction : {1.0f}) {
-                int T_out = int(m_batch_dims[0].T_out * fraction);
-                m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
-            }
+            // for (float fraction : {1.0f}) {
+            //     int T_out = int(m_batch_dims[0].T_out * fraction);
+            //     m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+            // }
         }
     }
 

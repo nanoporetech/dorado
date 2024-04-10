@@ -5,6 +5,7 @@
 #include "utils/gpu_profiling.h"
 #include "utils/module_utils.h"
 
+#include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
 
 #include <cstdint>
@@ -37,11 +38,17 @@ struct GatedMLPImpl : torch::nn::Module {
 TORCH_MODULE(GatedMLP);
 
 struct RotaryEmbeddingImpl : torch::nn::Module {
-    RotaryEmbeddingImpl(int lrno_, int dim_, int theta_, int max_seq_len_);
+    RotaryEmbeddingImpl(int lrno_,
+                        int dim_,
+                        float theta_,
+                        int max_seq_len_,
+                        const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
 
-    const int lrno, dim, theta, max_seq_len;
+    const int lrno, dim, max_seq_len;
+    const float theta;
+    const at::TensorOptions options;
 };
 
 TORCH_MODULE(RotaryEmbedding);
@@ -52,12 +59,14 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
                            int nhead_,
                            bool qkv_bias_,
                            bool out_bias_,
-                           const at::Tensor &attn_window_mask_);
+                           const at::Tensor &attn_window_mask_,
+                           const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
 
     const int lrno, d_model, nhead, head_dim;
     const at::Tensor &attn_window_mask;
+    const at::TensorOptions options;
 
     torch::nn::Linear wqkv{nullptr}, out_proj{nullptr};
     RotaryEmbedding rotary_emb{nullptr};
@@ -68,12 +77,15 @@ TORCH_MODULE(MultiHeadAttention);
 struct TxEncoderImpl : torch::nn::Module {
     TxEncoderImpl(int lrno_,
                   const basecall::tx::TxEncoderParams &params,
-                  const at::Tensor &attn_window_mask_);
+                  const at::Tensor &attn_window_mask_,
+                  const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
 
     const int lrno;
     const at::Tensor &attn_window_mask;
+    const at::TensorOptions options;
+
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
     RMSNorm norm1{nullptr}, norm2{nullptr};
@@ -106,11 +118,12 @@ struct LinearUpsampleImpl : torch::nn::Module {
 TORCH_MODULE(LinearUpsample);
 
 struct LinearScaledCRFImpl : torch::nn::Module {
-    LinearScaledCRFImpl(int insize, int outsize, bool bias);
+    LinearScaledCRFImpl(const tx::CRFEncoderParams &params);
 
     at::Tensor forward(at::Tensor x);
 
     torch::nn::Linear linear{nullptr};
+    tx::CRFEncoderParams m_params;
 };
 
 TORCH_MODULE(LinearScaledCRF);

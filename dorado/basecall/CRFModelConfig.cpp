@@ -442,6 +442,8 @@ std::string TxEncoderParams::to_string() const {
     str += " d_model:" + std::to_string(d_model);
     str += " nhead:" + std::to_string(nhead);
     str += " depth:" + std::to_string(depth);
+    str += " dim_feedforward:" + std::to_string(dim_feedforward);
+    str += " deepnorm_alpha:" + std::to_string(deepnorm_alpha);
     str += "}";
     return str;
 }
@@ -460,8 +462,9 @@ std::string CRFEncoderParams::to_string() const {
     str += " n_base:" + std::to_string(n_base);
     str += " state_len:" + std::to_string(state_len);
     str += " scale:" + std::to_string(scale);
-    // str += " blank_score:" + std::to_string(blank_score);
-    // str += " expand_blanks:" + std::to_string(expand_blanks);
+    str += " blank_score:" + std::to_string(blank_score);
+    str += " expand_blanks:" + std::to_string(expand_blanks);
+    str += " permute:" + std::to_string(!permute.empty());
     str += "}";
     return str;
 }
@@ -473,6 +476,7 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     params.d_model = toml::find<int>(enc, "layer", "d_model");
     params.nhead = toml::find<int>(enc, "layer", "nhead");
     params.dim_feedforward = toml::find<int>(enc, "layer", "dim_feedforward");
+    params.deepnorm_alpha = toml::find<float>(enc, "layer", "deepnorm_alpha");
     const auto attn_window_ = toml::find(enc, "layer", "attn_window").as_array();
     params.attn_window = {attn_window_[0].as_integer(), attn_window_[1].as_integer()};
     return params;
@@ -502,8 +506,10 @@ CRFEncoderParams parse_crf_encoder_params(const toml::value &cfg) {
     params.n_base = toml::find<int>(crf, "n_base");
     params.state_len = toml::find<int>(crf, "state_len");
     params.scale = toml::find<float>(crf, "scale");
-    // params.blank_score = toml::find<float>(crf, "blank_score");
-    // params.expand_blanks = toml::find<bool>(crf, "expand_blanks");
+    params.blank_score = toml::find<float>(crf, "blank_score");
+    params.expand_blanks = toml::find<bool>(crf, "expand_blanks");
+    params.permute = toml::find<std::vector<int>>(crf, "permute");
+
     return params;
 }
 
@@ -535,21 +541,15 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     }
     // Recalculate the stride by accounting for upsampling / downsampling
     config.stride /= upsample.scale_factor;
-    // Do not include blank state
-    config.out_features = pow(crf_encoder.n_base, crf_encoder.state_len) * crf_encoder.n_base;
+    config.out_features = crf_encoder.out_features();
+    config.outsize = crf_encoder.outsize();
 
     if (config_toml.contains("run_info")) {
         config.sample_rate = toml::find<int>(config_toml, "run_info", "sample_rate");
     }
 
-    // const auto &global_norm = toml::find(config_toml, "seqdist");
-    // config.state_len = toml::find<int>(global_norm, "state_len");
     config.state_len = config.tx->crf.state_len;
     config.num_features = config.convs.front().insize;
-    // All of the paths avoid outputting explicit stay scores from the NN,
-    // so we have 4^bases * 4 transitions.
-    const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
-    config.outsize = PowerOf4(config.state_len + 1);
 
     if (config_toml.contains("qscore")) {
         spdlog::warn("> transformer qscore calibration not implemented");

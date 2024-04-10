@@ -97,11 +97,13 @@ struct TxEncoderParams {
     std::pair<int, int> attn_window{-1, -1};
 
     // The deepnorm normalisation alpha parameter
-    float deepnorm_alpha() const { return float(pow(float(2 * depth), 0.25f)); }
+    float deepnorm_alpha{2.5};
     // The deepnorm normalisation beta constant
-    float deepnorm_beta() const { return float(pow(float(8 * depth), -0.25f)); }
+    // float deepnorm_beta() const { return float(pow(float(8 * depth), -0.25f)); }
 
     std::string to_string() const;
+
+    // float _default_deepnorm_alpha(int depth_) const { return float(pow(float(2 * depth_), 0.25f)); }
 };
 
 struct EncoderUpsampleParams {
@@ -118,8 +120,20 @@ struct CRFEncoderParams {
     int n_base;
     int state_len;
     float scale;
-    // float blank_score;
-    // bool expand_blanks;
+    float blank_score;
+    bool expand_blanks;
+    std::vector<int> permute;
+
+    // compute the outsize
+    int outsize() const {
+        if (expand_blanks) {
+            return static_cast<int>(pow(n_base, state_len + 1));
+        }
+        return (n_base + 1) * static_cast<int>(pow(n_base, state_len));
+    };
+
+    // compute the out_features
+    int out_features() const { return static_cast<int>(pow(n_base, state_len + 1)); };
 
     std::string to_string() const;
 };

@@ -4,6 +4,7 @@
 
 #include <torch/serialize.h>
 
+#include <cstdlib>
 #include <filesystem>
 
 namespace dorado::basecall::nn {
@@ -21,9 +22,11 @@ std::string shape(const at::Tensor &t, const std::string &name) {
 }
 
 void dump_tensor(const at::Tensor &t, const std::string &name) {
+    const char *envVar = std::getenv("DORADO_TENSOR_DUMP");
+    if (envVar != nullptr) {
+        return;
+    }
     const auto fp = std::filesystem::current_path() / (name + ".pt");
-    // (void)t;
-    // (void)name;
     spdlog::debug("Saving tensor: {}", fp.u8string());
     torch::save(t, fp);
 }
