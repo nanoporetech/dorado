@@ -104,6 +104,8 @@ public:
         return *this;
     }
 
+    explicit operator bool() const { return m_bam.operator bool(); }
+
     friend bool operator<(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
         return lhs.m_bam < rhs.m_bam;
     }
