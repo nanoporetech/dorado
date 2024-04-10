@@ -12,6 +12,7 @@
 #include <htslib/sam.h>
 #include <minimap.h>
 #include <spdlog/spdlog.h>
+#include <torch/torch.h>
 
 #include <cassert>
 #include <filesystem>
@@ -35,6 +36,29 @@ struct OverlapWindow {
     int cigar_end_offset = -1;
     float accuracy = 0;
 };
+
+struct WindowFeatures {
+    torch::Tensor bases;
+    torch::Tensor quals;
+    std::vector<torch::Tensor> indices;
+    torch::Tensor length;
+    std::vector<std::pair<int, int>> supported;
+};
+
+std::array<int, 128> base_forward_mapping() {
+    std::array<int, 128> base_forward = {0};
+    base_forward['*'] = '*';
+    base_forward['#'] = '*';
+    base_forward['A'] = 'A';
+    base_forward['a'] = 'A';
+    base_forward['T'] = 'T';
+    base_forward['t'] = 'T';
+    base_forward['C'] = 'C';
+    base_forward['c'] = 'C';
+    base_forward['G'] = 'G';
+    base_forward['g'] = 'G';
+    return base_forward;
+}
 
 bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
     bool long_indel = false;
@@ -80,8 +104,8 @@ void calculate_accuracy(OverlapWindow& overlap,
         qseq = utils::reverse_complement(alignments.seqs[overlap_idx].substr(qstart, qlen));
     }
 
-    spdlog::info("tstart {} tend {} qstart {} qend {} cig st {} cig end {}", tstart, tend, qstart,
-                 qend, overlap.cigar_start_idx, overlap.cigar_end_idx);
+    //spdlog::info("tstart {} tend {} qstart {} qend {} cig st {} cig end {}", tstart, tend, qstart,
+    //             qend, overlap.cigar_start_idx, overlap.cigar_end_idx);
 
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
 
@@ -140,7 +164,7 @@ void calculate_accuracy(OverlapWindow& overlap,
     //spdlog::info("m {} s {} i {} d {}", m, s, i, d);
 
     overlap.accuracy = (static_cast<float>(m) / (m + s + i + d));
-    spdlog::info("accuracy {}", overlap.accuracy);
+    //spdlog::info("accuracy {}", overlap.accuracy);
 }
 
 std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& windows,
@@ -188,11 +212,226 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& window
     return max_ins;
 }
 
-void extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                      const CorrectionAlignments& alignments,
-                      int m_window_size) {
+std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
+        const std::vector<OverlapWindow>& windows,
+        const CorrectionAlignments& alignments,
+        int win_len,
+        int tstart,
+        const std::vector<int>& max_ins) {
+    auto bases_options = torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCPU);
+    auto quals_options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+
+    int length = std::accumulate(max_ins.begin(), max_ins.end(), 0) + (int)max_ins.size();
+    auto bases = torch::empty({length, 1 + TOP_K}, bases_options);
+    bases.fill_('.');
+    auto quals = torch::empty({length, 1 + TOP_K}, quals_options);
+    quals.fill_((float)'!');
+
+    // Write target for window
+    const std::string& tseq = alignments.read_seq;
+    const std::vector<uint8_t>& tqual = alignments.read_qual;
+
+    int tpos = 0;
+    auto target_tbases_tensor = bases.index({torch::indexing::Slice(), 0});
+    target_tbases_tensor.fill_('*');
+    auto target_tquals_tensor = quals.index({torch::indexing::Slice(), 0});
+    for (int i = 0; i < win_len; i++) {
+        target_tbases_tensor[tpos] = tseq[i + tstart];
+        target_tquals_tensor[tpos] = float(tqual[i + tstart] + 33);
+
+        //spdlog::info("tpos {} base {} qual {}", tpos, tbases_tensor[tpos].item<uint8_t>(), tquals_tensor[tpos].item<float>());
+        tpos += 1 + max_ins[i];
+    }
+
+    //std::exit(0);
+
+    // Write bases for each overlap window
+    for (int w = 0; w < (int)windows.size(); w++) {
+        auto tbases_tensor = bases.index({torch::indexing::Slice(), w + 1});
+        auto tquals_tensor = quals.index({torch::indexing::Slice(), w + 1});
+        const auto& overlap = windows[w];
+        const auto& cigar = alignments.cigars[overlap.overlap_idx];
+        int offset = overlap.tstart - tstart;
+
+        bool fwd = alignments.overlaps[overlap.overlap_idx].fwd;
+        int oqstart = alignments.overlaps[overlap.overlap_idx].qstart;
+        int oqend = alignments.overlaps[overlap.overlap_idx].qend;
+        (void)oqend;
+
+        int qstart = -1, qend = -1, qlen = -1;
+        if (fwd) {
+            qstart = oqstart + overlap.qstart;
+            qend = oqstart + overlap.qend;
+            qlen = qend - qstart;
+        } else {
+            qstart = oqend - overlap.qend;
+            qend = oqend - overlap.qstart;
+            qlen = qend - qstart;
+        }
+
+        //spdlog::info("qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}", qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
+        (void)qlen;
+        int query_iter = 0;
+        std::string qseq = alignments.seqs[overlap.overlap_idx].substr(qstart, qlen);
+        std::vector<uint8_t> qqual(alignments.quals[overlap.overlap_idx].begin() + qstart,
+                                   alignments.quals[overlap.overlap_idx].begin() + qend);
+        if (!fwd) {
+            qseq = utils::reverse_complement(qseq);
+            std::reverse(qqual.begin(), qqual.end());
+        }
+        int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
+        int cigar_end = std::min((int)cigar.size(), cigar_len);
+
+        uint8_t gap = fwd ? '*' : '#';
+
+        tbases_tensor.fill_(gap);
+
+        tpos = offset;
+        int idx = offset + std::accumulate(max_ins.begin(), max_ins.begin() + offset, 0);
+
+        //spdlog::info("cigar_len {}, cigar_end {}, gap {}, tpos {}, idx {}, fwd {}", cigar_len, cigar_end, gap, tpos, idx, fwd ? '+' : '-');
+
+        if (idx > 0) {
+            auto no_alignment = tbases_tensor.index({torch::indexing::Slice(0, idx)});
+            no_alignment.fill_('.');
+        }
+
+        for (int cigar_idx = 0; cigar_idx < cigar_end; cigar_idx++) {
+            auto cigar_op = cigar[cigar_idx + overlap.cigar_start_idx];
+            auto l = cigar_op.len;
+            auto op = cigar_op.op;
+
+            if (cigar_len == 1) {
+                l = overlap.cigar_end_offset - overlap.cigar_start_offset;
+            } else if (cigar_idx == 0) {
+                l -= overlap.cigar_start_offset;
+            } else if (cigar_idx == cigar_len - 1) {
+                l = overlap.cigar_end_offset;
+            }
+
+            //spdlog::info("cigar_idx {} l {}", cigar_idx, l);
+
+            switch (op) {
+            case CigarOpType::MATCH:
+            case CigarOpType::MISMATCH:
+                for (uint32_t i = 0; i < l; i++) {
+                    auto base = uint8_t(qseq[query_iter]) + (fwd ? 0 : 32);
+                    auto qual = qqual[query_iter];
+
+                    tbases_tensor[idx] = base;
+                    tquals_tensor[idx] = (float)qual + 33;
+
+                    //spdlog::info("idx {} base {}, qual {}", idx, tbases_tensor[idx].item<uint8_t>(), tquals_tensor[idx].item<float>());
+
+                    idx += 1 + max_ins[tpos + i];
+                    query_iter++;
+                }
+
+                tpos += l;
+                break;
+            case CigarOpType::DEL:
+                for (uint32_t i = 0; i < l; i++) {
+                    //spdlog::info("idx {}", idx);
+                    idx += 1 + max_ins[tpos + i];
+                }
+                tpos += l;
+                break;
+            case CigarOpType::INS:
+                idx -= max_ins[tpos - 1];
+                for (uint32_t i = 0; i < l; i++) {
+                    auto base = uint8_t(qseq[query_iter]) + (fwd ? 0 : 32);
+                    auto qual = qqual[query_iter];
+
+                    tbases_tensor[idx + i] = base;
+                    tquals_tensor[idx + i] = (float)qual + 33;
+
+                    //spdlog::info("idx + i {} base {}, qual {}", idx + i, tbases_tensor[idx + i].item<uint8_t>(), tquals_tensor[idx + i].item<float>());
+
+                    query_iter++;
+                }
+
+                idx += max_ins[tpos - 1];
+            }
+        }
+
+        if (idx < tbases_tensor.sizes()[0]) {
+            auto no_alignment =
+                    tbases_tensor.index({torch::indexing::Slice(idx, torch::indexing::None)});
+            no_alignment.fill_('.');
+        }
+
+        //std::exit(0);
+    }
+
+    return {bases, quals};
+}
+
+std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
+    std::vector<std::pair<int, int>> supported;
+
+    static auto base_forward = base_forward_mapping();
+
+    const int cols = bases.sizes()[0];
+    const int rows = bases.sizes()[1];
+
+    //spdlog::info("cols {} rows {}", cols, rows);
+
+    int tpos = -1, ins = 0;
+    std::array<int, 128> counter;
+    for (int c = 0; c < cols; c++) {
+        if (bases[c][0].item<uint8_t>() == '*') {
+            ins += 1;
+        } else {
+            tpos += 1;
+            ins = 0;
+        }
+        counter.fill(0);
+        for (int r = 0; r < rows; r++) {
+            auto base = bases[c][r].item<uint8_t>();
+            //spdlog::info("row {} base {}", r, base);
+            if (base == '.') {
+                continue;
+            }
+            counter[base_forward[base]]++;
+            //spdlog::info("base {} pos {} counter {}", base, pos, counter[pos]);
+        }
+
+        //spdlog::info("col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'], counter['T'], counter['G'], counter['*']);
+        int count = std::count_if(counter.begin(), counter.end(), [](int num) { return num >= 3; });
+        //spdlog::info("count {}", count);
+        if (count >= 2) {
+            supported.push_back({tpos, ins});
+            //spdlog::info("support added for {} {}", tpos, ins);
+        }
+    }
+    return supported;
+}
+
+torch::Tensor get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported) {
+    auto tbase_tensor = bases.index({torch::indexing::Slice(), 0});
+    std::vector<int> indices;
+    for (int i = 0; i < tbase_tensor.sizes()[0]; i++) {
+        if (tbase_tensor[i].item<uint8_t>() != '*') {
+            indices.push_back(i);
+        }
+    }
+
+    std::vector<int> supported_indices;
+    supported_indices.reserve(supported.size());
+    for (auto [pos, ins] : supported) {
+        supported_indices.push_back(indices[pos] + ins);
+    }
+
+    return torch::from_blob(supported_indices.data(), {(int)supported_indices.size()});
+}
+
+WindowFeatures extract_features(std::vector<std::vector<OverlapWindow>>& windows,
+                                const CorrectionAlignments& alignments,
+                                int m_window_size) {
     const std::string& tseq = alignments.read_seq;
     int tlen = tseq.length();
+
+    WindowFeatures wf;
 
     for (size_t w = 0; w < windows.size(); w++) {
         int win_len = (w == windows.size() - 1) ? tlen - m_window_size * w : m_window_size;
@@ -223,8 +462,21 @@ void extract_features(std::vector<std::vector<OverlapWindow>>& windows,
         spdlog::info("window {} 1st {} 2nd {}", w, windows[w][0].qend, windows[w][1].qend);
 
         // Find the maximum insert size
-        get_max_ins_for_window(windows[w], alignments, w * m_window_size, win_len);
+        auto max_ins = get_max_ins_for_window(windows[w], alignments, w * m_window_size, win_len);
+
+        // Create tensors
+        auto [bases, quals] = get_features_for_window(windows[w], alignments, win_len,
+                                                      w * m_window_size, max_ins);
+        auto supported = get_supported(bases);
+
+        wf.bases = std::move(bases);
+        wf.quals = std::move(quals);
+        wf.supported = std::move(supported);
+        wf.length = std::move(torch::full({1}, (int)supported.size()));
+        wf.indices.push_back(std::move(get_indices(wf.bases, wf.supported)));
     }
+
+    return wf;
 }
 
 void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
@@ -245,9 +497,9 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             continue;
         }
 
-        spdlog::info("qlen {} qstart {} qend {} strand {} tlen {} tstart {} tend {}", overlap.qlen,
-                     overlap.qstart, overlap.qend, overlap.fwd, overlap.tlen, overlap.tstart,
-                     overlap.tend);
+        //spdlog::info("qlen {} qstart {} qend {} strand {} tlen {} tstart {} tend {}", overlap.qlen,
+        //             overlap.qstart, overlap.qend, overlap.fwd, overlap.tlen, overlap.tstart,
+        //             overlap.tend);
 
         int first_window = -1;
         int last_window = -1;
@@ -258,7 +510,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         int zeroth_window_thresh = (0.1f * m_window_size);
         int nth_window_thresh = overlap.tlen - zeroth_window_thresh;
 
-        spdlog::info("zeroth {} nth {}", zeroth_window_thresh, nth_window_thresh);
+        //spdlog::info("zeroth {} nth {}", zeroth_window_thresh, nth_window_thresh);
 
         first_window = (overlap.tstart < zeroth_window_thresh
                                 ? 0
@@ -268,8 +520,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         tstart = overlap.tstart;
         tpos = overlap.tstart;
 
-        spdlog::info("first window {} last window {} tstart {} tpos {}", first_window, last_window,
-                     tstart, tpos);
+        //spdlog::info("first window {} last window {} tstart {} tpos {}", first_window, last_window,
+        //             tstart, tpos);
 
         if (last_window - first_window < 1) {
             continue;
@@ -280,7 +532,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         int cigar_start_idx = -1;
         int cigar_start_offset = -1;
 
-        spdlog::info("tpos {} qpos {}", tpos, qpos);
+        //spdlog::info("tpos {} qpos {}", tpos, qpos);
 
         if ((tpos % m_window_size == 0) || (tstart < zeroth_window_thresh)) {
             t_window_start = tpos;
@@ -289,8 +541,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             cigar_start_offset = 0;
         }
 
-        spdlog::info("t_window_start {} q_window_start {} cigar_start_idx {} cigar_start_offset {}",
-                     t_window_start, q_window_start, cigar_start_idx, cigar_start_offset);
+        //spdlog::info("t_window_start {} q_window_start {} cigar_start_idx {} cigar_start_offset {}",
+        //             t_window_start, q_window_start, cigar_start_idx, cigar_start_offset);
 
         for (size_t cigar_idx = 0; cigar_idx < cigar.size(); cigar_idx++) {
             auto op = cigar[cigar_idx];
@@ -440,7 +692,8 @@ void CorrectionNode::input_thread_fn() {
                 for (auto& ovlp_windows : windows) {
                     spdlog::info("{} ovlps in window {}", ovlp_windows.size(), i++);
                 }
-                extract_features(windows, alignments, m_window_size);
+                auto wf = extract_features(windows, alignments, m_window_size);
+                (void)wf;
             }
         } else {
             send_message_to_sink(std::move(message));

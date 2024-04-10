@@ -227,6 +227,7 @@ struct Overlap {
 struct CorrectionAlignments {
     std::string read_name;
     std::string read_seq;
+    std::vector<uint8_t> read_qual;
     std::vector<Overlap> overlaps;
     std::vector<std::vector<CigarOp>> cigars;
     std::vector<std::string> seqs;

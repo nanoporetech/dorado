@@ -93,6 +93,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
             auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
             alignments.read_name = std::move(read_name);
             alignments.read_seq = std::move(read_seq);
+            alignments.read_qual = utils::extract_quality(read.get());
             send_message_to_sink(std::move(alignments));
         } else {
             send_message_to_sink(std::move(message));
