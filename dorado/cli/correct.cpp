@@ -118,7 +118,7 @@ int correct(int argc, char* argv[]) {
 
     // Setup outut file.
     auto output_mode = OutputMode::FASTA;
-    utils::HtsFile hts_file("-", output_mode, correct_writer_threads);
+    utils::HtsFile hts_file("-", output_mode, correct_writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
     // 5. Corrected reads will be written out FASTA or BAM format.
@@ -150,7 +150,7 @@ int correct(int argc, char* argv[]) {
     const auto& aligner_ref =
             dynamic_cast<ErrorCorrectionMapperNode&>(pipeline->get_node_ref(aligner));
     utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-    hts_file.set_and_write_header(header.get());
+    hts_file.set_header(header.get());
 
     // Set up stats counting.
     ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
@@ -175,7 +175,7 @@ int correct(int argc, char* argv[]) {
     tracker.update_progress_bar(final_stats);
 
     // Report progress during output file finalisation.
-    hts_file.finalise([&](size_t) {}, correct_writer_threads, false);
+    hts_file.finalise([&](size_t) {});
     tracker.summarize();
 
     spdlog::info("> finished correction");
