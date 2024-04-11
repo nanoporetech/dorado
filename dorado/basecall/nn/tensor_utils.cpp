@@ -23,7 +23,7 @@ std::string shape(const at::Tensor &t, const std::string &name) {
 
 void dump_tensor(const at::Tensor &t, const std::string &name) {
     const char *envVar = std::getenv("DORADO_TENSOR_DUMP");
-    if (envVar != nullptr) {
+    if (envVar == nullptr) {
         return;
     }
     const auto fp = std::filesystem::current_path() / (name + ".pt");
