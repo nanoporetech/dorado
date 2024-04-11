@@ -1,5 +1,6 @@
 #include "AdapterDetectorNode.h"
 
+#include "ClientInfo.h"
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "utils/bam_utils.h"
@@ -96,25 +97,21 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
     // Check read for instruction on what to trim.
-    bool trim_adapters = m_default_adapter_info->trim_adapters;
-    bool trim_primers = m_default_adapter_info->trim_primers;
     auto adapter_info = m_default_adapter_info;
-    if (read.read_common.adapter_info) {
-        // The read contains instruction on what to trim, so ignore class defaults.
-        adapter_info = read.read_common.adapter_info;
-        trim_adapters = read.read_common.adapter_info->trim_adapters;
-        trim_primers = read.read_common.adapter_info->trim_primers;
+    if (read.read_common.client_info->adapter_info()) {
+        // The client has specified what to trim, so ignore class defaults.
+        adapter_info = read.read_common.client_info->adapter_info();
     }
     auto detector = m_detector_selector.get_detector(*adapter_info);
-    if (trim_adapters) {
+    if (adapter_info->trim_adapters) {
         auto adapter_res = detector->find_adapters(read.read_common.seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    if (trim_primers) {
+    if (adapter_info->trim_primers) {
         auto primer_res = detector->find_primers(read.read_common.seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
-    if (trim_adapters || trim_primers) {
+    if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);

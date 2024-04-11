@@ -54,7 +54,6 @@ public:
 
     uint64_t start_time_ms;
 
-    std::shared_ptr<const AdapterInfo> adapter_info;
     std::shared_ptr<BarcodeScoreResult> barcoding_result;
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
