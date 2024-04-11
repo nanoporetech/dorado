@@ -117,7 +117,7 @@ int correct(int argc, char* argv[]) {
     utils::strip_alignment_data_from_header(header.get());
 
     // Setup outut file.
-    auto output_mode = OutputMode::BAM;
+    auto output_mode = OutputMode::FASTA;
     utils::HtsFile hts_file("-", output_mode, correct_writer_threads);
 
     PipelineDescriptor pipeline_desc;

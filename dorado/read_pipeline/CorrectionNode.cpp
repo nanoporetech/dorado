@@ -7,19 +7,35 @@
 #include "alignment/Minimap2Options.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/types.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
 #include <minimap.h>
 #include <spdlog/spdlog.h>
+#include <torch/script.h>
 #include <torch/torch.h>
 
 #include <cassert>
 #include <filesystem>
+#include <iostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-namespace {}  // namespace
+namespace {
+
+//void print_size(const torch::Tensor& t, const std::string& name) {
+//    std::string size = "";
+//    for (auto s : t.sizes()) {
+//        size += std::to_string(s) + ",";
+//    }
+//    std::stringstream ss;
+//    ss << t.dtype();
+//    spdlog::info("{} tensor size {} dtype {}", name, size, ss.str());
+//}
+
+}  // namespace
 
 namespace dorado {
 
@@ -43,6 +59,8 @@ struct WindowFeatures {
     std::vector<torch::Tensor> indices;
     torch::Tensor length;
     std::vector<std::pair<int, int>> supported;
+    std::vector<char> inferred_bases;
+    int n_alns = 0;
 };
 
 std::array<int, 128> base_forward_mapping() {
@@ -58,6 +76,24 @@ std::array<int, 128> base_forward_mapping() {
     base_forward['G'] = 'G';
     base_forward['g'] = 'G';
     return base_forward;
+}
+
+std::array<int, 128> gen_base_encoding() {
+    std::array<int, 128> base_encoding = {0};
+    const std::string bases = "ACGT*acgt#.";
+    for (size_t i = 0; i < bases.length(); i++) {
+        base_encoding[bases[i]] = i;
+    }
+    return base_encoding;
+}
+
+std::array<int, 11> gen_base_decoding() {
+    std::array<int, 11> base_decoding = {0};
+    const std::string bases = "ACGT*acgt#.";
+    for (size_t i = 0; i < bases.length(); i++) {
+        base_decoding[i] = bases[i];
+    }
+    return base_decoding;
 }
 
 bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
@@ -218,12 +254,13 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         int win_len,
         int tstart,
         const std::vector<int>& max_ins) {
-    auto bases_options = torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCPU);
+    static auto base_encoding = gen_base_encoding();
+    auto bases_options = torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
     auto quals_options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
     int length = std::accumulate(max_ins.begin(), max_ins.end(), 0) + (int)max_ins.size();
     auto bases = torch::empty({length, 1 + TOP_K}, bases_options);
-    bases.fill_('.');
+    bases.fill_(base_encoding['.']);
     auto quals = torch::empty({length, 1 + TOP_K}, quals_options);
     quals.fill_((float)'!');
 
@@ -233,10 +270,10 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
 
     int tpos = 0;
     auto target_tbases_tensor = bases.index({torch::indexing::Slice(), 0});
-    target_tbases_tensor.fill_('*');
+    target_tbases_tensor.fill_(base_encoding['*']);
     auto target_tquals_tensor = quals.index({torch::indexing::Slice(), 0});
     for (int i = 0; i < win_len; i++) {
-        target_tbases_tensor[tpos] = tseq[i + tstart];
+        target_tbases_tensor[tpos] = base_encoding[tseq[i + tstart]];
         target_tquals_tensor[tpos] = float(tqual[i + tstart] + 33);
 
         //spdlog::info("tpos {} base {} qual {}", tpos, tbases_tensor[tpos].item<uint8_t>(), tquals_tensor[tpos].item<float>());
@@ -284,7 +321,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
 
         uint8_t gap = fwd ? '*' : '#';
 
-        tbases_tensor.fill_(gap);
+        tbases_tensor.fill_(base_encoding[gap]);
 
         tpos = offset;
         int idx = offset + std::accumulate(max_ins.begin(), max_ins.begin() + offset, 0);
@@ -293,7 +330,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
 
         if (idx > 0) {
             auto no_alignment = tbases_tensor.index({torch::indexing::Slice(0, idx)});
-            no_alignment.fill_('.');
+            no_alignment.fill_(base_encoding['.']);
         }
 
         for (int cigar_idx = 0; cigar_idx < cigar_end; cigar_idx++) {
@@ -315,7 +352,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
             case CigarOpType::MATCH:
             case CigarOpType::MISMATCH:
                 for (uint32_t i = 0; i < l; i++) {
-                    auto base = uint8_t(qseq[query_iter]) + (fwd ? 0 : 32);
+                    auto base = base_encoding[uint8_t(qseq[query_iter]) + (fwd ? 0 : 32)];
                     auto qual = qqual[query_iter];
 
                     tbases_tensor[idx] = base;
@@ -339,7 +376,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
             case CigarOpType::INS:
                 idx -= max_ins[tpos - 1];
                 for (uint32_t i = 0; i < l; i++) {
-                    auto base = uint8_t(qseq[query_iter]) + (fwd ? 0 : 32);
+                    auto base = base_encoding[uint8_t(qseq[query_iter]) + (fwd ? 0 : 32)];
                     auto qual = qqual[query_iter];
 
                     tbases_tensor[idx + i] = base;
@@ -357,7 +394,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         if (idx < tbases_tensor.sizes()[0]) {
             auto no_alignment =
                     tbases_tensor.index({torch::indexing::Slice(idx, torch::indexing::None)});
-            no_alignment.fill_('.');
+            no_alignment.fill_(base_encoding['.']);
         }
 
         //std::exit(0);
@@ -370,6 +407,8 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
     std::vector<std::pair<int, int>> supported;
 
     static auto base_forward = base_forward_mapping();
+    static auto base_encoding = gen_base_encoding();
+    static auto base_decoding = gen_base_decoding();
 
     const int cols = bases.sizes()[0];
     const int rows = bases.sizes()[1];
@@ -379,7 +418,7 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
     int tpos = -1, ins = 0;
     std::array<int, 128> counter;
     for (int c = 0; c < cols; c++) {
-        if (bases[c][0].item<uint8_t>() == '*') {
+        if (bases[c][0].item<uint8_t>() == base_encoding['*']) {
             ins += 1;
         } else {
             tpos += 1;
@@ -389,10 +428,11 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
         for (int r = 0; r < rows; r++) {
             auto base = bases[c][r].item<uint8_t>();
             //spdlog::info("row {} base {}", r, base);
-            if (base == '.') {
+            if (base == base_encoding['.']) {
                 continue;
             }
-            counter[base_forward[base]]++;
+            //spdlog::info("decoded base {}", base_decoding[base]);
+            counter[base_forward[base_decoding[base]]]++;
             //spdlog::info("base {} pos {} counter {}", base, pos, counter[pos]);
         }
 
@@ -403,15 +443,17 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
             supported.push_back({tpos, ins});
             //spdlog::info("support added for {} {}", tpos, ins);
         }
+        //spdlog::info("num supported {}", supported.size());
     }
     return supported;
 }
 
-torch::Tensor get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported) {
+std::vector<int> get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported) {
+    static auto base_encoding = gen_base_encoding();
     auto tbase_tensor = bases.index({torch::indexing::Slice(), 0});
     std::vector<int> indices;
     for (int i = 0; i < tbase_tensor.sizes()[0]; i++) {
-        if (tbase_tensor[i].item<uint8_t>() != '*') {
+        if (tbase_tensor[i].item<uint8_t>() != base_encoding['*']) {
             indices.push_back(i);
         }
     }
@@ -422,18 +464,19 @@ torch::Tensor get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>&
         supported_indices.push_back(indices[pos] + ins);
     }
 
-    return torch::from_blob(supported_indices.data(), {(int)supported_indices.size()});
+    return supported_indices;
 }
 
-WindowFeatures extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                const CorrectionAlignments& alignments,
-                                int m_window_size) {
+std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
+                                             const CorrectionAlignments& alignments,
+                                             int m_window_size) {
     const std::string& tseq = alignments.read_seq;
     int tlen = tseq.length();
 
-    WindowFeatures wf;
+    std::vector<WindowFeatures> wfs;
 
     for (size_t w = 0; w < windows.size(); w++) {
+        //for (size_t w = 0; w < 1; w++) {
         int win_len = (w == windows.size() - 1) ? tlen - m_window_size * w : m_window_size;
         //spdlog::info("win idx {}: win len {}", w, win_len);
         auto& overlap_windows = windows[w];
@@ -459,24 +502,45 @@ WindowFeatures extract_features(std::vector<std::vector<OverlapWindow>>& windows
                       return a.accuracy > b.accuracy;
                   });
         windows[w].resize(std::min(TOP_K, (int)windows[w].size()));
-        spdlog::info("window {} 1st {} 2nd {}", w, windows[w][0].qend, windows[w][1].qend);
 
-        // Find the maximum insert size
-        auto max_ins = get_max_ins_for_window(windows[w], alignments, w * m_window_size, win_len);
+        if (windows[w].size() > 0) {
+            spdlog::info("window {} 1st {}", w, windows[w][0].qend);
+        }
+        if (windows[w].size() > 1) {
+            spdlog::info("window {} 1st {} 2nd {}", w, windows[w][0].qend, windows[w][1].qend);
+        }
 
-        // Create tensors
-        auto [bases, quals] = get_features_for_window(windows[w], alignments, win_len,
-                                                      w * m_window_size, max_ins);
-        auto supported = get_supported(bases);
+        WindowFeatures wf;
+        wf.n_alns = (int)windows[w].size();
+        if (windows[w].size() > 0) {
+            // Find the maximum insert size
+            auto max_ins =
+                    get_max_ins_for_window(windows[w], alignments, w * m_window_size, win_len);
 
-        wf.bases = std::move(bases);
-        wf.quals = std::move(quals);
-        wf.supported = std::move(supported);
-        wf.length = std::move(torch::full({1}, (int)supported.size()));
-        wf.indices.push_back(std::move(get_indices(wf.bases, wf.supported)));
+            // Create tensors
+            auto [bases, quals] = get_features_for_window(windows[w], alignments, win_len,
+                                                          w * m_window_size, max_ins);
+            auto supported = get_supported(bases);
+            spdlog::info("num supported {}", supported.size());
+
+            wf.bases = std::move(bases);
+            wf.quals = std::move(quals);
+            wf.supported = std::move(supported);
+            wf.length = std::move(
+                    torch::full({1}, (int)wf.supported.size(),
+                                torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)));
+            auto supported_indices = get_indices(wf.bases, wf.supported);
+
+            wf.indices.push_back(
+                    torch::from_blob(
+                            supported_indices.data(), {(int)supported_indices.size()},
+                            torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
+                            .clone());
+        }
+        wfs.push_back(std::move(wf));
     }
 
-    return wf;
+    return wfs;
 }
 
 void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
@@ -669,6 +733,180 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
     }
 }
 
+WindowFeatures run_inference(torch::jit::script::Module& module, std::vector<WindowFeatures>& wfs) {
+    torch::NoGradGuard no_grad;
+    module.eval();
+
+    auto decode_preds = [](const torch::Tensor& preds) {
+        std::vector<char> bases;
+        bases.reserve(preds.sizes()[0]);
+        static std::array<char, 5> decoder = {'A', 'C', 'G', 'T', '*'};
+        for (int i = 0; i < preds.sizes()[0]; i++) {
+            auto base_idx = preds[i].item<int>();
+            bases.push_back(decoder[base_idx]);
+            //spdlog::info("{} decoded to {}", i, bases.back());
+        }
+        return bases;
+    };
+    for (auto& wf : wfs) {
+        if (wf.n_alns > 1 && wf.supported.size() > 0) {
+            wf.bases = wf.bases.unsqueeze(0);  //.to(torch::kInt32);
+            wf.quals = 2.f * (wf.quals.unsqueeze(0) - 33.f) / (126.f - 33.f) - 1.f;
+            ;
+            //print_size(wf.bases, "bases");
+            //print_size(wf.quals, "quals");
+            //print_size(wf.length, "length");
+            //print_size(wf.indices[0], "indices");
+
+            //spdlog::info("bases max {} min {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>());
+            //spdlog::info("quals max {} min {}", wf.quals.max().item<float>(), wf.quals.min().item<float>());
+
+            std::vector<torch::jit::IValue> inputs;
+            inputs.push_back(wf.bases);
+            inputs.push_back(wf.quals);
+            inputs.push_back(wf.length);
+            inputs.push_back(wf.indices);
+
+            auto output = module.forward(inputs);
+            if (output.isTuple()) {
+                auto base_logits = output.toTuple()->elements()[1].toTensor();
+                auto preds = base_logits.argmax(1, false);
+                //print_size(base_logits, "base_logits");
+                //print_size(preds, "preds");
+                wf.inferred_bases = decode_preds(preds);
+            }
+        }
+    }
+
+    WindowFeatures f;
+    return f;
+}
+
+struct base_count_t {
+    int c = 0;
+    char b;
+};
+
+std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) {
+    std::vector<std::string> corrected_reads;
+    std::string corrected_seq;
+
+    auto base_to_idx_map = []() {
+        std::array<int, 128> map = {0};
+        map['A'] = 0;
+        map['C'] = 1;
+        map['G'] = 2;
+        map['T'] = 3;
+        map['*'] = 4;
+        map['a'] = 0;
+        map['c'] = 1;
+        map['g'] = 2;
+        map['t'] = 3;
+        map['#'] = 4;
+        return map;
+    };
+    static auto base_to_idx = base_to_idx_map();
+    static auto base_decoding = gen_base_decoding();
+    static auto base_forward = base_forward_mapping();
+
+    struct PairHash {
+        size_t operator()(const std::pair<int, int>& p) const {
+            return std::hash<int>()(p.first) ^ std::hash<int>()(p.second);
+        }
+    };
+    struct PairEqual {
+        bool operator()(const std::pair<int, int>& p1, const std::pair<int, int>& p2) const {
+            return p1.first == p2.first && p1.second == p2.second;
+        }
+    };
+
+    std::unordered_map<std::pair<int, int>, char, PairHash, PairEqual> bases_map;
+
+    for (const auto& wf : wfs) {
+        if (wf.n_alns < 2) {
+            if (corrected_seq.length() > 0) {
+                corrected_reads.push_back(corrected_seq);
+                spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
+                corrected_seq = "";
+            }
+            continue;
+        }
+
+        bases_map.clear();
+        for (size_t i = 0; i < wf.supported.size(); i++) {
+            //spdlog::info("supported positions {},{} for {}", wf.supported[i].first, wf.supported[i].second, wf.inferred_bases[i]);
+            bases_map.insert({wf.supported[i], wf.inferred_bases[i]});
+        }
+        auto bases = wf.bases.squeeze(0);
+        int tpos = -1, ins = 0;
+        for (int c = 0; c < bases.sizes()[0]; c++) {
+            const auto tbase = bases[c][0].item<uint8_t>();
+            if (base_decoding[tbase] == '*') {
+                ins += 1;
+            } else {
+                tpos += 1;
+                ins = 0;
+            }
+
+            auto p = std::make_pair(tpos, ins);
+            auto found_p = bases_map.find(p);
+            if (found_p != bases_map.end()) {
+                auto new_base = found_p->second;
+                if (new_base != '*') {
+                    corrected_seq += new_base;
+                    //spdlog::info("{} tbase {} inferred base {} at {} {}", c, tbase, new_base, tpos, ins);
+                }
+            } else {
+                std::array<base_count_t, 5> counter;
+                for (int r = 0; r < wf.n_alns; r++) {
+                    auto base = bases[c][r].item<uint8_t>();
+                    if (base_decoding[base] == '.') {
+                        continue;
+                    }
+                    auto idx = base_to_idx[base_decoding[base]];
+                    counter[idx].b = base;
+                    counter[idx].c++;
+                }
+
+                std::sort(counter.begin(), counter.end(),
+                          [](base_count_t a, base_count_t b) { return a.c > b.c; });
+
+                auto& first = counter[0];
+                auto& second = counter[1];
+
+                char new_base;
+                if ((first.c < 2) ||
+                    (first.c == second.c && (first.b == tbase || second.b == tbase))) {
+                    new_base = base_decoding[tbase];
+                } else {
+                    new_base = base_decoding[first.b];
+                }
+
+                new_base = base_forward[new_base];
+                if (new_base != '*') {
+                    //spdlog::info("{} tbase {} new base {}", c, tbase, new_base);
+                    corrected_seq += new_base;
+                }
+            }
+        }
+    }
+
+    if (!corrected_seq.empty()) {
+        spdlog::info("added seq end of len {}", corrected_seq.length());
+        corrected_reads.push_back(corrected_seq);
+    }
+
+    return corrected_reads;
+}
+
+BamPtr create_bam_record(const std::string& read_id, const std::string& seq) {
+    bam1_t* rec = bam_init1();
+    bam_set1(rec, read_id.length(), read_id.c_str(), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq.size(),
+             seq.data(), nullptr, 0);
+    return BamPtr(rec);
+}
+
 CorrectionNode::CorrectionNode(int threads) : MessageSink(10000, threads) {
     start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
@@ -676,10 +914,22 @@ CorrectionNode::CorrectionNode(int threads) : MessageSink(10000, threads) {
 void CorrectionNode::input_thread_fn() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
+
+    torch::jit::script::Module module;
+    try {
+        module = torch::jit::load("/home/OXFORDNANOLABS/jdaw/github/haec-BigBird/ont-model.pt");
+    } catch (const c10::Error& e) {
+        spdlog::error("Error loading model");
+        throw std::runtime_error("");
+    }
+
+    spdlog::info("Loaded model!");
+
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
-            if (alignments.read_name == "d6a6b9c7-a8ed-4271-a003-bd299cf84c85") {
+            //if (alignments.read_name == "0db071fd-ac9e-47f2-ae42-de43c48abb43") {
+            if (true) {
                 spdlog::info("Process windows for {} of length", alignments.read_name,
                              alignments.read_seq.length());
                 size_t n_windows =
@@ -688,12 +938,24 @@ void CorrectionNode::input_thread_fn() {
                 std::vector<std::vector<OverlapWindow>> windows;
                 windows.resize(n_windows);
                 extract_windows(windows, alignments, m_window_size);
-                int i = 0;
+                int o = 0;
                 for (auto& ovlp_windows : windows) {
-                    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), i++);
+                    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), o++);
                 }
-                auto wf = extract_features(windows, alignments, m_window_size);
-                (void)wf;
+                auto wfs = extract_features(windows, alignments, m_window_size);
+                run_inference(module, wfs);
+                auto corrected_seqs = decode_windows(wfs);
+                if (corrected_seqs.size() == 1) {
+                    auto rec = create_bam_record(alignments.read_name, corrected_seqs[0]);
+                    send_message_to_sink(std::move(rec));
+                } else {
+                    for (size_t s = 0; s < corrected_seqs.size(); s++) {
+                        const std::string read_name =
+                                alignments.read_name + ":" + std::to_string(s);
+                        auto rec = create_bam_record(read_name, corrected_seqs[s]);
+                        send_message_to_sink(std::move(rec));
+                    }
+                }
             }
         } else {
             send_message_to_sink(std::move(message));
