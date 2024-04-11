@@ -276,7 +276,6 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
 }
 
 at::Tensor TxModelImpl::forward(at::Tensor x) {
-    x = x.to(torch::kFloat32);
     dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
