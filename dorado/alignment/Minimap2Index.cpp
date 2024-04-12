@@ -7,6 +7,7 @@
 #include <mmpriv.h>
 
 #include <cassert>
+#include <cstdio>
 #include <filesystem>
 
 namespace {
@@ -102,8 +103,21 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 }
 
 bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {
-    auto index_reader = create_index_reader(index_file, *m_index_options);
+    const std::string saved_index = index_file + ".mmi";
+    auto index_to_load = index_file;
+    bool dump_index = true;
+    if (std::filesystem::exists(saved_index)) {
+        index_to_load = saved_index;
+        dump_index = false;
+    }
+    auto index_reader = create_index_reader(index_to_load, *m_index_options);
     m_index.reset(mm_idx_reader_read(index_reader.get(), num_threads), IndexDeleter());
+    if (dump_index) {
+        spdlog::info("Save index to {}", saved_index);
+        FILE* fp = fopen(saved_index.c_str(), "w");
+        mm_idx_dump(fp, m_index.get());
+        fclose(fp);
+    }
     IndexUniquePtr split_index{};
     split_index.reset(mm_idx_reader_read(index_reader.get(), num_threads));
     if (split_index != nullptr) {

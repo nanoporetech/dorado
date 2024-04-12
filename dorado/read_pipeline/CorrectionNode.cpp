@@ -149,6 +149,12 @@ void calculate_accuracy(OverlapWindow& overlap,
     int tpos = 0, qpos = 0;
     int m = 0, s = 0, i = 0, d = 0;
 
+    bool print = false;
+    if (overlap.qstart == 16347 && overlap.qend == 20443) {
+        print = true;
+        //spdlog::info("cigar start idx {} cigar end idx {}", overlap.cigar_start_idx, overlap.cigar_end_idx);
+    }
+
     for (int idx = overlap.cigar_start_idx; idx <= overlap.cigar_end_idx; idx++) {
         int len = -1;
         if (overlap.cigar_start_idx == overlap.cigar_end_idx) {
@@ -165,14 +171,18 @@ void calculate_accuracy(OverlapWindow& overlap,
             break;
         }
 
-        //spdlog::info("len {} tpos {} qpos {}", len, tpos, qpos);
+        if (print) {
+            //spdlog::info("len {} tpos {} qpos {}", len, tpos, qpos);
+        }
 
         switch (cigar[idx].op) {
         case CigarOpType::MATCH:
             for (int j = 0; j < len; j++) {
                 auto tbase = tseq[tpos + j];
                 auto qbase = qseq[qpos + j];
-                //spdlog::info("{} tbase {}, {} qbase {}", tpos + j, tbase, qpos + j, qbase);
+                if (print) {
+                    //spdlog::info("{} tbase {}, {} qbase {}", tpos + j, tbase, qpos + j, qbase);
+                }
 
                 if (tbase == qbase) {
                     m += 1;
@@ -200,7 +210,7 @@ void calculate_accuracy(OverlapWindow& overlap,
     //spdlog::info("m {} s {} i {} d {}", m, s, i, d);
 
     overlap.accuracy = (static_cast<float>(m) / (m + s + i + d));
-    //spdlog::info("accuracy {}", overlap.accuracy);
+    //spdlog::info("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
 }
 
 std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& windows,
@@ -255,6 +265,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         int tstart,
         const std::vector<int>& max_ins) {
     static auto base_encoding = gen_base_encoding();
+    //static auto base_decoding = gen_base_decoding();
     auto bases_options = torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
     auto quals_options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
@@ -276,7 +287,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         target_tbases_tensor[tpos] = base_encoding[tseq[i + tstart]];
         target_tquals_tensor[tpos] = float(tqual[i + tstart] + 33);
 
-        //spdlog::info("tpos {} base {} qual {}", tpos, tbases_tensor[tpos].item<uint8_t>(), tquals_tensor[tpos].item<float>());
+        //spdlog::info("tpos {} base {} qual {}", tpos, base_decoding[target_tbases_tensor[tpos].item<uint8_t>()], target_tquals_tensor[tpos].item<float>());
         tpos += 1 + max_ins[i];
     }
 
@@ -284,6 +295,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
 
     // Write bases for each overlap window
     for (int w = 0; w < (int)windows.size(); w++) {
+        //spdlog::info("get_features_for_ol_window for window {}", w);
         auto tbases_tensor = bases.index({torch::indexing::Slice(), w + 1});
         auto tquals_tensor = quals.index({torch::indexing::Slice(), w + 1});
         const auto& overlap = windows[w];
@@ -358,7 +370,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
                     tbases_tensor[idx] = base;
                     tquals_tensor[idx] = (float)qual + 33;
 
-                    //spdlog::info("idx {} base {}, qual {}", idx, tbases_tensor[idx].item<uint8_t>(), tquals_tensor[idx].item<float>());
+                    //spdlog::info("idx {} base {}, qual {}", idx, base_decoding[tbases_tensor[idx].item<uint8_t>()], tquals_tensor[idx].item<float>());
 
                     idx += 1 + max_ins[tpos + i];
                     query_iter++;
@@ -382,7 +394,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
                     tbases_tensor[idx + i] = base;
                     tquals_tensor[idx + i] = (float)qual + 33;
 
-                    //spdlog::info("idx + i {} base {}, qual {}", idx + i, tbases_tensor[idx + i].item<uint8_t>(), tquals_tensor[idx + i].item<float>());
+                    //spdlog::info("idx + i {} base {}, qual {}", idx + i, base_decoding[tbases_tensor[idx + i].item<uint8_t>()], tquals_tensor[idx + i].item<float>());
 
                     query_iter++;
                 }
@@ -488,9 +500,13 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                 filtered_overlaps.push_back(std::move(ovlp));
             }
         }
-        spdlog::info("window {} pre filter windows {} post filter windows {}", w,
-                     overlap_windows.size(), filtered_overlaps.size());
+        //spdlog::info("window {} pre filter windows {} post filter windows {}", w,
+        //             overlap_windows.size(), filtered_overlaps.size());
         windows[w] = std::move(filtered_overlaps);
+
+        //for (auto& ovlp : windows[w]) {
+        //    spdlog::info("qstart {} qend {}", ovlp.qstart, ovlp.qend);
+        //}
 
         // Sort overlaps by score
         for (auto& ovlp : windows[w]) {
@@ -503,11 +519,11 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                   });
         windows[w].resize(std::min(TOP_K, (int)windows[w].size()));
 
-        if (windows[w].size() > 0) {
-            spdlog::info("window {} 1st {}", w, windows[w][0].qend);
+        if (windows[w].size() == 1) {
+            //spdlog::info("window {} 1st {}-{}", w, windows[w][0].qstart, windows[w][0].qend);
         }
         if (windows[w].size() > 1) {
-            spdlog::info("window {} 1st {} 2nd {}", w, windows[w][0].qend, windows[w][1].qend);
+            //spdlog::info("window {} 1st {}-{} 2nd {}-{}", w, windows[w][0].qstart, windows[w][0].qend, windows[w][1].qstart, windows[w][1].qend);
         }
 
         WindowFeatures wf;
@@ -521,7 +537,7 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
             auto [bases, quals] = get_features_for_window(windows[w], alignments, win_len,
                                                           w * m_window_size, max_ins);
             auto supported = get_supported(bases);
-            spdlog::info("num supported {}", supported.size());
+            //spdlog::info("num supported {}", supported.size());
 
             wf.bases = std::move(bases);
             wf.quals = std::move(quals);
@@ -553,7 +569,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         //if (alignments.qnames[a] != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f") {
         //    continue;
         //}
-        spdlog::info("window for {}", alignments.qnames[a]);
+        //spdlog::info("window for {}", alignments.qnames[a]);
         //const std::string& qseq = alignments.seqs[a];
 
         // Following the is_target == False logic form the rust code.
@@ -664,6 +680,9 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                     } else {
                         q_window_start = qpos;
                     }
+
+                    cigar_start_idx = cigar_idx;
+                    cigar_start_offset = offset;
                 } else {
                     t_window_start = tpos + offset;
 
@@ -672,6 +691,9 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                     } else {
                         q_window_start = qpos;
                     }
+
+                    cigar_start_idx = cigar_idx;
+                    cigar_start_offset = offset;
                 }
             }
 
@@ -826,7 +848,7 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
         if (wf.n_alns < 2) {
             if (corrected_seq.length() > 0) {
                 corrected_reads.push_back(corrected_seq);
-                spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
+                //spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
                 corrected_seq = "";
             }
             continue;
@@ -892,7 +914,7 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
     }
 
     if (!corrected_seq.empty()) {
-        spdlog::info("added seq end of len {}", corrected_seq.length());
+        //spdlog::info("added seq end of len {}", corrected_seq.length());
         corrected_reads.push_back(corrected_seq);
     }
 
@@ -923,28 +945,34 @@ void CorrectionNode::input_thread_fn() {
         throw std::runtime_error("");
     }
 
-    spdlog::info("Loaded model!");
+    spdlog::debug("Loaded model!");
 
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
-            //if (alignments.read_name == "0db071fd-ac9e-47f2-ae42-de43c48abb43") {
+            //if (alignments.read_name == "c81b2926-dbba-4b21-a7d5-82d2a4335796") {
             if (true) {
-                spdlog::info("Process windows for {} of length", alignments.read_name,
+                spdlog::info("Process windows for {} of length {}", alignments.read_name,
                              alignments.read_seq.length());
                 size_t n_windows =
                         (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
-                spdlog::info("num windows {}", n_windows);
+                //spdlog::info("num windows {}", n_windows);
                 std::vector<std::vector<OverlapWindow>> windows;
                 windows.resize(n_windows);
+                auto t0 = std::chrono::high_resolution_clock::now();
                 extract_windows(windows, alignments, m_window_size);
-                int o = 0;
-                for (auto& ovlp_windows : windows) {
-                    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), o++);
-                }
+                //int o = 0;
+                //for (auto& ovlp_windows : windows) {
+                //    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), o++);
+                //}
+                auto t1 = std::chrono::high_resolution_clock::now();
                 auto wfs = extract_features(windows, alignments, m_window_size);
+                (void)wfs;
+                auto t2 = std::chrono::high_resolution_clock::now();
                 run_inference(module, wfs);
+                auto t3 = std::chrono::high_resolution_clock::now();
                 auto corrected_seqs = decode_windows(wfs);
+                auto t4 = std::chrono::high_resolution_clock::now();
                 if (corrected_seqs.size() == 1) {
                     auto rec = create_bam_record(alignments.read_name, corrected_seqs[0]);
                     send_message_to_sink(std::move(rec));
@@ -956,6 +984,31 @@ void CorrectionNode::input_thread_fn() {
                         send_message_to_sink(std::move(rec));
                     }
                 }
+                {
+                    std::chrono::duration<double> duration = t1 - t0;
+                    std::lock_guard<std::mutex> lock(ewMutex);
+                    extractWindowsDuration += duration;
+                }
+                {
+                    std::chrono::duration<double> duration = t2 - t1;
+                    std::lock_guard<std::mutex> lock(efMutex);
+                    extractFeaturesDuration += duration;
+                }
+                {
+                    std::chrono::duration<double> duration = t3 - t2;
+                    std::lock_guard<std::mutex> lock(riMutex);
+                    runInferenceDuration += duration;
+                }
+                {
+                    std::chrono::duration<double> duration = t4 - t3;
+                    std::lock_guard<std::mutex> lock(decodeMutex);
+                    decodeDuration += duration;
+                }
+            }
+            num_reads++;
+
+            if (num_reads.load() % 50 == 0) {
+                spdlog::info("Processed {} reads", num_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
@@ -963,6 +1016,14 @@ void CorrectionNode::input_thread_fn() {
         }
     }
     mm_tbuf_destroy(tbuf);
+}
+
+void CorrectionNode::terminate(const FlushOptions&) {
+    stop_input_processing();
+    spdlog::info("time for extract windows {}", extractWindowsDuration.count());
+    spdlog::info("time for extract features {}", extractFeaturesDuration.count());
+    spdlog::info("time for run inference features {}", runInferenceDuration.count());
+    spdlog::info("time for decode {}", decodeDuration.count());
 }
 
 stats::NamedStats CorrectionNode::sample_stats() const { return stats::from_obj(m_work_queue); }

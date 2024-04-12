@@ -129,7 +129,7 @@ int correct(int argc, char* argv[]) {
     // 4. The inference node will run the model on the tensors, decode
     // the output, and convert each window into its corrected read and stitch
     // adjacent windows together.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, 1);
+    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, threads);
 
     // 2. These will go into an Alignment node with the
     // same fastq as an index to perform all-vs-all alignment

@@ -9,7 +9,9 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,7 +23,7 @@ public:
     ~ErrorCorrectionMapperNode() { stop_input_processing(); }
     std::string get_name() const override { return "ErrorCorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void terminate(const FlushOptions&) override;  // { stop_input_processing(); }
     void restart() override {
         start_input_processing(&ErrorCorrectionMapperNode::input_thread_fn, this);
     }
@@ -38,6 +40,11 @@ private:
                                             int hits,
                                             const hts_io::FastxRandomReader* reader,
                                             const std::string& qread);
+
+    std::chrono::duration<double> mm2Duration;
+    std::mutex mm2mutex;
+    std::chrono::duration<double> fastqDuration;
+    std::mutex fastqmutex;
 };
 
 }  // namespace dorado

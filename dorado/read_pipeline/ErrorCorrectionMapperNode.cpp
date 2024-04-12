@@ -65,18 +65,27 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     } else {
         spdlog::info("Initialized index options");
     }
+    spdlog::info("Loading index...");
     if (m_index->load(index_file, threads) != alignment::IndexLoadResult::success) {
         spdlog::error("Failed to load index file {}", index_file);
         throw std::runtime_error("");
     } else {
-        spdlog::info("Loaded index.");
+        spdlog::info("Loaded mm2 index.");
     }
     // Create aligner.
     m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
     // Create fastx index.
-    if (fai_build(index_file.c_str()) != 0) {
-        spdlog::error("Failed to build index for file {}", index_file);
+    spdlog::info("Creating input fastq index...");
+    char* idx_name = fai_path(index_file.c_str());
+    spdlog::info("Looking for idx {}", idx_name);
+    if (!std::filesystem::exists(idx_name)) {
+        if (fai_build(index_file.c_str()) != 0) {
+            spdlog::error("Failed to build index for file {}", index_file);
+            throw std::runtime_error("");
+        }
+        spdlog::info("Created fastq index.");
     }
+    free(idx_name);
     start_input_processing(&ErrorCorrectionMapperNode::input_thread_fn, this);
 }
 
@@ -87,9 +96,16 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
-            auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
             const std::string read_name = bam_get_qname(read.get());
             const std::string read_seq = utils::extract_sequence(read.get());
+            auto start = std::chrono::high_resolution_clock::now();
+            auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
+            auto end = std::chrono::high_resolution_clock::now();
+            {
+                std::chrono::duration<double> duration = end - start;
+                std::lock_guard<std::mutex> lock(mm2mutex);
+                mm2Duration += duration;
+            }
             auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
             alignments.read_name = std::move(read_name);
             alignments.read_seq = std::move(read_seq);
@@ -101,6 +117,12 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
         }
     }
     mm_tbuf_destroy(tbuf);
+}
+
+void ErrorCorrectionMapperNode::terminate(const FlushOptions&) {
+    stop_input_processing();
+    spdlog::info("time for mm2 {}", mm2Duration.count());
+    spdlog::info("time for fastq read {}", fastqDuration.count());
 }
 
 CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
@@ -126,8 +148,15 @@ CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
 
         //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
         //    continue;
+        auto start = std::chrono::high_resolution_clock::now();
         alignments.seqs.push_back(reader->fetch_seq(qname));
         alignments.quals.push_back(reader->fetch_qual(qname));
+        auto end = std::chrono::high_resolution_clock::now();
+        {
+            std::chrono::duration<double> duration = end - start;
+            std::lock_guard<std::mutex> lock(fastqmutex);
+            fastqDuration += duration;
+        }
         alignments.qnames.push_back(qname);
 
         ovlp.qlen = (int)alignments.seqs.back().length();
