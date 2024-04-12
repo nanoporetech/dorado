@@ -44,4 +44,6 @@ void HtsFileDestructor::operator()(htsFile* hts_file) {
     }
 }
 
+void KStringDestructor::operator()(kstring_t* str) { ks_free(str); }
+
 }  // namespace dorado

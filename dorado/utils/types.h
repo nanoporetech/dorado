@@ -11,6 +11,7 @@ struct bam1_t;
 struct htsFile;
 struct mm_tbuf_s;
 struct sam_hdr_t;
+struct kstring_t;
 
 namespace dorado {
 
@@ -99,6 +100,11 @@ struct HtsFileDestructor {
     void operator()(htsFile *);
 };
 using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
+
+struct KStringDestructor {
+    void operator()(kstring_t *);
+};
+using KStringPtr = std::unique_ptr<kstring_t, KStringDestructor>;
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 
