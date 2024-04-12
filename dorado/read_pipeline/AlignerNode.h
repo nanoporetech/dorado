@@ -40,7 +40,7 @@ private:
     void input_thread_fn();
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ReadCommon& read_common);
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
-    void add_bed_hits_to_record(const std::string& genome, BamPtr& record);
+    void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::vector<std::string> m_header_sequences_for_bam_messages{};

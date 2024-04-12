@@ -121,7 +121,8 @@ void AlignerNode::input_thread_fn() {
                 if (!m_bed_file_for_bam_messages.filename().empty() &&
                     !(record->core.flag & BAM_FUNMAP)) {
                     auto ref_id = record->core.tid;
-                    add_bed_hits_to_record(m_header_sequences_for_bam_messages.at(ref_id), record);
+                    add_bed_hits_to_record(m_header_sequences_for_bam_messages.at(ref_id),
+                                           record.get());
                 }
                 send_message_to_sink(std::move(record));
             }
@@ -139,10 +140,10 @@ void AlignerNode::input_thread_fn() {
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
 
-void AlignerNode::add_bed_hits_to_record(const std::string& genome, BamPtr& record) {
+void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* record) {
     size_t genome_start = record->core.pos;
-    size_t genome_end = bam_endpos(record.get());
-    char direction = (bam_is_rev(record.get())) ? '-' : '+';
+    size_t genome_end = bam_endpos(record);
+    char direction = (bam_is_rev(record)) ? '-' : '+';
     int bed_hits = 0;
     for (const auto& interval : m_bed_file_for_bam_messages.entries(genome)) {
         if (!(interval.start >= genome_end || interval.end <= genome_start) &&
@@ -151,7 +152,7 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, BamPtr& reco
         }
     }
     // update the record.
-    bam_aux_append(record.get(), "bh", 'i', sizeof(bed_hits), (uint8_t*)&bed_hits);
+    bam_aux_append(record, "bh", 'i', sizeof(bed_hits), (uint8_t*)&bed_hits);
 }
 
 }  // namespace dorado

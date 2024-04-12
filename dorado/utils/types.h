@@ -84,49 +84,7 @@ struct ReadGroup {
 struct BamDestructor {
     void operator()(bam1_t*);
 };
-
-class BamMessagePtr {
-    std::unique_ptr<bam1_t, BamDestructor> m_bam;
-
-public:
-    BamMessagePtr() : m_bam() {}
-    BamMessagePtr(bam1_t* bam_data) : m_bam(bam_data) {}
-    BamMessagePtr(BamMessagePtr&& rhs) : m_bam(std::move(rhs.m_bam)) {}
-
-    void swap(BamMessagePtr& rhs) { m_bam.swap(rhs.m_bam); }
-    bam1_t* release() { return m_bam.release(); }
-    void reset(bam1_t* p = nullptr) { m_bam.reset(p); }
-    bam1_t* get() const { return m_bam.get(); }
-    bam1_t& operator*() const { return *m_bam; }
-    const std::unique_ptr<bam1_t, BamDestructor>& operator->() const { return m_bam; }
-    BamMessagePtr& operator=(BamMessagePtr&& other) {
-        m_bam = std::exchange(other.m_bam, nullptr);
-        return *this;
-    }
-
-    explicit operator bool() const { return m_bam.operator bool(); }
-
-    friend bool operator<(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam < rhs.m_bam;
-    }
-    friend bool operator<=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam <= rhs.m_bam;
-    }
-    friend bool operator>(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam > rhs.m_bam;
-    }
-    friend bool operator>=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam >= rhs.m_bam;
-    }
-    friend bool operator==(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam == rhs.m_bam;
-    }
-    friend bool operator!=(const BamMessagePtr& lhs, const BamMessagePtr& rhs) {
-        return lhs.m_bam != rhs.m_bam;
-    }
-};
-
-using BamPtr = BamMessagePtr;
+using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
 
 struct MmTbufDestructor {
     void operator()(mm_tbuf_s*);

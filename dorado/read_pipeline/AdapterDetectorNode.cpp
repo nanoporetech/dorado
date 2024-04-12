@@ -83,7 +83,7 @@ void AdapterDetectorNode::process_read(BamPtr& read) {
                          trim_interval.first, trim_interval.second, seq);
             return;
         }
-        read = Trimmer::trim_sequence(std::move(read), trim_interval);
+        read = Trimmer::trim_sequence(read.get(), trim_interval);
 
         utils::remove_alignment_tags_from_record(read.get());
     }

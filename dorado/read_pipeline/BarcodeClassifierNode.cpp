@@ -126,7 +126,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
         auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
 
         if (bc != "unclassified" && trim_interval.second - trim_interval.first <= seqlen) {
-            read = Trimmer::trim_sequence(std::move(read), trim_interval);
+            read = Trimmer::trim_sequence(read.get(), trim_interval);
         }
 
         utils::remove_alignment_tags_from_record(read.get());

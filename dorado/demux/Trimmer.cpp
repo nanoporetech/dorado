@@ -127,9 +127,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
     return trim_interval;
 }
 
-BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
-    bam1_t* input_record = input.get();
-
+BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_interval) {
     bool is_seq_reversed = input_record->core.flag & BAM_FREVERSE;
 
     // Fetch components that need to be trimmed.
@@ -161,7 +159,8 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
                             : trim_interval);
 
     // Create a new bam record to hold the trimmed read.
-    bam1_t* out_record = bam_init1();
+    BamPtr result{bam_init1()};
+    auto out_record = result.get();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
              bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
              0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/,
@@ -197,7 +196,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
         bam_aux_update_int(out_record, "ns", ns);
     }
 
-    return BamPtr(out_record);
+    return result;
 }
 
 void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval) {
