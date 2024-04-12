@@ -127,8 +127,12 @@ std::string ModelComplexParser::parse_version(const std::string& version) {
             }
             nums.push_back(value);
         } catch (const std::exception& e) {
-            throw std::runtime_error("Failed to parse model version: '" + version +
-                                     ", invalid part: '" + value + "' - " + e.what());
+            throw std::runtime_error(std::string("Failed to parse model version: '")
+                                             .append(version)
+                                             .append(", invalid part: '")
+                                             .append(value)
+                                             .append("' - ")
+                                             .append(e.what()));
         }
     }
 
@@ -158,21 +162,24 @@ fs::path ModelFinder::fetch_stereo_model() {
 std::vector<fs::path> ModelFinder::fetch_mods_models() {
     const auto model_names = get_mods_model_names();
     std::vector<fs::path> paths;
-    for (auto name : model_names) {
+    paths.reserve(model_names.size());
+    for (const auto& name : model_names) {
         paths.push_back(fetch_model(name, "modification"));
     }
     return paths;
 }
 
 fs::path ModelFinder::fetch_model(const std::string& model_name, const std::string& description) {
-    const auto local_path = fs::current_path() / model_name;
+    // clang-tidy warns about performance-no-automatic-move if |local_path| is const. It should be treated as such though.
+    /*const*/ auto local_path = fs::current_path() / model_name;
     if (fs::exists(local_path)) {
         spdlog::debug("Found existing {} model: {}", description, model_name);
         return local_path;
     }
 
     const fs::path temp_dir = utils::get_downloads_path(std::nullopt);
-    const fs::path temp_model_dir = temp_dir / model_name;
+    // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
+    /*const*/ fs::path temp_model_dir = temp_dir / model_name;
     if (models::download_models(temp_dir.u8string(), model_name)) {
         m_downloaded_models.emplace(temp_dir);
     } else {
@@ -193,6 +200,7 @@ std::string ModelFinder::get_simplex_model_name() const { return m_simplex_model
 std::vector<std::string> ModelFinder::get_mods_model_names() const {
     const ModelList& models = modified_models();
     std::vector<std::string> model_names;
+    model_names.reserve(m_selection.mods.size());
     for (const auto& mod : m_selection.mods) {
         const auto model_info = find_model(models, "modification", m_chemistry,
                                            m_simplex_model_info.simplex, mod, m_suggestions);
@@ -210,9 +218,10 @@ std::string ModelFinder::get_stereo_model_name() const {
 
 std::vector<std::string> ModelFinder::get_mods_for_simplex_model() const {
     const auto& modification_models = modified_models();
-    std::vector<std::string> model_names;
     const auto model_infos =
             find_models(modification_models, m_chemistry, m_selection.model, ModsVariantPair());
+    std::vector<std::string> model_names;
+    model_names.reserve(model_infos.size());
     for (const auto& info : model_infos) {
         model_names.push_back(info.name);
     }

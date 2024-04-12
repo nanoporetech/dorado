@@ -89,7 +89,7 @@ void StatsSampler::sampling_thread_fn() {
         for (const auto& reporter : m_stats_reporters) {
             const auto [obj_name, obj_stats] = reporter();
             for (const auto& [name, value] : obj_stats) {
-                stats_record.stats[obj_name + "." + name] = value;
+                stats_record.stats[std::string(obj_name).append(".").append(name)] = value;
             }
         }
 

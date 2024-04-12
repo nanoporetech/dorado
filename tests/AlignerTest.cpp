@@ -159,7 +159,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
 }
@@ -195,7 +195,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli", "bhi"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
     auto bh_tag_ptr = bam_aux_get(rec, "bh");
@@ -299,7 +299,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"RGZ", "MMZ", "MLB"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
 }
@@ -503,7 +503,7 @@ std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
     CHECK(!line.empty());
     CHECK(dorado::utils::starts_with(line, ">"));
     line = line.substr(1);
-    auto read_id = line.substr(0, line.find_first_of(" "));
+    auto read_id = line.substr(0, line.find_first_of(' '));
 
     std::string sequence;
     while (std::getline(query_input_stream, sequence)) {

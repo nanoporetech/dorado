@@ -40,19 +40,18 @@ using entry_ptr = std::function<int(int, char**)>;
 
 namespace {
 
-void usage(const std::vector<std::string> commands) {
+void usage(const std::vector<std::string>& commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
-              << "Positional arguments:" << std::endl;
+              << "Positional arguments:\n";
 
     for (const auto& command : commands) {
-        std::cerr << command << std::endl;
+        std::cerr << command << '\n';
     }
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
               << "-v --version            prints version information and exits\n"
-              << "-vv                     prints verbose version information and exits"
-              << std::endl;
+              << "-vv                     prints verbose version information and exits\n";
 }
 
 }  // namespace
@@ -77,13 +76,14 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv + 1, argv + argc);
     std::vector<std::string> keys;
 
+    keys.reserve(subcommands.size());
     for (const auto& [key, _] : subcommands) {
         keys.push_back(key);
     }
 
     if (arguments.size() == 0) {
         usage(keys);
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     // Log cmd
@@ -92,25 +92,25 @@ int main(int argc, char* argv[]) {
     const auto subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
-        std::cerr << DORADO_VERSION << std::endl;
+        std::cerr << DORADO_VERSION << '\n';
     } else if (subcommand == "-vv") {
 #ifdef __APPLE__
-        std::cerr << "dorado:   " << DORADO_VERSION << std::endl;
+        std::cerr << "dorado:   " << DORADO_VERSION << '\n';
 #else
-        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << std::endl;
+        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
 #endif
-        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << std::endl;
-        std::cerr << "minimap2: " << MM_VERSION << std::endl;
+        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << '\n';
+        std::cerr << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);
-        return 0;
+        return EXIT_SUCCESS;
     } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
         usage(keys);
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -30,7 +30,7 @@ struct SignalAnchorInfo {
 
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config) : m_config(config) {}
+    PolyTailCalculator(PolyTailConfig config) : m_config(std::move(config)) {}
 
     virtual ~PolyTailCalculator() = default;
 
@@ -66,7 +66,7 @@ protected:
                                                 const SimplexRead& read,
                                                 float num_samples_per_base) const;
 
-    PolyTailConfig m_config;
+    const PolyTailConfig m_config;
 };
 
 class PolyTailCalculatorFactory {

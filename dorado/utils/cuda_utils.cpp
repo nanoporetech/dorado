@@ -135,10 +135,13 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
-                                             "\" from device string " + device_string +
-                                             ", there are " + std::to_string(num_devices) +
-                                             " visible CUDA devices.");
+                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
+                                                     .append(device_id)
+                                                     .append("\" from device string ")
+                                                     .append(device_string)
+                                                     .append(", there are ")
+                                                     .append(std::to_string(num_devices))
+                                                     .append(" visible CUDA devices."));
                 }
                 devices.push_back("cuda:" + device_id);
             }
@@ -173,10 +176,13 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
-                                             "\" from device string " + device_string +
-                                             ", there are " + std::to_string(num_devices) +
-                                             " visible CUDA devices.");
+                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
+                                                     .append(device_id)
+                                                     .append("\" from device string ")
+                                                     .append(device_string)
+                                                     .append(", there are ")
+                                                     .append(std::to_string(num_devices))
+                                                     .append(" visible CUDA devices."));
                 }
                 device_ids.insert(device_idx);
             }
@@ -206,7 +212,7 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
 }
 
 std::string get_cuda_gpu_names(std::string device_string) {
-    auto dev_info = utils::get_cuda_device_info(device_string);
+    auto dev_info = utils::get_cuda_device_info(std::move(device_string));
     std::set<std::string> gpu_strs;
     std::string gpu_names;
 
@@ -247,7 +253,7 @@ void print_cuda_alloc_info(const std::string &label) {
     print_stat_array(stats.reserved_bytes, "Rs");
     print_stat_array(stats.active_bytes, "Act");
     print_stat_array(stats.inactive_split_bytes, "In");
-    std::cerr << std::endl;
+    std::cerr << '\n' << std::flush;
 }
 
 // Note that in general the torch caching allocator may be consuming

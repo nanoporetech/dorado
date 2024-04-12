@@ -121,10 +121,10 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 
 // Not introduced until catch2 3.3.0
 #ifndef SKIP
-#define SKIP(msg)                                           \
-    do {                                                    \
-        std::cerr << "Skipping test: " << msg << std::endl; \
-        return;                                             \
+#define SKIP(msg)                                      \
+    do {                                               \
+        std::cerr << "Skipping test: " << msg << '\n'; \
+        return;                                        \
     } while (false)
 #endif
 

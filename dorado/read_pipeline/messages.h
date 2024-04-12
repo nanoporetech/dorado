@@ -68,7 +68,7 @@ public:
 
     // Contains information about the client to which this read belongs, e.g includes the client ID.
     // By default it's a standalone implementation which has -1 as the id
-    std::shared_ptr<ClientInfo> client_info;
+    std::shared_ptr<const ClientInfo> client_info;
 
     uint32_t mean_qscore_start_pos = 0;
 

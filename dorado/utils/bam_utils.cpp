@@ -154,7 +154,7 @@ void strip_alignment_data_from_header(sam_hdr_t* hdr) {
 bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
     auto get_pg_id = [](std::string& str) {
         size_t start_pos = str.find("ID:");
-        size_t end_pos = str.find("\t", start_pos);
+        size_t end_pos = str.find('\t', start_pos);
         return end_pos == std::string::npos ? str.substr(start_pos)
                                             : str.substr(start_pos, end_pos - start_pos);
     };
@@ -324,7 +324,7 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
     return counts;
 }
 
-std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
                                                             const std::vector<std::string>& keys) {
     std::map<std::string, std::string> pg_keys;
     auto file = hts_open(filename.c_str(), "r");
@@ -339,7 +339,10 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
-            throw std::runtime_error("Required key " + k + " not found in header of " + filename);
+            throw std::runtime_error(std::string("Required key ")
+                                             .append(k)
+                                             .append(" not found in header of ")
+                                             .append(filename));
         }
         pg_keys[k] = std::string(val.s);
     }

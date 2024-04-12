@@ -13,7 +13,7 @@
 namespace dorado::barcode_kits {
 
 bool check_normalized_id_pattern(const std::string& pattern) {
-    auto modulo_pos = pattern.find_first_of("%");
+    auto modulo_pos = pattern.find_first_of('%');
     // Check for the presence of the % specifier.
     if (modulo_pos == std::string::npos) {
         return false;
@@ -66,7 +66,7 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
             throw std::runtime_error("Barcode pattern must be prefix%\\d+i, e.g. BC%02i");
         }
 
-        auto modulo_pos = pattern.find_first_of("%");
+        auto modulo_pos = pattern.find_first_of('%');
         auto seq_name_prefix = pattern.substr(0, modulo_pos);
         auto format_str = pattern.substr(modulo_pos);
 
