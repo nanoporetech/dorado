@@ -12,9 +12,7 @@ using torch::indexing::Ellipsis;
 namespace dorado::basecall {
 
 MetalModelRunner::MetalModelRunner(std::shared_ptr<MetalCaller> caller)
-        : m_caller(std::move(caller)) {
-    m_input = m_caller->create_input_tensor();
-}
+        : m_caller(std::move(caller)), m_input(m_caller->create_input_tensor()) {}
 
 void MetalModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     // Chunks are passed with timestep the innermost dimension, whereas we need
