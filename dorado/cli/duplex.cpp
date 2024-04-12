@@ -331,7 +331,7 @@ int duplex(int argc, char* argv[]) {
                 spdlog::error(
                         "--emit-fastq cannot be used with --reference as FASTQ cannot store "
                         "alignment results.");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
             spdlog::info(
                     " - Note: FASTQ output is not recommended as not all data can be preserved.");
@@ -355,7 +355,7 @@ int duplex(int argc, char* argv[]) {
             num_reads = DataLoader::get_num_reads(reads, read_list, {}, recursive_file_loading);
             if (num_reads == 0) {
                 spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
         }
         spdlog::debug("> Reads to process: {}", num_reads);
@@ -415,7 +415,7 @@ int duplex(int argc, char* argv[]) {
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
                 spdlog::error("The --pairs argument is required for the basespace model.");
-                return 1;  // Exit with an error code
+                return EXIT_FAILURE;  // Exit with an error code
             }
 
             if (!mod_bases.empty() || !mod_bases_models.empty()) {
@@ -440,7 +440,7 @@ int duplex(int argc, char* argv[]) {
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
 
             // Write header as no read group info is needed.
@@ -538,7 +538,7 @@ int duplex(int argc, char* argv[]) {
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
 
             // At present, header output file header writing relies on direct node method calls
@@ -588,8 +588,8 @@ int duplex(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         utils::clean_temporary_models(temp_model_paths);
         spdlog::error(e.what());
-        return 1;
+        return EXIT_FAILURE;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 }  // namespace dorado

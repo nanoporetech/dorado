@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
 
     if (arguments.size() == 0) {
         usage(keys);
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     // Log cmd
@@ -104,13 +104,13 @@ int main(int argc, char* argv[]) {
 
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(keys);
-        return 0;
+        return EXIT_SUCCESS;
     } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
         usage(keys);
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

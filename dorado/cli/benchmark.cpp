@@ -17,7 +17,7 @@ int benchmark(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';
         std::cerr << parser;
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     std::vector<size_t> sizes{1000, 1000, 2000, 3000, 4000, 10000, 100000, 1000000, 10000000};
@@ -65,7 +65,7 @@ int benchmark(int argc, char* argv[]) {
                   << '\n';
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

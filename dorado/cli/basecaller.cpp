@@ -519,7 +519,7 @@ int basecaller(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     std::vector<std::string> args(argv, argv + argc);
@@ -539,7 +539,7 @@ int basecaller(int argc, char* argv[]) {
     auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
         spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     auto output_mode = OutputMode::BAM;
@@ -549,7 +549,7 @@ int basecaller(int argc, char* argv[]) {
 
     if (emit_fastq && emit_sam) {
         spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if (emit_fastq) {
@@ -557,13 +557,13 @@ int basecaller(int argc, char* argv[]) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         if (!parser.visible.get<std::string>("--reference").empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
                     "results.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = OutputMode::FASTQ;
@@ -578,7 +578,7 @@ int basecaller(int argc, char* argv[]) {
     if (parser.visible.get<bool>("--no-trim")) {
         if (!trim_options.empty()) {
             spdlog::error("Only one of --no-trim and --trim can be used.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
     }
@@ -590,7 +590,7 @@ int basecaller(int argc, char* argv[]) {
         no_trim_barcodes = no_trim_primers = true;
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     std::string polya_config = "";
@@ -599,7 +599,7 @@ int basecaller(int argc, char* argv[]) {
             spdlog::error(
                     "--trim cannot be used with options 'primers', 'adapters', or 'all', "
                     "if you are also using --estimate-poly-a.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         no_trim_primers = no_trim_adapters = no_trim_barcodes = true;
         spdlog::info(
@@ -612,7 +612,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error(
                 "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
                 "one.");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     std::optional<std::string> custom_kit = std::nullopt;
@@ -636,7 +636,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error(
                 "Only one of --modified-bases, --modified-bases-models, or modified models set "
                 "via models argument can be used at once");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     };
 
     fs::path model_path;
@@ -663,7 +663,7 @@ int basecaller(int argc, char* argv[]) {
         } catch (std::exception& e) {
             spdlog::error(e.what());
             utils::clean_temporary_models(model_finder.downloaded_models());
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 
@@ -691,12 +691,12 @@ int basecaller(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     utils::clean_temporary_models(temp_download_paths);
     spdlog::info("> Finished");
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado
