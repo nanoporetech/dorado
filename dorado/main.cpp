@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> arguments(argv + 1, argv + argc);
     std::vector<std::string> keys;
 
-    keys.resize(subcommands.size());
+    keys.reserve(subcommands.size());
     for (const auto& [key, _] : subcommands) {
         keys.push_back(key);
     }
