@@ -233,8 +233,8 @@ TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
 
 at::Tensor TxEncoderStackImpl::build_attn_window_mask(const basecall::CRFModelConfig &config,
                                                       const at::TensorOptions &options) const {
-    const int size =
-            config.basecaller.chunksize / (config.stride * config.tx->upsample.scale_factor);
+    const int size = static_cast<int>(config.basecaller.chunksize /
+                                      (config.stride * config.tx->upsample.scale_factor));
     const auto [win_upper, win_lower] = config.tx->tx.attn_window;
 
     at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
