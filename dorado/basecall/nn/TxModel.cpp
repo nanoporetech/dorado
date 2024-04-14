@@ -15,6 +15,7 @@
 #include <torch/nn.h>
 #include <torch/nn/functional/padding.h>
 #include <torch/nn/options/padding.h>
+#include <torch/serialize.h>
 #include <torch/types.h>
 
 #include <filesystem>
