@@ -28,7 +28,6 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
     CHECK(config.num_features == 1);
     CHECK(config.stride == 6);
     CHECK(config.lstm_size == -1);
-    CHECK(config.blank_score == 0.0f);
     CHECK(config.scale == 1.0f);
     CHECK(config.state_len == 5);
     CHECK(config.outsize == 4096);
@@ -107,7 +106,7 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
     CHECK(config.tx->crf.insize == 512);
     CHECK(config.tx->crf.n_base == 4);
     CHECK(config.tx->crf.state_len == 5);
-    // CHECK(config.tx->crf.blank_score == 2.0);
+    CHECK(config.tx->crf.blank_score == 2.0);
     // CHECK(config.tx->crf.expand_blanks == true);
     CHECK(config.tx->crf.scale == 5.0);
 
