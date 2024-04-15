@@ -6,10 +6,8 @@
 #include "tensor_utils.h"
 #include "utils/gpu_profiling.h"
 
+#include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
-#include <ATen/ops/arange.h>
-#include <ATen/ops/cat.h>
-#include <ATen/ops/rsqrt.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
