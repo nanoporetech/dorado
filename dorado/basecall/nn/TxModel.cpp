@@ -8,9 +8,6 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
-#if TORCH_VERSION_MAJOR >= 2
-#include <ATen/ops/scaled_dot_product_attention.h>
-#endif
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
@@ -19,6 +16,9 @@
 #include <torch/serialize.h>
 #include <torch/types.h>
 #include <torch/version.h>
+#if TORCH_VERSION_MAJOR >= 2
+#include <ATen/ops/scaled_dot_product_attention.h>
+#endif
 
 #include <filesystem>
 #include <stdexcept>
