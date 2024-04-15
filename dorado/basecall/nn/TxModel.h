@@ -44,7 +44,7 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
                         int max_seq_len_,
                         const at::TensorOptions &options_);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 
     const int lrno, dim, max_seq_len;
     const float theta;
@@ -96,7 +96,7 @@ TORCH_MODULE(TxEncoder);
 struct TxEncoderStackImpl : torch::nn::Module {
     TxEncoderStackImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
 
-    at::Tensor forward(at::Tensor x) { return stack->forward(x); };
+    at::Tensor forward(const at::Tensor &x) { return stack->forward(x); };
     at::Tensor build_attn_window_mask(const basecall::CRFModelConfig &config,
                                       const at::TensorOptions &options) const;
 
@@ -109,7 +109,7 @@ TORCH_MODULE(TxEncoderStack);
 struct LinearUpsampleImpl : torch::nn::Module {
     LinearUpsampleImpl(const basecall::tx::EncoderUpsampleParams &params);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 
     const int scale_factor;
     torch::nn::Linear linear{nullptr};
@@ -120,7 +120,7 @@ TORCH_MODULE(LinearUpsample);
 struct LinearScaledCRFImpl : torch::nn::Module {
     LinearScaledCRFImpl(const tx::CRFEncoderParams &params);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 
     torch::nn::Linear linear{nullptr};
     tx::CRFEncoderParams m_params;

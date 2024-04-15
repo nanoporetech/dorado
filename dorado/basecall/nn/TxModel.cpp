@@ -67,7 +67,7 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
-    const at::Tensor out = fc2(functional::silu(gate).mul(y));
+    at::Tensor out = fc2(functional::silu(gate).mul(y));
 
     dump_tensor(fc1_, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc1");
     dump_tensor(out, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc2");
@@ -94,7 +94,7 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_,
     register_buffer("sin_freqs", torch::sin(freqs).to(options.dtype(torch::kHalf)));
 };
 
-at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
+at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
     // Expected shape: N, seq_len, 3, nhead, head_dim
     const int64_t seq_len = qkv.size(1);
@@ -250,11 +250,11 @@ LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
             Linear(LinearOptions(params.d_model, scale_factor * params.d_model).bias(true)));
 };
 
-at::Tensor LinearUpsampleImpl::forward(at::Tensor x) {
+at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     const int64_t N = x.size(0);
     const int64_t T = x.size(1);
     const int64_t C = x.size(2);
-    const at::Tensor out = linear(x).reshape({N, scale_factor * T, C});
+    at::Tensor out = linear(x).reshape({N, scale_factor * T, C});
     dump_tensor(linear->weight, "upsample.linear.weight.tensor");
     dump_tensor(linear->bias, "upsample.linear.bias.tensor");
     return out;
@@ -266,7 +266,7 @@ LinearScaledCRFImpl::LinearScaledCRFImpl(const tx::CRFEncoderParams &params) {
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
 };
 
-at::Tensor LinearScaledCRFImpl::forward(at::Tensor x) { return linear(x) * m_params.scale; }
+at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) { return linear(x) * m_params.scale; }
 
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
