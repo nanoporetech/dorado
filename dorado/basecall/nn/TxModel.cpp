@@ -8,6 +8,7 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
+#include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
