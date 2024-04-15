@@ -143,7 +143,7 @@ int aligner(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     if (parser.visible.get<bool>("--verbose")) {
@@ -196,8 +196,8 @@ int aligner(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << std::endl;
-            return 1;
+            std::cout << parser.visible << '\n';
+            return EXIT_FAILURE;
         }
 #endif
     }
@@ -251,7 +251,7 @@ int aligner(int argc, char* argv[]) {
         auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
         if (pipeline == nullptr) {
             spdlog::error("Failed to create pipeline");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
 
         // At present, header output file header writing relies on direct node method calls
@@ -322,7 +322,7 @@ int aligner(int argc, char* argv[]) {
         spdlog::info("> summary file complete.");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

@@ -47,8 +47,8 @@ void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
 
 bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
 
-bool HtsReader::has_tag(std::string tagname) {
-    uint8_t* tag = bam_aux_get(record.get(), tagname.c_str());
+bool HtsReader::has_tag(const char* tagname) {
+    uint8_t* tag = bam_aux_get(record.get(), tagname);
     return static_cast<bool>(tag);
 }
 

@@ -360,7 +360,7 @@ void retrieve_and_assign_current_throttling_reason(NvmlApi *nvml,
     unsigned long long reason{};
     auto result = nvml->DeviceGetCurrentClocksThrottleReasons(device, &reason);
     if (result == NVML_SUCCESS) {
-        info.current_throttling_reason = std::move(reason);
+        info.current_throttling_reason = reason;
     } else {
         info.current_throttling_reason_error = nvml->ErrorString(result);
     }

@@ -21,7 +21,7 @@ namespace {
 
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
-std::string generate_barcode_string(dorado::BarcodeScoreResult bc_res) {
+std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     std::string bc;
     if (bc_res.barcode_name != UNCLASSIFIED_BARCODE) {
         bc = dorado::barcode_kits::generate_standard_barcode_name(bc_res.kit, bc_res.barcode_name);

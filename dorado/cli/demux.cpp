@@ -147,7 +147,7 @@ int demuxer(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     if ((parser.visible.is_used("--no-classify") && parser.visible.is_used("--kit-name")) ||
@@ -156,14 +156,14 @@ int demuxer(int argc, char* argv[]) {
         spdlog::error(
                 "Please specify either --no-classify or --kit-name or pass a custom barcode "
                 "arrangement with --barcode-arrangement to use the demux tool.");
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     auto no_trim(parser.visible.get<bool>("--no-trim"));
     auto sort_bam(parser.visible.get<bool>("--sort-bam"));
     if (sort_bam && !no_trim) {
         spdlog::error("If --sort-bam is specified then --no-trim must also be specified.");
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
@@ -201,8 +201,8 @@ int demuxer(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << std::endl;
-            return 1;
+            std::cout << parser.visible << '\n';
+            return EXIT_FAILURE;
         }
 #endif
     }
@@ -216,7 +216,7 @@ int demuxer(int argc, char* argv[]) {
         std::string error_msg;
         if (!utils::sam_hdr_merge(header.get(), header_reader.header, error_msg)) {
             spdlog::error("Unable to combine headers from all input files: " + error_msg);
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 
@@ -266,7 +266,7 @@ int demuxer(int argc, char* argv[]) {
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // At present, header output file header writing relies on direct node method calls
@@ -344,7 +344,7 @@ int demuxer(int argc, char* argv[]) {
         spdlog::info("> summary file complete.");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

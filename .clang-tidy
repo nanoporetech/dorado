@@ -1,9 +1,14 @@
 # Disable all default warnings, then enable only the ones we want to check for.
 Checks: '-*,
-fuchsia-default-arguments-declarations
+fuchsia-default-arguments-declarations,
+performance-*,
 '
 WarningsAsErrors: '*'
 
 # clang-tidy's regex doesn't support negative lookahead, so we have to list all the places to
 # check rather than "not 3rdparty" -_-
 HeaderFilterRegex: 'dorado/(alignment|cli|data_loader|decode|demux|modbase|models|nn|read_pipeline|splitter|utils)'
+
+CheckOptions:
+  - key:    performance-move-const-arg.CheckTriviallyCopyableMove
+    value:  0

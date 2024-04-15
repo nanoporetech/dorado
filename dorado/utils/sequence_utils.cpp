@@ -327,7 +327,8 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     const auto overlap_result =
             compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
 
-    const auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
+    // clang-tidy warns about performance-no-automatic-move if |failed_realignment| is const. It should be treated as such though.
+    /*const*/ auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
     // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
     if (!overlap_result) {
         return failed_realignment;
@@ -421,7 +422,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
 
     edlibFreeAlignResult(edlib_result);
 
-    return {old_moves_offset, target_start - 1, new_moves};
+    return std::make_tuple(old_moves_offset, target_start - 1, std::move(new_moves));
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {

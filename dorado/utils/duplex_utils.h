@@ -10,7 +10,7 @@
 namespace dorado::utils {
 // Given a path to a space-delimited csv in `tempate_id complement_id` format,
 // returns a map of template_id to  complement_id
-std::map<std::string, std::string> load_pairs_file(std::string pairs_file);
+std::map<std::string, std::string> load_pairs_file(const std::string& pairs_file);
 
 // Returns subset of alignment for which start and end start with  `num_consecutive_wanted` consecutive nucleotides.
 std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
@@ -26,6 +26,6 @@ std::pair<std::pair<int, int>, std::pair<int, int>> get_trimmed_alignment(
 void preprocess_quality_scores(std::vector<uint8_t>& quality_scores);
 
 std::unordered_set<std::string> get_read_list_from_pairs(
-        std::map<std::string, std::string> template_complement_map);
+        const std::map<std::string, std::string>& template_complement_map);
 
 }  // namespace dorado::utils

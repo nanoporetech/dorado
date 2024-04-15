@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace dorado::utils {
-std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) {
+std::map<std::string, std::string> load_pairs_file(const std::string& pairs_file_path) {
     std::ifstream dataFile;
     dataFile.open(pairs_file_path);
 
@@ -33,7 +33,7 @@ std::map<std::string, std::string> load_pairs_file(std::string pairs_file_path) 
 }
 
 std::unordered_set<std::string> get_read_list_from_pairs(
-        std::map<std::string, std::string> template_complement_map) {
+        const std::map<std::string, std::string>& template_complement_map) {
     std::unordered_set<std::string> read_list;
     for (const auto& x : template_complement_map) {
         read_list.insert(x.first);

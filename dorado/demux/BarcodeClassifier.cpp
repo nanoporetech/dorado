@@ -333,7 +333,8 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         auto top_front_flank_rc = utils::reverse_complement(kit_info.top_front_flank);
         auto top_rear_flank_rc = utils::reverse_complement(kit_info.top_rear_flank);
-        candidate.top_context_rev = top_rear_flank_rc + bc_mask + top_front_flank_rc;
+        candidate.top_context_rev =
+                std::string(top_rear_flank_rc).append(bc_mask).append(top_front_flank_rc);
         candidate.top_context_rev_left_buffer =
                 extract_left_buffer(top_rear_flank_rc, m_scoring_params.flank_left_pad);
         candidate.top_context_rev_right_buffer =
@@ -353,7 +354,8 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
             auto bottom_front_flank_rc = utils::reverse_complement(kit_info.bottom_front_flank);
             auto bottom_rear_flank_rc = utils::reverse_complement(kit_info.bottom_rear_flank);
-            candidate.bottom_context_rev = bottom_rear_flank_rc + bc_mask + bottom_front_flank_rc;
+            candidate.bottom_context_rev =
+                    std::string(bottom_rear_flank_rc).append(bc_mask).append(bottom_front_flank_rc);
             candidate.bottom_context_rev_left_buffer =
                     extract_left_buffer(bottom_rear_flank_rc, m_scoring_params.flank_left_pad);
             candidate.bottom_context_rev_right_buffer =
@@ -493,14 +495,18 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
 
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
-        const auto barcode1 =
-                top_context_v1_left_buffer + candidate.barcodes1[i] + top_context_v1_right_buffer;
-        const auto barcode1_rev = bottom_context_v2_left_buffer + candidate.barcodes1_rev[i] +
-                                  bottom_context_v2_right_buffer;
-        const auto barcode2 =
-                top_context_v2_left_buffer + candidate.barcodes2[i] + top_context_v2_right_buffer;
-        const auto barcode2_rev = bottom_context_v1_left_buffer + candidate.barcodes2_rev[i] +
-                                  bottom_context_v1_right_buffer;
+        const auto barcode1 = std::string(top_context_v1_left_buffer)
+                                      .append(candidate.barcodes1[i])
+                                      .append(top_context_v1_right_buffer);
+        const auto barcode1_rev = std::string(bottom_context_v2_left_buffer)
+                                          .append(candidate.barcodes1_rev[i])
+                                          .append(bottom_context_v2_right_buffer);
+        const auto barcode2 = std::string(top_context_v2_left_buffer)
+                                      .append(candidate.barcodes2[i])
+                                      .append(top_context_v2_right_buffer);
+        const auto barcode2_rev = std::string(bottom_context_v1_left_buffer)
+                                          .append(candidate.barcodes2_rev[i])
+                                          .append(bottom_context_v1_right_buffer);
         auto& barcode_name = candidate.barcode_names[i];
 
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
@@ -635,8 +641,12 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
 
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
-        auto barcode = top_left_buffer + candidate.barcodes1[i] + top_right_buffer;
-        auto barcode_rev = bottom_left_buffer + candidate.barcodes1_rev[i] + bottom_right_buffer;
+        auto barcode = std::string(top_left_buffer)
+                               .append(candidate.barcodes1[i])
+                               .append(top_right_buffer);
+        auto barcode_rev = std::string(bottom_left_buffer)
+                                   .append(candidate.barcodes1_rev[i])
+                                   .append(bottom_right_buffer);
         auto& barcode_name = candidate.barcode_names[i];
 
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {

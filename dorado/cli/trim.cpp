@@ -80,7 +80,7 @@ int trim(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if (parser.get<bool>("--verbose")) {
@@ -105,14 +105,14 @@ int trim(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser << std::endl;
-            std::exit(EXIT_FAILURE);
+            std::cout << parser << '\n';
+            return EXIT_FAILURE;
         }
 #endif
         reads.push_back("-");
     } else if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     HtsReader reader(reads[0], read_list);
@@ -166,7 +166,7 @@ int trim(int argc, char* argv[]) {
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Set up stats counting
@@ -198,7 +198,7 @@ int trim(int argc, char* argv[]) {
 
     spdlog::info("> finished adapter/primer trimming");
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado
