@@ -31,7 +31,7 @@ public:
     // Change to a reference when we remove the default from AdapterDetectorNode
     // until then need to know if set or not, in order to know whether to override
     // the node's default.
-    virtual const std::shared_ptr<const AdapterInfo>& adapter_info() const = 0;
+    virtual const std::shared_ptr<AdapterInfo>& adapter_info() const = 0;
 
     virtual const AlignmentInfo& alignment_info() const = 0;
     virtual const BarcodingInfo& barcoding_info() const = 0;

@@ -12,7 +12,6 @@
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "read_pipeline/ProgressTracker.h"

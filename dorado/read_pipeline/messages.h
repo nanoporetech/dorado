@@ -202,14 +202,21 @@ public:
     int32_t client_id;
 };
 
+class BamMessage {
+public:
+    BamPtr bam_ptr;
+    std::shared_ptr<ClientInfo> client_info;
+};
+
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a SimplexReadPtr object, which represents a single Simplex read
 // - a DuplexReadPtr object, which represents a single Duplex read
-// - a BamPtr object, which represents a raw BAM alignment record
+// - a BamMessage object, composite class holding a BamPtr (which represents a raw BAM alignment record) and ClientInfo
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+using Message = std::
+        variant<SimplexReadPtr, BamPtr, BamMessage, ReadPair, CacheFlushMessage, DuplexReadPtr>;
 
 bool is_read_message(const Message& message);
 

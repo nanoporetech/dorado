@@ -1,5 +1,6 @@
 #pragma once
 
+#include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -25,6 +26,9 @@ public:
               std::optional<std::unordered_set<std::string>> read_list);
     ~HtsReader();
     bool read();
+
+    // If reading directly into a pipeline need to set the client info on the messages
+    void set_client_info(std::shared_ptr<ClientInfo> client_info);
     std::size_t read(Pipeline& pipeline, std::size_t max_reads);
     template <typename T>
     T get_tag(std::string tagname);
@@ -37,6 +41,7 @@ public:
 
 private:
     htsFile* m_file{nullptr};
+    std::shared_ptr<ClientInfo> m_client_info;
 
     std::optional<std::unordered_set<std::string>> m_read_list;
 };

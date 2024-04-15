@@ -3,6 +3,7 @@
 #include "dorado_version.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/read_output_progress_stats.h"
@@ -37,6 +38,23 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 }
 
 }  // anonymous namespace
+
+BarcodingInfo get_barcoding_info(cli::ArgParser& parser, const utils::SampleSheet* sample_sheet) {
+    BarcodingInfo result{};
+    result.kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
+    result.custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
+    if (result.kit_name.empty() && !result.custom_kit) {
+        return result;
+    }
+    result.barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+    result.trim = !parser.visible.get<bool>("--no-trim");
+    if (sample_sheet) {
+        result.allowed_barcodes = sample_sheet->get_barcode_values();
+    }
+    result.custom_seqs = parser.visible.present("--barcode-sequences");
+
+    return result;
+}
 
 int demuxer(int argc, char* argv[]) {
     cli::ArgParser parser("dorado demux");
@@ -177,16 +195,6 @@ int demuxer(int argc, char* argv[]) {
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
-    std::optional<std::string> custom_kit = std::nullopt;
-    if (parser.visible.is_used("--barcode-arrangement")) {
-        custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
-    }
-
-    std::optional<std::string> custom_barcode_file = std::nullopt;
-    if (parser.visible.is_used("--barcode-sequences")) {
-        custom_barcode_file = parser.visible.get<std::string>("--barcode-sequences");
-    }
-
     auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
 
     // Only allow `reads` to be empty if we're accepting input from a pipe
@@ -221,26 +229,36 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
-    BarcodingInfo::FilterSet allowed_barcodes;
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
-        allowed_barcodes = sample_sheet->get_barcode_values();
     }
+    BarcodingInfo barcoding_info = get_barcoding_info(parser, sample_sheet.get());
+
+    class DemuxClientInfo : public DefaultClientInfo {
+        const BarcodingInfo m_barcoding_info;
+
+    public:
+        DemuxClientInfo(BarcodingInfo barcoding_info)
+                : m_barcoding_info(std::move(barcoding_info)) {}
+        const BarcodingInfo& barcoding_info() const override { return m_barcoding_info; }
+    };
+    auto client_info = std::make_shared<DemuxClientInfo>(std::move(barcoding_info));
+    reader.set_client_info(client_info);
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
             std::move(sample_sheet), sort_bam);
 
-    if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
-        std::vector<std::string> kit_names;
-        if (auto names = parser.visible.present<std::vector<std::string>>("--kit-name")) {
-            kit_names = std::move(*names);
+    const auto& info = client_info->barcoding_info();
+    if (!info.kit_name.empty() || info.custom_kit) {
+        std::vector<std::string> kit_names{};
+        if (!info.kit_name.empty()) {
+            kit_names.push_back(info.kit_name);
         }
         pipeline_desc.add_node<BarcodeClassifierNode>(
-                {demux_writer}, demux_threads, kit_names,
-                parser.visible.get<bool>("--barcode-both-ends"), no_trim,
-                std::move(allowed_barcodes), std::move(custom_kit), std::move(custom_barcode_file));
+                {demux_writer}, demux_threads, kit_names, info.barcode_both_ends, !info.trim,
+                info.allowed_barcodes, info.custom_kit, info.custom_seqs);
     }
 
     // Create the Pipeline from our description.

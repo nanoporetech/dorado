@@ -3,6 +3,7 @@
 #include "alignment/Minimap2Aligner.h"
 #include "fake_client_info.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
@@ -58,11 +59,21 @@ protected:
         pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     }
 
-    template <class... Args>
-    std::vector<dorado::BamPtr> RunPipelineWithBamMessages(dorado::HtsReader& reader,
-                                                           Args&&... args) {
+    std::vector<dorado::BamPtr> RunPipelineWithBamMessages(
+            dorado::HtsReader& reader,
+            std::string reference_file,
+            std::string bed_file,
+            dorado::alignment::Minimap2Options options,
+            int threads) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        create_pipeline(index_file_access, args...);
+        create_pipeline(index_file_access, reference_file, bed_file, options, threads);
+
+        auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+        auto alignment_info = std::make_shared<dorado::AlignmentInfo>();
+        alignment_info->minimap_options = options;
+        alignment_info->reference_file = reference_file;
+        client_info->set_alignment_info(alignment_info);
+        reader.set_client_info(client_info);
         reader.read(*pipeline, 100);
         pipeline->terminate({});
         return ConvertMessages<dorado::BamPtr>(std::move(m_output_messages));

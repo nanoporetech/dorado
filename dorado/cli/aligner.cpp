@@ -3,6 +3,7 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -208,9 +209,21 @@ int aligner(int argc, char* argv[]) {
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
     progress_stats.set_post_processing_percentage(0.5f);
     progress_stats.start();
+
+    class AlignerClientInfo : public DefaultClientInfo {
+        const AlignmentInfo m_alignment_info;
+
+    public:
+        AlignerClientInfo(AlignmentInfo alignment_info)
+                : m_alignment_info(std::move(alignment_info)) {}
+        const AlignmentInfo& alignment_info() const override { return m_alignment_info; }
+    };
+    auto client_info = std::make_shared<AlignerClientInfo>(AlignmentInfo{options, index});
+
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
+        reader->set_client_info(client_info);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
             return EXIT_FAILURE;
