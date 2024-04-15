@@ -28,6 +28,6 @@ void dump_tensor(const at::Tensor &t, const std::string &name) {
     }
     const auto fp = std::filesystem::current_path() / (name + ".pt");
     spdlog::debug("Saving tensor: {}", fp.u8string());
-    torch::save(t, fp);
+    torch::save(t, fp.u8string());
 }
 }  // namespace dorado::basecall::nn
