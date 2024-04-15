@@ -478,7 +478,8 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     params.dim_feedforward = toml::find<int>(enc, "layer", "dim_feedforward");
     params.deepnorm_alpha = toml::find<float>(enc, "layer", "deepnorm_alpha");
     const auto attn_window_ = toml::find(enc, "layer", "attn_window").as_array();
-    params.attn_window = {attn_window_[0].as_integer(), attn_window_[1].as_integer()};
+    params.attn_window = {static_cast<int>(attn_window_[0].as_integer()),
+                          static_cast<int>(attn_window_[1].as_integer())};
     return params;
 }
 
