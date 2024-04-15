@@ -93,18 +93,11 @@ struct TxEncoderParams {
     int depth{-1};
     // The dimension of the feedforward model
     int dim_feedforward{-1};
-
     // Pair of ints defining (possibly asymmetric) sliding attention window mask
     std::pair<int, int> attn_window{-1, -1};
-
     // The deepnorm normalisation alpha parameter
-    float deepnorm_alpha{2.5};
-    // The deepnorm normalisation beta constant
-    // float deepnorm_beta() const { return float(pow(float(8 * depth), -0.25f)); }
-
+    float deepnorm_alpha{1.0};
     std::string to_string() const;
-
-    // float _default_deepnorm_alpha(int depth_) const { return float(pow(float(2 * depth_), 0.25f)); }
 };
 
 struct EncoderUpsampleParams {
