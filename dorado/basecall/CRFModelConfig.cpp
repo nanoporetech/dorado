@@ -483,15 +483,6 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     return params;
 }
 
-// BasecallerParams parse_basecaller_params(const toml::value &cfg) {
-//     const auto &bc = toml::find(cfg, "basecaller");
-//     BasecallerParams params;
-//     params.batchsize = static_cast<size_t>(toml::find<int>(bc, "batchsize"));
-//     params.chunksize = static_cast<size_t>(toml::find<int>(bc, "chunksize"));
-//     params.overlap = static_cast<size_t>(toml::find<int>(bc, "overlap"));
-//     return params;
-// }
-
 EncoderUpsampleParams parse_encoder_upsample_params(const toml::value &cfg) {
     const auto &ups = toml::find(cfg, "model", "encoder", "upsample");
     EncoderUpsampleParams params;
