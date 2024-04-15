@@ -8,7 +8,9 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
+#ifndef DORADO_TX2
 #include <ATen/ops/scaled_dot_product_attention.h>
+#endif
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
@@ -26,10 +28,30 @@ namespace dorado::basecall {
 
 namespace nn {
 
+using namespace at;
 using namespace dorado::basecall::tx;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
+
+#ifdef DORADO_TX2
+torch::Tensor scaled_dot_product_attention(torch::Tensor q,
+                                           torch::Tensor k,
+                                           torch::Tensor v,
+                                           torch::Tensor mask) {
+    auto matmul_qk = torch::matmul(q, k.transpose(-2, -1));
+
+    auto d_k = k.size(-1);
+    matmul_qk = matmul_qk / std::sqrt(d_k);
+
+    if (mask.defined()) {
+        matmul_qk = matmul_qk + (mask * -1e9);
+    }
+
+    auto weights = torch::softmax(matmul_qk, -1);
+    return torch::matmul(weights, v);
+}
+#endif
 
 at::Tensor load_synthetic(const std::string &filename, const at::TensorOptions &options) {
     spdlog::warn("Loading syntheic model result: {}", filename);
@@ -161,7 +183,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
         // spdlog::debug(shape(attn_window_mask, "MHA.attn_mask"));
-        attn_output = at::scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
+        attn_output = scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
                               .permute({0, 1, 3, 2, 4})
                               .reshape({N, T, C});
         dump_tensor(attn_output, name + ".attn_output");
