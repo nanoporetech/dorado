@@ -89,7 +89,7 @@ inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-static const Minimap2Options dflt_options{{15, 10, 16000000000ull, "lr:hq"},
+static const Minimap2Options dflt_options{{19, 19, 16000000000ull, "lr:hq"},
                                           {5, 500, 20000, false, false, true},
                                           false};
 }  // namespace dorado::alignment
