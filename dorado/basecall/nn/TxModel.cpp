@@ -8,7 +8,7 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
-#ifndef DORADO_TX2
+#if TORCH_VERSION_MAJOR >= 2
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
 #include <c10/core/ScalarType.h>
@@ -34,7 +34,7 @@ using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-#ifdef DORADO_TX2
+#if TORCH_VERSION_MAJOR < 2
 torch::Tensor scaled_dot_product_attention(torch::Tensor q,
                                            torch::Tensor k,
                                            torch::Tensor v,
