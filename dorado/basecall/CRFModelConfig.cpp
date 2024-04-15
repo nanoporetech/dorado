@@ -570,6 +570,8 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     // Force some exception downstream
     config.lstm_size = -1;
 
+    config.sample_type = get_model_type(model_name);
+
     return config;
 }
 
