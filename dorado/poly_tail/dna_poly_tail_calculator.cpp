@@ -54,9 +54,9 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     const bool fwd = dist_v1 < dist_v2;
-    const float flank_score = static_cast<float>(std::min(dist_v1, dist_v2)) /
-                              (front_primer.length() + rear_primer.length());
-    const bool proceed = flank_score < threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
+    const float flank_score = 1.f - static_cast<float>(std::min(dist_v1, dist_v2)) /
+                                            (front_primer.length() + rear_primer.length());
+    const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts, false};
 
