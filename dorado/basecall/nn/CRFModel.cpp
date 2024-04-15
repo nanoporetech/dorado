@@ -1,6 +1,5 @@
 #include "CRFModel.h"
 
-#include "basecall/nn/tensor_utils.h"
 #include "utils/gpu_profiling.h"
 #include "utils/math_utils.h"
 #include "utils/module_utils.h"
@@ -291,7 +290,6 @@ void ConvStackImpl::run_koi(WorkingMemory &wm) {
 
 at::Tensor ConvStackImpl::forward(at::Tensor x) {
     // Input x is [N, C_in, T_in], contiguity optional
-    int lrno = 0;
     for (auto &layer : layers) {
         utils::ScopedProfileRange spr("conv", 2);
         x = layer.conv(x);
@@ -304,8 +302,6 @@ at::Tensor ConvStackImpl::forward(at::Tensor x) {
         } else {
             throw std::logic_error("Unrecognised activation function id.");
         }
-        dump_tensor(x.transpose(1, 2), "m.encoder.conv_" + std::to_string(lrno));
-        lrno++;
     }
     // Output is [N, T_out, C_out], non-contiguous
     return x.transpose(1, 2);

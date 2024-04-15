@@ -107,7 +107,6 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
     CHECK(config.tx->crf.n_base == 4);
     CHECK(config.tx->crf.state_len == 5);
     CHECK(config.tx->crf.blank_score == 2.0);
-    // CHECK(config.tx->crf.expand_blanks == true);
     CHECK(config.tx->crf.scale == 5.0);
 
     CHECK(config.tx->upsample.scale_factor == 2);

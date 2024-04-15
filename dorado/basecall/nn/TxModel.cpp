@@ -3,7 +3,6 @@
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
 #include "spdlog/spdlog.h"
-#include "tensor_utils.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
@@ -54,19 +53,6 @@ torch::Tensor scaled_dot_product_attention(torch::Tensor q,
 }
 #endif
 
-at::Tensor load_synthetic(const std::string &filename, const at::TensorOptions &options) {
-    spdlog::warn("Loading syntheic model result: {}", filename);
-    at::Tensor out;
-    try {
-        torch::load(out, filename);
-    } catch (const c10::Error &e) {
-        spdlog::error("Error loading tensor from file: {}", e.msg());
-    }
-    out = out.to(options);
-    spdlog::warn(shape(out, "synthetic_out.shape"));
-    return out;
-}
-
 RMSNormImpl::RMSNormImpl(int lrno_, int hidden_size_) : lrno(lrno_), hidden_size(hidden_size_) {
     weight = at::ones({hidden_size});
     register_parameter("weight", weight, false);
@@ -90,9 +76,6 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
     at::Tensor out = fc2(functional::silu(gate).mul(y));
-
-    dump_tensor(fc1_, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc1");
-    dump_tensor(out, "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".ff.fc2");
     return out;
 }
 
@@ -117,7 +100,6 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_,
 };
 
 at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
-    const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
     // Expected shape: N, seq_len, 3, nhead, head_dim
     const int64_t seq_len = qkv.size(1);
 
@@ -164,35 +146,28 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const int64_t T = x.size(1);
     const int64_t C = x.size(2);
 
-    const std::string name = "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn";
-    spdlog::debug(shape(x, name + ".x"));
     at::Tensor qkv;
     at::Tensor attn_output;
     {
         utils::ScopedProfileRange spr("QKV", 2);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
-        dump_tensor(qkv, name + ".qkv");
     }
     {
         utils::ScopedProfileRange spr("ROTE", 2);
         qkv = rotary_emb(qkv);
-        dump_tensor(qkv, name + ".rotary_emb");
     }
     {
         utils::ScopedProfileRange spr("MEA", 2);
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
-        // spdlog::debug(shape(attn_window_mask, "MHA.attn_mask"));
         attn_output = scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
                               .permute({0, 1, 3, 2, 4})
                               .reshape({N, T, C});
-        dump_tensor(attn_output, name + ".attn_output");
     }
     {
         utils::ScopedProfileRange spr("OUTP", 2);
         x = out_proj(attn_output);
-        dump_tensor(x, name + ".out_proj");
     }
     return x;
 };
@@ -214,31 +189,24 @@ TxEncoderImpl::TxEncoderImpl(int lrno_,
 };
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
-    const std::string t_name = "m.encoder.transformer_encoder_" + std::to_string(lrno);
-    // spdlog::debug(shape(x, t_name + ".x"));
     at::Tensor attn, f;
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
-        dump_tensor(attn, t_name + ".self_attn");
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
         x = norm1(attn + (x * named_buffers()["deepnorm_alpha"]));
-        dump_tensor(x, t_name + ".norm1");
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
         f = ff(x);
-        dump_tensor(f, t_name + ".ff");
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
         x = norm2(f + (x * named_buffers()["deepnorm_alpha"]));
-        dump_tensor(x, t_name + ".norm2");
     }
 
-    dump_tensor(x, t_name);
     return x;
 }
 
@@ -277,8 +245,6 @@ at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     const int64_t T = x.size(1);
     const int64_t C = x.size(2);
     at::Tensor out = linear(x).reshape({N, scale_factor * T, C});
-    dump_tensor(linear->weight, "upsample.linear.weight.tensor");
-    dump_tensor(linear->bias, "upsample.linear.bias.tensor");
     return out;
 };
 
@@ -299,50 +265,23 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
 }
 
 at::Tensor TxModelImpl::forward(const at::Tensor &x) {
-    dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);
         h = convs->forward(x);
-        spdlog::debug(shape(h, "m.encoder.conv"));
-        dump_tensor(h, "m.encoder.conv");
     }
     {
         utils::ScopedProfileRange spr("TransEnc", 1);
         h = tx_encoder(h);
-        spdlog::debug(shape(h, "m.encoder.transformer_encoder"));
-        dump_tensor(h, "m.encoder.transformer_encoder");
     }
-
-    // h = load_synthetic(
-    //         "/home/OXFORDNANOLABS/rharris/dev/dorado/synthetic_tensor/"
-    //         "m.encoder.transformer_encoder.pt",
-    //         m_options);
-    // h = torch::ones({x.size(0), 833, 512}, m_options);
     {
         utils::ScopedProfileRange spr("TransDec", 1);
         h = tx_decoder(h);
-        spdlog::debug(shape(h, "m.encoder.upsample"));
-        dump_tensor(h, "m.encoder.upsample.ones");
     }
-
-    // h = load_synthetic(
-    //         "/home/OXFORDNANOLABS/rharris/dev/dorado/synthetic_tensor/"
-    //         "m.encoder.upsample.pt",
-    //         m_options);
-
     {
         utils::ScopedProfileRange spr("CRF", 1);
         h = crf(h);
-        spdlog::debug(shape(h, "m.encoder.crf"));
-        dump_tensor(h, "m.encoder.crf");
     }
-
-    // h = load_synthetic(
-    //         "/home/OXFORDNANOLABS/rharris/dev/dorado/synthetic_tensor/"
-    //         "m.encoder.crf.pt",
-    //         m_options);
-
     return h;
 }
 
