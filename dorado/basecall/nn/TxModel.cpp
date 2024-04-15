@@ -62,7 +62,7 @@ GatedMLPImpl::GatedMLPImpl(int lrno_, int in_features, int hidden_features) : lr
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
 };
 
-at::Tensor GatedMLPImpl::forward(at::Tensor x) {
+at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     const at::Tensor fc1_ = fc1(x);
     const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
@@ -97,7 +97,7 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_,
 at::Tensor RotaryEmbeddingImpl::forward(at::Tensor qkv) {
     const std::string name = "m.encoder.transformer_encoder_0.self_attn.rotary_emb";
     // Expected shape: N, seq_len, 3, nhead, head_dim
-    const long int seq_len = qkv.size(1);
+    const int64_t seq_len = qkv.size(1);
 
     const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
     const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
@@ -138,9 +138,9 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
 };
 
 at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
-    const long int N = x.size(0);
-    const long int T = x.size(1);
-    const long int C = x.size(2);
+    const int64_t N = x.size(0);
+    const int64_t T = x.size(1);
+    const int64_t C = x.size(2);
 
     const std::string name = "m.encoder.transformer_encoder_" + std::to_string(lrno) + ".self_attn";
     spdlog::debug(shape(x, name + ".x"));
@@ -251,9 +251,9 @@ LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
 };
 
 at::Tensor LinearUpsampleImpl::forward(at::Tensor x) {
-    const long int N = x.size(0);
-    const long int T = x.size(1);
-    const long int C = x.size(2);
+    const int64_t N = x.size(0);
+    const int64_t T = x.size(1);
+    const int64_t C = x.size(2);
     const at::Tensor out = linear(x).reshape({N, scale_factor * T, C});
     dump_tensor(linear->weight, "upsample.linear.weight.tensor");
     dump_tensor(linear->bias, "upsample.linear.bias.tensor");

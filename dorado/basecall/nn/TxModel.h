@@ -29,7 +29,7 @@ TORCH_MODULE(RMSNorm);
 struct GatedMLPImpl : torch::nn::Module {
     GatedMLPImpl(int lrno_, int in_features, int hidden_features);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 
     torch::nn::Linear fc1{nullptr}, fc2{nullptr};
     const int lrno;
