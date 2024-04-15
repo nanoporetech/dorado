@@ -135,7 +135,7 @@ struct TxModelImpl : torch::nn::Module {
         utils::load_state_dict(*this, weights, {});
     }
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor &x);
 
     basecall::nn::ConvStack convs{nullptr};
     TxEncoderStack tx_encoder{nullptr};

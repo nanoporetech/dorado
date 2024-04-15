@@ -276,7 +276,7 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
     crf = register_module("crf", LinearScaledCRF(config.tx->crf));
 }
 
-at::Tensor TxModelImpl::forward(at::Tensor x) {
+at::Tensor TxModelImpl::forward(const at::Tensor &x) {
     dump_tensor(x, "TxModel.x");
     at::Tensor h;
     {
