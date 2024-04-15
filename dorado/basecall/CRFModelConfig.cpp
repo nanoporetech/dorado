@@ -573,7 +573,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
 }
 
 void Params::check() const {
-    const auto eq = [](const float a, const float b, const std::string &msg) {
+    const auto eq = [](const int a, const int b, const std::string &msg) {
         if (a != b) {
             spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
         }
