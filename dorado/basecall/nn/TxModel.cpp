@@ -18,6 +18,7 @@
 #include <torch/nn/options/padding.h>
 #include <torch/serialize.h>
 #include <torch/types.h>
+#include <torch/version.h>
 
 #include <filesystem>
 #include <stdexcept>
