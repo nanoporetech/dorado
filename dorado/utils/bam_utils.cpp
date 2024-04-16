@@ -558,6 +558,9 @@ void remove_alignment_tags_from_record(bam1_t* record) {
             aux_ptr = bam_aux_next(record, aux_ptr);
         }
     }
+    // The core.tid field indicates the reference. This needs to be -1 for
+    // an unmapped read.
+    record->core.tid = -1;
 }
 
 }  // namespace dorado::utils

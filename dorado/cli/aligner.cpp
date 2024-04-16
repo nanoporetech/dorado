@@ -73,8 +73,7 @@ bool create_output_folder(const std::filesystem::path& output_folder) {
 }
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_pg(hdr, "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION,
-                   nullptr);
+    sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, nullptr);
 }
 
 }  // namespace

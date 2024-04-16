@@ -32,7 +32,7 @@ using namespace std::chrono_literals;
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_pg(hdr, "ID", "demux", "PN", "dorado", "VN", DORADO_VERSION, nullptr);
+    sam_hdr_add_pg(hdr, "demux", "PN", "dorado", "VN", DORADO_VERSION, nullptr);
 }
 
 // This function allows us to map the reference id from input BAM records to what
@@ -155,7 +155,8 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto no_trim(parser.visible.get<bool>("--no-trim"));
+    auto no_trim(parser.visible.get<bool>("--no-trim") ||
+                 parser.visible.get<bool>("--no-classify"));
     auto sort_bam(parser.visible.get<bool>("--sort-bam"));
     if (sort_bam && !no_trim) {
         spdlog::error("If --sort-bam is specified then --no-trim must also be specified.");
@@ -300,7 +301,10 @@ int demuxer(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting barcode demuxing");
-    reader.set_record_mutator([&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
+    if (!strip_alignment) {
+        reader.set_record_mutator(
+                [&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
+    }
     auto num_reads_in_file = reader.read(*pipeline, max_reads);
     spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
 
@@ -309,9 +313,11 @@ int demuxer(int argc, char* argv[]) {
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader input_reader(all_files[input_idx].input, read_list);
-        reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
-            adjust_tid(sq_mapping[input_idx], record);
-        });
+        if (!strip_alignment) {
+            input_reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
+                adjust_tid(sq_mapping[input_idx], record);
+            });
+        }
         num_reads_in_file = input_reader.read(*pipeline, max_reads);
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);

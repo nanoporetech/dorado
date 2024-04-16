@@ -72,6 +72,7 @@ void BarcodeClassifierNode::input_thread_fn() {
                 (read->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
                 continue;
             }
+            spdlog::info("read tid field is {}", read->core.tid);
             barcode(read);
             send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
