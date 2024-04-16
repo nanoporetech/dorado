@@ -34,14 +34,14 @@ public:
     int32_t client_id() const override { return -1; }
     bool is_disconnected() const override { return false; }
 
-    void set_alignment_info(std::shared_ptr<AlignmentInfo>& alignment_info) {
-        m_alignment_info = alignment_info;
+    void set_alignment_info(std::shared_ptr<AlignmentInfo> alignment_info) {
+        m_alignment_info = std::move(alignment_info);
     }
-    void set_barcoding_info(std::shared_ptr<BarcodingInfo>& barcoding_info) {
-        m_barcoding_info = barcoding_info;
+    void set_barcoding_info(std::shared_ptr<BarcodingInfo> barcoding_info) {
+        m_barcoding_info = std::move(barcoding_info);
     }
-    void set_adapter_info(std::shared_ptr<AdapterInfo>& adapter_info) {
-        m_adapter_info = adapter_info;
+    void set_adapter_info(std::shared_ptr<AdapterInfo> adapter_info) {
+        m_adapter_info = std::move(adapter_info);
     }
 };
 

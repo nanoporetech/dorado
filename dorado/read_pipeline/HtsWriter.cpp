@@ -41,12 +41,17 @@ OutputMode HtsWriter::get_output_mode(const std::string& mode) {
 void HtsWriter::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        // If this message isn't a BamPtr, ignore it.
-        if (!std::holds_alternative<BamPtr>(message)) {
+        BamPtr aln;
+        if (std::holds_alternative<BamPtr>(message)) {
+            aln = std::move(std::get<BamPtr>(message));
+        } else if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::move(std::get<BamMessage>(message));
+            aln = std::move(bam_message.bam_ptr);
+        }
+        // If this message isn't a Bam message, ignore it.
+        if (!aln) {
             continue;
         }
-
-        auto aln = std::move(std::get<BamPtr>(message));
 
         if (m_file.get_output_mode() == utils::HtsFile::OutputMode::FASTQ) {
             if (!m_gpu_names.empty()) {

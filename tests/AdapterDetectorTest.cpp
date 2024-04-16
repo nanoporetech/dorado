@@ -4,6 +4,7 @@
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
 #include "read_pipeline/AdapterDetectorNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -359,6 +360,11 @@ TEST_CASE(
     auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10, false);
 
     // Push a Read type.
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    client_info->set_adapter_info(
+            std::make_shared<dorado::AdapterInfo>(dorado::AdapterInfo{true, true, std::nullopt}));
+    read->read_common.client_info = std::move(client_info);
+
     pipeline->push_message(std::move(read));
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.

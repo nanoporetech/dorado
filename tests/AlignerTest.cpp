@@ -76,7 +76,12 @@ protected:
         reader.set_client_info(client_info);
         reader.read(*pipeline, 100);
         pipeline->terminate({});
-        return ConvertMessages<dorado::BamPtr>(std::move(m_output_messages));
+        auto bam_messages = ConvertMessages<dorado::BamMessage>(std::move(m_output_messages));
+        std::vector<dorado::BamPtr> result{};
+        for (auto& bam_message : bam_messages) {
+            result.push_back(std::move(bam_message.bam_ptr));
+        }
+        return result;
     }
 
     template <class MessageType, class MessageTypePtr = std::unique_ptr<MessageType>>

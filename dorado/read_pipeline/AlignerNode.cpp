@@ -3,6 +3,7 @@
 #include "ClientInfo.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
+#include "messages.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
@@ -125,6 +126,19 @@ void AlignerNode::input_thread_fn() {
                                            record.get());
                 }
                 send_message_to_sink(std::move(record));
+            }
+        } else if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+            auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
+                                   .align(bam_message.bam_ptr.get(), tbuf);
+            for (auto& record : records) {
+                if (!m_bed_file_for_bam_messages.filename().empty() &&
+                    !(record->core.flag & BAM_FUNMAP)) {
+                    auto ref_id = record->core.tid;
+                    add_bed_hits_to_record(m_header_sequences_for_bam_messages.at(ref_id),
+                                           record.get());
+                }
+                send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
             }
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             align_read(std::get<SimplexReadPtr>(std::move(message)));
