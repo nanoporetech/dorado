@@ -1,5 +1,10 @@
 #include <basecall/nn/TxModel.h>
+#include <c10/core/TensorOptions.h>
 #include <catch2/catch.hpp>
+#include <torch/nn.h>
+#if TORCH_VERSION_MAJOR >= 2
+#include <ATen/ops/scaled_dot_product_attention.h>
+#endif
 
 #include <vector>
 
