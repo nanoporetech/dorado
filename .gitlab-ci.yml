@@ -257,6 +257,8 @@ build:linux:x86:focal:valgrind:
   variables:
     # valgrind can't cope with huge executables, so we have to go dynamic.
     BUILD_OPTIONS: "-D TRY_USING_STATIC_TORCH_LIB=NO"
+    # We want debug symbols.
+    BUILD_TYPE: "Debug"
   extends:
     - .linux_runner
   script:
