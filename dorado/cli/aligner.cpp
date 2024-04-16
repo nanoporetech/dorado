@@ -72,14 +72,14 @@ bool create_output_folder(const std::filesystem::path& output_folder) {
     return true;
 }
 
+void add_pg_hdr(sam_hdr_t* hdr) {
+    sam_hdr_add_pg(hdr, "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION,
+                   nullptr);
+}
+
 }  // namespace
 
 namespace dorado {
-
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS",
-                     MM_VERSION, NULL);
-}
 
 int aligner(int argc, char* argv[]) {
     cli::ArgParser parser("dorado aligner");

@@ -153,6 +153,7 @@ void MergeHeaders::finalize_merge() {
     m_merged_header.reset(sam_hdr_init());
     if (!m_hd_line.empty()) {
         sam_hdr_add_lines(m_merged_header.get(), m_hd_line.c_str(), 0);
+        sam_hdr_change_HD(m_merged_header.get(), "SO", "unknown");
     }
 
     for (const auto& entry : m_program_lut) {

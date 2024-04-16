@@ -7,6 +7,7 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
+#include "utils/MergeHeaders.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
@@ -28,15 +29,28 @@ using namespace std::chrono_literals;
 #include <unistd.h>
 #endif
 
-namespace dorado {
-
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "demux", "PN", "dorado", "VN", DORADO_VERSION, NULL);
+    sam_hdr_add_pg(hdr, "ID", "demux", "PN", "dorado", "VN", DORADO_VERSION, nullptr);
+}
+
+// This function allows us to map the reference id from input BAM records to what
+// they should be in the output file, based on the new ordering of references in
+// the merged header.
+void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
+    auto tid = record.get()->core.tid;
+    if (tid >= 0) {
+        if (tid >= int32_t(mapping.size())) {
+            throw std::range_error("BAM tid field out of range with respect to SQ lines.");
+        }
+        record.get()->core.tid = int32_t(mapping.at(tid));
+    }
 }
 
 }  // anonymous namespace
+
+namespace dorado {
 
 int demuxer(int argc, char* argv[]) {
     cli::ArgParser parser("dorado demux");
@@ -161,6 +175,7 @@ int demuxer(int argc, char* argv[]) {
     auto emit_summary = parser.visible.get<bool>("emit-summary");
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
+    auto strip_alignment = !no_trim;
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -200,24 +215,23 @@ int demuxer(int argc, char* argv[]) {
     }
 
     HtsReader reader(all_files[0].input, read_list);
-    auto header = SamHdrPtr(sam_hdr_dup(reader.header));
+    utils::MergeHeaders hdr_merger(strip_alignment);
+    hdr_merger.add_header(reader.header, all_files[0].input);
 
     // Fold in the headers from all the other files in the input list.
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader header_reader(all_files[input_idx].input, read_list);
-        std::string error_msg;
-        if (!utils::sam_hdr_merge(header.get(), header_reader.header, error_msg)) {
+        auto error_msg = hdr_merger.add_header(header_reader.header, all_files[input_idx].input);
+        if (!error_msg.empty()) {
             spdlog::error("Unable to combine headers from all input files: " + error_msg);
             std::exit(EXIT_FAILURE);
         }
     }
 
+    hdr_merger.finalize_merge();
+    auto sq_mapping = hdr_merger.get_sq_mapping();
+    auto header = SamHdrPtr(sam_hdr_dup(hdr_merger.get_merged_header()));
     add_pg_hdr(header.get());
-    if (!no_trim) {
-        // Remove SQ lines from header since alignment information
-        // is invalidated after trimming.
-        utils::strip_alignment_data_from_header(header.get());
-    }
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
@@ -286,6 +300,7 @@ int demuxer(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting barcode demuxing");
+    reader.set_record_mutator([&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
     auto num_reads_in_file = reader.read(*pipeline, max_reads);
     spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
 
@@ -294,6 +309,9 @@ int demuxer(int argc, char* argv[]) {
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader input_reader(all_files[input_idx].input, read_list);
+        reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
+            adjust_tid(sq_mapping[input_idx], record);
+        });
         num_reads_in_file = input_reader.read(*pipeline, max_reads);
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);

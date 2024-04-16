@@ -31,7 +31,7 @@ using OutputMode = dorado::utils::HtsFile::OutputMode;
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "trim", "PN", "dorado", "VN", DORADO_VERSION, NULL);
+    sam_hdr_add_pg(hdr, "ID", "trim", "PN", "dorado", "VN", DORADO_VERSION, NULL);
 }
 
 }  // anonymous namespace

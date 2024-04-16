@@ -41,21 +41,6 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 void strip_alignment_data_from_header(sam_hdr_t* hdr);
 
 /**
- * @brief Merges lines from source_header into dest_header if they aren't already present.
- *
- * This function will not copy any HD header lines from the source_header to the destination, even if they mismatch
- * existing HD lines in the destination.  This function will not merge headers if there are mismatching PG records,
- * or if there are mismatching SQ records in the header.
- * 
- * @param dest_header A pointer to a valid sam_hdr_t object which will be modified.
- * @param source_header A pointer to a valid sam_hdr_t object which will have all it's lines copied into dest_header
- *  if they are not already present.
- * @param error_msg A reference to a string to fill in with an error message if merge could not be performed.
- * @return true if the merge happened, false if it did not.  in the case false it returned, error_msg will contain more info.
- */
-bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg);
-
-/**
  * @brief Retrieves read group information from a SAM/BAM/CRAM file header based on a specified key.
  *
  * This function extracts read group information from a SAM/BAM/CRAM file header

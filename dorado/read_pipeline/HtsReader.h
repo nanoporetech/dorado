@@ -29,6 +29,7 @@ public:
     template <typename T>
     T get_tag(std::string tagname);
     bool has_tag(std::string tagname);
+    void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
     char* format{nullptr};
     bool is_aligned{false};
@@ -38,6 +39,7 @@ public:
 private:
     htsFile* m_file{nullptr};
 
+    std::function<void(BamPtr&)> m_record_mutator{};
     std::optional<std::unordered_set<std::string>> m_read_list;
 };
 
