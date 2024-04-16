@@ -42,10 +42,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
                 edlibFreeAlignResult(rev_rear);
             });
 
-    float fwd_front_score = fwd_front.editDistance / float(front_flank.length());
-    float fwd_rear_score = fwd_rear.editDistance / float(rear_flank.length());
-    float rev_front_score = rev_front.editDistance / float(rear_flank_rc.length());
-    float rev_rear_score = rev_rear.editDistance / float(front_flank_rc.length());
+    float fwd_front_score = 1.f - fwd_front.editDistance / float(front_flank.length());
+    float fwd_rear_score = 1.f - fwd_rear.editDistance / float(rear_flank.length());
+    float rev_front_score = 1.f - rev_front.editDistance / float(rear_flank_rc.length());
+    float rev_rear_score = 1.f - rev_rear.editDistance / float(front_flank_rc.length());
 
     spdlog::trace("Flank scores: fwd_front {} fwd_rear {}, rev_front {}, rev_rear {}",
                   fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score);
@@ -53,14 +53,14 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     auto scores = {fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score};
 
     if (std::none_of(std::begin(scores), std::end(scores),
-                     [threshold](auto val) { return val < threshold; })) {
+                     [threshold](auto val) { return val >= threshold; })) {
         spdlog::trace("{} flank score too high {}", read.read_common.read_id,
                       *std::min_element(std::begin(scores), std::end(scores)));
         return {false, -1, 0, false};
     }
 
     bool fwd = std::distance(std::begin(scores),
-                             std::min_element(std::begin(scores), std::end(scores))) < 2;
+                             std::max_element(std::begin(scores), std::end(scores))) < 2;
 
     float front_result_score = fwd ? fwd_front_score : rev_front_score;
     float rear_result_score = fwd ? fwd_rear_score : rev_rear_score;
@@ -69,7 +69,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
 
     // good flank detection with the front and rear in order is the only configuration
     // where we can be sure we haven't cleaved the tail
-    bool split_tail = front_result_score < threshold && rear_result_score < threshold &&
+    bool split_tail = front_result_score >= threshold && rear_result_score >= threshold &&
                       rear_result.endLocations[0] < front_result.startLocations[0];
 
     if (split_tail) {
@@ -88,10 +88,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
             spdlog::trace("Using fwd rear flank as anchor");
         }
 
-        if (fwd_front_score < threshold) {
+        if (fwd_front_score >= threshold) {
             trailing_tail_bases += dorado::utils::count_trailing_chars(front_flank, 'A');
         }
-        if (fwd_rear_score < threshold) {
+        if (fwd_rear_score >= threshold) {
             trailing_tail_bases += dorado::utils::count_leading_chars(rear_flank, 'A');
         }
     } else {
@@ -103,10 +103,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
             spdlog::trace("Using rev rear flank as anchor");
         }
 
-        if (rev_front_score < threshold) {
+        if (rev_front_score >= threshold) {
             trailing_tail_bases += dorado::utils::count_trailing_chars(rear_flank_rc, 'T');
         }
-        if (rev_rear_score < threshold) {
+        if (rev_rear_score >= threshold) {
             trailing_tail_bases += dorado::utils::count_leading_chars(front_flank_rc, 'T');
         }
     }

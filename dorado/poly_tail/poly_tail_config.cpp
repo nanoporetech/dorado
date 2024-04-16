@@ -40,7 +40,7 @@ PolyTailConfig prepare_config(std::istream& is) {
             config.plasmid_front_flank = toml::find<std::string>(anchors, "plasmid_front_flank");
             config.plasmid_rear_flank = toml::find<std::string>(anchors, "plasmid_rear_flank");
             config.is_plasmid = true;
-            config.flank_threshold = 0.15f;  // reduced default for plasmids
+            config.flank_threshold = 0.85f;  // stricter default for plasmids
         }
 
         if (anchors.contains("primer_window")) {
