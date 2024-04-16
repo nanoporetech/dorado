@@ -505,6 +505,10 @@ build_archive:macos:x64:
   variables:
     GIT_STRATEGY: none
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../archive .
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
     - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
