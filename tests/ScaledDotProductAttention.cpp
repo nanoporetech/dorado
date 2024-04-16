@@ -3,11 +3,11 @@
 
 #include <vector>
 
-#define TEST_TAG "[SPDA]"
+#define TEST_TAG "[SDPA]"
 
 using namespace dorado::basecall::nn;
 
-TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention") {
+TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2
     SECTION("SDPA tests invalid if TORCH_VERSION_MAJOR < 2") { CHECK(false); }
 #endif
