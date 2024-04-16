@@ -51,6 +51,10 @@ int correct(int argc, char* argv[]) {
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
+    parser.add_argument("-b", "--batch-size")
+            .help("batch size for inference.")
+            .default_value(32)
+            .scan<'i', int>();
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
             .default_value(std::string(""));
@@ -78,6 +82,7 @@ int correct(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
+    auto batch_size(parser.get<int>("batch-size"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -129,7 +134,7 @@ int correct(int argc, char* argv[]) {
     // 4. The inference node will run the model on the tensors, decode
     // the output, and convert each window into its corrected read and stitch
     // adjacent windows together.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, threads);
+    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, threads, batch_size);
 
     // 2. These will go into an Alignment node with the
     // same fastq as an index to perform all-vs-all alignment

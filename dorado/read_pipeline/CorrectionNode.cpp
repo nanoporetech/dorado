@@ -1,18 +1,12 @@
 #include "CorrectionNode.h"
 
-#include "ClientInfo.h"
-#include "alignment/Minimap2Aligner.h"
-#include "alignment/Minimap2Index.h"
-#include "alignment/Minimap2IndexSupportTypes.h"
-#include "alignment/Minimap2Options.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
-#include <htslib/faidx.h>
 #include <htslib/sam.h>
-#include <minimap.h>
 #include <spdlog/spdlog.h>
+#include <torch/nn/utils/rnn.h>
 #include <torch/script.h>
 #include <torch/torch.h>
 
@@ -25,43 +19,28 @@
 
 namespace {
 
-//void print_size(const torch::Tensor& t, const std::string& name) {
-//    std::string size = "";
-//    for (auto s : t.sizes()) {
-//        size += std::to_string(s) + ",";
-//    }
-//    std::stringstream ss;
-//    ss << t.dtype();
-//    spdlog::info("{} tensor size {} dtype {}", name, size, ss.str());
-//}
+dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& seq) {
+    bam1_t* rec = bam_init1();
+    bam_set1(rec, read_id.length(), read_id.c_str(), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq.size(),
+             seq.data(), nullptr, 0);
+    return dorado::BamPtr(rec);
+}
 
-}  // namespace
+template <typename T>
+torch::Tensor collate(std::vector<torch::Tensor> tensors, T fill_val) {
+    return torch::nn::utils::rnn::pad_sequence(tensors, true, fill_val);
+}
 
-namespace dorado {
-
-const int TOP_K = 30;
-
-struct OverlapWindow {
-    size_t overlap_idx = -1;
-    int tstart = -1;
-    int qstart = -1;
-    int qend = -1;
-    int cigar_start_idx = -1;
-    int cigar_start_offset = -1;
-    int cigar_end_idx = -1;
-    int cigar_end_offset = -1;
-    float accuracy = 0;
-};
-
-struct WindowFeatures {
-    torch::Tensor bases;
-    torch::Tensor quals;
-    std::vector<torch::Tensor> indices;
-    torch::Tensor length;
-    std::vector<std::pair<int, int>> supported;
-    std::vector<char> inferred_bases;
-    int n_alns = 0;
-};
+[[maybe_unused]] void print_size(const torch::Tensor& t, const std::string& name) {
+    std::string size = "";
+    for (auto s : t.sizes()) {
+        size += std::to_string(s) + ",";
+    }
+    std::stringstream ss;
+    ss << t.dtype();
+    spdlog::info("{} tensor size {} dtype {}", name, size, ss.str());
+}
 
 std::array<int, 128> base_forward_mapping() {
     std::array<int, 128> base_forward = {0};
@@ -96,7 +75,14 @@ std::array<int, 11> gen_base_decoding() {
     return base_decoding;
 }
 
-bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
+}  // namespace
+
+namespace dorado {
+
+const int TOP_K = 30;
+
+bool CorrectionNode::filter_overlap(const OverlapWindow& overlap,
+                                    const CorrectionAlignments& alignments) {
     bool long_indel = false;
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
     for (size_t i = overlap.cigar_start_idx;
@@ -108,11 +94,10 @@ bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& al
     return long_indel;
 }
 
-void calculate_accuracy(OverlapWindow& overlap,
-                        const CorrectionAlignments& alignments,
-                        size_t win_idx,
-                        int win_len,
-                        int m_window_size) {
+void CorrectionNode::calculate_accuracy(OverlapWindow& overlap,
+                                        const CorrectionAlignments& alignments,
+                                        size_t win_idx,
+                                        int win_len) {
     int tstart = overlap.tstart;
     int tend = win_idx * m_window_size + win_len;
 
@@ -213,10 +198,10 @@ void calculate_accuracy(OverlapWindow& overlap,
     //spdlog::info("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
 }
 
-std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
-                                        const CorrectionAlignments& alignments,
-                                        int tstart,
-                                        int win_len) {
+std::vector<int> CorrectionNode::get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
+                                                        const CorrectionAlignments& alignments,
+                                                        int tstart,
+                                                        int win_len) {
     std::vector<int> max_ins(win_len, 0);
     ;
     for (const auto& overlap : overlaps) {
@@ -258,7 +243,7 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
     return max_ins;
 }
 
-std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
+std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window(
         const std::vector<OverlapWindow>& overlaps,
         const CorrectionAlignments& alignments,
         int win_len,
@@ -282,7 +267,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
     auto quals = torch::full({reads, length}, (float)'!', quals_options);
     auto t0 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> dur = (t0 - t_init);
-    spdlog::info("time to create tensor {}", dur.count());
+    //spdlog::info("time to create tensor {}", dur.count());
     // Write target for window
     const std::string& tseq = alignments.read_seq;
     const std::vector<uint8_t>& tqual = alignments.read_qual;
@@ -307,7 +292,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
     }
     auto t1 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = t1 - t0;
-    spdlog::info("prolog duration {}", duration.count());
+    //spdlog::info("prolog duration {}", duration.count());
     string_time += duration;
 
     //std::exit(0);
@@ -444,20 +429,19 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         //spdlog::info("sum of bases at at overlap {} {}",w , bases.sum().item<int>());
         t1 = std::chrono::high_resolution_clock::now();
         duration = t1 - t0;
-        spdlog::info("duration for overlap {}: {}", w, duration.count());
+        //spdlog::info("duration for overlap {}: {}", w, duration.count());
         string_time += duration;
-        ;
     }
 
     //for(int i = 0; i < length; i++) {
     //    spdlog::info("target row at end pos {} base {}", i, bases[0][1].item<int>());
     //}
 
-    spdlog::info("string time {}", string_time.count());
+    //spdlog::info("string time {}", string_time.count());
     return {std::move(bases), std::move(quals)};
 }
 
-std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
+std::vector<std::pair<int, int>> CorrectionNode::get_supported(torch::Tensor& bases) {
     std::vector<std::pair<int, int>> supported;
 
     static auto base_forward = base_forward_mapping();
@@ -506,7 +490,8 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
     return supported;
 }
 
-std::vector<int> get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported) {
+torch::Tensor CorrectionNode::get_indices(torch::Tensor bases,
+                                          std::vector<std::pair<int, int>>& supported) {
     static auto base_encoding = gen_base_encoding();
     //auto tbase_tensor = bases.index({torch::indexing::Slice(), 0});
     auto tbase_tensor = bases.data_ptr<int>();
@@ -523,12 +508,14 @@ std::vector<int> get_indices(torch::Tensor bases, std::vector<std::pair<int, int
         supported_indices.push_back(indices[pos] + ins);
     }
 
-    return supported_indices;
+    return torch::from_blob(supported_indices.data(), {(int)supported_indices.size()},
+                            torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
+            .clone();
 }
 
-std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                             const CorrectionAlignments& alignments,
-                                             int m_window_size) {
+std::vector<WindowFeatures> CorrectionNode::extract_features(
+        std::vector<std::vector<OverlapWindow>>& windows,
+        const CorrectionAlignments& alignments) {
     const std::string& tseq = alignments.read_seq;
     int tlen = tseq.length();
 
@@ -540,7 +527,6 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
     std::chrono::duration<double> features_time{};
     std::chrono::duration<double> supported_time{};
     std::chrono::duration<double> indices_time{};
-    std::chrono::duration<double> move_time{};
     for (size_t w = 0; w < windows.size(); w++) {
         //for (size_t w = 0; w < 1; w++) {
         int win_len = (w == windows.size() - 1) ? tlen - m_window_size * w : m_window_size;
@@ -566,7 +552,7 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
 
         // Sort overlaps by score
         for (auto& ovlp : windows[w]) {
-            calculate_accuracy(ovlp, alignments, w, win_len, m_window_size);
+            calculate_accuracy(ovlp, alignments, w, win_len);
         }
         // Sort the filtered overlaps by accuracy score
         std::sort(windows[w].begin(), windows[w].end(),
@@ -583,8 +569,6 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
             //spdlog::info("window {} 1st {}-{} 2nd {}-{}", w, windows[w][0].qstart, windows[w][0].qend, windows[w][1].qstart, windows[w][1].qend);
         }
 
-        WindowFeatures wf;
-        wf.n_alns = (int)windows[w].size();
         if (windows[w].size() > 1) {
             // Find the maximum insert size
             auto start = std::chrono::high_resolution_clock::now();
@@ -596,13 +580,13 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
             ins_time += duration;
 
             // Create tensors
-            spdlog::info("get features for window {}", w);
+            //spdlog::info("get features for window {}", w);
             auto [bases, quals] = get_features_for_window(windows[w], alignments, win_len,
                                                           w * m_window_size, max_ins);
             auto feat = std::chrono::high_resolution_clock::now();
             duration = feat - ins;
             features_time += duration;
-            spdlog::info("time to get features for window {} is {}", w, duration.count());
+            //spdlog::info("time to get features for window {} is {}", w, duration.count());
             auto supported = get_supported(bases);
             //spdlog::info("num supported {}", supported.size());
             auto supp = std::chrono::high_resolution_clock::now();
@@ -610,29 +594,26 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
             duration = supp - feat;
             supported_time += duration;
 
+            WindowFeatures wf;
+            wf.window_idx = w;
+            wf.read_name = alignments.read_name;
+            wf.n_alns = (int)windows[w].size();
+
             wf.bases = std::move(bases);
             wf.quals = std::move(quals);
             wf.supported = std::move(supported);
-            wf.length = std::move(
-                    torch::full({1}, (int)wf.supported.size(),
-                                torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)));
-            auto supported_indices = get_indices(wf.bases, wf.supported);
+            wf.length = (int)wf.supported.size();
+            //    std::move(
+            //        torch::full({1}, (int)wf.supported.size(),
+            //                    torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)));
+            wf.indices = get_indices(wf.bases, wf.supported);
             auto ind = std::chrono::high_resolution_clock::now();
 
             duration = ind - supp;
             indices_time += duration;
 
-            wf.indices.push_back(
-                    torch::from_blob(
-                            supported_indices.data(), {(int)supported_indices.size()},
-                            torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
-                            .clone());
-            auto move = std::chrono::high_resolution_clock::now();
-
-            duration = move - ind;
-            move_time += duration;
+            wfs.push_back(std::move(wf));
         }
-        wfs.push_back(std::move(wf));
         auto t3 = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double> duration = t1 - t0;
@@ -643,21 +624,19 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
         gen_tensor_time += duration;
     }
 
-    spdlog::info("time for filter {}", filter_time.count());
-    spdlog::info("time for sort {}", sort_time.count());
-    spdlog::info("time for gen_tensor {}", gen_tensor_time.count());
-    spdlog::info("time for ins_time {}", ins_time.count());
-    spdlog::info("time for features {}", features_time.count());
-    spdlog::info("time for supported {}", supported_time.count());
-    spdlog::info("time for indices {}", indices_time.count());
-    spdlog::info("time for move {}", move_time.count());
+    //spdlog::info("time for filter {}", filter_time.count());
+    //spdlog::info("time for sort {}", sort_time.count());
+    //spdlog::info("time for gen_tensor {}", gen_tensor_time.count());
+    //spdlog::info("time for ins_time {}", ins_time.count());
+    //spdlog::info("time for features {}", features_time.count());
+    //spdlog::info("time for supported {}", supported_time.count());
+    //spdlog::info("time for indices {}", indices_time.count());
 
     return wfs;
 }
 
-void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
-                     const CorrectionAlignments& alignments,
-                     int m_window_size) {
+void CorrectionNode::extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
+                                     const CorrectionAlignments& alignments) {
     size_t num_alignments = alignments.overlaps.size();
     for (size_t a = 0; a < num_alignments; a++) {
         const auto& overlap = alignments.overlaps[a];
@@ -851,8 +830,13 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
     }
 }
 
-void run_inference(torch::jit::script::Module& module, std::vector<WindowFeatures>& wfs) {
+void CorrectionNode::run_inference(torch::jit::script::Module& module,
+                                   std::vector<WindowFeatures>& wfs,
+                                   int batch_size) {
+    const auto device = torch::kCUDA;
+    //const auto device = torch::kCPU;
     torch::NoGradGuard no_grad;
+    module.to(device);
     module.eval();
 
     auto decode_preds = [](const torch::Tensor& preds) {
@@ -866,45 +850,106 @@ void run_inference(torch::jit::script::Module& module, std::vector<WindowFeature
         }
         return bases;
     };
+
+    std::vector<torch::Tensor> bases_batch;
+    std::vector<torch::Tensor> quals_batch;
+    std::vector<int> lengths;
+    std::vector<int64_t> sizes;
+    std::vector<torch::Tensor> indices_batch;
+    std::vector<int> wf_idx;
+
+    auto batch_infer = [&]() {
+        // Run inference on batch
+        auto t0 = std::chrono::high_resolution_clock::now();
+        auto batched_bases = collate<int>(bases_batch, (int)11);
+        auto batched_quals = collate<float>(quals_batch, 0.f);
+        auto length_tensor =
+                torch::from_blob(lengths.data(), {(int)lengths.size()},
+                                 torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
+        //print_size(batched_bases, "batched_bases");
+        //print_size(batched_quals, "batched_quals");
+        //print_size(length_tensor, "length_tensor");
+
+        auto t1 = std::chrono::high_resolution_clock::now();
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(batched_bases.to(device));
+        inputs.push_back(batched_quals.to(device));
+        inputs.push_back(length_tensor.to(device));
+        std::for_each(indices_batch.begin(), indices_batch.end(),
+                      [device](torch::Tensor& t) { t.to(device); });
+        inputs.push_back(indices_batch);
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        auto output = module.forward(inputs);
+        if (output.isTuple()) {
+            auto base_logits = output.toTuple()->elements()[1].toTensor();
+            //print_size(base_logits, "base_logits");
+            auto preds = base_logits.argmax(1, false).to(torch::kCPU);
+            ;
+            auto t3 = std::chrono::high_resolution_clock::now();
+            //print_size(preds, "preds");
+            auto split_preds = preds.split_with_sizes(sizes);
+            //spdlog::info("split preds size {}", split_preds.size());
+            for (size_t w = 0; w < split_preds.size(); w++) {
+                auto decoded_output = decode_preds(split_preds[w]);
+                //spdlog::info("decoded output size {}", decoded_output.size());
+                auto idx_to_store = wf_idx[w];
+                //spdlog::info("storing out in {}", idx_to_store);
+                wfs[idx_to_store].inferred_bases = decoded_output;
+                //spdlog::info("stored output");
+            }
+            auto t4 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> collate_time = (t1 - t0);
+            std::chrono::duration<double> move_to_device = (t2 - t1);
+            std::chrono::duration<double> forward = (t3 - t2);
+            std::chrono::duration<double> dec = (t4 - t3);
+            spdlog::info("collate {} move_to_dev {} forward {} dec {}", collate_time.count(),
+                         move_to_device.count(), forward.count(), dec.count());
+        }
+    };
+
+    int idx = 0;
     for (auto& wf : wfs) {
         if (wf.n_alns > 1 && wf.supported.size() > 0) {
             //for(int i = 0; i < wf.bases.sizes()[0]; i++) {
             //    spdlog::info("target row before inference pos {} base {}", i, wf.bases[i][0].item<int>());
             //}
-            wf.bases = wf.bases.unsqueeze(0);  //.to(torch::kInt32);
-            wf.quals = 2.f * (wf.quals.unsqueeze(0) - 33.f) / (126.f - 33.f) - 1.f;
+            auto b = wf.bases.transpose(0, 1);
+            auto q = 2.f * (wf.quals.transpose(0, 1) - 33.f) / (126.f - 33.f) - 1.f;
+
+            wf_idx.push_back(idx);
+            bases_batch.push_back(b);
+            quals_batch.push_back(q);
+            lengths.push_back(wf.length);
+            sizes.push_back(wf.length);
+            indices_batch.push_back(wf.indices);
             //print_size(wf.bases, "bases");
             //print_size(wf.quals, "quals");
-            //print_size(wf.length, "length");
-            //print_size(wf.indices[0], "indices");
+            //print_size(wf.indices, "indices");
+            //spdlog::info("length {}", wf.length);
+
+            if ((int)bases_batch.size() == batch_size) {
+                batch_infer();
+                bases_batch.clear();
+                quals_batch.clear();
+                lengths.clear();
+                sizes.clear();
+                indices_batch.clear();
+                wf_idx.clear();
+            }
 
             //spdlog::info("bases max {} min {} sum {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>(), wf.bases.sum().item<int>());
             //spdlog::info("quals max {} min {} sum {}", wf.quals.max().item<float>(), wf.quals.min().item<float>(), wf.quals.sum().item<float>());
-
-            std::vector<torch::jit::IValue> inputs;
-            inputs.push_back(wf.bases.transpose(1, 2));
-            inputs.push_back(wf.quals.transpose(1, 2));
-            inputs.push_back(wf.length);
-            inputs.push_back(wf.indices);
-
-            auto output = module.forward(inputs);
-            if (output.isTuple()) {
-                auto base_logits = output.toTuple()->elements()[1].toTensor();
-                auto preds = base_logits.argmax(1, false);
-                //print_size(base_logits, "base_logits");
-                //print_size(preds, "preds");
-                wf.inferred_bases = decode_preds(preds);
-            }
         }
+        idx++;
+    }
+
+    if (bases_batch.size() > 0) {
+        batch_infer();
     }
 }
 
-struct base_count_t {
-    int c = 0;
-    char b;
-};
-
-std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) {
+std::vector<std::string> CorrectionNode::decode_windows(const std::vector<WindowFeatures>& wfs) {
     std::vector<std::string> corrected_reads;
     std::string corrected_seq;
 
@@ -939,22 +984,24 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
 
     std::unordered_map<std::pair<int, int>, char, PairHash, PairEqual> bases_map;
 
+    int prev_decoded_window_idx = wfs[0].window_idx;
     for (const auto& wf : wfs) {
-        if (wf.n_alns < 2) {
+        if (wf.window_idx != (prev_decoded_window_idx + 1)) {
             if (corrected_seq.length() > 0) {
                 corrected_reads.push_back(corrected_seq);
                 //spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
                 corrected_seq = "";
             }
-            continue;
         }
+
+        prev_decoded_window_idx = wf.window_idx;
 
         bases_map.clear();
         for (size_t i = 0; i < wf.supported.size(); i++) {
             //spdlog::info("supported positions {},{} for {}", wf.supported[i].first, wf.supported[i].second, wf.inferred_bases[i]);
             bases_map.insert({wf.supported[i], wf.inferred_bases[i]});
         }
-        auto bases = wf.bases.squeeze(0);
+        auto bases = wf.bases;
         int tpos = -1, ins = 0;
         int length = bases.sizes()[1];
         int* bases_tensor = bases.data_ptr<int>();
@@ -1018,21 +1065,13 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
     return corrected_reads;
 }
 
-BamPtr create_bam_record(const std::string& read_id, const std::string& seq) {
-    bam1_t* rec = bam_init1();
-    bam_set1(rec, read_id.length(), read_id.c_str(), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
-             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq.size(),
-             seq.data(), nullptr, 0);
-    return BamPtr(rec);
-}
-
-CorrectionNode::CorrectionNode(int threads) : MessageSink(10000, threads) {
+CorrectionNode::CorrectionNode(int threads, int batch_size)
+        : MessageSink(10000, threads), m_batch_size(batch_size) {
     start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
 
 void CorrectionNode::input_thread_fn() {
     Message message;
-    mm_tbuf_t* tbuf = mm_tbuf_init();
 
     torch::jit::script::Module module;
     try {
@@ -1057,30 +1096,30 @@ void CorrectionNode::input_thread_fn() {
                 std::vector<std::vector<OverlapWindow>> windows;
                 windows.resize(n_windows);
                 auto t0 = std::chrono::high_resolution_clock::now();
-                extract_windows(windows, alignments, m_window_size);
+                extract_windows(windows, alignments);
                 //int o = 0;
                 //for (auto& ovlp_windows : windows) {
                 //    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), o++);
                 //}
                 auto t1 = std::chrono::high_resolution_clock::now();
-                auto wfs = extract_features(windows, alignments, m_window_size);
+                auto wfs = extract_features(windows, alignments);
                 (void)wfs;
                 auto t2 = std::chrono::high_resolution_clock::now();
-                run_inference(module, wfs);
+                run_inference(module, wfs, m_batch_size);
                 auto t3 = std::chrono::high_resolution_clock::now();
                 auto corrected_seqs = decode_windows(wfs);
                 auto t4 = std::chrono::high_resolution_clock::now();
-                //if (corrected_seqs.size() == 1) {
-                //    auto rec = create_bam_record(alignments.read_name, corrected_seqs[0]);
-                //    send_message_to_sink(std::move(rec));
-                //} else {
-                //    for (size_t s = 0; s < corrected_seqs.size(); s++) {
-                //        const std::string read_name =
-                //                alignments.read_name + ":" + std::to_string(s);
-                //        auto rec = create_bam_record(read_name, corrected_seqs[s]);
-                //        send_message_to_sink(std::move(rec));
-                //    }
-                //}
+                if (corrected_seqs.size() == 1) {
+                    auto rec = create_bam_record(alignments.read_name, corrected_seqs[0]);
+                    send_message_to_sink(std::move(rec));
+                } else {
+                    for (size_t s = 0; s < corrected_seqs.size(); s++) {
+                        const std::string read_name =
+                                alignments.read_name + ":" + std::to_string(s);
+                        auto rec = create_bam_record(read_name, corrected_seqs[s]);
+                        send_message_to_sink(std::move(rec));
+                    }
+                }
                 {
                     std::chrono::duration<double> duration = t1 - t0;
                     std::lock_guard<std::mutex> lock(ewMutex);
@@ -1112,7 +1151,6 @@ void CorrectionNode::input_thread_fn() {
             continue;
         }
     }
-    mm_tbuf_destroy(tbuf);
 }
 
 void CorrectionNode::terminate(const FlushOptions&) {
