@@ -85,7 +85,7 @@ using namespace std::chrono_literals;
 using namespace dorado::models;
 namespace fs = std::filesystem;
 
-void setup(std::vector<std::string> args,
+void setup(const std::vector<std::string>& args,
            const fs::path& model_path,
            const std::string& data_path,
            const std::vector<fs::path>& remora_models,
@@ -102,7 +102,7 @@ void setup(std::vector<std::string> args,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
-           std::string read_list_file_path,
+           const std::string& read_list_file_path,
            bool recursive_file_loading,
            const alignment::Minimap2Options& aligner_options,
            bool skip_model_compatibility_check,
@@ -192,7 +192,7 @@ void setup(std::vector<std::string> args,
             utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
                                                    custom_barcodes, sample_sheet.get());
         } else {
-            const auto kit_info = get_barcode_kit_info(barcode_kit);
+            const auto& kit_info = get_barcode_kit_info(barcode_kit);
             utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
                                                    custom_barcodes, sample_sheet.get());
         }
@@ -227,14 +227,14 @@ void setup(std::vector<std::string> args,
     if (adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim, std::move(custom_primer_file));
+                !primer_no_trim, custom_primer_file);
     }
     if (barcode_enabled) {
         std::vector<std::string> kit_as_vector{barcode_kit};
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, kit_as_vector,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes),
-                std::move(custom_kit), std::move(custom_barcode_file));
+                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes), custom_kit,
+                custom_barcode_file);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -425,11 +425,12 @@ int basecaller(int argc, char* argv[]) {
             .action([](const std::string& value) {
                 const auto& mods = models::modified_model_variants();
                 if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                    spdlog::error(
-                            "'{}' is not a supported modification please select from {}", value,
-                            std::accumulate(
-                                    std::next(mods.begin()), mods.end(), mods[0],
-                                    [](std::string a, std::string b) { return a + ", " + b; }));
+                    spdlog::error("'{}' is not a supported modification please select from {}",
+                                  value,
+                                  std::accumulate(std::next(mods.begin()), mods.end(), mods[0],
+                                                  [](std::string const& a, std::string const& b) {
+                                                      return a + ", " + b;
+                                                  }));
                     std::exit(EXIT_FAILURE);
                 }
                 return value;
@@ -518,7 +519,7 @@ int basecaller(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     std::vector<std::string> args(argv, argv + argc);
@@ -538,7 +539,7 @@ int basecaller(int argc, char* argv[]) {
     auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
         spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     auto output_mode = OutputMode::BAM;
@@ -548,7 +549,7 @@ int basecaller(int argc, char* argv[]) {
 
     if (emit_fastq && emit_sam) {
         spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if (emit_fastq) {
@@ -556,13 +557,13 @@ int basecaller(int argc, char* argv[]) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         if (!parser.visible.get<std::string>("--reference").empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
                     "results.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = OutputMode::FASTQ;
@@ -577,7 +578,7 @@ int basecaller(int argc, char* argv[]) {
     if (parser.visible.get<bool>("--no-trim")) {
         if (!trim_options.empty()) {
             spdlog::error("Only one of --no-trim and --trim can be used.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
     }
@@ -589,7 +590,7 @@ int basecaller(int argc, char* argv[]) {
         no_trim_barcodes = no_trim_primers = true;
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     std::string polya_config = "";
@@ -598,7 +599,7 @@ int basecaller(int argc, char* argv[]) {
             spdlog::error(
                     "--trim cannot be used with options 'primers', 'adapters', or 'all', "
                     "if you are also using --estimate-poly-a.");
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
         no_trim_primers = no_trim_adapters = no_trim_barcodes = true;
         spdlog::info(
@@ -611,7 +612,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error(
                 "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
                 "one.");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     std::optional<std::string> custom_kit = std::nullopt;
@@ -635,7 +636,7 @@ int basecaller(int argc, char* argv[]) {
         spdlog::error(
                 "Only one of --modified-bases, --modified-bases-models, or modified models set "
                 "via models argument can be used at once");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     };
 
     fs::path model_path;
@@ -662,7 +663,7 @@ int basecaller(int argc, char* argv[]) {
         } catch (std::exception& e) {
             spdlog::error(e.what());
             utils::clean_temporary_models(model_finder.downloaded_models());
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 
@@ -684,19 +685,18 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--resume-from"),
               parser.visible.get<std::string>("--kit-name"),
               parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
-              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"),
-              std::move(custom_kit), std::move(custom_barcode_seqs), std::move(custom_primer_file),
-              resume_parser, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
-              model_selection);
+              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"), custom_kit,
+              custom_barcode_seqs, custom_primer_file, resume_parser,
+              parser.visible.get<bool>("--estimate-poly-a"), polya_config, model_selection);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     utils::clean_temporary_models(temp_download_paths);
     spdlog::info("> Finished");
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

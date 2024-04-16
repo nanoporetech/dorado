@@ -856,6 +856,7 @@ const std::unordered_set<std::string>& get_barcode_identifiers() {
 
 std::string barcode_kits_list_str() {
     std::vector<std::string> kit_names;
+    kit_names.reserve(kit_info_map.size());
     for (auto& [kit_name, _] : kit_info_map) {
         kit_names.push_back(kit_name);
     }

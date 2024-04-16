@@ -121,7 +121,7 @@ stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
         auto node_stats = node->sample_stats();
         const auto node_name = node->get_name();
         for (const auto &[name, value] : node_stats) {
-            final_stats[node_name + "." + name] = value;
+            final_stats[std::string(node_name).append(".").append(name)] = value;
         }
     }
     return final_stats;

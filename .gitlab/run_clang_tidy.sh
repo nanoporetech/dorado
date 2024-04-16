@@ -55,6 +55,9 @@ cmake \
 # Remove any 3rdparty .clang-tidy's otherwise we check them for errors.
 find ${source_dir}/dorado/3rdparty/* -name .clang-tidy -delete
 
+# Print the current config to make sure it parses correctly.
+clang-tidy --dump-config
+
 # Run clang-tidy with our warnings.
 # Note that we use run-clang-tidy to avoid the overhead of having to a full build too.
 run-clang-tidy \

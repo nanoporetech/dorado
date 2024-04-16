@@ -75,7 +75,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without mods variant: {}", matches.size(), description,
                          to_string(mods.variant));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - mods variant: {}", m.name, to_string(m.mods.variant));
             }
         }
@@ -86,7 +86,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without mods version: {}", matches.size(), description,
                          to_string(mods.ver));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - mods version: {}", m.name, to_string(m.mods.ver));
             }
         }
@@ -102,7 +102,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without model variant: {}", matches.size(),
                          description, to_string(model.variant));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - model variant: {}", m.name, to_string(m.simplex.variant));
             }
         }
@@ -113,7 +113,7 @@ void suggest_models(const std::vector<ModelInfo>& models,
         if (matches.size() > 0) {
             spdlog::info("Found {} {} models without model version: {}", matches.size(),
                          description, to_string(model.ver));
-            for (auto m : matches) {
+            for (const auto& m : matches) {
                 spdlog::info("- {} - model version: {}", m.name, to_string(m.simplex.ver));
             }
         }
@@ -759,6 +759,7 @@ const std::vector<ModelInfo>& modified_models() { return modified::models; }
 namespace {
 std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
     std::vector<std::string> v;
+    v.reserve(infos.size());
     for (const auto& item : infos) {
         v.push_back(std::string(item.name));
     }
@@ -816,7 +817,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
 }
 
 ModelInfo get_simplex_model_info(const std::string& model_name) {
-    const auto simplex_model_infos = simplex_models();
+    const auto& simplex_model_infos = simplex_models();
     auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
     std::vector<ModelInfo> matches;
     std::copy_if(simplex_model_infos.begin(), simplex_model_infos.end(),
@@ -875,7 +876,7 @@ std::string get_modification_model(const std::filesystem::path& simplex_model_pa
 }
 
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
-    const auto chemistries = chemistry_kits();
+    const auto& chemistries = chemistry_kits();
     const ModelInfo model_info = get_simplex_model_info(model_name);
     auto iter = chemistries.find(model_info.chemistry);
     if (iter != chemistries.end()) {

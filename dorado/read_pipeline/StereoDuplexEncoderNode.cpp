@@ -12,9 +12,9 @@
 
 namespace dorado {
 
-DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) {
-    const ReadPair::ReadData& template_read = read_pair.template_read;
-    const ReadPair::ReadData& complement_read = read_pair.complement_read;
+DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
+    ReadPair::ReadData& template_read = read_pair.template_read;
+    ReadPair::ReadData& complement_read = read_pair.complement_read;
 
     // We rely on the incoming read raw data being of type float16 to allow direct memcpy
     // of tensor elements.
@@ -27,16 +27,16 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     assert(complement_read.read_common.start_time_ms > template_read.read_common.start_time_ms);
 
     // We align the reverse complement of the complement read to the template read.
-    const auto complement_sequence_reverse_complement =
+    auto complement_sequence_reverse_complement =
             dorado::utils::reverse_complement(complement_read.read_common.seq);
 
     // Align the two reads to one another and print out the score.
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    auto temp_strand = template_read.read_common.seq.substr(
+    auto temp_strand = std::string_view{template_read.read_common.seq}.substr(
             template_read.seq_start, template_read.seq_end - template_read.seq_start);
-    auto comp_strand = complement_sequence_reverse_complement.substr(
+    auto comp_strand = std::string_view{complement_sequence_reverse_complement}.substr(
             complement_read.seq_start, complement_read.seq_end - complement_read.seq_start);
 
     EdlibAlignResult edlib_result =
@@ -56,13 +56,13 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
                 &edlib_result.alignment[edlib_result.startLocations[0]], alignment_size);
     edlibFreeAlignResult(edlib_result);
 
-    stereo_feature_inputs.template_seq_start = std::move(template_read.seq_start);
+    stereo_feature_inputs.template_seq_start = template_read.seq_start;
     stereo_feature_inputs.template_seq = std::move(template_read.read_common.seq);
     stereo_feature_inputs.template_qstring = std::move(template_read.read_common.qstring);
     stereo_feature_inputs.template_moves = std::move(template_read.read_common.moves);
     stereo_feature_inputs.template_signal = std::move(template_read.read_common.raw_data);
 
-    stereo_feature_inputs.complement_seq_start = std::move(complement_read.seq_start);
+    stereo_feature_inputs.complement_seq_start = complement_read.seq_start;
     stereo_feature_inputs.complement_seq = std::move(complement_sequence_reverse_complement);
     stereo_feature_inputs.complement_qstring = std::move(complement_read.read_common.qstring);
     stereo_feature_inputs.complement_moves = std::move(complement_read.read_common.moves);
@@ -78,12 +78,12 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(const ReadPair& read_pair) 
     read->read_common.start_time_ms = template_read.read_common.start_time_ms;
 
     read->read_common.read_tag = template_read.read_common.read_tag;
-    read->read_common.client_info = template_read.read_common.client_info;
+    read->read_common.client_info = std::move(template_read.read_common.client_info);
     read->read_common.is_duplex = true;
-    read->read_common.run_id = template_read.read_common.run_id;
-    read->read_common.flowcell_id = template_read.read_common.flowcell_id;
-    read->read_common.position_id = template_read.read_common.position_id;
-    read->read_common.experiment_id = template_read.read_common.experiment_id;
+    read->read_common.run_id = std::move(template_read.read_common.run_id);
+    read->read_common.flowcell_id = std::move(template_read.read_common.flowcell_id);
+    read->read_common.position_id = std::move(template_read.read_common.position_id);
+    read->read_common.experiment_id = std::move(template_read.read_common.experiment_id);
 
     ++m_num_encoded_pairs;
 
@@ -101,7 +101,7 @@ void StereoDuplexEncoderNode::input_thread_fn() {
         }
 
         auto read_pair = std::get<ReadPair>(std::move(message));
-        auto stereo_encoded_read = stereo_encode(read_pair);
+        auto stereo_encoded_read = stereo_encode(std::move(read_pair));
 
         send_message_to_sink(
                 std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink

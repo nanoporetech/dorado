@@ -85,7 +85,7 @@ AlignmentOps get_alignment_op_counts(bam1_t* record);
  * @return Map of keys to their values
  * @throws An error if a key is requested that doesn't exist.
  */
-std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
                                                             const std::vector<std::string>& keys);
 
 /*

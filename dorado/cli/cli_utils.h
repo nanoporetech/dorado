@@ -44,7 +44,7 @@ static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
 
 struct ArgParser {
     ArgParser(std::string program_name)
-            : visible(program_name, DORADO_VERSION, argparse::default_arguments::help),
+            : visible(std::move(program_name), DORADO_VERSION, argparse::default_arguments::help),
               hidden(HIDDEN_PROGRAM_NAME){};
     argparse::ArgumentParser visible;
     argparse::ArgumentParser hidden;
@@ -62,7 +62,9 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
     return std::make_pair(aligner_threads, writer_threads);
 }
 
-inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std::string device) {
+inline void add_pg_hdr(sam_hdr_t* hdr,
+                       const std::vector<std::string>& args,
+                       const std::string& device) {
     sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
     auto safe_id = sam_hdr_pg_id(hdr, "basecaller");
 
@@ -81,14 +83,14 @@ inline void add_pg_hdr(sam_hdr_t* hdr, const std::vector<std::string>& args, std
     (void)device;
 #endif
 
-    pg << std::endl;
+    pg << '\n';
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
 
 inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
     size_t first_pos = 0, pos = 0;
     std::vector<int> tokens;
-    while ((pos = version.find(".", first_pos)) != std::string::npos) {
+    while ((pos = version.find('.', first_pos)) != std::string::npos) {
         tokens.emplace_back(std::stoi(version.substr(first_pos, pos)));
         first_pos = pos + 1;
     }

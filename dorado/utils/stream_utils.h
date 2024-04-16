@@ -70,7 +70,8 @@ public:
     /// <summary>
     /// Invoke a function with stderr suppressed
     /// </summary>
-    static void invoke(std::function<void()> func) {
+    template <typename Func>
+    static void invoke(Func &&func) {
         SuppressStderr suppression{};
         func();
     }

@@ -89,7 +89,7 @@ std::pair<float, float> ModBaseScaler::calc_offset_scale(
     }
 
     std::vector<float> quants(19);
-    std::generate(std::begin(quants), std::end(quants), [n = 0.f]() mutable { return n += 0.05f; });
+    std::generate(std::begin(quants), std::end(quants), [i = 0.f]() mutable { return i += 0.05f; });
 
     new_levels = utils::quantiles(new_levels, quants);
     optim_dacs = utils::quantiles(optim_dacs, quants);

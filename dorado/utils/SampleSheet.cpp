@@ -245,8 +245,10 @@ void SampleSheet::validate_headers(const std::vector<std::string>& col_names,
     for (auto& col_name : col_names) {
         if (std::find(allowed_column_names.begin(), allowed_column_names.end(), col_name) ==
             allowed_column_names.end()) {
-            throw std::runtime_error(std::string("Sample sheet ") + filename +
-                                     " contains invalid column " + col_name);
+            throw std::runtime_error(std::string("Sample sheet ")
+                                             .append(filename)
+                                             .append(" contains invalid column ")
+                                             .append(col_name));
         }
     }
 
