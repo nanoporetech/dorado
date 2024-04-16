@@ -47,7 +47,7 @@ plasmid_front_flank = "CGATCG"
 plasmid_rear_flank = "TGACTGC"
 
 [threshold]
-flank_threshold = 0.4
+flank_threshold = 0.6
 
 [tail]
 tail_interrupt_length = 10
