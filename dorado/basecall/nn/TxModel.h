@@ -9,6 +9,7 @@
 #include <torch/nn.h>
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace dorado::basecall {
@@ -59,13 +60,15 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
                            int nhead_,
                            bool qkv_bias_,
                            bool out_bias_,
-                           const at::Tensor &attn_window_mask_,
+                           const std::pair<int, int> &attn_window_,
                            const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
 
+    at::Tensor build_attn_window_mask(const int64_t size) const;
+
     const int lrno, d_model, nhead, head_dim;
-    const at::Tensor &attn_window_mask;
+    const std::pair<int, int> attn_window;
     const at::TensorOptions options;
 
     torch::nn::Linear wqkv{nullptr}, out_proj{nullptr};
@@ -77,13 +80,11 @@ TORCH_MODULE(MultiHeadAttention);
 struct TxEncoderImpl : torch::nn::Module {
     TxEncoderImpl(int lrno_,
                   const basecall::tx::TxEncoderParams &params,
-                  const at::Tensor &attn_window_mask_,
                   const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
 
     const int lrno;
-    const at::Tensor &attn_window_mask;
     const at::TensorOptions options;
 
     MultiHeadAttention self_attn{nullptr};
@@ -97,10 +98,6 @@ struct TxEncoderStackImpl : torch::nn::Module {
     TxEncoderStackImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
 
     at::Tensor forward(const at::Tensor &x) { return stack->forward(x); };
-    at::Tensor build_attn_window_mask(const basecall::CRFModelConfig &config,
-                                      const at::TensorOptions &options) const;
-
-    const at::Tensor attn_window_mask;
     torch::nn::Sequential stack{nullptr};
 };
 
@@ -110,7 +107,6 @@ struct LinearUpsampleImpl : torch::nn::Module {
     LinearUpsampleImpl(const basecall::tx::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
-
     const int scale_factor;
     torch::nn::Linear linear{nullptr};
 };

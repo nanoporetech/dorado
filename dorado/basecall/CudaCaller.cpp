@@ -246,12 +246,10 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         } else {
             // Use other chunk sizes as a fraction of the requested one
             // TODO: determine the best set of chunk sizes
-
-            // TODO: ABSOLUTELY DON'T LEAVE THIS IN - 0.5 -> 1.0
-            // for (float fraction : {1.0f}) {
-            //     int T_out = int(m_batch_dims[0].T_out * fraction);
-            //     m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
-            // }
+            for (float fraction : {0.5f}) {
+                int T_out = int(m_batch_dims[0].T_out * fraction);
+                m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+            }
         }
     }
 

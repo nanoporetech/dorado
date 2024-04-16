@@ -125,19 +125,28 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
                                                int nhead_,
                                                bool qkv_bias_,
                                                bool out_bias_,
-                                               const at::Tensor &attn_window_mask_,
+                                               const std::pair<int, int> &attn_window_,
                                                const at::TensorOptions &options_)
         : lrno(lrno_),
           d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
-          attn_window_mask(attn_window_mask_),
+          attn_window(attn_window_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
-    // TODO: can max_seq_len 1000 -> attn_window.size()?
-    rotary_emb = register_module("rotary_emb", RotaryEmbedding(lrno, head_dim, 10000.0,
-                                                               attn_window_mask.size(0), options));
+    const float theta = 10000.0f;
+    const int64_t max_seq_len = 2000;
+    rotary_emb = register_module("rotary_emb",
+                                 RotaryEmbedding(lrno, head_dim, theta, max_seq_len, options));
+};
+
+at::Tensor MultiHeadAttentionImpl::build_attn_window_mask(const int64_t size) const {
+    const auto [win_upper, win_lower] = attn_window;
+    at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
+    mask *= at::tril(mask, win_lower);
+    mask = mask.to(at::kBool).to(options.device());
+    return mask;
 };
 
 at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
@@ -160,6 +169,8 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("MEA", 2);
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
+        auto attn_window_mask = build_attn_window_mask(T);
+
         attn_output = scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
                               .permute({0, 1, 3, 2, 4})
                               .reshape({N, T, C});
@@ -173,12 +184,11 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 
 TxEncoderImpl::TxEncoderImpl(int lrno_,
                              const TxEncoderParams &params,
-                             const at::Tensor &attn_window_mask_,
                              const at::TensorOptions &options_)
-        : lrno(lrno_), attn_window_mask(attn_window_mask_), options(options_) {
+        : lrno(lrno_), options(options_) {
     self_attn = register_module("self_attn",
                                 MultiHeadAttention(lrno, params.d_model, params.nhead, false, true,
-                                                   attn_window_mask, options));
+                                                   params.attn_window, options));
     ff = register_module("ff", GatedMLP(lrno, params.d_model, params.dim_feedforward));
     norm1 = register_module("norm1", RMSNorm(lrno, params.d_model));
     norm2 = register_module("norm2", RMSNorm(lrno, params.d_model));
@@ -210,26 +220,13 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 }
 
 TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
-                                       const at::TensorOptions &options)
-        : attn_window_mask(build_attn_window_mask(config, options)) {
+                                       const at::TensorOptions &options) {
     const auto &tx_enc_params = config.tx->tx;
     stack = Sequential();
     for (int i = 0; i < tx_enc_params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(i, tx_enc_params, attn_window_mask, options)));
+                                         TxEncoder(i, tx_enc_params, options)));
     }
-};
-
-at::Tensor TxEncoderStackImpl::build_attn_window_mask(const basecall::CRFModelConfig &config,
-                                                      const at::TensorOptions &options) const {
-    const int size = static_cast<int>(config.basecaller.chunksize /
-                                      (config.stride * config.tx->upsample.scale_factor));
-    const auto [win_upper, win_lower] = config.tx->tx.attn_window;
-
-    at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
-    mask *= at::tril(mask, win_lower);
-    mask = mask.to(at::kBool).to(options.device());
-    return mask;
 };
 
 LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
