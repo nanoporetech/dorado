@@ -72,7 +72,11 @@ if (DORADO_GPU_BUILD)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
     else()
         target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
+        if (NOT DORADO_TX2)
+            target_sources(dorado_tests PRIVATE ScaledDotProductAttention.cpp)
+        endif()
     endif()
+
 endif()
 
 

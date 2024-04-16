@@ -1,0 +1,48 @@
+#include <basecall/nn/TxModel.h>
+#include <catch2/catch.hpp>
+
+#include <vector>
+
+#define TEST_TAG "[SPDA]"
+
+using namespace dorado::basecall::nn;
+
+TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention") {
+#if TORCH_VERSION_MAJOR < 2
+    SECTION("SDPA tests invalid if TORCH_VERSION_MAJOR < 2") { CHECK(false); }
+#endif
+
+    auto options = at::TensorOptions().dtype(torch::kFloat64).device(c10::kCUDA);
+
+    SECTION("No Mask") {
+        torch::manual_seed(0);
+        if (!torch::hasCUDA()) {
+            spdlog::warn(
+                    "No Nvidia driver present - Test skipped - Scaled Dot Product Attention "
+                    "[no mask]");
+            return;
+        }
+
+        torch::Tensor no_mask;
+        std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);
+        const auto naive_res = scaled_dot_product_attention_naive(qkv[0], qkv[1], qkv[2], no_mask);
+        const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2]);
+        CHECK(at::allclose(naive_res, torch_res));
+    }
+
+    SECTION("Masked") {
+        torch::manual_seed(1);
+        if (!torch::hasCUDA()) {
+            spdlog::warn(
+                    "No Nvidia driver present -  Test skipped - Scaled Dot Product Attention "
+                    "[mask]");
+            return;
+        }
+
+        torch::Tensor mask = torch::rand({8, 8}, options).gt(0.5);
+        std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);
+        const auto naive_res = scaled_dot_product_attention_naive(qkv[0], qkv[1], qkv[2], mask);
+        const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2], mask);
+        CHECK(at::allclose(naive_res, torch_res));
+    }
+}

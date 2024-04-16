@@ -27,30 +27,27 @@ namespace dorado::basecall {
 
 namespace nn {
 
-using namespace at;
 using namespace dorado::basecall::tx;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-#if TORCH_VERSION_MAJOR < 2
-torch::Tensor scaled_dot_product_attention(torch::Tensor q,
-                                           torch::Tensor k,
-                                           torch::Tensor v,
-                                           torch::Tensor mask) {
+torch::Tensor scaled_dot_product_attention_naive(torch::Tensor q,
+                                                 torch::Tensor k,
+                                                 torch::Tensor v,
+                                                 torch::Tensor mask) {
     auto matmul_qk = torch::matmul(q, k.transpose(-2, -1));
 
     auto d_k = k.size(-1);
     matmul_qk = matmul_qk / std::sqrt(d_k);
 
     if (mask.defined()) {
-        matmul_qk = matmul_qk + (mask * -1e9);
+        matmul_qk = matmul_qk + (mask.logical_not() * -1e9);
     }
 
     auto weights = torch::softmax(matmul_qk, -1);
     return torch::matmul(weights, v);
 }
-#endif
 
 RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
     weight = at::ones({hidden_size});
@@ -168,9 +165,13 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
         auto attn_window_mask = build_attn_window_mask(T);
 
-        attn_output = scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask)
-                              .permute({0, 1, 3, 2, 4})
-                              .reshape({N, T, C});
+#if TORCH_VERSION_MAJOR < 2
+        attn_output =
+                scaled_dot_product_attention_naive(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
+#else
+        attn_output = at::scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
+#endif
+        attn_output = attn_output.permute({0, 1, 3, 2, 4}).reshape({N, T, C});
     }
     {
         utils::ScopedProfileRange spr("OUTP", 2);
