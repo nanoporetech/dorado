@@ -1,8 +1,6 @@
 #pragma once
 
-#include <math.h>
-#include <toml/value.hpp>
-
+#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -188,9 +186,6 @@ struct CRFModelConfig {
 
     std::string to_string() const;
 };
-
-std::optional<toml::value> toml_get(const toml::value& value,
-                                    const std::vector<std::string>& fields);
 
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);

@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <toml/get.hpp>
+#include <toml/value.hpp>
 
 #include <cstddef>
 #include <optional>
@@ -350,6 +351,8 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     return config;
 }
 
+namespace {
+
 std::optional<toml::value> toml_get(const toml::value &value,
                                     const std::vector<std::string> &fields) {
     if (fields.empty()) {
@@ -365,6 +368,8 @@ std::optional<toml::value> toml_get(const toml::value &value,
     }
     return *v;
 }
+
+}  // namespace
 
 bool is_tx_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
