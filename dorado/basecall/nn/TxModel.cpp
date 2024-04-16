@@ -32,10 +32,10 @@ using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-torch::Tensor scaled_dot_product_attention_naive(torch::Tensor q,
-                                                 torch::Tensor k,
-                                                 torch::Tensor v,
-                                                 torch::Tensor mask) {
+torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
+                                                 const torch::Tensor &k,
+                                                 const torch::Tensor &v,
+                                                 const torch::Tensor &mask) {
     auto matmul_qk = torch::matmul(q, k.transpose(-2, -1));
 
     auto d_k = k.size(-1);

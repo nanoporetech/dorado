@@ -16,10 +16,10 @@ namespace dorado::basecall {
 
 namespace nn {
 
-torch::Tensor scaled_dot_product_attention_naive(torch::Tensor q,
-                                                 torch::Tensor k,
-                                                 torch::Tensor v,
-                                                 torch::Tensor mask);
+torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
+                                                 const torch::Tensor &k,
+                                                 const torch::Tensor &v,
+                                                 const torch::Tensor &mask);
 
 struct RMSNormImpl : torch::nn::Module {
     RMSNormImpl(int hidden_size_);
