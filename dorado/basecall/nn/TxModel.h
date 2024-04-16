@@ -17,37 +17,35 @@ namespace dorado::basecall {
 namespace nn {
 
 struct RMSNormImpl : torch::nn::Module {
-    RMSNormImpl(int lrno_, int hidden_size_);
+    RMSNormImpl(int hidden_size_);
     at::Tensor forward(at::Tensor x);
 
     at::Tensor weight;
-    const int lrno, hidden_size;
+    const int hidden_size;
     const float eps{1e-5f};
 };
 
 TORCH_MODULE(RMSNorm);
 
 struct GatedMLPImpl : torch::nn::Module {
-    GatedMLPImpl(int lrno_, int in_features, int hidden_features);
+    GatedMLPImpl(int in_features, int hidden_features);
 
     at::Tensor forward(const at::Tensor &x);
 
     torch::nn::Linear fc1{nullptr}, fc2{nullptr};
-    const int lrno;
 };
 
 TORCH_MODULE(GatedMLP);
 
 struct RotaryEmbeddingImpl : torch::nn::Module {
-    RotaryEmbeddingImpl(int lrno_,
-                        int dim_,
+    RotaryEmbeddingImpl(int dim_,
                         float theta_,
                         int max_seq_len_,
                         const at::TensorOptions &options_);
 
     at::Tensor forward(const at::Tensor &x);
 
-    const int lrno, dim, max_seq_len;
+    const int dim, max_seq_len;
     const float theta;
     const at::TensorOptions options;
 };
@@ -55,8 +53,7 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
 TORCH_MODULE(RotaryEmbedding);
 
 struct MultiHeadAttentionImpl : torch::nn::Module {
-    MultiHeadAttentionImpl(int lrno_,
-                           int d_model_,
+    MultiHeadAttentionImpl(int d_model_,
                            int nhead_,
                            bool qkv_bias_,
                            bool out_bias_,
@@ -67,7 +64,7 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 
     at::Tensor build_attn_window_mask(const int64_t size) const;
 
-    const int lrno, d_model, nhead, head_dim;
+    const int d_model, nhead, head_dim;
     const std::pair<int, int> attn_window;
     const at::TensorOptions options;
 
@@ -78,14 +75,9 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(int lrno_,
-                  const basecall::tx::TxEncoderParams &params,
-                  const at::TensorOptions &options_);
+    TxEncoderImpl(const basecall::tx::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
-
-    const int lrno;
-    const at::TensorOptions options;
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};

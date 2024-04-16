@@ -52,7 +52,7 @@ torch::Tensor scaled_dot_product_attention(torch::Tensor q,
 }
 #endif
 
-RMSNormImpl::RMSNormImpl(int lrno_, int hidden_size_) : lrno(lrno_), hidden_size(hidden_size_) {
+RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
     weight = at::ones({hidden_size});
     register_parameter("weight", weight, false);
 }
@@ -63,7 +63,7 @@ at::Tensor RMSNormImpl::forward(at::Tensor x) {
     return (x * rstd * weight).to(torch::kHalf);
 }
 
-GatedMLPImpl::GatedMLPImpl(int lrno_, int in_features, int hidden_features) : lrno(lrno_) {
+GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
     fc1 = register_module("fc1",
                           Linear(LinearOptions(in_features, 2 * hidden_features).bias(false)));
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
@@ -78,12 +78,11 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     return out;
 }
 
-RotaryEmbeddingImpl::RotaryEmbeddingImpl(int lrno_,
-                                         int dim_,
+RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
                                          float theta_,
                                          int max_seq_len_,
                                          const at::TensorOptions &options_)
-        : lrno(lrno_), dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
+        : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
     // To maintain precision we use float32 here
     const at::Tensor inv_freq =
             torch::pow(theta, torch::arange(0, dim, 2, options.dtype(torch::kFloat32)) / dim)
@@ -120,15 +119,13 @@ at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     return out.to(torch::kHalf);
 }
 
-MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
-                                               int d_model_,
+MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
                                                int nhead_,
                                                bool qkv_bias_,
                                                bool out_bias_,
                                                const std::pair<int, int> &attn_window_,
                                                const at::TensorOptions &options_)
-        : lrno(lrno_),
-          d_model(d_model_),
+        : d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
           attn_window(attn_window_),
@@ -137,8 +134,8 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int lrno_,
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     const float theta = 10000.0f;
     const int64_t max_seq_len = 2000;
-    rotary_emb = register_module("rotary_emb",
-                                 RotaryEmbedding(lrno, head_dim, theta, max_seq_len, options));
+    rotary_emb =
+            register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
 
 at::Tensor MultiHeadAttentionImpl::build_attn_window_mask(const int64_t size) const {
@@ -182,16 +179,12 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(int lrno_,
-                             const TxEncoderParams &params,
-                             const at::TensorOptions &options_)
-        : lrno(lrno_), options(options_) {
-    self_attn = register_module("self_attn",
-                                MultiHeadAttention(lrno, params.d_model, params.nhead, false, true,
-                                                   params.attn_window, options));
-    ff = register_module("ff", GatedMLP(lrno, params.d_model, params.dim_feedforward));
-    norm1 = register_module("norm1", RMSNorm(lrno, params.d_model));
-    norm2 = register_module("norm2", RMSNorm(lrno, params.d_model));
+TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params, const at::TensorOptions &options) {
+    self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
+                                                                true, params.attn_window, options));
+    ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
+    norm1 = register_module("norm1", RMSNorm(params.d_model));
+    norm2 = register_module("norm2", RMSNorm(params.d_model));
 
     const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha);
     register_buffer("deepnorm_alpha", deepnorm_alpha);
@@ -225,7 +218,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
     stack = Sequential();
     for (int i = 0; i < tx_enc_params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(i, tx_enc_params, options)));
+                                         TxEncoder(tx_enc_params, options)));
     }
 };
 
