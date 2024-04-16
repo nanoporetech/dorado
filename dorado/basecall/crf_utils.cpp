@@ -3,7 +3,6 @@
 #include "CRFModelConfig.h"
 #include "nn/CRFModel.h"
 #include "nn/TxModel.h"
-#include "spdlog/spdlog.h"
 #include "utils/memory_utils.h"
 #include "utils/tensor_utils.h"
 

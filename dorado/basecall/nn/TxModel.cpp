@@ -2,7 +2,6 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
-#include "spdlog/spdlog.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
