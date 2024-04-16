@@ -94,8 +94,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& mod_bases_models,
                          const std::string& reads,
                          const bool recursive_file_loading,
-                         const bool skip_model_compatibility_check,
-                         const basecall::BasecallerParams basecaller_params) {
+                         const bool skip_model_compatibility_check) {
     using namespace dorado::models;
 
     ModelFinder model_finder = get_model_finder(model_arg, reads, recursive_file_loading);
@@ -126,7 +125,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = basecall::load_model_config(model_path, basecaller_params);
+            const auto model_config = basecall::load_model_config(model_path);
             const auto model_name = model_path.filename().string();
             check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
                                             recursive_file_loading);
@@ -150,11 +149,10 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_finder.get_simplex_model_name();
-    const auto model_config = basecall::load_model_config(model_path, basecaller_params);
+    const auto model_config = basecall::load_model_config(model_path);
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    const auto stereo_model_config =
-            basecall::load_model_config(stereo_model_path, basecaller_params);
+    const auto stereo_model_config = basecall::load_model_config(stereo_model_path);
 
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,
@@ -443,19 +441,9 @@ int duplex(int argc, char* argv[]) {
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
-            // TODO: This is a placeholder impl
-            spdlog::error("DON'T FORGET TO HANDLE STERERO_BATCH_SIZE");
-
-            size_t batch_size(parser.visible.get<int>("-b"));
-            size_t chunk_size(parser.visible.get<int>("-c"));
-            size_t overlap(parser.visible.get<int>("-o"));
-
-            const auto basecaller_params =
-                    basecall::BasecallerParams{batch_size, chunk_size, overlap};
-
             const DuplexModels models =
                     load_models(model, mod_bases, mod_bases_models, reads, recursive_file_loading,
-                                skip_model_compatibility_check, basecaller_params);
+                                skip_model_compatibility_check);
 
             temp_model_paths = models.temp_paths;
 
@@ -477,6 +465,9 @@ int duplex(int argc, char* argv[]) {
                                                            recursive_file_loading));
             utils::add_rg_headers(hdr.get(), read_groups);
 
+            int batch_size(parser.visible.get<int>("-b"));
+            int chunk_size(parser.visible.get<int>("-c"));
+            int overlap(parser.visible.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
 
             int stereo_batch_size = 0;

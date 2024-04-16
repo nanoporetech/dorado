@@ -118,8 +118,7 @@ void setup(std::vector<std::string> args,
            bool estimate_poly_a,
            const std::string* const polya_config,
            const ModelSelection& model_selection) {
-    const auto model_config = basecall::load_model_config(
-            model_path, basecall::BasecallerParams{batch_size, chunk_size, overlap});
+    const auto model_config = basecall::load_model_config(model_path);
 
     spdlog::debug(model_config.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_path);

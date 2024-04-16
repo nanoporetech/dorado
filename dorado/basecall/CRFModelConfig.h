@@ -72,14 +72,6 @@ enum SampleType {
     RNA004,
 };
 
-struct BasecallerParams {
-    size_t batchsize;
-    size_t chunksize;
-    size_t overlap;
-
-    std::string to_string() const;
-};
-
 namespace tx {
 
 struct TxEncoderParams {
@@ -173,9 +165,6 @@ struct CRFModelConfig {
     // convolution layer params
     std::vector<ConvParams> convs;
 
-    // Basecaller params
-    BasecallerParams basecaller;
-
     // Tx Model Params
     std::optional<tx::Params> tx = std::nullopt;
 
@@ -190,7 +179,7 @@ struct CRFModelConfig {
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);
 
-CRFModelConfig load_model_config(const std::filesystem::path& path, const BasecallerParams& bcp);
+CRFModelConfig load_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);

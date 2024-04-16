@@ -206,7 +206,6 @@ std::string ConvParams::to_string() const {
 
 std::string CRFModelConfig::to_string() const {
     std::string str = "CRFModelConfig {";
-    str += " basecaller: " + basecaller.to_string();
     str += " qscale:" + std::to_string(qscale);
     str += " qbias:" + std::to_string(qbias);
     str += " stride:" + std::to_string(stride);
@@ -377,11 +376,8 @@ bool is_tx_model_config(const std::filesystem::path &path) {
     return res.has_value();
 }
 
-CRFModelConfig load_model_config(const std::filesystem::path &path, const BasecallerParams &bcp) {
-    CRFModelConfig cfg = is_tx_model_config(path) ? tx::load_tx_model_config(path)
-                                                  : load_lstm_model_config(path);
-    cfg.basecaller = bcp;
-    return cfg;
+CRFModelConfig load_model_config(const std::filesystem::path &path) {
+    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
@@ -391,15 +387,6 @@ bool is_rna_model(const CRFModelConfig &model_config) {
 }
 
 bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
-
-std::string BasecallerParams::to_string() const {
-    std::string str = "BasecallerParams {";
-    str += " batchsize:" + std::to_string(batchsize);
-    str += " chunksize:" + std::to_string(chunksize);
-    str += " overlap:" + std::to_string(overlap);
-    str += "}";
-    return str;
-}
 
 std::string to_string(const Activation &activation) {
     switch (activation) {
