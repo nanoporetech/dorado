@@ -149,7 +149,7 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
+std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused) {
     std::vector<CUDADeviceInfo> results;
     std::regex e("[0-9]+");
     std::smatch m;
@@ -188,6 +188,10 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
     for (int device_id = 0; device_id < int(num_devices); device_id++) {
         CUDADeviceInfo device_info;
         device_info.device_id = device_id;
+        device_info.in_use = device_ids.find(device_id) != device_ids.end();
+        if (!include_unused && !device_info.in_use) {
+            continue;
+        }
 
         cudaSetDevice(device_id);
         cudaMemGetInfo(&device_info.free_mem, &device_info.total_mem);
@@ -197,8 +201,9 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
                                device_id);
         cudaGetDeviceProperties(&device_info.device_properties, device_id);
 
-        device_info.in_use = device_ids.find(device_id) != device_ids.end();
-
+        if (!device_info.in_use) {
+            cudaDeviceReset();
+        }
         results.push_back(device_info);
     }
 
@@ -206,14 +211,13 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
 }
 
 std::string get_cuda_gpu_names(std::string device_string) {
-    auto dev_info = utils::get_cuda_device_info(device_string);
+    auto dev_info =
+            utils::get_cuda_device_info(std::move(device_string), false);  // ignore unused GPUs
     std::set<std::string> gpu_strs;
     std::string gpu_names;
 
     for (const auto &dev : dev_info) {
-        if (dev.in_use) {
-            gpu_strs.insert(dev.device_properties.name);
-        }
+        gpu_strs.insert(dev.device_properties.name);
     }
 
     for (const auto &gpu_id : gpu_strs) {
