@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "spdlog/spdlog.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
@@ -97,6 +98,13 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
 at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     // Expected shape: N, seq_len, 3, nhead, head_dim
     const int64_t seq_len = qkv.size(1);
+
+    if (seq_len > max_seq_len) {
+        spdlog::error("RotaryEmbedding - seq_len ({}) > max_seq_len({})", seq_len, max_seq_len);
+        throw std::runtime_error(
+                "RotaryEmbedding maximum sequence length exceeded - Your chunksize may be too "
+                "large");
+    }
 
     const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
     const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});

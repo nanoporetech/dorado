@@ -173,6 +173,11 @@ struct CRFModelConfig {
     // True if this model config describes a transormer model
     bool is_tx_model() const { return tx.has_value(); };
 
+    // The model upsampling scale factor
+    int scale_factor() const { return is_tx_model() ? tx->upsample.scale_factor : 1; };
+    // The model stride multiplied by the upsampling scale factor
+    int stride_inner() const { return stride * scale_factor(); };
+
     std::string to_string() const;
 };
 

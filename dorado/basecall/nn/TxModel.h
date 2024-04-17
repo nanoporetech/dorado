@@ -50,7 +50,7 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
 
     at::Tensor forward(const at::Tensor &x);
 
-    const int dim, max_seq_len;
+    const int64_t dim, max_seq_len;
     const float theta;
     const at::TensorOptions options;
 };
