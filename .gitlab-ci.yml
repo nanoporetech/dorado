@@ -262,11 +262,22 @@ build:linux:x86:focal:valgrind:
   extends:
     - .linux_runner
   script:
-    - apt update && apt install -y valgrind
+    - !reference [.set_parallel_jobs]
+    # We need a recent valgrind that includes https://bugs.kde.org/show_bug.cgi?id=402833.
+    - VALGRIND_VERSION="3.22.0"
+    - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
+    - tar -xvf valgrind-${VALGRIND_VERSION}.tar.bz2
+    - pushd valgrind-${VALGRIND_VERSION}
+    -   ./autogen.sh
+    -   ./configure
+    -   make -j ${PARALLEL_JOBS}
+    -   valgrind=$(pwd)/vg-in-place
+    - popd
+    # Build dorado.
     - !reference [.run_dorado_cmake_build]
     # Run the ordinary tests directly under valgrind.
     # We don't use `ctest -VV -E smoke -T memcheck` since that requires additional setup.
-    - valgrind --error-exitcode=1 -- ./${BUILD_DIR}/tests/dorado_tests
+    - ${valgrind} --error-exitcode=1 -- ./${BUILD_DIR}/tests/dorado_tests
 
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
