@@ -185,7 +185,7 @@ struct CRFModelConfig {
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);
 
-CRFModelConfig load_model_config(const std::filesystem::path& path);
+CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);

@@ -376,7 +376,7 @@ bool is_tx_model_config(const std::filesystem::path &path) {
     return res.has_value();
 }
 
-CRFModelConfig load_model_config(const std::filesystem::path &path) {
+CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
 }
 

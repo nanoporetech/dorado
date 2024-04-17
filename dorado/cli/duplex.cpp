@@ -125,7 +125,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = basecall::load_model_config(model_path);
+            const auto model_config = basecall::load_crf_model_config(model_path);
             const auto model_name = model_path.filename().string();
             check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
                                             recursive_file_loading);
@@ -149,10 +149,10 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_finder.get_simplex_model_name();
-    const auto model_config = basecall::load_model_config(model_path);
+    const auto model_config = basecall::load_crf_model_config(model_path);
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    const auto stereo_model_config = basecall::load_model_config(stereo_model_path);
+    const auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
 
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,
