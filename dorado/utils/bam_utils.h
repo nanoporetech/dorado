@@ -199,15 +199,16 @@ kstring_t allocate_kstring();
  *
  * @param record BAM record.
  * @param seq New sequence.
- * @param qual New qquality scores.
+ * @param qual New quality scores.
  * 
- * If seq and qual are empty strings, the sequence and qualities from record will be
- * used. If qual is empty and seq is not, then this means no quality data should be
- * included. Otherwise, if seq and qual are not empty, they must be the same length.
+ * If seq is an empty string, then qual is ignored and the sequence and qualities from the
+ * input record will be used. If seq is not empty then it will replace the original sequence
+ * in the new object, and qual will replace the original qualities in the new object. This
+ * means that if seq is not empty but qual is, then the new object will have nullptr as its
+ * quality field. If seq and qual are both non-empty, then of course they must be the same
+ * length.
  */
-BamPtr new_unmapped_record(const BamPtr& record,
-                           const std::string& seq,
-                           const std::vector<uint8_t>& qual);
+BamPtr new_unmapped_record(const BamPtr& record, std::string seq, std::vector<uint8_t> qual);
 
 /*
  * Remove any alignment related tags from a BAM record.
