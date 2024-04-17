@@ -31,7 +31,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     const auto& model_config = runners.front()->config();
     auto adjusted_overlap = (overlap / model_config.stride_inner()) * model_config.stride_inner();
     if (overlap != adjusted_overlap) {
-        spdlog::debug("- adjusted overlap to match inner model stride: {} -> {}", overlap,
+        spdlog::debug("- adjusted overlap to match model stride: {} -> {}", overlap,
                       adjusted_overlap);
         overlap = adjusted_overlap;
     }

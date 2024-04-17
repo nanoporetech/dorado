@@ -211,14 +211,13 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     c10::cuda::CUDAGuard device_guard(m_options.device());
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
+    // Ensure that all batches are divisible by the stride_inner := (stride * scale_factor)
     const int scale_factor = m_config.scale_factor();
-    const int granularity = get_batch_size_granularity();
+    const int granularity = get_batch_size_granularity(m_config);
     {
-        // First set of batch dimensions. Adjust chunk size to be a multiple of the stride.
+        // First set of batch dimensions. Adjust chunk size to be a multiple of the stride_inner.
         // Batch size defaults to `granularity` but will be increased further down if memory allows.
-        int T_out = requested_chunk_size / m_config.stride;
-        // Ensure chunk is a multiple of the scale factor
-        T_out = (T_out / scale_factor) * scale_factor;
+        int T_out = (requested_chunk_size / m_config.stride_inner()) * scale_factor;
         m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
     }
 #ifdef DORADO_TX2
@@ -239,8 +238,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             constexpr char SEPARATOR = ';';
             std::string env_string(env_extra_chunk_sizes);
             for (size_t start = 0, end = 0; end != std::string::npos; start = end + 1) {
-                int T_out = (std::atoi(env_string.c_str() + start) / m_config.stride);
-                T_out = (T_out / scale_factor) * scale_factor;
+                int T_out = (std::atoi(env_string.c_str() + start) / m_config.stride_inner()) *
+                            scale_factor;
                 if (T_out > 0) {
                     m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
                 }
@@ -250,8 +249,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             // Use other chunk sizes as a fraction of the requested one
             // TODO: determine the best set of chunk sizes
             for (float fraction : {0.5f}) {
-                int T_out = int(m_batch_dims[0].T_out * fraction);
-                T_out = (T_out / scale_factor) * scale_factor;
+                // First chunk is already divided by stride
+                int T_out = int(m_batch_dims[0].T_out * fraction / scale_factor) * scale_factor;
                 m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
             }
         }
