@@ -7,7 +7,7 @@
 
 #if TORCH_VERSION_MAJOR >= 2
 #include <ATen/ops/scaled_dot_product_attention.h>
-#endif  // #if TORCH_VERSION_MAJOR >= 2
+#endif
 
 #define TEST_TAG "[SDPA]"
 
@@ -15,7 +15,7 @@ using namespace dorado::basecall::nn;
 
 TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2
-    SECTION("SDPA tests invalid if TORCH_VERSION_MAJOR < 2") { CHECK(false); }
+    spdlog::warn("TORCH_VERSION_MAJOR < 2 - Tests skipped - Scaled Dot Product Attention");
 #else
     auto options = at::TensorOptions().dtype(torch::kFloat64).device(c10::kCUDA);
 
@@ -50,6 +50,5 @@ TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
         const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2], mask);
         CHECK(at::allclose(naive_res, torch_res));
     }
-
 #endif  // #if TORCH_VERSION_MAJOR < 2
 }
