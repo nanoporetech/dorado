@@ -536,6 +536,31 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     return cigar_str;
 }
 
+BamPtr new_unmapped_record(const BamPtr& record,
+                           const std::string& seq,
+                           const std::vector<uint8_t>& qual) {
+    const bam1_t* input_record = record.get();
+    auto seq_ptr = seq.empty() ? nullptr : seq.data();
+    size_t seq_len = seq.size();
+    auto qual_ptr = qual.empty() ? nullptr : (const char*)qual.data();
+    if (!seq_ptr) {
+        seq_ptr = (const char*)bam_get_seq(input_record);
+        seq_len = input_record->core.l_qseq;
+    }
+    if (!qual_ptr && !seq.empty()) {
+        qual_ptr = (const char*)bam_get_qual(input_record);
+    }
+    bam1_t* out_record = bam_init1();
+    bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
+             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq_len,
+             seq_ptr, qual_ptr, bam_get_l_aux(input_record));
+    memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
+    out_record->l_data += bam_get_l_aux(input_record);
+    remove_alignment_tags_from_record(out_record);
+    return BamPtr(out_record);
+}
+
 void remove_alignment_tags_from_record(bam1_t* record) {
     // Iterate through all tags and check against known set
     // of tags to remove.
