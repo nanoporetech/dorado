@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dorado::basecall {
@@ -170,7 +171,7 @@ struct CRFModelConfig {
 
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }
-    // True if this model config describes a transormer model
+    // True if this model config describes a transformer model
     bool is_tx_model() const { return tx.has_value(); };
 
     // The model upsampling scale factor

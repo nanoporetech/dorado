@@ -51,7 +51,7 @@ public:
 private:
     struct NNTask;
 
-    int get_batch_size_granularity(const CRFModelConfig &model_config) const {
+    static int get_batch_size_granularity(const CRFModelConfig &model_config) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return model_config.is_tx_model() ? 32 : 64;
     }
