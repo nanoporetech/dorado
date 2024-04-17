@@ -53,6 +53,7 @@ struct Minimap2MappingOptions {
     std::optional<int> zdrop_inv;
     std::optional<std::string> cs;
     std::optional<std::string> dual;
+    std::optional<uint64_t> mini_batch_size;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
@@ -100,12 +101,7 @@ static const std::string DEFAULT_MM_PRESET{"lr:hq"};
 
 static const Minimap2Options dflt_options{
         {std::nullopt, std::nullopt, std::nullopt, DEFAULT_MM_PRESET},
-        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, std::nullopt},
-        false};
-
-{std::nullopt, std::nullopt, std::nullopt, DEFAULT_MM_PRESET},
-        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false,        std::nullopt,
+        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, std::nullopt, std::nullopt,
          std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt},
-        false
-};
+        false};
 }  // namespace dorado::alignment

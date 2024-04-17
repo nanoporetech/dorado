@@ -569,6 +569,10 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
             //spdlog::info("window {} 1st {}-{} 2nd {}-{}", w, windows[w][0].qstart, windows[w][0].qend, windows[w][1].qstart, windows[w][1].qend);
         }
 
+        WindowFeatures wf;
+        wf.window_idx = w;
+        wf.read_name = alignments.read_name;
+        wf.n_alns = (int)windows[w].size();
         if (windows[w].size() > 1) {
             // Find the maximum insert size
             auto start = std::chrono::high_resolution_clock::now();
@@ -594,11 +598,6 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
             duration = supp - feat;
             supported_time += duration;
 
-            WindowFeatures wf;
-            wf.window_idx = w;
-            wf.read_name = alignments.read_name;
-            wf.n_alns = (int)windows[w].size();
-
             wf.bases = std::move(bases);
             wf.quals = std::move(quals);
             wf.supported = std::move(supported);
@@ -611,9 +610,8 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
 
             duration = ind - supp;
             indices_time += duration;
-
-            wfs.push_back(std::move(wf));
         }
+        wfs.push_back(std::move(wf));
         auto t3 = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double> duration = t1 - t0;
@@ -830,125 +828,6 @@ void CorrectionNode::extract_windows(std::vector<std::vector<OverlapWindow>>& wi
     }
 }
 
-void CorrectionNode::run_inference(torch::jit::script::Module& module,
-                                   std::vector<WindowFeatures>& wfs,
-                                   int batch_size) {
-    const auto device = torch::kCUDA;
-    //const auto device = torch::kCPU;
-    torch::NoGradGuard no_grad;
-    module.to(device);
-    module.eval();
-
-    auto decode_preds = [](const torch::Tensor& preds) {
-        std::vector<char> bases;
-        bases.reserve(preds.sizes()[0]);
-        static std::array<char, 5> decoder = {'A', 'C', 'G', 'T', '*'};
-        for (int i = 0; i < preds.sizes()[0]; i++) {
-            auto base_idx = preds[i].item<int>();
-            bases.push_back(decoder[base_idx]);
-            //spdlog::info("{} decoded to {}", i, bases.back());
-        }
-        return bases;
-    };
-
-    std::vector<torch::Tensor> bases_batch;
-    std::vector<torch::Tensor> quals_batch;
-    std::vector<int> lengths;
-    std::vector<int64_t> sizes;
-    std::vector<torch::Tensor> indices_batch;
-    std::vector<int> wf_idx;
-
-    auto batch_infer = [&]() {
-        // Run inference on batch
-        auto t0 = std::chrono::high_resolution_clock::now();
-        auto batched_bases = collate<int>(bases_batch, (int)11);
-        auto batched_quals = collate<float>(quals_batch, 0.f);
-        auto length_tensor =
-                torch::from_blob(lengths.data(), {(int)lengths.size()},
-                                 torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
-        //print_size(batched_bases, "batched_bases");
-        //print_size(batched_quals, "batched_quals");
-        //print_size(length_tensor, "length_tensor");
-
-        auto t1 = std::chrono::high_resolution_clock::now();
-        std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(batched_bases.to(device));
-        inputs.push_back(batched_quals.to(device));
-        inputs.push_back(length_tensor.to(device));
-        std::for_each(indices_batch.begin(), indices_batch.end(),
-                      [device](torch::Tensor& t) { t.to(device); });
-        inputs.push_back(indices_batch);
-        auto t2 = std::chrono::high_resolution_clock::now();
-
-        auto output = module.forward(inputs);
-        if (output.isTuple()) {
-            auto base_logits = output.toTuple()->elements()[1].toTensor();
-            //print_size(base_logits, "base_logits");
-            auto preds = base_logits.argmax(1, false).to(torch::kCPU);
-            ;
-            auto t3 = std::chrono::high_resolution_clock::now();
-            //print_size(preds, "preds");
-            auto split_preds = preds.split_with_sizes(sizes);
-            //spdlog::info("split preds size {}", split_preds.size());
-            for (size_t w = 0; w < split_preds.size(); w++) {
-                auto decoded_output = decode_preds(split_preds[w]);
-                //spdlog::info("decoded output size {}", decoded_output.size());
-                auto idx_to_store = wf_idx[w];
-                //spdlog::info("storing out in {}", idx_to_store);
-                wfs[idx_to_store].inferred_bases = decoded_output;
-                //spdlog::info("stored output");
-            }
-            auto t4 = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> collate_time = (t1 - t0);
-            std::chrono::duration<double> move_to_device = (t2 - t1);
-            std::chrono::duration<double> forward = (t3 - t2);
-            std::chrono::duration<double> dec = (t4 - t3);
-            spdlog::info("collate {} move_to_dev {} forward {} dec {}", collate_time.count(),
-                         move_to_device.count(), forward.count(), dec.count());
-        }
-    };
-
-    int idx = 0;
-    for (auto& wf : wfs) {
-        if (wf.n_alns > 1 && wf.supported.size() > 0) {
-            //for(int i = 0; i < wf.bases.sizes()[0]; i++) {
-            //    spdlog::info("target row before inference pos {} base {}", i, wf.bases[i][0].item<int>());
-            //}
-            auto b = wf.bases.transpose(0, 1);
-            auto q = 2.f * (wf.quals.transpose(0, 1) - 33.f) / (126.f - 33.f) - 1.f;
-
-            wf_idx.push_back(idx);
-            bases_batch.push_back(b);
-            quals_batch.push_back(q);
-            lengths.push_back(wf.length);
-            sizes.push_back(wf.length);
-            indices_batch.push_back(wf.indices);
-            //print_size(wf.bases, "bases");
-            //print_size(wf.quals, "quals");
-            //print_size(wf.indices, "indices");
-            //spdlog::info("length {}", wf.length);
-
-            if ((int)bases_batch.size() == batch_size) {
-                batch_infer();
-                bases_batch.clear();
-                quals_batch.clear();
-                lengths.clear();
-                sizes.clear();
-                indices_batch.clear();
-                wf_idx.clear();
-            }
-
-            //spdlog::info("bases max {} min {} sum {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>(), wf.bases.sum().item<int>());
-            //spdlog::info("quals max {} min {} sum {}", wf.quals.max().item<float>(), wf.quals.min().item<float>(), wf.quals.sum().item<float>());
-        }
-        idx++;
-    }
-
-    if (bases_batch.size() > 0) {
-        batch_infer();
-    }
-}
-
 std::vector<std::string> CorrectionNode::decode_windows(const std::vector<WindowFeatures>& wfs) {
     std::vector<std::string> corrected_reads;
     std::string corrected_seq;
@@ -984,24 +863,23 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
 
     std::unordered_map<std::pair<int, int>, char, PairHash, PairEqual> bases_map;
 
-    int prev_decoded_window_idx = wfs[0].window_idx;
     for (const auto& wf : wfs) {
-        if (wf.window_idx != (prev_decoded_window_idx + 1)) {
+        if (wf.n_alns < 2) {
             if (corrected_seq.length() > 0) {
                 corrected_reads.push_back(corrected_seq);
                 //spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
                 corrected_seq = "";
             }
-        }
 
-        prev_decoded_window_idx = wf.window_idx;
+            continue;
+        }
 
         bases_map.clear();
         for (size_t i = 0; i < wf.supported.size(); i++) {
             //spdlog::info("supported positions {},{} for {}", wf.supported[i].first, wf.supported[i].second, wf.inferred_bases[i]);
             bases_map.insert({wf.supported[i], wf.inferred_bases[i]});
         }
-        auto bases = wf.bases;
+        auto& bases = wf.bases;
         int tpos = -1, ins = 0;
         int length = bases.sizes()[1];
         int* bases_tensor = bases.data_ptr<int>();
@@ -1066,12 +944,75 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
 }
 
 CorrectionNode::CorrectionNode(int threads, int batch_size)
-        : MessageSink(10000, threads), m_batch_size(batch_size) {
+        : MessageSink(10000, threads),
+          m_batch_size(batch_size),
+          m_features_queue(1000),
+          m_inferred_features_queue(1000) {
+    m_infer_thread = std::make_unique<std::thread>(&CorrectionNode::infer_fn, this);
+    for (int i = 0; i < 4; i++) {
+        m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
+    }
     start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
 
-void CorrectionNode::input_thread_fn() {
-    Message message;
+void CorrectionNode::decode_fn() {
+    spdlog::info("Starting decode thread!");
+    m_num_active_decode_threads++;
+
+    WindowFeatures item;
+    while (m_inferred_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
+        //spdlog::info("Popped inferred feature for {}", item.window_idx);
+        std::vector<WindowFeatures> to_decode;
+        {
+            std::lock_guard<std::mutex> lock(m_features_mutex);
+            auto pos = item.window_idx;
+            auto read_name = item.read_name;
+            auto find_iter = m_features_by_id.find(read_name);
+            auto& output_features = find_iter->second;
+            output_features[pos] = std::move(item);
+            //spdlog::info("replaced window in position {}", pos);
+            auto& pending = m_pending_features_by_id.find(read_name)->second;
+            pending--;
+            if (pending == 0) {
+                //spdlog::info("Got all features!");
+                // Got all features!
+                to_decode = std::move(output_features);
+                m_features_by_id.erase(read_name);
+                m_pending_features_by_id.erase(read_name);
+            }
+        }
+
+        if (!to_decode.empty()) {
+            auto t0 = std::chrono::high_resolution_clock::now();
+            const std::string& read_name = to_decode[0].read_name;
+            //spdlog::info("decoding window now for {}", read_name);
+            auto corrected_seqs = decode_windows(to_decode);
+            if (corrected_seqs.size() == 1) {
+                auto rec = create_bam_record(read_name, corrected_seqs[0]);
+                send_message_to_sink(std::move(rec));
+            } else {
+                for (size_t s = 0; s < corrected_seqs.size(); s++) {
+                    const std::string new_name = read_name + ":" + std::to_string(s);
+                    auto rec = create_bam_record(new_name, corrected_seqs[s]);
+                    send_message_to_sink(std::move(rec));
+                }
+            }
+            auto t1 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> duration = t1 - t0;
+            {
+                std::lock_guard<std::mutex> lock(decodeMutex);
+                decodeDuration += duration;
+            }
+        }
+    }
+
+    m_num_active_decode_threads--;
+}
+
+void CorrectionNode::infer_fn() {
+    spdlog::info("Starting process thread!");
+
+    m_num_active_infer_threads++;
 
     torch::jit::script::Module module;
     try {
@@ -1082,43 +1023,191 @@ void CorrectionNode::input_thread_fn() {
     }
 
     spdlog::debug("Loaded model!");
+    const auto device = torch::kCUDA;
+    //const auto device = torch::kCPU;
+    torch::NoGradGuard no_grad;
+    module.to(device);
+    module.eval();
+
+    bool first_inference = true;
+
+    std::vector<torch::Tensor> bases_batch;
+    std::vector<torch::Tensor> quals_batch;
+    std::vector<int> lengths;
+    std::vector<int64_t> sizes;
+    std::vector<torch::Tensor> indices_batch;
+    std::vector<WindowFeatures> wfs;
+
+    auto decode_preds = [](const torch::Tensor& preds) {
+        std::vector<char> bases;
+        bases.reserve(preds.sizes()[0]);
+        static std::array<char, 5> decoder = {'A', 'C', 'G', 'T', '*'};
+        for (int i = 0; i < preds.sizes()[0]; i++) {
+            auto base_idx = preds[i].item<int>();
+            bases.push_back(decoder[base_idx]);
+            //spdlog::info("{} decoded to {}", i, bases.back());
+        }
+        return bases;
+    };
+
+    auto batch_infer = [&]() {
+        if (first_inference) {
+            spdlog::info("Calling inference");
+        }
+        // Run inference on batch
+        auto t0 = std::chrono::high_resolution_clock::now();
+        auto batched_bases = collate<int>(bases_batch, (int)11);
+        auto batched_quals = collate<float>(quals_batch, 0.f);
+        auto length_tensor =
+                torch::from_blob(lengths.data(), {(int)lengths.size()},
+                                 torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
+        //print_size(batched_bases, "batched_bases");
+        //print_size(batched_quals, "batched_quals");
+        //print_size(length_tensor, "length_tensor");
+
+        auto t1 = std::chrono::high_resolution_clock::now();
+        std::vector<torch::jit::IValue> inputs;
+        inputs.push_back(batched_bases.to(device));
+        inputs.push_back(batched_quals.to(device));
+        inputs.push_back(length_tensor.to(device));
+        std::for_each(indices_batch.begin(), indices_batch.end(),
+                      [device](torch::Tensor& t) { t.to(device); });
+        inputs.push_back(indices_batch);
+        auto t2 = std::chrono::high_resolution_clock::now();
+
+        auto output = module.forward(inputs);
+        if (output.isTuple()) {
+            auto base_logits = output.toTuple()->elements()[1].toTensor();
+            //print_size(base_logits, "base_logits");
+            auto preds = base_logits.argmax(1, false).to(torch::kCPU);
+            auto t3 = std::chrono::high_resolution_clock::now();
+            //print_size(preds, "preds");
+            auto split_preds = preds.split_with_sizes(sizes);
+            //spdlog::info("split preds size {}", split_preds.size());
+            for (size_t w = 0; w < split_preds.size(); w++) {
+                auto decoded_output = decode_preds(split_preds[w]);
+                //spdlog::info("decoded output size {}", decoded_output.size());
+                wfs[w].inferred_bases = decoded_output;
+                //spdlog::info("stored output");
+            }
+            auto t4 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> collate_time = (t1 - t0);
+            std::chrono::duration<double> move_to_device = (t2 - t1);
+            std::chrono::duration<double> forward = (t3 - t2);
+            std::chrono::duration<double> dec = (t4 - t3);
+            if (first_inference) {
+                spdlog::info("collate {} move_to_dev {} forward {} dec {}", collate_time.count(),
+                             move_to_device.count(), forward.count(), dec.count());
+            }
+
+            for (auto& wf : wfs) {
+                //spdlog::info("Pushing inferred features for {} window", wf.window_idx);
+                m_inferred_features_queue.try_push(std::move(wf));
+            }
+            {
+                std::chrono::duration<double> duration = t4 - t0;
+                std::lock_guard<std::mutex> lock(riMutex);
+                runInferenceDuration += duration;
+            }
+        }
+        bases_batch.clear();
+        quals_batch.clear();
+        lengths.clear();
+        sizes.clear();
+        wfs.clear();
+        indices_batch.clear();
+        first_inference = false;
+    };
+
+    WindowFeatures item;
+    while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
+        //continue;
+        wfs.push_back(std::move(item));
+        auto& wf = wfs.back();
+        //spdlog::info("Popped window idx {}", wf.window_idx);
+        //for(int i = 0; i < wf.bases.sizes()[0]; i++) {
+        //    spdlog::info("target row before inference pos {} base {}", i, wf.bases[i][0].item<int>());
+        //}
+        //print_size(wf.bases, "popped from features queue");
+        auto b = wf.bases.transpose(0, 1);
+        auto q = 2.f * (wf.quals.transpose(0, 1) - 33.f) / (126.f - 33.f) - 1.f;
+
+        bases_batch.push_back(b);
+        quals_batch.push_back(q);
+        lengths.push_back(wf.length);
+        sizes.push_back(wf.length);
+        indices_batch.push_back(wf.indices);
+        //print_size(wf.bases, "bases");
+        //print_size(wf.quals, "quals");
+        //print_size(wf.indices, "indices");
+        //spdlog::info("length {}", wf.length);
+
+        if ((int)bases_batch.size() == m_batch_size) {
+            batch_infer();
+        }
+
+        //spdlog::info("bases max {} min {} sum {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>(), wf.bases.sum().item<int>());
+        //spdlog::info("quals max {} min {} sum {}", wf.quals.max().item<float>(), wf.quals.min().item<float>(), wf.quals.sum().item<float>());
+    }
+
+    if (bases_batch.size() > 0) {
+        batch_infer();
+    }
+
+    m_num_active_infer_threads--;
+    if (m_num_active_infer_threads.load() == 0) {
+        m_inferred_features_queue.terminate();
+    }
+}
+
+void CorrectionNode::input_thread_fn() {
+    Message message;
+
+    m_num_active_feature_threads++;
 
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
             //if (alignments.read_name == "37ed430b-4289-4bad-9810-10494ff686b7") {
             if (true) {
-                spdlog::info("Process windows for {} of length {}", alignments.read_name,
-                             alignments.read_seq.length());
+                //spdlog::info("Process windows for {} of length {}", alignments.read_name,
+                //             alignments.read_seq.length());
                 size_t n_windows =
                         (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
                 //spdlog::info("num windows {}", n_windows);
                 std::vector<std::vector<OverlapWindow>> windows;
                 windows.resize(n_windows);
                 auto t0 = std::chrono::high_resolution_clock::now();
+                // Get the windows
                 extract_windows(windows, alignments);
                 //int o = 0;
                 //for (auto& ovlp_windows : windows) {
                 //    spdlog::info("{} ovlps in window {}", ovlp_windows.size(), o++);
                 //}
                 auto t1 = std::chrono::high_resolution_clock::now();
+                // Get the features
                 auto wfs = extract_features(windows, alignments);
-                (void)wfs;
                 auto t2 = std::chrono::high_resolution_clock::now();
-                run_inference(module, wfs, m_batch_size);
-                auto t3 = std::chrono::high_resolution_clock::now();
-                auto corrected_seqs = decode_windows(wfs);
-                auto t4 = std::chrono::high_resolution_clock::now();
-                if (corrected_seqs.size() == 1) {
-                    auto rec = create_bam_record(alignments.read_name, corrected_seqs[0]);
-                    send_message_to_sink(std::move(rec));
-                } else {
-                    for (size_t s = 0; s < corrected_seqs.size(); s++) {
-                        const std::string read_name =
-                                alignments.read_name + ":" + std::to_string(s);
-                        auto rec = create_bam_record(read_name, corrected_seqs[s]);
-                        send_message_to_sink(std::move(rec));
+                std::vector<WindowFeatures> features_to_infer;
+
+                // Move features that don't need inferring into an output
+                // vector for later use.
+                for (size_t w = 0; w < wfs.size(); w++) {
+                    if (wfs[w].n_alns > 1 && wfs[w].supported.size() > 0) {
+                        features_to_infer.push_back(std::move(wfs[w]));
                     }
+                }
+                //spdlog::info("Have {} pending features {} done features", features_to_infer.size(), output.size());
+                {
+                    std::lock_guard<std::mutex> lock(m_features_mutex);
+                    m_features_by_id.insert({alignments.read_name, std::move(wfs)});
+                    m_pending_features_by_id.insert(
+                            {alignments.read_name, (int)features_to_infer.size()});
+                }
+                // Push the ones that need inference to another thread.
+                for (auto& wf : features_to_infer) {
+                    //spdlog::info("Pushing window idx {} to features queue", wf.window_idx);
+                    m_features_queue.try_push(std::move(wf));
                 }
                 {
                     std::chrono::duration<double> duration = t1 - t0;
@@ -1129,16 +1218,6 @@ void CorrectionNode::input_thread_fn() {
                     std::chrono::duration<double> duration = t2 - t1;
                     std::lock_guard<std::mutex> lock(efMutex);
                     extractFeaturesDuration += duration;
-                }
-                {
-                    std::chrono::duration<double> duration = t3 - t2;
-                    std::lock_guard<std::mutex> lock(riMutex);
-                    runInferenceDuration += duration;
-                }
-                {
-                    std::chrono::duration<double> duration = t4 - t3;
-                    std::lock_guard<std::mutex> lock(decodeMutex);
-                    decodeDuration += duration;
                 }
             }
             num_reads++;
@@ -1151,16 +1230,34 @@ void CorrectionNode::input_thread_fn() {
             continue;
         }
     }
+
+    m_num_active_feature_threads--;
+    if (m_num_active_feature_threads.load() == 0) {
+        m_features_queue.terminate();
+    }
 }
 
 void CorrectionNode::terminate(const FlushOptions&) {
     stop_input_processing();
+    if (m_infer_thread && m_infer_thread->joinable()) {
+        m_infer_thread->join();
+    }
+
+    for (auto& decode_thread : m_decode_threads) {
+        if (decode_thread->joinable()) {
+            decode_thread->join();
+        }
+    }
     spdlog::info("time for extract windows {}", extractWindowsDuration.count());
     spdlog::info("time for extract features {}", extractFeaturesDuration.count());
     spdlog::info("time for run inference features {}", runInferenceDuration.count());
     spdlog::info("time for decode {}", decodeDuration.count());
 }
 
-stats::NamedStats CorrectionNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+stats::NamedStats CorrectionNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats["reads_processed"] = double(num_reads.load());
+    return stats;
+}
 
 }  // namespace dorado

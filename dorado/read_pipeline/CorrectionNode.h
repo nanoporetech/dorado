@@ -2,6 +2,7 @@
 
 #include "read_pipeline/MessageSink.h"
 #include "read_pipeline/messages.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -14,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace dorado {
@@ -82,10 +84,16 @@ private:
                                                  const CorrectionAlignments& alignments);
     void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                          const CorrectionAlignments& alignments);
-    void run_inference(torch::jit::script::Module& module,
-                       std::vector<WindowFeatures>& wfs,
-                       int batch_size);
     std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs);
+
+    void infer_fn();
+    void decode_fn();
+
+    utils::AsyncQueue<WindowFeatures> m_features_queue;
+    utils::AsyncQueue<WindowFeatures> m_inferred_features_queue;
+
+    std::unique_ptr<std::thread> m_infer_thread;
+    std::vector<std::unique_ptr<std::thread>> m_decode_threads;
 
     std::chrono::duration<double> extractWindowsDuration;
     std::mutex ewMutex;
@@ -96,6 +104,14 @@ private:
     std::chrono::duration<double> decodeDuration;
     std::mutex decodeMutex;
     std::atomic<int> num_reads;
+
+    std::unordered_map<std::string, std::vector<WindowFeatures>> m_features_by_id;
+    std::unordered_map<std::string, int> m_pending_features_by_id;
+    std::mutex m_features_mutex;
+
+    std::atomic<int> m_num_active_feature_threads{0};
+    std::atomic<int> m_num_active_infer_threads{0};
+    std::atomic<int> m_num_active_decode_threads{0};
 };
 
 }  // namespace dorado

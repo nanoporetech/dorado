@@ -5,6 +5,7 @@
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 
 #include <htslib/faidx.h>
@@ -19,7 +20,9 @@
 
 namespace {
 
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar, bool fwd) {
+[[maybe_unused]] std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar,
+                                                          uint32_t n_cigar,
+                                                          bool fwd) {
     std::vector<dorado::CigarOp> cigar_ops;
     cigar_ops.reserve(n_cigar);
     for (uint32_t i = 0; i < n_cigar; i++) {
@@ -100,6 +103,14 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
             const std::string read_seq = utils::extract_sequence(read.get());
             auto start = std::chrono::high_resolution_clock::now();
             auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
+            auto clear_alignments = utils::PostCondition([reg, hits]() {
+                for (int j = 0; j < hits; j++) {
+                    free(reg[j].p);
+                }
+                free(reg);
+            });
+            (void)reg;
+            (void)hits;
             auto end = std::chrono::high_resolution_clock::now();
             {
                 std::chrono::duration<double> duration = end - start;
@@ -107,6 +118,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
                 mm2Duration += duration;
             }
             auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
+            //CorrectionAlignments alignments;
             alignments.read_name = std::move(read_name);
             alignments.read_seq = std::move(read_seq);
             alignments.read_qual = utils::extract_quality(read.get());
@@ -130,6 +142,9 @@ CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
         int hits,
         const hts_io::FastxRandomReader* reader,
         const std::string& qread) {
+    (void)reader;
+    ;
+    (void)qread;
     dorado::CorrectionAlignments alignments;
     for (int j = 0; j < hits; j++) {
         Overlap ovlp;
@@ -154,7 +169,7 @@ CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
         auto end = std::chrono::high_resolution_clock::now();
         {
             std::chrono::duration<double> duration = end - start;
-            std::lock_guard<std::mutex> lock(fastqmutex);
+            //std::lock_guard<std::mutex> lock(fastqmutex);
             fastqDuration += duration;
         }
         alignments.qnames.push_back(qname);

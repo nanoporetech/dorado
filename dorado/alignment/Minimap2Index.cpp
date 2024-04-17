@@ -97,6 +97,9 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
         }
     }
 
+    m_mapping_options->mini_batch_size =
+            mapping_options.mini_batch_size.value_or(m_mapping_options->mini_batch_size);
+
     // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
     m_mapping_options->cap_kalloc = 100'000'000;
     m_mapping_options->max_sw_mat = 50'000'000;
