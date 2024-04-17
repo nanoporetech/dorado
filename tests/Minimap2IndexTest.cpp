@@ -45,31 +45,42 @@ TEST_CASE(TEST_GROUP " initialise() with default options returns true", TEST_GRO
     REQUIRE(cut.initialise(dflt_options));
 }
 
-TEST_CASE(TEST_GROUP " initialise() with default options sets indexing options", TEST_GROUP) {
+TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing options", TEST_GROUP) {
     Minimap2Index cut{};
 
-    cut.initialise(dflt_options);
+    auto options{dflt_options};
+    options.kmer_size = 11;
+    options.window_size = 12;
+    options.index_batch_size = 123456789;
 
-    CHECK(cut.index_options().k == dflt_options.kmer_size);
-    CHECK(cut.index_options().w == dflt_options.window_size);
-    CHECK(cut.index_options().batch_size == dflt_options.index_batch_size);
+    cut.initialise(options);
+
+    CHECK(cut.index_options().k == *options.kmer_size);
+    CHECK(cut.index_options().w == *options.window_size);
+    CHECK(cut.index_options().batch_size == *options.index_batch_size);
 }
 
 TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
     Minimap2Index cut{};
+    auto options{dflt_options};
+    options.bandwidth = 300;
+    options.bandwidth_long = 12000;
+    options.best_n_secondary = 123456789;
+    options.soft_clipping = true;
 
-    cut.initialise(dflt_options);
+    cut.initialise(options);
 
-    CHECK(cut.mapping_options().bw == dflt_options.bandwidth);
-    CHECK(cut.mapping_options().bw_long == dflt_options.bandwidth_long);
-    CHECK(cut.mapping_options().best_n == dflt_options.best_n_secondary);
+    CHECK(cut.mapping_options().bw == options.bandwidth);
+    CHECK(cut.mapping_options().bw_long == options.bandwidth_long);
+    CHECK(cut.mapping_options().best_n == options.best_n_secondary);
     CHECK(cut.mapping_options().flag > 0);  // Just checking it's been updated.
 }
 
 TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GROUP) {
     Minimap2Index cut{};
     auto invalid_options{dflt_options};
-    invalid_options.bandwidth = invalid_options.bandwidth_long + 1;
+    invalid_options.bandwidth_long = 100;
+    invalid_options.bandwidth = *invalid_options.bandwidth_long + 1;
 
     bool result{};
     SuppressStderr::invoke(
@@ -95,7 +106,8 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP) {
     cut.load(reference_file, 1);
     Minimap2Options invalid_compatible_options{dflt_options};
-    invalid_compatible_options.bandwidth = invalid_compatible_options.bandwidth_long + 1;
+    invalid_compatible_options.bandwidth_long = 100;
+    invalid_compatible_options.bandwidth = *invalid_compatible_options.bandwidth_long + 1;
 
     std::shared_ptr<Minimap2Index> compatible_index{};
     {
@@ -111,7 +123,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP) {
     cut.load(reference_file, 1);
     Minimap2Options compatible_options{dflt_options};
-    ++compatible_options.best_n_secondary;
+    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
     REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
 }
@@ -123,7 +135,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP) {
     cut.load(reference_file, 1);
     Minimap2Options compatible_options{dflt_options};
-    ++compatible_options.best_n_secondary;
+    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
@@ -137,11 +149,11 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP) {
     cut.load(reference_file, 1);
     Minimap2Options compatible_options{dflt_options};
-    ++compatible_options.best_n_secondary;
+    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
-    REQUIRE(compatible_index->mapping_options().best_n == dflt_options.best_n_secondary + 1);
+    REQUIRE(compatible_index->mapping_options().best_n == cut.mapping_options().best_n + 1);
 }
 
 }  // namespace dorado::alignment::test

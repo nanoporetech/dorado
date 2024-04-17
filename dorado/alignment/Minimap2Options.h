@@ -1,15 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <tuple>
 
 namespace dorado::alignment {
 
 struct Minimap2IndexOptions {
-    short kmer_size;
-    short window_size;
-    uint64_t index_batch_size;
+    std::optional<short> kmer_size;
+    std::optional<short> window_size;
+    std::optional<uint64_t> index_batch_size;
     std::string mm2_preset;
 };
 
@@ -40,12 +41,12 @@ inline bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions
 }
 
 struct Minimap2MappingOptions {
-    int best_n_secondary;
-    int bandwidth;
-    int bandwidth_long;
-    bool soft_clipping;
+    std::optional<int> best_n_secondary;
+    std::optional<int> bandwidth;
+    std::optional<int> bandwidth_long;
+    std::optional<bool> soft_clipping;
     bool secondary_seq;
-    bool print_secondary;
+    std::optional<bool> print_secondary;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
@@ -89,7 +90,11 @@ inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-static const Minimap2Options dflt_options{{15, 10, 16000000000ull, "lr:hq"},
-                                          {5, 500, 20000, false, false, true},
-                                          false};
+static const std::string DEFAULT_MM_PRESET{"lr:hq"};
+
+static const Minimap2Options dflt_options{
+        {std::nullopt, std::nullopt, std::nullopt, DEFAULT_MM_PRESET},
+        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, std::nullopt},
+        false};
+
 }  // namespace dorado::alignment
