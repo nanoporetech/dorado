@@ -18,9 +18,6 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(const CRFModelConfi
 
 std::vector<at::Tensor> load_tx_model_weights(const std::filesystem::path& dir);
 
-torch::nn::ModuleHolder<torch::nn::AnyModule> load_tx_model(const CRFModelConfig& model_config,
-                                                            const at::TensorOptions& options);
-
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_model(const CRFModelConfig& model_config,
                                                          const torch::TensorOptions& options);
 
