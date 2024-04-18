@@ -943,18 +943,6 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
     return corrected_reads;
 }
 
-CorrectionNode::CorrectionNode(int threads, int batch_size)
-        : MessageSink(10000, threads),
-          m_batch_size(batch_size),
-          m_features_queue(1000),
-          m_inferred_features_queue(1000) {
-    m_infer_thread = std::make_unique<std::thread>(&CorrectionNode::infer_fn, this);
-    for (int i = 0; i < 4; i++) {
-        m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
-    }
-    start_input_processing(&CorrectionNode::input_thread_fn, this);
-}
-
 void CorrectionNode::decode_fn() {
     spdlog::info("Starting decode thread!");
     m_num_active_decode_threads++;
@@ -1222,7 +1210,7 @@ void CorrectionNode::input_thread_fn() {
             }
             num_reads++;
 
-            if (num_reads.load() % 50 == 0) {
+            if (num_reads.load() % 100 == 0) {
                 spdlog::info("Processed {} reads", num_reads.load());
             }
         } else {
@@ -1235,6 +1223,18 @@ void CorrectionNode::input_thread_fn() {
     if (m_num_active_feature_threads.load() == 0) {
         m_features_queue.terminate();
     }
+}
+
+CorrectionNode::CorrectionNode(int threads, int batch_size)
+        : MessageSink(1000, threads),
+          m_batch_size(batch_size),
+          m_features_queue(500),
+          m_inferred_features_queue(500) {
+    m_infer_thread = std::make_unique<std::thread>(&CorrectionNode::infer_fn, this);
+    for (int i = 0; i < 4; i++) {
+        m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
+    }
+    start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
 
 void CorrectionNode::terminate(const FlushOptions&) {

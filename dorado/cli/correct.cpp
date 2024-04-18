@@ -134,7 +134,8 @@ int correct(int argc, char* argv[]) {
     // 4. The inference node will run the model on the tensors, decode
     // the output, and convert each window into its corrected read and stitch
     // adjacent windows together.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, threads, batch_size);
+    auto corrector =
+            pipeline_desc.add_node<CorrectionNode>({hts_writer}, 5 * threads / 6, batch_size);
 
     // 2. These will go into an Alignment node with the
     // same fastq as an index to perform all-vs-all alignment
@@ -142,7 +143,7 @@ int correct(int argc, char* argv[]) {
     // multiple aligned records, which will all be packaged
     // and sent into a window generation node.
     auto aligner =
-            pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0], threads);
+            pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0], threads / 6);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

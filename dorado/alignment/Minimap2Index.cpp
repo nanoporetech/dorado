@@ -1,5 +1,7 @@
 #include "Minimap2Index.h"
 
+#include "utils/string_utils.h"
+
 #include <spdlog/spdlog.h>
 
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
@@ -54,6 +56,8 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
                   m_mapping_options->bw_long);
 
     if (!mapping_options.print_secondary.value_or(true)) {
+
+    if (!mapping_options.print_secondary) {
         m_mapping_options->flag |= MM_F_NO_PRINT_2ND;
     }
     m_mapping_options->best_n =
@@ -73,6 +77,11 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
                   static_cast<bool>(m_mapping_options->flag & MM_F_SOFTCLIP),
                   static_cast<bool>(m_mapping_options->flag & MM_F_SECONDARY_SEQ));
 
+    m_mapping_options->occ_dist = mapping_options.occ_dist.value_or(m_mapping_options->occ_dist);
+    m_mapping_options->min_chain_score = mapping_options.min_chain_score.value_or(m_mapping_options->min_chain_score);
+    m_mapping_options->zdrop = mapping_options.zdrop.value_or(m_mapping_options->zdrop);
+    m_mapping_options->zdrop_inv = mapping_options.zdrop_inv.value_or(m_mapping_options->zdrop_inv);
+    m_mapping_options->mini_batch_size = mapping_options.mini_batch_size.value_or(m_mapping_options->mini_batch_size);
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
     if (mapping_options.cs) {
@@ -97,27 +106,29 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
         }
     }
 
-    m_mapping_options->mini_batch_size =
-            mapping_options.mini_batch_size.value_or(m_mapping_options->mini_batch_size);
-
     // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
     m_mapping_options->cap_kalloc = 100'000'000;
     m_mapping_options->max_sw_mat = 50'000'000;
 }
 
 bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {
-    const std::string saved_index = index_file + ".mmi";
     auto index_to_load = index_file;
-    bool dump_index = true;
-    if (std::filesystem::exists(saved_index)) {
-        index_to_load = saved_index;
+    bool dump_index = false;
+    bool is_prebuilt = utils::ends_with(index_file, ".mmi");
+    const std::string prebuilt_index = index_file + ".mmi";
+    if (is_prebuilt) {
+        // Do nothing
+    } else if (!std::filesystem::exists(prebuilt_index)) {
+        dump_index = true;
+    } else {
         dump_index = false;
+        index_to_load = prebuilt_index;
     }
     auto index_reader = create_index_reader(index_to_load, *m_index_options);
     m_index.reset(mm_idx_reader_read(index_reader.get(), num_threads), IndexDeleter());
     if (dump_index) {
-        spdlog::info("Save index to {}", saved_index);
-        FILE* fp = fopen(saved_index.c_str(), "w");
+        spdlog::info("Save index to {}", prebuilt_index);
+        FILE* fp = fopen(prebuilt_index.c_str(), "w");
         mm_idx_dump(fp, m_index.get());
         fclose(fp);
     }

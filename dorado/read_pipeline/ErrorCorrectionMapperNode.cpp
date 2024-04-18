@@ -55,6 +55,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     options.window_size = 17;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
+    options.bandwidth_long = 2000;
     options.min_chain_score = 4000;
     options.zdrop = options.zdrop_inv = 200;
     options.occ_dist = 200;
@@ -109,8 +110,6 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
                 }
                 free(reg);
             });
-            (void)reg;
-            (void)hits;
             auto end = std::chrono::high_resolution_clock::now();
             {
                 std::chrono::duration<double> duration = end - start;
@@ -118,7 +117,6 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
                 mm2Duration += duration;
             }
             auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
-            //CorrectionAlignments alignments;
             alignments.read_name = std::move(read_name);
             alignments.read_seq = std::move(read_seq);
             alignments.read_qual = utils::extract_quality(read.get());
@@ -169,7 +167,7 @@ CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
         auto end = std::chrono::high_resolution_clock::now();
         {
             std::chrono::duration<double> duration = end - start;
-            //std::lock_guard<std::mutex> lock(fastqmutex);
+            std::lock_guard<std::mutex> lock(fastqmutex);
             fastqDuration += duration;
         }
         alignments.qnames.push_back(qname);
