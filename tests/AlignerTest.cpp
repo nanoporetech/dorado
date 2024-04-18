@@ -199,10 +199,9 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
         CHECK_THAT(aux, Contains(tag));
     }
     auto bh_tag_ptr = bam_aux_get(rec, "bh");
-    auto bh_tag_type = *(char*)bh_tag_ptr;
+    auto bh_tag_type = bam_aux_type(bh_tag_ptr);
     CHECK(bh_tag_type == 'i');
-    int32_t bh_tag_value = 0;
-    memcpy(&bh_tag_value, bh_tag_ptr + 1, 4);
+    auto bh_tag_value = bam_aux2i(bh_tag_ptr);
     CHECK(bh_tag_value == 3);
 }
 
