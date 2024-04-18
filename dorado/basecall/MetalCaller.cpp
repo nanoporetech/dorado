@@ -75,8 +75,7 @@ MetalCaller::MetalCaller(const CRFModelConfig &model_config,
     // In both cases beam search applies the same 5/127 factor to scores.
     m_score_scale = static_cast<float>(5.0 / 127.0);
 
-    auto state_dict = load_crf_model_weights(
-            model_config.model_path, model_config.out_features.has_value(), model_config.bias);
+    auto state_dict = load_crf_model_weights(model_config);
 
     auto selected_batch_size = (batch_size == 0)
                                        ? benchmark_batch_sizes(model_config, state_dict, chunk_size,
