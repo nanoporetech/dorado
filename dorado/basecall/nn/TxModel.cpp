@@ -55,9 +55,10 @@ RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
 }
 
 at::Tensor RMSNormImpl::forward(at::Tensor x) {
-    x = x.to(torch::kFloat32);
-    at::Tensor rstd = torch::rsqrt(x.square().mean(-1, true, torch::kFloat32) + eps);
-    return (x * rstd * weight).to(torch::kHalf);
+    at::Tensor rstd = torch::rsqrt(x.to(torch::kFloat32).square().mean(-1, true) + eps);
+    x *= rstd;
+    x *= weight;
+    return x.to(torch::kHalf);
 }
 
 GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
@@ -71,7 +72,7 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
-    at::Tensor out = fc2(functional::silu(gate).mul(y));
+    at::Tensor out = fc2(functional::silu(gate).mul_(y));
     return out;
 }
 
@@ -98,22 +99,25 @@ at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     assert_forward_dims(qkv);
     const int64_t seq_len = qkv.size(1);
 
-    const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
-    const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
+    auto buffers = named_buffers();
+    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, seq_len);
+    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, seq_len);
 
     at::Tensor out = qkv.clone();
 
-    using Slices = std::vector<Idx::TensorIndex>;
-    const Slices evens = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(Idx::None, dim / 2)};
-    const Slices odds = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(dim / 2, dim)};
+    using Slices = std::vector<at::indexing::TensorIndex>;
+    const Slices evens = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
+                          at::indexing::Slice(), at::indexing::Slice(at::indexing::None, dim / 2)};
+    const Slices odds = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
+                         at::indexing::Slice(), at::indexing::Slice(dim / 2, dim)};
 
-    const at::Tensor qk_evens = qkv.index(evens).to(torch::kFloat32);
-    const at::Tensor qk_odds = qkv.index(odds).to(torch::kFloat32);
+    at::Tensor qk_evens = qkv.index(evens);
+    at::Tensor qk_odds = qkv.index(odds);
 
-    out.index(evens) = (cos_buf * qk_evens) - (sin_buf * qk_odds);
-    out.index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
+    out.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
+    out.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
 
-    return out.to(torch::kHalf);
+    return out;
 }
 
 void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
@@ -164,9 +168,9 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
 
 at::Tensor MultiHeadAttentionImpl::build_attn_window_mask(const int64_t size) const {
     const auto [win_upper, win_lower] = attn_window;
-    at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
-    mask *= at::tril(mask, win_lower);
-    mask = mask.to(at::kBool).to(options.device());
+    at::Tensor mask = at::ones({size, size}, options.device());
+    mask.triu_(-win_upper).tril_(win_lower);
+    mask = mask.to(at::kBool);
     return mask;
 };
 
