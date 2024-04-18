@@ -29,8 +29,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              NodeHandle sink_node_handle,
                              NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
-    auto model_stride = runners.front()->model_stride();
-    auto adjusted_overlap = (overlap / model_stride) * model_stride;
+    auto adjusted_overlap = (overlap / model_config.stride_inner()) * model_config.stride_inner();
     if (overlap != adjusted_overlap) {
         spdlog::debug("- adjusted overlap to match model stride: {} -> {}", overlap,
                       adjusted_overlap);
@@ -89,7 +88,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_stride, 1000);
+                {}, std::move(modbase_runners), modbase_node_threads, model_config.stride, 1000);
         pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
         current_node_handle = mod_base_caller_node;
         last_node_handle = mod_base_caller_node;
@@ -125,8 +124,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto stereo_model_name =
             std::filesystem::canonical(stereo_model_config.model_path).filename().string();
     auto duplex_rg_name = std::string(model_name + "_" + stereo_model_name);
-    auto stereo_model_stride = stereo_runners.front()->model_stride();
-    auto adjusted_stereo_overlap = (overlap / stereo_model_stride) * stereo_model_stride;
+    auto stereo_model_stride_inner = stereo_model_config.stride_inner();
+    auto adjusted_stereo_overlap =
+            (overlap / stereo_model_stride_inner) * stereo_model_stride_inner;
 
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {}, std::move(stereo_runners), adjusted_stereo_overlap, duplex_rg_name, 1000,
@@ -135,15 +135,14 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads,
-                size_t(runners.front()->model_stride()), 1000);
+                {}, std::move(modbase_runners), modbase_node_threads, size_t(model_config.stride),
+                1000);
         pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
     }
 
-    auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
-                                                                       int(simplex_model_stride));
+                                                                       int(model_config.stride));
 
     auto pairing_node =
             std::holds_alternative<DuplexPairingParameters>(pairing_parameters)
@@ -166,7 +165,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
             {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);
 
-    auto adjusted_simplex_overlap = (overlap / simplex_model_stride) * simplex_model_stride;
+    auto simplex_model_stride_inner = model_config.stride_inner();
+    auto adjusted_simplex_overlap =
+            (overlap / simplex_model_stride_inner) * simplex_model_stride_inner;
 
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
             {splitter_node}, std::move(runners), adjusted_simplex_overlap, model_name, 1000,

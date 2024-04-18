@@ -18,7 +18,7 @@ ModelRunner::ModelRunner(const CRFModelConfig &model_config,
     m_decoder_options.q_scale = model_config.qscale;
 
     // adjust chunk size to be a multiple of the stride
-    chunk_size -= chunk_size % model_config.stride;
+    chunk_size -= chunk_size % model_config.stride_inner();
 
     m_input = at::zeros({batch_size, model_config.num_features, chunk_size},
                         at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));

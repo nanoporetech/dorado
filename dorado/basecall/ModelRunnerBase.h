@@ -21,7 +21,6 @@ public:
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
     virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual const CRFModelConfig &config() const = 0;
-    virtual size_t model_stride() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
     // Timeout is short for simplex, longer for duplex which gets a subset of reads

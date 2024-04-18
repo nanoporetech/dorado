@@ -29,7 +29,6 @@ std::vector<decode::DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) 
 }
 
 const CRFModelConfig &MetalModelRunner::config() const { return m_caller->config(); }
-size_t MetalModelRunner::model_stride() const { return m_caller->config().stride; }
 size_t MetalModelRunner::chunk_size() const { return m_input.size(1); }
 size_t MetalModelRunner::batch_size() const { return m_input.size(0); }
 
