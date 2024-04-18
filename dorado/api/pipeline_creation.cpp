@@ -124,8 +124,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto stereo_model_name =
             std::filesystem::canonical(stereo_model_config.model_path).filename().string();
     auto duplex_rg_name = std::string(model_name + "_" + stereo_model_name);
-    auto stereo_model_stride_inner =
-            stereo_runners.front()->model_stride() * stereo_model_config.scale_factor();
+    auto stereo_model_stride_inner = stereo_model_config.stride_inner();
     auto adjusted_stereo_overlap =
             (overlap / stereo_model_stride_inner) * stereo_model_stride_inner;
 
@@ -136,15 +135,14 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
         auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads,
-                size_t(runners.front()->model_stride()), 1000);
+                {}, std::move(modbase_runners), modbase_node_threads, size_t(model_config.stride),
+                1000);
         pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
     }
 
-    auto simplex_model_stride = runners.front()->model_stride();
     auto stereo_node = pipeline_desc.add_node<StereoDuplexEncoderNode>({stereo_basecaller_node},
-                                                                       int(simplex_model_stride));
+                                                                       int(model_config.stride));
 
     auto pairing_node =
             std::holds_alternative<DuplexPairingParameters>(pairing_parameters)
@@ -167,7 +165,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
             {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);
 
-    auto simplex_model_stride_inner = simplex_model_stride * model_config.scale_factor();
+    auto simplex_model_stride_inner = model_config.stride_inner();
     auto adjusted_simplex_overlap =
             (overlap / simplex_model_stride_inner) * simplex_model_stride_inner;
 

@@ -1,7 +1,10 @@
 #include <basecall/nn/TxModel.h>
 #include <c10/core/TensorOptions.h>
-#include <catch2/catch.hpp>
 #include <torch/nn.h>
+
+// clang-format off
+#include <catch2/catch.hpp>
+// clang-format on
 
 #include <vector>
 
