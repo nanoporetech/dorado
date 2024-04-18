@@ -84,8 +84,8 @@ public:
     // Loaded from source file.
     uint64_t sample_rate = 0;
 
-    float shift;                 // To be set by scaler
-    float scale;                 // To be set by scaler
+    float shift = 0;             // To be set by scaler
+    float scale = 0;             // To be set by scaler
     std::string scaling_method;  // To be set by scaler
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
