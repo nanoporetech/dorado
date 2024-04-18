@@ -11,7 +11,7 @@ struct Minimap2IndexOptions {
     std::optional<short> kmer_size;
     std::optional<short> window_size;
     std::optional<uint64_t> index_batch_size;
-    std::string mm2_preset;
+    std::string mm2_preset;  // By default we use a preset, hence not an optional
 };
 
 inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
@@ -45,7 +45,7 @@ struct Minimap2MappingOptions {
     std::optional<int> bandwidth;
     std::optional<int> bandwidth_long;
     std::optional<bool> soft_clipping;
-    bool secondary_seq;
+    bool secondary_seq;  // Not available to be set by the user, hence not optional
     std::optional<bool> print_secondary;
 };
 
@@ -80,7 +80,7 @@ inline bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOpt
 }
 
 struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
-    bool print_aln_seq;
+    bool print_aln_seq;  // Not available to be set by the user, hence not optional
 };
 
 inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {

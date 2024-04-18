@@ -49,8 +49,8 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
     m_mapping_options->bw = mapping_options.bandwidth.value_or(m_mapping_options->bw);
     m_mapping_options->bw_long =
             mapping_options.bandwidth_long.value_or(m_mapping_options->bw_long);
-    spdlog::trace("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                  m_mapping_options->bw, m_mapping_options->bw_long);
+    spdlog::trace("> Map parameters: bandwidth={} and bandwidth long={}.", m_mapping_options->bw,
+                  m_mapping_options->bw_long);
 
     if (!mapping_options.print_secondary.value_or(true)) {
         m_mapping_options->flag |= MM_F_NO_PRINT_2ND;
