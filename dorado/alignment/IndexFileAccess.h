@@ -58,8 +58,11 @@ public:
     void unload_index(const std::string& index_file, const Minimap2IndexOptions& index_options);
 
     // returns a string containing the sequence records for the requested index
+    // Note, if not loaded will create an index from an existing compatible one.
+    // By contract there must be a loaded index for the index file with matching indexing
+    // options, if not there will be an assertion failure.
     std::string generate_sequence_records_header(const std::string& index_file,
-                                                 const Minimap2Options& options) const;
+                                                 const Minimap2Options& options);
 
     // Testability. Method needed to support utests
     bool is_index_loaded(const std::string& index_file, const Minimap2Options& options) const;

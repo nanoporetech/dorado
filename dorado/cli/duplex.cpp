@@ -275,7 +275,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, alignment::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
 
     std::set<fs::path> temp_model_paths;
@@ -377,7 +377,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+            auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
