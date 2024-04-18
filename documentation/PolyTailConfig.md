@@ -47,7 +47,7 @@ plasmid_front_flank = "CGATCG"
 plasmid_rear_flank = "TGACTGC"
 
 [threshold]
-flank_threshold = 10
+flank_threshold = 0.6
 
 [tail]
 tail_interrupt_length = 10
@@ -61,5 +61,6 @@ tail_interrupt_length = 10
 | rear_primer | Rear primer sequence for cDNA |
 | plasmid_front_flank | Front flanking sequence of poly(A) in plasmid |
 | plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
-| flank_threshold  | The edit distance threshold to use for detection of the flank/primer sequences |
+| flank_threshold  | Threshold to use for detection of the flank/primer sequences. Equates to `(1 - edit distance / flank_sequence)` |
+| primer_window | Window of bases at the front and rear of the rear within which to look for primer sequences |
 | tail_interrupt_length | Combine tails that are within this distance of each other (default is 0, i.e. don't combine any) |
