@@ -161,15 +161,8 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
                             : trim_interval);
 
     // Create a new bam record to hold the trimmed read.
-    bam1_t* out_record = bam_init1();
-    bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
-             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
-             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/,
-             trimmed_seq.size(), trimmed_seq.data(),
-             trimmed_qual.empty() ? nullptr : (char*)trimmed_qual.data(),
-             bam_get_l_aux(input_record));
-    memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
-    out_record->l_data += bam_get_l_aux(input_record);
+    BamPtr output(utils::new_unmapped_record(input, trimmed_seq, trimmed_qual));
+    bam1_t* out_record = output.get();
 
     // Insert the new tags and delete the old ones.
     if (!trimmed_moves.empty()) {
@@ -197,7 +190,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
         bam_aux_update_int(out_record, "ns", ns);
     }
 
-    return BamPtr(out_record);
+    return output;
 }
 
 void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval) {

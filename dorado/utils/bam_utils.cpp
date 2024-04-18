@@ -536,20 +536,35 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     return cigar_str;
 }
 
+BamPtr new_unmapped_record(const BamPtr& record, std::string seq, std::vector<uint8_t> qual) {
+    bam1_t* input_record = record.get();
+    if (seq.empty()) {
+        seq = extract_sequence(input_record);
+        qual = extract_quality(input_record);
+    }
+    bam1_t* out_record = bam_init1();
+    bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
+             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq.size(),
+             seq.data(), qual.empty() ? nullptr : (char*)qual.data(), bam_get_l_aux(input_record));
+    memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
+    out_record->l_data += bam_get_l_aux(input_record);
+    remove_alignment_tags_from_record(out_record);
+    return BamPtr(out_record);
+}
+
 void remove_alignment_tags_from_record(bam1_t* record) {
     // Iterate through all tags and check against known set
     // of tags to remove.
-    static const std::set<std::pair<std::string, char>> tags_to_remove = {
-            {"SA", 'Z'}, {"NM", 'i'}, {"ms", 'i'}, {"AS", 'i'}, {"nn", 'i'}, {"ts", 'A'},
-            {"de", 'f'}, {"dv", 'f'}, {"tp", 'A'}, {"cm", 'i'}, {"s1", 'i'}, {"s2", 'i'},
-            {"MD", 'Z'}, {"zd", 'i'}, {"rl", 'i'}, {"bh", 'i'}};
+    static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "ts",
+                                                         "de", "dv", "tp", "cm", "s1", "s2",
+                                                         "MD", "zd", "rl", "bh"};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {
         auto tag_ptr = bam_aux_tag(aux_ptr);
         std::string tag = std::string(tag_ptr, tag_ptr + 2);
-        char type = bam_aux_type(aux_ptr);
-        if (tags_to_remove.find({tag, type}) != tags_to_remove.end()) {
+        if (tags_to_remove.find(tag) != tags_to_remove.end()) {
             aux_ptr = bam_aux_remove(record, aux_ptr);
         } else {
             aux_ptr = bam_aux_next(record, aux_ptr);
