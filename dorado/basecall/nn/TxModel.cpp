@@ -2,13 +2,13 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
-#include "spdlog/spdlog.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
+#include <spdlog/spdlog.h>
 #include <torch/nn.h>
 #include <torch/nn/functional/padding.h>
 #include <torch/nn/options/padding.h>
@@ -28,7 +28,6 @@ namespace dorado::basecall {
 
 namespace nn {
 
-using namespace dorado::basecall::tx;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
@@ -96,15 +95,8 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
 };
 
 at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
-    // Expected shape: N, seq_len, 3, nhead, head_dim
+    assert_forward_dims(qkv);
     const int64_t seq_len = qkv.size(1);
-
-    if (seq_len > max_seq_len) {
-        spdlog::error("RotaryEmbedding - seq_len ({}) > max_seq_len({})", seq_len, max_seq_len);
-        throw std::runtime_error(
-                "RotaryEmbedding maximum sequence length exceeded - Your chunksize may be too "
-                "large");
-    }
 
     const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
     const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
@@ -122,6 +114,33 @@ at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     out.index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
 
     return out.to(torch::kHalf);
+}
+
+void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
+    // Expected shape: N, seq_len, 3, nhead, head_dim
+    const int64_t seq_len = qkv.size(1);
+    const int64_t three = qkv.size(2);
+    const int64_t head_dim = qkv.size(4);
+
+    bool has_error = false;
+    if (seq_len > max_seq_len) {
+        has_error = true;
+        spdlog::error(
+                "RotE - maximum sequence length exceeded (len:{} > max:{}) - "
+                "Your chunksize may be too large",
+                seq_len, max_seq_len);
+    }
+    if (three != 3) {
+        has_error = true;
+        spdlog::error("RotE - expected constant size:3 at dim:2 found:{}", three);
+    }
+    if (head_dim != dim) {
+        has_error = true;
+        spdlog::error("RotE - expected head_dim size:{} at dim:4 found:{}", dim, head_dim);
+    }
+    if (has_error) {
+        throw std::runtime_error("RotE - input dimensions invalid");
+    }
 }
 
 MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
@@ -188,7 +207,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params, const at::TensorOptions &options) {
+TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options) {
     self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
                                                                 true, params.attn_window, options));
     ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
@@ -231,7 +250,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
     }
 };
 
-LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
+LinearUpsampleImpl::LinearUpsampleImpl(const tx::EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
     linear = register_module(
             "linear",

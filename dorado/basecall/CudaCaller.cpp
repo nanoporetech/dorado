@@ -54,7 +54,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     m_num_input_features = model_config.num_features;
 
     at::InferenceMode guard;
-    m_module = load_model(model_config, m_options);
+    m_module = load_crf_model(model_config, m_options);
 
     determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty);
 

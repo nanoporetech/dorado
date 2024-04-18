@@ -12,9 +12,9 @@
 using namespace torch::nn;
 
 namespace dorado::basecall {
-std::vector<at::Tensor> load_crf_model_weights(const std::filesystem::path &dir,
-                                               bool decomposition,
-                                               bool linear_layer_bias) {
+std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir,
+                                                bool decomposition,
+                                                bool linear_layer_bias) {
     auto tensors = std::vector<std::string>{
 
             "0.conv.weight.tensor",      "0.conv.bias.tensor",
@@ -238,11 +238,18 @@ std::vector<torch::Tensor> load_tx_model_weights(const std::filesystem::path &di
     return utils::load_tensors(dir, tensors);
 }
 
-ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
-                                       const at::TensorOptions &options) {
+std::vector<at::Tensor> load_crf_model_weights(const CRFModelConfig &model_config) {
+    if (model_config.is_tx_model()) {
+        return load_tx_model_weights(model_config.model_path);
+    }
+    return load_lstm_model_weights(model_config.model_path, model_config.out_features.has_value(),
+                                   model_config.bias);
+}
+
+ModuleHolder<AnyModule> load_lstm_model(const CRFModelConfig &model_config,
+                                        const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
-    auto state_dict = load_crf_model_weights(
-            model_config.model_path, model_config.out_features.has_value(), model_config.bias);
+    auto state_dict = load_crf_model_weights(model_config);
     model->load_state_dict(state_dict);
     model->to(options.dtype().toScalarType());
     model->to(options.device());
@@ -256,7 +263,7 @@ ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
 ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
                                       const at::TensorOptions &options) {
     auto model = nn::TxModel(model_config, options);
-    auto state_dict = load_tx_model_weights(model_config.model_path);
+    auto state_dict = load_crf_model_weights(model_config);
     model->load_state_dict(state_dict);
     model->to(options.dtype().toScalarType());
     model->to(options.device());
@@ -267,12 +274,12 @@ ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
     return holder;
 }
 
-ModuleHolder<AnyModule> load_model(const CRFModelConfig &model_config,
-                                   const torch::TensorOptions &options) {
+ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
+                                       const torch::TensorOptions &options) {
     if (model_config.is_tx_model()) {
         return load_tx_model(model_config, options);
     }
-    return load_crf_model(model_config, options);
+    return load_lstm_model(model_config, options);
 }
 
 size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
