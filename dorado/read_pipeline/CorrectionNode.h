@@ -6,6 +6,7 @@
 #include "utils/stats.h"
 #include "utils/types.h"
 
+#include <spdlog/spdlog.h>
 #include <torch/nn/utils/rnn.h>
 #include <torch/script.h>
 #include <torch/torch.h>
@@ -14,6 +15,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
 #include <vector>
@@ -86,13 +88,13 @@ private:
                          const CorrectionAlignments& alignments);
     std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs);
 
-    void infer_fn();
+    void infer_fn(int gpu_num);
     void decode_fn();
 
     utils::AsyncQueue<WindowFeatures> m_features_queue;
     utils::AsyncQueue<WindowFeatures> m_inferred_features_queue;
 
-    std::unique_ptr<std::thread> m_infer_thread;
+    std::vector<std::unique_ptr<std::thread>> m_infer_threads;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
 
     std::chrono::duration<double> extractWindowsDuration;
@@ -112,6 +114,66 @@ private:
     std::atomic<int> m_num_active_feature_threads{0};
     std::atomic<int> m_num_active_infer_threads{0};
     std::atomic<int> m_num_active_decode_threads{0};
+
+    std::atomic<std::chrono::duration<double>> filter_time{};
+    std::atomic<std::chrono::duration<double>> sort_time{};
+    std::atomic<std::chrono::duration<double>> gen_tensor_time{};
+    std::atomic<std::chrono::duration<double>> ins_time{};
+    std::atomic<std::chrono::duration<double>> features_time{};
+    std::atomic<std::chrono::duration<double>> supported_time{};
+    std::atomic<std::chrono::duration<double>> indices_time{};
+    std::atomic<std::chrono::duration<double>> feature_tensors_alloc_time{};
+    std::atomic<std::chrono::duration<double>> feature_tensors_fill_time{};
+
+    template <typename T>
+    class MemoryManager {
+    public:
+        MemoryManager(int threads, T fill_val) : m_fill_val(fill_val) {
+            const size_t num_tensors = NW * threads * 2;
+            m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
+            std::fill(m_bases_ptr.get(), m_bases_ptr.get() + tensor_size * num_tensors, fill_val);
+
+            for (size_t i = 0; i < num_tensors; i++) {
+                m_bases_locations.push(&m_bases_ptr.get()[i * tensor_size]);
+            }
+        };
+
+        ~MemoryManager() = default;
+
+        T* get_next_ptr() {
+            std::lock_guard<std::mutex> lock(m_bases_mtx);
+            if (m_bases_locations.size() == 0) {
+                throw std::runtime_error("No more pointers left!");
+            }
+            //spdlog::info("requesting pointer @ size {}", m_bases_locations.size());
+            auto next_ptr = m_bases_locations.front();
+            m_bases_locations.pop();
+            return next_ptr;
+        }
+
+        void return_ptr(T* ptr) {
+            std::lock_guard<std::mutex> lock(m_bases_mtx);
+            //spdlog::info("returning pointer @ size {}", m_bases_locations.size());
+            std::fill(ptr, ptr + tensor_size, m_fill_val);
+            m_bases_locations.push(ptr);
+        }
+
+    private:
+        static constexpr int WS = 5120;
+        static constexpr int NR = 31;
+        static constexpr int NW = 128;
+        static constexpr int tensor_size = WS * NR;
+        T m_fill_val;
+
+        std::unique_ptr<T[]> m_bases_ptr;
+
+        std::queue<T*> m_bases_locations;
+
+        std::mutex m_bases_mtx;
+    };
+
+    MemoryManager<int> m_bases_manager;
+    MemoryManager<float> m_quals_manager;
 };
 
 }  // namespace dorado

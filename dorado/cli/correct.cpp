@@ -135,15 +135,15 @@ int correct(int argc, char* argv[]) {
     // the output, and convert each window into its corrected read and stitch
     // adjacent windows together.
     auto corrector =
-            pipeline_desc.add_node<CorrectionNode>({hts_writer}, 5 * threads / 6, batch_size);
+            pipeline_desc.add_node<CorrectionNode>({hts_writer}, correct_threads, batch_size);
 
     // 2. These will go into an Alignment node with the
     // same fastq as an index to perform all-vs-all alignment
     // for reach read. Each alignment is expected to generate
     // multiple aligned records, which will all be packaged
     // and sent into a window generation node.
-    auto aligner =
-            pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0], threads / 6);
+    auto aligner = pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0],
+                                                                     correct_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

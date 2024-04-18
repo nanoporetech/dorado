@@ -259,14 +259,27 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
 
     int length = std::accumulate(max_ins.begin(), max_ins.end(), 0) + (int)max_ins.size();
     int reads = 1 + TOP_K;
-    //auto bases = torch::empty({reads, length}, bases_options);
-    //bases.fill_(base_encoding['.']);
-    auto bases = torch::full({reads, length}, base_encoding['.'], bases_options);
-    //auto quals = torch::empty({reads, length}, quals_options);
-    //quals.fill_((float)'!');
-    auto quals = torch::full({reads, length}, (float)'!', quals_options);
+    int* alloc_bases_ptr = m_bases_manager.get_next_ptr();
+    float* alloc_quals_ptr = m_quals_manager.get_next_ptr();
+
+    auto bases = torch::from_blob(alloc_bases_ptr, {reads, length}, bases_options);
+    auto quals = torch::from_blob(alloc_quals_ptr, {reads, length}, quals_options);
+
     auto t0 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> dur = (t0 - t_init);
+    feature_tensors_alloc_time.store(feature_tensors_alloc_time.load() + dur);
+
+    //auto bases = torch::empty({reads, length}, bases_options);
+    //bases.fill_(base_encoding['.']);
+    //auto bases = torch::full({reads, length}, base_encoding['.'], bases_options);
+    //auto quals = torch::empty({reads, length}, quals_options);
+    //quals.fill_((float)'!');
+    //auto quals = torch::full({reads, length}, (float)'!', quals_options);
+
+    auto tfill = std::chrono::high_resolution_clock::now();
+    dur = (tfill - t0);
+    feature_tensors_fill_time.store(feature_tensors_fill_time.load() + dur);
+
     //spdlog::info("time to create tensor {}", dur.count());
     // Write target for window
     const std::string& tseq = alignments.read_seq;
@@ -520,13 +533,6 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
     int tlen = tseq.length();
 
     std::vector<WindowFeatures> wfs;
-    std::chrono::duration<double> filter_time{};
-    std::chrono::duration<double> sort_time{};
-    std::chrono::duration<double> gen_tensor_time{};
-    std::chrono::duration<double> ins_time{};
-    std::chrono::duration<double> features_time{};
-    std::chrono::duration<double> supported_time{};
-    std::chrono::duration<double> indices_time{};
     for (size_t w = 0; w < windows.size(); w++) {
         //for (size_t w = 0; w < 1; w++) {
         int win_len = (w == windows.size() - 1) ? tlen - m_window_size * w : m_window_size;
@@ -581,7 +587,7 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
             auto ins = std::chrono::high_resolution_clock::now();
 
             std::chrono::duration<double> duration = ins - start;
-            ins_time += duration;
+            ins_time.store(ins_time.load() + duration);
 
             // Create tensors
             //spdlog::info("get features for window {}", w);
@@ -589,14 +595,14 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
                                                           w * m_window_size, max_ins);
             auto feat = std::chrono::high_resolution_clock::now();
             duration = feat - ins;
-            features_time += duration;
+            features_time.store(features_time.load() + duration);
             //spdlog::info("time to get features for window {} is {}", w, duration.count());
             auto supported = get_supported(bases);
             //spdlog::info("num supported {}", supported.size());
             auto supp = std::chrono::high_resolution_clock::now();
 
             duration = supp - feat;
-            supported_time += duration;
+            supported_time.store(supported_time.load() + duration);
 
             wf.bases = std::move(bases);
             wf.quals = std::move(quals);
@@ -609,26 +615,18 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
             auto ind = std::chrono::high_resolution_clock::now();
 
             duration = ind - supp;
-            indices_time += duration;
+            indices_time.store(indices_time.load() + duration);
         }
         wfs.push_back(std::move(wf));
         auto t3 = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double> duration = t1 - t0;
-        filter_time += duration;
+        filter_time.store(filter_time.load() + duration);
         duration = t2 - t1;
-        sort_time += duration;
+        sort_time.store(sort_time.load() + duration);
         duration = t3 - t2;
-        gen_tensor_time += duration;
+        gen_tensor_time.store(gen_tensor_time.load() + duration);
     }
-
-    //spdlog::info("time for filter {}", filter_time.count());
-    //spdlog::info("time for sort {}", sort_time.count());
-    //spdlog::info("time for gen_tensor {}", gen_tensor_time.count());
-    //spdlog::info("time for ins_time {}", ins_time.count());
-    //spdlog::info("time for features {}", features_time.count());
-    //spdlog::info("time for supported {}", supported_time.count());
-    //spdlog::info("time for indices {}", indices_time.count());
 
     return wfs;
 }
@@ -991,13 +989,22 @@ void CorrectionNode::decode_fn() {
                 std::lock_guard<std::mutex> lock(decodeMutex);
                 decodeDuration += duration;
             }
+
+            for (auto& wf : to_decode) {
+                if (wf.n_alns > 1) {
+                    int* bases_ptr = wf.bases.data_ptr<int>();
+                    float* quals_ptr = wf.quals.data_ptr<float>();
+                    m_bases_manager.return_ptr(bases_ptr);
+                    m_quals_manager.return_ptr(quals_ptr);
+                }
+            }
         }
     }
 
     m_num_active_decode_threads--;
 }
 
-void CorrectionNode::infer_fn() {
+void CorrectionNode::infer_fn(int gpu) {
     spdlog::info("Starting process thread!");
 
     m_num_active_infer_threads++;
@@ -1011,7 +1018,7 @@ void CorrectionNode::infer_fn() {
     }
 
     spdlog::debug("Loaded model!");
-    const auto device = torch::kCUDA;
+    const auto device = torch::Device(torch::kCUDA, gpu);
     //const auto device = torch::kCPU;
     torch::NoGradGuard no_grad;
     module.to(device);
@@ -1229,8 +1236,13 @@ CorrectionNode::CorrectionNode(int threads, int batch_size)
         : MessageSink(1000, threads),
           m_batch_size(batch_size),
           m_features_queue(500),
-          m_inferred_features_queue(500) {
-    m_infer_thread = std::make_unique<std::thread>(&CorrectionNode::infer_fn, this);
+          m_inferred_features_queue(500),
+          m_bases_manager(threads, gen_base_encoding()['.']),
+          m_quals_manager(threads, (float)'!') {
+    for (int i = 0; i < 1; i++) {
+        m_infer_threads.push_back(
+                std::make_unique<std::thread>(&CorrectionNode::infer_fn, this, i));
+    }
     for (int i = 0; i < 4; i++) {
         m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
     }
@@ -1239,15 +1251,26 @@ CorrectionNode::CorrectionNode(int threads, int batch_size)
 
 void CorrectionNode::terminate(const FlushOptions&) {
     stop_input_processing();
-    if (m_infer_thread && m_infer_thread->joinable()) {
-        m_infer_thread->join();
+    for (auto& infer_thread : m_infer_threads) {
+        if (infer_thread->joinable()) {
+            infer_thread->join();
+        }
     }
-
     for (auto& decode_thread : m_decode_threads) {
         if (decode_thread->joinable()) {
             decode_thread->join();
         }
     }
+    spdlog::info("time for filter {}", filter_time.load().count());
+    spdlog::info("time for sort {}", sort_time.load().count());
+    spdlog::info("time for gen_tensor {}", gen_tensor_time.load().count());
+    spdlog::info("time for ins_time {}", ins_time.load().count());
+    spdlog::info("time for features {}", features_time.load().count());
+    spdlog::info("time for supported {}", supported_time.load().count());
+    spdlog::info("time for indices {}", indices_time.load().count());
+    spdlog::info("time for feature tensors alloc {}", feature_tensors_alloc_time.load().count());
+    spdlog::info("time for feature tensors fill {}", feature_tensors_fill_time.load().count());
+
     spdlog::info("time for extract windows {}", extractWindowsDuration.count());
     spdlog::info("time for extract features {}", extractFeaturesDuration.count());
     spdlog::info("time for run inference features {}", runInferenceDuration.count());
