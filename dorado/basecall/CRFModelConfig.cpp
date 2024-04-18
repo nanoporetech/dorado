@@ -376,10 +376,6 @@ bool is_tx_model_config(const std::filesystem::path &path) {
     return res.has_value();
 }
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
-    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
-}
-
 bool is_rna_model(const CRFModelConfig &model_config) {
     auto path = std::filesystem::canonical(model_config.model_path);
     auto filename = path.filename();
@@ -570,5 +566,9 @@ void Params::check() const {
 }
 
 }  // namespace tx
+
+CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
+    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
+}
 
 }  // namespace dorado::basecall
