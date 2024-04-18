@@ -95,7 +95,7 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
     register_buffer("sin_freqs", torch::sin(freqs).to(options.dtype(torch::kHalf)));
 };
 
-at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
+at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
     assert_forward_dims(qkv);
     const int64_t seq_len = qkv.size(1);
 
@@ -103,21 +103,19 @@ at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
     const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, seq_len);
     const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, seq_len);
 
-    at::Tensor out = qkv.clone();
-
     using Slices = std::vector<at::indexing::TensorIndex>;
     const Slices evens = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
                           at::indexing::Slice(), at::indexing::Slice(at::indexing::None, dim / 2)};
     const Slices odds = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
                          at::indexing::Slice(), at::indexing::Slice(dim / 2, dim)};
 
-    at::Tensor qk_evens = qkv.index(evens);
+    at::Tensor qk_evens = qkv.index(evens).clone();
     at::Tensor qk_odds = qkv.index(odds);
 
-    out.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
-    out.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
+    qkv.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
+    qkv.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
 
-    return out;
+    return qkv;
 }
 
 void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {

@@ -48,7 +48,7 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
                         int max_seq_len_,
                         const at::TensorOptions &options_);
 
-    at::Tensor forward(const at::Tensor &qkv);
+    at::Tensor forward(at::Tensor &qkv);
     void assert_forward_dims(const at::Tensor &qkv) const;
 
     const int64_t dim, max_seq_len;
