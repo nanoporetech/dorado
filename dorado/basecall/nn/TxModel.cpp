@@ -55,10 +55,9 @@ RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
 }
 
 at::Tensor RMSNormImpl::forward(at::Tensor x) {
-    at::Tensor rstd = torch::rsqrt(x.to(torch::kFloat32).square().mean(-1, true) + eps);
-    x *= rstd;
-    x *= weight;
-    return x.to(torch::kHalf);
+    at::Tensor rstd = torch::rsqrt(x.to(torch::kFloat32).square().mean(-1, true).add_(eps));
+    x.mul_(rstd).mul_(weight).to(torch::kHalf);
+    return x;
 }
 
 GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
