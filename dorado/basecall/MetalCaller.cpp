@@ -75,8 +75,7 @@ MetalCaller::MetalCaller(const CRFModelConfig &model_config,
     // In both cases beam search applies the same 5/127 factor to scores.
     m_score_scale = static_cast<float>(5.0 / 127.0);
 
-    auto state_dict = load_crf_model_weights(
-            model_config.model_path, model_config.out_features.has_value(), model_config.bias);
+    auto state_dict = load_crf_model_weights(model_config);
 
     auto selected_batch_size = (batch_size == 0)
                                        ? benchmark_batch_sizes(model_config, state_dict, chunk_size,
@@ -158,7 +157,7 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
                                        int chunk_size,
                                        int batch_size) {
     // Chunk size after decimation via convolution stride.
-    m_out_chunk_size = chunk_size / model_config.stride;
+    m_out_chunk_size = (chunk_size / model_config.stride_inner()) * model_config.scale_factor();
     // round chunk size down to a multiple of the stride
     m_in_chunk_size = m_out_chunk_size * model_config.stride;
 
@@ -247,7 +246,8 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
     // remaining memory.  This generally constrains the batch size to use fewer than
     // the maximum GPU cores when running sup models on systems with a large GPU core
     // to system memory ratio.
-    const auto out_chunk_size = static_cast<size_t>(chunk_size / model_config.stride);
+    const auto out_chunk_size = static_cast<size_t>((chunk_size / model_config.stride_inner()) *
+                                                    model_config.scale_factor());
     const auto decode_buffer_size_per_elem =
             static_cast<size_t>(out_chunk_size) *
             (static_cast<size_t>(model_config.outsize) +        // Scores
@@ -283,8 +283,8 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
     // To speed up test runs, use a smaller chunk size.  This means we will not see
     // the true effect of memory thrashing, so we are relying on the memory limit
     // above to avoid that scenario.
-    const int benchmark_chunk_size =
-            std::min(chunk_size - chunk_size % model_config.stride, model_config.stride * 300);
+    const int benchmark_chunk_size = std::min(chunk_size - chunk_size % model_config.stride_inner(),
+                                              model_config.stride * 300);
 
     // Iterate through batch size candidates to find the most efficient one.
     int best_batch_size = -1;

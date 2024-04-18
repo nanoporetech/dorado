@@ -21,7 +21,6 @@ public:
     void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig& config() const final;
-    size_t model_stride() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
     int batch_timeout_ms() const final;

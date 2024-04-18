@@ -3,7 +3,6 @@
 #include "SampleSheet.h"
 #include "barcode_kits.h"
 #include "sequence_utils.h"
-#include "spdlog/spdlog.h"
 
 #include <htslib/sam.h>
 
