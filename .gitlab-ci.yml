@@ -263,7 +263,7 @@ build:linux:x86:focal:valgrind:
     - .linux_runner
   script:
     - !reference [.set_parallel_jobs]
-    - apt update && apt install -y autoconf autotools-dev automake wget
+    - apt update && apt install -y autoconf autotools-dev automake wget libc6-dbg
     # We need a recent valgrind that includes https://bugs.kde.org/show_bug.cgi?id=402833.
     - VALGRIND_VERSION="3.22.0"
     - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
