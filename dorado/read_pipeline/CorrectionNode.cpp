@@ -259,20 +259,22 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
 
     int length = std::accumulate(max_ins.begin(), max_ins.end(), 0) + (int)max_ins.size();
     int reads = 1 + TOP_K;
-    int* alloc_bases_ptr = m_bases_manager.get_next_ptr();
-    float* alloc_quals_ptr = m_quals_manager.get_next_ptr();
+    //int* alloc_bases_ptr = m_bases_manager.get_next_ptr();
+    //float* alloc_quals_ptr = m_quals_manager.get_next_ptr();
 
-    auto bases = torch::from_blob(alloc_bases_ptr, {reads, length}, bases_options);
-    auto quals = torch::from_blob(alloc_quals_ptr, {reads, length}, quals_options);
+    //auto bases = torch::from_blob(alloc_bases_ptr, {reads, length}, bases_options);
+    //auto quals = torch::from_blob(alloc_quals_ptr, {reads, length}, quals_options);
 
     auto t0 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> dur = (t0 - t_init);
     feature_tensors_alloc_time.store(feature_tensors_alloc_time.load() + dur);
 
-    //auto bases = torch::empty({reads, length}, bases_options);
+    auto bases = torch::empty({reads, length}, bases_options);
+    std::fill(bases.data_ptr<int>(), bases.data_ptr<int>() + bases.numel(), base_encoding['.']);
     //bases.fill_(base_encoding['.']);
     //auto bases = torch::full({reads, length}, base_encoding['.'], bases_options);
-    //auto quals = torch::empty({reads, length}, quals_options);
+    auto quals = torch::empty({reads, length}, quals_options);
+    std::fill(quals.data_ptr<float>(), quals.data_ptr<float>() + quals.numel(), (float)'!');
     //quals.fill_((float)'!');
     //auto quals = torch::full({reads, length}, (float)'!', quals_options);
 
@@ -990,14 +992,14 @@ void CorrectionNode::decode_fn() {
                 decodeDuration += duration;
             }
 
-            for (auto& wf : to_decode) {
-                if (wf.n_alns > 1) {
-                    int* bases_ptr = wf.bases.data_ptr<int>();
-                    float* quals_ptr = wf.quals.data_ptr<float>();
-                    m_bases_manager.return_ptr(bases_ptr);
-                    m_quals_manager.return_ptr(quals_ptr);
-                }
-            }
+            //for (auto& wf : to_decode) {
+            //    if (wf.n_alns > 1) {
+            //        int* bases_ptr = wf.bases.data_ptr<int>();
+            //        float* quals_ptr = wf.quals.data_ptr<float>();
+            //        m_bases_manager.return_ptr(bases_ptr);
+            //        m_quals_manager.return_ptr(quals_ptr);
+            //    }
+            //}
         }
     }
 
