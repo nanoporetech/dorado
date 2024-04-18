@@ -507,7 +507,7 @@ int basecaller(int argc, char* argv[]) {
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, alignment::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -680,7 +680,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
               parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive,
-              cli::process_minimap2_arguments(parser, alignment::dflt_options),
+              cli::process_minimap2_arguments<alignment::Minimap2Options>(parser),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

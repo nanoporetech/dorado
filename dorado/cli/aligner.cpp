@@ -134,7 +134,7 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, alignment::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
 
     try {
         cli::parse(parser, argc, argv);
@@ -171,7 +171,7 @@ int aligner(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+    auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
