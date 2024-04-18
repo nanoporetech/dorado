@@ -550,7 +550,8 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
     config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
 
-    // Force some exception downstream
+    // Force downstream issue (negative lstm size) if a tx model config is incorrectly
+    // used to define an LSTM model. Incorrect use should be guarded against by using is_tx_model()
     config.lstm_size = -1;
 
     config.sample_type = get_model_type(model_name);

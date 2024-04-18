@@ -211,7 +211,6 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     c10::cuda::CUDAGuard device_guard(m_options.device());
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
-    // Ensure that all batches are divisible by stride_inner := (stride * scale_factor)
     const int scale_factor = m_config.scale_factor();
     const int granularity = get_batch_size_granularity(m_config);
     {
