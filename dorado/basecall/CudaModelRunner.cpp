@@ -30,7 +30,6 @@ std::vector<decode::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
 }
 
 const CRFModelConfig &CudaModelRunner::config() const { return m_caller->config(); }
-size_t CudaModelRunner::model_stride() const { return m_caller->config().stride; }
 size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
 size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
 int CudaModelRunner::batch_timeout_ms() const { return m_caller->batch_timeout_ms(); }

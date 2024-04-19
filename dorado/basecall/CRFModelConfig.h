@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dorado::basecall {
@@ -71,6 +73,67 @@ enum SampleType {
     RNA004,
 };
 
+namespace tx {
+
+struct TxEncoderParams {
+    // The number of expected features in the encoder/decoder inputs
+    int d_model{-1};
+    // The number of heads in the multi-head attention (MHA) models
+    int nhead{-1};
+    // The number of transformer layers
+    int depth{-1};
+    // The dimension of the feedforward model
+    int dim_feedforward{-1};
+    // Pair of ints defining (possibly asymmetric) sliding attention window mask
+    std::pair<int, int> attn_window{-1, -1};
+    // The deepnorm normalisation alpha parameter
+    float deepnorm_alpha{1.0};
+    std::string to_string() const;
+};
+
+struct EncoderUpsampleParams {
+    // The number of expected features in the encoder/decoder inputs
+    int d_model;
+    // Linear upsample scale factor
+    int scale_factor;
+
+    std::string to_string() const;
+};
+
+struct CRFEncoderParams {
+    int insize;
+    int n_base;
+    int state_len;
+    float scale;
+    float blank_score;
+    bool expand_blanks;
+    std::vector<int> permute;
+
+    // compute the outsize
+    int outsize() const {
+        if (expand_blanks) {
+            return static_cast<int>(pow(n_base, state_len + 1));
+        }
+        return (n_base + 1) * static_cast<int>(pow(n_base, state_len));
+    };
+
+    // compute the out_features
+    int out_features() const { return static_cast<int>(pow(n_base, state_len + 1)); };
+
+    std::string to_string() const;
+};
+
+struct Params {
+    TxEncoderParams tx;
+    EncoderUpsampleParams upsample;
+    CRFEncoderParams crf;
+
+    // Self consistency check
+    void check() const;
+};
+
+}  // namespace tx
+
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
     float qscale = 1.0f;
@@ -103,8 +166,24 @@ struct CRFModelConfig {
     // convolution layer params
     std::vector<ConvParams> convs;
 
+    // Tx Model Params
+    std::optional<tx::Params> tx = std::nullopt;
+
+    // True if this model config describes a LSTM model
+    bool is_lstm_model() const { return !is_tx_model(); }
+    // True if this model config describes a transformer model
+    bool is_tx_model() const { return tx.has_value(); };
+
+    // The model upsampling scale factor
+    int scale_factor() const { return is_tx_model() ? tx->upsample.scale_factor : 1; };
+    // The model stride multiplied by the upsampling scale factor
+    int stride_inner() const { return stride * scale_factor(); };
+
     std::string to_string() const;
 };
+
+// True if this config at path describes a transformer model
+bool is_tx_model_config(const std::filesystem::path& path);
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 

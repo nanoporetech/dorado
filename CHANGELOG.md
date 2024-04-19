@@ -68,6 +68,13 @@ This release of Dorado improves performance for short read basecalling and RBK b
 * 8dfd180d526bf426624d2129bf1a495d1e1d43dc - Consolidate pipeline node input thread handling
 * 401882331baf86d7a3e4b8e5a018389a8363cfbb - Update DEV.md to install the correct package
 
+# [0.5.3] (06 Feb 2024)
+
+This release of Dorado fixes a bug causing low Poly(A) estimation rates in RNA.
+
+* 59a083c9d9ee359049fc30ea4ca9ec4aacb84fe7 - Fix RNA Poly(A) tail estimated in the absence of adapter trimming.
+* f0f98838156fe45c51a3e39795ee45248e045100 - Clarify `ns` tag in Dorado SAM spec.
+
 # [0.5.2] (18 Jan 2024)
 
 This release of Dorado fixes a bug causing malformed CIGAR strings, prevents crashing when calling modifications with duplex, and improves adapter and primer trimming support.

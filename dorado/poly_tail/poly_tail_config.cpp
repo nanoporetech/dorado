@@ -40,14 +40,22 @@ PolyTailConfig prepare_config(std::istream& is) {
             config.plasmid_front_flank = toml::find<std::string>(anchors, "plasmid_front_flank");
             config.plasmid_rear_flank = toml::find<std::string>(anchors, "plasmid_rear_flank");
             config.is_plasmid = true;
-            config.flank_threshold = 10;  // reduced default for plasmids
+            config.flank_threshold = 0.85f;  // stricter default for plasmids
+        }
+
+        if (anchors.contains("primer_window")) {
+            config.primer_window = toml::find<int>(anchors, "primer_window");
+            if (config.primer_window <= 0) {
+                throw std::runtime_error("primer_window size needs to be > 0, given " +
+                                         std::to_string(config.primer_window));
+            }
         }
     }
 
     if (config_toml.contains("threshold")) {
         const auto& threshold = toml::find(config_toml, "threshold");
         if (threshold.contains("flank_threshold ")) {
-            config.flank_threshold = toml::find<int>(threshold, "flank_threshold ");
+            config.flank_threshold = toml::find<float>(threshold, "flank_threshold");
         }
     }
 

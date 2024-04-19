@@ -111,10 +111,9 @@ bool IndexFileAccess::is_index_loaded(const std::string& index_file,
     return is_index_loaded_impl(index_file, options);
 }
 
-std::string IndexFileAccess::generate_sequence_records_header(
-        const std::string& index_file,
-        const Minimap2Options& options) const {
-    auto loaded_index = get_exact_index(index_file, options);
+std::string IndexFileAccess::generate_sequence_records_header(const std::string& index_file,
+                                                              const Minimap2Options& options) {
+    auto loaded_index = get_index(index_file, options);
     assert(loaded_index && "Index must be loaded to generate header records");
     auto sequence_records = loaded_index->get_sequence_records_for_header();
 
