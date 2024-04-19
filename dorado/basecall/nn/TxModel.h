@@ -5,10 +5,13 @@
 #include "utils/gpu_profiling.h"
 #include "utils/module_utils.h"
 
+#include <ATen/core/TensorBody.h>
+#include <c10/core/Device.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
 
 #include <cstdint>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -58,6 +61,17 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
 
 TORCH_MODULE(RotaryEmbedding);
 
+using MaskKey = std::pair<int64_t, torch::Device>;
+
+// Hash function for std::pair<int64_t, int>
+struct MaskKeyHash {
+    std::size_t operator()(const MaskKey &key) const {
+        auto hash1 = std::hash<int64_t>{}(key.first);
+        auto hash2 = std::hash<torch::Device>{}(key.second);
+        return hash1 ^ (hash2 << 1);
+    }
+};
+
 struct MultiHeadAttentionImpl : torch::nn::Module {
     MultiHeadAttentionImpl(int d_model_,
                            int nhead_,
@@ -68,11 +82,14 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 
     at::Tensor forward(at::Tensor x);
 
+    at::Tensor get_attn_window_mask(const int64_t size);
     at::Tensor build_attn_window_mask(const int64_t size) const;
 
     const int d_model, nhead, head_dim;
     const std::pair<int, int> attn_window;
     const at::TensorOptions options;
+
+    std::unordered_map<MaskKey, at::Tensor, MaskKeyHash> mask_cache{};
 
     torch::nn::Linear wqkv{nullptr}, out_proj{nullptr};
     RotaryEmbedding rotary_emb{nullptr};

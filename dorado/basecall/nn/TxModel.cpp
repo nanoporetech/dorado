@@ -161,7 +161,16 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
             register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
 
+at::Tensor MultiHeadAttentionImpl::get_attn_window_mask(const int64_t size) {
+    const auto key = MaskKey{size, options.device()};
+    if (mask_cache.find(key) == mask_cache.end()) {
+        mask_cache[key] = build_attn_window_mask(size);
+    }
+    return mask_cache.at(key);
+}
+
 at::Tensor MultiHeadAttentionImpl::build_attn_window_mask(const int64_t size) const {
+    utils::ScopedProfileRange spr("AWM", 3);
     const auto [win_upper, win_lower] = attn_window;
     at::Tensor mask = at::ones({size, size}, options.device());
     mask.triu_(-win_upper).tril_(win_lower);
@@ -189,7 +198,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("MEA", 2);
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
-        auto attn_window_mask = build_attn_window_mask(T);
+        auto attn_window_mask = get_attn_window_mask(T);
 
 #if TORCH_VERSION_MAJOR < 2
         attn_output =
@@ -219,13 +228,14 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
+    const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
-        x = norm1(attn + (x * named_buffers()["deepnorm_alpha"]));
+        x = norm1(attn + (x * deepnorm_alpha));
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
@@ -233,7 +243,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
-        x = norm2(f + (x * named_buffers()["deepnorm_alpha"]));
+        x = norm2(f + (x * deepnorm_alpha));
     }
 
     return x;
