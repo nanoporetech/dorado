@@ -82,7 +82,7 @@ TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP
     auto merged_hdr = merger.get_merged_header();
     std::string merged_hdr_txt = sam_hdr_str(merged_hdr);
     std::string expected_hdr_txt =
-            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@HD\tVN:1.6\tSO:unknown\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
             "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
             "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n";
@@ -127,7 +127,7 @@ TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
 
     std::string merged_hdr_txt = sam_hdr_str(merged_hdr);
     std::string expected_hdr_txt =
-            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@HD\tVN:1.6\tSO:unknown\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26\n"
             "@PG\tID:aligner.1\tPN:minimap2\tVN:2.27\n"
             "@PG\tID:demux\tPN:dorado\tVN:0.6.0\n"
