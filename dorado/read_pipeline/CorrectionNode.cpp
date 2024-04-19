@@ -28,8 +28,40 @@ dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& 
 }
 
 template <typename T>
-torch::Tensor collate(std::vector<torch::Tensor> tensors, T fill_val) {
-    return torch::nn::utils::rnn::pad_sequence(tensors, true, fill_val);
+torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::ScalarType type) {
+#if 1
+    auto max_length = std::max_element(tensors.begin(), tensors.end(),
+                                       [](const torch::Tensor& a, const torch::Tensor& b) {
+                                           return a.sizes()[0] < b.sizes()[0];
+                                       })
+                              ->sizes()[0];
+    auto max_reads = std::max_element(tensors.begin(), tensors.end(),
+                                      [](const torch::Tensor& a, const torch::Tensor& b) {
+                                          return a.sizes()[1] < b.sizes()[1];
+                                      })
+                             ->sizes()[1];
+    const auto elems_per_tensor = max_length * max_reads;
+    auto options = torch::TensorOptions().dtype(type).device(torch::kCPU);
+    torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
+    T* ptr = batch.data_ptr<T>();
+    std::fill(ptr, ptr + batch.numel(), fill_val);
+    // Copy over data for each tensor
+    for (size_t i = 0; i < tensors.size(); i++) {
+        //spdlog::info("slice {}x{}, {}x{}", 0, tensors[i].sizes()[0], 0, tensors[i].sizes()[1]);
+        torch::Tensor slice = batch.index({(int)i, torch::indexing::Slice(0, tensors[i].sizes()[0]),
+                                           torch::indexing::Slice(0, tensors[i].sizes()[1])});
+        slice.copy_(tensors[i]);
+        //T* batch_ptr = ptr + i * elems_per_tensor;
+        //T* src_ptr = tensors[i].data_ptr<T>();
+        //std::memcpy(batch_ptr, src_ptr, tensors[i].numel() * sizeof(T));
+    }
+#else
+    torch::Tensor batch = torch::nn::utils::rnn::pad_sequence(tensors, true, fill_val);
+    auto max_length = batch.sizes()[1];
+    auto max_reads = batch.sizes()[0];
+#endif
+    //spdlog::info("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads, batch.numel(), batch.sum().item<T>());
+    return batch;
 }
 
 [[maybe_unused]] void print_size(const torch::Tensor& t, const std::string& name) {
@@ -41,6 +73,8 @@ torch::Tensor collate(std::vector<torch::Tensor> tensors, T fill_val) {
     ss << t.dtype();
     spdlog::info("{} tensor size {} dtype {}", name, size, ss.str());
 }
+
+float normalize_quals(float q) { return 2.f * (q - 33.f) / (126.f - 33.f) - 1.f; }
 
 std::array<int, 128> base_forward_mapping() {
     std::array<int, 128> base_forward = {0};
@@ -274,7 +308,8 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
     //bases.fill_(base_encoding['.']);
     //auto bases = torch::full({reads, length}, base_encoding['.'], bases_options);
     auto quals = torch::empty({reads, length}, quals_options);
-    std::fill(quals.data_ptr<float>(), quals.data_ptr<float>() + quals.numel(), (float)'!');
+    std::fill(quals.data_ptr<float>(), quals.data_ptr<float>() + quals.numel(),
+              normalize_quals((float)'!'));
     //quals.fill_((float)'!');
     //auto quals = torch::full({reads, length}, (float)'!', quals_options);
 
@@ -300,7 +335,7 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
     // PyTorch stores data in column major format.
     for (int i = 0; i < win_len; i++) {
         target_bases_tensor[tpos] = base_encoding[tseq[i + tstart]];
-        target_quals_tensor[tpos] = float(tqual[i + tstart] + 33);
+        target_quals_tensor[tpos] = normalize_quals(float(tqual[i + tstart] + 33));
 
         //spdlog::info("tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]], target_quals_tensor[tpos]);
         tpos += 1 + max_ins[i];
@@ -397,7 +432,7 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
                     auto qual = qqual[query_iter];
 
                     query_bases_tensor[idx] = base;
-                    query_quals_tensor[idx] = (float)qual + 33;
+                    query_quals_tensor[idx] = normalize_quals((float)qual + 33);
 
                     //spdlog::info("idx {} base {}, qual {}", idx, base_decoding[query_bases_tensor[idx]], query_quals_tensor[idx]);
 
@@ -421,7 +456,7 @@ std::tuple<torch::Tensor, torch::Tensor> CorrectionNode::get_features_for_window
                     auto qual = qqual[query_iter];
 
                     query_bases_tensor[(idx + i)] = base;
-                    query_quals_tensor[(idx + i)] = (float)qual + 33;
+                    query_quals_tensor[(idx + i)] = normalize_quals((float)qual + 33);
 
                     //spdlog::info("idx + i {} base {}, qual {}", idx + i, base_decoding[query_bases_tensor[(idx + i)]], query_quals_tensor[(idx + i)]);
 
@@ -1046,6 +1081,7 @@ void CorrectionNode::infer_fn(int gpu) {
         }
         return bases;
     };
+    (void)decode_preds;
 
     auto batch_infer = [&]() {
         if (first_inference) {
@@ -1053,16 +1089,18 @@ void CorrectionNode::infer_fn(int gpu) {
         }
         // Run inference on batch
         auto t0 = std::chrono::high_resolution_clock::now();
-        auto batched_bases = collate<int>(bases_batch, (int)11);
-        auto batched_quals = collate<float>(quals_batch, 0.f);
         auto length_tensor =
                 torch::from_blob(lengths.data(), {(int)lengths.size()},
                                  torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
+        auto batched_bases = collate<int>(bases_batch, (int)11, torch::kInt32);
+        auto batched_quals = collate<float>(quals_batch, 0.f, torch::kFloat32);
         //print_size(batched_bases, "batched_bases");
         //print_size(batched_quals, "batched_quals");
         //print_size(length_tensor, "length_tensor");
 
         auto t1 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> collate_dur = (t1 - t0);
+        collate_time.store(collate_time.load() + collate_dur);
         std::vector<torch::jit::IValue> inputs;
         inputs.push_back(batched_bases.to(device));
         inputs.push_back(batched_quals.to(device));
@@ -1071,7 +1109,13 @@ void CorrectionNode::infer_fn(int gpu) {
                       [device](torch::Tensor& t) { t.to(device); });
         inputs.push_back(indices_batch);
         auto t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> transfer_dur = (t2 - t1);
+        transfer_time.store(transfer_time.load() + transfer_dur);
 
+        (void)t0;
+        (void)t1;
+        (void)t2;
+#if 1
         auto output = module.forward(inputs);
         if (output.isTuple()) {
             auto base_logits = output.toTuple()->elements()[1].toTensor();
@@ -1107,6 +1151,7 @@ void CorrectionNode::infer_fn(int gpu) {
                 runInferenceDuration += duration;
             }
         }
+#endif
         bases_batch.clear();
         quals_batch.clear();
         lengths.clear();
@@ -1118,7 +1163,6 @@ void CorrectionNode::infer_fn(int gpu) {
 
     WindowFeatures item;
     while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
-        //continue;
         wfs.push_back(std::move(item));
         auto& wf = wfs.back();
         //spdlog::info("Popped window idx {}", wf.window_idx);
@@ -1127,7 +1171,10 @@ void CorrectionNode::infer_fn(int gpu) {
         //}
         //print_size(wf.bases, "popped from features queue");
         auto b = wf.bases.transpose(0, 1);
-        auto q = 2.f * (wf.quals.transpose(0, 1) - 33.f) / (126.f - 33.f) - 1.f;
+        //auto q = 2.f * (wf.quals.transpose(0, 1) - 33.f) / (126.f - 33.f) - 1.f;
+        auto q = wf.quals.transpose(0, 1);
+        //q.sub_(33.f).div_(126.f - 33.f).mul_(2.f).sub_(1.f);
+        //auto q = wf.quals;
 
         bases_batch.push_back(b);
         quals_batch.push_back(q);
@@ -1202,10 +1249,14 @@ void CorrectionNode::input_thread_fn() {
                             {alignments.read_name, (int)features_to_infer.size()});
                 }
                 // Push the ones that need inference to another thread.
+                auto fs = std::chrono::high_resolution_clock::now();
                 for (auto& wf : features_to_infer) {
                     //spdlog::info("Pushing window idx {} to features queue", wf.window_idx);
                     m_features_queue.try_push(std::move(wf));
                 }
+                auto fe = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> fd = fe - fs;
+                feature_push_time.store(feature_push_time.load() + fd);
                 {
                     std::chrono::duration<double> duration = t1 - t0;
                     std::lock_guard<std::mutex> lock(ewMutex);
@@ -1234,14 +1285,14 @@ void CorrectionNode::input_thread_fn() {
     }
 }
 
-CorrectionNode::CorrectionNode(int threads, int batch_size)
+CorrectionNode::CorrectionNode(int threads, int infer_threads, int batch_size)
         : MessageSink(1000, threads),
           m_batch_size(batch_size),
-          m_features_queue(500),
-          m_inferred_features_queue(500),
+          m_features_queue(1024),
+          m_inferred_features_queue(512),
           m_bases_manager(threads, gen_base_encoding()['.']),
           m_quals_manager(threads, (float)'!') {
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < infer_threads; i++) {
         m_infer_threads.push_back(
                 std::make_unique<std::thread>(&CorrectionNode::infer_fn, this, i));
     }
@@ -1272,9 +1323,12 @@ void CorrectionNode::terminate(const FlushOptions&) {
     spdlog::info("time for indices {}", indices_time.load().count());
     spdlog::info("time for feature tensors alloc {}", feature_tensors_alloc_time.load().count());
     spdlog::info("time for feature tensors fill {}", feature_tensors_fill_time.load().count());
+    spdlog::info("time for feature push time {}", feature_push_time.load().count());
 
     spdlog::info("time for extract windows {}", extractWindowsDuration.count());
     spdlog::info("time for extract features {}", extractFeaturesDuration.count());
+    spdlog::info("time for collate {}", collate_time.load().count());
+    spdlog::info("time for transfer {}", transfer_time.load().count());
     spdlog::info("time for run inference features {}", runInferenceDuration.count());
     spdlog::info("time for decode {}", decodeDuration.count());
 }

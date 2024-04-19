@@ -53,7 +53,7 @@ struct base_count_t {
 
 class CorrectionNode : public MessageSink {
 public:
-    CorrectionNode(int threads, int bach_size);
+    CorrectionNode(int threads, int infer_threads, int bach_size);
     ~CorrectionNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
@@ -124,18 +124,21 @@ private:
     std::atomic<std::chrono::duration<double>> indices_time{};
     std::atomic<std::chrono::duration<double>> feature_tensors_alloc_time{};
     std::atomic<std::chrono::duration<double>> feature_tensors_fill_time{};
+    std::atomic<std::chrono::duration<double>> collate_time{};
+    std::atomic<std::chrono::duration<double>> transfer_time{};
+    std::atomic<std::chrono::duration<double>> feature_push_time{};
 
     template <typename T>
     class MemoryManager {
     public:
         MemoryManager(int threads, T fill_val) : m_fill_val(fill_val) {
             const size_t num_tensors = NW * threads * 2;
-            m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
-            std::fill(m_bases_ptr.get(), m_bases_ptr.get() + tensor_size * num_tensors, fill_val);
+            //m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
+            //std::fill(m_bases_ptr.get(), m_bases_ptr.get() + tensor_size * num_tensors, fill_val);
 
-            for (size_t i = 0; i < num_tensors; i++) {
-                m_bases_locations.push(&m_bases_ptr.get()[i * tensor_size]);
-            }
+            //for (size_t i = 0; i < num_tensors; i++) {
+            //    m_bases_locations.push(&m_bases_ptr.get()[i * tensor_size]);
+            //}
         };
 
         ~MemoryManager() = default;
