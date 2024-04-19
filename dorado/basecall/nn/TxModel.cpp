@@ -82,16 +82,14 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
         : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
     // To maintain precision we use float32 here
     const at::Tensor inv_freq =
-            torch::pow(theta, torch::arange(0, dim, 2, options.dtype(torch::kFloat32)) / dim)
-                    .reciprocal();
+            torch::pow(theta, torch::arange(0, dim, 2, options) / dim).reciprocal();
 
     // freqs.shape := {max_seq_len, 1, 1, dim/2}
-    const at::Tensor freqs = torch::arange(max_seq_len, options.dtype(torch::kFloat32))
-                                     .reshape({max_seq_len, 1, 1, 1}) *
-                             inv_freq;
+    const at::Tensor freqs =
+            torch::arange(max_seq_len, options).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
 
-    register_buffer("cos_freqs", torch::cos(freqs).to(options.dtype(torch::kHalf)));
-    register_buffer("sin_freqs", torch::sin(freqs).to(options.dtype(torch::kHalf)));
+    register_buffer("cos_freqs", torch::cos(freqs).to(options));
+    register_buffer("sin_freqs", torch::sin(freqs).to(options));
 };
 
 at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
