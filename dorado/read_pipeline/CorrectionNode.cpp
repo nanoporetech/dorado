@@ -2,8 +2,13 @@
 
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 #include "utils/types.h"
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
 
+#include <c10/cuda/CUDAStream.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/nn/utils/rnn.h>
@@ -28,7 +33,10 @@ dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& 
 }
 
 template <typename T>
-torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::ScalarType type) {
+torch::Tensor collate(std::vector<torch::Tensor>& tensors,
+                      T fill_val,
+                      torch::ScalarType type,
+                      T* mem_ptr) {
 #if 1
     auto max_length = std::max_element(tensors.begin(), tensors.end(),
                                        [](const torch::Tensor& a, const torch::Tensor& b) {
@@ -42,7 +50,9 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::Sc
                              ->sizes()[1];
     const auto elems_per_tensor = max_length * max_reads;
     auto options = torch::TensorOptions().dtype(type).device(torch::kCPU);
-    torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
+    //torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
+    torch::Tensor batch =
+            torch::from_blob(mem_ptr, {(int)tensors.size(), max_length, max_reads}, options);
     T* ptr = batch.data_ptr<T>();
     std::fill(ptr, ptr + batch.numel(), fill_val);
     // Copy over data for each tensor
@@ -1041,7 +1051,7 @@ void CorrectionNode::decode_fn() {
     m_num_active_decode_threads--;
 }
 
-void CorrectionNode::infer_fn(int gpu) {
+void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     spdlog::info("Starting process thread!");
 
     m_num_active_infer_threads++;
@@ -1055,11 +1065,18 @@ void CorrectionNode::infer_fn(int gpu) {
     }
 
     spdlog::debug("Loaded model!");
-    const auto device = torch::Device(torch::kCUDA, gpu);
     //const auto device = torch::kCPU;
+    torch::Device device = torch::Device(device_str);
     torch::NoGradGuard no_grad;
     module.to(device);
     module.eval();
+
+#if DORADO_CUDA_BUILD
+    auto stream = c10::cuda::getStreamFromPool(false, device.index());
+
+    torch::DeviceGuard device_guard(device);
+    torch::StreamGuard stream_guard(stream);
+#endif
 
     bool first_inference = true;
 
@@ -1069,6 +1086,8 @@ void CorrectionNode::infer_fn(int gpu) {
     std::vector<int64_t> sizes;
     std::vector<torch::Tensor> indices_batch;
     std::vector<WindowFeatures> wfs;
+    // If there are any windows > 5120, then reduce batch size by 1
+    int remaining_batch_slots = m_batch_size;
 
     auto decode_preds = [](const torch::Tensor& preds) {
         std::vector<char> bases;
@@ -1092,8 +1111,10 @@ void CorrectionNode::infer_fn(int gpu) {
         auto length_tensor =
                 torch::from_blob(lengths.data(), {(int)lengths.size()},
                                  torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
-        auto batched_bases = collate<int>(bases_batch, (int)11, torch::kInt32);
-        auto batched_quals = collate<float>(quals_batch, 0.f, torch::kFloat32);
+        auto batched_bases =
+                collate<int>(bases_batch, (int)11, torch::kInt32, m_bases_manager.get_next_ptr());
+        auto batched_quals =
+                collate<float>(quals_batch, 0.f, torch::kFloat32, m_quals_manager.get_next_ptr());
         //print_size(batched_bases, "batched_bases");
         //print_size(batched_quals, "batched_quals");
         //print_size(length_tensor, "length_tensor");
@@ -1152,6 +1173,9 @@ void CorrectionNode::infer_fn(int gpu) {
             }
         }
 #endif
+        m_bases_manager.return_ptr(batched_bases.data_ptr<int>());
+        m_quals_manager.return_ptr(batched_quals.data_ptr<float>());
+
         bases_batch.clear();
         quals_batch.clear();
         lengths.clear();
@@ -1159,12 +1183,20 @@ void CorrectionNode::infer_fn(int gpu) {
         wfs.clear();
         indices_batch.clear();
         first_inference = false;
+        remaining_batch_slots = m_batch_size;
+        //spdlog::info("reset actual bs {}", remaining_batch_slots);
     };
 
     WindowFeatures item;
     while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
+        //spdlog::info("remaining batch spots {}", remaining_batch_slots);
+        int required_batch_slots = (item.bases.sizes()[1] / 5120) + 1;
+        if (required_batch_slots > remaining_batch_slots) {
+            batch_infer();
+        }
         wfs.push_back(std::move(item));
         auto& wf = wfs.back();
+
         //spdlog::info("Popped window idx {}", wf.window_idx);
         //for(int i = 0; i < wf.bases.sizes()[0]; i++) {
         //    spdlog::info("target row before inference pos {} base {}", i, wf.bases[i][0].item<int>());
@@ -1181,14 +1213,11 @@ void CorrectionNode::infer_fn(int gpu) {
         lengths.push_back(wf.length);
         sizes.push_back(wf.length);
         indices_batch.push_back(wf.indices);
+        remaining_batch_slots -= required_batch_slots;
         //print_size(wf.bases, "bases");
         //print_size(wf.quals, "quals");
         //print_size(wf.indices, "indices");
         //spdlog::info("length {}", wf.length);
-
-        if ((int)bases_batch.size() == m_batch_size) {
-            batch_infer();
-        }
 
         //spdlog::info("bases max {} min {} sum {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>(), wf.bases.sum().item<int>());
         //spdlog::info("quals max {} min {} sum {}", wf.quals.max().item<float>(), wf.quals.min().item<float>(), wf.quals.sum().item<float>());
@@ -1285,16 +1314,44 @@ void CorrectionNode::input_thread_fn() {
     }
 }
 
-CorrectionNode::CorrectionNode(int threads, int infer_threads, int batch_size)
+CorrectionNode::CorrectionNode(int threads,
+                               const std::string& device,
+                               int infer_threads,
+                               int batch_size)
         : MessageSink(1000, threads),
           m_batch_size(batch_size),
           m_features_queue(1024),
           m_inferred_features_queue(512),
-          m_bases_manager(threads, gen_base_encoding()['.']),
-          m_quals_manager(threads, (float)'!') {
-    for (int i = 0; i < infer_threads; i++) {
-        m_infer_threads.push_back(
-                std::make_unique<std::thread>(&CorrectionNode::infer_fn, this, i));
+          m_bases_manager(batch_size, gen_base_encoding()['.']),
+          m_quals_manager(batch_size, (float)'!') {
+    std::vector<std::string> devices;
+    if (device == "cpu") {
+        infer_threads = 1;
+        devices.push_back(device);
+    }
+#ifdef __APPLE__
+    else if (device == "mps") {
+        devices.push_back("mps");
+    }
+#endif
+#if DORADO_CUDA_BUILD
+    else if (utils::starts_with(device, "cuda")) {
+        if (!torch::cuda::is_available()) {
+            throw std::runtime_error("CUDA backend not available. Choose another one.");
+        }
+        devices = dorado::utils::parse_cuda_device_string(device);
+    }
+#else
+    else {
+        throw std::runtime_error("Unsupported device: " + device);
+    }
+#endif
+    for (size_t d = 0; d < devices.size(); d++) {
+        const auto& dev = devices[d];
+        for (int i = 0; i < infer_threads; i++) {
+            m_infer_threads.push_back(
+                    std::make_unique<std::thread>(&CorrectionNode::infer_fn, this, dev, (int)d));
+        }
     }
     for (int i = 0; i < 4; i++) {
         m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));

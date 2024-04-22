@@ -47,10 +47,20 @@ int correct(int argc, char* argv[]) {
                   "all available threads.")
             .default_value(0)
             .scan<'i', int>();
+    parser.add_argument("-x", "--device")
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"mps\", \"cpu\" "
+                  "etc..")
+            .default_value(
+#if DORADO_CUDA_BUILD
+                    std::string{"cuda:all"}
+#elif __APPLE__
+                    std::string{"mps"}
+#else
+                    std::string{"cpu"}
+#endif
+            );
     parser.add_argument("-i", "--infer-threads")
-            .help("Combined number of threads for adapter/primer detection and output generation. "
-                  "Default uses "
-                  "all available threads.")
+            .help("Number of threads per device.")
             .default_value(1)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
@@ -88,6 +98,7 @@ int correct(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto infer_threads(parser.get<int>("infer-threads"));
+    auto device(parser.get<std::string>("device"));
     auto max_reads(parser.get<int>("max-reads"));
     auto batch_size(parser.get<int>("batch-size"));
 
@@ -141,7 +152,7 @@ int correct(int argc, char* argv[]) {
     // 4. The inference node will run the model on the tensors, decode
     // the output, and convert each window into its corrected read and stitch
     // adjacent windows together.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, correct_threads,
+    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, correct_threads, device,
                                                             infer_threads, batch_size);
 
     // 2. These will go into an Alignment node with the

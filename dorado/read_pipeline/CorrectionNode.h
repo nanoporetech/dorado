@@ -53,7 +53,7 @@ struct base_count_t {
 
 class CorrectionNode : public MessageSink {
 public:
-    CorrectionNode(int threads, int infer_threads, int bach_size);
+    CorrectionNode(int threads, const std::string& device, int infer_threads, int bach_size);
     ~CorrectionNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
@@ -88,7 +88,7 @@ private:
                          const CorrectionAlignments& alignments);
     std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs);
 
-    void infer_fn(int gpu_num);
+    void infer_fn(const std::string& device, int mtx_idx);
     void decode_fn();
 
     utils::AsyncQueue<WindowFeatures> m_features_queue;
@@ -128,17 +128,20 @@ private:
     std::atomic<std::chrono::duration<double>> transfer_time{};
     std::atomic<std::chrono::duration<double>> feature_push_time{};
 
+    std::array<std::mutex, 32> m_gpu_mutexes;
+
     template <typename T>
     class MemoryManager {
     public:
-        MemoryManager(int threads, T fill_val) : m_fill_val(fill_val) {
-            const size_t num_tensors = NW * threads * 2;
-            //m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
+        MemoryManager(int batch_size, T fill_val) : m_fill_val(fill_val) {
+            const size_t num_tensors = 8 * 8;  // devices * threads per device;
+            const size_t tensor_size = WS * NR * batch_size;
+            m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
             //std::fill(m_bases_ptr.get(), m_bases_ptr.get() + tensor_size * num_tensors, fill_val);
 
-            //for (size_t i = 0; i < num_tensors; i++) {
-            //    m_bases_locations.push(&m_bases_ptr.get()[i * tensor_size]);
-            //}
+            for (size_t i = 0; i < num_tensors; i++) {
+                m_bases_locations.push(&m_bases_ptr.get()[i * tensor_size]);
+            }
         };
 
         ~MemoryManager() = default;
@@ -157,7 +160,7 @@ private:
         void return_ptr(T* ptr) {
             std::lock_guard<std::mutex> lock(m_bases_mtx);
             //spdlog::info("returning pointer @ size {}", m_bases_locations.size());
-            std::fill(ptr, ptr + tensor_size, m_fill_val);
+            //std::fill(ptr, ptr + tensor_size, m_fill_val);
             m_bases_locations.push(ptr);
         }
 
@@ -165,7 +168,6 @@ private:
         static constexpr int WS = 5120;
         static constexpr int NR = 31;
         static constexpr int NW = 128;
-        static constexpr int tensor_size = WS * NR;
         T m_fill_val;
 
         std::unique_ptr<T[]> m_bases_ptr;
