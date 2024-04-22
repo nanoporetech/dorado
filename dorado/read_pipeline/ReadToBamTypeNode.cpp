@@ -39,7 +39,7 @@ void ReadToBamTypeNode::input_thread_fn() {
         auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold,
                                                        is_duplex_parent);
         for (auto& aln : alns) {
-            send_message_to_sink(std::move(aln));
+            send_message_to_sink(BamMessage{std::move(aln), read_common_data.client_info});
         }
     }
 }

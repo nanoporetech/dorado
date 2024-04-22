@@ -115,7 +115,7 @@ protected:
 };
 
 using NodeSmokeTestRead = NodeSmokeTestBase<dorado::SimplexReadPtr>;
-using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
+using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamMessage>;
 
 #define DEFINE_TEST(base, name) TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
 

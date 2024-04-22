@@ -66,7 +66,7 @@ public:
 
     // Contains information about the client to which this read belongs, e.g includes the client ID.
     // By default it's a standalone implementation which has -1 as the id
-    std::shared_ptr<const ClientInfo> client_info;
+    std::shared_ptr<ClientInfo> client_info;
 
     uint32_t mean_qscore_start_pos = 0;
 
@@ -220,7 +220,8 @@ using Message = std::
 
 bool is_read_message(const Message& message);
 
-ReadCommon& get_read_common_data(const Message& message);
+ReadCommon& get_read_common_data(Message& message);
+const ReadCommon& get_read_common_data(const Message& message);
 
 // Ensures the raw_data field is non-empty, which it won't necessarily be for DuplexRead.
 void materialise_read_raw_data(Message& message);

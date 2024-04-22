@@ -76,6 +76,16 @@ void BarcodeClassifierNode::input_thread_fn() {
             }
             barcode(read);
             send_message_to_sink(std::move(read));
+        } else if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+            // If the read is a secondary or supplementary read, ignore it if
+            // we're setup to trim reads.
+            if (m_default_barcoding_info->trim &&
+                (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                continue;
+            }
+            barcode(bam_message.bam_ptr);
+            send_message_to_sink(std::move(bam_message));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             auto read = std::get<SimplexReadPtr>(std::move(message));
             barcode(*read);
