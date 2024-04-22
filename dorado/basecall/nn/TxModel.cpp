@@ -80,7 +80,6 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
                                          int max_seq_len_,
                                          const at::TensorOptions &options_)
         : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
-    // To maintain precision we use float32 here
     const at::Tensor inv_freq =
             torch::pow(theta, torch::arange(0, dim, 2, options) / dim).reciprocal();
 
