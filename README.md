@@ -452,8 +452,6 @@ On macOS, the equivalent export would be (change path as appropriate):
 $ export DYLD_LIBRARY_PATH=<PATH_TO_DORADO>/dorado-x.y.z-osx-arm64/lib:$DYLD_LIBRARY_PATH
 ```
 
-This will let the Dorado binary pick up the shipped libraries and you will not need to manually install `libaec` and `zstd`. 
-
 ### Improving the Speed of Duplex Basecalling
 
 Duplex basecalling is an IO-intensive process and can perform poorly if using networked storage or HDD. This can generally be improved by splitting up POD5 files appropriately.
