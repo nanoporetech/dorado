@@ -94,7 +94,7 @@ struct ModBaseConvModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<at::Tensor>& weights) {
-        utils::load_state_dict(*this, weights, {});
+        utils::load_state_dict(*this, weights);
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
@@ -185,7 +185,7 @@ struct ModBaseConvLSTMModelImpl : Module {
     }
 
     void load_state_dict(const std::vector<at::Tensor>& weights) {
-        utils::load_state_dict(*this, weights, {});
+        utils::load_state_dict(*this, weights);
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
