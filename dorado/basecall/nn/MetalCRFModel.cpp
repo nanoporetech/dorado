@@ -494,7 +494,7 @@ MetalCRFModelImpl::MetalCRFModelImpl(const CRFModelConfig &config,
 }
 
 void MetalCRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
-    utils::load_state_dict(*this, weights, {});
+    utils::load_state_dict(*this, weights);
     mtl_block->load_weights();
 }
 
