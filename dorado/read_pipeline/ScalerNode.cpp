@@ -193,7 +193,6 @@ void ScalerNode::input_thread_fn() {
                 // 2. x_std = (1 / Stdev)*(x_pa - Mean)
                 // => x_std = (Scale / Stdev)*(x + (Offset - (Mean / Scale)))
                 // => x_std = (x - ((Mean / Scale) - Offset)) / (Stdev / Scale)
-                //            ---- scale ---        ------- shift --------
                 scale = stdn.stdev / read->scaling;
                 shift = (stdn.mean / read->scaling) - read->offset;
             } else {
