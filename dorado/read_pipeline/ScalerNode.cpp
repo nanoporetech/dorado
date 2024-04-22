@@ -184,22 +184,25 @@ void ScalerNode::input_thread_fn() {
 
         read->read_common.scaling_method = to_string(m_scaling_params.strategy);
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
+            // We want to keep the scaling formula `(x - shift) / scale` consistent between
+            // quantile and pA methods as this affects downstream tools.
             const auto& stdn = m_scaling_params.standarisation;
             if (stdn.standardise) {
                 // Standardise from scaled pa
                 // 1. x_pa  = (Scale)*(x + Offset)
                 // 2. x_std = (1 / Stdev)*(x_pa - Mean)
                 // => x_std = (Scale / Stdev)*(x + (Offset - (Mean / Scale)))
+                // => x_std = (x - ((Mean / Scale) - Offset)) / (Stdev / Scale)
                 //            ---- scale ---        ------- shift --------
-                scale = read->scaling / stdn.stdev;
-                shift = read->offset - (stdn.mean / read->scaling);
+                scale = stdn.stdev / read->scaling;
+                shift = (stdn.mean / read->scaling) - read->offset;
             } else {
-                scale = read->scaling;
-                shift = read->offset;
+                scale = 1.f / read->scaling;
+                shift = -1.f * read->offset;
             }
 
             read->read_common.raw_data =
-                    ((read->read_common.raw_data.to(at::kFloat) + shift) * scale)
+                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
                             .to(at::ScalarType::Half);
 
             read->read_common.scale = scale;
