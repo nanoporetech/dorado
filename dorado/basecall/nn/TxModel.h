@@ -126,7 +126,7 @@ struct TxModelImpl : torch::nn::Module {
     explicit TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
-        utils::load_state_dict(*this, weights, {});
+        utils::load_state_dict(*this, weights, {}, /*is_tx_model=*/true);
     }
 
     at::Tensor forward(const at::Tensor &x);

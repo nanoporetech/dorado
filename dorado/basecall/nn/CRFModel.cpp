@@ -750,7 +750,7 @@ CRFModelImpl::CRFModelImpl(const CRFModelConfig &config) {
 }
 
 void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
-    utils::load_state_dict(*this, weights, {});
+    utils::load_state_dict(*this, weights, {}, /*is_tx_model=*/false);
 }
 
 #if DORADO_CUDA_BUILD
