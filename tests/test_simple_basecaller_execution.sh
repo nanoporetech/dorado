@@ -345,6 +345,7 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
         echo "Missing expected bam file $bam"
         exit 1
     fi
+    samtools view $bam > /dev/null
 done
 
 rm -rf $output_dir
