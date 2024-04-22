@@ -2,6 +2,20 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.6.1] (23 April 2024)
+
+This release of Dorado fixes some critical bugs in `dorado aligner` primarily related to using presets correctly.
+
+* TBD - Make sm/sd tags for pA and quantile scaling consistent
+* a2abf83852e895b1016c690769b59c06587684fe - Fix incorrect overriding of minimap2 options when minimap2 preset is specified
+* 1cc207a166b1cafcbd012f5c70b5c817c788c7f3 - Fix bug causing unclassified records from `dorado demux` to be unreadable by samtools
+* 298277150ad2522ca6c1928c4981782ce2893a5a - Fix issue with allocating memory on unused GPU during basecalling
+* fa79f4a77fca737704d8a9e08d0495b9988f88ef - Fix reverse strand alignments when re-mapping a SAM/BAM file with `dorado aligner`
+* 3b2c8252d1a40bb0f941ca2ceca0849be15d15fa - Propagate `sv` tag to split reads
+* 11675a565da9af52de89a3f6614d15e57d10765d - Fix bug where errors were being swalled in HtsFile class
+* 73046e19fd443dfb48f3fbb82c0b37c5c7cfb8d5 - Fx type in Warnings.cmake
+
+
 # [0.6.0] (2 April 2024)
 
 This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates the minimap2 version and default mapping preset. It also adds GPU information to the output BAM or FASTQ and includes several other improvements and bug fixes.
