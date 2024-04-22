@@ -43,7 +43,8 @@ function(check_linked_libs TARGET_NAME)
             POST_BUILD
             COMMAND echo "Checking linked libs..."
             # We shouldn't be linking to anything from homebrew.
-            COMMAND sh -c "otool -L $<TARGET_FILE:${TARGET_NAME}> | grep -i homebrew ; test $? -eq 1"
+            COMMAND sh -c "otool -L $<TARGET_FILE:${TARGET_NAME}> | grep -i /opt/homebrew ; test $? -eq 1"
+            COMMAND sh -c "otool -L $<TARGET_FILE:${TARGET_NAME}> | grep -i /usr/local/opt ; test $? -eq 1"
             VERBATIM
         )
     endif()
