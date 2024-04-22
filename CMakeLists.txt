@@ -342,6 +342,7 @@ if(NOT DORADO_DISABLE_DORADO)
     endif()
 
     enable_warnings_as_errors(dorado)
+    check_linked_libs(dorado)
 
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(dorado REUSE_FROM dorado_lib)
