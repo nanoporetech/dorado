@@ -32,6 +32,11 @@ function(disable_warnings TARGET_NAME)
 endfunction()
 
 function(check_linked_libs TARGET_NAME)
+    if (ECM_ENABLE_SANITIZERS)
+        # We don't ship these, so no need to check them.
+        return()
+    endif()
+
     if (APPLE)
         add_custom_command(
             TARGET ${TARGET_NAME}
