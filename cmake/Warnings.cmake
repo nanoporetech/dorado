@@ -30,3 +30,22 @@ function(disable_warnings TARGET_NAME)
         )
     endif()
 endfunction()
+
+function(check_linked_libs TARGET_NAME)
+    if (ECM_ENABLE_SANITIZERS)
+        # We don't ship these, so no need to check them.
+        return()
+    endif()
+
+    if (APPLE)
+        add_custom_command(
+            TARGET ${TARGET_NAME}
+            POST_BUILD
+            COMMAND echo "Checking linked libs..."
+            # We shouldn't be linking to anything from homebrew.
+            COMMAND sh -c "otool -L $<TARGET_FILE:${TARGET_NAME}> | grep -i /opt/homebrew ; test $? -eq 1"
+            COMMAND sh -c "otool -L $<TARGET_FILE:${TARGET_NAME}> | grep -i /usr/local/opt ; test $? -eq 1"
+            VERBATIM
+        )
+    endif()
+endfunction()
