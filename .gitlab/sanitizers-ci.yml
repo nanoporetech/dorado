@@ -7,6 +7,11 @@
         - "address;undefined"
         - "thread"
   timeout: 1h 30m
+  variables:
+    # Debug is much faster to build than Release, and that outweighs the time spent
+    # running the tests on some of our CI machines. It's good to sanitize unoptimised
+    # builds anyway so that the optimiser can't have already acted on any UB.
+    BUILD_TYPE: "Debug"
   before_script:
     # Add the sanitizer flag to the build
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
