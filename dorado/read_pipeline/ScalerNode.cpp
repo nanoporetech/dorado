@@ -6,6 +6,7 @@
 #include "utils/trim.h"
 #include "utils/trim_rapid_adapter.h"
 
+#include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
 #include <ATen/TensorOperators.h>
 #include <spdlog/spdlog.h>
