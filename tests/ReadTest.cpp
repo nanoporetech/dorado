@@ -1,7 +1,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 

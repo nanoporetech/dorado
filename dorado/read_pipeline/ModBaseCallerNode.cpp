@@ -9,7 +9,8 @@
 #include "utils/stats.h"
 #include "utils/tensor_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
+#include <ATen/TensorIndexing.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 

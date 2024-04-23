@@ -6,10 +6,17 @@
       - SANITIZER:
         - "address;undefined"
         - "thread"
-  timeout: 1h 30m
+  variables:
+    # Debug is much faster to build than Release, and that outweighs the time spent
+    # running the tests on some of our CI machines. It's good to sanitize unoptimised
+    # builds anyway so that the optimiser can't have already acted on any UB.
+    BUILD_TYPE: "Debug"
   before_script:
     # Add the sanitizer flag to the build
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
+    # Disable ccache since it's not likely to find a match and it slows down the ordinary
+    # builds if we do polute the cache.
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
     # Setup additional runtime options
     - export ASAN_OPTIONS=detect_stack_use_after_return=1:check_initialization_order=1
     - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=${PWD}/.gitlab/ubsan.supp
@@ -26,6 +33,10 @@
 .sanitizer_common_linux:
   extends:
     .sanitizer_common
+  variables:
+    # The only BUILD_OPTIONS in the Linux jobs are to build Koi from source and to build
+    # the mm2 exe. We don't need either of those for the sanitizers though.
+    BUILD_OPTIONS: ""
   parallel:
     matrix:
       - SANITIZER:
@@ -54,10 +65,6 @@ sanitize:linux:arm64:focal:
     # Run both base setups
     - !reference ["build:linux:arm64:focal", before_script]
     - !reference [.sanitizer_common_linux, before_script]
-  retry:
-    max: 1
-    when:
-    - job_execution_timeout
 
 sanitize:macos:arm:
   extends:

@@ -4,7 +4,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/trim.h"
 
-#include <ATen/ATen.h>
+#include <ATen/TensorIndexing.h>
 #include <htslib/sam.h>
 
 using Slice = at::indexing::Slice;

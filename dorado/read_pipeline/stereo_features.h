@@ -2,7 +2,7 @@
 
 #include "ReadPipeline.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Tensor.h>
 
 namespace dorado {
 

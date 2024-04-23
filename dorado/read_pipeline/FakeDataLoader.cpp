@@ -2,7 +2,7 @@
 
 #include "read_pipeline/ReadPipeline.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
 
 #include <cstdint>
 #include <memory>
