@@ -45,13 +45,24 @@ const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client
 namespace dorado {
 
 BarcodeClassifierNode::BarcodeClassifierNode(int threads,
-                                             const std::vector<std::string>&,
-                                             bool,
-                                             bool,
-                                             const BarcodingInfo::FilterSet&,
-                                             const std::optional<std::string>&,
-                                             const std::optional<std::string>&)
-        : MessageSink(10000, threads) {
+                                             const std::vector<std::string>& kit_names,
+                                             bool barcode_both_ends,
+                                             bool no_trim,
+                                             const BarcodingInfo::FilterSet& allowed_barcodes,
+                                             const std::optional<std::string>& custom_kit,
+                                             const std::optional<std::string>& custom_seqs)
+        : MessageSink(10000, threads),
+          m_default_barcoding_info(create_barcoding_info(kit_names,
+                                                         barcode_both_ends,
+                                                         !no_trim,
+                                                         allowed_barcodes,
+                                                         custom_kit,
+                                                         custom_seqs)) {
+    if (m_default_barcoding_info->kit_name.empty()) {
+        spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
+    } else {
+        spdlog::debug("Barcode for {}", m_default_barcoding_info->kit_name);
+    }
     start_input_processing(&BarcodeClassifierNode::input_thread_fn, this);
 }
 
@@ -66,12 +77,17 @@ void BarcodeClassifierNode::input_thread_fn() {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it if
             // client requires read trimming.
+            if (m_default_barcoding_info->trim &&
+                (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                continue;
+            }
+
             const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
             if (barcoding_info && barcoding_info->trim &&
                 (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
                 continue;
             }
-            barcode(bam_message.bam_ptr, barcoding_info);
+            barcode(bam_message.bam_ptr);
             send_message_to_sink(std::move(bam_message));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             auto read = std::get<SimplexReadPtr>(std::move(message));
@@ -83,17 +99,18 @@ void BarcodeClassifierNode::input_thread_fn() {
     }
 }
 
-void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding_info) {
-    if (!barcoding_info) {
+void BarcodeClassifierNode::barcode(BamPtr& read) {
+    if (!m_default_barcoding_info ||
+        (m_default_barcoding_info->kit_name.empty() && !m_default_barcoding_info->custom_kit)) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
+    auto barcoder = m_barcoder_selector.get_barcoder(*m_default_barcoding_info);
 
     bam1_t* irecord = read.get();
     std::string seq = utils::extract_sequence(irecord);
 
-    auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
-                                    barcoding_info->allowed_barcodes);
+    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
+                                    m_default_barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     spdlog::trace("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
@@ -103,7 +120,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding
         m_barcode_count[bc]++;
     }
 
-    if (barcoding_info->trim) {
+    if (m_default_barcoding_info->trim) {
         int seqlen = irecord->core.l_qseq;
         auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
 
