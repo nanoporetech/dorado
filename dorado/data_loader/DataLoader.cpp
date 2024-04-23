@@ -9,7 +9,7 @@
 #include "utils/types.h"
 #include "vbz_plugin_user_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
 #include <cxxpool.h>
 #include <highfive/H5Easy.hpp>
 #include <highfive/H5File.hpp>

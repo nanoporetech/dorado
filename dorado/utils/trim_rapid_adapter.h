@@ -1,5 +1,5 @@
 #pragma once
-#include <ATen/ATen.h>
+#include <ATen/Tensor.h>
 
 #include <cstdint>
 #include <optional>

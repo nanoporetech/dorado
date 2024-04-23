@@ -1,6 +1,7 @@
 #include "duplex_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
+#include <ATen/TensorIndexing.h>
 
 #include <algorithm>
 #include <fstream>

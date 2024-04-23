@@ -6,7 +6,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
 #include <catch2/catch.hpp>
 
 #include <filesystem>
