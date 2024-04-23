@@ -2,6 +2,7 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
+#include <ATen/TensorOperators.h>
 
 #include <algorithm>
 #include <fstream>
