@@ -10,6 +10,9 @@
   before_script:
     # Add the sanitizer flag to the build
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D ECM_ENABLE_SANITIZERS='${SANITIZER}'"
+    # Disable ccache since it's not likely to find a match and it slows down the ordinary
+    # builds if we do polute the cache.
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
     # Setup additional runtime options
     - export ASAN_OPTIONS=detect_stack_use_after_return=1:check_initialization_order=1
     - export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1:suppressions=${PWD}/.gitlab/ubsan.supp
