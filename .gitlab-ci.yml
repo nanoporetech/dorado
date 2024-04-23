@@ -278,7 +278,7 @@ build:linux:x86:focal:valgrind:
     - !reference [.run_dorado_cmake_build]
     # Run the ordinary tests directly under valgrind.
     # We don't use `ctest -VV -E smoke -T memcheck` since that requires additional setup.
-    - ${valgrind} --error-exitcode=1 -- ./${BUILD_DIR}/tests/dorado_tests
+    - ${valgrind} --error-exitcode=1 --track-origins=yes -- ./${BUILD_DIR}/tests/dorado_tests
 
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
