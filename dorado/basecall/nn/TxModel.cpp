@@ -19,6 +19,12 @@
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
 
+#if DORADO_CUDA_BUILD
+extern "C" {
+#include "../../3rdparty/koi/koi/lib/koi.h"
+}
+#endif
+
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -228,13 +234,37 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
     const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
+#if DORADO_CUDA_BUILD
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    bool koi_norm = utils::get_dev_opt<bool>("koi_norm", true);
+    x = koi_norm ? x.contiguous() : x;           // If using koi, make sure x is NTC order in memory
+    const int num_rows = x.size(0) * x.size(1);  // N * T
+#endif
+
+    auto run_norm = [&](RMSNorm norm, at::Tensor in, at::Tensor residual, at::Tensor out) {
+#if DORADO_CUDA_BUILD
+        int res = KOI_NOT_SUPPORTED;
+        if (koi_norm) {
+            res = host_fused_residual_rmsnorm_f16(stream, in.size(-1), num_rows, in.data_ptr(),
+                                                  residual.data_ptr(), deepnorm_alpha.data_ptr(),
+                                                  norm->weight.data_ptr(), out.data_ptr());
+        }
+        if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
+            throw std::runtime_error("Koi error during layer norm");
+        } else if (res == KOI_NOT_SUPPORTED)
+#endif
+        {
+            out = norm1(in + (residual * deepnorm_alpha));
+        }
+    };
+
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
-        x = norm1(attn + (x * deepnorm_alpha));
+        run_norm(norm1, attn, x, x);
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
@@ -242,9 +272,8 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
-        x = norm2(f + (x * deepnorm_alpha));
+        run_norm(norm2, f, x, x);
     }
-
     return x;
 }
 
