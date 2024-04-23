@@ -61,9 +61,9 @@ protected:
 
     std::vector<dorado::BamPtr> RunPipelineWithBamMessages(
             dorado::HtsReader& reader,
-            std::string reference_file,
-            std::string bed_file,
-            dorado::alignment::Minimap2Options options,
+            const std::string& reference_file,
+            const std::string& bed_file,
+            const dorado::alignment::Minimap2Options& options,
             int threads) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
         create_pipeline(index_file_access, reference_file, bed_file, options, threads);
@@ -78,6 +78,7 @@ protected:
         pipeline->terminate({});
         auto bam_messages = ConvertMessages<dorado::BamMessage>(std::move(m_output_messages));
         std::vector<dorado::BamPtr> result{};
+        result.reserve(bam_messages.size());
         for (auto& bam_message : bam_messages) {
             result.push_back(std::move(bam_message.bam_ptr));
         }

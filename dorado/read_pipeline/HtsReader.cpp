@@ -18,7 +18,7 @@ namespace dorado {
 
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
-        : m_read_list(std::move(read_list)), m_client_info(std::make_shared<DefaultClientInfo>()) {
+        : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
