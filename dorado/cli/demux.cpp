@@ -161,6 +161,7 @@ int demuxer(int argc, char* argv[]) {
     auto emit_summary = parser.visible.get<bool>("emit-summary");
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
+    auto no_classify(parser.visible.get<bool>("--no-classify"));
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -213,7 +214,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     add_pg_hdr(header.get());
-    if (!no_trim) {
+    if (!no_classify && !no_trim) {
         // Remove SQ lines from header since alignment information
         // is invalidated after trimming.
         utils::strip_alignment_data_from_header(header.get());
