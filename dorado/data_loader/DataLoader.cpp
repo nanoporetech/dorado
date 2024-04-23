@@ -394,7 +394,7 @@ void DataLoader::load_reads(const std::filesystem::path& path,
     iterate_directory(filtered_entries);
 }
 
-int DataLoader::get_num_reads(std::filesystem::path data_path,
+int DataLoader::get_num_reads(const std::filesystem::path& data_path,
                               std::optional<std::unordered_set<std::string>> read_list,
                               const std::unordered_set<std::string>& ignore_read_list,
                               bool recursive_file_loading) {
@@ -448,7 +448,8 @@ int DataLoader::get_num_reads(std::filesystem::path data_path,
     return int(num_reads);
 }
 
-void DataLoader::load_read_channels(std::filesystem::path data_path, bool recursive_file_loading) {
+void DataLoader::load_read_channels(const std::filesystem::path& data_path,
+                                    bool recursive_file_loading) {
     auto iterate_directory = [&](const auto& iterator) {
         for (const auto& entry : iterator) {
             auto file_path = std::filesystem::path(entry);
@@ -508,7 +509,7 @@ void DataLoader::load_read_channels(std::filesystem::path data_path, bool recurs
                     // Store the read_id in the channel's list.
                     ReadID read_id;
                     std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
-                    channel_to_read_id[channel].push_back(std::move(read_id));
+                    channel_to_read_id[channel].push_back(read_id);
 
                     char read_id_tmp[POD5_READ_ID_LEN];
                     if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
@@ -533,7 +534,7 @@ void DataLoader::load_read_channels(std::filesystem::path data_path, bool recurs
 }
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
-        std::filesystem::path data_path,
+        const std::filesystem::path& data_path,
         std::string model_name,
         std::string modbase_model_names,
         bool recursive_file_loading) {
@@ -573,17 +574,18 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
                             spdlog::error("Failed to free run info");
                         }
 
-                        std::string id = run_id + "_" + model_name;
+                        std::string id = std::string(run_id).append("_").append(model_name);
                         read_groups[id] = ReadGroup{
-                                run_id,
+                                std::move(run_id),
                                 model_name,
                                 modbase_model_names,
-                                flowcell_id,
-                                device_id,
+                                std::move(flowcell_id),
+                                std::move(device_id),
                                 utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
-                                sample_id,
-                                position_id,
-                                experiment_id};
+                                std::move(sample_id),
+                                std::move(position_id),
+                                std::move(experiment_id),
+                        };
                     }
                     if (pod5_close_and_free_reader(file) != POD5_OK) {
                         spdlog::error("Failed to close and free POD5 reader");
@@ -598,7 +600,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
     return read_groups;
 }
 
-bool DataLoader::is_read_data_present(std::filesystem::path data_path,
+bool DataLoader::is_read_data_present(const std::filesystem::path& data_path,
                                       bool recursive_file_loading) {
     auto check_directory = [&](const auto& iterator) {
         for (const auto& entry : iterator) {
@@ -615,7 +617,8 @@ bool DataLoader::is_read_data_present(std::filesystem::path data_path,
     return check_directory(fetch_directory_entries(data_path, recursive_file_loading));
 }
 
-uint16_t DataLoader::get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading) {
+uint16_t DataLoader::get_sample_rate(const std::filesystem::path& data_path,
+                                     bool recursive_file_loading) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
     auto iterate_directory = [&](const auto& iterator) {
@@ -703,8 +706,9 @@ uint16_t DataLoader::get_sample_rate(std::filesystem::path data_path, bool recur
     }
 }
 
-std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistry(std::filesystem::path data_path,
-                                                                    bool recursive_file_loading) {
+std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
+        const std::filesystem::path& data_path,
+        bool recursive_file_loading) {
     std::set<models::ChemistryKey> chemistries;
 
     auto iterate_directory = [&](const auto& iterator) {
@@ -855,6 +859,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
         for (auto& v : futures) {
             auto read = v.get();
+            initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
@@ -914,6 +919,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
+            initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
@@ -1021,9 +1027,16 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
 
         if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=
                                     m_allowed_read_ids->end())) {
+            initialise_read(new_read->read_common);
             m_pipeline.push_message(std::move(new_read));
             m_loaded_read_count++;
         }
+    }
+}
+
+void DataLoader::initialise_read(ReadCommon& read_common) const {
+    for (const auto& initialiser : m_read_initialisers) {
+        initialiser(read_common);
     }
 }
 

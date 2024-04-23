@@ -17,7 +17,7 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     CFURLRef root_url = CFBundleCopyBundleURL(CFBundleGetMainBundle());
     if (!CFURLGetFileSystemRepresentation(
                 root_url, true, reinterpret_cast<unsigned char*>(raw_path), sizeof(raw_path))) {
-        std::cerr << "Failed to resolve bundle path." << std::endl;
+        std::cerr << "Failed to resolve bundle path.\n";
         exit(1);
     }
     CFRelease(root_url);
@@ -27,12 +27,12 @@ std::filesystem::path get_data_dir(const std::string& sub_dir) {
     const std::filesystem::path root_path("./tests/data/");
 #endif
 
-    const auto data_path = root_path / sub_dir;
+    // clang-tidy warns about performance-no-automatic-move if |data_path| is const. It should be treated as such though.
+    /*const*/ auto data_path = root_path / sub_dir;
     if (!std::filesystem::exists(data_path)) {
         std::cerr << "Datapath " << data_path
                   << " does not exist, exiting.\n"
-                     "Unit tests must be run from the root directory of the dorado checkout"
-                  << std::endl;
+                     "Unit tests must be run from the root directory of the dorado checkout\n";
         exit(1);
     }
     return data_path;

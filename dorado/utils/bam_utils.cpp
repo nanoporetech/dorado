@@ -153,7 +153,7 @@ void strip_alignment_data_from_header(sam_hdr_t* hdr) {
 bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
     auto get_pg_id = [](std::string& str) {
         size_t start_pos = str.find("ID:");
-        size_t end_pos = str.find("\t", start_pos);
+        size_t end_pos = str.find('\t', start_pos);
         return end_pos == std::string::npos ? str.substr(start_pos)
                                             : str.substr(start_pos, end_pos - start_pos);
     };
@@ -323,7 +323,7 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
     return counts;
 }
 
-std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string filename,
+std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
                                                             const std::vector<std::string>& keys) {
     std::map<std::string, std::string> pg_keys;
     auto file = hts_open(filename.c_str(), "r");
@@ -338,7 +338,10 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string fi
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
-            throw std::runtime_error("Required key " + k + " not found in header of " + filename);
+            throw std::runtime_error(std::string("Required key ")
+                                             .append(k)
+                                             .append(" not found in header of ")
+                                             .append(filename));
         }
         pg_keys[k] = std::string(val.s);
     }
@@ -535,20 +538,35 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     return cigar_str;
 }
 
+BamPtr new_unmapped_record(const BamPtr& record, std::string seq, std::vector<uint8_t> qual) {
+    bam1_t* input_record = record.get();
+    if (seq.empty()) {
+        seq = extract_sequence(input_record);
+        qual = extract_quality(input_record);
+    }
+    bam1_t* out_record = bam_init1();
+    bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
+             bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
+             0 /*n_cigar*/, nullptr /*cigar*/, -1 /*mtid*/, -1 /*mpos*/, 0 /*isize*/, seq.size(),
+             seq.data(), qual.empty() ? nullptr : (char*)qual.data(), bam_get_l_aux(input_record));
+    memcpy(bam_get_aux(out_record), bam_get_aux(input_record), bam_get_l_aux(input_record));
+    out_record->l_data += bam_get_l_aux(input_record);
+    remove_alignment_tags_from_record(out_record);
+    return BamPtr(out_record);
+}
+
 void remove_alignment_tags_from_record(bam1_t* record) {
     // Iterate through all tags and check against known set
     // of tags to remove.
-    static const std::set<std::pair<std::string, char>> tags_to_remove = {
-            {"SA", 'Z'}, {"NM", 'i'}, {"ms", 'i'}, {"AS", 'i'}, {"nn", 'i'}, {"ts", 'A'},
-            {"de", 'f'}, {"dv", 'f'}, {"tp", 'A'}, {"cm", 'i'}, {"s1", 'i'}, {"s2", 'i'},
-            {"MD", 'Z'}, {"zd", 'i'}, {"rl", 'i'}, {"bh", 'i'}};
+    static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "ts",
+                                                         "de", "dv", "tp", "cm", "s1", "s2",
+                                                         "MD", "zd", "rl", "bh"};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {
         auto tag_ptr = bam_aux_tag(aux_ptr);
         std::string tag = std::string(tag_ptr, tag_ptr + 2);
-        char type = bam_aux_type(aux_ptr);
-        if (tags_to_remove.find({tag, type}) != tags_to_remove.end()) {
+        if (tags_to_remove.find(tag) != tags_to_remove.end()) {
             aux_ptr = bam_aux_remove(record, aux_ptr);
         } else {
             aux_ptr = bam_aux_next(record, aux_ptr);

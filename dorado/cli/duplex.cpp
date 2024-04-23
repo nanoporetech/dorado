@@ -10,6 +10,7 @@
 #include "models/models.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/DuplexReadTaggingNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -18,6 +19,9 @@
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
+#if DORADO_CUDA_BUILD
+#include "utils/cuda_utils.h"
+#endif
 #include "utils/duplex_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
@@ -272,7 +276,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, alignment::dflt_options);
+    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
 
     std::set<fs::path> temp_model_paths;
@@ -327,7 +331,7 @@ int duplex(int argc, char* argv[]) {
                 spdlog::error(
                         "--emit-fastq cannot be used with --reference as FASTQ cannot store "
                         "alignment results.");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
             spdlog::info(
                     " - Note: FASTQ output is not recommended as not all data can be preserved.");
@@ -351,30 +355,34 @@ int duplex(int argc, char* argv[]) {
             num_reads = DataLoader::get_num_reads(reads, read_list, {}, recursive_file_loading);
             if (num_reads == 0) {
                 spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
         }
         spdlog::debug("> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());
-        cli::add_pg_hdr(hdr.get(), args);
+        cli::add_pg_hdr(hdr.get(), args, device);
 
         constexpr int WRITER_THREADS = 4;
-        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS);
+        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS, false);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
+        std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+        gpu_names = utils::get_cuda_gpu_names(device);
+#endif
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments(parser, alignment::dflt_options);
+            auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -399,10 +407,15 @@ int duplex(int argc, char* argv[]) {
 
         constexpr auto kStatsPeriod = 100ms;
 
+        auto default_client_info = std::make_shared<DefaultClientInfo>();
+        auto client_info_init_func = [default_client_info](ReadCommon& read) {
+            read.client_info = default_client_info;
+        };
+
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
                 spdlog::error("The --pairs argument is required for the basespace model.");
-                return 1;  // Exit with an error code
+                return EXIT_FAILURE;  // Exit with an error code
             }
 
             if (!mod_bases.empty() || !mod_bases_models.empty()) {
@@ -412,6 +425,10 @@ int duplex(int argc, char* argv[]) {
 
             spdlog::info("> Loading reads");
             auto read_map = read_bam(reads, read_list_from_pairs);
+
+            for (auto& [key, read] : read_map) {
+                client_info_init_func(read->read_common);
+            }
 
             spdlog::info("> Starting Basespace Duplex Pipeline");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -423,11 +440,11 @@ int duplex(int argc, char* argv[]) {
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
 
             // Write header as no read group info is needed.
-            hts_file.set_and_write_header(hdr.get());
+            hts_file.set_header(hdr.get());
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -521,7 +538,7 @@ int duplex(int argc, char* argv[]) {
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
                 spdlog::error("Failed to create pipeline");
-                std::exit(EXIT_FAILURE);
+                return EXIT_FAILURE;
             }
 
             // At present, header output file header writing relies on direct node method calls
@@ -531,9 +548,10 @@ int duplex(int argc, char* argv[]) {
                         dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_file.set_and_write_header(hdr.get());
+            hts_file.set_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
+            loader.add_read_initialiser(client_info_init_func);
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -555,11 +573,9 @@ int duplex(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         tracker.set_description("Sorting output files");
-        hts_file.finalise(
-                [&](size_t progress) {
-                    tracker.update_post_processing_progress(static_cast<float>(progress));
-                },
-                WRITER_THREADS);
+        hts_file.finalise([&](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
 
         tracker.summarize();
         if (!dump_stats_file.empty()) {
@@ -572,8 +588,8 @@ int duplex(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         utils::clean_temporary_models(temp_model_paths);
         spdlog::error(e.what());
-        return 1;
+        return EXIT_FAILURE;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 }  // namespace dorado

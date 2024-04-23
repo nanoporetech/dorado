@@ -35,7 +35,7 @@ int summary(int argc, char *argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     if (parser.get<bool>("--verbose")) {
@@ -49,7 +49,7 @@ int summary(int argc, char *argv[]) {
     summary.set_separator(separator[0]);
     summary.process_file(reads, std::cout);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

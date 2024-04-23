@@ -93,6 +93,7 @@ std::string to_string(const ModsVariant& variant) {
 
 std::string to_string(const std::set<ModelVariant>& variants, const std::string& separator) {
     std::vector<std::string> strings;
+    strings.reserve(variants.size());
     for (const auto& variant : variants) {
         strings.push_back(to_string(variant, "model variant", model_variants_map()));
     }

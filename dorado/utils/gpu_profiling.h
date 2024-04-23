@@ -47,7 +47,7 @@ private:
         handle_cuda_result(cudaEventDestroy(m_start));
         handle_cuda_result(cudaEventDestroy(stop));
         std::cerr << std::string(m_detail_level - 1, '\t') << "[" << m_label << " " << timeMs
-                  << " ms]" << std::endl;
+                  << " ms]\n";
         m_active = false;
     }
 

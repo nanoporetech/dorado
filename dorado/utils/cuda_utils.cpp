@@ -135,10 +135,13 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
-                                             "\" from device string " + device_string +
-                                             ", there are " + std::to_string(num_devices) +
-                                             " visible CUDA devices.");
+                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
+                                                     .append(device_id)
+                                                     .append("\" from device string ")
+                                                     .append(device_string)
+                                                     .append(", there are ")
+                                                     .append(std::to_string(num_devices))
+                                                     .append(" visible CUDA devices."));
                 }
                 devices.push_back("cuda:" + device_id);
             }
@@ -149,7 +152,7 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
+std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused) {
     std::vector<CUDADeviceInfo> results;
     std::regex e("[0-9]+");
     std::smatch m;
@@ -173,10 +176,13 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
                 std::string device_id = x.str();
                 int device_idx = std::stoi(device_id);
                 if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error("Invalid CUDA device index \"" + device_id +
-                                             "\" from device string " + device_string +
-                                             ", there are " + std::to_string(num_devices) +
-                                             " visible CUDA devices.");
+                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
+                                                     .append(device_id)
+                                                     .append("\" from device string ")
+                                                     .append(device_string)
+                                                     .append(", there are ")
+                                                     .append(std::to_string(num_devices))
+                                                     .append(" visible CUDA devices."));
                 }
                 device_ids.insert(device_idx);
             }
@@ -188,6 +194,10 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
     for (int device_id = 0; device_id < int(num_devices); device_id++) {
         CUDADeviceInfo device_info;
         device_info.device_id = device_id;
+        device_info.in_use = device_ids.find(device_id) != device_ids.end();
+        if (!include_unused && !device_info.in_use) {
+            continue;
+        }
 
         cudaSetDevice(device_id);
         cudaMemGetInfo(&device_info.free_mem, &device_info.total_mem);
@@ -197,12 +207,33 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string) {
                                device_id);
         cudaGetDeviceProperties(&device_info.device_properties, device_id);
 
-        device_info.in_use = device_ids.find(device_id) != device_ids.end();
-
+        if (!device_info.in_use) {
+            cudaDeviceReset();
+        }
         results.push_back(device_info);
     }
 
     return results;
+}
+
+std::string get_cuda_gpu_names(std::string device_string) {
+    auto dev_info =
+            utils::get_cuda_device_info(std::move(device_string), false);  // ignore unused GPUs
+    std::set<std::string> gpu_strs;
+    std::string gpu_names;
+
+    for (const auto &dev : dev_info) {
+        gpu_strs.insert(dev.device_properties.name);
+    }
+
+    for (const auto &gpu_id : gpu_strs) {
+        if (!gpu_names.empty()) {
+            gpu_names += "|";
+        }
+        gpu_names += gpu_id;
+    }
+
+    return gpu_names;
 }
 
 std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
@@ -226,7 +257,7 @@ void print_cuda_alloc_info(const std::string &label) {
     print_stat_array(stats.reserved_bytes, "Rs");
     print_stat_array(stats.active_bytes, "Act");
     print_stat_array(stats.inactive_split_bytes, "In");
-    std::cerr << std::endl;
+    std::cerr << '\n' << std::flush;
 }
 
 // Note that in general the torch caching allocator may be consuming

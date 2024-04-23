@@ -73,7 +73,7 @@ NamedStats from_obj(const T& obj) {
     const auto prefix = obj.get_name();
     const auto obj_stats = obj.sample_stats();
     for (const auto& [name, value] : obj_stats) {
-        prefixed_stats[prefix + "." + name] = value;
+        prefixed_stats[std::string(prefix).append(".").append(name)] = value;
     }
     return prefixed_stats;
 }

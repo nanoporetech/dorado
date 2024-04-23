@@ -83,14 +83,32 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // get query name.
     std::string_view qname(bam_get_qname(irecord));
 
-    // get the sequence to map from the record
-    std::string seq = utils::extract_sequence(irecord);
-    // Pre-generate reverse complement sequence.
-    std::string seq_rev = utils::reverse_complement(seq);
+    std::string seq;
+    std::string seq_rev;
+    std::vector<uint8_t> qual;
+    std::vector<uint8_t> qual_rev;
 
-    // Pre-generate reverse of quality string.
-    std::vector<uint8_t> qual = utils::extract_quality(irecord);
-    std::vector<uint8_t> qual_rev(qual.rbegin(), qual.rend());
+    // If the record is an already aligned record, the strand
+    // orientation needs to be fetched so the original
+    // read orientation can be recovered.
+    bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
+
+    if (is_input_reversed) {
+        seq_rev = utils::extract_sequence(irecord);
+        qual_rev = utils::extract_quality(irecord);
+
+        seq = utils::reverse_complement(seq_rev);
+        qual = std::vector<uint8_t>(qual_rev.rbegin(), qual_rev.rend());
+    } else {
+        // get the sequence to map from the record
+        seq = utils::extract_sequence(irecord);
+        // Pre-generate reverse complement sequence.
+        seq_rev = utils::reverse_complement(seq);
+
+        // Pre-generate reverse of quality string.
+        qual = utils::extract_quality(irecord);
+        qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
+    }
 
     // do the mapping
     int hits = 0;
@@ -204,13 +222,6 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         bam1_t* record = bam_init1();
 
         // Set properties of the BAM record.
-        // NOTE: Passing bam_get_qname(irecord) + l_qname into bam_set1
-        // was causing the generated string to have some extra
-        // null characters. Not sure why yet. Using string_view
-        // resolved that issue, which is okay to use since it doesn't
-        // copy any data and we know the underlying string is null
-        // terminated.
-        // TODO: See if bam_get_qname(irecord) usage can be fixed.
         bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
                  cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
                  irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));

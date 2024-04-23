@@ -151,7 +151,7 @@ bool SummaryData::write_rows_from_reader(
 
         auto rg_value = reader.get_tag<std::string>("RG");
         if (rg_value.length() > 0) {
-            auto rg_split = rg_value.find("_");
+            auto rg_split = rg_value.find('_');
             run_id = rg_value.substr(0, rg_split);
             model = rg_value.substr(rg_split + 1, rg_value.length());
         }

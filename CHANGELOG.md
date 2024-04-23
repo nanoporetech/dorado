@@ -2,6 +2,79 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.6.0] (1 April 2024)
+
+This release of Dorado improves performance for short read basecalling and RBK barcode classification rates, introduces sorted and indexed BAM generation in Dorado aligner and demux, and updates the minimap2 version and default mapping preset. It also adds GPU information to the output BAM or FASTQ and includes several other improvements and bug fixes.
+
+## New feature highlights
+
+1. `--emit-summary` option to generate summary files from `dorado demux` and `dorado aligner`.
+2. Support for loading inputs from/saving outputs to a folder for`dorado demux` and `dorado aligner`
+3. `--bed-file` option in `dorado aligner` to capture alignments hits in specific intervals of the reference. Hits per read stored in the `bh:i` tag.
+4. `--sort-bam` option in `dorado demux` to output sorted reads when input is sorted and barcodes are not trimmed.
+
+## Changes to default behavior
+
+1. Default mapping preset for `dorado aligner` updated to `lr:hq`.
+2. `dorado trim` and `dorado demux` now output unaligned records by default (i.e. all alignment information such as tags and headers removed).
+
+## Backwards incompatible changes
+
+1. New scoring parameters for barcode classification to support an updated classification algorithm. Older scoring config files will no longer be compatible.
+
+## All key changes
+
+* dc22d7f21215082796e972760db68cbaa3faf242 - Update method for barcode classification
+* e65eaf4d4dee3d85d5eee007013c9a8815f4aaa2 - Improve basecalling speed on short reads
+* f0b829d5eb5e1e56b96d6d8a7749445fa3d0f4d2 - Emit sorted, indexed BAM files from `dorado demux` and `dorado aligner`
+* 913f062d6efac4e661bea0142c644331a01a5c29 - Add DS:gpu information to output FASTQ and SAM/BAM files
+* c4598901d764f073a18232f02039a618d1d94d3c - Added support for `demux` and `aligner` reading from a folder and a `--recursive` option
+* d994a4d5232226ddac68eac60a14de5db087cf5c - Add `--emit-summary` option to `dorado demux` and `dorado aligner`
+* 246b9b995360a384e1b122a7ef477f43acc29843 - Add `--bed-file` argument to `dorado aligner`
+* f6b65540d1edfc84f06fda3a751ccae8d96dcfba - Add `--sort-bam` option to `dorado demux`
+* 9b49ae5e2be1df596c0aaed821c63dfb0add5a9c - Update to minimap2-2.27 and use `lr:hq` as default mapping preset
+* a0f9462761df979540826d4725a2414a68db9503 - Add `RG` and `st` tags to FASTQ for consistency with BAM
+* ae47155115e5f22475f424e8da3553312315cf53 - Calculate mean Q-score for RNA on bases after the poly(A)
+* 3cf15fa02edd65d036cd830970719cb15d8c7e99 - Trimming rapid adapter from raw signal
+* b40d0015618d3ef355445d35ea7a1ebeb2029101 - Improve read splitting for RBK
+* 9d3af872b2aa4ddda4044c8a52113b765abd0701 - Trim low-quality data from reads with end reason mux_change or unblock_mux_change
+* ec106d65eed2592683a8d30f936318721369b427 - Improve performance of calling modified bases on NVIDIA GPUs
+* 77c55999499f72ff56fdfa792745dd0b1b0d00bd - Improve Apple silicon auto batch sizing
+* b4fdb2453b8719f36eb2f99ce5814a110f7b300f - Fix bug with `MM/ML` tags not updating correctly with `dorado trim`
+* bacd354210f74373946a0f4d248162bb22e88063 - Remove invalidated tags if running `dorado demux` or `dorado trim` on aligned BAM
+* b6077db36f18947c27cfba1d2d3b95bca3a014a7 - Fix bug with modbase model auto detection on `@v0`
+* ba0d70862f1b861b996244d83d7f547da9845d59 - Ensure `ts` set to zero if `--no-trim` or `--estimate-poly-a` enabled
+* 12c5a3e23dff454f28a6c27ce24afbba62414e72 - Fix duplicate SQ lines in header of aligned BAM
+* 9dc052dce52014aa7c2eaaf4c57eab290974194d - Ensure read group header lines include custom barcodes
+* e8fb085897feeda7dd101b201f856d64e33b125c - Skip barcode trimming when running poly(A) estimation
+* bbe6ad6964944158236a369f4e723c7e5f21330f - Handle issues related to user locale
+* bdc05e37dd6eea975615d37f246c1529fa8144c7 - Fix bug using simplex-only model complex and `--modified-bases{-models}` arguments
+* b31e5c88b71913ae9f6900fdd2938ae58e84ead6 - Fix resume loading for split reads
+* 2919fe0b1ded1bce64ee66534e13d7fbf06ccb96 - Fix bug with custom barcode arrangements
+* 98763daba089be12708479ade687c8146f2ca245 - Fix bug when aligner writing to stdout
+* 74b4b536f621ec31d795f4559c9fdd205fd71fc7 - Fix regression with calling modified bases on macOS
+* 392900332620a21da1b6e86f264c0459b163511c - Perform an allocation-less matmul when using torch
+* 6f283a5f6876df767b09ee4c4ec4d6e268731b9d - Prevent CUDA OOM due to small allocations
+* 0fa2c2f7f964942287548ecc3afc439a9c530b5c - Fix Cuda OOM during batch size calculation
+* 7506d44333d980e2d381a4731608fe3137354975 - Add support for additional barcodes
+* 13ba5af85aecfd7c651b249a127cf1b3243c1aec - Add deprecation warning for FAST5
+* b5dc9f846bbc6f487a1f971824690c3a0f5fe3e4 - Update to Koi v0.4.5
+* c9c5ad0ea395bd528c99680daa73208df4b09165 - Update to POD5 v0.2.4
+* 901f700e00c76158a11aa4fa34425c107fa15a18 - Improve error reporting when the device string is invalid for CUDA devices
+* e3442ec2633238ca6bfd073c9e817b6b6c14728c - Log errors reported by Metal and enable warnings
+* e61cfe4ac28be6e06ea42721eeee2e7693527638 - Output Dorado commandline arguments in logs
+* de59f33492f75ecb6777b372c9f0a0382a65a768 - Move default download path for third-party libraries into the build folder
+* d7defcc424f566ff3a8de193262da0531cdd4fe5 - Log a warning message if running on Apple Silicon with less than 16GB RAM
+* 8dfd180d526bf426624d2129bf1a495d1e1d43dc - Consolidate pipeline node input thread handling
+* 401882331baf86d7a3e4b8e5a018389a8363cfbb - Update DEV.md to install the correct package
+
+# [0.5.3] (06 Feb 2024)
+
+This release of Dorado fixes a bug causing low Poly(A) estimation rates in RNA.
+
+* 59a083c9d9ee359049fc30ea4ca9ec4aacb84fe7 - Fix RNA Poly(A) tail estimated in the absence of adapter trimming.
+* f0f98838156fe45c51a3e39795ee45248e045100 - Clarify `ns` tag in Dorado SAM spec.
+
 # [0.5.2] (18 Jan 2024)
 
 This release of Dorado fixes a bug causing malformed CIGAR strings, prevents crashing when calling modifications with duplex, and improves adapter and primer trimming support.

@@ -18,7 +18,10 @@ TEST_CASE(TEST_GROUP ": InputsMatchOutputs") {
     AsyncQueue<int> queue(n);
 
     for (int i = 0; i < n; ++i) {
-        const auto status = queue.try_push(std::move(i));
+        // clang-tidy don't like us reusing a moved-from variable even if it's trivial,
+        // so store to a temporary that's not used again after it's moved.
+        int ii = i;
+        const auto status = queue.try_push(std::move(ii));
         REQUIRE(status == AsyncQueueStatus::Success);
     }
     for (int i = 0; i < n; ++i) {
@@ -113,7 +116,10 @@ TEST_CASE(TEST_GROUP ": process_and_pop_n") {
     const int n = 10;
     AsyncQueue<int> queue(n);
     for (int i = 0; i < n; ++i) {
-        const auto status = queue.try_push(std::move(i));
+        // clang-tidy don't like us reusing a moved-from variable even if it's trivial,
+        // so store to a temporary that's not used again after it's moved.
+        int ii = i;
+        const auto status = queue.try_push(std::move(ii));
         REQUIRE(status == AsyncQueueStatus::Success);
     }
 

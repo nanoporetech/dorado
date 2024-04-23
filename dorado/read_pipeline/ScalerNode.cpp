@@ -147,6 +147,8 @@ void ScalerNode::input_thread_fn() {
                 // If RNA adapter isn't trimmed, track where the adapter signal is ending
                 // so it can be used during polyA estimation.
                 read->read_common.rna_adapter_end_signal_pos = trim_start;
+                // Since we're not actualy trimming the signal, reset the trim value to 0.
+                trim_start = 0;
             }
         }
 
@@ -196,10 +198,13 @@ void ScalerNode::input_thread_fn() {
             read->read_common.scale = scale;
             read->read_common.shift = shift;
         } else {
+            // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
+            auto scaling_data = read->read_common.raw_data.index(
+                    {Slice(read->read_common.rna_adapter_end_signal_pos, at::indexing::None)});
             std::tie(shift, scale) =
                     m_scaling_params.strategy == ScalingStrategy::QUANTILE
-                            ? normalisation(m_scaling_params.quantile, read->read_common.raw_data)
-                            : med_mad(read->read_common.raw_data);
+                            ? normalisation(m_scaling_params.quantile, scaling_data)
+                            : med_mad(scaling_data);
 
             // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
             // shifting/scaling in float32 form.

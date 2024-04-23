@@ -34,6 +34,10 @@ public:
 
     int32_t client_id() const override { return 1; }
 
+    const dorado::poly_tail::PolyTailCalculator* poly_a_calculator() const override {
+        return nullptr;
+    };
+
     const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
 
     bool is_disconnected() const override { return false; }
@@ -155,7 +159,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
 }
@@ -191,14 +195,13 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli", "bhi"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
     auto bh_tag_ptr = bam_aux_get(rec, "bh");
-    auto bh_tag_type = *(char*)bh_tag_ptr;
+    auto bh_tag_type = bam_aux_type(bh_tag_ptr);
     CHECK(bh_tag_type == 'i');
-    int32_t bh_tag_value = 0;
-    memcpy(&bh_tag_value, bh_tag_ptr + 1, 4);
+    auto bh_tag_value = bam_aux2i(bh_tag_ptr);
     CHECK(bh_tag_value == 3);
 }
 
@@ -295,7 +298,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     uint32_t l_aux = bam_get_l_aux(rec);
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"RGZ", "MMZ", "MLB"};
-    for (auto tag : tags) {
+    for (const auto& tag : tags) {
         CHECK_THAT(aux, Contains(tag));
     }
 }
@@ -322,7 +325,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     bam1_t* supplementary_rec = bam_records[2].get();
 
     // Check aux tags.
-    if (options.soft_clipping) {
+    if (*options.soft_clipping) {
         CHECK(bam_aux_get(primary_rec, "MM") != nullptr);
         CHECK(bam_aux_get(primary_rec, "ML") != nullptr);
         CHECK(bam_aux_get(primary_rec, "MN") != nullptr);
@@ -499,7 +502,7 @@ std::pair<std::string, std::string> get_read_id_and_sequence_from_fasta(
     CHECK(!line.empty());
     CHECK(dorado::utils::starts_with(line, ">"));
     line = line.substr(1);
-    auto read_id = line.substr(0, line.find_first_of(" "));
+    auto read_id = line.substr(0, line.find_first_of(' '));
 
     std::string sequence;
     while (std::getline(query_input_stream, sequence)) {
@@ -600,7 +603,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Check aux tags.
     CHECK_THAT(bam_aux2Z(bam_aux_get(primary_rec, "SA")), Equals("read2,1,+,999S899M,60,0;"));
-    if (options.soft_clipping) {
+    if (*options.soft_clipping) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(secondary_rec, "SA")),
                    Equals("read3,1,+,999M899S,0,0;read2,1,+,999S899M,60,0;"));
     } else {

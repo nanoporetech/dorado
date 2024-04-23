@@ -30,8 +30,13 @@ struct CUDADeviceInfo {
 };
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of CUDADeviceInfo for all
-// visible devices on the host machine, with information on whether they are in use or not.
-std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string);
+// visible devices on the host machine, with information on whether they are in use or not
+// Set include_unused to true to skip unused devices
+std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused);
+
+// Given a string representing cuda devices (e.g "cuda:0,1,3") returns a string containing
+// the set of types of gpu that will be used.
+std::string get_cuda_gpu_names(std::string device_string);
 
 // Reports the amount of available memory (in bytes) for a given device.
 size_t available_memory(torch::Device device);

@@ -6,6 +6,7 @@
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ModBaseCallerNode.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -64,6 +65,7 @@ protected:
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read->read_common.attributes.fast5_filename = "test.fast5";
+        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
         return read;
     }
 
@@ -118,10 +120,10 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
 
 // Not introduced until catch2 3.3.0
 #ifndef SKIP
-#define SKIP(msg)                                           \
-    do {                                                    \
-        std::cerr << "Skipping test: " << msg << std::endl; \
-        return;                                             \
+#define SKIP(msg)                                      \
+    do {                                               \
+        std::cerr << "Skipping test: " << msg << '\n'; \
+        return;                                        \
     } while (false)
 #endif
 
@@ -375,13 +377,15 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    set_read_mutator([](dorado::SimplexReadPtr& read) {
+    set_read_mutator([is_rna](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
+        dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
+        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
     });
 
-    run_smoke_test<dorado::PolyACalculatorNode>(8, is_rna, 1000, nullptr);
+    run_smoke_test<dorado::PolyACalculatorNode>(8, 1000);
 }
 
 }  // namespace

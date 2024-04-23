@@ -1,6 +1,5 @@
 #pragma once
 
-#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
@@ -14,10 +13,7 @@ namespace dorado {
 
 class PolyACalculatorNode : public MessageSink {
 public:
-    PolyACalculatorNode(size_t num_worker_threads,
-                        bool is_rna,
-                        size_t max_reads,
-                        const std::string *const config_file);
+    PolyACalculatorNode(size_t num_worker_threads, size_t max_reads);
     ~PolyACalculatorNode() { terminate_impl(); }
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;
@@ -34,8 +30,6 @@ private:
 
     std::mutex m_mutex;
     std::map<int, int> tail_length_counts;
-
-    std::unique_ptr<poly_tail::PolyTailCalculator> m_calculator;
 };
 
 }  // namespace dorado

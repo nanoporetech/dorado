@@ -30,11 +30,11 @@ protected:
     void generate_bam(HtsFile::OutputMode mode, int num_threads) {
         HtsReader reader(m_in_sam.string(), std::nullopt);
 
-        utils::HtsFile hts_file(m_out_bam.string(), mode, num_threads);
-        hts_file.set_and_write_header(reader.header);
+        utils::HtsFile hts_file(m_out_bam.string(), mode, num_threads, false);
+        hts_file.set_header(reader.header);
 
         PipelineDescriptor pipeline_desc;
-        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file);
+        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
@@ -43,7 +43,7 @@ protected:
         auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
         stats = writer_ref.sample_stats();
 
-        hts_file.finalise([](size_t) { /* noop */ }, num_threads);
+        hts_file.finalise([](size_t) { /* noop */ });
     }
 
     stats::NamedStats stats;
@@ -87,8 +87,8 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     HtsReader reader(input_fastq.string(), std::nullopt);
     {
         // Write with tags into temporary folder.
-        utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2);
-        HtsWriter writer(hts_file);
+        utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2, false);
+        HtsWriter writer(hts_file, "");
         reader.read();
         CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "RG")),
                    Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."
@@ -96,7 +96,7 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(reader.record.get(), "st")),
                    Equals("2023-06-22T07:17:48.308+00:00"));
         writer.write(reader.record.get());
-        hts_file.finalise([](size_t) { /* noop */ }, 2);
+        hts_file.finalise([](size_t) { /* noop */ });
     }
 
     // Read temporary file to make sure tags were correctly set.

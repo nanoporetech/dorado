@@ -33,33 +33,36 @@ IndexReaderPtr create_index_reader(const std::string& index_file,
 namespace dorado::alignment {
 
 void Minimap2Index::set_index_options(const Minimap2IndexOptions& index_options) {
-    m_index_options->k = index_options.kmer_size;
-    m_index_options->w = index_options.window_size;
+    m_index_options->k = index_options.kmer_size.value_or(m_index_options->k);
+    m_index_options->w = index_options.window_size.value_or(m_index_options->w);
     spdlog::trace("> Index parameters input by user: kmer size={} and window size={}.",
                   m_index_options->k, m_index_options->w);
 
-    m_index_options->batch_size = index_options.index_batch_size;
-    m_index_options->mini_batch_size = index_options.index_batch_size;
+    //if not specified override the preset value of 8000000000 with 16000000000
+    m_index_options->batch_size = index_options.index_batch_size.value_or(16000000000);
+    m_index_options->mini_batch_size = m_index_options->batch_size;
     spdlog::trace("> Index parameters input by user: batch size={} and mini batch size={}.",
                   m_index_options->batch_size, m_index_options->mini_batch_size);
 }
 
 void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_options) {
-    m_mapping_options->bw = mapping_options.bandwidth;
-    m_mapping_options->bw_long = mapping_options.bandwidth_long;
-    spdlog::trace("> Map parameters input by user: bandwidth={} and bandwidth long={}.",
-                  m_mapping_options->bw, m_mapping_options->bw_long);
+    m_mapping_options->bw = mapping_options.bandwidth.value_or(m_mapping_options->bw);
+    m_mapping_options->bw_long =
+            mapping_options.bandwidth_long.value_or(m_mapping_options->bw_long);
+    spdlog::trace("> Map parameters: bandwidth={} and bandwidth long={}.", m_mapping_options->bw,
+                  m_mapping_options->bw_long);
 
-    if (!mapping_options.print_secondary) {
+    if (!mapping_options.print_secondary.value_or(true)) {
         m_mapping_options->flag |= MM_F_NO_PRINT_2ND;
     }
-    m_mapping_options->best_n = mapping_options.best_n_secondary;
+    m_mapping_options->best_n =
+            mapping_options.best_n_secondary.value_or(m_mapping_options->best_n);
     spdlog::trace(
             "> Map parameters input by user: don't print secondary={} and best n secondary={}.",
             static_cast<bool>(m_mapping_options->flag & MM_F_NO_PRINT_2ND),
             m_mapping_options->best_n);
 
-    if (mapping_options.soft_clipping) {
+    if (mapping_options.soft_clipping.value_or(false)) {
         m_mapping_options->flag |= MM_F_SOFTCLIP;
     }
     if (mapping_options.secondary_seq) {
@@ -71,6 +74,10 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
+
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    m_mapping_options->cap_kalloc = 100'000'000;
+    m_mapping_options->max_sw_mat = 50'000'000;
 }
 
 bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -44,22 +45,25 @@ public:
                     ReadOrder traversal_order);
 
     static std::unordered_map<std::string, ReadGroup> load_read_groups(
-            std::filesystem::path data_path,
+            const std::filesystem::path& data_path,
             std::string model_name,
             std::string modbase_model_names,
             bool recursive_file_loading);
 
-    static int get_num_reads(std::filesystem::path data_path,
+    static int get_num_reads(const std::filesystem::path& data_path,
                              std::optional<std::unordered_set<std::string>> read_list,
                              const std::unordered_set<std::string>& ignore_read_list,
                              bool recursive_file_loading);
 
-    static bool is_read_data_present(std::filesystem::path data_path, bool recursive_file_loading);
+    static bool is_read_data_present(const std::filesystem::path& data_path,
+                                     bool recursive_file_loading);
 
-    static uint16_t get_sample_rate(std::filesystem::path data_path, bool recursive_file_loading);
+    static uint16_t get_sample_rate(const std::filesystem::path& data_path,
+                                    bool recursive_file_loading);
 
-    static std::set<models::ChemistryKey> get_sequencing_chemistry(std::filesystem::path data_path,
-                                                                   bool recursive_file_loading);
+    static std::set<models::ChemistryKey> get_sequencing_chemistry(
+            const std::filesystem::path& data_path,
+            bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
@@ -70,12 +74,19 @@ public:
         uint32_t read_number;
     };
 
+    using ReadInitialiserF = std::function<void(ReadCommon&)>;
+    void add_read_initialiser(ReadInitialiserF func) {
+        m_read_initialisers.push_back(std::move(func));
+    }
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
-    void load_read_channels(std::filesystem::path data_path, bool recursive_file_loading);
+    void load_read_channels(const std::filesystem::path& data_path, bool recursive_file_loading);
+
+    void initialise_read(ReadCommon& read) const;
 
     Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
@@ -90,8 +101,10 @@ private:
     std::unordered_map<std::string, size_t> m_read_id_to_index;
     int m_max_channel{0};
 
+    std::vector<ReadInitialiserF> m_read_initialisers;
+
     // Issue warnings if read is potentially problematic
-    inline void check_read(const SimplexReadPtr& read);
+    void check_read(const SimplexReadPtr& read);
     // A flag to warn only once if the data chemsitry is known
     std::atomic<bool> m_log_unknown_chemistry{true};
 };

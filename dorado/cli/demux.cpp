@@ -107,7 +107,15 @@ int demuxer(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--no-trim")
-            .help("Skip barcode trimming. If option is not chosen, trimming is enabled.")
+            .help("Skip barcode trimming. If this option is not chosen, trimming is enabled. "
+                  "Note that you should use this option if your input data is mapped and you "
+                  "want to preserve the mapping in the output files, as trimming will result "
+                  "in any mapping information from the input file(s) being discarded.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.visible.add_argument("--sort-bam")
+            .help("Sort any BAM output files that contain mapped reads. Using this option "
+                  "requires that the --no-trim option is also set.")
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--barcode-arrangement")
@@ -121,7 +129,7 @@ int demuxer(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(1);
+        return EXIT_FAILURE;
     }
 
     if ((parser.visible.is_used("--no-classify") && parser.visible.is_used("--kit-name")) ||
@@ -130,7 +138,14 @@ int demuxer(int argc, char* argv[]) {
         spdlog::error(
                 "Please specify either --no-classify or --kit-name or pass a custom barcode "
                 "arrangement with --barcode-arrangement to use the demux tool.");
-        std::exit(1);
+        return EXIT_FAILURE;
+    }
+
+    auto no_trim(parser.visible.get<bool>("--no-trim"));
+    auto sort_bam(parser.visible.get<bool>("--sort-bam"));
+    if (sort_bam && !no_trim) {
+        spdlog::error("If --sort-bam is specified then --no-trim must also be specified.");
+        return EXIT_FAILURE;
     }
 
     auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
@@ -146,7 +161,6 @@ int demuxer(int argc, char* argv[]) {
     auto emit_summary = parser.visible.get<bool>("emit-summary");
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto no_trim(parser.visible.get<bool>("--no-trim"));
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -179,8 +193,8 @@ int demuxer(int argc, char* argv[]) {
     if (reads.empty()) {
 #ifndef _WIN32
         if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << std::endl;
-            return 1;
+            std::cout << parser.visible << '\n';
+            return EXIT_FAILURE;
         }
 #endif
     }
@@ -194,7 +208,7 @@ int demuxer(int argc, char* argv[]) {
         std::string error_msg;
         if (!utils::sam_hdr_merge(header.get(), header_reader.header, error_msg)) {
             spdlog::error("Unable to combine headers from all input files: " + error_msg);
-            std::exit(EXIT_FAILURE);
+            return EXIT_FAILURE;
         }
     }
 
@@ -216,7 +230,7 @@ int demuxer(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet));
+            std::move(sample_sheet), sort_bam);
 
     if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
         std::vector<std::string> kit_names;
@@ -234,7 +248,7 @@ int demuxer(int argc, char* argv[]) {
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // At present, header output file header writing relies on direct node method calls
@@ -245,6 +259,9 @@ int demuxer(int argc, char* argv[]) {
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(0, false, 1.f);
+    if (progress_stats_frequency > 0) {
+        tracker.disable_progress_reporting();
+    }
     tracker.set_description("Demuxing");
 
     // Set up stats counting
@@ -255,6 +272,9 @@ int demuxer(int argc, char* argv[]) {
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::single_collector);
+    progress_stats.set_post_processing_percentage(0.4f);
+    progress_stats.start();
+
     stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
         progress_stats.update_stats(stats);
     });
@@ -284,15 +304,16 @@ int demuxer(int argc, char* argv[]) {
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
+    progress_stats.notify_stats_collector_completed(final_stats);
 
     // Finalise the files that were created.
     tracker.set_description("Sorting output files");
     demux_writer_ref.finalise_hts_files([&](size_t progress) {
         tracker.update_post_processing_progress(static_cast<float>(progress));
+        progress_stats.update_post_processing_progress(static_cast<float>(progress));
     });
 
     tracker.summarize();
-    progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();
 
     spdlog::info("> finished barcode demuxing");
@@ -305,7 +326,7 @@ int demuxer(int argc, char* argv[]) {
         spdlog::info("> summary file complete.");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 }  // namespace dorado

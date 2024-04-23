@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "splitter/RNAReadSplitter.h"
 
@@ -23,26 +24,24 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-08-11T02:56:14.296+00:00";
     read->read_common.attributes.num_samples = 10494;
+    read->read_common.scaling_method = "test";
 
     const auto signal_path = std::filesystem::path(get_data_dir("rna_split")) / "signal.tensor";
     torch::load(read->read_common.raw_data, signal_path.string());
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     dorado::splitter::RNASplitSettings splitter_settings;
     dorado::splitter::RNAReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
-    CHECK(split_res.size() == 2);
+    REQUIRE(split_res.size() == 2);
 
-    std::vector<uint64_t> num_samples;
-    for (auto &r : split_res) {
-        num_samples.push_back(r->read_common.attributes.num_samples);
-    }
-    CHECK(num_samples == std::vector<uint64_t>{4833, 5657});
+    CHECK(split_res[0]->read_common.attributes.num_samples == 4833);
+    CHECK(split_res[0]->read_common.split_point == 0);
+    CHECK(split_res[0]->read_common.scaling_method == "test");
 
-    std::vector<uint32_t> split_points;
-    for (auto &r : split_res) {
-        split_points.push_back(r->read_common.split_point);
-    }
-    CHECK(split_points == std::vector<uint32_t>{0, 4837});
+    CHECK(split_res[1]->read_common.attributes.num_samples == 5657);
+    CHECK(split_res[1]->read_common.split_point == 4837);
+    CHECK(split_res[1]->read_common.scaling_method == "test");
 }

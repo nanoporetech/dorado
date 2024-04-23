@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/ReadSplitNode.h"
@@ -49,6 +50,7 @@ auto make_read() {
     torch::load(read->read_common.raw_data, DataPath("raw.tensor").string());
     read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     read->prev_read = "prev";
     read->next_read = "next";
@@ -64,62 +66,45 @@ TEST_CASE("4 subread splitting test", TEST_GROUP) {
             dorado::splitter::DuplexSplitSettings(false));
 
     const auto split_res = splitter_node.split(std::move(read));
-    CHECK(split_res.size() == 4);
-    std::vector<int> split_sizes;
-    for (auto &r : split_res) {
-        split_sizes.push_back(int(r->read_common.seq.size()));
-    }
-    CHECK(split_sizes == std::vector<int>{6858, 7854, 5185, 5168});
+    REQUIRE(split_res.size() == 4);
 
-    std::vector<std::string> start_times;
-    for (auto &r : split_res) {
-        start_times.push_back(r->read_common.attributes.start_time);
-    }
-    CHECK(start_times == std::vector<std::string>{
-                                 "2023-02-21T12:46:01.529+00:00", "2023-02-21T12:46:25.837+00:00",
-                                 "2023-02-21T12:46:39.607+00:00", "2023-02-21T12:46:53.105+00:00"});
+    CHECK(split_res[0]->read_common.seq.size() == 6858);
+    CHECK(split_res[1]->read_common.seq.size() == 7854);
+    CHECK(split_res[2]->read_common.seq.size() == 5185);
+    CHECK(split_res[3]->read_common.seq.size() == 5168);
 
-    std::vector<uint64_t> start_time_mss;
-    for (auto &r : split_res) {
-        start_time_mss.push_back(r->read_common.start_time_ms);
-    }
-    CHECK(start_time_mss ==
-          std::vector<uint64_t>{1676983561529, 1676983585837, 1676983599607, 1676983613105});
+    CHECK(split_res[0]->read_common.attributes.start_time == "2023-02-21T12:46:01.529+00:00");
+    CHECK(split_res[1]->read_common.attributes.start_time == "2023-02-21T12:46:25.837+00:00");
+    CHECK(split_res[2]->read_common.attributes.start_time == "2023-02-21T12:46:39.607+00:00");
+    CHECK(split_res[3]->read_common.attributes.start_time == "2023-02-21T12:46:53.105+00:00");
 
-    std::vector<uint64_t> num_samples;
-    for (auto &r : split_res) {
-        num_samples.push_back(r->read_common.attributes.num_samples);
-    }
-    CHECK(num_samples == std::vector<uint64_t>{97125, 55055, 53950, 50475});
+    CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
+    CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
+    CHECK(split_res[2]->read_common.start_time_ms == 1676983599607);
+    CHECK(split_res[3]->read_common.start_time_ms == 1676983613105);
 
-    std::vector<uint32_t> split_points;
-    for (auto &r : split_res) {
-        split_points.push_back(r->read_common.split_point);
-    }
-    CHECK(split_points == std::vector<uint32_t>{0, 97230, 152310, 206305});
+    CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
+    CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
+    CHECK(split_res[2]->read_common.attributes.num_samples == 53950);
+    CHECK(split_res[3]->read_common.attributes.num_samples == 50475);
 
-    std::set<std::string> names;
-    for (auto &r : split_res) {
-        names.insert(r->read_common.read_id);
-    }
-    CHECK(names.size() == 4);
+    CHECK(split_res[0]->read_common.split_point == 0);
+    CHECK(split_res[1]->read_common.split_point == 97230);
+    CHECK(split_res[2]->read_common.split_point == 152310);
+    CHECK(split_res[3]->read_common.split_point == 206305);
+
     CHECK(std::all_of(split_res.begin(), split_res.end(),
                       [](const auto &r) { return r->read_common.read_tag == 42; }));
 
-    std::vector<std::string> prev_read_names;
-    std::vector<std::string> next_read_names;
-    for (auto &r : split_res) {
-        prev_read_names.push_back(r->prev_read);
-        next_read_names.push_back(r->next_read);
-    }
-    CHECK(prev_read_names == std::vector<std::string>{"prev",
-                                                      "e7e47439-5968-4883-96ff-7f2d2040dc43",
-                                                      "a62e28ab-c367-4a93-af9b-84130d3df58c",
-                                                      "f8e75422-3275-47f6-b45f-062aa00df368"});
-    CHECK(next_read_names == std::vector<std::string>{"a62e28ab-c367-4a93-af9b-84130d3df58c",
-                                                      "f8e75422-3275-47f6-b45f-062aa00df368",
-                                                      "c4219558-db6c-476e-a9e5-81f4694f263c",
-                                                      "next"});
+    CHECK(split_res[0]->prev_read == "prev");
+    CHECK(split_res[1]->prev_read == "e7e47439-5968-4883-96ff-7f2d2040dc43");
+    CHECK(split_res[2]->prev_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
+    CHECK(split_res[3]->prev_read == "f8e75422-3275-47f6-b45f-062aa00df368");
+
+    CHECK(split_res[0]->next_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
+    CHECK(split_res[1]->next_read == "f8e75422-3275-47f6-b45f-062aa00df368");
+    CHECK(split_res[2]->next_read == "c4219558-db6c-476e-a9e5-81f4694f263c");
+    CHECK(split_res[3]->next_read == "next");
 }
 
 TEST_CASE("4 subread split tagging", TEST_GROUP) {
@@ -195,6 +180,7 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.raw_data =
             at::zeros(read->read_common.seq.length() * 10).to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
@@ -244,6 +230,8 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     torch::load(read->read_common.raw_data, (data_dir / "raw.tensor").string());
     read->read_common.raw_data = read->read_common.raw_data.to(at::ScalarType::Half);
     read->read_common.read_tag = 42;
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+
     dorado::PipelineDescriptor pipeline_desc;
 
     std::vector<dorado::Message> messages;

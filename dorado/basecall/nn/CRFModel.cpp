@@ -429,7 +429,7 @@ LinearCRFImpl::LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_
     }
 };
 
-at::Tensor LinearCRFImpl::forward(at::Tensor x) {
+at::Tensor LinearCRFImpl::forward(const at::Tensor &x) {
     utils::ScopedProfileRange spr("linear", 2);
     // Input x is [N, T, C], contiguity optional
     auto scores = linear(x);
@@ -750,11 +750,11 @@ CRFModelImpl::CRFModelImpl(const CRFModelConfig &config) {
 }
 
 void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
-    utils::load_state_dict(*this, weights, {});
+    utils::load_state_dict(*this, weights);
 }
 
 #if DORADO_CUDA_BUILD
-at::Tensor CRFModelImpl::run_koi(at::Tensor in) {
+at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
     // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
 
@@ -791,7 +791,7 @@ at::Tensor CRFModelImpl::run_koi(at::Tensor in) {
 }
 #endif
 
-at::Tensor CRFModelImpl::forward(at::Tensor x) {
+at::Tensor CRFModelImpl::forward(const at::Tensor &x) {
     utils::ScopedProfileRange spr("nn_forward", 1);
     if (x.device() == torch::kCPU) {
         // Output is [T, N, C], which CPU decoding requires.

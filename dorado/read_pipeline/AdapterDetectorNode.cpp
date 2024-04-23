@@ -80,11 +80,10 @@ void AdapterDetectorNode::process_read(BamPtr& read) {
         if (trim_interval.first >= trim_interval.second) {
             spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
                          trim_interval.first, trim_interval.second, seq);
+            read = utils::new_unmapped_record(read, {}, {});
             return;
         }
         read = Trimmer::trim_sequence(std::move(read), trim_interval);
-
-        utils::remove_alignment_tags_from_record(read.get());
     }
 }
 

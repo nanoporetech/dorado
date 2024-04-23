@@ -1,5 +1,6 @@
 #include "dna_poly_tail_calculator.h"
 
+#include "read_pipeline/messages.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -19,15 +20,15 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     const std::string& front_primer_rc = m_config.rc_front_primer;
     const std::string& rear_primer = m_config.rear_primer;
     const std::string& rear_primer_rc = m_config.rc_rear_primer;
-    const int threshold = m_config.flank_threshold;
+    const float threshold = m_config.flank_threshold;
+    const int primer_window = m_config.primer_window;
     int trailing_Ts = static_cast<int>(dorado::utils::count_trailing_chars(rear_primer, 'T'));
 
     const int kMinSeparation = 10;
-    const int kWindowSize = 150;
     std::string_view seq_view = std::string_view(read.read_common.seq);
-    std::string_view read_top = seq_view.substr(0, kWindowSize);
-    auto bottom_start = std::max(0, (int)seq_view.length() - kWindowSize);
-    std::string_view read_bottom = seq_view.substr(bottom_start, kWindowSize);
+    std::string_view read_top = seq_view.substr(0, primer_window);
+    auto bottom_start = std::max(0, (int)seq_view.length() - primer_window);
+    std::string_view read_bottom = seq_view.substr(bottom_start, primer_window);
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_LOC;
@@ -52,9 +53,10 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
-    bool fwd = dist_v1 < dist_v2;
-    bool proceed =
-            std::min(dist_v1, dist_v2) < threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
+    const bool fwd = dist_v1 < dist_v2;
+    const float flank_score = 1.f - static_cast<float>(std::min(dist_v1, dist_v2)) /
+                                            (front_primer.length() + rear_primer.length());
+    const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts, false};
 

@@ -44,7 +44,9 @@ public:
         // TODO -- probably want to make node constructors private, which would entail
         // avoiding make_unique.
         auto node = std::make_unique<NodeType>(std::forward<Args>(args)...);
-        NodeDescriptor node_desc{std::move(node), std::move(sink_handles)};
+        NodeDescriptor node_desc;
+        node_desc.node = std::move(node);
+        node_desc.sink_handles = std::move(sink_handles);
         m_node_descriptors.push_back(std::move(node_desc));
         return static_cast<NodeHandle>(m_node_descriptors.size() - 1);
     }

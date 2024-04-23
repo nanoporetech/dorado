@@ -1,11 +1,15 @@
 #pragma once
 
 #include "poly_tail_config.h"
-#include "read_pipeline/messages.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+namespace dorado {
+class SimplexRead;
+}
 
 namespace dorado::poly_tail {
 
@@ -26,7 +30,7 @@ struct SignalAnchorInfo {
 
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config) : m_config(config) {}
+    PolyTailCalculator(PolyTailConfig config) : m_config(std::move(config)) {}
 
     virtual ~PolyTailCalculator() = default;
 
@@ -62,13 +66,12 @@ protected:
                                                 const SimplexRead& read,
                                                 float num_samples_per_base) const;
 
-    PolyTailConfig m_config;
+    const PolyTailConfig m_config;
 };
 
 class PolyTailCalculatorFactory {
 public:
-    static std::unique_ptr<PolyTailCalculator> create(bool is_rna,
-                                                      const std::string* const config_file);
+    static std::unique_ptr<PolyTailCalculator> create(bool is_rna, const std::string& config_file);
 };
 
 }  // namespace dorado::poly_tail
