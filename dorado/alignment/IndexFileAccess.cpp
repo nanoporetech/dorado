@@ -85,7 +85,7 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& index_file,
         return IndexLoadResult::validation_error;
     }
 
-    auto load_result = new_index->load(index_file, num_threads);
+    auto load_result = new_index->load(index_file, num_threads, false);
     if (load_result != IndexLoadResult::success) {
         return load_result;
     }

@@ -8,6 +8,7 @@
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
+#include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -119,49 +120,38 @@ int correct(int argc, char* argv[]) {
     }
 
     // The overall pipeline will be as follows -
-    // 1. The HTSReader will read the fastq input and
-    // generate read records.
-    // 2. These will go into an Alignment node with the
-    // same fastq as an index to perform all-vs-all alignment
-    // for reach read. Each alignment is expected to generate
+    // 1. The Alignment node will be responsible
+    // for running all-vs-all alignment. Since the index
+    // for a full genome could be larger than what can
+    // fit in memory, the alignment node needs to support
+    // split mm2 indices. This requires the input reads
+    // to be iterated over multiple times, once for each
+    // index chunk. In order to manage this properly, the
+    // input file reading is handled within the alignment node.
+    // Each alignment out of that node is expected to generate
     // multiple aligned records, which will all be packaged
     // and sent into a window generation node.
-    // 3. Window generation will chunk up the alignments into
-    // multiple windows and create tensors for downstream inference.
-    // 4. The inference node will run the model on the tensors, decode
-    // the output, and convert each window into its corrected read and stitch
-    // adjacent windows together.
-    // 5. Corrected reads will be written out FASTA or BAM format.
-
-    // Setup input file reader.
-    HtsReader reader(reads[0], read_list);
-    auto header = SamHdrPtr(sam_hdr_dup(reader.header));
-    add_pg_hdr(header.get());
-    utils::strip_alignment_data_from_header(header.get());
+    // 2. Correction node will chunk up the alignments into
+    // multiple windows, create tensors, run inference and decode
+    // the windows into a final corrected sequence.
+    // 3. Corrected reads will be written out FASTA or BAM format.
 
     // Setup outut file.
     auto output_mode = OutputMode::FASTA;
     utils::HtsFile hts_file("-", output_mode, correct_writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
-    // 5. Corrected reads will be written out FASTA or BAM format.
+    // 3. Corrected reads will be written out FASTA or BAM format.
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
-    // 3. Window generation will chunk up the alignments into
-    // multiple windows and create tensors for downstream inference.
-    // 4. The inference node will run the model on the tensors, decode
-    // the output, and convert each window into its corrected read and stitch
-    // adjacent windows together.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, correct_threads, device,
-                                                            infer_threads, batch_size);
+    // 2. Window generation, encoding + inference and decoding to generate
+    // final reads.
+    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads,
+                                                            device, infer_threads, batch_size);
 
-    // 2. These will go into an Alignment node with the
-    // same fastq as an index to perform all-vs-all alignment
-    // for reach read. Each alignment is expected to generate
-    // multiple aligned records, which will all be packaged
-    // and sent into a window generation node.
-    auto aligner = pipeline_desc.add_node<ErrorCorrectionMapperNode>({corrector}, reads[0],
-                                                                     correct_threads);
+    // 1. Alignment node that generates alignments per read to be
+    // corrected.
+    ErrorCorrectionMapperNode aligner(reads[0], correct_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -170,11 +160,6 @@ int correct(int argc, char* argv[]) {
         spdlog::error("Failed to create pipeline");
         std::exit(EXIT_FAILURE);
     }
-
-    const auto& aligner_ref =
-            dynamic_cast<ErrorCorrectionMapperNode&>(pipeline->get_node_ref(aligner));
-    utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-    hts_file.set_header(header.get());
 
     // Set up stats counting.
     ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
@@ -188,9 +173,8 @@ int correct(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting correction");
-    // 1. The HTSReader will read the fastq input and
-    // generate read records.
-    reader.read(*pipeline, max_reads);
+    // Start the pipeline.
+    aligner.process(*pipeline);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.

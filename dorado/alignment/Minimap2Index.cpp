@@ -19,10 +19,13 @@ struct IndexDeleter {
 };
 using IndexUniquePtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
 
-struct IndexReaderDeleter {
-    void operator()(mm_idx_reader_t* index_reader) { mm_idx_reader_close(index_reader); }
-};
-using IndexReaderPtr = std::unique_ptr<mm_idx_reader_t, IndexReaderDeleter>;
+}  // namespace
+
+namespace dorado::alignment {
+
+void IndexReaderDeleter::operator()(mm_idx_reader_t* index_reader) {
+    mm_idx_reader_close(index_reader);
+}
 
 IndexReaderPtr create_index_reader(const std::string& index_file,
                                    const mm_idxopt_t& index_options) {
@@ -30,10 +33,6 @@ IndexReaderPtr create_index_reader(const std::string& index_file,
     reader.reset(mm_idx_reader_open(index_file.c_str(), &index_options, 0));
     return reader;
 }
-
-}  // namespace
-
-namespace dorado::alignment {
 
 void Minimap2Index::set_index_options(const Minimap2IndexOptions& index_options) {
     m_index_options->k = index_options.kmer_size.value_or(m_index_options->k);
@@ -56,8 +55,6 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
                   m_mapping_options->bw_long);
 
     if (!mapping_options.print_secondary.value_or(true)) {
-
-    if (!mapping_options.print_secondary) {
         m_mapping_options->flag |= MM_F_NO_PRINT_2ND;
     }
     m_mapping_options->best_n =
@@ -78,10 +75,12 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
                   static_cast<bool>(m_mapping_options->flag & MM_F_SECONDARY_SEQ));
 
     m_mapping_options->occ_dist = mapping_options.occ_dist.value_or(m_mapping_options->occ_dist);
-    m_mapping_options->min_chain_score = mapping_options.min_chain_score.value_or(m_mapping_options->min_chain_score);
+    m_mapping_options->min_chain_score =
+            mapping_options.min_chain_score.value_or(m_mapping_options->min_chain_score);
     m_mapping_options->zdrop = mapping_options.zdrop.value_or(m_mapping_options->zdrop);
     m_mapping_options->zdrop_inv = mapping_options.zdrop_inv.value_or(m_mapping_options->zdrop_inv);
-    m_mapping_options->mini_batch_size = mapping_options.mini_batch_size.value_or(m_mapping_options->mini_batch_size);
+    m_mapping_options->mini_batch_size =
+            mapping_options.mini_batch_size.value_or(m_mapping_options->mini_batch_size);
     // Force cigar generation.
     m_mapping_options->flag |= MM_F_CIGAR;
     if (mapping_options.cs) {
@@ -93,16 +92,16 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
         } else if (*mapping_options.cs == "none") {
             m_mapping_options->flag &= ~MM_F_OUT_CS;
         } else {
-            spdlog::warn("Unrecognized options for --cs={}", mapping_options.cs);
+            spdlog::warn("Unrecognized options for --cs={}", *mapping_options.cs);
         }
     }
-    if (imapping_options.dual) {
+    if (mapping_options.dual) {
         if (*mapping_options.dual == "yes") {
             m_mapping_options->flag &= ~MM_F_NO_DUAL;
         } else if (*mapping_options.dual == "no") {
             m_mapping_options->flag |= MM_F_NO_DUAL;
         } else {
-            spdlog::warn("Unrecognized options for --dual={}", mapping_options.dual);
+            spdlog::warn("Unrecognized options for --dual={}", *mapping_options.dual);
         }
     }
 
@@ -111,7 +110,9 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
     m_mapping_options->max_sw_mat = 50'000'000;
 }
 
-bool Minimap2Index::load_index_unless_split(const std::string& index_file, int num_threads) {
+bool Minimap2Index::load_initial_index(const std::string& index_file,
+                                       int num_threads,
+                                       bool allow_split_index) {
     auto index_to_load = index_file;
     bool dump_index = false;
     bool is_prebuilt = utils::ends_with(index_file, ".mmi");
@@ -124,18 +125,21 @@ bool Minimap2Index::load_index_unless_split(const std::string& index_file, int n
         dump_index = false;
         index_to_load = prebuilt_index;
     }
-    auto index_reader = create_index_reader(index_to_load, *m_index_options);
-    m_index.reset(mm_idx_reader_read(index_reader.get(), num_threads), IndexDeleter());
-    if (dump_index) {
+    m_index_reader = create_index_reader(index_to_load, *m_index_options);
+    m_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads), IndexDeleter());
+    if (!allow_split_index) {
+        IndexUniquePtr split_index{};
+        split_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads));
+        if (split_index != nullptr) {
+            return false;
+        }
+    }
+    //if (dump_index) {
+    if (false) {
         spdlog::info("Save index to {}", prebuilt_index);
         FILE* fp = fopen(prebuilt_index.c_str(), "w");
         mm_idx_dump(fp, m_index.get());
         fclose(fp);
-    }
-    IndexUniquePtr split_index{};
-    split_index.reset(mm_idx_reader_read(index_reader.get(), num_threads));
-    if (split_index != nullptr) {
-        return false;
     }
 
     if (m_index->k != m_index_options->k || m_index->w != m_index_options->w) {
@@ -149,7 +153,26 @@ bool Minimap2Index::load_index_unless_split(const std::string& index_file, int n
         mm_idx_stat(m_index.get());
     }
 
+    spdlog::info("Loaded index with {} target seqs", m_index->n_seq);
+
     return true;
+}
+
+IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
+    if (!m_index_reader) {
+        spdlog::info("No index loaded");
+        return IndexLoadResult::no_index_loaded;
+    }
+
+    auto next_idx = mm_idx_reader_read(m_index_reader.get(), num_threads);
+    if (next_idx == 0) {
+        spdlog::info("Nothing returned for next index");
+        return IndexLoadResult::end_of_index;
+    }
+
+    m_index.reset(next_idx, IndexDeleter());
+    spdlog::info("Loaded index with {} target seqs", m_index->n_seq);
+    return IndexLoadResult::success;
 }
 
 bool Minimap2Index::initialise(Minimap2Options options) {
@@ -183,7 +206,9 @@ bool Minimap2Index::initialise(Minimap2Options options) {
     return true;
 }
 
-IndexLoadResult Minimap2Index::load(const std::string& index_file, int num_threads) {
+IndexLoadResult Minimap2Index::load(const std::string& index_file,
+                                    int num_threads,
+                                    bool allow_split_index) {
     assert(m_index_options && m_mapping_options &&
            "Loading an index requires options have been initialised.");
     assert(!m_index && "Loading an index requires it is not already loaded.");
@@ -193,7 +218,7 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file, int num_threa
         return IndexLoadResult::reference_file_not_found;
     }
 
-    if (!load_index_unless_split(index_file, num_threads)) {
+    if (!load_initial_index(index_file, num_threads, allow_split_index)) {
         return IndexLoadResult::split_index_not_supported;
     }
 

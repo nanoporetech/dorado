@@ -23,13 +23,13 @@ void make_torch_deterministic() {
 #endif
 }
 
-void set_torch_allocator_max_split_size() {
+void set_torch_allocator_max_split_size(int size) {
 #if DORADO_CUDA_BUILD && TORCH_VERSION_MAJOR >= 2
 
     // Do not re-use smaller chunks of large buffers
     // This prevents small allocations from reusing large sections of cached allocated memory
     // which can lead to OoM errors when the original large allocation is needed again
-    auto max_split_size_mb = 25;
+    auto max_split_size_mb = size;
     std::string settings = "max_split_size_mb:" + std::to_string(max_split_size_mb);
 
     const char *pytorch_cuda_alloc_conf = std::getenv("PYTORCH_CUDA_ALLOC_CONF");

@@ -1,6 +1,7 @@
 #include "ErrorCorrectionMapperNode.h"
 
 #include "ClientInfo.h"
+#include "HtsReader.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
@@ -31,16 +32,16 @@ namespace {
         if (op == MM_CIGAR_MATCH) {
             cigar_ops.push_back({dorado::CigarOpType::MATCH, len});
         } else if (op == MM_CIGAR_INS) {
-            cigar_ops.push_back({dorado::CigarOpType::DEL, len});
-        } else if (op == MM_CIGAR_DEL) {
             cigar_ops.push_back({dorado::CigarOpType::INS, len});
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops.push_back({dorado::CigarOpType::DEL, len});
         } else {
             throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
         }
     }
-    if (!fwd) {
-        std::reverse(cigar_ops.begin(), cigar_ops.end());
-    }
+    //if (!fwd) {
+    //    std::reverse(cigar_ops.begin(), cigar_ops.end());
+    //}
     return cigar_ops;
 }
 
@@ -48,11 +49,135 @@ namespace {
 
 namespace dorado {
 
+void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
+                                                   int hits,
+                                                   const std::string& qread,
+                                                   const std::string& qname,
+                                                   const std::vector<uint8_t>& qqual) {
+    for (int j = 0; j < hits; j++) {
+        // mapping region
+        auto aln = &reg[j];
+        const std::string tname(m_index->index()->seq[aln->rid].name);
+
+        std::unique_lock<std::mutex> lock(m_correction_mtx);
+        if (m_read_mutex.find(tname) == m_read_mutex.end()) {
+            m_read_mutex.emplace(tname, std::make_unique<std::mutex>());
+            m_correction_records.emplace(tname, CorrectionAlignments{});
+        }
+        auto& mtx = *m_read_mutex[tname];
+        lock.unlock();
+
+        Overlap ovlp;
+        ovlp.qstart = aln->qs;
+        ovlp.qend = aln->qe;
+        ovlp.fwd = !aln->rev;
+        ovlp.tstart = aln->rs;
+        ovlp.tend = aln->re;
+        ovlp.qlen = (int)qread.length();
+
+        size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
+        auto cigar = parse_cigar(aln->p->cigar, n_cigar, ovlp.fwd);
+
+        std::lock_guard<std::mutex> aln_lock(mtx);
+        auto& alignments = m_correction_records[tname];
+        if (alignments.read_name.empty()) {
+            alignments.read_name = tname;
+        }
+
+        ovlp.qid = alignments.seqs.size();
+        ovlp.tlen = (int)alignments.read_seq.length();
+
+        //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
+        //    continue;
+        alignments.qnames.push_back(qname);
+
+        alignments.cigars.push_back(std::move(cigar));
+        alignments.overlaps.push_back(std::move(ovlp));
+    }
+}
+
+void ErrorCorrectionMapperNode::input_thread_fn() {
+    BamPtr read;
+    mm_tbuf_t* tbuf = mm_tbuf_init();
+    while (m_reads_queue.try_pop(read) != utils::AsyncQueueStatus::Terminate) {
+        const std::string read_name = bam_get_qname(read.get());
+        const std::string read_seq = utils::extract_sequence(read.get());
+        auto read_qual = utils::extract_quality(read.get());
+        auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
+        auto clear_alignments = utils::PostCondition([reg, hits]() {
+            for (int j = 0; j < hits; j++) {
+                free(reg[j].p);
+            }
+            free(reg);
+        });
+        extract_alignments(reg, hits, read_seq, read_name, read_qual);
+        m_alignments_processed++;
+        if (m_alignments_processed.load() % 10000 == 0) {
+            spdlog::info("Alignments processed {}", m_alignments_processed.load());
+        }
+    }
+    mm_tbuf_destroy(tbuf);
+}
+
+void ErrorCorrectionMapperNode::load_read_fn() {
+    m_reads_queue.restart();
+    HtsReader reader(m_index_file, {});
+    while (reader.read()) {
+        m_reads_queue.try_push(BamPtr(bam_dup1(reader.record.get())));
+        m_reads_read++;
+        if (m_reads_read.load() % 10000 == 0) {
+            spdlog::info("Read {} reads", m_reads_read.load());
+        }
+    }
+    m_reads_queue.terminate();
+}
+
+void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
+    int index = 0;
+    do {
+        spdlog::info("Align with index {}", index);
+        m_reads_read.store(0);
+        m_alignments_processed.store(0);
+
+        // Create aligner.
+        m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
+        // 1. Start threads for aligning reads.
+        m_reader_thread =
+                std::make_unique<std::thread>(&ErrorCorrectionMapperNode::load_read_fn, this);
+        // 2. Start thread for generating reads.
+        for (int i = 0; i < m_num_threads; i++) {
+            m_aligner_threads.push_back(std::make_unique<std::thread>(
+                    &ErrorCorrectionMapperNode::input_thread_fn, this));
+        }
+        // 3. Wait for alignments to finish and all reads to be read
+        if (m_reader_thread->joinable()) {
+            m_reader_thread->join();
+        }
+        for (auto& t : m_aligner_threads) {
+            if (t->joinable()) {
+                t->join();
+            }
+        }
+        for (auto& [n, r] : m_correction_records) {
+            //spdlog::info("Pushing {} with cov {}", n, r.seqs.size());
+            pipeline.push_message(std::move(r));
+        }
+        m_correction_records.clear();
+        m_read_mutex.clear();
+        // 4. Load next index and loop
+        index++;
+    } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
+}
+
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)
-        : MessageSink(10000, threads), m_index_file(index_file) {
+        : MessageSink(10000, threads),
+          m_index_file(index_file),
+          m_num_threads(threads),
+          m_reads_queue(1000) {
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
+    options.index_batch_size = 8000000000ull;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;
@@ -64,128 +189,16 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
-        spdlog::error("Failed to initialize with options.");
-        throw std::runtime_error("");
+        throw std::runtime_error("Failed to initialize with options.");
     } else {
-        spdlog::info("Initialized index options");
+        spdlog::info("Initialized index options.");
     }
     spdlog::info("Loading index...");
-    if (m_index->load(index_file, threads) != alignment::IndexLoadResult::success) {
-        spdlog::error("Failed to load index file {}", index_file);
-        throw std::runtime_error("");
+    if (m_index->load(index_file, threads, true) != alignment::IndexLoadResult::success) {
+        throw std::runtime_error("Failed to load index file " + index_file);
     } else {
         spdlog::info("Loaded mm2 index.");
     }
-    // Create aligner.
-    m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
-    // Create fastx index.
-    spdlog::info("Creating input fastq index...");
-    char* idx_name = fai_path(index_file.c_str());
-    spdlog::info("Looking for idx {}", idx_name);
-    if (!std::filesystem::exists(idx_name)) {
-        if (fai_build(index_file.c_str()) != 0) {
-            spdlog::error("Failed to build index for file {}", index_file);
-            throw std::runtime_error("");
-        }
-        spdlog::info("Created fastq index.");
-    }
-    free(idx_name);
-    start_input_processing(&ErrorCorrectionMapperNode::input_thread_fn, this);
-}
-
-void ErrorCorrectionMapperNode::input_thread_fn() {
-    Message message;
-    mm_tbuf_t* tbuf = mm_tbuf_init();
-    auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_index_file);
-    while (get_input_message(message)) {
-        if (std::holds_alternative<BamPtr>(message)) {
-            auto read = std::get<BamPtr>(std::move(message));
-            const std::string read_name = bam_get_qname(read.get());
-            const std::string read_seq = utils::extract_sequence(read.get());
-            auto start = std::chrono::high_resolution_clock::now();
-            auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
-            auto clear_alignments = utils::PostCondition([reg, hits]() {
-                for (int j = 0; j < hits; j++) {
-                    free(reg[j].p);
-                }
-                free(reg);
-            });
-            auto end = std::chrono::high_resolution_clock::now();
-            {
-                std::chrono::duration<double> duration = end - start;
-                std::lock_guard<std::mutex> lock(mm2mutex);
-                mm2Duration += duration;
-            }
-            auto alignments = extract_alignments(reg, hits, fastx_reader.get(), read_seq);
-            alignments.read_name = std::move(read_name);
-            alignments.read_seq = std::move(read_seq);
-            alignments.read_qual = utils::extract_quality(read.get());
-            send_message_to_sink(std::move(alignments));
-        } else {
-            send_message_to_sink(std::move(message));
-            continue;
-        }
-    }
-    mm_tbuf_destroy(tbuf);
-}
-
-void ErrorCorrectionMapperNode::terminate(const FlushOptions&) {
-    stop_input_processing();
-    spdlog::info("time for mm2 {}", mm2Duration.count());
-    spdlog::info("time for fastq read {}", fastqDuration.count());
-}
-
-CorrectionAlignments ErrorCorrectionMapperNode::extract_alignments(
-        const mm_reg1_t* reg,
-        int hits,
-        const hts_io::FastxRandomReader* reader,
-        const std::string& qread) {
-    (void)reader;
-    ;
-    (void)qread;
-    dorado::CorrectionAlignments alignments;
-    for (int j = 0; j < hits; j++) {
-        Overlap ovlp;
-
-        // mapping region
-        auto aln = &reg[j];
-
-        ovlp.qid = alignments.seqs.size();
-        ovlp.qstart = aln->rs;
-        ovlp.qend = aln->re;
-        ovlp.fwd = !aln->rev;
-        ovlp.tstart = aln->qs;
-        ovlp.tend = aln->qe;
-
-        const std::string qname(m_index->index()->seq[aln->rid].name);
-
-        //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
-        //    continue;
-        auto start = std::chrono::high_resolution_clock::now();
-        alignments.seqs.push_back(reader->fetch_seq(qname));
-        alignments.quals.push_back(reader->fetch_qual(qname));
-        auto end = std::chrono::high_resolution_clock::now();
-        {
-            std::chrono::duration<double> duration = end - start;
-            std::lock_guard<std::mutex> lock(fastqmutex);
-            fastqDuration += duration;
-        }
-        alignments.qnames.push_back(qname);
-
-        ovlp.qlen = (int)alignments.seqs.back().length();
-        ovlp.tlen = (int)qread.length();
-
-        size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        alignments.cigars.push_back(parse_cigar(aln->p->cigar, n_cigar, ovlp.fwd));
-
-        alignments.overlaps.push_back(std::move(ovlp));
-    }
-    return alignments;
-}
-
-alignment::HeaderSequenceRecords ErrorCorrectionMapperNode::get_sequence_records_for_header()
-        const {
-    return m_aligner->get_sequence_records_for_header();
 }
 
 stats::NamedStats ErrorCorrectionMapperNode::sample_stats() const {

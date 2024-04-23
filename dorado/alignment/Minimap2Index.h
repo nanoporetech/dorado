@@ -12,9 +12,15 @@
 
 namespace dorado::alignment {
 
+struct IndexReaderDeleter {
+    void operator()(mm_idx_reader_t* index_reader);
+};
+using IndexReaderPtr = std::unique_ptr<mm_idx_reader_t, IndexReaderDeleter>;
+
 class Minimap2Index {
     Minimap2Options m_options;
     std::shared_ptr<const mm_idx_t> m_index;
+    IndexReaderPtr m_index_reader;
     std::optional<mm_idxopt_t> m_index_options{};
     std::optional<mm_mapopt_t> m_mapping_options{};
 
@@ -22,11 +28,12 @@ class Minimap2Index {
     void set_mapping_options(const Minimap2MappingOptions& mapping_options);
 
     // returns false if a split index
-    bool load_index_unless_split(const std::string& index_file, int num_threads);
+    bool load_initial_index(const std::string& index_file, int num_threads, bool allow_split_index);
 
 public:
     bool initialise(Minimap2Options options);
-    IndexLoadResult load(const std::string& index_file, int num_threads);
+    IndexLoadResult load(const std::string& index_file, int num_threads, bool allow_split_index);
+    IndexLoadResult load_next_chunk(int num_threads);
 
     // Returns a shallow copy of this MinimapIndex with the given mapping options applied.
     // By contract the given indexing options must be identical to those held in this instance

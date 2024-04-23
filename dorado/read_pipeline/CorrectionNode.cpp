@@ -1,14 +1,17 @@
 #include "CorrectionNode.h"
 
 #include "utils/bam_utils.h"
+#include "utils/gpu_profiling.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/types.h"
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
+#include "hts_io/FastxRandomReader.h"
 
 #include <c10/cuda/CUDAStream.h>
+#include <htslib/faidx.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/nn/utils/rnn.h>
@@ -37,6 +40,7 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
                       T fill_val,
                       torch::ScalarType type,
                       T* mem_ptr) {
+    dorado::utils::ScopedProfileRange spr("collate", 1);
 #if 1
     auto max_length = std::max_element(tensors.begin(), tensors.end(),
                                        [](const torch::Tensor& a, const torch::Tensor& b) {
@@ -125,6 +129,21 @@ namespace dorado {
 
 const int TOP_K = 30;
 
+void CorrectionNode::hydrate_alignments(CorrectionAlignments& alignments,
+                                        hts_io::FastxRandomReader* reader) {
+    const auto& tname = alignments.read_name;
+    alignments.read_seq = std::move(reader->fetch_seq(tname));
+    alignments.read_qual = std::move(reader->fetch_qual(tname));
+    auto num_qnames = alignments.qnames.size();
+    alignments.seqs.resize(num_qnames);
+    alignments.quals.resize(num_qnames);
+    for (size_t i = 0; i < num_qnames; i++) {
+        const std::string& qname = alignments.qnames[i];
+        alignments.seqs[i] = std::move(reader->fetch_seq(qname));
+        alignments.quals[i] = std::move(reader->fetch_qual(qname));
+    }
+}
+
 bool CorrectionNode::filter_overlap(const OverlapWindow& overlap,
                                     const CorrectionAlignments& alignments) {
     bool long_indel = false;
@@ -135,6 +154,7 @@ bool CorrectionNode::filter_overlap(const OverlapWindow& overlap,
             long_indel |= cigar[i].len >= 30;
         }
     }
+    //spdlog::info("filter ? tstart {} qstart {} qend {} res {}", overlap.tstart, overlap.qstart, overlap.qend, long_indel);
     return long_indel;
 }
 
@@ -604,14 +624,16 @@ std::vector<WindowFeatures> CorrectionNode::extract_features(
         //}
 
         // Sort overlaps by score
-        for (auto& ovlp : windows[w]) {
-            calculate_accuracy(ovlp, alignments, w, win_len);
+        if (windows[w].size() > 1) {
+            for (auto& ovlp : windows[w]) {
+                calculate_accuracy(ovlp, alignments, w, win_len);
+            }
+            // Sort the filtered overlaps by accuracy score
+            std::sort(windows[w].begin(), windows[w].end(),
+                      [](const OverlapWindow& a, const OverlapWindow& b) {
+                          return a.accuracy > b.accuracy;
+                      });
         }
-        // Sort the filtered overlaps by accuracy score
-        std::sort(windows[w].begin(), windows[w].end(),
-                  [](const OverlapWindow& a, const OverlapWindow& b) {
-                      return a.accuracy > b.accuracy;
-                  });
         windows[w].resize(std::min(TOP_K, (int)windows[w].size()));
         auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -877,21 +899,21 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
     std::vector<std::string> corrected_reads;
     std::string corrected_seq;
 
-    auto base_to_idx_map = []() {
-        std::array<int, 128> map = {0};
-        map['A'] = 0;
-        map['C'] = 1;
-        map['G'] = 2;
-        map['T'] = 3;
-        map['*'] = 4;
-        map['a'] = 0;
-        map['c'] = 1;
-        map['g'] = 2;
-        map['t'] = 3;
-        map['#'] = 4;
+    auto encoding_to_idx_map = []() {
+        std::array<int, 10> map = {0};
+        map[0] = 0;
+        map[1] = 1;
+        map[2] = 2;
+        map[3] = 3;
+        map[4] = 4;
+        map[5] = 0;
+        map[6] = 1;
+        map[7] = 2;
+        map[8] = 3;
+        map[9] = 4;
         return map;
     };
-    static auto base_to_idx = base_to_idx_map();
+    static auto encoding_to_idx = encoding_to_idx_map();
     static auto base_decoding = gen_base_decoding();
     static auto base_forward = base_forward_mapping();
 
@@ -947,12 +969,12 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
                 }
             } else {
                 std::array<base_count_t, 5> counter;
-                for (int r = 0; r < wf.n_alns; r++) {
+                for (int r = 0; r < wf.n_alns + 1; r++) {
                     auto base = bases_tensor[r * length + c];
                     if (base_decoding[base] == '.') {
                         continue;
                     }
-                    auto idx = base_to_idx[base_decoding[base]];
+                    auto idx = encoding_to_idx[base];
                     counter[idx].b = base;
                     counter[idx].c++;
                 }
@@ -964,8 +986,9 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
                 auto& second = counter[1];
 
                 char new_base;
-                if ((first.c < 2) ||
-                    (first.c == second.c && (first.b == tbase || second.b == tbase))) {
+                if ((first.c < 2) || (first.c == second.c &&
+                                      (encoding_to_idx[first.b] == encoding_to_idx[tbase] ||
+                                       encoding_to_idx[second.b] == encoding_to_idx[tbase]))) {
                     new_base = base_decoding[tbase];
                 } else {
                     new_base = base_decoding[first.b];
@@ -975,6 +998,8 @@ std::vector<std::string> CorrectionNode::decode_windows(const std::vector<Window
                 if (new_base != '*') {
                     //spdlog::info("{} tbase {} new base {}", c, tbase, new_base);
                     corrected_seq += new_base;
+                } else {
+                    //spdlog::info("{} tbase {} new base {} skipping", c, tbase, new_base);
                 }
             }
         }
@@ -995,6 +1020,7 @@ void CorrectionNode::decode_fn() {
     WindowFeatures item;
     while (m_inferred_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
         //spdlog::info("Popped inferred feature for {}", item.window_idx);
+        utils::ScopedProfileRange spr("decode_loop", 1);
         std::vector<WindowFeatures> to_decode;
         {
             std::lock_guard<std::mutex> lock(m_features_mutex);
@@ -1103,6 +1129,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     (void)decode_preds;
 
     auto batch_infer = [&]() {
+        utils::ScopedProfileRange infer("infer", 1);
         if (first_inference) {
             spdlog::info("Calling inference");
         }
@@ -1122,13 +1149,18 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         auto t1 = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> collate_dur = (t1 - t0);
         collate_time.store(collate_time.load() + collate_dur);
+
+        std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(batched_bases.to(device));
-        inputs.push_back(batched_quals.to(device));
-        inputs.push_back(length_tensor.to(device));
-        std::for_each(indices_batch.begin(), indices_batch.end(),
-                      [device](torch::Tensor& t) { t.to(device); });
-        inputs.push_back(indices_batch);
+        {
+            utils::ScopedProfileRange move_to_device("move_to_device", 1);
+            inputs.push_back(batched_bases.to(device));
+            inputs.push_back(batched_quals.to(device));
+            inputs.push_back(length_tensor.to(device));
+            std::for_each(indices_batch.begin(), indices_batch.end(),
+                          [device](torch::Tensor& t) { t.to(device); });
+            inputs.push_back(indices_batch);
+        }
         auto t2 = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> transfer_dur = (t2 - t1);
         transfer_time.store(transfer_time.load() + transfer_dur);
@@ -1142,6 +1174,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             auto base_logits = output.toTuple()->elements()[1].toTensor();
             //print_size(base_logits, "base_logits");
             auto preds = base_logits.argmax(1, false).to(torch::kCPU);
+            lock.unlock();
             auto t3 = std::chrono::high_resolution_clock::now();
             //print_size(preds, "preds");
             auto split_preds = preds.split_with_sizes(sizes);
@@ -1189,6 +1222,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
 
     WindowFeatures item;
     while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
+        utils::ScopedProfileRange spr("collect_features", 1);
         //spdlog::info("remaining batch spots {}", remaining_batch_slots);
         int required_batch_slots = (item.bases.sizes()[1] / 5120) + 1;
         if (required_batch_slots > remaining_batch_slots) {
@@ -1238,10 +1272,13 @@ void CorrectionNode::input_thread_fn() {
 
     m_num_active_feature_threads++;
 
+    auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
-            //if (alignments.read_name == "37ed430b-4289-4bad-9810-10494ff686b7") {
+            utils::ScopedProfileRange spr("input_loop", 1);
+            hydrate_alignments(alignments, fastx_reader.get());
+            //if (alignments.read_name == "a0ce7c4c-28d3-46cd-aca7-9a203b87ffc6") {
             if (true) {
                 //spdlog::info("Process windows for {} of length {}", alignments.read_name,
                 //             alignments.read_seq.length());
@@ -1299,7 +1336,7 @@ void CorrectionNode::input_thread_fn() {
             }
             num_reads++;
 
-            if (num_reads.load() % 100 == 0) {
+            if (num_reads.load() % 10000 == 0) {
                 spdlog::info("Processed {} reads", num_reads.load());
             }
         } else {
@@ -1314,11 +1351,13 @@ void CorrectionNode::input_thread_fn() {
     }
 }
 
-CorrectionNode::CorrectionNode(int threads,
+CorrectionNode::CorrectionNode(const std::string& fastq,
+                               int threads,
                                const std::string& device,
                                int infer_threads,
                                int batch_size)
         : MessageSink(1000, threads),
+          m_fastq(fastq),
           m_batch_size(batch_size),
           m_features_queue(1024),
           m_inferred_features_queue(512),
@@ -1356,6 +1395,17 @@ CorrectionNode::CorrectionNode(int threads,
     for (int i = 0; i < 4; i++) {
         m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
     }
+    // Create index for fastq file.
+    char* idx_name = fai_path(fastq.c_str());
+    spdlog::info("Looking for idx {}", idx_name);
+    if (!std::filesystem::exists(idx_name)) {
+        if (fai_build(fastq.c_str()) != 0) {
+            spdlog::error("Failed to build index for file {}", fastq);
+            throw std::runtime_error("");
+        }
+        spdlog::info("Created fastq index.");
+    }
+    free(idx_name);
     start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
 

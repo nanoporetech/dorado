@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hts_io/FastxRandomReader.h"
 #include "read_pipeline/MessageSink.h"
 #include "read_pipeline/messages.h"
 #include "utils/AsyncQueue.h"
@@ -53,7 +54,11 @@ struct base_count_t {
 
 class CorrectionNode : public MessageSink {
 public:
-    CorrectionNode(int threads, const std::string& device, int infer_threads, int bach_size);
+    CorrectionNode(const std::string& fastq,
+                   int threads,
+                   const std::string& device,
+                   int infer_threads,
+                   int bach_size);
     ~CorrectionNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
@@ -61,10 +66,12 @@ public:
     void restart() override { start_input_processing(&CorrectionNode::input_thread_fn, this); }
 
 private:
+    const std::string m_fastq;
     void input_thread_fn();
     const int m_window_size = 4096;
     int m_batch_size;
 
+    void hydrate_alignments(CorrectionAlignments& alignments, hts_io::FastxRandomReader* reader);
     bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& alignments);
     void calculate_accuracy(OverlapWindow& overlap,
                             const CorrectionAlignments& alignments,
@@ -135,7 +142,7 @@ private:
     public:
         MemoryManager(int batch_size, T fill_val) : m_fill_val(fill_val) {
             const size_t num_tensors = 8 * 8;  // devices * threads per device;
-            const size_t tensor_size = WS * NR * batch_size;
+            tensor_size = WS * NR * batch_size;
             m_bases_ptr = std::make_unique<T[]>(tensor_size * num_tensors);
             //std::fill(m_bases_ptr.get(), m_bases_ptr.get() + tensor_size * num_tensors, fill_val);
 
@@ -168,6 +175,7 @@ private:
         static constexpr int WS = 5120;
         static constexpr int NR = 31;
         static constexpr int NW = 128;
+        size_t tensor_size;
         T m_fill_val;
 
         std::unique_ptr<T[]> m_bases_ptr;
