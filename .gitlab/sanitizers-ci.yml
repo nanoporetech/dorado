@@ -6,7 +6,6 @@
       - SANITIZER:
         - "address;undefined"
         - "thread"
-  timeout: 1h 30m
   variables:
     # Debug is much faster to build than Release, and that outweighs the time spent
     # running the tests on some of our CI machines. It's good to sanitize unoptimised
@@ -66,10 +65,6 @@ sanitize:linux:arm64:focal:
     # Run both base setups
     - !reference ["build:linux:arm64:focal", before_script]
     - !reference [.sanitizer_common_linux, before_script]
-  retry:
-    max: 1
-    when:
-    - job_execution_timeout
 
 sanitize:macos:arm:
   extends:
