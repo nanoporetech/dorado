@@ -160,7 +160,8 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
         throw std::runtime_error("no read groups in file");
     }
 
-    kstring_t rg = allocate_kstring();
+    auto rg = allocate_kstring();
+    KStringPtr rg_ptr(&rg);
     std::map<std::string, std::string> read_group_info;
 
     for (int i = 0; i < num_read_groups; ++i) {
@@ -175,8 +176,6 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
             read_group_info[read_group_id] = std::string(rg.s, rg.l);
         }
     }
-
-    free(rg.s);
     return read_group_info;
 }
 

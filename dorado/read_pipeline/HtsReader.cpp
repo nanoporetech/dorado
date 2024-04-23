@@ -41,7 +41,7 @@ HtsReader::~HtsReader() {
 }
 
 void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
-    m_record_mutator = mutator;
+    m_record_mutator = std::move(mutator);
 }
 
 bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }

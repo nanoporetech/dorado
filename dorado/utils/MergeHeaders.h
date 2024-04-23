@@ -37,7 +37,9 @@ public:
 
     /** Get the merged header object.
      * 
-     *  This returns a nullptr if finalize_merge() has not been called.
+     *  This should only be called after finalize_merge() has been called.
+     *  An exception will be thrown if finalize_merge() hasn't been called.
+     * 
      *  The returned pointer is owned by the MergeHeaders object. Copy
      *  it with sam_hdr_dup() if you need a copy that will remain valid
      *  beyond the lifetime of the MergeHeaders object.
@@ -47,6 +49,9 @@ public:
     /** Get the mapping of indexes of SQ lines from original headers to
      *  the merged header.
      *  
+     *  This should only be called after finalize_merge() has been called.
+     *  An exception will be thrown if finalize_merge() hasn't been called.
+     * 
      *  Each element of the returned vector corresponds to one of the
      *  original header files, in the order they were added.
      * 
@@ -73,10 +78,6 @@ private:
     bool m_strip_alignment;
     SamHdrPtr m_merged_header;
     std::vector<std::vector<uint32_t>> m_sq_mapping;
-
-    // Stores the HD line of the first header, which will be used
-    // as the HD line for the merged header.
-    std::string m_hd_line;
 
     // Stores unique RG lines across all headers.
     std::map<std::string, std::string> m_read_group_lut;

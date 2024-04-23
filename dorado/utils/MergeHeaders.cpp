@@ -49,9 +49,21 @@ std::string MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename
     return std::string();
 }
 
-sam_hdr_t* MergeHeaders::get_merged_header() const { return m_merged_header.get(); }
+sam_hdr_t* MergeHeaders::get_merged_header() const {
+    if (!m_merged_header) {
+        throw std::logic_error(
+                "Error in MergeHeaders. get_merged_header() called before finalize_merge().");
+    }
+    return m_merged_header.get();
+}
 
-std::vector<std::vector<uint32_t>> MergeHeaders::get_sq_mapping() const { return m_sq_mapping; }
+std::vector<std::vector<uint32_t>> MergeHeaders::get_sq_mapping() const {
+    if (!m_merged_header) {
+        throw std::logic_error(
+                "Error in MergeHeaders. get_sq_mapping() called before finalize_merge().");
+    }
+    return m_sq_mapping;
+}
 
 int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
     std::map<std::string, RefInfo> ref_map;
@@ -86,7 +98,6 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
 
 int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr) {
     int num_lines = sam_hdr_count_lines(hdr, "RG");
-    ;
     for (int i = 0; i < num_lines; ++i) {
         auto idp = sam_hdr_line_name(hdr, "RG", i);
         if (!idp) {
@@ -119,7 +130,7 @@ int MergeHeaders::add_pg_data(sam_hdr_t* hdr) {
         if (!idp) {
             return -1;
         }
-        kstring_t line_data = KS_INITIALIZE;
+        kstring_t line_data = allocate_kstring();
         KStringPtr line_ptr(&line_data);
         auto res = sam_hdr_find_line_pos(hdr, "PG", i, line_ptr.get());
         if (res < 0) {
@@ -146,9 +157,7 @@ void MergeHeaders::add_other_lines(sam_hdr_t* hdr) {
             continue;
         }
         if (header_type == "@HD") {
-            if (m_hd_line.empty()) {
-                m_hd_line = header_line;
-            }
+            // We will generate our own HD line for the output file.
             continue;
         }
         m_other_lines.insert(header_line);
@@ -157,10 +166,7 @@ void MergeHeaders::add_other_lines(sam_hdr_t* hdr) {
 
 void MergeHeaders::finalize_merge() {
     m_merged_header.reset(sam_hdr_init());
-    if (!m_hd_line.empty()) {
-        sam_hdr_add_lines(m_merged_header.get(), m_hd_line.c_str(), 0);
-        sam_hdr_change_HD(m_merged_header.get(), "SO", "unknown");
-    }
+    sam_hdr_add_lines(m_merged_header.get(), "@HD\tVN:1.6\tSO:unknown", 0);
 
     for (const auto& entry : m_program_lut) {
         const auto& key = entry.first;
