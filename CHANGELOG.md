@@ -4,9 +4,8 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.6.1] (23 April 2024)
 
-This release of Dorado fixes some critical bugs in `dorado aligner` primarily related to using presets correctly.
+This release of Dorado fixes bugs in `dorado aligner` related to using presets incorrectly and in `dorado demux` which were causing demultiplexed outputs to be malformed.
 
-* TBD - Make sm/sd tags for pA and quantile scaling consistent
 * 3e060db5a35ab09fecbeef9754cc545ba400edf1 - Skip stripping of SQ header lines in dorado demux --no-classify
 * a2abf83852e895b1016c690769b59c06587684fe - Fix incorrect overriding of minimap2 options when minimap2 preset is specified
 * 1cc207a166b1cafcbd012f5c70b5c817c788c7f3 - Fix bug causing unclassified records from `dorado demux` to be unreadable by samtools
@@ -15,7 +14,6 @@ This release of Dorado fixes some critical bugs in `dorado aligner` primarily re
 * 3b2c8252d1a40bb0f941ca2ceca0849be15d15fa - Propagate `sv` tag to split reads
 * 11675a565da9af52de89a3f6614d15e57d10765d - Fix bug where errors were being swallowed in HtsFile class
 * 73046e19fd443dfb48f3fbb82c0b37c5c7cfb8d5 - Fx typo in Warnings.cmake
-
 
 # [0.6.0] (2 April 2024)
 
