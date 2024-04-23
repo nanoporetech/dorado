@@ -21,7 +21,7 @@ public:
                           const std::vector<std::string>& kit_name,
                           bool barcode_both_ends,
                           bool no_trim,
-                          BarcodingInfo::FilterSet allowed_barcodes,
+                          const BarcodingInfo::FilterSet& allowed_barcodes,
                           const std::optional<std::string>& custom_kit,
                           const std::optional<std::string>& custom_seqs);
     BarcodeClassifierNode(int threads);

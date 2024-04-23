@@ -48,7 +48,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads,
                                              const std::vector<std::string>&,
                                              bool,
                                              bool,
-                                             BarcodingInfo::FilterSet,
+                                             const BarcodingInfo::FilterSet&,
                                              const std::optional<std::string>&,
                                              const std::optional<std::string>&)
         : MessageSink(10000, threads) {
@@ -62,10 +62,7 @@ BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, t
 void BarcodeClassifierNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        if (std::holds_alternative<BamPtr>(message)) {
-            auto read = std::get<BamPtr>(std::move(message));
-            send_message_to_sink(std::move(read));
-        } else if (std::holds_alternative<BamMessage>(message)) {
+        if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it if
             // client requires read trimming.

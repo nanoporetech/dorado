@@ -38,15 +38,7 @@ AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threa
 void AdapterDetectorNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        if (std::holds_alternative<BamPtr>(message)) {
-            auto read = std::get<BamPtr>(std::move(message));
-            // If the read is a secondary or supplementary read, ignore it.
-            if (read->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
-                continue;
-            }
-            process_read(read);
-            send_message_to_sink(std::move(read));
-        } else if (std::holds_alternative<BamMessage>(message)) {
+        if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it.
             if (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {

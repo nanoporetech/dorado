@@ -384,16 +384,9 @@ TEST_CASE(
             int(stride * 2 * flank_size);  // * 2 is because we have 2 moves per base
 
     for (auto& message : messages) {
-        if (std::holds_alternative<BamPtr>(message) ||
-            std::holds_alternative<BamMessage>(message)) {
-            BamPtr bam_ptr;
-            if (std::holds_alternative<BamPtr>(message)) {
-                bam_ptr = std::get<BamPtr>(std::move(message));
-            } else {
-                auto bam_message = std::get<BamMessage>(std::move(message));
-                bam_ptr = std::move(bam_message.bam_ptr);
-            }
-            bam1_t* rec = bam_ptr.get();
+        if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+            bam1_t* rec = bam_message.bam_ptr.get();
 
             // Check trimming on the bam1_t struct.
             auto seq = dorado::utils::extract_sequence(rec);

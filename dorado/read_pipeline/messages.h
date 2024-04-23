@@ -215,8 +215,8 @@ public:
 // - a BamMessage object, composite class holding a BamPtr (which represents a raw BAM alignment record) and ClientInfo
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::
-        variant<SimplexReadPtr, BamPtr, BamMessage, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+using Message =
+        std::variant<SimplexReadPtr, BamMessage, ReadPair, CacheFlushMessage, DuplexReadPtr>;
 
 bool is_read_message(const Message& message);
 

@@ -232,7 +232,7 @@ void setup(const std::vector<std::string>& args,
         std::vector<std::string> kit_as_vector{barcode_kit};
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads, kit_as_vector,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes), custom_kit,
+                barcode_both_ends, barcode_no_trim, allowed_barcodes, custom_kit,
                 custom_barcode_file);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
