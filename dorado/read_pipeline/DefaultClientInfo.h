@@ -27,7 +27,9 @@ public:
 
     const std::shared_ptr<AdapterInfo>& adapter_info() const override { return m_adapter_info; }
     const AlignmentInfo& alignment_info() const override { return *m_alignment_info; }
-    const BarcodingInfo& barcoding_info() const override { return *m_barcoding_info; }
+    const std::shared_ptr<BarcodingInfo>& barcoding_info() const override {
+        return m_barcoding_info;
+    }
     const poly_tail::PolyTailCalculator* poly_a_calculator() const override {
         return m_poly_a_calculator.get();
     };

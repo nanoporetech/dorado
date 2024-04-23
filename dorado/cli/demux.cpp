@@ -39,19 +39,20 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 
 }  // anonymous namespace
 
-BarcodingInfo get_barcoding_info(cli::ArgParser& parser, const utils::SampleSheet* sample_sheet) {
-    BarcodingInfo result{};
-    result.kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
-    result.custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
-    if (result.kit_name.empty() && !result.custom_kit) {
+std::shared_ptr<BarcodingInfo> get_barcoding_info(cli::ArgParser& parser,
+                                                  const utils::SampleSheet* sample_sheet) {
+    auto result = std::make_shared<BarcodingInfo>();
+    result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
+    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
+    if (result->kit_name.empty() && !result->custom_kit) {
         return result;
     }
-    result.barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
-    result.trim = !parser.visible.get<bool>("--no-trim");
+    result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+    result->trim = !parser.visible.get<bool>("--no-trim");
     if (sample_sheet) {
-        result.allowed_barcodes = sample_sheet->get_barcode_values();
+        result->allowed_barcodes = sample_sheet->get_barcode_values();
     }
-    result.custom_seqs = parser.visible.present("--barcode-sequences");
+    result->custom_seqs = parser.visible.present("--barcode-sequences");
 
     return result;
 }
@@ -232,17 +233,9 @@ int demuxer(int argc, char* argv[]) {
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
     }
-    BarcodingInfo barcoding_info = get_barcoding_info(parser, sample_sheet.get());
 
-    class DemuxClientInfo : public DefaultClientInfo {
-        const BarcodingInfo m_barcoding_info;
-
-    public:
-        DemuxClientInfo(BarcodingInfo barcoding_info)
-                : m_barcoding_info(std::move(barcoding_info)) {}
-        const BarcodingInfo& barcoding_info() const override { return m_barcoding_info; }
-    };
-    auto client_info = std::make_shared<DemuxClientInfo>(std::move(barcoding_info));
+    auto client_info = std::make_shared<DefaultClientInfo>();
+    client_info->set_barcoding_info(get_barcoding_info(parser, sample_sheet.get()));
     reader.set_client_info(client_info);
 
     PipelineDescriptor pipeline_desc;
@@ -250,7 +243,7 @@ int demuxer(int argc, char* argv[]) {
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
             std::move(sample_sheet), sort_bam);
 
-    const auto& info = client_info->barcoding_info();
+    const auto& info = *client_info->barcoding_info();
     if (!info.kit_name.empty() || info.custom_kit) {
         std::vector<std::string> kit_names{};
         if (!info.kit_name.empty()) {

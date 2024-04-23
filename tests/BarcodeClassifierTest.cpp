@@ -211,7 +211,7 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     auto client_info = std::make_shared<dorado::FakeClientInfo>();
-    client_info->set_barcoding_info(*barcoding_info);
+    client_info->set_barcoding_info(barcoding_info);
     read->read_common.client_info = client_info;
 
     std::vector<uint8_t> moves;
@@ -369,7 +369,7 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
     reader.read();
 
     auto client_info = std::make_shared<dorado::FakeClientInfo>();
-    client_info->set_barcoding_info(*barcoding_info);
+    client_info->set_barcoding_info(barcoding_info);
 
     // Fetch the original read before barcode trimming.
     auto orig_seq = dorado::utils::extract_sequence(reader.record.get());

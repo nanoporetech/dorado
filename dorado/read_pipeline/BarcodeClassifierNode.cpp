@@ -32,30 +32,26 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     return bc;
 }
 
+const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
+    if (!client_info.barcoding_info()) {
+        return nullptr;
+    }
+    const auto info = client_info.barcoding_info().get();
+    return !info->kit_name.empty() || info->custom_kit.has_value() ? info : nullptr;
+}
+
 }  // namespace
 
 namespace dorado {
 
-// A Node which encapsulates running barcode classification on each read.
 BarcodeClassifierNode::BarcodeClassifierNode(int threads,
-                                             const std::vector<std::string>& kit_names,
-                                             bool barcode_both_ends,
-                                             bool no_trim,
-                                             BarcodingInfo::FilterSet allowed_barcodes,
-                                             const std::optional<std::string>& custom_kit,
-                                             const std::optional<std::string>& custom_seqs)
-        : MessageSink(10000, threads),
-          m_default_barcoding_info(create_barcoding_info(kit_names,
-                                                         barcode_both_ends,
-                                                         !no_trim,
-                                                         std::move(allowed_barcodes),
-                                                         custom_kit,
-                                                         custom_seqs)) {
-    if (m_default_barcoding_info->kit_name.empty()) {
-        spdlog::debug("Barcode with new kit from {}", *m_default_barcoding_info->custom_kit);
-    } else {
-        spdlog::debug("Barcode for {}", m_default_barcoding_info->kit_name);
-    }
+                                             const std::vector<std::string>&,
+                                             bool,
+                                             bool,
+                                             BarcodingInfo::FilterSet,
+                                             const std::optional<std::string>&,
+                                             const std::optional<std::string>&)
+        : MessageSink(10000, threads) {
     start_input_processing(&BarcodeClassifierNode::input_thread_fn, this);
 }
 
@@ -68,23 +64,17 @@ void BarcodeClassifierNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamPtr>(message)) {
             auto read = std::get<BamPtr>(std::move(message));
-            // If the read is a secondary or supplementary read, ignore it if
-            // we're setup to trim reads.
-            if (m_default_barcoding_info->trim &&
-                (read->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
-                continue;
-            }
-            barcode(read);
             send_message_to_sink(std::move(read));
         } else if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it if
-            // we're setup to trim reads.
-            if (m_default_barcoding_info->trim &&
+            // client requires read trimming.
+            const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
+            if (barcoding_info && barcoding_info->trim &&
                 (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
                 continue;
             }
-            barcode(bam_message.bam_ptr);
+            barcode(bam_message.bam_ptr, barcoding_info);
             send_message_to_sink(std::move(bam_message));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             auto read = std::get<SimplexReadPtr>(std::move(message));
@@ -96,32 +86,17 @@ void BarcodeClassifierNode::input_thread_fn() {
     }
 }
 
-const BarcodingInfo* BarcodeClassifierNode::get_barcoding_info(const SimplexRead& read) const {
-    if (m_default_barcoding_info && (!m_default_barcoding_info->kit_name.empty() ||
-                                     m_default_barcoding_info->custom_kit.has_value())) {
-        return m_default_barcoding_info.get();
-    }
-
-    if (!read.read_common.client_info->barcoding_info().kit_name.empty() ||
-        read.read_common.client_info->barcoding_info().custom_kit.has_value()) {
-        return &read.read_common.client_info->barcoding_info();
-    }
-
-    return nullptr;
-}
-
-void BarcodeClassifierNode::barcode(BamPtr& read) {
-    if (!m_default_barcoding_info ||
-        (m_default_barcoding_info->kit_name.empty() && !m_default_barcoding_info->custom_kit)) {
+void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding_info) {
+    if (!barcoding_info) {
         return;
     }
-    auto barcoder = m_barcoder_selector.get_barcoder(*m_default_barcoding_info);
+    auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
     bam1_t* irecord = read.get();
     std::string seq = utils::extract_sequence(irecord);
 
-    auto bc_res = barcoder->barcode(seq, m_default_barcoding_info->barcode_both_ends,
-                                    m_default_barcoding_info->allowed_barcodes);
+    auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
+                                    barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     spdlog::trace("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_append(irecord, "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
@@ -131,7 +106,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
         m_barcode_count[bc]++;
     }
 
-    if (m_default_barcoding_info->trim) {
+    if (barcoding_info->trim) {
         int seqlen = irecord->core.l_qseq;
         auto trim_interval = Trimmer::determine_trim_interval(bc_res, seqlen);
 
@@ -144,7 +119,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
 }
 
 void BarcodeClassifierNode::barcode(SimplexRead& read) {
-    auto barcoding_info = get_barcoding_info(read);
+    const auto* barcoding_info = get_barcoding_info(*read.read_common.client_info);
     if (!barcoding_info) {
         return;
     }
