@@ -7,6 +7,7 @@ All notable changes to Dorado will be documented in this file.
 This release of Dorado fixes some critical bugs in `dorado aligner` primarily related to using presets correctly.
 
 * TBD - Make sm/sd tags for pA and quantile scaling consistent
+* 3e060db5a35ab09fecbeef9754cc545ba400edf1 - Skip stripping of SQ header lines in dorado demux --no-classify
 * a2abf83852e895b1016c690769b59c06587684fe - Fix incorrect overriding of minimap2 options when minimap2 preset is specified
 * 1cc207a166b1cafcbd012f5c70b5c817c788c7f3 - Fix bug causing unclassified records from `dorado demux` to be unreadable by samtools
 * 298277150ad2522ca6c1928c4981782ce2893a5a - Fix issue with allocating memory on unused GPU during basecalling
