@@ -34,6 +34,10 @@
 .sanitizer_common_linux:
   extends:
     .sanitizer_common
+  variables:
+    # The only BUILD_OPTIONS in the Linux jobs are to build Koi from source and to build
+    # the mm2 exe. We don't need either of those for the sanitizers though.
+    BUILD_OPTIONS: ""
   parallel:
     matrix:
       - SANITIZER:
