@@ -133,6 +133,12 @@ int MergeHeaders::add_pg_data(sam_hdr_t* hdr) {
 }
 
 void MergeHeaders::add_other_lines(sam_hdr_t* hdr) {
+    auto header_str = sam_hdr_str(hdr);
+    if (!header_str) {
+        // A nullptr here means the header object is empty. This usually just means
+        // the input file was a fastq file.
+        return;
+    }
     auto source_stream = std::stringstream{sam_hdr_str(hdr)};
     for (std::string header_line; std::getline(source_stream, header_line);) {
         std::string_view header_type = std::string_view(header_line).substr(0, 3);
