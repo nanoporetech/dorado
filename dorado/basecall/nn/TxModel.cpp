@@ -55,9 +55,9 @@ RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {
 }
 
 at::Tensor RMSNormImpl::forward(at::Tensor x) {
-    x = x.to(torch::kFloat32);
-    at::Tensor rstd = torch::rsqrt(x.square().mean(-1, true, torch::kFloat32) + eps);
-    return (x * rstd * weight).to(torch::kHalf);
+    at::Tensor rstd = torch::rsqrt(x.square().mean(-1, true).add_(eps));
+    x.mul_(rstd).mul_(weight);
+    return x;
 }
 
 GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
@@ -71,7 +71,7 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
     const at::Tensor &y = chunks[0];
     const at::Tensor &gate = chunks[1];
-    at::Tensor out = fc2(functional::silu(gate).mul(y));
+    at::Tensor out = fc2(functional::silu(gate).mul_(y));
     return out;
 }
 
@@ -80,40 +80,38 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
                                          int max_seq_len_,
                                          const at::TensorOptions &options_)
         : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
-    // To maintain precision we use float32 here
     const at::Tensor inv_freq =
-            torch::pow(theta, torch::arange(0, dim, 2, options.dtype(torch::kFloat32)) / dim)
-                    .reciprocal();
+            torch::pow(theta, torch::arange(0, dim, 2, options) / dim).reciprocal();
 
     // freqs.shape := {max_seq_len, 1, 1, dim/2}
-    const at::Tensor freqs = torch::arange(max_seq_len, options.dtype(torch::kFloat32))
-                                     .reshape({max_seq_len, 1, 1, 1}) *
-                             inv_freq;
+    const at::Tensor freqs =
+            torch::arange(max_seq_len, options).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
 
-    register_buffer("cos_freqs", torch::cos(freqs).to(options.dtype(torch::kHalf)));
-    register_buffer("sin_freqs", torch::sin(freqs).to(options.dtype(torch::kHalf)));
+    register_buffer("cos_freqs", torch::cos(freqs).to(options));
+    register_buffer("sin_freqs", torch::sin(freqs).to(options));
 };
 
-at::Tensor RotaryEmbeddingImpl::forward(const at::Tensor &qkv) {
+at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
     assert_forward_dims(qkv);
     const int64_t seq_len = qkv.size(1);
 
-    const at::Tensor cos_buf = named_buffers()["cos_freqs"].index({Slice(Idx::None, seq_len)});
-    const at::Tensor sin_buf = named_buffers()["sin_freqs"].index({Slice(Idx::None, seq_len)});
+    auto buffers = named_buffers();
+    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, seq_len);
+    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, seq_len);
 
-    at::Tensor out = qkv.clone();
+    using Slices = std::vector<at::indexing::TensorIndex>;
+    const Slices evens = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
+                          at::indexing::Slice(), at::indexing::Slice(at::indexing::None, dim / 2)};
+    const Slices odds = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
+                         at::indexing::Slice(), at::indexing::Slice(dim / 2, dim)};
 
-    using Slices = std::vector<Idx::TensorIndex>;
-    const Slices evens = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(Idx::None, dim / 2)};
-    const Slices odds = {Idx::Ellipsis, Slice(Idx::None, 2), Slice(), Slice(dim / 2, dim)};
+    at::Tensor qk_evens = qkv.index(evens).clone();
+    at::Tensor qk_odds = qkv.index(odds);
 
-    const at::Tensor qk_evens = qkv.index(evens).to(torch::kFloat32);
-    const at::Tensor qk_odds = qkv.index(odds).to(torch::kFloat32);
+    qkv.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
+    qkv.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
 
-    out.index(evens) = (cos_buf * qk_evens) - (sin_buf * qk_odds);
-    out.index(odds) = (sin_buf * qk_evens) + (cos_buf * qk_odds);
-
-    return out.to(torch::kHalf);
+    return qkv;
 }
 
 void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
@@ -162,11 +160,20 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
             register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
 
+at::Tensor MultiHeadAttentionImpl::get_attn_window_mask(const int64_t size) {
+    const auto key = MaskKey{size, options.device()};
+    if (mask_cache.find(key) == mask_cache.end()) {
+        mask_cache[key] = build_attn_window_mask(size);
+    }
+    return mask_cache.at(key);
+}
+
 at::Tensor MultiHeadAttentionImpl::build_attn_window_mask(const int64_t size) const {
+    utils::ScopedProfileRange spr("AWM", 3);
     const auto [win_upper, win_lower] = attn_window;
-    at::Tensor mask = at::triu(at::ones({size, size}), -win_upper);
-    mask *= at::tril(mask, win_lower);
-    mask = mask.to(at::kBool).to(options.device());
+    at::Tensor mask = at::ones({size, size}, options.device());
+    mask.triu_(-win_upper).tril_(win_lower);
+    mask = mask.to(at::kBool);
     return mask;
 };
 
@@ -190,7 +197,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         utils::ScopedProfileRange spr("MEA", 2);
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
-        auto attn_window_mask = build_attn_window_mask(T);
+        auto attn_window_mask = get_attn_window_mask(T);
 
 #if TORCH_VERSION_MAJOR < 2
         attn_output =
@@ -220,13 +227,14 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
+    const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
-        x = norm1(attn + (x * named_buffers()["deepnorm_alpha"]));
+        x = norm1(attn + (x * deepnorm_alpha));
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
@@ -234,7 +242,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
-        x = norm2(f + (x * named_buffers()["deepnorm_alpha"]));
+        x = norm2(f + (x * deepnorm_alpha));
     }
 
     return x;
