@@ -140,7 +140,7 @@ public:
     KString &operator=(const KString &) = delete;
 
     /// Move assignment.
-    KString &operator=(KString &&rhs);
+    KString &operator=(KString &&rhs) noexcept;
 
     /// Destroys the kstring_t data.
     ~KString();

@@ -61,7 +61,7 @@ KString::KString(KString&& other) noexcept : m_data(std::make_unique<kstring_t>(
     m_data.swap(other.m_data);
 }
 
-KString& KString::operator=(KString&& rhs) {
+KString& KString::operator=(KString&& rhs) noexcept {
     if (m_data->s) {
         ks_free(m_data.get());
     }
