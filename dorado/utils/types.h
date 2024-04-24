@@ -131,10 +131,10 @@ public:
      *  Note that it is an error to create more than one KString object
      *  that owns the same kstring_t data.
      */
-    KString(kstring_t &&data);
+    KString(kstring_t &&data) noexcept;
 
     /// Move Constructor
-    KString(KString &&other);
+    KString(KString &&other) noexcept;
 
     /// No copying allowed.
     KString &operator=(const KString &) = delete;
