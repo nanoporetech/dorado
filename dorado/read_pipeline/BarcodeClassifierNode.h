@@ -35,13 +35,14 @@ public:
 
 private:
     std::atomic<int> m_num_records{0};
-    std::shared_ptr<const BarcodingInfo> m_default_barcoding_info;
+    std::shared_ptr<BarcodingInfo> m_default_barcoding_info;
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
-    std::shared_ptr<const BarcodingInfo> get_barcoding_info(const SimplexRead& read) const;
+    std::shared_ptr<BarcodingInfo> get_barcoding_info(
+            const std::shared_ptr<BarcodingInfo>& client_barcoding_info);
 
     void input_thread_fn();
-    void barcode(BamPtr& read);
+    void barcode(BamPtr& read, const BarcodingInfo* barcoding_info);
     void barcode(SimplexRead& read);
 
     // Track how many reads were classified as each barcode for debugging
