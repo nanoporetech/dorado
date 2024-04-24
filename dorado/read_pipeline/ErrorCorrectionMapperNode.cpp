@@ -85,7 +85,6 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         }
 
         ovlp.qid = alignments.seqs.size();
-        ovlp.tlen = (int)alignments.read_seq.length();
 
         //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
         //    continue;

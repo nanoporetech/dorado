@@ -141,6 +141,7 @@ void CorrectionNode::hydrate_alignments(CorrectionAlignments& alignments,
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = std::move(reader->fetch_seq(qname));
         alignments.quals[i] = std::move(reader->fetch_qual(qname));
+        alignments.overlaps[i].tlen = (int)alignments.read_seq.length();
     }
 }
 
