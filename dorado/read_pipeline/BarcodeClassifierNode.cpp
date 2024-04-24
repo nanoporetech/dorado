@@ -32,14 +32,6 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     return bc;
 }
 
-const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
-    if (!client_info.barcoding_info()) {
-        return nullptr;
-    }
-    const auto info = client_info.barcoding_info().get();
-    return !info->kit_name.empty() || info->custom_kit.has_value() ? info : nullptr;
-}
-
 }  // namespace
 
 namespace dorado {
