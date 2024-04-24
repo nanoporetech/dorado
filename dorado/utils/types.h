@@ -131,7 +131,7 @@ public:
      *  Note that it is an error to create more than one KString object
      *  that owns the same kstring_t data.
      */
-    KString(const kstring_t &kstring);
+    KString(kstring_t &&data);
 
     /// Move Constructor
     KString(KString &&other);

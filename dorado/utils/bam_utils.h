@@ -167,21 +167,6 @@ uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t quer
 std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
 
 /*
- * Allocate kstring_t which is already resized to hold 1 MB of data.
- *
- * This is done to work around a Windows DLL cross-heap segmentation fault.
- * The ks_resize/ks_free functions from htslib
- * are inline functions. When htslib is shipped as a DLL, some of these functions
- * are inlined into the DLL code through other htslib APIs. But those same functions
- * also get inlined into dorado code when invoked directly. As a result, it's possible
- * that an htslib APIs resizes a string using the DLL code. But when a ks_free
- * is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
- *
- * @return kstring_t struct
- */
-//kstring_t allocate_kstring();
-
-/*
  * Make a copy of the bam record with any alignment data stripped out.
  *
  * @param record BAM record.

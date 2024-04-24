@@ -51,7 +51,10 @@ KString::KString(size_t n) : m_data(std::make_unique<kstring_t>()) {
     ks_resize(m_data.get(), n);
 }
 
-KString::KString(const kstring_t& data) : m_data(std::make_unique<kstring_t>()) { *m_data = data; }
+KString::KString(kstring_t&& data) : m_data(std::make_unique<kstring_t>()) {
+    *m_data = data;
+    data = {0, 0, nullptr};
+}
 
 KString::KString(KString&& other) : m_data(std::make_unique<kstring_t>()) {
     *m_data = {0, 0, nullptr};

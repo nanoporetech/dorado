@@ -112,14 +112,6 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 
 }  // namespace
 
-/*
-kstring_t allocate_kstring() {
-    kstring_t str = {0, 0, NULL};
-    ks_resize(&str, 1'000'000);
-    return str;
-}
-*/
-
 void add_hd_header_line(sam_hdr_t* hdr) {
     sam_hdr_add_line(hdr, "HD", "VN", SAM_FORMAT_VERSION, "SO", "unknown", nullptr);
 }
