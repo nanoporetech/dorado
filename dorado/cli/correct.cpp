@@ -2,13 +2,9 @@
 #include "dorado_version.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
-#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
-#include "utils/bam_utils.h"
-#include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
-#include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -81,7 +77,7 @@ int correct(int argc, char* argv[]) {
         std::ostringstream parser_stream;
         parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     if (parser.get<bool>("--verbose")) {
@@ -96,14 +92,12 @@ int correct(int argc, char* argv[]) {
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
-    // adapter/primer correctming. Heuristically use 10% of threads for BAM
+    // correct. Heuristically use 10% of threads for BAM
     // generation and rest for correctming.
-    auto [correct_threads, correct_writer_threads] =
-            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
+    const int correct_threads = threads;
+    const int correct_writer_threads = 1;
     spdlog::debug("> correcting threads {}, writer threads {}", correct_threads,
                   correct_writer_threads);
-
-    auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
     if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");

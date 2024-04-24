@@ -1,7 +1,5 @@
 #include "Minimap2Index.h"
 
-#include "utils/string_utils.h"
-
 #include <spdlog/spdlog.h>
 
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
@@ -134,25 +132,23 @@ bool Minimap2Index::load_initial_index(const std::string& index_file,
         mm_idx_stat(m_index.get());
     }
 
-    spdlog::info("Loaded index with {} target seqs", m_index->n_seq);
+    spdlog::debug("Loaded index with {} target seqs", m_index->n_seq);
 
     return true;
 }
 
 IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
     if (!m_index_reader) {
-        spdlog::info("No index loaded");
         return IndexLoadResult::no_index_loaded;
     }
 
     auto next_idx = mm_idx_reader_read(m_index_reader.get(), num_threads);
     if (next_idx == 0) {
-        spdlog::info("Nothing returned for next index");
         return IndexLoadResult::end_of_index;
     }
 
     m_index.reset(next_idx, IndexDeleter());
-    spdlog::info("Loaded index with {} target seqs", m_index->n_seq);
+    spdlog::debug("Loaded next index chunk with {} target seqs", m_index->n_seq);
     return IndexLoadResult::success;
 }
 

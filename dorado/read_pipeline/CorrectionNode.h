@@ -1,5 +1,6 @@
 #pragma once
 
+#include "correct/types.h"
 #include "hts_io/FastxRandomReader.h"
 #include "read_pipeline/MessageSink.h"
 #include "read_pipeline/messages.h"
@@ -23,35 +24,6 @@
 
 namespace dorado {
 
-struct OverlapWindow {
-    size_t overlap_idx = -1;
-    int tstart = -1;
-    int qstart = -1;
-    int qend = -1;
-    int cigar_start_idx = -1;
-    int cigar_start_offset = -1;
-    int cigar_end_idx = -1;
-    int cigar_end_offset = -1;
-    float accuracy = 0;
-};
-
-struct WindowFeatures {
-    torch::Tensor bases;
-    torch::Tensor quals;
-    torch::Tensor indices;
-    int length;
-    std::vector<std::pair<int, int>> supported;
-    std::vector<char> inferred_bases;
-    int n_alns = 0;
-    std::string read_name = "";
-    int window_idx = -1;
-};
-
-struct base_count_t {
-    int c = 0;
-    char b;
-};
-
 class CorrectionNode : public MessageSink {
 public:
     CorrectionNode(const std::string& fastq,
@@ -71,35 +43,25 @@ private:
     const int m_window_size = 4096;
     int m_batch_size;
 
-    void hydrate_alignments(CorrectionAlignments& alignments, hts_io::FastxRandomReader* reader);
-    bool filter_overlap(const OverlapWindow& overlap, const CorrectionAlignments& alignments);
-    void calculate_accuracy(OverlapWindow& overlap,
-                            const CorrectionAlignments& alignments,
-                            size_t win_idx,
-                            int win_len);
-    std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
-                                            const CorrectionAlignments& alignments,
-                                            int tstart,
-                                            int win_len);
-    std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
-            const std::vector<OverlapWindow>& overlaps,
-            const CorrectionAlignments& alignments,
-            int win_len,
-            int tstart,
-            const std::vector<int>& max_ins);
-    std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases);
-    torch::Tensor get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported);
-    std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                                 const CorrectionAlignments& alignments);
-    void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
-                         const CorrectionAlignments& alignments);
-    std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs);
+    //std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
+    //        const std::vector<correction::OverlapWindow>& overlaps,
+    //        const CorrectionAlignments& alignments,
+    //        int win_len,
+    //        int tstart,
+    //        const std::vector<int>& max_ins);
+    //std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases);
+    //torch::Tensor get_indices(torch::Tensor bases, std::vector<std::pair<int, int>>& supported);
+    //std::vector<correction::WindowFeatures> extract_features(std::vector<std::vector<correction::OverlapWindow>>& windows,
+    //                                             const CorrectionAlignments& alignments);
+    //void extract_windows(std::vector<std::vector<correction::OverlapWindow>>& windows,
+    //                     const CorrectionAlignments& alignments);
+    //std::vector<std::string> decode_windows(const std::vector<correction::WindowFeatures>& wfs);
 
     void infer_fn(const std::string& device, int mtx_idx);
     void decode_fn();
 
-    utils::AsyncQueue<WindowFeatures> m_features_queue;
-    utils::AsyncQueue<WindowFeatures> m_inferred_features_queue;
+    utils::AsyncQueue<correction::WindowFeatures> m_features_queue;
+    utils::AsyncQueue<correction::WindowFeatures> m_inferred_features_queue;
 
     std::vector<std::unique_ptr<std::thread>> m_infer_threads;
     std::vector<std::unique_ptr<std::thread>> m_decode_threads;
@@ -114,7 +76,7 @@ private:
     std::mutex decodeMutex;
     std::atomic<int> num_reads;
 
-    std::unordered_map<std::string, std::vector<WindowFeatures>> m_features_by_id;
+    std::unordered_map<std::string, std::vector<correction::WindowFeatures>> m_features_by_id;
     std::unordered_map<std::string, int> m_pending_features_by_id;
     std::mutex m_features_mutex;
 

@@ -6,7 +6,6 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
-#include <variant>
 #include <vector>
 
 struct bam1_t;
