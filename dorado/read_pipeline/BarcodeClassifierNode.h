@@ -38,6 +38,8 @@ private:
     std::shared_ptr<const BarcodingInfo> m_default_barcoding_info;
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
+    std::shared_ptr<const BarcodingInfo> get_barcoding_info(const SimplexRead& read) const;
+
     void input_thread_fn();
     void barcode(BamPtr& read);
     void barcode(SimplexRead& read);

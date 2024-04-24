@@ -82,11 +82,6 @@ void BarcodeClassifierNode::input_thread_fn() {
                 continue;
             }
 
-            const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
-            if (barcoding_info && barcoding_info->trim &&
-                (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
-                continue;
-            }
             barcode(bam_message.bam_ptr);
             send_message_to_sink(std::move(bam_message));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
@@ -97,6 +92,21 @@ void BarcodeClassifierNode::input_thread_fn() {
             send_message_to_sink(std::move(message));
         }
     }
+}
+
+std::shared_ptr<const BarcodingInfo> BarcodeClassifierNode::get_barcoding_info(
+        const SimplexRead& read) const {
+    if (m_default_barcoding_info && (!m_default_barcoding_info->kit_name.empty() ||
+                                     m_default_barcoding_info->custom_kit.has_value())) {
+        return m_default_barcoding_info;
+    }
+
+    auto& info = read.read_common.client_info->barcoding_info();
+    if (info && (!info->kit_name.empty() || info->custom_kit.has_value())) {
+        return info;
+    }
+
+    return nullptr;
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read) {
@@ -133,7 +143,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read) {
 }
 
 void BarcodeClassifierNode::barcode(SimplexRead& read) {
-    const auto* barcoding_info = get_barcoding_info(*read.read_common.client_info);
+    auto barcoding_info = get_barcoding_info(read);
     if (!barcoding_info) {
         return;
     }
