@@ -32,6 +32,9 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger index "
                 "size.");
+    case dorado::alignment::IndexLoadResult::no_index_loaded:
+    case dorado::alignment::IndexLoadResult::end_of_index:
+        throw std::runtime_error("AlignerNode index loading error - should not reach here.");
     case dorado::alignment::IndexLoadResult::success:
         break;
     }

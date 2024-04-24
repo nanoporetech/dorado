@@ -21,9 +21,7 @@
 
 namespace {
 
-[[maybe_unused]] std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar,
-                                                          uint32_t n_cigar,
-                                                          bool fwd) {
+[[maybe_unused]] std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
     std::vector<dorado::CigarOp> cigar_ops;
     cigar_ops.reserve(n_cigar);
     for (uint32_t i = 0; i < n_cigar; i++) {
@@ -52,8 +50,7 @@ namespace dorado {
 void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
                                                    int hits,
                                                    const std::string& qread,
-                                                   const std::string& qname,
-                                                   const std::vector<uint8_t>& qqual) {
+                                                   const std::string& qname) {
     for (int j = 0; j < hits; j++) {
         // mapping region
         auto aln = &reg[j];
@@ -76,7 +73,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         ovlp.qlen = (int)qread.length();
 
         size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        auto cigar = parse_cigar(aln->p->cigar, n_cigar, ovlp.fwd);
+        auto cigar = parse_cigar(aln->p->cigar, n_cigar);
 
         std::lock_guard<std::mutex> aln_lock(mtx);
         auto& alignments = m_correction_records[tname];
@@ -97,25 +94,23 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
 
 void ErrorCorrectionMapperNode::input_thread_fn() {
     BamPtr read;
-    mm_tbuf_t* tbuf = mm_tbuf_init();
+    MmTbufPtr tbuf(mm_tbuf_init());
     while (m_reads_queue.try_pop(read) != utils::AsyncQueueStatus::Terminate) {
         const std::string read_name = bam_get_qname(read.get());
         const std::string read_seq = utils::extract_sequence(read.get());
-        auto read_qual = utils::extract_quality(read.get());
-        auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf);
+        auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf.get());
         auto clear_alignments = utils::PostCondition([reg, hits]() {
             for (int j = 0; j < hits; j++) {
                 free(reg[j].p);
             }
             free(reg);
         });
-        extract_alignments(reg, hits, read_seq, read_name, read_qual);
+        extract_alignments(reg, hits, read_seq, read_name);
         m_alignments_processed++;
         if (m_alignments_processed.load() % 10000 == 0) {
             spdlog::info("Alignments processed {}", m_alignments_processed.load());
         }
     }
-    mm_tbuf_destroy(tbuf);
 }
 
 void ErrorCorrectionMapperNode::load_read_fn() {
@@ -196,7 +191,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
-          m_reads_queue(1000) {
+          m_reads_queue(5000) {
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;

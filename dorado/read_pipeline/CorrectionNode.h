@@ -131,7 +131,6 @@ private:
     std::atomic<std::chrono::duration<double>> indices_time{};
     std::atomic<std::chrono::duration<double>> feature_tensors_alloc_time{};
     std::atomic<std::chrono::duration<double>> feature_tensors_fill_time{};
-    std::atomic<std::chrono::duration<double>> collate_time{};
     std::atomic<std::chrono::duration<double>> transfer_time{};
     std::atomic<std::chrono::duration<double>> feature_push_time{};
 

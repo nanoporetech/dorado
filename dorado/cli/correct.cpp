@@ -28,14 +28,6 @@ namespace dorado {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-namespace {
-
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "correct", "PN", "dorado", "VN", DORADO_VERSION, NULL);
-}
-
-}  // anonymous namespace
-
 int correct(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Dorado read correction tool.");
@@ -100,7 +92,6 @@ int correct(int argc, char* argv[]) {
     auto threads(parser.get<int>("threads"));
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
-    auto max_reads(parser.get<int>("max-reads"));
     auto batch_size(parser.get<int>("batch-size"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -146,8 +137,8 @@ int correct(int argc, char* argv[]) {
 
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
-    auto corrector = pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads,
-                                                            device, infer_threads, batch_size);
+    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
+                                           infer_threads, batch_size);
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
@@ -158,7 +149,7 @@ int correct(int argc, char* argv[]) {
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
-        std::exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     // Set up stats counting.

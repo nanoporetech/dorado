@@ -6,7 +6,10 @@
 #include <algorithm>
 #include <memory>
 
-using CharPtr = std::unique_ptr<char[], void (*)(char*)>;
+struct CharDestructor {
+    void operator()(char* ptr) { free(ptr); };
+};
+using CharPtr = std::unique_ptr<char, CharDestructor>;
 
 namespace dorado::hts_io {
 
@@ -23,7 +26,7 @@ FastxRandomReader::FastxRandomReader(const std::string& fastx_path) {
 
 std::string FastxRandomReader::fetch_seq(const std::string& read_id) const {
     int len = 0;
-    CharPtr seq(fai_fetch(m_faidx.get(), read_id.c_str(), &len), [](char* ptr) { delete[] ptr; });
+    CharPtr seq(fai_fetch(m_faidx.get(), read_id.c_str(), &len));
     if (len == -2) {
         spdlog::error("Read {} not found", read_id);
         return "";
@@ -37,8 +40,7 @@ std::string FastxRandomReader::fetch_seq(const std::string& read_id) const {
 
 std::vector<uint8_t> FastxRandomReader::fetch_qual(const std::string& read_id) const {
     int len = 0;
-    CharPtr qual(fai_fetchqual(m_faidx.get(), read_id.c_str(), &len),
-                 [](char* ptr) { delete[] ptr; });
+    CharPtr qual(fai_fetchqual(m_faidx.get(), read_id.c_str(), &len));
     if (len == -2) {
         spdlog::error("Read qual {} not found", read_id);
         return std::vector<uint8_t>();

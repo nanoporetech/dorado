@@ -31,11 +31,12 @@ TEST_CASE("Check if read can be loaded correctly.", "FastxRandomReader") {
 
     // Write temporary file.
     {
-        utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTQ, 2);
+        utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTQ, 2,
+                                false);
         HtsWriter writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, qscore);
         writer.write(rec.get());
-        hts_file.finalise([](size_t) { /* noop */ }, 2, false);
+        hts_file.finalise([](size_t) { /* noop */ });
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string());

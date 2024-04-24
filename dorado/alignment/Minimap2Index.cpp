@@ -113,19 +113,7 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
 bool Minimap2Index::load_initial_index(const std::string& index_file,
                                        int num_threads,
                                        bool allow_split_index) {
-    auto index_to_load = index_file;
-    bool dump_index = false;
-    bool is_prebuilt = utils::ends_with(index_file, ".mmi");
-    const std::string prebuilt_index = index_file + ".mmi";
-    if (is_prebuilt) {
-        // Do nothing
-    } else if (!std::filesystem::exists(prebuilt_index)) {
-        dump_index = true;
-    } else {
-        dump_index = false;
-        index_to_load = prebuilt_index;
-    }
-    m_index_reader = create_index_reader(index_to_load, *m_index_options);
+    m_index_reader = create_index_reader(index_file, *m_index_options);
     m_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads), IndexDeleter());
     if (!allow_split_index) {
         IndexUniquePtr split_index{};
@@ -133,13 +121,6 @@ bool Minimap2Index::load_initial_index(const std::string& index_file,
         if (split_index != nullptr) {
             return false;
         }
-    }
-    //if (dump_index) {
-    if (false) {
-        spdlog::info("Save index to {}", prebuilt_index);
-        FILE* fp = fopen(prebuilt_index.c_str(), "w");
-        mm_idx_dump(fp, m_index.get());
-        fclose(fp);
     }
 
     if (m_index->k != m_index_options->k || m_index->w != m_index_options->w) {

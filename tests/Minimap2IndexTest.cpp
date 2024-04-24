@@ -92,19 +92,19 @@ TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GR
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " load() with invalid reference file returns reference_file_not_found",
                  TEST_GROUP) {
-    REQUIRE(cut.load("some_reference_file", 1) == IndexLoadResult::reference_file_not_found);
+    REQUIRE(cut.load("some_reference_file", 1, false) == IndexLoadResult::reference_file_not_found);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " load() with valid reference file returns success",
                  TEST_GROUP) {
-    REQUIRE(cut.load(reference_file, 1) == IndexLoadResult::success);
+    REQUIRE(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with invalid mapping options returns null",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options invalid_compatible_options{dflt_options};
     invalid_compatible_options.bandwidth_long = 100;
     invalid_compatible_options.bandwidth = *invalid_compatible_options.bandwidth_long + 1;
@@ -121,7 +121,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with valid options returns non-null",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
@@ -133,7 +133,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  " create_compatible_index() with valid options returns Minimap2Index with same "
                  "underlying index",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
@@ -147,7 +147,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  " create_compatible_index() with valid options returns Minimap2Index with mapping "
                  "options updated",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 

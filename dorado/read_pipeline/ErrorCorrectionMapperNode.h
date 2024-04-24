@@ -47,8 +47,7 @@ private:
     void extract_alignments(const mm_reg1_t* reg,
                             int hits,
                             const std::string& qread,
-                            const std::string& qname,
-                            const std::vector<uint8_t>& qqual);
+                            const std::string& qname);
 
     // Queue for reads being aligned.
     utils::AsyncQueue<BamPtr> m_reads_queue;
