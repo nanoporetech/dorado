@@ -257,8 +257,6 @@ build:linux:x86:focal:valgrind:
   variables:
     # valgrind can't cope with huge executables, so we have to go dynamic.
     BUILD_OPTIONS: "-D TRY_USING_STATIC_TORCH_LIB=NO"
-    # We want debug symbols.
-    BUILD_TYPE: "Debug"
   extends:
     - .linux_runner
   script:
@@ -274,6 +272,9 @@ build:linux:x86:focal:valgrind:
     -   make -j ${PARALLEL_JOBS}
     -   valgrind=$(pwd)/vg-in-place
     - popd
+    # We need symbols otherwise the generated reports are useless.
+    - export CFLAGS="${CFLAGS} -g"
+    - export CXXFLAGS="${CXXFLAGS} -g"
     # Build dorado.
     - !reference [.run_dorado_cmake_build]
     # Run the ordinary tests directly under valgrind.
