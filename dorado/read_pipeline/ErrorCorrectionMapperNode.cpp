@@ -132,7 +132,25 @@ void ErrorCorrectionMapperNode::load_read_fn() {
     m_reads_queue.terminate();
 }
 
+void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
+    while (!m_copy_terminate.load()) {
+        std::unique_lock<std::mutex> lock(m_copy_mtx);
+        m_copy_cv.wait(lock, [&] {
+            return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
+        });
+
+        spdlog::info("Pushing {} records for correction", m_shadow_correction_records.size());
+        for (auto& [n, r] : m_shadow_correction_records) {
+            //spdlog::info("Pushing {} with cov {}", n, r.seqs.size());
+            pipeline.push_message(std::move(r));
+        }
+        m_shadow_correction_records.clear();
+    }
+}
+
 void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
+    m_copy_thread = std::make_unique<std::thread>(&ErrorCorrectionMapperNode::send_data_fn, this,
+                                                  std::ref(pipeline));
     int index = 0;
     do {
         spdlog::info("Align with index {}", index);
@@ -158,15 +176,21 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
                 t->join();
             }
         }
-        for (auto& [n, r] : m_correction_records) {
-            //spdlog::info("Pushing {} with cov {}", n, r.seqs.size());
-            pipeline.push_message(std::move(r));
+        {
+            std::unique_lock<std::mutex> lock(m_copy_mtx);
+            m_shadow_correction_records = std::move(m_correction_records);
+            m_copy_cv.notify_one();
         }
         m_correction_records.clear();
         m_read_mutex.clear();
         // 4. Load next index and loop
         index++;
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
+
+    m_copy_terminate.store(true);
+    if (m_copy_thread->joinable()) {
+        m_copy_thread->join();
+    }
 }
 
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)
@@ -177,7 +201,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
-    options.index_batch_size = 8000000000ull;
+    options.index_batch_size = 800000000ull;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;

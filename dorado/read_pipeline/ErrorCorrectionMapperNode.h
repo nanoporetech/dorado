@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -41,6 +42,7 @@ private:
 
     void input_thread_fn();
     void load_read_fn();
+    void send_data_fn(Pipeline& pipeline);
 
     void extract_alignments(const mm_reg1_t* reg,
                             int hits,
@@ -55,14 +57,21 @@ private:
     std::mutex m_correction_mtx;
     std::unordered_map<std::string, CorrectionAlignments> m_correction_records;
 
+    std::mutex m_copy_mtx;
+    std::condition_variable m_copy_cv;
+    std::unordered_map<std::string, CorrectionAlignments> m_shadow_correction_records;
+
     // Mutex per target id to prevent a global lock across all targets.
     std::unordered_map<std::string, std::unique_ptr<std::mutex>> m_read_mutex;
 
     std::unique_ptr<std::thread> m_reader_thread;
     std::vector<std::unique_ptr<std::thread>> m_aligner_threads;
+    std::unique_ptr<std::thread> m_copy_thread;
 
     std::atomic<int> m_reads_read{0};
     std::atomic<int> m_alignments_processed{0};
+
+    std::atomic<bool> m_copy_terminate{false};
 };
 
 }  // namespace dorado
