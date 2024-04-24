@@ -116,7 +116,7 @@ int trim(int argc, char* argv[]) {
 
     HtsReader reader(reads[0], read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
-    sam_hdr_add_lines(header.get(), "@HD\tVN:1.6\tSO:unknown", 0);
+    utils::add_hd_header_line(header.get());
     add_pg_hdr(header.get());
     // Always remove alignment information from input header
     // because at minimum the adapters are trimmed, which

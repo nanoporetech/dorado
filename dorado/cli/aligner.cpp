@@ -217,7 +217,7 @@ int aligner(int argc, char* argv[]) {
 
         spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
         auto header = SamHdrPtr(sam_hdr_dup(reader->header));
-        sam_hdr_add_lines(header.get(), "@HD\tVN:1.6\tSO:unknown", 0);
+        utils::add_hd_header_line(header.get());
         add_pg_hdr(header.get());
         dorado::utils::strip_alignment_data_from_header(header.get());
 

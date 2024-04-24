@@ -25,6 +25,8 @@ struct AlignmentOps {
     size_t substitutions;
 };
 
+void add_hd_header_line(sam_hdr_t* hdr);
+
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
 
 void add_rg_headers_with_barcode_kit(
@@ -177,7 +179,7 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
  *
  * @return kstring_t struct
  */
-kstring_t allocate_kstring();
+//kstring_t allocate_kstring();
 
 /*
  * Make a copy of the bam record with any alignment data stripped out.

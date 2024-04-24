@@ -17,18 +17,6 @@
 namespace fs = std::filesystem;
 using namespace dorado;
 
-namespace {
-class WrappedKString {
-    kstring_t m_str = KS_INITIALIZE;
-
-public:
-    WrappedKString() { m_str = utils::allocate_kstring(); }
-    ~WrappedKString() { ks_free(&m_str); }
-
-    kstring_t *get() { return &m_str; }
-};
-}  // namespace
-
 TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
@@ -45,13 +33,13 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
     auto has_read_group_header = [](sam_hdr_t *ptr, const char *id) {
         return sam_hdr_line_index(ptr, "RG", id) >= 0;
     };
-    WrappedKString barcode_kstring;
+    KString barcode_kstring(1000000);
     auto get_barcode_tag = [&barcode_kstring](sam_hdr_t *ptr,
                                               const char *id) -> std::optional<std::string> {
-        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", barcode_kstring.get()) != 0) {
+        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", &barcode_kstring.get()) != 0) {
             return std::nullopt;
         }
-        std::string tag(ks_str(barcode_kstring.get()), ks_len(barcode_kstring.get()));
+        std::string tag(ks_str(&barcode_kstring.get()), ks_len(&barcode_kstring.get()));
         return tag;
     };
 

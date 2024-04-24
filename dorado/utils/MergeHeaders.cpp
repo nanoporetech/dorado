@@ -69,9 +69,9 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
     std::map<std::string, RefInfo> ref_map;
     int nrefs = sam_hdr_nref(hdr);
     for (int i = 0; i < nrefs; ++i) {
-        kstring_t line_data = KS_INITIALIZE;
-        KStringPtr line_ptr(&line_data);
-        auto res = sam_hdr_find_line_pos(hdr, "SQ", i, line_ptr.get());
+        KString line_wrapper(1000000);
+        auto line_data = line_wrapper.get();
+        auto res = sam_hdr_find_line_pos(hdr, "SQ", i, &line_data);
         if (res < 0) {
             return -1;
         }
@@ -80,7 +80,7 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
             return -1;
         }
         std::string key(ref_name);
-        std::string line(ks_str(line_ptr.get()));
+        std::string line(ks_str(&line_data));
         RefInfo info{uint32_t(i), line};
         ref_map[key] = std::move(info);
         auto entry = m_ref_lut.find(key);
@@ -103,14 +103,14 @@ int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr) {
         if (!idp) {
             return -1;
         }
-        kstring_t line_data = KS_INITIALIZE;
-        KStringPtr line_ptr(&line_data);
-        auto res = sam_hdr_find_line_pos(hdr, "RG", i, line_ptr.get());
+        KString line_wrapper(1000000);
+        auto line_data = line_wrapper.get();
+        auto res = sam_hdr_find_line_pos(hdr, "RG", i, &line_data);
         if (res < 0) {
             return -1;
         }
         std::string key(idp);
-        std::string line(ks_str(line_ptr.get()));
+        std::string line(ks_str(&line_data));
         auto entry = m_read_group_lut.find(key);
         if (entry == m_read_group_lut.end()) {
             m_read_group_lut[key] = std::move(line);
@@ -130,14 +130,14 @@ int MergeHeaders::add_pg_data(sam_hdr_t* hdr) {
         if (!idp) {
             return -1;
         }
-        kstring_t line_data = allocate_kstring();
-        KStringPtr line_ptr(&line_data);
-        auto res = sam_hdr_find_line_pos(hdr, "PG", i, line_ptr.get());
+        KString line_wrapper(1000000);
+        auto line_data = line_wrapper.get();
+        auto res = sam_hdr_find_line_pos(hdr, "PG", i, &line_data);
         if (res < 0) {
             return -1;
         }
         std::string key(idp);
-        std::string line(ks_str(line_ptr.get()));
+        std::string line(ks_str(&line_data));
         m_program_lut[key].insert(std::move(line));
     }
     return 0;
@@ -166,7 +166,7 @@ void MergeHeaders::add_other_lines(sam_hdr_t* hdr) {
 
 void MergeHeaders::finalize_merge() {
     m_merged_header.reset(sam_hdr_init());
-    sam_hdr_add_lines(m_merged_header.get(), "@HD\tVN:1.6\tSO:unknown", 0);
+    add_hd_header_line(m_merged_header.get());
 
     for (const auto& entry : m_program_lut) {
         const auto& key = entry.first;

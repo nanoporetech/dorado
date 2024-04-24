@@ -112,10 +112,16 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 
 }  // namespace
 
+/*
 kstring_t allocate_kstring() {
     kstring_t str = {0, 0, NULL};
     ks_resize(&str, 1'000'000);
     return str;
+}
+*/
+
+void add_hd_header_line(sam_hdr_t* hdr) {
+    sam_hdr_add_line(hdr, "HD", "VN", SAM_FORMAT_VERSION, "SO", "unknown", nullptr);
 }
 
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
@@ -160,8 +166,8 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
         throw std::runtime_error("no read groups in file");
     }
 
-    auto rg = allocate_kstring();
-    KStringPtr rg_ptr(&rg);
+    KString rg_wrapper(1000000);
+    auto rg = rg_wrapper.get();
     std::map<std::string, std::string> read_group_info;
 
     for (int i = 0; i < num_read_groups; ++i) {
@@ -253,7 +259,8 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
-    kstring_t val = allocate_kstring();
+    KString val_wrapper(1000000);
+    auto val = val_wrapper.get();
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
@@ -264,7 +271,6 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
         }
         pg_keys[k] = std::string(val.s);
     }
-    ks_free(&val);
     hts_close(file);
     return pg_keys;
 }
