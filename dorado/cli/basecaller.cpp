@@ -326,6 +326,17 @@ void setup(const std::vector<std::string>& args,
     DefaultClientInfo::PolyTailSettings polytail_settings{estimate_poly_a,
                                                           is_rna_model(model_config), polya_config};
     auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
+    if (barcode_enabled) {
+        auto barcoding_info = std::make_shared<BarcodingInfo>();
+        barcoding_info->kit_name = barcode_kit;
+        barcoding_info->barcode_both_ends = barcode_both_ends;
+        barcoding_info->trim = !barcode_no_trim;
+        barcoding_info->allowed_barcodes = allowed_barcodes;
+        barcoding_info->custom_kit = custom_kit;
+        barcoding_info->custom_seqs = custom_barcode_file;
+        default_client_info->set_barcoding_info(std::move(barcoding_info));
+    }
+
     auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };
     loader.add_read_initialiser(func);
 
