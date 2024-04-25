@@ -4,7 +4,7 @@
 namespace dorado::correction {
 
 struct OverlapWindow {
-    size_t overlap_idx = -1;
+    size_t overlap_idx = 0;
     int tstart = -1;
     int qstart = -1;
     int qend = -1;

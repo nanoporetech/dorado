@@ -72,7 +72,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         ovlp.tend = aln->re;
         ovlp.qlen = (int)qread.length();
 
-        size_t n_cigar = aln->p ? aln->p->n_cigar : 0;
+        uint32_t n_cigar = aln->p ? aln->p->n_cigar : 0;
         auto cigar = parse_cigar(aln->p->cigar, n_cigar);
 
         std::lock_guard<std::mutex> aln_lock(mtx);
@@ -81,7 +81,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             alignments.read_name = tname;
         }
 
-        ovlp.qid = alignments.seqs.size();
+        ovlp.qid = (int)alignments.seqs.size();
 
         //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
         //    continue;
