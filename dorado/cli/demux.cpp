@@ -249,9 +249,7 @@ int demuxer(int argc, char* argv[]) {
         if (!info.kit_name.empty()) {
             kit_names.push_back(info.kit_name);
         }
-        pipeline_desc.add_node<BarcodeClassifierNode>(
-                {demux_writer}, demux_threads, kit_names, info.barcode_both_ends, !info.trim,
-                info.allowed_barcodes, info.custom_kit, info.custom_seqs);
+        pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads);
     }
 
     // Create the Pipeline from our description.

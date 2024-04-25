@@ -17,13 +17,6 @@ namespace dorado {
 
 class BarcodeClassifierNode : public MessageSink {
 public:
-    BarcodeClassifierNode(int threads,
-                          const std::vector<std::string>& kit_name,
-                          bool barcode_both_ends,
-                          bool no_trim,
-                          const BarcodingInfo::FilterSet& allowed_barcodes,
-                          const std::optional<std::string>& custom_kit,
-                          const std::optional<std::string>& custom_seqs);
     BarcodeClassifierNode(int threads);
     ~BarcodeClassifierNode() { stop_input_processing(); }
     std::string get_name() const override { return "BarcodeClassifierNode"; }
@@ -35,11 +28,7 @@ public:
 
 private:
     std::atomic<int> m_num_records{0};
-    std::shared_ptr<BarcodingInfo> m_default_barcoding_info;
     demux::BarcodeClassifierSelector m_barcoder_selector{};
-
-    std::shared_ptr<BarcodingInfo> get_barcoding_info(
-            const std::shared_ptr<BarcodingInfo>& client_barcoding_info);
 
     void input_thread_fn();
     void barcode(BamPtr& read, const BarcodingInfo* barcoding_info);

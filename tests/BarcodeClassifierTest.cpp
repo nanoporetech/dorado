@@ -179,18 +179,11 @@ TEST_CASE(
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
     const bool barcode_both_ends = GENERATE(true, false);
-    const bool use_per_read_barcoding = GENERATE(true, false);
     CAPTURE(barcode_both_ends);
-    CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
     auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
                                                         std::nullopt, std::nullopt, std::nullopt);
-    if (use_per_read_barcoding) {
-        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
-    } else {
-        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                      std::nullopt, std::nullopt, std::nullopt);
-    }
+    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -255,11 +248,8 @@ TEST_CASE(
     // Push a Read type.
     pipeline->push_message(std::move(read));
     // Push BamPtr type.
-    if (!use_per_read_barcoding) {
-        // The classifier node will only barcode Simplex reads so BamPtr is not relevant here
-        for (auto& rec : records) {
-            pipeline->push_message(BamMessage{BamPtr(std::move(rec)), client_info});
-        }
+    for (auto& rec : records) {
+        pipeline->push_message(BamMessage{BamPtr(std::move(rec)), client_info});
     }
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
@@ -267,7 +257,7 @@ TEST_CASE(
 
     pipeline->terminate(DefaultFlushOptions());
 
-    const size_t num_expected_messages = use_per_read_barcoding ? 2 : 3;
+    constexpr size_t num_expected_messages = 3;
     CHECK(messages.size() == num_expected_messages);
 
     const std::string expected_bc = "SQK-RPB004_barcode01";
@@ -348,8 +338,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     std::vector<std::string> kits = {"SQK-16S024"};
     bool barcode_both_ends = false;
     bool no_trim = false;
-    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                  std::nullopt, std::nullopt, std::nullopt);
+    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
     auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
                                                         std::nullopt, std::nullopt, std::nullopt);
 
