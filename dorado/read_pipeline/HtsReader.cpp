@@ -40,6 +40,10 @@ HtsReader::~HtsReader() {
     hts_close(m_file);
 }
 
+void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
+    m_record_mutator = std::move(mutator);
+}
+
 bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
 
 bool HtsReader::has_tag(const char* tagname) {
@@ -55,6 +59,9 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
             if (m_read_list->find(read_id) == m_read_list->end()) {
                 continue;
             }
+        }
+        if (m_record_mutator) {
+            m_record_mutator(record);
         }
         pipeline.push_message(BamPtr(bam_dup1(record.get())));
         ++num_reads;

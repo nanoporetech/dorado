@@ -3,6 +3,7 @@
 
 #include "dorado_version.h"
 #include "models/kits.h"
+#include "utils/bam_utils.h"
 #include "utils/dev_utils.h"
 
 #include <optional>
@@ -66,10 +67,11 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
 inline void add_pg_hdr(sam_hdr_t* hdr,
                        const std::vector<std::string>& args,
                        const std::string& device) {
-    sam_hdr_add_lines(hdr, "@HD\tVN:1.6\tSO:unknown", 0);
+    utils::add_hd_header_line(hdr);
+    auto safe_id = sam_hdr_pg_id(hdr, "basecaller");
 
     std::stringstream pg;
-    pg << "@PG\tID:basecaller\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    pg << "@PG\tID:" << safe_id << "\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
     for (const auto& arg : args) {
         pg << " " << arg;
     }

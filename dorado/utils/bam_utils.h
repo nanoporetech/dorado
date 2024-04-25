@@ -25,6 +25,8 @@ struct AlignmentOps {
     size_t substitutions;
 };
 
+void add_hd_header_line(sam_hdr_t* hdr);
+
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);
 
 void add_rg_headers_with_barcode_kit(
@@ -39,21 +41,6 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 
 /// Remove SO tag and any SQ lines from the header.
 void strip_alignment_data_from_header(sam_hdr_t* hdr);
-
-/**
- * @brief Merges lines from source_header into dest_header if they aren't already present.
- *
- * This function will not copy any HD header lines from the source_header to the destination, even if they mismatch
- * existing HD lines in the destination.  This function will not merge headers if there are mismatching PG records,
- * or if there are mismatching SQ records in the header.
- * 
- * @param dest_header A pointer to a valid sam_hdr_t object which will be modified.
- * @param source_header A pointer to a valid sam_hdr_t object which will have all it's lines copied into dest_header
- *  if they are not already present.
- * @param error_msg A reference to a string to fill in with an error message if merge could not be performed.
- * @return true if the merge happened, false if it did not.  in the case false it returned, error_msg will contain more info.
- */
-bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg);
 
 /**
  * @brief Retrieves read group information from a SAM/BAM/CRAM file header based on a specified key.
@@ -178,21 +165,6 @@ uint32_t ref_pos_consumed(uint32_t n_cigar, const uint32_t* cigar, uint32_t quer
  * @return CIGAR string
  */
 std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
-
-/*
- * Allocate kstring_t which is already resized to hold 1 MB of data.
- *
- * This is done to work around a Windows DLL cross-heap segmentation fault.
- * The ks_resize/ks_free functions from htslib
- * are inline functions. When htslib is shipped as a DLL, some of these functions
- * are inlined into the DLL code through other htslib APIs. But those same functions
- * also get inlined into dorado code when invoked directly. As a result, it's possible
- * that an htslib APIs resizes a string using the DLL code. But when a ks_free
- * is attempted on it from dorado, there's cross-heap behavior and a segfault occurs.
- *
- * @return kstring_t struct
- */
-kstring_t allocate_kstring();
 
 /*
  * Make a copy of the bam record with any alignment data stripped out.
