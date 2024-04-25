@@ -2,7 +2,7 @@
 
 #include "utils/dev_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Tensor.h>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <toml/get.hpp>

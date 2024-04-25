@@ -13,6 +13,13 @@ endif()
 #  eventually set elsewhere
 set(BUILD_SHARED_LIBS OFF)
 
+# Allow targets with no side effects to be built in parallel when using Makefiles.
+# Koi uses OBJECT targets which are (currently) incompatible with this.
+# See https://gitlab.kitware.com/cmake/cmake/-/issues/24058.
+if (NOT BUILD_KOI_FROM_SOURCE)
+    set(CMAKE_OPTIMIZE_DEPENDENCIES ON)
+endif()
+
 get_cmake_property(MULTI_CONFIG GENERATOR_IS_MULTI_CONFIG)
 if (NOT MULTI_CONFIG)
   if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt AND NOT CMAKE_BUILD_TYPE)
@@ -342,6 +349,7 @@ if(NOT DORADO_DISABLE_DORADO)
     endif()
 
     enable_warnings_as_errors(dorado)
+    check_linked_libs(dorado)
 
     if (DORADO_ENABLE_PCH)
         target_precompile_headers(dorado REUSE_FROM dorado_lib)

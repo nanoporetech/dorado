@@ -5,7 +5,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/read_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/TensorIndexing.h>
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 

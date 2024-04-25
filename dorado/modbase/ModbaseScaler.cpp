@@ -2,7 +2,8 @@
 
 #include "utils/math_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
+#include <ATen/TensorOperators.h>
 #include <nvtx3/nvtx3.hpp>
 
 #include <algorithm>

@@ -170,7 +170,7 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (m_config.out_features.has_value()) {
         auto out_features = m_config.out_features.value();
-        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}};
+        const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}, {4096, 34848}};
         auto it = out_features_map.upper_bound(out_features - 1);
         if (it == out_features_map.end()) {
             spdlog::error(
@@ -213,12 +213,12 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
-
-    const int granularity = get_batch_size_granularity();
+    const int scale_factor = m_config.scale_factor();
+    const int granularity = get_batch_size_granularity(m_config);
     {
-        // First set of batch dimensions. Adjust chunk size to be a multiple of the stride.
+        // First set of batch dimensions. Adjust chunk size to be a multiple of stride_inner.
         // Batch size defaults to `granularity` but will be increased further down if memory allows.
-        int T_out = requested_chunk_size / m_config.stride;
+        int T_out = (requested_chunk_size / m_config.stride_inner()) * scale_factor;
         m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
     }
 #ifdef DORADO_TX2
@@ -239,7 +239,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             constexpr char SEPARATOR = ';';
             std::string env_string(env_extra_chunk_sizes);
             for (size_t start = 0, end = 0; end != std::string::npos; start = end + 1) {
-                int T_out = std::atoi(env_string.c_str() + start) / m_config.stride;
+                int T_out = (std::atoi(env_string.c_str() + start) / m_config.stride_inner()) *
+                            scale_factor;
                 if (T_out > 0) {
                     m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
                 }
@@ -249,7 +250,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
             // Use other chunk sizes as a fraction of the requested one
             // TODO: determine the best set of chunk sizes
             for (float fraction : {0.5f}) {
-                int T_out = int(m_batch_dims[0].T_out * fraction);
+                // First chunk is already divided by stride
+                int T_out = int(m_batch_dims[0].T_out * fraction / scale_factor) * scale_factor;
                 m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
             }
         }

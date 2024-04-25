@@ -1,6 +1,6 @@
 #include "utils/sequence_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/TensorIndexing.h>
 #include <catch2/catch.hpp>
 
 using Slice = at::indexing::Slice;

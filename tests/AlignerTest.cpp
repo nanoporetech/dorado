@@ -202,10 +202,9 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
         CHECK_THAT(aux, Contains(tag));
     }
     auto bh_tag_ptr = bam_aux_get(rec, "bh");
-    auto bh_tag_type = *(char*)bh_tag_ptr;
+    auto bh_tag_type = bam_aux_type(bh_tag_ptr);
     CHECK(bh_tag_type == 'i');
-    int32_t bh_tag_value = 0;
-    memcpy(&bh_tag_value, bh_tag_ptr + 1, 4);
+    auto bh_tag_value = bam_aux2i(bh_tag_ptr);
     CHECK(bh_tag_value == 3);
 }
 
@@ -329,7 +328,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     bam1_t* supplementary_rec = bam_records[2].get();
 
     // Check aux tags.
-    if (options.soft_clipping) {
+    if (*options.soft_clipping) {
         CHECK(bam_aux_get(primary_rec, "MM") != nullptr);
         CHECK(bam_aux_get(primary_rec, "ML") != nullptr);
         CHECK(bam_aux_get(primary_rec, "MN") != nullptr);
@@ -607,7 +606,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Check aux tags.
     CHECK_THAT(bam_aux2Z(bam_aux_get(primary_rec, "SA")), Equals("read2,1,+,999S899M,60,0;"));
-    if (options.soft_clipping) {
+    if (*options.soft_clipping) {
         CHECK_THAT(bam_aux2Z(bam_aux_get(secondary_rec, "SA")),
                    Equals("read3,1,+,999M899S,0,0;read2,1,+,999S899M,60,0;"));
     } else {

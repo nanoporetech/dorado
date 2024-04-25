@@ -2,8 +2,11 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
+#include <toml/get.hpp>
+#include <toml/value.hpp>
 
 #include <cstddef>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -222,10 +225,23 @@ std::string CRFModelConfig::to_string() const {
         str += " " + std::to_string(c) + ": " + convs[c].to_string();
     }
     str += "}";
+    if (is_lstm_model()) {
+        str += " model_type: lstm";
+        str += " bias:" + std::to_string(bias);
+        str += " outsize:" + std::to_string(outsize);
+        str += " blank_score:" + std::to_string(blank_score);
+        str += " scale:" + std::to_string(scale);
+    }
+    if (is_tx_model()) {
+        str += " model_type: tx";
+        str += " crf_encoder: " + tx->crf.to_string();
+        str += " transformer: " + tx->tx.to_string();
+    }
+
     return str;
 };
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
+CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     const toml::value config_toml = toml::parse(path / "config.toml");
 
     CRFModelConfig config;
@@ -334,6 +350,32 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return config;
 }
 
+namespace {
+
+std::optional<toml::value> toml_get(const toml::value &value,
+                                    const std::vector<std::string> &fields) {
+    if (fields.empty()) {
+        return std::nullopt;
+    }
+    const auto *v = &value;
+    for (const auto &field : fields) {
+        if (v->is_table() && v->contains(field)) {
+            v = &v->as_table().at(field);
+        } else {
+            return std::nullopt;
+        }
+    }
+    return *v;
+}
+
+}  // namespace
+
+bool is_tx_model_config(const std::filesystem::path &path) {
+    const auto config_toml = toml::parse(path / "config.toml");
+    const auto res = toml_get(config_toml, {"model", "encoder", "transformer_encoder"});
+    return res.has_value();
+}
+
 bool is_rna_model(const CRFModelConfig &model_config) {
     auto path = std::filesystem::canonical(model_config.model_path);
     auto filename = path.filename();
@@ -379,6 +421,154 @@ ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
         return ScalingStrategy::PA;
     }
     throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
+}
+
+namespace tx {
+
+std::string TxEncoderParams::to_string() const {
+    std::string str = "TxEncoderParams {";
+    str += " d_model:" + std::to_string(d_model);
+    str += " nhead:" + std::to_string(nhead);
+    str += " depth:" + std::to_string(depth);
+    str += " dim_feedforward:" + std::to_string(dim_feedforward);
+    str += " deepnorm_alpha:" + std::to_string(deepnorm_alpha);
+    str += "}";
+    return str;
+}
+
+std::string EncoderUpsampleParams::to_string() const {
+    std::string str = "EncoderUpsampleParams {";
+    str += " d_model:" + std::to_string(d_model);
+    str += " scale_factor:" + std::to_string(scale_factor);
+    str += "}";
+    return str;
+}
+
+std::string CRFEncoderParams::to_string() const {
+    std::string str = "CRFEncoderParams {";
+    str += " insize:" + std::to_string(insize);
+    str += " n_base:" + std::to_string(n_base);
+    str += " state_len:" + std::to_string(state_len);
+    str += " scale:" + std::to_string(scale);
+    str += " blank_score:" + std::to_string(blank_score);
+    str += " expand_blanks:" + std::to_string(expand_blanks);
+    str += " permute:" + std::to_string(!permute.empty());
+    str += "}";
+    return str;
+}
+
+TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
+    const auto &enc = toml::find(cfg, "model", "encoder", "transformer_encoder");
+    TxEncoderParams params;
+    params.depth = toml::find<int>(enc, "depth");
+    params.d_model = toml::find<int>(enc, "layer", "d_model");
+    params.nhead = toml::find<int>(enc, "layer", "nhead");
+    params.dim_feedforward = toml::find<int>(enc, "layer", "dim_feedforward");
+    params.deepnorm_alpha = toml::find<float>(enc, "layer", "deepnorm_alpha");
+    const auto attn_window_ = toml::find(enc, "layer", "attn_window").as_array();
+    params.attn_window = {static_cast<int>(attn_window_[0].as_integer()),
+                          static_cast<int>(attn_window_[1].as_integer())};
+    return params;
+}
+
+EncoderUpsampleParams parse_encoder_upsample_params(const toml::value &cfg) {
+    const auto &ups = toml::find(cfg, "model", "encoder", "upsample");
+    EncoderUpsampleParams params;
+    params.d_model = toml::find<int>(ups, "d_model");
+    params.scale_factor = toml::find<int>(ups, "scale_factor");
+    return params;
+}
+
+CRFEncoderParams parse_crf_encoder_params(const toml::value &cfg) {
+    const auto &crf = toml::find(cfg, "model", "encoder", "crf");
+    CRFEncoderParams params;
+    params.insize = toml::find<int>(crf, "insize");
+    params.n_base = toml::find<int>(crf, "n_base");
+    params.state_len = toml::find<int>(crf, "state_len");
+    params.scale = toml::find<float>(crf, "scale");
+    params.blank_score = toml::find<float>(crf, "blank_score");
+    params.expand_blanks = toml::find<bool>(crf, "expand_blanks");
+    params.permute = toml::find<std::vector<int>>(crf, "permute");
+
+    return params;
+}
+
+CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
+    const auto config_toml = toml::parse(path / "config.toml");
+    const auto model_toml = toml::find(config_toml, "model");
+
+    CRFModelConfig config;
+
+    config.model_path = path;
+
+    const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
+    const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
+    const CRFEncoderParams crf_encoder = parse_crf_encoder_params(config_toml);
+
+    config.tx = tx::Params{tx_encoder, upsample, crf_encoder};
+    config.tx->check();
+
+    const auto &convs = toml::find(model_toml, "encoder", "conv");
+    for (const auto &segment : toml::find(convs, "sublayers").as_array()) {
+        const auto type = toml::find<std::string>(segment, "type");
+        if (type.compare("convolution") != 0) {
+            continue;
+        }
+
+        const auto conv = parse_conv_params(segment, false /* Tx models do not have swish clamp */);
+        config.convs.push_back(conv);
+        config.stride *= conv.stride;
+    }
+    // Recalculate the stride by accounting for upsampling / downsampling
+    config.stride /= upsample.scale_factor;
+    config.out_features = crf_encoder.out_features();
+    config.outsize = crf_encoder.outsize();
+
+    if (config_toml.contains("run_info")) {
+        config.sample_rate = toml::find<int>(config_toml, "run_info", "sample_rate");
+    }
+
+    config.state_len = config.tx->crf.state_len;
+    config.num_features = config.convs.front().insize;
+
+    if (config_toml.contains("qscore")) {
+        spdlog::warn("> transformer qscore calibration not implemented");
+        const auto &qscore = toml::find(config_toml, "qscore");
+        config.qbias = toml::find<float>(qscore, "bias");
+        config.qscale = toml::find<float>(qscore, "scale");
+        if (qscore.contains("mean_qscore_start_pos")) {
+            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
+        }
+    } else {
+        spdlog::debug("> no qscore calibration found");
+    }
+
+    std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
+    config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
+
+    // Force downstream issue (negative lstm size) if a tx model config is incorrectly
+    // used to define an LSTM model. Incorrect use should be guarded against by using is_tx_model()
+    config.lstm_size = -1;
+
+    config.sample_type = get_model_type(model_name);
+
+    return config;
+}
+
+void Params::check() const {
+    const auto eq = [](const int a, const int b, const std::string &msg) {
+        if (a != b) {
+            spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
+        }
+    };
+    eq(crf.insize, tx.d_model, "linearcrfencoder.insize == transformer_encoder.layer.d_model");
+    eq(upsample.d_model, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
+}
+
+}  // namespace tx
+
+CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
+    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
 }  // namespace dorado::basecall

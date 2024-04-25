@@ -195,6 +195,22 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
 kstring_t allocate_kstring();
 
 /*
+ * Make a copy of the bam record with any alignment data stripped out.
+ *
+ * @param record BAM record.
+ * @param seq New sequence.
+ * @param qual New quality scores.
+ * 
+ * If seq is an empty string, then qual is ignored and the sequence and qualities from the
+ * input record will be used. If seq is not empty then it will replace the original sequence
+ * in the new object, and qual will replace the original qualities in the new object. This
+ * means that if seq is not empty but qual is, then the new object will have nullptr as its
+ * quality field. If seq and qual are both non-empty, then of course they must be the same
+ * length.
+ */
+BamPtr new_unmapped_record(bam1_t* record, std::string seq, std::vector<uint8_t> qual);
+
+/*
  * Remove any alignment related tags from a BAM record.
  *
  * @param record BAM record.

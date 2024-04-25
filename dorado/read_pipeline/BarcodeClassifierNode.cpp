@@ -128,9 +128,9 @@ void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding
 
         if (bc != "unclassified" && trim_interval.second - trim_interval.first <= seqlen) {
             read = Trimmer::trim_sequence(read.get(), trim_interval);
+        } else {
+            read = utils::new_unmapped_record(read.get(), {}, {});
         }
-
-        utils::remove_alignment_tags_from_record(read.get());
     }
 }
 

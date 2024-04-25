@@ -36,7 +36,6 @@
 #endif
 
 namespace fs = std::filesystem;
-
 namespace {
 
 // Fixture for smoke testing nodes

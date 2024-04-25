@@ -19,7 +19,6 @@
 #include <vector>
 
 #define TEST_GROUP "[barcode_demux]"
-
 namespace fs = std::filesystem;
 
 using namespace dorado;
@@ -339,13 +338,14 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", TEST_GROUP) {
+TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data stripping",
+          TEST_GROUP) {
     using Catch::Matchers::Equals;
 
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    std::vector<std::string> kits = {"SQK-RBK114-96"};
+    std::vector<std::string> kits = {"SQK-16S024"};
     bool barcode_both_ends = false;
     bool no_trim = false;
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
@@ -355,28 +355,59 @@ TEST_CASE("BarcodeClassifierNode: test reads where trim length == read length", 
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
-    auto bc_file = data_dir / "no_trim_expected.fastq";
+    auto bc_file = data_dir / "simple_mapped_reads.sam";
 
-    // Only one read in the file, so fetch that.
+    // First read should be unclassified.
     HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
 
     auto client_info = std::make_shared<dorado::FakeClientInfo>();
     client_info->set_barcoding_info(barcoding_info);
 
-    // Fetch the original read before barcode trimming.
-    auto orig_seq = dorado::utils::extract_sequence(reader.record.get());
+    BamPtr read1(bam_dup1(reader.record.get()));
+    std::string id_in1 = bam_get_qname(read1.get());
+    auto orig_seq1 = dorado::utils::extract_sequence(read1.get());
+    pipeline->push_message(dorado::BamMessage{std::move(read1), client_info});
 
-    pipeline->push_message(dorado::BamMessage{std::move(reader.record), client_info});
+    // Second read should be classified.
+    reader.read();
+    BamPtr read2(bam_dup1(reader.record.get()));
+    std::string id_in2 = bam_get_qname(read2.get());
+    auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
+    pipeline->push_message(dorado::BamMessage{std::move(read2), client_info});
+
     pipeline->terminate(DefaultFlushOptions());
 
-    CHECK(messages.size() == 1);
+    CHECK(messages.size() == 2);
 
     auto bam_message = std::get<BamMessage>(std::move(messages[0]));
-    auto seq = dorado::utils::extract_sequence(bam_message.bam_ptr.get());
+    read1 = std::move(bam_message.bam_ptr);
+    bam_message = std::get<BamMessage>(std::move(messages[1]));
+    read2 = std::move(bam_message.bam_ptr);
 
-    // We don't expect any trimming to happen, so the original and final sequence must match.
-    CHECK(seq == orig_seq);
+    // Reads may not come back in the same order.
+    std::string id_out1 = bam_get_qname(read1.get());
+    std::string id_out2 = bam_get_qname(read2.get());
+    if (id_out1 != id_in1) {
+        read1.swap(read2);
+    }
+
+    // First read should be unclassified and untrimmed.
+    auto seq1 = dorado::utils::extract_sequence(read1.get());
+    CHECK(seq1 == orig_seq1);
+    CHECK_THAT(bam_aux2Z(bam_aux_get(read1.get(), "BC")), Equals("unclassified"));
+
+    // Second read should be classified and trimmed.
+    auto seq2 = dorado::utils::extract_sequence(read2.get());
+    CHECK(seq2 ==
+          seq1);  // Sequence 2 is just sequence 1 plus the barcode, which should be trimmed.
+    CHECK_THAT(bam_aux2Z(bam_aux_get(read2.get(), "BC")), Equals("SQK-16S024_barcode01"));
+
+    // Check to make sure alignment data has been stripped from both reads.
+    CHECK(read1->core.tid == -1);
+    CHECK(bam_aux_get(read1.get(), "bh") == nullptr);
+    CHECK(read2->core.tid == -1);
+    CHECK(bam_aux_get(read2.get(), "bh") == nullptr);
 }
 
 struct CustomDoubleEndedKitInput {
