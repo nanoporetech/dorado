@@ -15,7 +15,9 @@
 #include "correct/windows.h"
 #include "hts_io/FastxRandomReader.h"
 
+#if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
+#endif
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -45,16 +47,16 @@ dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& 
 void populate_alignments(dorado::CorrectionAlignments& alignments,
                          dorado::hts_io::FastxRandomReader* reader) {
     const auto& tname = alignments.read_name;
-    alignments.read_seq = std::move(reader->fetch_seq(tname));
-    alignments.read_qual = std::move(reader->fetch_qual(tname));
+    alignments.read_seq = reader->fetch_seq(tname);
+    alignments.read_qual = reader->fetch_qual(tname);
     int tlen = (int)alignments.read_seq.length();
     auto num_qnames = alignments.qnames.size();
     alignments.seqs.resize(num_qnames);
     alignments.quals.resize(num_qnames);
     for (size_t i = 0; i < num_qnames; i++) {
         const std::string& qname = alignments.qnames[i];
-        alignments.seqs[i] = std::move(reader->fetch_seq(qname));
-        alignments.quals[i] = std::move(reader->fetch_qual(qname));
+        alignments.seqs[i] = reader->fetch_seq(qname);
+        alignments.quals[i] = reader->fetch_qual(qname);
         alignments.overlaps[i].tlen = tlen;
     }
 }
@@ -196,7 +198,6 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         //print_size(length_tensor, "length_tensor");
 
         auto t1 = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> collate_dur = (t1 - t0);
 
         std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
@@ -210,7 +211,6 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             inputs.push_back(indices_batch);
         }
         auto t2 = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> transfer_dur = (t2 - t1);
 
 #if 1
         auto output = module.forward(inputs);
@@ -354,13 +354,10 @@ void CorrectionNode::input_thread_fn() {
                             {alignments.read_name, (int)features_to_infer.size()});
                 }
                 // Push the ones that need inference to another thread.
-                auto fs = std::chrono::high_resolution_clock::now();
                 for (auto& wf : features_to_infer) {
                     //spdlog::info("Pushing window idx {} to features queue", wf.window_idx);
                     m_features_queue.try_push(std::move(wf));
                 }
-                auto fe = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> fd = fe - fs;
                 {
                     std::chrono::duration<double> duration = t1 - t0;
                     std::lock_guard<std::mutex> lock(ewMutex);

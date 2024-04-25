@@ -163,10 +163,10 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
         }
     }
 
-    int sum = 0;
-    for (auto i : max_ins) {
-        sum += i;
-    }
+    //int sum = 0;
+    //for (auto i : max_ins) {
+    //    sum += i;
+    //}
     //spdlog::info("max ins sum {}", sum);
     return max_ins;
 }

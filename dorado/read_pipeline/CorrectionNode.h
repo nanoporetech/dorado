@@ -34,7 +34,7 @@ public:
     ~CorrectionNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&);  // override { stop_input_processing(); }
+    void terminate(const FlushOptions&) override;
     void restart() override { start_input_processing(&CorrectionNode::input_thread_fn, this); }
 
 private:
@@ -70,7 +70,6 @@ private:
     std::mutex ewMutex;
     std::chrono::duration<double> extractFeaturesDuration;
     std::mutex efMutex;
-    std::chrono::duration<double> runInferenceDuration;
     std::mutex riMutex;
     std::chrono::duration<double> decodeDuration;
     std::mutex decodeMutex;
@@ -83,18 +82,6 @@ private:
     std::atomic<int> m_num_active_feature_threads{0};
     std::atomic<int> m_num_active_infer_threads{0};
     std::atomic<int> m_num_active_decode_threads{0};
-
-    std::atomic<std::chrono::duration<double>> filter_time{};
-    std::atomic<std::chrono::duration<double>> sort_time{};
-    std::atomic<std::chrono::duration<double>> gen_tensor_time{};
-    std::atomic<std::chrono::duration<double>> ins_time{};
-    std::atomic<std::chrono::duration<double>> features_time{};
-    std::atomic<std::chrono::duration<double>> supported_time{};
-    std::atomic<std::chrono::duration<double>> indices_time{};
-    std::atomic<std::chrono::duration<double>> feature_tensors_alloc_time{};
-    std::atomic<std::chrono::duration<double>> feature_tensors_fill_time{};
-    std::atomic<std::chrono::duration<double>> transfer_time{};
-    std::atomic<std::chrono::duration<double>> feature_push_time{};
 
     std::array<std::mutex, 32> m_gpu_mutexes;
 

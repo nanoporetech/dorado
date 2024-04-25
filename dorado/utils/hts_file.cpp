@@ -261,7 +261,7 @@ int HtsFile::write_to_file(const bam1_t* record) {
     // FIXME -- HtsFile is constructed in a state where attempting to write
     // will segfault, since set_header has to have been called
     // in order to set m_header.
-    if (m_mode != OutputMode::FASTQ || m_mode != OutputMode::FASTA) {
+    if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
         assert(m_header);
     }
     return sam_write1(m_file.get(), m_header.get(), record);

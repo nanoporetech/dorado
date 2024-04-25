@@ -98,7 +98,10 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
     while (m_reads_queue.try_pop(read) != utils::AsyncQueueStatus::Terminate) {
         const std::string read_name = bam_get_qname(read.get());
         const std::string read_seq = utils::extract_sequence(read.get());
-        auto [reg, hits] = m_aligner->get_mapping(read.get(), tbuf.get());
+        std::tuple<mm_reg1_t*, int> mapping = m_aligner->get_mapping(read.get(), tbuf.get());
+        mm_reg1_t* reg = std::get<0>(mapping);
+        int hits = std::get<1>(mapping);
+
         auto clear_alignments = utils::PostCondition([reg, hits]() {
             for (int j = 0; j < hits; j++) {
                 free(reg[j].p);

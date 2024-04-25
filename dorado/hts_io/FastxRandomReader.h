@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 // Class to wrap reading randomly from a FASTx
 // file using an index via the htslib APIs.
