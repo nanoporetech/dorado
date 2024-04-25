@@ -172,6 +172,7 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
+    dorado/read_pipeline/context_container.h
     dorado/read_pipeline/DefaultClientInfo.cpp
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp

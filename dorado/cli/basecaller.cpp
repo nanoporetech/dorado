@@ -332,7 +332,7 @@ void setup(const std::vector<std::string>& args,
         barcoding_info->allowed_barcodes = allowed_barcodes;
         barcoding_info->custom_kit = custom_kit;
         barcoding_info->custom_seqs = custom_barcode_file;
-        default_client_info->set_barcoding_info(std::move(barcoding_info));
+        default_client_info->contexts().register_context<BarcodingInfo>(barcoding_info);
     }
 
     auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };

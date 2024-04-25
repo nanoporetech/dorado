@@ -2,8 +2,8 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "fake_client_info.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
@@ -181,8 +181,6 @@ TEST_CASE(
     const bool barcode_both_ends = GENERATE(true, false);
     CAPTURE(barcode_both_ends);
     constexpr bool no_trim = false;
-    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
-                                                        std::nullopt, std::nullopt, std::nullopt);
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
@@ -202,8 +200,10 @@ TEST_CASE(
     read->read_common.read_id = "read_id";
     read->read_common.model_stride = stride;
 
-    auto client_info = std::make_shared<dorado::FakeClientInfo>();
-    client_info->set_barcoding_info(barcoding_info);
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
+                                                        std::nullopt, std::nullopt, std::nullopt);
+    client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
     std::vector<uint8_t> moves;
@@ -339,8 +339,6 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     bool barcode_both_ends = false;
     bool no_trim = false;
     pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
-    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
-                                                        std::nullopt, std::nullopt, std::nullopt);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
@@ -350,8 +348,10 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
 
-    auto client_info = std::make_shared<dorado::FakeClientInfo>();
-    client_info->set_barcoding_info(barcoding_info);
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
+                                                        std::nullopt, std::nullopt, std::nullopt);
+    client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());

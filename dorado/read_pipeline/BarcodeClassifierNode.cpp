@@ -32,10 +32,13 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     return bc;
 }
 
-dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
-    if (client_info.barcoding_info() && (!client_info.barcoding_info()->kit_name.empty() ||
-                                         client_info.barcoding_info()->custom_kit.has_value())) {
-        return client_info.barcoding_info().get();
+const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
+    if (!client_info.contexts().exists<dorado::BarcodingInfo>()) {
+        return nullptr;
+    }
+    auto& info = client_info.contexts().get<dorado::BarcodingInfo>();
+    if (!info.kit_name.empty() || info.custom_kit.has_value()) {
+        return &info;
     }
 
     return nullptr;
@@ -56,9 +59,11 @@ void BarcodeClassifierNode::input_thread_fn() {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it if
             // client requires read trimming.
-            auto barcoding_info = get_barcoding_info(*bam_message.client_info);
+            const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
             if (barcoding_info && barcoding_info->trim &&
                 (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                // TODO check this, if we are removing from the pipeline here why was
+                // it pushed to the pipelin in the first place?
                 continue;
             }
 
@@ -75,7 +80,7 @@ void BarcodeClassifierNode::input_thread_fn() {
 }
 
 void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding_info) {
-    if (!barcoding_info || (barcoding_info->kit_name.empty() && !barcoding_info->custom_kit)) {
+    if (!barcoding_info) {
         return;
     }
     auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
@@ -107,7 +112,7 @@ void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding
 }
 
 void BarcodeClassifierNode::barcode(SimplexRead& read) {
-    auto barcoding_info = get_barcoding_info(*read.read_common.client_info);
+    const auto* barcoding_info = get_barcoding_info(*read.read_common.client_info);
     if (!barcoding_info) {
         return;
     }

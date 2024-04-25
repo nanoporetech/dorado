@@ -338,7 +338,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     barcoding_info->trim = !no_trim;
     barcoding_info->custom_kit = kit_inputs.custom_kit;
     barcoding_info->custom_seqs = kit_inputs.custom_sequences;
-    client_info->set_barcoding_info(std::move(barcoding_info));
+    client_info->contexts().register_context<dorado::BarcodingInfo>(std::move(barcoding_info));
 
     set_pipeline_restart(pipeline_restart);
 
@@ -375,7 +375,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     barcoding_info->kit_name = kit;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    client_info->set_barcoding_info(std::make_shared<dorado::BarcodingInfo>());
+    client_info->contexts().register_context<dorado::BarcodingInfo>(std::move(barcoding_info));
     for (auto& test_file : {data1, data2}) {
         dorado::HtsReader reader(test_file.string(), std::nullopt);
         reader.set_client_info(client_info);

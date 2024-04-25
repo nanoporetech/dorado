@@ -1,6 +1,7 @@
 #pragma once
 
 #include "alignment/Minimap2Options.h"
+#include "context_container.h"
 
 #include <cstdint>
 #include <memory>
@@ -22,8 +23,6 @@ struct AlignmentInfo {
     std::string reference_file;
 };
 
-struct BarcodingInfo;
-
 class ClientInfo {
 public:
     virtual ~ClientInfo() = default;
@@ -34,10 +33,12 @@ public:
     virtual const std::shared_ptr<AdapterInfo>& adapter_info() const = 0;
 
     virtual const AlignmentInfo& alignment_info() const = 0;
-    virtual const std::shared_ptr<BarcodingInfo>& barcoding_info() const = 0;
     virtual const poly_tail::PolyTailCalculator* poly_a_calculator() const = 0;
     virtual int32_t client_id() const = 0;
     virtual bool is_disconnected() const = 0;
+
+    virtual ContextContainer& contexts() = 0;
+    virtual const ContextContainer& contexts() const = 0;
 };
 
 }  // namespace dorado

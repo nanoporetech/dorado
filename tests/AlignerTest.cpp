@@ -1,7 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Aligner.h"
-#include "fake_client_info.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
@@ -86,18 +85,19 @@ protected:
     }
 
     template <class MessageType, class MessageTypePtr = std::unique_ptr<MessageType>>
-    MessageTypePtr RunPipelineForRead(const dorado::AlignmentInfo& loaded_align_info,
-                                      const dorado::AlignmentInfo& client_align_info,
-                                      std::string read_id,
-                                      std::string sequence) {
+    MessageTypePtr RunPipelineForRead(
+            const std::shared_ptr<dorado::AlignmentInfo>& loaded_align_info,
+            const std::shared_ptr<dorado::AlignmentInfo>& client_align_info,
+            std::string read_id,
+            std::string sequence) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        CHECK(index_file_access->load_index(loaded_align_info.reference_file,
-                                            loaded_align_info.minimap_options,
+        CHECK(index_file_access->load_index(loaded_align_info->reference_file,
+                                            loaded_align_info->minimap_options,
                                             2) == dorado::alignment::IndexLoadResult::success);
         create_pipeline(index_file_access, 2);
 
         dorado::ReadCommon read_common{};
-        auto client_info = std::make_shared<dorado::FakeClientInfo>();
+        auto client_info = std::make_shared<dorado::DefaultClientInfo>();
         client_info->set_alignment_info(client_align_info);
         read_common.client_info = client_info;
         read_common.read_id = std::move(read_id);
@@ -396,14 +396,14 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
         fs::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
 
-        dorado::AlignmentInfo align_info{};
-        align_info.minimap_options = dorado::alignment::dflt_options;
-        align_info.reference_file = ref.string();
+        auto align_info = std::make_shared<dorado::AlignmentInfo>();
+        align_info->minimap_options = dorado::alignment::dflt_options;
+        align_info->reference_file = ref.string();
 
         const std::string TEST_SEQUENCE{"ACGTACGTACGTACGT"};
 
         AND_GIVEN("client with no alignment requirements") {
-            const dorado::AlignmentInfo EMPTY_ALIGN_INFO{};
+            const auto EMPTY_ALIGN_INFO = std::make_shared<dorado::AlignmentInfo>();
             WHEN("push simplex read to pipeline") {
                 auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
                         align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
@@ -537,9 +537,9 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Get the sam line from ReadCommon pipeline
     auto [read_id, sequence] = get_read_id_and_sequence_from_fasta(query);
-    dorado::AlignmentInfo align_info{};
-    align_info.minimap_options = options;
-    align_info.reference_file = ref;
+    auto align_info = std::make_shared<dorado::AlignmentInfo>();
+    align_info->minimap_options = options;
+    align_info->reference_file = ref;
     auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
             align_info, align_info, std::move(read_id), std::move(sequence));
     auto sam_line_from_read_common = std::move(simplex_read->read_common.alignment_string);

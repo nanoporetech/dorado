@@ -13,6 +13,7 @@ class DefaultClientInfo : public ClientInfo {
     std::shared_ptr<BarcodingInfo> m_barcoding_info = std::make_shared<BarcodingInfo>();
     const std::unique_ptr<const poly_tail::PolyTailCalculator> m_poly_a_calculator;
     std::shared_ptr<AdapterInfo> m_adapter_info{};
+    ContextContainer m_contexts{};
 
 public:
     struct PolyTailSettings {
@@ -25,26 +26,17 @@ public:
     DefaultClientInfo(const PolyTailSettings& polytail_settings);
     ~DefaultClientInfo() = default;
 
-    const std::shared_ptr<AdapterInfo>& adapter_info() const override { return m_adapter_info; }
-    const AlignmentInfo& alignment_info() const override { return *m_alignment_info; }
-    const std::shared_ptr<BarcodingInfo>& barcoding_info() const override {
-        return m_barcoding_info;
-    }
-    const poly_tail::PolyTailCalculator* poly_a_calculator() const override {
-        return m_poly_a_calculator.get();
-    };
-    int32_t client_id() const override { return -1; }
-    bool is_disconnected() const override { return false; }
+    void set_alignment_info(std::shared_ptr<AlignmentInfo> alignment_info);
+    void set_adapter_info(std::shared_ptr<AdapterInfo> adapter_info);
 
-    void set_alignment_info(std::shared_ptr<AlignmentInfo> alignment_info) {
-        m_alignment_info = std::move(alignment_info);
-    }
-    void set_barcoding_info(std::shared_ptr<BarcodingInfo> barcoding_info) {
-        m_barcoding_info = std::move(barcoding_info);
-    }
-    void set_adapter_info(std::shared_ptr<AdapterInfo> adapter_info) {
-        m_adapter_info = std::move(adapter_info);
-    }
+    // Implementation of ClientInfo interface
+    const std::shared_ptr<AdapterInfo>& adapter_info() const override;
+    const AlignmentInfo& alignment_info() const override;
+    const poly_tail::PolyTailCalculator* poly_a_calculator() const override;
+    int32_t client_id() const override;
+    bool is_disconnected() const override;
+    ContextContainer& contexts() override;
+    const ContextContainer& contexts() const override;
 };
 
 }  // namespace dorado
