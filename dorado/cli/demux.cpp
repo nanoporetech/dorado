@@ -305,6 +305,7 @@ int demuxer(int argc, char* argv[]) {
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader input_reader(all_files[input_idx].input, read_list);
+        input_reader.set_client_info(client_info);
         num_reads_in_file = input_reader.read(*pipeline, max_reads);
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
