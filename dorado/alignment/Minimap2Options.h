@@ -84,8 +84,8 @@ struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOpti
 };
 
 inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
-    return static_cast<Minimap2IndexOptions>(l) == static_cast<Minimap2IndexOptions>(r) &&
-           static_cast<Minimap2MappingOptions>(l) == static_cast<Minimap2MappingOptions>(r);
+    return static_cast<const Minimap2IndexOptions&>(l) == r &&
+           static_cast<const Minimap2MappingOptions&>(l) == r;
 }
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }

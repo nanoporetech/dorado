@@ -2,7 +2,9 @@
 
 #include "beam_search.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorOperators.h>
 #include <math.h>
 #include <spdlog/spdlog.h>
 

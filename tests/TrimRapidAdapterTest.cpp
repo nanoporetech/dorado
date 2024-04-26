@@ -1,7 +1,6 @@
 #include "utils/trim_rapid_adapter.h"
 
-#include <ATen/ATen.h>
-#include <ATen/core/TensorBody.h>
+#include <ATen/Functions.h>
 #include <c10/core/ScalarType.h>
 #include <catch2/catch.hpp>
 

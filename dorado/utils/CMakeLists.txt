@@ -27,6 +27,8 @@ add_library(dorado_utils
     math_utils.h
     memory_utils.cpp
     memory_utils.h
+    MergeHeaders.cpp
+    MergeHeaders.h
     module_utils.h
     parameters.cpp
     parameters.h

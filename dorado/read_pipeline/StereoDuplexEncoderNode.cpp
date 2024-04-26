@@ -3,7 +3,7 @@
 #include "utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/Functions.h>
 #include <edlib.h>
 
 #include <cassert>

@@ -66,6 +66,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, b
             // finalise method.
             m_finalise_is_noop = false;
         } else {
+            m_sort_bam = false;
             m_file.reset(hts_open(m_filename.c_str(), "wb"));
         }
         break;
@@ -231,6 +232,9 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
 int HtsFile::set_header(const sam_hdr_t* const header) {
     if (header) {
         m_header.reset(sam_hdr_dup(header));
+        if (m_sort_bam) {
+            sam_hdr_change_HD(m_header.get(), "SO", "coordinate");
+        }
         if (m_file) {
             return sam_hdr_write(m_file.get(), m_header.get());
         }

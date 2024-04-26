@@ -1,6 +1,5 @@
 #pragma once
 #include "models/models.h"
-#include "read_pipeline/messages.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -20,7 +19,9 @@ struct Pod5FileReader;
 namespace dorado {
 
 class Pipeline;
-struct ReadGroup;
+class ReadCommon;
+class SimplexRead;
+using SimplexReadPtr = std::unique_ptr<SimplexRead>;
 
 constexpr size_t POD5_READ_ID_SIZE = 16;
 using ReadID = std::array<uint8_t, POD5_READ_ID_SIZE>;

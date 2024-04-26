@@ -112,10 +112,8 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 
 }  // namespace
 
-kstring_t allocate_kstring() {
-    kstring_t str = {0, 0, NULL};
-    ks_resize(&str, 1'000'000);
-    return str;
+void add_hd_header_line(sam_hdr_t* hdr) {
+    sam_hdr_add_line(hdr, "HD", "VN", SAM_FORMAT_VERSION, "SO", "unknown", nullptr);
 }
 
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups) {
@@ -147,87 +145,7 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
 
 void strip_alignment_data_from_header(sam_hdr_t* hdr) {
     sam_hdr_remove_except(hdr, "SQ", nullptr, nullptr);
-    sam_hdr_update_line(hdr, "HD", "SO", "unknown", nullptr);
-}
-
-bool sam_hdr_merge(sam_hdr_t* dest_header, sam_hdr_t* source_header, std::string& error_msg) {
-    auto get_pg_id = [](std::string& str) {
-        size_t start_pos = str.find("ID:");
-        size_t end_pos = str.find('\t', start_pos);
-        return end_pos == std::string::npos ? str.substr(start_pos)
-                                            : str.substr(start_pos, end_pos - start_pos);
-    };
-
-    // Gather information about the target header.
-    std::set<std::string> dest_lines;
-    std::vector<std::string> dest_references;
-    std::map<std::string, std::string> dest_programs;
-    auto dest_stream = std::stringstream{sam_hdr_str(dest_header)};
-    for (std::string header_line; std::getline(dest_stream, header_line);) {
-        dest_lines.insert(header_line);
-        std::string_view header_type = std::string_view(header_line).substr(0, 3);
-        if (header_type == "@SQ") {
-            dest_references.push_back(header_line);
-            continue;
-        }
-        if (header_type == "@PG") {
-            std::string ID = get_pg_id(header_line);
-            dest_programs[ID] = header_line;
-            continue;
-        }
-    }
-
-    // Parse the source header to check if it's compatible with the destination header.
-    std::vector<std::string> source_references;
-    std::map<std::string, std::string> source_programs;
-    const char* source_header_cstr = sam_hdr_str(source_header);
-    // If the source file has no header, simply return true.
-    if (!source_header_cstr) {
-        return true;
-    }
-    auto source_stream = std::stringstream{sam_hdr_str(source_header)};
-    for (std::string header_line; std::getline(source_stream, header_line);) {
-        std::string_view header_type = std::string_view(header_line).substr(0, 3);
-        if (header_type == "@SQ") {
-            source_references.push_back(header_line);
-            continue;
-        }
-        if (header_type == "@PG") {
-            std::string ID = get_pg_id(header_line);
-            source_programs[ID] = header_line;
-            continue;
-        }
-    }
-
-    if (source_references != dest_references) {
-        error_msg = "Could not merge BAM headers as @SQ lines are not equal.";
-        return false;
-    }
-
-    for (auto& source_program : source_programs) {
-        if (dest_programs.find(source_program.first) != dest_programs.end() &&
-            dest_programs[source_program.first] != source_program.second) {
-            error_msg = "Could not merge BAM headers as @PG lines for " + source_program.first +
-                        " are not equal.";
-            return false;
-        }
-    }
-
-    // Now we've validated that the headers are compatible, we can proceed with the copy across.
-    sam_hdr_update_line(dest_header, "HD", NULL, NULL, "SO", "unknown", NULL);
-    source_stream = std::stringstream{sam_hdr_str(source_header)};
-    for (std::string header_line; std::getline(source_stream, header_line);) {
-        std::string_view header_type = std::string_view(header_line).substr(0, 3);
-        if (header_type == "@HD" || header_type == "@SQ") {
-            // Don't copy these across - they are already there
-            continue;
-        }
-        if (dest_lines.find(header_line) == dest_lines.end()) {
-            sam_hdr_add_lines(dest_header, header_line.c_str(), 0);
-        }
-    }
-
-    return true;
+    sam_hdr_change_HD(hdr, "SO", "unknown");
 }
 
 std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key) {
@@ -240,7 +158,8 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
         throw std::runtime_error("no read groups in file");
     }
 
-    kstring_t rg = allocate_kstring();
+    KString rg_wrapper(1000000);
+    auto rg = rg_wrapper.get();
     std::map<std::string, std::string> read_group_info;
 
     for (int i = 0; i < num_read_groups; ++i) {
@@ -255,8 +174,6 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
             read_group_info[read_group_id] = std::string(rg.s, rg.l);
         }
     }
-
-    free(rg.s);
     return read_group_info;
 }
 
@@ -334,7 +251,8 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
-    kstring_t val = allocate_kstring();
+    KString val_wrapper(1000000);
+    auto val = val_wrapper.get();
     for (auto& k : keys) {
         auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
         if (ret != 0) {
@@ -345,7 +263,6 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
         }
         pg_keys[k] = std::string(val.s);
     }
-    ks_free(&val);
     hts_close(file);
     return pg_keys;
 }

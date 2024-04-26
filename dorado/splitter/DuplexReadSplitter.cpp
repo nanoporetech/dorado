@@ -8,7 +8,7 @@
 #include "utils/sequence_utils.h"
 #include "utils/uuid_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>

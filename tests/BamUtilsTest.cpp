@@ -17,18 +17,6 @@
 namespace fs = std::filesystem;
 using namespace dorado;
 
-namespace {
-class WrappedKString {
-    kstring_t m_str = KS_INITIALIZE;
-
-public:
-    WrappedKString() { m_str = utils::allocate_kstring(); }
-    ~WrappedKString() { ks_free(&m_str); }
-
-    kstring_t *get() { return &m_str; }
-};
-}  // namespace
-
 TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
@@ -45,13 +33,13 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
     auto has_read_group_header = [](sam_hdr_t *ptr, const char *id) {
         return sam_hdr_line_index(ptr, "RG", id) >= 0;
     };
-    WrappedKString barcode_kstring;
+    KString barcode_kstring(1000000);
     auto get_barcode_tag = [&barcode_kstring](sam_hdr_t *ptr,
                                               const char *id) -> std::optional<std::string> {
-        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", barcode_kstring.get()) != 0) {
+        if (sam_hdr_find_tag_id(ptr, "RG", "ID", id, "BC", &barcode_kstring.get()) != 0) {
             return std::nullopt;
         }
-        std::string tag(ks_str(barcode_kstring.get()), ks_len(barcode_kstring.get()));
+        std::string tag(ks_str(&barcode_kstring.get()), ks_len(&barcode_kstring.get()));
         return tag;
     };
 
@@ -287,110 +275,6 @@ TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     if (a_cigar) {
         hts_free(a_cigar);
     }
-}
-
-TEST_CASE("BamUtilsTest: test sam_hdr_merge on identical headers", TEST_GROUP) {
-    std::string header_1 =
-            "@HD\tVN:1.6\tSO:unknown\n"
-            "@SQ\tSN:Lambda\tLN:48400\n"
-            "@PG\tID:aligner\tPN:minimap2\tVN:2.24-r1122\n"
-            "@RG\tID:a706823101911eaf79e9538f89284a76cec07945_unknown\tDS:runid="
-            "a706823101911eaf79e9538f89284a76cec07945\tPL:ONT\n";
-
-    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
-    SamHdrPtr header_src = SamHdrPtr(sam_hdr_dup(header_dest.get()));
-
-    std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
-    CHECK(result == true);
-
-    std::string result_header = sam_hdr_str(header_dest.get());
-    CHECK(result_header == header_1);
-}
-
-TEST_CASE("BamUtilsTest: test sam_hdr_merge on overlapping headers", TEST_GROUP) {
-    std::string header_1 =
-            "@HD\tVN:1.6\tSO:unknown\n"
-            "@SQ\tSN:Lambda\tLN:48400\n"
-            "@PG\tID:aligner\tPN:minimap2\tVN:2.24-r1122\n"
-            "@RG\tID:a706823101911eaf79e9538f89284a76cec07945_unknown\tDS:runid="
-            "a706823101911eaf79e9538f89284a76cec07945\tPL:ONT\n";
-
-    std::string header_2 =
-            "@HD\tVN:1.6\tSO:unknown\n"
-            "@SQ\tSN:Lambda\tLN:48400\n"
-            "@PG\tID:aligner\tPN:minimap2\tVN:2.24-r1122\n"
-            "@RG\tID:b106823101911eaf79e9538f89284a76cec0797f_unknown\tDS:runid="
-            "b106823101911eaf79e9538f89284a76cec0797f\tPL:ONT\n";
-
-    std::string expected_result =
-            "@HD\tVN:1.6\tSO:unknown\n"
-            "@SQ\tSN:Lambda\tLN:48400\n"
-            "@PG\tID:aligner\tPN:minimap2\tVN:2.24-r1122\n"
-            "@RG\tID:a706823101911eaf79e9538f89284a76cec07945_unknown\tDS:runid="
-            "a706823101911eaf79e9538f89284a76cec07945\tPL:ONT\n"
-            "@RG\tID:b106823101911eaf79e9538f89284a76cec0797f_unknown\tDS:runid="
-            "b106823101911eaf79e9538f89284a76cec0797f\tPL:ONT\n";
-
-    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
-    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
-
-    std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
-    CHECK(result == true);
-
-    std::string result_header = sam_hdr_str(header_dest.get());
-    CHECK(result_header == expected_result);
-}
-
-TEST_CASE("BamUtilsTest: test sam_hdr_merge unsets SO tag in HD line", TEST_GROUP) {
-    std::string header_1 = "@HD\tVN:1.6\tSO:coordinate\n";
-    std::string header_2 = "@HD\tVN:1.6\tSO:queryname\n";
-    std::string expected_result = "@HD\tVN:1.6\tSO:unknown\n";
-
-    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
-    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
-
-    std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
-    CHECK(result == true);
-
-    std::string result_header = sam_hdr_str(header_dest.get());
-    CHECK(result_header == expected_result);
-}
-
-TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible PG", TEST_GROUP) {
-    std::string header_1 =
-            "@HD\tVN:1.6\tSO:coordinate\n"
-            "@PG\tID:aligner\tPN:minimap2\tVN:2.24-r1122\n";
-    std::string header_2 =
-            "@HD\tVN:1.6\tSO:queryname\n"
-            "@PG\tID:aligner\tPN:minimap3\tVN:2.24-r1122\n";
-
-    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
-    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
-
-    std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
-    CHECK(result == false);
-    CHECK(error_msg.size() != 0);
-}
-
-TEST_CASE("BamUtilsTest: test sam_hdr_merge refuses to merge incompatible SQ", TEST_GROUP) {
-    std::string header_1 =
-            "@HD\tVN:1.6\tSO:coordinate\n"
-            "@SQ\tSN:Lambda\tLN:48400\n";
-    std::string header_2 =
-            "@HD\tVN:1.6\tSO:queryname\n"
-            "@SQ\tSN:Chicken\tLN:32000000\n";
-
-    SamHdrPtr header_dest = SamHdrPtr(sam_hdr_parse(header_1.size(), header_1.c_str()));
-    SamHdrPtr header_src = SamHdrPtr(sam_hdr_parse(header_2.size(), header_2.c_str()));
-
-    std::string error_msg;
-    bool result = utils::sam_hdr_merge(header_dest.get(), header_src.get(), error_msg);
-    CHECK(result == false);
-    CHECK(error_msg.size() != 0);
 }
 
 TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {

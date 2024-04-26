@@ -81,17 +81,19 @@ public:
     // Barcode.
     std::string barcode{};
 
-    uint64_t sample_rate;  // Loaded from source file
+    // Loaded from source file.
+    uint64_t sample_rate = 0;
 
-    float shift;                 // To be set by scaler
-    float scale;                 // To be set by scaler
+    float shift = 0;             // To be set by scaler
+    float scale = 0;             // To be set by scaler
     std::string scaling_method;  // To be set by scaler
     std::string parent_read_id;  // Origin read ID for all its subreads. Empty for nonsplit reads.
 
     std::shared_ptr<const ModBaseInfo>
             mod_base_info;  // Modified base settings of the models that ran on this read
 
-    uint64_t num_trimmed_samples;  // Number of samples which have been trimmed from the raw read.
+    // Number of samples which have been trimmed from the raw read.
+    uint64_t num_trimmed_samples = 0;
 
     bool is_duplex{false};
 

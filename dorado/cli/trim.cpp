@@ -31,7 +31,7 @@ using OutputMode = dorado::utils::HtsFile::OutputMode;
 namespace {
 
 void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "trim", "PN", "dorado", "VN", DORADO_VERSION, NULL);
+    sam_hdr_add_pg(hdr, "trim", "PN", "dorado", "VN", DORADO_VERSION, NULL);
 }
 
 }  // anonymous namespace
@@ -116,6 +116,7 @@ int trim(int argc, char* argv[]) {
 
     HtsReader reader(reads[0], read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
+    utils::add_hd_header_line(header.get());
     add_pg_hdr(header.get());
     // Always remove alignment information from input header
     // because at minimum the adapters are trimmed, which
