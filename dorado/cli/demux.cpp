@@ -45,7 +45,7 @@ std::shared_ptr<BarcodingInfo> get_barcoding_info(cli::ArgParser& parser,
     result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
     result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
     if (result->kit_name.empty() && !result->custom_kit) {
-        return result;
+        return nullptr;
     }
     result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
     result->trim = !parser.visible.get<bool>("--no-trim");
@@ -235,8 +235,6 @@ int demuxer(int argc, char* argv[]) {
     }
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
-    client_info->contexts().register_context<BarcodingInfo>(barcoding_info);
     reader.set_client_info(client_info);
 
     PipelineDescriptor pipeline_desc;
@@ -244,7 +242,9 @@ int demuxer(int argc, char* argv[]) {
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
             std::move(sample_sheet), sort_bam);
 
-    if (!barcoding_info->kit_name.empty() || barcoding_info->custom_kit) {
+    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
+    if (barcoding_info) {
+        client_info->contexts().register_context<BarcodingInfo>(barcoding_info);
         pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads);
     }
 

@@ -3,6 +3,7 @@
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "models/models.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -391,12 +392,13 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
+    client_info->contexts().register_context<dorado::poly_tail::PolyTailCalculator>(
+            dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
+
     set_read_mutator([is_rna](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
-        dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
-        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
     });
 
     run_smoke_test<dorado::PolyACalculatorNode>(8, 1000);

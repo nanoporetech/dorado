@@ -4,22 +4,11 @@
 
 namespace dorado {
 
-DefaultClientInfo::DefaultClientInfo(const PolyTailSettings& polytail_settings)
-        : m_poly_a_calculator(polytail_settings.active
-                                      ? poly_tail::PolyTailCalculatorFactory::create(
-                                                polytail_settings.is_rna,
-                                                polytail_settings.config_file)
-                                      : nullptr) {}
-
 const std::shared_ptr<AdapterInfo>& DefaultClientInfo::adapter_info() const {
     return m_adapter_info;
 }
 
 const AlignmentInfo& DefaultClientInfo::alignment_info() const { return *m_alignment_info; }
-
-const poly_tail::PolyTailCalculator* DefaultClientInfo::poly_a_calculator() const {
-    return m_poly_a_calculator.get();
-};
 
 int32_t DefaultClientInfo::client_id() const { return -1; }
 
