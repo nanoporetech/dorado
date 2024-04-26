@@ -317,13 +317,10 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     std::vector<BamPtr> alns;
 
     bam1_t *aln = bam_init1();
-    uint32_t flags = 4;              // 4 = UNMAPPED
-    std::string ref_seq = "*";       // UNMAPPED
-    int leftmost_pos = -1;           // UNMAPPED - will be written as 0
-    int map_q = 0;                   // UNMAPPED
-    std::string cigar_string = "*";  // UNMAPPED
-    std::string r_next = "*";
-    int next_pos = -1;  // UNMAPPED - will be written as 0
+    uint32_t flags = 4;     // 4 = UNMAPPED
+    int leftmost_pos = -1;  // UNMAPPED - will be written as 0
+    int map_q = 0;          // UNMAPPED
+    int next_pos = -1;      // UNMAPPED - will be written as 0
 
     // Convert string qscore to phred vector.
     std::vector<uint8_t> qscore;

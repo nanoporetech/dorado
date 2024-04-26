@@ -4,12 +4,14 @@ include_guard(GLOBAL)
 set(TORCH_VERSION 2.0.0)
 unset(TORCH_PATCH_SUFFIX)
 
-# If we're building with sanitizers then we want Torch to be dynamic since we don't build the
-# static lib with instrumentation and hence get some false-positives.
-if(ECM_ENABLE_SANITIZERS)
-    set(TRY_USING_STATIC_TORCH_LIB FALSE)
-else()
-    set(TRY_USING_STATIC_TORCH_LIB TRUE)
+if (NOT DEFINED TRY_USING_STATIC_TORCH_LIB)
+    # If we're building with sanitizers then we want Torch to be dynamic since we don't build the
+    # static lib with instrumentation and hence get some false-positives.
+    if(ECM_ENABLE_SANITIZERS)
+        set(TRY_USING_STATIC_TORCH_LIB FALSE)
+    else()
+        set(TRY_USING_STATIC_TORCH_LIB TRUE)
+    endif()
 endif()
 set(USING_STATIC_TORCH_LIB FALSE)
 

@@ -9,7 +9,7 @@ if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aa
 
 elseif(WIN32)
     set(HDF_VER hdf5-1.12.1-3)
-    set(ZLIB_VER 1.2.12)
+    set(ZLIB_VER 1.3.1)
 
     # On windows, we need to build HDF5
     set(HDF5_ZLIB_INSTALL_DIR ${CMAKE_BINARY_DIR}/zlib-${ZLIB_VER}/install)
