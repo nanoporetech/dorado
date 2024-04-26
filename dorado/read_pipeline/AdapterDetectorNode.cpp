@@ -97,9 +97,9 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
 
     // Check read for instruction on what to trim.
     auto adapter_info = m_default_adapter_info;
-    if (read.read_common.client_info->adapter_info()) {
+    if (read.read_common.client_info->contexts().exists<AdapterInfo>()) {
         // The client has specified what to trim, so ignore class defaults.
-        adapter_info = read.read_common.client_info->adapter_info();
+        adapter_info = read.read_common.client_info->contexts().get_ptr<AdapterInfo>();
     }
     auto detector = m_detector_selector.get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {

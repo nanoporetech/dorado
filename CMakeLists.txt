@@ -141,6 +141,7 @@ configure_file(
 )
 
 add_library(dorado_lib
+    dorado/alignment/alignment_info.h
     dorado/alignment/alignment_processing_items.cpp
     dorado/alignment/alignment_processing_items.h
     dorado/alignment/BedFile.cpp
@@ -172,8 +173,7 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h
-    dorado/read_pipeline/DefaultClientInfo.cpp
+    dorado/read_pipeline/context_container.h    
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
