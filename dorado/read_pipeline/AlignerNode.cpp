@@ -3,6 +3,7 @@
 #include "ClientInfo.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
+#include "alignment/alignment_info.h"
 #include "messages.h"
 
 #include <htslib/sam.h>
@@ -67,7 +68,10 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ReadCommon& read_common) {
-    auto& align_info = read_common.client_info->alignment_info();
+    if (!read_common.client_info->contexts().exists<alignment::AlignmentInfo>()) {
+        return {};
+    }
+    const auto& align_info = read_common.client_info->contexts().get<alignment::AlignmentInfo>();
     if (align_info.reference_file.empty()) {
         return {};
     }
