@@ -262,6 +262,12 @@ add_library(dorado_lib
     dorado/summary/summary.h
     dorado/hts_io/FastxRandomReader.cpp
     dorado/hts_io/FastxRandomReader.h
+    dorado/correct/features.cpp
+    dorado/correct/features.h
+    dorado/correct/windows.cpp
+    dorado/correct/windows.h
+    dorado/correct/conversions.cpp
+    dorado/correct/conversions.h
 )
 
 enable_warnings_as_errors(dorado_lib)

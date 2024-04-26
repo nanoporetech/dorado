@@ -1,5 +1,10 @@
 #include "CorrectionNode.h"
 
+#include "correct/conversions.h"
+#include "correct/decode.h"
+#include "correct/features.h"
+#include "correct/infer.h"
+#include "correct/windows.h"
 #include "utils/bam_utils.h"
 #include "utils/gpu_profiling.h"
 #include "utils/sequence_utils.h"
@@ -8,11 +13,6 @@
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
-#include "correct/conversions.h"
-#include "correct/decode.h"
-#include "correct/features.h"
-#include "correct/infer.h"
-#include "correct/windows.h"
 #include "hts_io/FastxRandomReader.h"
 
 #if DORADO_CUDA_BUILD

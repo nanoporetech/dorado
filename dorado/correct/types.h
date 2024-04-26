@@ -27,9 +27,4 @@ struct WindowFeatures {
     int window_idx = -1;
 };
 
-struct base_count_t {
-    int c = 0;
-    char b;
-};
-
 }  // namespace dorado::correction

@@ -5,8 +5,33 @@
 
 #include <array>
 
+struct base_count_t {
+    int count = 0;
+    char base;
+};
+
+struct PairHash {
+    size_t operator()(const std::pair<int, int>& p) const {
+        return std::hash<int>()(p.first) ^ std::hash<int>()(p.second);
+    }
+};
+struct PairEqual {
+    bool operator()(const std::pair<int, int>& p1, const std::pair<int, int>& p2) const {
+        return p1.first == p2.first && p1.second == p2.second;
+    }
+};
+
 namespace dorado::correction {
 
+// The decode algorithm is split into 2 parts -
+// 1. For positions that are predicted by the model (determined by
+// the 'supported' indices), the model output is directly taken as
+// the correct base.
+// 2. For other positions, a majority vote is taken across the bases
+// in that column. The majority base must have at least 2 reads
+// supporting it. Now if the top 2 candidate bases have the same count and
+// one of them matches the base in the target read, then the target read base is
+// kept. Otherwise one of the two candidates is arbitrarily picked.
 std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) {
     std::vector<std::string> corrected_reads;
     std::string corrected_seq;
@@ -29,24 +54,13 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
     static auto base_decoding = gen_base_decoding();
     static auto base_forward = base_forward_mapping();
 
-    struct PairHash {
-        size_t operator()(const std::pair<int, int>& p) const {
-            return std::hash<int>()(p.first) ^ std::hash<int>()(p.second);
-        }
-    };
-    struct PairEqual {
-        bool operator()(const std::pair<int, int>& p1, const std::pair<int, int>& p2) const {
-            return p1.first == p2.first && p1.second == p2.second;
-        }
-    };
-
     std::unordered_map<std::pair<int, int>, char, PairHash, PairEqual> bases_map;
 
     for (const auto& wf : wfs) {
         if (wf.n_alns < 2) {
             if (corrected_seq.length() > 0) {
                 corrected_reads.push_back(corrected_seq);
-                //spdlog::info("added seq naln < 2 of len {}", corrected_seq.length());
+                spdlog::trace("added seq naln < 2 of len {}", corrected_seq.length());
                 corrected_seq = "";
             }
 
@@ -55,7 +69,8 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
 
         bases_map.clear();
         for (size_t i = 0; i < wf.supported.size(); i++) {
-            //spdlog::info("supported positions {},{} for {}", wf.supported[i].first, wf.supported[i].second, wf.inferred_bases[i]);
+            spdlog::trace("supported positions {},{} for {}", wf.supported[i].first,
+                          wf.supported[i].second, wf.inferred_bases[i]);
             bases_map.insert({wf.supported[i], wf.inferred_bases[i]});
         }
         auto& bases = wf.bases;
@@ -77,7 +92,8 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
                 auto new_base = found_p->second;
                 if (new_base != '*') {
                     corrected_seq += new_base;
-                    //spdlog::info("{} tbase {} inferred base {} at {} {}", c, tbase, new_base, tpos, ins);
+                    spdlog::trace("{} tbase {} inferred base {} at {} {}", c, tbase, new_base, tpos,
+                                  ins);
                 }
             } else {
                 std::array<base_count_t, 5> counter;
@@ -87,38 +103,39 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
                         continue;
                     }
                     auto idx = encoding_to_idx[base];
-                    counter[idx].b = base;
-                    counter[idx].c++;
+                    counter[idx].base = base;
+                    counter[idx].count++;
                 }
 
                 std::sort(counter.begin(), counter.end(),
-                          [](base_count_t a, base_count_t b) { return a.c > b.c; });
+                          [](base_count_t a, base_count_t b) { return a.count > b.count; });
 
                 auto& first = counter[0];
                 auto& second = counter[1];
 
                 char new_base;
-                if ((first.c < 2) || (first.c == second.c &&
-                                      (encoding_to_idx[first.b] == encoding_to_idx[tbase] ||
-                                       encoding_to_idx[second.b] == encoding_to_idx[tbase]))) {
+                if ((first.count < 2) ||
+                    (first.count == second.count &&
+                     (encoding_to_idx[first.base] == encoding_to_idx[tbase] ||
+                      encoding_to_idx[second.base] == encoding_to_idx[tbase]))) {
                     new_base = base_decoding[tbase];
                 } else {
-                    new_base = base_decoding[first.b];
+                    new_base = base_decoding[first.base];
                 }
 
                 new_base = base_forward[new_base];
                 if (new_base != '*') {
-                    //spdlog::info("{} tbase {} new base {}", c, tbase, new_base);
+                    spdlog::trace("{} tbase {} new base {}", c, tbase, new_base);
                     corrected_seq += new_base;
                 } else {
-                    //spdlog::info("{} tbase {} new base {} skipping", c, tbase, new_base);
+                    spdlog::trace("{} tbase {} new base {} skipping", c, tbase, new_base);
                 }
             }
         }
     }
 
     if (!corrected_seq.empty()) {
-        //spdlog::info("added seq end of len {}", corrected_seq.length());
+        spdlog::trace("added seq end of len {}", corrected_seq.length());
         corrected_reads.push_back(corrected_seq);
     }
 
