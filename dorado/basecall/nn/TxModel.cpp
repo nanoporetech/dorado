@@ -21,7 +21,7 @@
 
 #if DORADO_CUDA_BUILD
 extern "C" {
-#include "../../3rdparty/koi/koi/lib/koi.h"
+#include "koi.h"
 }
 #endif
 
