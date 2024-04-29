@@ -237,8 +237,8 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 #if DORADO_CUDA_BUILD
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     bool koi_norm = utils::get_dev_opt<bool>("koi_norm", true);
-    x = koi_norm ? x.contiguous() : x;           // If using koi, make sure x is NTC order in memory
-    const int num_rows = x.size(0) * x.size(1);  // N * T
+    x = koi_norm ? x.contiguous() : x;  // If using koi, make sure x is NTC order in memory
+    const int num_rows = int(x.size(0) * x.size(1));  // N * T
 #endif
 
     auto run_norm = [&](RMSNorm norm, at::Tensor in) {
