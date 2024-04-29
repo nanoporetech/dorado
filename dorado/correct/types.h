@@ -1,5 +1,8 @@
 #pragma once
+
 #include <torch/torch.h>
+
+#include <vector>
 
 namespace dorado::correction {
 

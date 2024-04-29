@@ -1,5 +1,8 @@
 #include "conversions.h"
 
+#include <array>
+#include <string>
+
 namespace dorado::correction {
 
 float normalize_quals(float q) { return 2.f * (q - MIN_QSCORE) / (MAX_QSCORE - MIN_QSCORE) - 1.f; }

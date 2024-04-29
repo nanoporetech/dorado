@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 namespace dorado::correction {
 
 const float MIN_QSCORE = 33.f;
