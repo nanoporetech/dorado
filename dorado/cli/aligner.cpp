@@ -74,14 +74,13 @@ bool create_output_folder(const std::filesystem::path& output_folder) {
     return true;
 }
 
+void add_pg_hdr(sam_hdr_t* hdr) {
+    sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, nullptr);
+}
+
 }  // namespace
 
 namespace dorado {
-
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_line(hdr, "PG", "ID", "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS",
-                     MM_VERSION, NULL);
-}
 
 int aligner(int argc, char* argv[]) {
     cli::ArgParser parser("dorado aligner");
@@ -226,10 +225,10 @@ int aligner(int argc, char* argv[]) {
         }
 
         spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
-        auto header = sam_hdr_dup(reader->header);
-        dorado::utils::strip_alignment_data_from_header(header);
-
-        add_pg_hdr(header);
+        auto header = SamHdrPtr(sam_hdr_dup(reader->header));
+        utils::add_hd_header_line(header.get());
+        add_pg_hdr(header.get());
+        dorado::utils::strip_alignment_data_from_header(header.get());
 
         const bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
                                file_info.output != "-");
@@ -254,9 +253,9 @@ int aligner(int argc, char* argv[]) {
         // At present, header output file header writing relies on direct node method calls
         // rather than the pipeline framework.
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
-        utils::add_sq_hdr(header, aligner_ref.get_sequence_records_for_header());
+        utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
         auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
-        hts_file.set_header(header);
+        hts_file.set_header(header.get());
 
         // All progress reporting is in the post-processing part.
         ProgressTracker tracker(0, false, 1.f);

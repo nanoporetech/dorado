@@ -12,6 +12,7 @@ struct bam1_t;
 struct htsFile;
 struct mm_tbuf_s;
 struct sam_hdr_t;
+struct kstring_t;
 
 namespace dorado {
 
@@ -31,12 +32,12 @@ struct BarcodingInfo {
     std::optional<std::string> custom_seqs = std::nullopt;
 };
 
-std::shared_ptr<BarcodingInfo> create_barcoding_info(const std::vector<std::string>& kit_names,
+std::shared_ptr<BarcodingInfo> create_barcoding_info(const std::vector<std::string> &kit_names,
                                                      bool barcode_both_ends,
                                                      bool trim_barcode,
                                                      BarcodingInfo::FilterSet allowed_barcodes,
-                                                     const std::optional<std::string>& custom_kit,
-                                                     const std::optional<std::string>& custom_seqs);
+                                                     const std::optional<std::string> &custom_kit,
+                                                     const std::optional<std::string> &custom_seqs);
 
 struct BarcodeScoreResult {
     int penalty = -1;
@@ -81,24 +82,75 @@ struct ReadGroup {
 };
 
 struct BamDestructor {
-    void operator()(bam1_t*);
+    void operator()(bam1_t *);
 };
 using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
 
 struct MmTbufDestructor {
-    void operator()(mm_tbuf_s*);
+    void operator()(mm_tbuf_s *);
 };
 using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
 
 struct SamHdrDestructor {
-    void operator()(sam_hdr_t*);
+    void operator()(sam_hdr_t *);
 };
 using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
 struct HtsFileDestructor {
-    void operator()(htsFile*);
+    void operator()(htsFile *);
 };
 using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
+
+/// Wrapper for htslib kstring_t struct.
+class KString {
+public:
+    /** Contains an uninitialized kstring_t.
+     *  Useful for later assigning to a kstring_t returned by an htslib
+     *  API function. If you need to pass object to an API function which
+     *  will put data in it, then use the pre-allocate constructor instead,
+     *  to avoid library conflicts on windows.   
+     */
+    KString();
+
+    /** Pre-allocate the string with n bytes of storage. If you pass the kstring
+     *  into an htslib API function that would resize the kstring_t object as
+     *  needed, when the API function does the resize this can result in
+     *  strange errors like stack corruption due to differences between the
+     *  implementation in the compiled library, and the implementation compiled
+     *  into your C++ code using htslib macros. So make sure you pre-allocate
+     *  with enough memory to insure that no resizing will be needed.
+     */
+    KString(size_t n);
+
+    /** This object owns the storage in the internal kstring_t object.
+     *  To avoid reference counting, we don't allow this object to be copied.
+     */
+    KString(const KString &) = delete;
+
+    /** Take ownership of the data in the kstring_t object.
+     *  Note that it is an error to create more than one KString object
+     *  that owns the same kstring_t data.
+     */
+    KString(kstring_t &&data) noexcept;
+
+    /// Move Constructor
+    KString(KString &&other) noexcept;
+
+    /// No copying allowed.
+    KString &operator=(const KString &) = delete;
+
+    /// Move assignment.
+    KString &operator=(KString &&rhs) noexcept;
+
+    /// Destroys the kstring_t data.
+    ~KString();
+
+    /// Returns the kstring_t object that points to the internal data.
+    kstring_t &get() const;
+
+private:
+    std::unique_ptr<kstring_t> m_data;
+};
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 

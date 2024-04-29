@@ -45,6 +45,10 @@ void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
     m_client_info = std::move(client_info);
 }
 
+void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
+    m_record_mutator = std::move(mutator);
+}
+
 bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
 
 bool HtsReader::has_tag(const char* tagname) {
@@ -61,6 +65,10 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
                 continue;
             }
         }
+        if (m_record_mutator) {
+            m_record_mutator(record);
+        }
+
         BamMessage bam_message{BamPtr(bam_dup1(record.get())), m_client_info};
         pipeline.push_message(std::move(bam_message));
         ++num_reads;

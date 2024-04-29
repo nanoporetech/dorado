@@ -28,6 +28,7 @@ add_executable(dorado_tests
     HtsFileTest.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp
+    MergeHeadersTest.cpp
     Minimap2IndexTest.cpp
     ModBaseEncoderTest.cpp
     ModelKitsTest.cpp

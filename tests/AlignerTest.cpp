@@ -124,9 +124,8 @@ protected:
                 dynamic_cast<dorado::AlignerNode&>(pipeline->get_node_ref(aligner_node_handle));
         dorado::utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
 
-        auto sam_line_buffer = dorado::utils::allocate_kstring();
-        auto free_buffer =
-                dorado::utils::PostCondition([&sam_line_buffer] { ks_free(&sam_line_buffer); });
+        dorado::KString line_wrapper(1000000);
+        kstring_t sam_line_buffer = line_wrapper.get();
         CHECK(sam_format1(header.get(), bam_record.get(), &sam_line_buffer) >= 0);
 
         return std::string(ks_str(&sam_line_buffer), ks_len(&sam_line_buffer));

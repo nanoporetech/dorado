@@ -155,8 +155,7 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file, int num_threa
 
 std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
         const Minimap2Options& options) const {
-    assert(static_cast<Minimap2IndexOptions>(m_options) ==
-                   static_cast<Minimap2IndexOptions>(options) &&
+    assert(static_cast<const Minimap2IndexOptions&>(m_options) == options &&
            " create_compatible_index expects compatible indexing options");
     assert(m_index && " create_compatible_index expects the index has been loaded.");
 
