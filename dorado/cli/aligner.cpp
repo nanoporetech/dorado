@@ -84,7 +84,7 @@ int aligner(int argc, char* argv[]) {
     cli::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
-            "The default parameters use the map-ont preset.\n"
+            "The default parameters use the lr:hq preset.\n"
             "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
             "parameter names are not finalized and may change.");
     parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");

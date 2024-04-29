@@ -191,7 +191,7 @@ To basecall with alignment with duplex or simplex, run with the `--reference` op
 $ dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
-Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `map-ont` preset. This can be overridden with the `-k` and `-w` options to set kmer and window size respectively.
+Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `lr:hq` preset. This can be overridden with the `--mm2-preset` option or using `-k` and `-w` options to set kmer and window size respectively.
 
 ### Sequencing Summary
 
