@@ -60,6 +60,10 @@ int correct(int argc, char* argv[]) {
             .help("batch size for inference.")
             .default_value(32)
             .scan<'i', int>();
+    parser.add_argument("-m", "--model-path")
+            .help("path t- torchscript model file.")
+            .default_value(std::string(
+                    "/home/OXFORDNANOLABS/jdaw/github/haec-BigBird/../haec-BigBird/ont-model.pt"));
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
             .default_value(std::string(""));
@@ -89,6 +93,7 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
+    auto model_path(parser.get<std::string>("model-path"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -132,7 +137,7 @@ int correct(int argc, char* argv[]) {
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
     pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
-                                           infer_threads, batch_size);
+                                           infer_threads, batch_size, model_path);
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.

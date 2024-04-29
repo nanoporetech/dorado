@@ -111,7 +111,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
         extract_alignments(reg, hits, read_seq, read_name);
         m_alignments_processed++;
         if (m_alignments_processed.load() % 10000 == 0) {
-            spdlog::info("Alignments processed {}", m_alignments_processed.load());
+            spdlog::debug("Alignments processed {}", m_alignments_processed.load());
         }
     }
 }
@@ -123,7 +123,7 @@ void ErrorCorrectionMapperNode::load_read_fn() {
         m_reads_queue.try_push(BamPtr(bam_dup1(reader.record.get())));
         m_reads_read++;
         if (m_reads_read.load() % 10000 == 0) {
-            spdlog::info("Read {} reads", m_reads_read.load());
+            spdlog::debug("Read {} reads", m_reads_read.load());
         }
     }
     m_reads_queue.terminate();
@@ -136,9 +136,8 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
-        spdlog::info("Pushing {} records for correction", m_shadow_correction_records.size());
+        spdlog::debug("Pushing {} records for correction", m_shadow_correction_records.size());
         for (auto& [n, r] : m_shadow_correction_records) {
-            //spdlog::info("Pushing {} with cov {}", n, r.seqs.size());
             pipeline.push_message(std::move(r));
         }
         m_shadow_correction_records.clear();
@@ -150,7 +149,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
                                                   std::ref(pipeline));
     int index = 0;
     do {
-        spdlog::info("Align with index {}", index);
+        spdlog::debug("Align with index {}", index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
 
@@ -174,6 +173,8 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
             }
         }
         {
+            // Only copy when the thread sending alignments to downstream pipeline
+            // is done.
             std::unique_lock<std::mutex> lock(m_copy_mtx);
             m_shadow_correction_records = std::move(m_correction_records);
             m_copy_cv.notify_one();
@@ -212,13 +213,13 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     if (!m_index->initialise(options)) {
         throw std::runtime_error("Failed to initialize with options.");
     } else {
-        spdlog::info("Initialized index options.");
+        spdlog::debug("Initialized index options.");
     }
-    spdlog::info("Loading index...");
+    spdlog::debug("Loading index...");
     if (m_index->load(index_file, threads, true) != alignment::IndexLoadResult::success) {
         throw std::runtime_error("Failed to load index file " + index_file);
     } else {
-        spdlog::info("Loaded mm2 index.");
+        spdlog::debug("Loaded mm2 index.");
     }
 }
 
