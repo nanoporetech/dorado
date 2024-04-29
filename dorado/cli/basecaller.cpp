@@ -224,6 +224,10 @@ void setup(const std::vector<std::string>& args,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     auto client_info = std::make_shared<DefaultClientInfo>();
     if (estimate_poly_a) {
+        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
+                is_rna_model(model_config), polya_config);
+        client_info->contexts().register_context<poly_tail::PolyTailCalculator>(
+                std::move(poly_tail_calculator));
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
@@ -237,7 +241,15 @@ void setup(const std::vector<std::string>& args,
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (barcode_enabled) {
-        std::vector<std::string> kit_as_vector{barcode_kit};
+        auto barcoding_info = std::make_shared<BarcodingInfo>();
+        barcoding_info->kit_name = barcode_kit;
+        barcoding_info->barcode_both_ends = barcode_both_ends;
+        barcoding_info->trim = !barcode_no_trim;
+        barcoding_info->allowed_barcodes = allowed_barcodes;
+        barcoding_info->custom_kit = custom_kit;
+        barcoding_info->custom_seqs = custom_barcode_file;
+        client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
+
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }
@@ -326,24 +338,6 @@ void setup(const std::vector<std::string>& args,
 
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
-
-    if (estimate_poly_a) {
-        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), polya_config);
-        client_info->contexts().register_context<poly_tail::PolyTailCalculator>(
-                std::move(poly_tail_calculator));
-    }
-
-    if (barcode_enabled) {
-        auto barcoding_info = std::make_shared<BarcodingInfo>();
-        barcoding_info->kit_name = barcode_kit;
-        barcoding_info->barcode_both_ends = barcode_both_ends;
-        barcoding_info->trim = !barcode_no_trim;
-        barcoding_info->allowed_barcodes = allowed_barcodes;
-        barcoding_info->custom_kit = custom_kit;
-        barcoding_info->custom_seqs = custom_barcode_file;
-        client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
-    }
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
