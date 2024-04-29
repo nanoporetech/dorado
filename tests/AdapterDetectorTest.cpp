@@ -301,7 +301,7 @@ TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true, std::nullopt);
+    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 

@@ -20,18 +20,11 @@
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
-AdapterDetectorNode::AdapterDetectorNode(int threads,
-                                         bool trim_adapters,
-                                         bool trim_primers,
-                                         const std::optional<std::string>& custom_seqs)
-        : MessageSink(10000, threads) {
-    AdapterInfo info{trim_adapters, trim_primers, custom_seqs};
-    m_default_adapter_info = std::make_shared<AdapterInfo>(std::move(info));
-    start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
-}
-
 AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {
     m_default_adapter_info = std::make_shared<AdapterInfo>();
+    m_default_adapter_info->trim_adapters = false;
+    m_default_adapter_info->trim_primers = false;
+    m_default_adapter_info->custom_seqs = std::nullopt;
     start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
@@ -44,7 +37,7 @@ void AdapterDetectorNode::input_thread_fn() {
             if (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
                 continue;
             }
-            process_read(bam_message.bam_ptr);
+            process_read(bam_message);
             send_message_to_sink(std::move(bam_message));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             auto read = std::get<SimplexReadPtr>(std::move(message));
@@ -56,35 +49,47 @@ void AdapterDetectorNode::input_thread_fn() {
     }
 }
 
-void AdapterDetectorNode::process_read(BamPtr& read) {
-    bam1_t* irecord = read.get();
+std::shared_ptr<const demux::AdapterDetector> AdapterDetectorNode::get_detector(
+        const AdapterInfo& adapter_info) {
+    if (!adapter_info.trim_adapters && !adapter_info.trim_primers) {
+        return nullptr;
+    }
+    return m_detector_selector.get_detector(adapter_info);
+}
+
+void AdapterDetectorNode::process_read(BamMessage& bam_message) {
+    bam1_t* irecord = bam_message.bam_ptr.get();
     std::string seq = utils::extract_sequence(irecord);
     int seqlen = irecord->core.l_qseq;
 
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
-    auto detector = m_detector_selector.get_detector(*m_default_adapter_info);
-    if (m_default_adapter_info->trim_adapters) {
+
+    // Standalone requires the client to have AdapterInfo if the AdapterNode is being used
+    const auto& adapter_info =
+            bam_message.client_info->contexts().get_ptr<AdapterInfo>(m_default_adapter_info);
+    auto detector = get_detector(*adapter_info);
+    if (adapter_info->trim_adapters) {
         auto adapter_res = detector->find_adapters(seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    if (m_default_adapter_info->trim_primers) {
+    if (adapter_info->trim_primers) {
         auto primer_res = detector->find_primers(seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
     m_num_records++;
 
-    if (m_default_adapter_info->trim_adapters || m_default_adapter_info->trim_primers) {
+    if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
             spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
                          trim_interval.first, trim_interval.second, seq);
-            read = utils::new_unmapped_record(read.get(), {}, {});
+            bam_message.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
             return;
         }
-        read = Trimmer::trim_sequence(read.get(), trim_interval);
+        bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
     }
 }
 
@@ -95,13 +100,9 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    // Check read for instruction on what to trim.
-    auto adapter_info = m_default_adapter_info;
-    if (read.read_common.client_info->contexts().exists<AdapterInfo>()) {
-        // The client has specified what to trim, so ignore class defaults.
-        adapter_info = read.read_common.client_info->contexts().get_ptr<AdapterInfo>();
-    }
-    auto detector = m_detector_selector.get_detector(*adapter_info);
+    const auto& adapter_info =
+            read.read_common.client_info->contexts().get_ptr<AdapterInfo>(m_default_adapter_info);
+    auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
         auto adapter_res = detector->find_adapters(read.read_common.seq);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);

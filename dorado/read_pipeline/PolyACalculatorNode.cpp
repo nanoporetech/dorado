@@ -25,26 +25,28 @@ void PolyACalculatorNode::input_thread_fn() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        if (!read->read_common.client_info->contexts().exists<poly_tail::PolyTailCalculator>()) {
+        auto calculator =
+                read->read_common.client_info->contexts().get_ptr<poly_tail::PolyTailCalculator>(
+                        nullptr);
+
+        if (!calculator) {
             send_message_to_sink(std::move(read));
             num_not_called++;
             continue;
         }
 
-        auto& calculator =
-                read->read_common.client_info->contexts().get<poly_tail::PolyTailCalculator>();
-        auto signal_info = calculator.determine_signal_anchor_and_strand(*read);
+        auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
 
         if (signal_info.signal_anchor >= 0) {
-            int num_bases = calculator.calculate_num_bases(*read, signal_info);
+            int num_bases = calculator->calculate_num_bases(*read, signal_info);
             if (signal_info.split_tail) {
                 auto split_bases = std::max(
-                        0, calculator.calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
-                                                                  signal_info.split_tail}));
+                        0, calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
+                                                                   signal_info.split_tail}));
                 num_bases += split_bases;
             }
 
-            if (num_bases > 0 && num_bases < calculator.max_tail_length()) {
+            if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
                 ++num_called;

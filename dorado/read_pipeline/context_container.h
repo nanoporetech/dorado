@@ -49,8 +49,28 @@ public:
     }
 
     template <typename T>
+    std::shared_ptr<T> get_ptr(std::shared_ptr<T> default_value) {
+        auto registered_entry = m_contexts.find(typeid(T));
+        if (registered_entry == m_contexts.end()) {
+            return default_value;
+        }
+        auto& base = registered_entry->second;
+        return dynamic_cast<details::ContextHolder<T>*>(base.get())->get_ptr();
+    }
+
+    template <typename T>
     std::shared_ptr<T> get_ptr() const {
         auto& base = m_contexts.at(typeid(T));
+        return dynamic_cast<details::ContextHolder<T>*>(base.get())->get_ptr();
+    }
+
+    template <typename T>
+    std::shared_ptr<T> get_ptr(std::shared_ptr<T> default_value) const {
+        auto registered_entry = m_contexts.find(typeid(T));
+        if (registered_entry == m_contexts.end()) {
+            return default_value;
+        }
+        auto& base = registered_entry->second;
         return dynamic_cast<details::ContextHolder<T>*>(base.get())->get_ptr();
     }
 

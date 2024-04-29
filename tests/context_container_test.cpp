@@ -42,6 +42,22 @@ TEST_CASE(CUT_TAG " get_ptr() with class T registered as T returns the same inst
     REQUIRE(actual_instance.get() == original_instance.get());
 }
 
+TEST_CASE(CUT_TAG " get_ptr() with default and match returns match instance", CUT_TAG) {
+    ContextContainer cut{};
+    auto original_instance = std::make_shared<SomeClass>();
+    cut.register_context<SomeClass>(original_instance);
+
+    auto actual_instance = cut.get_ptr<SomeClass>(nullptr);
+
+    REQUIRE(actual_instance.get() == original_instance.get());
+}
+
+TEST_CASE(CUT_TAG " get_ptr() with default and no match returns default", CUT_TAG) {
+    ContextContainer cut{};
+
+    REQUIRE(cut.get_ptr<SomeClass>(nullptr) == nullptr);
+}
+
 TEST_CASE(CUT_TAG " get() with class T registered as T returns the same instance", CUT_TAG) {
     ContextContainer cut{};
     auto original_instance = std::make_shared<SomeClass>();

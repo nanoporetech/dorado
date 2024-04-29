@@ -77,6 +77,25 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
     return *custom_kit_info;
 }
 
+std::shared_ptr<dorado::AdapterInfo> create_adapter_info(
+        cli::ArgParser& parser,
+        const dorado::utils::SampleSheet* sample_sheet) {
+    auto result = std::make_shared<BarcodingInfo>();
+    result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
+    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
+    if (result->kit_name.empty() && !result->custom_kit) {
+        return nullptr;
+    }
+    result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+    result->trim = !parser.visible.get<bool>("--no-trim");
+    if (sample_sheet) {
+        result->allowed_barcodes = sample_sheet->get_barcode_values();
+    }
+    result->custom_seqs = parser.visible.present("--barcode-sequences");
+
+    return result;
+}
+
 }  // namespace
 
 using dorado::utils::default_parameters;
@@ -222,14 +241,19 @@ void setup(const std::vector<std::string>& args,
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
+    auto client_info = std::make_shared<DefaultClientInfo>();
     if (estimate_poly_a) {
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
+        auto adapter_info = std::make_shared<AdapterInfo>();
+        adapter_info->trim_adapters = !adapter_no_trim;
+        adapter_info->trim_primers = !primer_no_trim;
+        adapter_info->custom_seqs = custom_primer_file;
+        client_info->contexts().register_context<AdapterInfo>(std::move(adapter_info));
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
-                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim, custom_primer_file);
+                {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (barcode_enabled) {
         std::vector<std::string> kit_as_vector{barcode_kit};
@@ -322,7 +346,6 @@ void setup(const std::vector<std::string>& args,
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
 
-    auto client_info = std::make_shared<DefaultClientInfo>();
     if (estimate_poly_a) {
         auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
                 is_rna_model(model_config), polya_config);

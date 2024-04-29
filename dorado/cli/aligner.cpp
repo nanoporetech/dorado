@@ -1,6 +1,6 @@
 #include "alignment/IndexFileAccess.h"
-#include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
+#include "alignment/r"
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"

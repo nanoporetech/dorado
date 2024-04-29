@@ -347,12 +347,16 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
-    auto trim_adapters = GENERATE(false, true);
-    auto trim_primers = GENERATE(false, true);
+    auto adapter_info = std::make_shared<dorado::AdapterInfo>();
+    adapter_info->custom_seqs = std::nullopt;
+    adapter_info->trim_adapters = GENERATE(false, true);
+    adapter_info->trim_primers = GENERATE(false, true);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(trim_adapters);
     CAPTURE(trim_primers);
     CAPTURE(pipeline_restart);
+
+    client_info->contexts().register_context<dorado::AdapterInfo>(std::move(adapter_info));
 
     set_pipeline_restart(pipeline_restart);
     run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers, std::nullopt);

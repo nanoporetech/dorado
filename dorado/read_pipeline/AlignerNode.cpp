@@ -67,25 +67,22 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 }
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
-        const ReadCommon& read_common) {
-    if (!read_common.client_info->contexts().exists<alignment::AlignmentInfo>()) {
-        return {};
-    }
-    const auto& align_info = read_common.client_info->contexts().get<alignment::AlignmentInfo>();
-    if (align_info.reference_file.empty()) {
+        const ClientInfo& client_info) {
+    auto align_info = client_info.contexts().get_ptr<alignment::AlignmentInfo>(nullptr);
+    if (!align_info || align_info->reference_file.empty()) {
         return {};
     }
     auto index =
-            m_index_file_access->get_index(align_info.reference_file, align_info.minimap_options);
+            m_index_file_access->get_index(align_info->reference_file, align_info->minimap_options);
     if (!index) {
-        if (read_common.client_info->is_disconnected()) {
+        if (client_info.is_disconnected()) {
             // Unlikely but ... may have disconnected since last checked and caused a
             // an unload of the index file.
             return {};
         }
         throw std::runtime_error(
                 "Cannot align read. Expected alignment reference file is not loaded: " +
-                align_info.reference_file);
+                align_info->reference_file);
     }
 
     return index;
@@ -102,7 +99,7 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
         return;
     }
 
-    auto index = get_index(read_common);
+    auto index = get_index(*read_common.client_info);
     if (!index) {
         return;
     }

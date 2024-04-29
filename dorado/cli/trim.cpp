@@ -157,9 +157,7 @@ int trim(int argc, char* argv[]) {
     client_info->contexts().register_context<AdapterInfo>(adapter_info);
     reader.set_client_info(client_info);
 
-    pipeline_desc.add_node<AdapterDetectorNode>(
-            {hts_writer}, trim_threads, adapter_info->trim_adapters, adapter_info->trim_primers,
-            adapter_info->custom_seqs);
+    pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
