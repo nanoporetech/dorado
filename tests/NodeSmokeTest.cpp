@@ -352,14 +352,14 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     adapter_info->trim_adapters = GENERATE(false, true);
     adapter_info->trim_primers = GENERATE(false, true);
     auto pipeline_restart = GENERATE(false, true);
-    CAPTURE(trim_adapters);
-    CAPTURE(trim_primers);
+    CAPTURE(adapter_info->trim_adapters);
+    CAPTURE(adapter_info->trim_primers);
     CAPTURE(pipeline_restart);
 
     client_info->contexts().register_context<dorado::AdapterInfo>(std::move(adapter_info));
 
     set_pipeline_restart(pipeline_restart);
-    run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers, std::nullopt);
+    run_smoke_test<dorado::AdapterDetectorNode>(2);
 }
 
 TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files", "[SmokeTest]") {

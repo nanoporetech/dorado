@@ -77,25 +77,6 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
     return *custom_kit_info;
 }
 
-std::shared_ptr<dorado::AdapterInfo> create_adapter_info(
-        cli::ArgParser& parser,
-        const dorado::utils::SampleSheet* sample_sheet) {
-    auto result = std::make_shared<BarcodingInfo>();
-    result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
-    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
-    if (result->kit_name.empty() && !result->custom_kit) {
-        return nullptr;
-    }
-    result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
-    result->trim = !parser.visible.get<bool>("--no-trim");
-    if (sample_sheet) {
-        result->allowed_barcodes = sample_sheet->get_barcode_values();
-    }
-    result->custom_seqs = parser.visible.present("--barcode-sequences");
-
-    return result;
-}
-
 }  // namespace
 
 using dorado::utils::default_parameters;
