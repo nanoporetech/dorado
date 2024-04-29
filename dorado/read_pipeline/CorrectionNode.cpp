@@ -216,7 +216,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     WindowFeatures item;
     while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
         utils::ScopedProfileRange spr("collect_features", 1);
-        int required_batch_slots = (item.bases.sizes()[1] / 5120) + 1;
+        int required_batch_slots = ((int)item.bases.sizes()[1] / 5120) + 1;
         if (required_batch_slots > remaining_batch_slots) {
             batch_infer();
         }

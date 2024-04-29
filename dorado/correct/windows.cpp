@@ -37,7 +37,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                       overlap.qstart, overlap.qend, overlap.fwd, overlap.tlen, overlap.tstart,
                       overlap.tend);
 
-        int zeroth_window_thresh = (0.1f * window_size);
+        int zeroth_window_thresh = static_cast<int>(0.1f * window_size);
         int nth_window_thresh = overlap.tlen - zeroth_window_thresh;
 
         spdlog::trace("zeroth {} nth {}", zeroth_window_thresh, nth_window_thresh);

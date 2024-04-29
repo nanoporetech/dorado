@@ -26,7 +26,7 @@ std::array<int, 128> gen_base_encoding() {
     std::array<int, 128> base_encoding = {0};
     const std::string bases = "ACGT*acgt#.";
     for (size_t i = 0; i < bases.length(); i++) {
-        base_encoding[bases[i]] = i;
+        base_encoding[bases[i]] = static_cast<int>(i);
     }
     return base_encoding;
 }

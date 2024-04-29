@@ -30,7 +30,7 @@ void calculate_accuracy(OverlapWindow& overlap,
                         int win_len,
                         int window_size) {
     int tstart = overlap.tstart;
-    int tend = win_idx * window_size + win_len;
+    int tend = (int)win_idx * window_size + win_len;
 
     // get query region
     const auto overlap_idx = overlap.overlap_idx;

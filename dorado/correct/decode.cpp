@@ -77,7 +77,7 @@ std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs) 
         }
         auto& bases = wf.bases;
         int tpos = -1, ins = 0;
-        int length = bases.sizes()[1];
+        int length = (int)bases.sizes()[1];
         int* bases_tensor = bases.data_ptr<int>();
         for (int c = 0; c < length; c++) {
             const auto tbase = bases_tensor[c];
