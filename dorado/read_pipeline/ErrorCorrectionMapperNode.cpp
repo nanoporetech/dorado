@@ -83,8 +83,6 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
 
         ovlp.qid = (int)alignments.seqs.size();
 
-        //if (qname != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f")
-        //    continue;
         alignments.qnames.push_back(qname);
 
         alignments.cigars.push_back(std::move(cigar));
@@ -145,8 +143,10 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
 }
 
 void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
-    m_copy_thread = std::make_unique<std::thread>(&ErrorCorrectionMapperNode::send_data_fn, this,
-                                                  std::ref(pipeline));
+    std::unique_ptr<std::thread> m_reader_thread;
+    std::vector<std::unique_ptr<std::thread>> m_aligner_threads;
+    std::unique_ptr<std::thread> m_copy_thread = std::make_unique<std::thread>(
+            &ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
     int index = 0;
     do {
         spdlog::debug("Align with index {}", index);
@@ -167,18 +167,21 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         if (m_reader_thread->joinable()) {
             m_reader_thread->join();
         }
+        m_reader_thread.reset();
         for (auto& t : m_aligner_threads) {
             if (t->joinable()) {
                 t->join();
             }
         }
+        m_aligner_threads.clear();
         {
             // Only copy when the thread sending alignments to downstream pipeline
             // is done.
             std::unique_lock<std::mutex> lock(m_copy_mtx);
             m_shadow_correction_records = std::move(m_correction_records);
-            m_copy_cv.notify_one();
         }
+        m_copy_cv.notify_one();
+
         m_correction_records.clear();
         m_read_mutex.clear();
         // 4. Load next index and loop
@@ -189,6 +192,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     if (m_copy_thread->joinable()) {
         m_copy_thread->join();
     }
+    m_copy_thread.reset();
 }
 
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)

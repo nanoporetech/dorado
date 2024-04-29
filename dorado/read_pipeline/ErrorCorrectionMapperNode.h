@@ -63,10 +63,6 @@ private:
     // Mutex per target id to prevent a global lock across all targets.
     std::unordered_map<std::string, std::unique_ptr<std::mutex>> m_read_mutex;
 
-    std::unique_ptr<std::thread> m_reader_thread;
-    std::vector<std::unique_ptr<std::thread>> m_aligner_threads;
-    std::unique_ptr<std::thread> m_copy_thread;
-
     std::atomic<int> m_reads_read{0};
     std::atomic<int> m_alignments_processed{0};
 

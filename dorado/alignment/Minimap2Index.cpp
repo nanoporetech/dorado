@@ -115,7 +115,7 @@ bool Minimap2Index::load_initial_index(const std::string& index_file,
     m_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads), IndexDeleter());
     if (!allow_split_index) {
         // If split index is not supported, then verify that the index doesn't
-        // have multiple parts by loading the index against and making sure
+        // have multiple parts by loading the index again and making sure
         // the returned value is nullptr.
         IndexUniquePtr split_index{};
         split_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads));

@@ -174,8 +174,8 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         }
     } else {
         if (!m_is_progress_reporting_disabled) {
-            //std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
-            //std::cerr << "\r";
+            std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
+            std::cerr << "\r";
         }
     }
 
