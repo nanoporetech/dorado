@@ -233,20 +233,23 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
+    const int N = static_cast<int>(x.size(0));
+    const int T = static_cast<int>(x.size(1));
+    const int C = static_cast<int>(x.size(2));
     const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
 #if DORADO_CUDA_BUILD
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     bool koi_norm = utils::get_dev_opt<bool>("koi_norm", true);
     x = koi_norm ? x.contiguous() : x;  // If using koi, make sure x is NTC order in memory
-    const int num_rows = int(x.size(0) * x.size(1));  // N * T
+    const int num_rows = N * T;
 #endif
 
-    auto run_norm = [&](RMSNorm norm, at::Tensor in) {
+    auto run_norm = [&](RMSNorm norm, const at::Tensor &in) {
 #if DORADO_CUDA_BUILD
         int res = KOI_NOT_SUPPORTED;
         if (koi_norm) {
-            res = host_fused_residual_rmsnorm_f16(stream, in.size(-1), num_rows, in.data_ptr(),
-                                                  x.data_ptr(), deepnorm_alpha.data_ptr(),
+            res = host_fused_residual_rmsnorm_f16(stream, C, num_rows, in.data_ptr(), x.data_ptr(),
+                                                  deepnorm_alpha.data_ptr(),
                                                   norm->weight.data_ptr(), x.data_ptr());
         }
         if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
