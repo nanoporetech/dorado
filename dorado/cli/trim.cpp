@@ -126,12 +126,11 @@ int trim(int argc, char* argv[]) {
     auto output_mode = OutputMode::BAM;
 
     auto emit_fastq = parser.get<bool>("--emit-fastq");
-    auto emit_sam = !emit_fastq;
 
     if (emit_fastq) {
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = OutputMode::FASTQ;
-    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+    } else if (utils::is_fd_tty(stdout)) {
         output_mode = OutputMode::SAM;
     } else if (utils::is_fd_pipe(stdout)) {
         output_mode = OutputMode::UBAM;
