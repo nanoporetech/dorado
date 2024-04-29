@@ -396,7 +396,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    client_info->contexts().register_context<dorado::poly_tail::PolyTailCalculator>(
+    client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculator>(
             dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
 
     set_read_mutator([](dorado::SimplexReadPtr& read) {

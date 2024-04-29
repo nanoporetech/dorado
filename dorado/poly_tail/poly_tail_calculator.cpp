@@ -232,7 +232,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     return num_bases;
 }
 
-std::shared_ptr<PolyTailCalculator> PolyTailCalculatorFactory::create(
+std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
         bool is_rna,
         const std::string& config_file) {
     auto config = prepare_config(config_file);

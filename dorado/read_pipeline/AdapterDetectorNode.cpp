@@ -65,7 +65,6 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    // Standalone requires the client to have AdapterInfo if the AdapterNode is being used
     const auto& adapter_info =
             bam_message.client_info->contexts().get_ptr<AdapterInfo>(m_default_adapter_info);
     auto detector = get_detector(*adapter_info);

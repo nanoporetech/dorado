@@ -25,9 +25,8 @@ void PolyACalculatorNode::input_thread_fn() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        auto calculator =
-                read->read_common.client_info->contexts().get_ptr<poly_tail::PolyTailCalculator>(
-                        nullptr);
+        auto calculator = read->read_common.client_info->contexts()
+                                  .get_ptr<const poly_tail::PolyTailCalculator>(nullptr);
 
         if (!calculator) {
             send_message_to_sink(std::move(read));
