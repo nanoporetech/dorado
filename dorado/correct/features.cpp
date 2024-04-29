@@ -341,8 +341,8 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
     static auto base_encoding = gen_base_encoding();
     static auto base_decoding = gen_base_decoding();
 
-    const int reads = bases.sizes()[0];
-    const int length = bases.sizes()[1];
+    const int reads = static_cast<int>(bases.sizes()[0]);
+    const int length = static_cast<int>(bases.sizes()[1]);
 
     auto bases_ptr = bases.data_ptr<int>();
 

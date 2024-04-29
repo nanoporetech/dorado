@@ -141,7 +141,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                         q_window_start = qpos;
                     }
 
-                    cigar_start_idx = cigar_idx;
+                    cigar_start_idx = (int)cigar_idx;
                     cigar_start_offset = offset;
                 } else {
                     t_window_start = tpos + offset;

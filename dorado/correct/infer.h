@@ -37,8 +37,8 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
                                            torch::indexing::Slice(0, tensors[i].sizes()[1])});
         slice.copy_(tensors[i]);
     }
-    spdlog::info("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
-                 batch.numel(), batch.sum().item<T>());
+    spdlog::trace("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
+                  batch.numel(), batch.sum().item<T>());
     return batch;
 }
 

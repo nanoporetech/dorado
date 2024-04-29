@@ -9,7 +9,7 @@
 
 struct base_count_t {
     int count = 0;
-    char base;
+    int base;
 };
 
 struct PairHash {

@@ -119,7 +119,8 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     try {
         module = torch::jit::load(m_model_path);
     } catch (const c10::Error& e) {
-        throw std::runtime_error("Error loading model: " + m_model_path);
+        throw std::runtime_error("Error loading model from " + m_model_path +
+                                 " with error: " + e.what());
     }
 
     spdlog::debug("Loaded model!");
