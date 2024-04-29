@@ -233,11 +233,11 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
+    const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
+#if DORADO_CUDA_BUILD
     const int N = static_cast<int>(x.size(0));
     const int T = static_cast<int>(x.size(1));
     const int C = static_cast<int>(x.size(2));
-    const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
-#if DORADO_CUDA_BUILD
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     bool koi_norm = utils::get_dev_opt<bool>("koi_norm", true);
     x = koi_norm ? x.contiguous() : x;  // If using koi, make sure x is NTC order in memory
