@@ -11,8 +11,8 @@ namespace dorado::correction {
 bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
     bool long_indel = false;
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
-    for (size_t i = overlap.cigar_start_idx;
-         i < std::min(size_t(overlap.cigar_end_idx + 1), cigar.size()); i++) {
+    size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
+    for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
         if (cigar[i].op == CigarOpType::INS || cigar[i].op == CigarOpType::DEL) {
             long_indel |= cigar[i].len >= 30;
         }

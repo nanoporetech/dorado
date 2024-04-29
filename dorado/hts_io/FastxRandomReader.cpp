@@ -7,7 +7,7 @@
 #include <memory>
 
 struct CharDestructor {
-    void operator()(char* ptr) { free(ptr); };
+    void operator()(char* ptr) { hts_free(ptr); };
 };
 using CharPtr = std::unique_ptr<char, CharDestructor>;
 
