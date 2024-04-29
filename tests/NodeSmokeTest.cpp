@@ -399,7 +399,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     client_info->contexts().register_context<dorado::poly_tail::PolyTailCalculator>(
             dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
 
-    set_read_mutator([is_rna](dorado::SimplexReadPtr& read) {
+    set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
