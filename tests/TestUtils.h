@@ -60,6 +60,8 @@ public:
     ~TraceLogger() { spdlog::set_level(spdlog::level::off); }
 };
 
+std::string generate_random_sequence_string(int len);
+
 }  // namespace dorado::tests
 
 using namespace dorado::tests;

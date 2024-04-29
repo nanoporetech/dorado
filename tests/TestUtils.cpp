@@ -1,5 +1,6 @@
 #include "TestUtils.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -75,6 +76,15 @@ std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path) {
     vec.resize(str.size());
     std::memcpy(vec.data(), str.data(), str.size());
     return vec;
+}
+
+std::string generate_random_sequence_string(int len) {
+    const char bases[4] = {'A', 'C', 'G', 'T'};
+    std::string read(len, 'A');
+    for (int i = 0; i < len; i++) {
+        read[i] = bases[rand() % 4];
+    }
+    return read;
 }
 
 }  // namespace dorado::tests

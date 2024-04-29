@@ -144,8 +144,10 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
-    if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
-        throw std::runtime_error("Could not write header to temp file.");
+    if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
+        if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
+            throw std::runtime_error("Could not write header to temp file.");
+        }
     }
 
     for (const auto& item : m_buffer_map) {
