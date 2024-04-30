@@ -92,26 +92,35 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
 };
 
 at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
+    // Input is NT3HD
     assert_forward_dims(qkv);
-    const int64_t seq_len = qkv.size(1);
+    const int64_t N = qkv.size(0);
+    const int64_t T = qkv.size(1);
+    const int64_t H = qkv.size(3);
+    const int64_t D = qkv.size(4);
 
     auto buffers = named_buffers();
-    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, seq_len);
-    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, seq_len);
+    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, T);
+    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, T);
 
-    using Slices = std::vector<at::indexing::TensorIndex>;
-    const Slices evens = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
-                          at::indexing::Slice(), at::indexing::Slice(at::indexing::None, dim / 2)};
-    const Slices odds = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
-                         at::indexing::Slice(), at::indexing::Slice(dim / 2, dim)};
+    auto qk_evens = qkv.slice(2, 0, 2).slice(4, 0, D / 2);
+    auto qk_odds = qkv.slice(2, 0, 2).slice(4, D / 2, D);
 
-    at::Tensor qk_evens = qkv.index(evens).clone();
-    at::Tensor qk_odds = qkv.index(odds);
+    // Allocate output tensor with memory layout as consumed by attention: 3NHTD
+    auto output = at::empty({3, N, H, T, D}, qkv.options());
+    // View as [3 (q|k|v), N, H, T, 2 (even|odd), D/2], narrow first dim to 2 (q|k), then
+    // permute as [2 (even|odd), N, T, 2 (q|k), H, D/2] which is compatible with assignment below
+    auto output_kv_even_odd =
+            output.view({3, N, H, T, 2, D / 2}).slice(0, 0, 2).permute({4, 1, 3, 0, 2, 5});
 
-    qkv.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
-    qkv.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
+    // Apply rotary embedding to Q and K
+    output_kv_even_odd[0] = cos_buf * qk_evens - sin_buf * qk_odds;
+    output_kv_even_odd[1] = sin_buf * qk_evens + cos_buf * qk_odds;
 
-    return qkv;
+    // Copy V to output
+    output.select(0, 2).permute({0, 2, 1, 3}) = qkv.select(2, 2);
+
+    return output;
 }
 
 void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
@@ -192,11 +201,6 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     {
         utils::ScopedProfileRange spr("ROTE", 3);
         qkv = rotary_emb(qkv);
-    }
-    {
-        utils::ScopedProfileRange spr("PERM", 3);
-        // NT3HD -> 3NHTD
-        qkv = qkv.permute({2, 0, 3, 1, 4}).contiguous();
     }
     {
         utils::ScopedProfileRange spr2("MEA", 3);
