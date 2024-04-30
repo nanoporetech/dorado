@@ -45,20 +45,6 @@ public:
 
     // returns the shared_ptr if registered otherwise returns nullptr
     template <typename T>
-    std::shared_ptr<T> get_ptr() {
-        auto registered_entry = m_contexts.find(typeid(T));
-        if (registered_entry == m_contexts.end()) {
-            return nullptr;
-        }
-        auto base = dynamic_cast<details::ContextHolder<T>*>(registered_entry->second.get());
-        if (!base) {
-            return nullptr;
-        }
-        return base->get_ptr();
-    }
-
-    // returns the shared_ptr if registered otherwise returns nullptr
-    template <typename T>
     std::shared_ptr<T> get_ptr() const {
         auto registered_entry = m_contexts.find(typeid(T));
         if (registered_entry == m_contexts.end()) {
@@ -69,20 +55,6 @@ public:
             return nullptr;
         }
         return base->get_ptr();
-    }
-
-    // returns the value if registered otherwise throws std::out_of_range
-    template <typename T>
-    T& get() {
-        auto registered_entry = m_contexts.find(typeid(T));
-        if (registered_entry == m_contexts.end()) {
-            throw std::out_of_range("Not a registered type");
-        }
-        auto base = dynamic_cast<details::ContextHolder<T>*>(registered_entry->second.get());
-        if (!base) {
-            throw std::out_of_range("Type not convertible");
-        }
-        return base->get();
     }
 
     // returns the value if registered otherwise throws std::out_of_range
