@@ -52,18 +52,11 @@ int correct(int argc, char* argv[]) {
             .help("Number of threads per device.")
             .default_value(1)
             .scan<'i', int>();
-    parser.add_argument("-n", "--max-reads")
-            .help("maximum number of reads to process (for debugging, 0=unlimited).")
-            .default_value(0)
-            .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
             .help("batch size for inference.")
             .default_value(32)
             .scan<'i', int>();
-    parser.add_argument("-m", "--model-path")
-            .help("path t- torchscript model file.")
-            .default_value(std::string(
-                    "/home/OXFORDNANOLABS/jdaw/github/haec-BigBird/../haec-BigBird/ont-model.pt"));
+    parser.add_argument("-m", "--model-path").help("path t- torchscript model file.").required();
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
             .default_value(std::string(""));
