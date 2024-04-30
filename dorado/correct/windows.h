@@ -1,7 +1,10 @@
 #pragma once
 
-#include "read_pipeline/messages.h"
 #include "types.h"
+
+namespace dorado {
+struct CorrectionAlignments;
+}
 
 namespace dorado::correction {
 

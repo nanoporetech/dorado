@@ -1,6 +1,6 @@
 #pragma once
 
-#include <torch/torch.h>
+#include <ATen/Tensor.h>
 
 #include <vector>
 
@@ -19,9 +19,9 @@ struct OverlapWindow {
 };
 
 struct WindowFeatures {
-    torch::Tensor bases;
-    torch::Tensor quals;
-    torch::Tensor indices;
+    at::Tensor bases;
+    at::Tensor quals;
+    at::Tensor indices;
     int length;
     std::vector<std::pair<int, int>> supported;
     std::vector<char> inferred_bases;

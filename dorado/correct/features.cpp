@@ -1,10 +1,14 @@
 #include "features.h"
 
 #include "conversions.h"
+#include "read_pipeline/messages.h"
 #include "utils/sequence_utils.h"
 
+#include <ATen/Tensor.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
+#include <torch/types.h>
+
+const int TOP_K = 30;
 
 namespace dorado::correction {
 
@@ -164,7 +168,7 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
 // reads the bases from the target and query sequences and qualitiy
 // scores and fills 2x2D matrices where each column in a position
 // in the pileup and each row is a read.
-std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
+std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         const std::vector<OverlapWindow>& overlaps,
         const CorrectionAlignments& alignments,
         int win_len,
@@ -172,15 +176,15 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
         const std::vector<int>& max_ins) {
     static auto base_encoding = gen_base_encoding();
     static auto base_decoding = gen_base_decoding();
-    auto bases_options = torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
-    auto quals_options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
+    auto bases_options = at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
+    auto quals_options = at::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
     const int length = std::accumulate(max_ins.begin(), max_ins.end(), 0) + (int)max_ins.size();
     const int reads = 1 + TOP_K;
 
-    auto bases = torch::empty({reads, length}, bases_options);
+    auto bases = at::empty({reads, length}, bases_options);
     std::fill(bases.data_ptr<int>(), bases.data_ptr<int>() + bases.numel(), base_encoding['.']);
-    auto quals = torch::empty({reads, length}, quals_options);
+    auto quals = at::empty({reads, length}, quals_options);
     std::fill(quals.data_ptr<float>(), quals.data_ptr<float>() + quals.numel(),
               normalize_quals((float)'!'));
 
@@ -334,7 +338,7 @@ std::tuple<torch::Tensor, torch::Tensor> get_features_for_window(
 // first element being a position in the target sequence
 // and the second element being an insertion offset from that
 // position.
-std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
+std::vector<std::pair<int, int>> get_supported(at::Tensor& bases) {
     std::vector<std::pair<int, int>> supported;
 
     static auto base_forward = base_forward_mapping();
@@ -380,8 +384,7 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
 
 // Convert the tuple of pairs for {target pos, insertion offset} into a
 // column in the tensor.
-torch::Tensor get_indices(const torch::Tensor& bases,
-                          const std::vector<std::pair<int, int>>& supported) {
+at::Tensor get_indices(const at::Tensor& bases, const std::vector<std::pair<int, int>>& supported) {
     static auto base_encoding = gen_base_encoding();
     auto tbase_tensor = bases.data_ptr<int>();
     std::vector<int> indices;
@@ -397,8 +400,8 @@ torch::Tensor get_indices(const torch::Tensor& bases,
         supported_indices.push_back(indices[pos] + ins);
     }
 
-    return torch::from_blob(supported_indices.data(), {(int)supported_indices.size()},
-                            torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
+    return at::from_blob(supported_indices.data(), {(int)supported_indices.size()},
+                         at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
             .clone();
 }
 
@@ -426,7 +429,6 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
         spdlog::trace("window {} pre filter windows {} post filter windows {}", w,
                       overlap_windows.size(), filtered_overlaps.size());
         overlap_windows = std::move(filtered_overlaps);
-        //windows[w] = std::move(filtered_overlaps);
 
         // Sort overlaps by score
         if (overlap_windows.size() > 1) {

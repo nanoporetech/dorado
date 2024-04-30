@@ -9,9 +9,6 @@
 #include "utils/types.h"
 
 #include <spdlog/spdlog.h>
-#include <torch/nn/utils/rnn.h>
-#include <torch/script.h>
-#include <torch/torch.h>
 
 #include <atomic>
 #include <chrono>
@@ -51,8 +48,8 @@ private:
     utils::AsyncQueue<correction::WindowFeatures> m_features_queue;
     utils::AsyncQueue<correction::WindowFeatures> m_inferred_features_queue;
 
-    std::vector<std::unique_ptr<std::thread>> m_infer_threads;
-    std::vector<std::unique_ptr<std::thread>> m_decode_threads;
+    std::vector<std::thread> m_infer_threads;
+    std::vector<std::thread> m_decode_threads;
 
     std::atomic<int> num_reads;
 

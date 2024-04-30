@@ -18,12 +18,11 @@
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
 #endif
+#include <ATen/Tensor.h>
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
-#include <torch/nn/utils/rnn.h>
 #include <torch/script.h>
-#include <torch/torch.h>
 
 #include <cassert>
 #include <filesystem>
@@ -70,7 +69,6 @@ void CorrectionNode::decode_fn() {
 
     WindowFeatures item;
     while (m_inferred_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
-        //spdlog::trace("Popped inferred feature for {}", item.window_idx);
         utils::ScopedProfileRange spr("decode_loop", 1);
         std::vector<WindowFeatures> to_decode;
         {
@@ -80,11 +78,9 @@ void CorrectionNode::decode_fn() {
             auto find_iter = m_features_by_id.find(read_name);
             auto& output_features = find_iter->second;
             output_features[pos] = std::move(item);
-            //spdlog::trace("replaced window in position {}", pos);
             auto& pending = m_pending_features_by_id.find(read_name)->second;
             pending--;
             if (pending == 0) {
-                //spdlog::trace("Got all features!");
                 // Got all features!
                 to_decode = std::move(output_features);
                 m_features_by_id.erase(read_name);
@@ -94,7 +90,7 @@ void CorrectionNode::decode_fn() {
 
         if (!to_decode.empty()) {
             const std::string& read_name = to_decode[0].read_name;
-            //spdlog::trace("decoding window now for {}", read_name);
+            spdlog::trace("decoding window for {}", read_name);
             auto corrected_seqs = decode_windows(to_decode);
             if (corrected_seqs.size() == 1) {
                 auto rec = create_bam_record(read_name, corrected_seqs[0]);
@@ -136,23 +132,22 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     torch::StreamGuard stream_guard(stream);
 #endif
 
-    std::vector<torch::Tensor> bases_batch;
-    std::vector<torch::Tensor> quals_batch;
+    std::vector<at::Tensor> bases_batch;
+    std::vector<at::Tensor> quals_batch;
     std::vector<int> lengths;
     std::vector<int64_t> sizes;
-    std::vector<torch::Tensor> indices_batch;
+    std::vector<at::Tensor> indices_batch;
     std::vector<WindowFeatures> wfs;
     // If there are any windows > 5120, then reduce batch size by 1
     int remaining_batch_slots = m_batch_size;
 
-    auto decode_preds = [](const torch::Tensor& preds) {
+    auto decode_preds = [](const at::Tensor& preds) {
         std::vector<char> bases;
         bases.reserve(preds.sizes()[0]);
         static std::array<char, 5> decoder = {'A', 'C', 'G', 'T', '*'};
         for (int i = 0; i < preds.sizes()[0]; i++) {
             auto base_idx = preds[i].item<int>();
             bases.push_back(decoder[base_idx]);
-            //spdlog::trace("{} decoded to {}", i, bases.back());
         }
         return bases;
     };
@@ -161,15 +156,12 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         utils::ScopedProfileRange infer("infer", 1);
         // Run inference on batch
         auto length_tensor =
-                torch::from_blob(lengths.data(), {(int)lengths.size()},
-                                 torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
+                at::from_blob(lengths.data(), {(int)lengths.size()},
+                              at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
         auto batched_bases =
                 collate<int>(bases_batch, (int)11, torch::kInt32, m_bases_manager.get_next_ptr());
         auto batched_quals =
                 collate<float>(quals_batch, 0.f, torch::kFloat32, m_quals_manager.get_next_ptr());
-        //print_size(batched_bases, "batched_bases");
-        //print_size(batched_quals, "batched_quals");
-        //print_size(length_tensor, "length_tensor");
 
         std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
@@ -179,7 +171,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             inputs.push_back(batched_quals.to(device));
             inputs.push_back(length_tensor.to(device));
             std::for_each(indices_batch.begin(), indices_batch.end(),
-                          [device](torch::Tensor& t) { t.to(device); });
+                          [device](at::Tensor& t) { t.to(device); });
             inputs.push_back(indices_batch);
         }
 
@@ -189,11 +181,8 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             throw std::runtime_error("Expected inference result to be tuple.");
         }
         auto base_logits = output.toTuple()->elements()[1].toTensor();
-        //print_size(base_logits, "base_logits");
         auto preds = base_logits.argmax(1, false).to(torch::kCPU);
-        //print_size(preds, "preds");
         auto split_preds = preds.split_with_sizes(sizes);
-        //spdlog::trace("split preds size {}", split_preds.size());
         for (size_t w = 0; w < split_preds.size(); w++) {
             auto decoded_output = decode_preds(split_preds[w]);
             wfs[w].inferred_bases = decoded_output;
@@ -233,9 +222,6 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         sizes.push_back(wf.length);
         indices_batch.push_back(wf.indices);
         remaining_batch_slots -= required_batch_slots;
-
-        //spdlog::trace("bases max {} min {} sum {}", wf.bases.max().item<uint8_t>(), wf.bases.min().item<uint8_t>(), wf.bases.sum().item<int>());
-        //spdlog::trace("quals max {} min {} sum {}", wf.quals.max().item<float>(), wf.quals.min().item<float>(), wf.quals.sum().item<float>());
     }
 
     if (bases_batch.size() > 0) {
@@ -260,7 +246,7 @@ void CorrectionNode::input_thread_fn() {
             utils::ScopedProfileRange spr("input_loop", 1);
             populate_alignments(alignments, fastx_reader.get());
             size_t n_windows = (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
-            //spdlog::trace("num windows {}", n_windows);
+            spdlog::trace("num windows {} for read {}", n_windows, alignments.read_name);
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
             // Get the windows
@@ -276,7 +262,6 @@ void CorrectionNode::input_thread_fn() {
                     features_to_infer.push_back(std::move(wfs[w]));
                 }
             }
-            //spdlog::trace("Have {} pending features {} done features", features_to_infer.size(), output.size());
             {
                 std::lock_guard<std::mutex> lock(m_features_mutex);
                 m_features_by_id.insert({alignments.read_name, std::move(wfs)});
@@ -285,13 +270,14 @@ void CorrectionNode::input_thread_fn() {
             }
             // Push the ones that need inference to another thread.
             for (auto& wf : features_to_infer) {
-                //spdlog::trace("Pushing window idx {} to features queue", wf.window_idx);
+                spdlog::trace("Pushing window idx {} to features queue", wf.window_idx);
                 m_features_queue.try_push(std::move(wf));
             }
             num_reads++;
 
+            // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Processed {} reads", num_reads.load());
+                spdlog::debug("Corrected {} reads", num_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
@@ -344,12 +330,11 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
     for (size_t d = 0; d < devices.size(); d++) {
         const auto& dev = devices[d];
         for (int i = 0; i < infer_threads; i++) {
-            m_infer_threads.push_back(
-                    std::make_unique<std::thread>(&CorrectionNode::infer_fn, this, dev, (int)d));
+            m_infer_threads.push_back(std::thread(&CorrectionNode::infer_fn, this, dev, (int)d));
         }
     }
     for (int i = 0; i < 4; i++) {
-        m_decode_threads.push_back(std::make_unique<std::thread>(&CorrectionNode::decode_fn, this));
+        m_decode_threads.push_back(std::thread(&CorrectionNode::decode_fn, this));
     }
     // Create index for fastq file.
     char* idx_name = fai_path(fastq.c_str());
@@ -368,15 +353,17 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
 void CorrectionNode::terminate(const FlushOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
-        if (infer_thread->joinable()) {
-            infer_thread->join();
+        if (infer_thread.joinable()) {
+            infer_thread.join();
         }
     }
+    m_infer_threads.clear();
     for (auto& decode_thread : m_decode_threads) {
-        if (decode_thread->joinable()) {
-            decode_thread->join();
+        if (decode_thread.joinable()) {
+            decode_thread.join();
         }
     }
+    m_decode_threads.clear();
 }
 
 stats::NamedStats CorrectionNode::sample_stats() const {

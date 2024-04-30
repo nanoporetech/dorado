@@ -1,6 +1,7 @@
 #include "windows.h"
 
 #include "conversions.h"
+#include "read_pipeline/messages.h"
 #include "types.h"
 
 #include <spdlog/spdlog.h>

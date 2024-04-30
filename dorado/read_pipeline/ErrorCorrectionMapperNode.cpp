@@ -37,9 +37,6 @@ namespace {
             throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
         }
     }
-    //if (!fwd) {
-    //    std::reverse(cigar_ops.begin(), cigar_ops.end());
-    //}
     return cigar_ops;
 }
 
@@ -108,6 +105,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
         });
         extract_alignments(reg, hits, read_seq, read_name);
         m_alignments_processed++;
+        // TODO: Remove and move to ProgressTracker
         if (m_alignments_processed.load() % 10000 == 0) {
             spdlog::debug("Alignments processed {}", m_alignments_processed.load());
         }
@@ -120,6 +118,7 @@ void ErrorCorrectionMapperNode::load_read_fn() {
     while (reader.read()) {
         m_reads_queue.try_push(BamPtr(bam_dup1(reader.record.get())));
         m_reads_read++;
+        // TODO: Remove and move to ProgressTracker
         if (m_reads_read.load() % 10000 == 0) {
             spdlog::debug("Read {} reads", m_reads_read.load());
         }
@@ -143,10 +142,10 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
 }
 
 void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
-    std::unique_ptr<std::thread> reader_thread;
-    std::vector<std::unique_ptr<std::thread>> aligner_threads;
-    std::unique_ptr<std::thread> copy_thread = std::make_unique<std::thread>(
-            &ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
+    std::thread reader_thread;
+    std::vector<std::thread> aligner_threads;
+    std::thread copy_thread =
+            std::thread(&ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
     int index = 0;
     do {
         spdlog::debug("Align with index {}", index);
@@ -156,21 +155,20 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
         // 1. Start threads for aligning reads.
-        reader_thread =
-                std::make_unique<std::thread>(&ErrorCorrectionMapperNode::load_read_fn, this);
+        reader_thread = std::thread(&ErrorCorrectionMapperNode::load_read_fn, this);
         // 2. Start thread for generating reads.
         for (int i = 0; i < m_num_threads; i++) {
-            aligner_threads.push_back(std::make_unique<std::thread>(
-                    &ErrorCorrectionMapperNode::input_thread_fn, this));
+            aligner_threads.push_back(
+                    std::thread(&ErrorCorrectionMapperNode::input_thread_fn, this));
         }
         // 3. Wait for alignments to finish and all reads to be read
-        if (reader_thread->joinable()) {
-            reader_thread->join();
+        if (reader_thread.joinable()) {
+            reader_thread.join();
         }
-        reader_thread.reset();
+        //reader_thread.reset();
         for (auto& t : aligner_threads) {
-            if (t->joinable()) {
-                t->join();
+            if (t.joinable()) {
+                t.join();
             }
         }
         aligner_threads.clear();
@@ -189,10 +187,10 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
     m_copy_terminate.store(true);
-    if (copy_thread->joinable()) {
-        copy_thread->join();
+    if (copy_thread.joinable()) {
+        copy_thread.join();
     }
-    copy_thread.reset();
+    //copy_thread.reset();
 }
 
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)

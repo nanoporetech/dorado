@@ -1,11 +1,12 @@
 #pragma once
 
-#include "read_pipeline/messages.h"
 #include "types.h"
 
-namespace dorado::correction {
+namespace dorado {
+struct CorrectionAlignments;
+}
 
-const int TOP_K = 30;
+namespace dorado::correction {
 
 std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
                                              const CorrectionAlignments& alignments,

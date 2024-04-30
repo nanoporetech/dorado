@@ -26,7 +26,6 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
                                       })
                              ->sizes()[1];
     auto options = torch::TensorOptions().dtype(type).device(torch::kCPU);
-    //torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
     torch::Tensor batch =
             torch::from_blob(mem_ptr, {(int)tensors.size(), max_length, max_reads}, options);
     T* ptr = batch.data_ptr<T>();
