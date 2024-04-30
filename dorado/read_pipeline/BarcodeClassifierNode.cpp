@@ -58,8 +58,6 @@ void BarcodeClassifierNode::input_thread_fn() {
             const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
             if (barcoding_info && barcoding_info->trim &&
                 (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
-                // TODO check this, if we are removing from the pipeline here why was
-                // it pushed to the pipelin in the first place?
                 continue;
             }
 
