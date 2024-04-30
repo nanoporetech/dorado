@@ -78,7 +78,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                 "t_window_start {} q_window_start {} cigar_start_idx {} cigar_start_offset {}",
                 t_window_start, q_window_start, cigar_start_idx, cigar_start_offset);
 
-        for (size_t cigar_idx = 0; cigar_idx < cigar.size(); cigar_idx++) {
+        for (int cigar_idx = 0; cigar_idx < (int)cigar.size(); cigar_idx++) {
             auto op = cigar[cigar_idx];
             int tnew = tpos;
             int qnew = qpos;
@@ -170,7 +170,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             int cigar_end_offset = -1;
 
             if (tnew == new_w * window_size) {
-                if (cigar_idx + 1 < cigar.size() && cigar[cigar_idx + 1].op == CigarOpType::INS) {
+                if (cigar_idx + 1 < (int)cigar.size() &&
+                    cigar[cigar_idx + 1].op == CigarOpType::INS) {
                     qend += cigar[cigar_idx + 1].len;
                     cigar_end_idx = cigar_idx + 2;
                 } else {

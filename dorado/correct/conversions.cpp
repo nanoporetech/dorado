@@ -7,8 +7,8 @@ namespace dorado::correction {
 
 float normalize_quals(float q) { return 2.f * (q - MIN_QSCORE) / (MAX_QSCORE - MIN_QSCORE) - 1.f; }
 
-std::array<int, 128> base_forward_mapping() {
-    std::array<int, 128> base_forward = {0};
+std::array<char, 128> base_forward_mapping() {
+    std::array<char, 128> base_forward = {0};
     base_forward['*'] = '*';
     base_forward['#'] = '*';
     base_forward['A'] = 'A';
@@ -31,8 +31,8 @@ std::array<int, 128> gen_base_encoding() {
     return base_encoding;
 }
 
-std::array<int, 11> gen_base_decoding() {
-    std::array<int, 11> base_decoding = {0};
+std::array<char, 11> gen_base_decoding() {
+    std::array<char, 11> base_decoding = {0};
     const std::string bases = "ACGT*acgt#.";
     for (size_t i = 0; i < bases.length(); i++) {
         base_decoding[i] = bases[i];

@@ -367,7 +367,8 @@ std::vector<std::pair<int, int>> get_supported(torch::Tensor& bases) {
 
         spdlog::trace("col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'],
                       counter['T'], counter['G'], counter['*']);
-        int count = std::count_if(counter.begin(), counter.end(), [](int num) { return num >= 3; });
+        int count = (int)std::count_if(counter.begin(), counter.end(),
+                                       [](int num) { return num >= 3; });
         if (count >= 2) {
             supported.push_back({tpos, ins});
             spdlog::trace("support added for {} {}", tpos, ins);
@@ -407,11 +408,11 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                                              const CorrectionAlignments& alignments,
                                              int window_size) {
     const std::string& tseq = alignments.read_seq;
-    int tlen = tseq.length();
+    int tlen = (int)tseq.length();
 
     std::vector<WindowFeatures> wfs;
-    for (size_t w = 0; w < windows.size(); w++) {
-        int win_len = (w == windows.size() - 1) ? tlen - window_size * w : window_size;
+    for (int w = 0; w < (int)windows.size(); w++) {
+        int win_len = (w == (int)windows.size() - 1) ? tlen - window_size * w : window_size;
         spdlog::trace("win idx {}: win len {}", w, win_len);
         auto& overlap_windows = windows[w];
 
