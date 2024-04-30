@@ -143,9 +143,9 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
 }
 
 void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
-    std::unique_ptr<std::thread> m_reader_thread;
-    std::vector<std::unique_ptr<std::thread>> m_aligner_threads;
-    std::unique_ptr<std::thread> m_copy_thread = std::make_unique<std::thread>(
+    std::unique_ptr<std::thread> reader_thread;
+    std::vector<std::unique_ptr<std::thread>> aligner_threads;
+    std::unique_ptr<std::thread> copy_thread = std::make_unique<std::thread>(
             &ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
     int index = 0;
     do {
@@ -156,24 +156,24 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
         // 1. Start threads for aligning reads.
-        m_reader_thread =
+        reader_thread =
                 std::make_unique<std::thread>(&ErrorCorrectionMapperNode::load_read_fn, this);
         // 2. Start thread for generating reads.
         for (int i = 0; i < m_num_threads; i++) {
-            m_aligner_threads.push_back(std::make_unique<std::thread>(
+            aligner_threads.push_back(std::make_unique<std::thread>(
                     &ErrorCorrectionMapperNode::input_thread_fn, this));
         }
         // 3. Wait for alignments to finish and all reads to be read
-        if (m_reader_thread->joinable()) {
-            m_reader_thread->join();
+        if (reader_thread->joinable()) {
+            reader_thread->join();
         }
-        m_reader_thread.reset();
-        for (auto& t : m_aligner_threads) {
+        reader_thread.reset();
+        for (auto& t : aligner_threads) {
             if (t->joinable()) {
                 t->join();
             }
         }
-        m_aligner_threads.clear();
+        aligner_threads.clear();
         {
             // Only copy when the thread sending alignments to downstream pipeline
             // is done.
@@ -189,10 +189,10 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
     m_copy_terminate.store(true);
-    if (m_copy_thread->joinable()) {
-        m_copy_thread->join();
+    if (copy_thread->joinable()) {
+        copy_thread->join();
     }
-    m_copy_thread.reset();
+    copy_thread.reset();
 }
 
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)

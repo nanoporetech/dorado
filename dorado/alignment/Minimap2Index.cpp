@@ -17,19 +17,19 @@ struct IndexDeleter {
 };
 using IndexUniquePtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
 
+dorado::alignment::IndexReaderPtr create_index_reader(const std::string& index_file,
+                                                      const mm_idxopt_t& index_options) {
+    dorado::alignment::IndexReaderPtr reader;
+    reader.reset(mm_idx_reader_open(index_file.c_str(), &index_options, 0));
+    return reader;
+}
+
 }  // namespace
 
 namespace dorado::alignment {
 
 void IndexReaderDeleter::operator()(mm_idx_reader_t* index_reader) {
     mm_idx_reader_close(index_reader);
-}
-
-IndexReaderPtr create_index_reader(const std::string& index_file,
-                                   const mm_idxopt_t& index_options) {
-    IndexReaderPtr reader;
-    reader.reset(mm_idx_reader_open(index_file.c_str(), &index_options, 0));
-    return reader;
 }
 
 void Minimap2Index::set_index_options(const Minimap2IndexOptions& index_options) {
