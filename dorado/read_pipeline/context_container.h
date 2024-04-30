@@ -30,7 +30,7 @@ public:
 
 }  // namespace details
 
-class ContextContainer {
+class ContextContainer final {
     std::map<std::type_index, std::unique_ptr<details::ContextBase>> m_contexts{};
 
 public:
