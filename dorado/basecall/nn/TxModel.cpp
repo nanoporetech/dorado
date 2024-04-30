@@ -239,19 +239,15 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     const int T = static_cast<int>(x.size(1));
     const int C = static_cast<int>(x.size(2));
     auto stream = at::cuda::getCurrentCUDAStream().stream();
-    bool koi_norm = utils::get_dev_opt<bool>("koi_norm", true);
-    x = koi_norm ? x.contiguous() : x;  // If using koi, make sure x is NTC order in memory
+    x = x.contiguous();  // If using koi, make sure x is NTC order in memory
     const int num_rows = N * T;
 #endif
 
     auto run_norm = [&](RMSNorm norm, const at::Tensor &in) {
 #if DORADO_CUDA_BUILD
-        int res = KOI_NOT_SUPPORTED;
-        if (koi_norm) {
-            res = host_fused_residual_rmsnorm_f16(stream, C, num_rows, in.data_ptr(), x.data_ptr(),
+        int res = host_fused_residual_rmsnorm_f16(stream, C, num_rows, in.data_ptr(), x.data_ptr(),
                                                   deepnorm_alpha.data_ptr(),
                                                   norm->weight.data_ptr(), x.data_ptr());
-        }
         if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
             throw std::runtime_error("Koi error during layer norm");
         } else if (res == KOI_NOT_SUPPORTED)
