@@ -25,6 +25,19 @@ namespace {
 
 // Create edlib configuration for detecting barcode region
 // using the flanks.
+[[maybe_unused]] EdlibAlignConfig init_edlib_config_for_midstrand_flanks() {
+    EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
+    placement_config.mode = EDLIB_MODE_HW;
+    // The Ns are the barcode mask. The M is for the wobble base in the 16S barcode flanks.
+    static const EdlibEqualityPair additionalEqualities[7] = {
+            {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}, {'N', 'U'}, {'M', 'A'}, {'M', 'C'}};
+    placement_config.additionalEqualities = additionalEqualities;
+    placement_config.additionalEqualitiesLength = 7;
+    return placement_config;
+}
+
+// Create edlib configuration for detecting barcode region
+// using the flanks.
 EdlibAlignConfig init_edlib_config_for_flanks() {
     EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
     placement_config.mode = EDLIB_MODE_HW;
@@ -403,6 +416,65 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
     return candidates_list;
 }
 
+bool BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
+                                               const BarcodeCandidateKit& candidate) const {
+    auto length_of_end_windows =
+            m_scoring_params.front_barcode_window + m_scoring_params.rear_barcode_window;
+    if ((int)read_seq.length() < length_of_end_windows) {
+        return false;
+    }
+
+    std::string_view top_context_v1 = candidate.top_context;
+    std::string_view bottom_context_v1 = candidate.bottom_context_rev;
+
+    std::string_view top_context_v2 = candidate.bottom_context;
+    std::string_view bottom_context_v2 = candidate.top_context_rev;
+
+    auto length_without_end_windows = read_seq.length() - length_of_end_windows;
+
+    if (length_without_end_windows <
+        std::min({top_context_v1.length(), bottom_context_v1.length(), top_context_v2.length(),
+                  bottom_context_v2.length()})) {
+        return false;
+    }
+
+    auto read_mid =
+            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+
+    // Try to find the location of the barcode + flanks in the top and bottom windows.
+    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+
+    int barcode_len = int(candidate.barcodes1[0].length());
+
+    // Fetch barcode mask locations for variant 1
+    auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
+            top_context_v1, read_mid, barcode_len, placement_config, "midstrand flank top v1");
+
+    auto [bottom_result_v1, bottom_flank_score_v1, bottom_bc_loc_v1] =
+            extract_flank_fit(bottom_context_v1, read_mid, barcode_len, placement_config,
+                              "midstrand flank bottom v1");
+
+    // Fetch barcode mask locations for variant 2
+    auto [top_result_v2, top_flank_score_v2, top_bc_loc_v2] = extract_flank_fit(
+            top_context_v2, read_mid, barcode_len, placement_config, "midstrand flank top v2");
+
+    auto [bottom_result_v2, bottom_flank_score_v2, bottom_bc_loc_v2] =
+            extract_flank_fit(bottom_context_v2, read_mid, barcode_len, placement_config,
+                              "midstrand flank bottom v2");
+
+    edlibFreeAlignResult(top_result_v1);
+    edlibFreeAlignResult(bottom_result_v1);
+    edlibFreeAlignResult(top_result_v2);
+    edlibFreeAlignResult(bottom_result_v2);
+    // Find the best variant of the two.
+    if (std::max({top_flank_score_v1, bottom_flank_score_v1, top_flank_score_v2,
+                  bottom_flank_score_v2}) >= 0.8f) {
+        return true;
+    }
+
+    return false;
+}
+
 // Calculate barcode score for the following barcoding scenario:
 // Variant 1 (v1)
 // 5' >-=====----------------=====-> 3'
@@ -773,6 +845,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     } else {
         // TODO: Implement finding best kit match.
         throw std::runtime_error("Unimplemented: multiple barcoding kits");
+    }
+
+    if (find_midstrand_barcode(fwd, *candidate)) {
+        spdlog::trace("Found midstrand barcode.");
+        return UNCLASSIFIED;
     }
 
     // Then find the best barcode hit within that kit.
