@@ -468,7 +468,7 @@ bool BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
     edlibFreeAlignResult(bottom_result_v2);
     // Find the best variant of the two.
     if (std::max({top_flank_score_v1, bottom_flank_score_v1, top_flank_score_v2,
-                  bottom_flank_score_v2}) >= 0.8f) {
+                  bottom_flank_score_v2}) >= m_scoring_params.min_flank_score) {
         return true;
     }
 
