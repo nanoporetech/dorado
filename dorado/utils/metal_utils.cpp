@@ -43,18 +43,6 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // Functions here that create autorelease objects should be called with an autorelease pool set up,
 // which on MacOS isn't the case unless something like ScopedAutoReleasePool is used.
 
-auto get_library_location() {
-    char ns_path[PATH_MAX + 1];
-    uint32_t size = sizeof(ns_path);
-    _NSGetExecutablePath(ns_path, &size);
-
-    fs::path exepth{ns_path};
-    fs::path mtllib{"../lib/default.metallib"};
-    fs::path fspath = exepth.parent_path() / mtllib;
-
-    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
-}
-
 void report_error(const NS::Error *error, const char *function) {
     if (error == nil) {
         return;
@@ -73,6 +61,18 @@ void report_error(const NS::Error *error, const char *function) {
         report_error(error_, #func_with_err);              \
         result;                                            \
     })
+
+auto get_library_location() {
+    char ns_path[PATH_MAX + 1];
+    uint32_t size = sizeof(ns_path);
+    _NSGetExecutablePath(ns_path, &size);
+
+    fs::path exepth{ns_path};
+    fs::path mtllib{"../lib/default.metallib"};
+    fs::path fspath = exepth.parent_path() / mtllib;
+
+    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
+}
 
 #if !TARGET_OS_IPHONE
 
