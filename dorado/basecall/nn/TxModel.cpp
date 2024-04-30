@@ -212,6 +212,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         qkv = rotary_emb(qkv);
     }
     {
+        utils::ScopedProfileRange spr("MEA", 3);
         // NT3HD -> N3HTD -> N[1]HTD
         auto attn_window_mask = get_attn_window_mask(T);
         attn_output_ntc = at::empty({N, T, C}, x.options());
