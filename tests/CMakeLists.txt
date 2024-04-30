@@ -234,7 +234,13 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     # Enable the metal validation layer when running tests.
     if (APPLE)
         set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "MTL_DEBUG_LAYER=set:1")
-        set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "SIMCTL_CHILD_MTL_DEBUG_LAYER=set:1")
+        # We can't have warnings as errors because of the MPS backend in torch. Even enabling it in
+        # logging mode is too spammy.
+        #set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "MTL_DEBUG_LAYER_WARNING_MODE=set:nslog")
+
+        # It would be nice to enable this fully for the simulator, however the simulator simulates old hardware
+        # which we don't plan on supporting (256MB maxBufferLength, lack of compute memory barriers, etc...).
+        #set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "SIMCTL_CHILD_MTL_DEBUG_LAYER=set:1")
     endif()
 endforeach()
 
