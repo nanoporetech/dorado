@@ -135,7 +135,7 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
 
     std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4, 5};
     std::vector<size_t> subread_ids;
-    for (auto &message : messages) {
+    for (const auto &message : messages) {
         const auto &read_common = get_read_common_data(message);
         subread_ids.push_back(read_common.subread_id);
     }

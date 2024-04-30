@@ -213,7 +213,7 @@ int aligner(int argc, char* argv[]) {
     progress_stats.start();
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    client_info->contexts().register_context<alignment::AlignmentInfo>(align_info);
+    client_info->contexts().register_context<const alignment::AlignmentInfo>(align_info);
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);

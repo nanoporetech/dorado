@@ -72,7 +72,8 @@ protected:
         auto alignment_info = std::make_shared<dorado::alignment::AlignmentInfo>();
         alignment_info->minimap_options = options;
         alignment_info->reference_file = reference_file;
-        client_info->contexts().register_context<dorado::alignment::AlignmentInfo>(alignment_info);
+        client_info->contexts().register_context<const dorado::alignment::AlignmentInfo>(
+                alignment_info);
         reader.set_client_info(client_info);
 
         reader.read(*pipeline, 100);
@@ -100,7 +101,7 @@ protected:
 
         dorado::ReadCommon read_common{};
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-        client_info->contexts().register_context<dorado::alignment::AlignmentInfo>(
+        client_info->contexts().register_context<const dorado::alignment::AlignmentInfo>(
                 client_align_info);
         read_common.client_info = client_info;
         read_common.read_id = std::move(read_id);
