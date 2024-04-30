@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "utils/dev_utils.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
@@ -159,6 +160,8 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
         : d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
+          // TODO: this may benefit from fine-tuning. 8 gives good performance at chunk size 12k
+          num_splits(utils::get_dev_opt<int>("mha_num_splits", 8)),
           attn_window(attn_window_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
@@ -207,13 +210,12 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         auto attn_window_mask = get_attn_window_mask(T);
         attn_output_ntc = at::empty({N, T, C}, x.options());
         auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
-        int num_splits = utils::get_dev_opt<int>("mha_num_splits", 8);
         const auto [win_upper, win_lower] = attn_window;
         for (int i = 0; i < num_splits; ++i) {
             auto qb = i * T / num_splits;
             auto qe = (i + 1) * T / num_splits;
-            auto kvb = std::max(0l, qb - win_lower);
-            auto kve = std::min(T, qe + win_upper);
+            auto kvb = std::max<int64_t>(0, qb - win_lower);
+            auto kve = std::min<int64_t>(T, qe + win_upper);
             const auto q = qkv[0].slice(-2, qb, qe);
             const auto k = qkv[1].slice(-2, kvb, kve);
             const auto v = qkv[2].slice(-2, kvb, kve);
