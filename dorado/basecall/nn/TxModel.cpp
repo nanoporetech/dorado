@@ -183,33 +183,47 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const int64_t C = x.size(2);
 
     at::Tensor qkv;
-    at::Tensor attn_output;
+    at::Tensor attn_output_ntc;
     {
-        utils::ScopedProfileRange spr("QKV", 2);
+        utils::ScopedProfileRange spr("QKV", 3);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
     }
     {
-        utils::ScopedProfileRange spr("ROTE", 2);
+        utils::ScopedProfileRange spr("ROTE", 3);
         qkv = rotary_emb(qkv);
     }
     {
-        utils::ScopedProfileRange spr("MEA", 2);
-        // NT3HD -> N3HTD -> N[1]HTD
-        const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
-        auto attn_window_mask = get_attn_window_mask(T);
-
-#if TORCH_VERSION_MAJOR < 2
-        attn_output =
-                scaled_dot_product_attention_naive(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
-#else
-        attn_output = at::scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
-#endif
-        attn_output = attn_output.permute({0, 1, 3, 2, 4}).reshape({N, T, C});
+        utils::ScopedProfileRange spr("PERM", 3);
+        // NT3HD -> 3NHTD
+        qkv = qkv.permute({2, 0, 3, 1, 4}).contiguous();
     }
     {
-        utils::ScopedProfileRange spr("OUTP", 2);
-        x = out_proj(attn_output);
+        utils::ScopedProfileRange spr2("MEA", 3);
+        auto attn_window_mask = get_attn_window_mask(T);
+        attn_output_ntc = at::empty({N, T, C}, x.options());
+        auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
+        int num_splits = utils::get_dev_opt<int>("mha_num_splits", 8);
+        const auto [win_upper, win_lower] = attn_window;
+        for (int i = 0; i < num_splits; ++i) {
+            auto qb = i * T / num_splits;
+            auto qe = (i + 1) * T / num_splits;
+            auto kvb = std::max(0l, qb - win_lower);
+            auto kve = std::min(T, qe + win_upper);
+            const auto q = qkv[0].slice(-2, qb, qe);
+            const auto k = qkv[1].slice(-2, kvb, kve);
+            const auto v = qkv[2].slice(-2, kvb, kve);
+            const auto mask = attn_window_mask.index({Slice(qb, qe), Slice(kvb, kve)});
+#if TORCH_VERSION_MAJOR >= 2
+            attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, mask);
+#else
+            attn_output.slice(-2, qb, qe) = scaled_dot_product_attention_naive(q, k, v, mask);
+#endif
+        }
+    }
+    {
+        utils::ScopedProfileRange spr("OUTP", 3);
+        x = out_proj(attn_output_ntc);
     }
     return x;
 };
