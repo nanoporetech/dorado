@@ -20,6 +20,12 @@
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
 
+#if DORADO_CUDA_BUILD
+extern "C" {
+#include "koi.h"
+}
+#endif
+
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -206,7 +212,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         qkv = rotary_emb(qkv);
     }
     {
-        utils::ScopedProfileRange spr2("MEA", 3);
+        // NT3HD -> N3HTD -> N[1]HTD
         auto attn_window_mask = get_attn_window_mask(T);
         attn_output_ntc = at::empty({N, T, C}, x.options());
         auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
@@ -248,13 +254,36 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
     const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
+#if DORADO_CUDA_BUILD
+    const int N = static_cast<int>(x.size(0));
+    const int T = static_cast<int>(x.size(1));
+    const int C = static_cast<int>(x.size(2));
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    x = x.contiguous();  // If using koi, make sure x is NTC order in memory
+    const int num_rows = N * T;
+#endif
+
+    auto run_norm = [&](RMSNorm norm, const at::Tensor &in) {
+#if DORADO_CUDA_BUILD
+        int res = host_fused_residual_rmsnorm_f16(stream, C, num_rows, in.data_ptr(), x.data_ptr(),
+                                                  deepnorm_alpha.data_ptr(),
+                                                  norm->weight.data_ptr(), x.data_ptr());
+        if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
+            throw std::runtime_error("Koi error during layer norm");
+        } else if (res == KOI_NOT_SUPPORTED)
+#endif
+        {
+            x = norm(in + (x * deepnorm_alpha));
+        }
+    };
+
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
-        x = norm1(attn + (x * deepnorm_alpha));
+        run_norm(norm1, attn);
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
@@ -262,9 +291,8 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
-        x = norm2(f + (x * deepnorm_alpha));
+        run_norm(norm2, f);
     }
-
     return x;
 }
 
