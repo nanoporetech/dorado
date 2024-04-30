@@ -203,7 +203,7 @@ TEST_CASE(
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
                                                         std::nullopt, std::nullopt, std::nullopt);
-    client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
+    client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
     std::vector<uint8_t> moves;
@@ -351,7 +351,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
                                                         std::nullopt, std::nullopt, std::nullopt);
-    client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
+    client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());

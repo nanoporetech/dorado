@@ -49,7 +49,7 @@ void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
     }
 }
 
-std::shared_ptr<dorado::BarcodingInfo> get_barcoding_info(
+std::shared_ptr<const dorado::BarcodingInfo> get_barcoding_info(
         dorado::cli::ArgParser& parser,
         const dorado::utils::SampleSheet* sample_sheet) {
     auto result = std::make_shared<dorado::BarcodingInfo>();
@@ -260,7 +260,7 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
     if (barcoding_info) {
-        client_info->contexts().register_context<BarcodingInfo>(barcoding_info);
+        client_info->contexts().register_context<const BarcodingInfo>(barcoding_info);
         pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads);
     }
 

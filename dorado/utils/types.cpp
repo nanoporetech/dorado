@@ -6,7 +6,7 @@
 
 namespace dorado {
 
-std::shared_ptr<BarcodingInfo> create_barcoding_info(
+std::shared_ptr<const BarcodingInfo> create_barcoding_info(
         const std::vector<std::string>& kit_names,
         bool barcode_both_ends,
         bool trim_barcode,

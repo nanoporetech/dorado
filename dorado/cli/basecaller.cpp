@@ -116,7 +116,7 @@ void setup(const std::vector<std::string>& args,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelSelection& model_selection,
-           std::shared_ptr<dorado::BarcodingInfo> barcoding_info,
+           std::shared_ptr<const dorado::BarcodingInfo> barcoding_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     const auto model_config = basecall::load_crf_model_config(model_path);
 
@@ -229,7 +229,7 @@ void setup(const std::vector<std::string>& args,
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (barcoding_info) {
-        client_info->contexts().register_context<BarcodingInfo>(std::move(barcoding_info));
+        client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }

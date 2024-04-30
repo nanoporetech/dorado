@@ -33,7 +33,7 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
 }
 
 const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
-    auto info = client_info.contexts().get_ptr<dorado::BarcodingInfo>();
+    auto info = client_info.contexts().get_ptr<const dorado::BarcodingInfo>();
     if (!info || (info->kit_name.empty() && !info->custom_kit.has_value())) {
         return nullptr;
     }
