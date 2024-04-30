@@ -19,6 +19,12 @@
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
 
+#if DORADO_CUDA_BUILD
+extern "C" {
+#include "koi.h"
+}
+#endif
+
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -185,16 +191,16 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     at::Tensor qkv;
     at::Tensor attn_output;
     {
-        utils::ScopedProfileRange spr("QKV", 2);
+        utils::ScopedProfileRange spr("QKV", 3);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
         qkv = wqkv(x).view({N, T, 3, nhead, head_dim});
     }
     {
-        utils::ScopedProfileRange spr("ROTE", 2);
+        utils::ScopedProfileRange spr("ROTE", 3);
         qkv = rotary_emb(qkv);
     }
     {
-        utils::ScopedProfileRange spr("MEA", 2);
+        utils::ScopedProfileRange spr("MEA", 3);
         // NT3HD -> N3HTD -> N[1]HTD
         const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
         auto attn_window_mask = get_attn_window_mask(T);
@@ -208,7 +214,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         attn_output = attn_output.permute({0, 1, 3, 2, 4}).reshape({N, T, C});
     }
     {
-        utils::ScopedProfileRange spr("OUTP", 2);
+        utils::ScopedProfileRange spr("OUTP", 3);
         x = out_proj(attn_output);
     }
     return x;
@@ -228,13 +234,36 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
     const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
+#if DORADO_CUDA_BUILD
+    const int N = static_cast<int>(x.size(0));
+    const int T = static_cast<int>(x.size(1));
+    const int C = static_cast<int>(x.size(2));
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    x = x.contiguous();  // If using koi, make sure x is NTC order in memory
+    const int num_rows = N * T;
+#endif
+
+    auto run_norm = [&](RMSNorm norm, const at::Tensor &in) {
+#if DORADO_CUDA_BUILD
+        int res = host_fused_residual_rmsnorm_f16(stream, C, num_rows, in.data_ptr(), x.data_ptr(),
+                                                  deepnorm_alpha.data_ptr(),
+                                                  norm->weight.data_ptr(), x.data_ptr());
+        if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
+            throw std::runtime_error("Koi error during layer norm");
+        } else if (res == KOI_NOT_SUPPORTED)
+#endif
+        {
+            x = norm(in + (x * deepnorm_alpha));
+        }
+    };
+
     {
         utils::ScopedProfileRange spr("MHE", 2);
         attn = self_attn(x);
     }
     {
         utils::ScopedProfileRange spr("LNORM1", 2);
-        x = norm1(attn + (x * deepnorm_alpha));
+        run_norm(norm1, attn);
     }
     {
         utils::ScopedProfileRange spr("FF", 2);
@@ -242,9 +271,8 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("LNORM2", 2);
-        x = norm2(f + (x * deepnorm_alpha));
+        run_norm(norm2, f);
     }
-
     return x;
 }
 
