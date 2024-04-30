@@ -15,7 +15,7 @@ public:
 };
 
 template <typename T>
-class ContextHolder : public ContextBase {
+class ContextHolder final : public ContextBase {
     std::shared_ptr<T> m_context;
 
 public:
