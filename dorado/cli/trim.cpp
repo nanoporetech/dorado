@@ -155,7 +155,7 @@ int trim(int argc, char* argv[]) {
     adapter_info->custom_seqs = custom_primer_file;
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    client_info->contexts().register_context<AdapterInfo>(adapter_info);
+    client_info->contexts().register_context<const AdapterInfo>(adapter_info);
     reader.set_client_info(client_info);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads);

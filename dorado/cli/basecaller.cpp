@@ -224,7 +224,7 @@ void setup(const std::vector<std::string>& args,
         adapter_info->trim_adapters = !adapter_no_trim;
         adapter_info->trim_primers = !primer_no_trim;
         adapter_info->custom_seqs = custom_primer_file;
-        client_info->contexts().register_context<AdapterInfo>(std::move(adapter_info));
+        client_info->contexts().register_context<const AdapterInfo>(std::move(adapter_info));
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads);
     }

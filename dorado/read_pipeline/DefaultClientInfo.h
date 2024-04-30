@@ -7,7 +7,7 @@
 
 namespace dorado {
 
-class DefaultClientInfo : public ClientInfo {
+class DefaultClientInfo final : public ClientInfo {
     ContextContainer m_contexts{};
 
 public:

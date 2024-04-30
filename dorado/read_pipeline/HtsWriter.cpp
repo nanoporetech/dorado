@@ -41,6 +41,10 @@ OutputMode HtsWriter::get_output_mode(const std::string& mode) {
 void HtsWriter::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
+        if (!std::holds_alternative<BamMessage>(message)) {
+            continue;
+        }
+
         auto bam_message = std::move(std::get<BamMessage>(message));
         BamPtr aln = std::move(bam_message.bam_ptr);
         // If this message isn't a Bam message, ignore it.

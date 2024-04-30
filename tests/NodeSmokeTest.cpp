@@ -356,7 +356,7 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     CAPTURE(adapter_info->trim_primers);
     CAPTURE(pipeline_restart);
 
-    client_info->contexts().register_context<dorado::AdapterInfo>(std::move(adapter_info));
+    client_info->contexts().register_context<const dorado::AdapterInfo>(std::move(adapter_info));
 
     set_pipeline_restart(pipeline_restart);
     run_smoke_test<dorado::AdapterDetectorNode>(2);
