@@ -65,7 +65,10 @@ void report_error(const NS::Error *error, const char *function) {
 auto get_library_location() {
     char ns_path[PATH_MAX + 1];
     uint32_t size = sizeof(ns_path);
-    _NSGetExecutablePath(ns_path, &size);
+    if (_NSGetExecutablePath(ns_path, &size) < 0) {
+        throw std::runtime_error("Failed to build path to kernels");
+    }
+    ns_path[size] = '\0';
 
     fs::path exepth{ns_path};
     fs::path mtllib{"../lib/default.metallib"};
