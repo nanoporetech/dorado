@@ -22,7 +22,6 @@ public:
     void restart() override { start_input_processing(&AdapterDetectorNode::input_thread_fn, this); }
 
 private:
-    std::shared_ptr<const AdapterInfo> m_default_adapter_info;
     std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
     demux::AdapterDetectorSelector m_detector_selector{};

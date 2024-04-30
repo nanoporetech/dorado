@@ -42,20 +42,50 @@ TEST_CASE(CUT_TAG " get_ptr() with class T registered as T returns the same inst
     REQUIRE(actual_instance.get() == original_instance.get());
 }
 
-TEST_CASE(CUT_TAG " get_ptr() with default and match returns match instance", CUT_TAG) {
+TEST_CASE(CUT_TAG " 'get_ptr<T>()' when T has not been registered returns nullptr", CUT_TAG) {
     ContextContainer cut{};
-    auto original_instance = std::make_shared<SomeClass>();
-    cut.register_context<SomeClass>(original_instance);
 
-    auto actual_instance = cut.get_ptr<SomeClass>(nullptr);
-
-    REQUIRE(actual_instance.get() == original_instance.get());
+    REQUIRE(cut.get_ptr<SomeClass>() == nullptr);
 }
 
-TEST_CASE(CUT_TAG " get_ptr() with default and no match returns default", CUT_TAG) {
+TEST_CASE(CUT_TAG " 'get_ptr<const T>()' when T has been registered returns nullptr", CUT_TAG) {
     ContextContainer cut{};
+    cut.register_context<SomeClass>(std::make_shared<SomeClass>());
 
-    REQUIRE(cut.get_ptr<SomeClass>(nullptr) == nullptr);
+    REQUIRE(cut.get_ptr<const SomeClass>() == nullptr);
+}
+
+TEST_CASE(CUT_TAG " 'get_ptr<T>()' when const T has been registered returns nullptr", CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<const SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE(cut.get_ptr<SomeClass>() == nullptr);
+}
+
+TEST_CASE(CUT_TAG " 'get_ptr<T>() const' when T has not been registered returns nullptr", CUT_TAG) {
+    const ContextContainer cut{};
+
+    REQUIRE(cut.get_ptr<SomeClass>() == nullptr);
+}
+
+TEST_CASE(CUT_TAG " 'get_ptr<const T>() const' when T has been registered returns nullptr",
+          CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<SomeClass>(std::make_shared<SomeClass>());
+
+    const ContextContainer& cut_const = cut;
+
+    REQUIRE(cut_const.get_ptr<const SomeClass>() == nullptr);
+}
+
+TEST_CASE(CUT_TAG " 'get_ptr<T>() const' when const T has been registered returns nullptr",
+          CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<const SomeClass>(std::make_shared<SomeClass>());
+
+    const ContextContainer& cut_const = cut;
+
+    REQUIRE(cut_const.get_ptr<SomeClass>() == nullptr);
 }
 
 TEST_CASE(CUT_TAG " get() with class T registered as T returns the same instance", CUT_TAG) {
@@ -155,6 +185,54 @@ TEST_CASE(CUT_TAG " get() const with superclass of T when registered as T and as
     auto& instance_as_base = cut_const.get<SomeBaseClass>();
 
     REQUIRE(&instance_as_base == original_instance.get());
+}
+
+TEST_CASE(CUT_TAG " get<T>() when T is not registered throws out_of_range", CUT_TAG) {
+    ContextContainer cut{};
+
+    REQUIRE_THROWS_AS(cut.get<SomeClass>(), std::out_of_range);
+}
+
+TEST_CASE(CUT_TAG " get<T>() when const T is registered throws out_of_range", CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<const SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE_THROWS_AS(cut.get<SomeClass>(), std::out_of_range);
+}
+
+TEST_CASE(CUT_TAG " get<const T>() when T is registered throws out_of_range", CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE_THROWS_AS(cut.get<const SomeClass>(), std::out_of_range);
+}
+
+TEST_CASE(CUT_TAG " exists<T>() when T is registered returns true", CUT_TAG) {
+    ContextContainer cut{};
+
+    cut.register_context<SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE(cut.exists<SomeClass>());
+}
+
+TEST_CASE(CUT_TAG " exists<T>() when T is not registered returns false", CUT_TAG) {
+    ContextContainer cut{};
+
+    REQUIRE_FALSE(cut.exists<SomeClass>());
+}
+
+TEST_CASE(CUT_TAG " exists<T>() when const T is registered returns false", CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<const SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE_FALSE(cut.exists<SomeClass>());
+}
+
+TEST_CASE(CUT_TAG " exists<const T>() when T is registered returns false", CUT_TAG) {
+    ContextContainer cut{};
+    cut.register_context<SomeClass>(std::make_shared<SomeClass>());
+
+    REQUIRE_FALSE(cut.exists<const SomeClass>());
 }
 
 }  // namespace dorado::context_container::test

@@ -26,7 +26,7 @@ void PolyACalculatorNode::input_thread_fn() {
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
         auto calculator = read->read_common.client_info->contexts()
-                                  .get_ptr<const poly_tail::PolyTailCalculator>(nullptr);
+                                  .get_ptr<const poly_tail::PolyTailCalculator>();
 
         if (!calculator) {
             send_message_to_sink(std::move(read));

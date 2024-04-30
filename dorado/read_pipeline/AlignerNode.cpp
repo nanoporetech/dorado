@@ -68,7 +68,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {
-    auto align_info = client_info.contexts().get_ptr<alignment::AlignmentInfo>(nullptr);
+    auto align_info = client_info.contexts().get_ptr<alignment::AlignmentInfo>();
     if (!align_info || align_info->reference_file.empty()) {
         return {};
     }

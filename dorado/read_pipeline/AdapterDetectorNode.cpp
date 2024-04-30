@@ -3,6 +3,7 @@
 #include "ClientInfo.h"
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"
@@ -25,7 +26,6 @@ AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threa
     info.trim_adapters = false;
     info.trim_primers = false;
     info.custom_seqs = std::nullopt;
-    m_default_adapter_info = std::make_shared<AdapterInfo>(std::move(info));
     start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
 }
 
@@ -63,11 +63,16 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     std::string seq = utils::extract_sequence(irecord);
     int seqlen = irecord->core.l_qseq;
 
+    auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
+
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    const auto& adapter_info =
-            bam_message.client_info->contexts().get_ptr<const AdapterInfo>(m_default_adapter_info);
+    const auto& adapter_info = bam_message.client_info->contexts().get_ptr<const AdapterInfo>();
+    if (!adapter_info) {
+        return;
+    }
+
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
         auto adapter_res = detector->find_adapters(seq);
@@ -77,7 +82,6 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         auto primer_res = detector->find_primers(seq);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
-    m_num_records++;
 
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
@@ -100,8 +104,13 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    const auto& adapter_info = read.read_common.client_info->contexts().get_ptr<const AdapterInfo>(
-            m_default_adapter_info);
+    auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
+
+    const auto& adapter_info =
+            read.read_common.client_info->contexts().get_ptr<const AdapterInfo>();
+    if (!adapter_info) {
+        return;
+    }
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
         auto adapter_res = detector->find_adapters(read.read_common.seq);
@@ -124,7 +133,6 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         Trimmer::trim_sequence(read, trim_interval);
         read.read_common.adapter_trim_interval = trim_interval;
     }
-    m_num_records++;
 }
 
 stats::NamedStats AdapterDetectorNode::sample_stats() const {
