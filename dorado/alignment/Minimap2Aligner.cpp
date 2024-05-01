@@ -69,12 +69,28 @@ void add_sa_tag(bam1_t* record,
         bam_aux_append(record, "SA", 'Z', int(sa.length() + 1), (uint8_t*)sa.c_str());
     }
 }
+
 }  // namespace
 
 namespace dorado::alignment {
 
 // Stripped of the prefix QNAME and postfix SEQ + \t + QUAL
 const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
+
+std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbuf_t* buf) {
+    std::string_view qname(bam_get_qname(irecord));
+
+    // get the sequence to map from the record
+    std::string seq = utils::extract_sequence(irecord);
+
+    // do the mapping
+    int hits = 0;
+    auto mm_index = m_minimap_index->index();
+    const auto& mm_map_opts = m_minimap_index->mapping_options();
+    mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
+                            &mm_map_opts, qname.data());
+    return {reg, hits};
+}
 
 std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // some where for the hits

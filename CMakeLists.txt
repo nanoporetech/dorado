@@ -177,6 +177,10 @@ add_library(dorado_lib
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
+    dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
+    dorado/read_pipeline/ErrorCorrectionMapperNode.h
+    dorado/read_pipeline/CorrectionNode.cpp
+    dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/HtsReader.cpp
@@ -256,6 +260,16 @@ add_library(dorado_lib
     dorado/poly_tail/rna_poly_tail_calculator.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
+    dorado/hts_io/FastxRandomReader.cpp
+    dorado/hts_io/FastxRandomReader.h
+    dorado/correct/features.cpp
+    dorado/correct/features.h
+    dorado/correct/windows.cpp
+    dorado/correct/windows.h
+    dorado/correct/conversions.cpp
+    dorado/correct/conversions.h
+    dorado/correct/decode.cpp
+    dorado/correct/decode.h
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -336,6 +350,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/benchmark.cpp
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
+        dorado/cli/correct.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
     )

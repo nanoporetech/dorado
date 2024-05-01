@@ -43,4 +43,7 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
 // such that `quantized_tensor / scales ~= tensor`
 std::pair<at::Tensor, at::Tensor> quantize_tensor(const at::Tensor& tensor);
 
+// Helper function to print tensor size.
+std::string print_size(const at::Tensor& t, const std::string& name);
+
 }  // namespace dorado::utils

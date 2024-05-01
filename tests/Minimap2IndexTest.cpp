@@ -1,9 +1,13 @@
 #include "alignment/Minimap2Index.h"
 
 #include "TestUtils.h"
+#include "read_pipeline/HtsWriter.h"
+#include "utils/hts_file.h"
 #include "utils/stream_utils.h"
+#include "utils/types.h"
 
 #include <catch2/catch.hpp>
+#include <htslib/sam.h>
 
 #include <filesystem>
 
@@ -92,19 +96,19 @@ TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GR
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " load() with invalid reference file returns reference_file_not_found",
                  TEST_GROUP) {
-    REQUIRE(cut.load("some_reference_file", 1) == IndexLoadResult::reference_file_not_found);
+    REQUIRE(cut.load("some_reference_file", 1, false) == IndexLoadResult::reference_file_not_found);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " load() with valid reference file returns success",
                  TEST_GROUP) {
-    REQUIRE(cut.load(reference_file, 1) == IndexLoadResult::success);
+    REQUIRE(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with invalid mapping options returns null",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options invalid_compatible_options{dflt_options};
     invalid_compatible_options.bandwidth_long = 100;
     invalid_compatible_options.bandwidth = *invalid_compatible_options.bandwidth_long + 1;
@@ -121,7 +125,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with valid options returns non-null",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
@@ -133,7 +137,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  " create_compatible_index() with valid options returns Minimap2Index with same "
                  "underlying index",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
@@ -147,13 +151,63 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  " create_compatible_index() with valid options returns Minimap2Index with mapping "
                  "options updated",
                  TEST_GROUP) {
-    cut.load(reference_file, 1);
+    cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{dflt_options};
     compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
     REQUIRE(compatible_index->mapping_options().best_n == cut.mapping_options().best_n + 1);
+}
+
+TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
+    // Create large index file
+    auto temp_dir = tests::make_temp_dir("mm2_split_index_test");
+    auto temp_input_file = temp_dir.m_path / "input.fa";
+    utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTA, 2, false);
+    HtsWriter writer(hts_file, "");
+    for (auto& [seq, read_id] : {
+                 std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
+                                                          "read1"),
+                 std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
+                                                          "read2"),
+                 std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
+                                                          "read3"),
+                 std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
+                                                          "read4"),
+                 std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
+                                                          "read5"),
+         }) {
+        BamPtr rec = BamPtr(bam_init1());
+        bam_set1(rec.get(), read_id.length(), read_id.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0,
+                 seq.length(), seq.c_str(), nullptr, 0);
+        writer.write(rec.get());
+    }
+    hts_file.finalise([](size_t) { /* noop */ });
+
+    SECTION("No split index allowed") {
+        Minimap2Index cut{};
+
+        auto options{dflt_options};
+        options.index_batch_size = 10000;
+
+        cut.initialise(options);
+
+        CHECK(cut.load(temp_input_file.string(), 1, false) ==
+              IndexLoadResult::split_index_not_supported);
+    }
+
+    SECTION("Split index allowed") {
+        Minimap2Index cut{};
+
+        auto options{dflt_options};
+        options.index_batch_size = 10000;
+
+        cut.initialise(options);
+
+        CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
+        CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
+    }
 }
 
 }  // namespace dorado::alignment::test

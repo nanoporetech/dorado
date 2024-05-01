@@ -7,11 +7,14 @@
 
 namespace dorado::alignment {
 
+static const std::string DEFAULT_MM_PRESET{"lr:hq"};
+
 struct Minimap2IndexOptions {
     std::optional<short> kmer_size;
     std::optional<short> window_size;
     std::optional<uint64_t> index_batch_size;
-    std::string mm2_preset;  // By default we use a preset, hence not an optional
+    std::string mm2_preset =
+            DEFAULT_MM_PRESET;  // By default we use a preset, hence not an optional
 };
 
 inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
@@ -45,8 +48,15 @@ struct Minimap2MappingOptions {
     std::optional<int> bandwidth;
     std::optional<int> bandwidth_long;
     std::optional<bool> soft_clipping;
-    bool secondary_seq;  // Not available to be set by the user, hence not optional
+    bool secondary_seq = false;  // Not available to be set by the user, hence not optional
     std::optional<bool> print_secondary;
+    std::optional<int> occ_dist;
+    std::optional<int> min_chain_score;
+    std::optional<int> zdrop;
+    std::optional<int> zdrop_inv;
+    std::optional<std::string> cs;
+    std::optional<std::string> dual;
+    std::optional<uint64_t> mini_batch_size;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
@@ -90,11 +100,5 @@ inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-static const std::string DEFAULT_MM_PRESET{"lr:hq"};
-
-static const Minimap2Options dflt_options{
-        {std::nullopt, std::nullopt, std::nullopt, DEFAULT_MM_PRESET},
-        {std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, std::nullopt},
-        false};
-
+static const Minimap2Options dflt_options{Minimap2IndexOptions{}, Minimap2MappingOptions{}, false};
 }  // namespace dorado::alignment

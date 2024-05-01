@@ -16,6 +16,7 @@ public:
         BAM,
         SAM,
         FASTQ,
+        FASTA,
     };
 
     using ProgressCallback = std::function<void(size_t percentage)>;

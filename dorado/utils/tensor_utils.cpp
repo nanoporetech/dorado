@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstring>
 #include <fstream>
+#include <sstream>
 #include <vector>
 
 namespace {
@@ -183,6 +184,17 @@ std::pair<at::Tensor, at::Tensor> quantize_tensor(const at::Tensor& tensor) {
     auto quant_max = (levels / 2) - 1;
     auto tensor_quantized = (tensor * quant_scale).round().clip(-quant_max, quant_max);
     return {quant_scale.to(at::ScalarType::Float), tensor_quantized.to(at::ScalarType::Char)};
+}
+
+std::string print_size(const at::Tensor& t, const std::string& name) {
+    std::string size = "";
+    std::stringstream ss;
+    ss << name << " tensor size ";
+    for (auto s : t.sizes()) {
+        ss << s << ",";
+    }
+    ss << " dtype " << t.dtype();
+    return ss.str();
 }
 
 }  // namespace dorado::utils

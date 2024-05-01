@@ -60,6 +60,12 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, b
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
         hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
         break;
+    case OutputMode::FASTA:
+        m_file.reset(hts_open(filename.c_str(), "wF"));
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
+        break;
     case OutputMode::BAM:
         if (m_filename != "-" && m_sort_bam) {
             // We're doing sorted BAM output. We need to indicate this for the
@@ -138,8 +144,10 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
             throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
-    if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
-        throw std::runtime_error("Could not write header to temp file.");
+    if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
+        if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
+            throw std::runtime_error("Could not write header to temp file.");
+        }
     }
 
     for (const auto& item : m_buffer_map) {
@@ -255,7 +263,7 @@ int HtsFile::write_to_file(const bam1_t* record) {
     // FIXME -- HtsFile is constructed in a state where attempting to write
     // will segfault, since set_header has to have been called
     // in order to set m_header.
-    if (m_mode != OutputMode::FASTQ) {
+    if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
         assert(m_header);
     }
     return sam_write1(m_file.get(), m_header.get(), record);
