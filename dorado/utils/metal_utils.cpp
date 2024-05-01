@@ -64,7 +64,7 @@ void report_error(const NS::Error *error, const char *function) {
 
 auto load_kernels(MTL::Device *const device) {
     char ns_path[PATH_MAX + 1];
-    uint32_t size = sizeof(ns_path);
+    uint32_t size = PATH_MAX;
     if (_NSGetExecutablePath(ns_path, &size) < 0) {
         throw std::runtime_error("Failed to build path to kernels");
     }
