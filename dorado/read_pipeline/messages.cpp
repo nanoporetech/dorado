@@ -346,7 +346,11 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     return alns;
 }
 
-ReadCommon &get_read_common_data(const Message &message) {
+ReadCommon &get_read_common_data(Message &message) {
+    return const_cast<ReadCommon &>(get_read_common_data(const_cast<const Message &>(message)));
+}
+
+const ReadCommon &get_read_common_data(const Message &message) {
     if (!is_read_message(message)) {
         throw std::invalid_argument("Message is not a read");
     } else {

@@ -54,8 +54,6 @@ public:
 
     uint64_t start_time_ms;
 
-    std::shared_ptr<const AdapterInfo> adapter_info;
-    std::shared_ptr<const BarcodingInfo> barcoding_info;
     std::shared_ptr<BarcodeScoreResult> barcoding_result;
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
@@ -68,7 +66,7 @@ public:
 
     // Contains information about the client to which this read belongs, e.g includes the client ID.
     // By default it's a standalone implementation which has -1 as the id
-    std::shared_ptr<const ClientInfo> client_info;
+    std::shared_ptr<ClientInfo> client_info;
 
     uint32_t mean_qscore_start_pos = 0;
 
@@ -206,18 +204,26 @@ public:
     int32_t client_id;
 };
 
+class BamMessage {
+public:
+    BamPtr bam_ptr;
+    std::shared_ptr<ClientInfo> client_info;
+};
+
 // The Message type is a std::variant that can hold different types of message objects.
 // It is currently able to store:
 // - a SimplexReadPtr object, which represents a single Simplex read
 // - a DuplexReadPtr object, which represents a single Duplex read
-// - a BamPtr object, which represents a raw BAM alignment record
+// - a BamMessage object, composite class holding a BamPtr (which represents a raw BAM alignment record) and ClientInfo
 // - a ReadPair object, which represents a pair of reads for duplex calling
 // To add more message types, simply add them to the list of types in the std::variant.
-using Message = std::variant<SimplexReadPtr, BamPtr, ReadPair, CacheFlushMessage, DuplexReadPtr>;
+using Message =
+        std::variant<SimplexReadPtr, BamMessage, ReadPair, CacheFlushMessage, DuplexReadPtr>;
 
 bool is_read_message(const Message& message);
 
-ReadCommon& get_read_common_data(const Message& message);
+ReadCommon& get_read_common_data(Message& message);
+const ReadCommon& get_read_common_data(const Message& message);
 
 // Ensures the raw_data field is non-empty, which it won't necessarily be for DuplexRead.
 void materialise_read_raw_data(Message& message);

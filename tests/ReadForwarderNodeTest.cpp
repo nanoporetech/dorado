@@ -18,7 +18,7 @@ TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
 
     // Test that only simplex and duplex reads are passed out of ReadForwarderNode.
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-    pipeline->push_message(dorado::BamPtr());
+    pipeline->push_message(dorado::BamMessage());
     pipeline->push_message(dorado::ReadPair());
     pipeline->push_message(dorado::CacheFlushMessage());
     pipeline->push_message(std::make_unique<dorado::DuplexRead>());

@@ -56,8 +56,6 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->read_common.read_tag = read.read_common.read_tag;
     copy->read_common.client_info = read.read_common.client_info;
-    copy->read_common.barcoding_info = read.read_common.barcoding_info;
-    copy->read_common.adapter_info = read.read_common.adapter_info;
 
     return copy;
 }

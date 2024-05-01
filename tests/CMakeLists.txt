@@ -19,6 +19,7 @@ add_executable(dorado_tests
     BarcodeDemuxerNodeTest.cpp    
     BedFileTest.cpp
     CliUtilsTest.cpp
+    context_container_test.cpp
     CRFModelConfigTest.cpp
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp

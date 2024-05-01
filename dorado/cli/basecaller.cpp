@@ -8,11 +8,11 @@
 #include "dorado_version.h"
 #include "models/kits.h"
 #include "models/models.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -109,19 +109,15 @@ void setup(const std::vector<std::string>& args,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            const std::string& resume_from_file,
-           const std::string& barcode_kit,
-           bool barcode_both_ends,
-           bool barcode_no_trim,
            bool adapter_no_trim,
            bool primer_no_trim,
-           const std::string& barcode_sample_sheet,
-           const std::optional<std::string>& custom_kit,
-           const std::optional<std::string>& custom_barcode_file,
            const std::optional<std::string>& custom_primer_file,
            argparse::ArgumentParser& resume_parser,
            bool estimate_poly_a,
            const std::string& polya_config,
-           const ModelSelection& model_selection) {
+           const ModelSelection& model_selection,
+           std::shared_ptr<const dorado::BarcodingInfo> barcoding_info,
+           std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     const auto model_config = basecall::load_crf_model_config(model_path);
 
     spdlog::debug(model_config.to_string());
@@ -169,34 +165,26 @@ void setup(const std::vector<std::string>& args,
                                                     recursive_file_loading);
 
     const bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
-    const bool barcode_enabled = !barcode_kit.empty() || custom_kit;
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
-            barcode_enabled, adapter_trimming_enabled);
-
-    std::unique_ptr<const utils::SampleSheet> sample_sheet;
-    BarcodingInfo::FilterSet allowed_barcodes;
-    if (!barcode_sample_sheet.empty()) {
-        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
-        allowed_barcodes = sample_sheet->get_barcode_values();
-    }
+            barcoding_info != nullptr, adapter_trimming_enabled);
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), args, device);
 
-    if (barcode_enabled) {
+    if (barcoding_info) {
         std::unordered_map<std::string, std::string> custom_barcodes{};
-        if (custom_barcode_file) {
-            custom_barcodes = demux::parse_custom_sequences(*custom_barcode_file);
+        if (barcoding_info->custom_seqs) {
+            custom_barcodes = demux::parse_custom_sequences(*barcoding_info->custom_seqs);
         }
-        if (custom_kit) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+        if (barcoding_info->custom_kit) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*barcoding_info->custom_kit);
             utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
                                                    custom_barcodes, sample_sheet.get());
         } else {
-            const auto& kit_info = get_barcode_kit_info(barcode_kit);
-            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcode_kit, kit_info,
-                                                   custom_barcodes, sample_sheet.get());
+            const auto& kit_info = get_barcode_kit_info(barcoding_info->kit_name);
+            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
+                                                   kit_info, custom_barcodes, sample_sheet.get());
         }
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
@@ -222,21 +210,28 @@ void setup(const std::vector<std::string>& args,
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
+    auto client_info = std::make_shared<DefaultClientInfo>();
     if (estimate_poly_a) {
+        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
+                is_rna_model(model_config), polya_config);
+        client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
+                std::move(poly_tail_calculator));
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
+        auto adapter_info = std::make_shared<AdapterInfo>();
+        adapter_info->trim_adapters = !adapter_no_trim;
+        adapter_info->trim_primers = !primer_no_trim;
+        adapter_info->custom_seqs = custom_primer_file;
+        client_info->contexts().register_context<const AdapterInfo>(std::move(adapter_info));
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
-                {current_sink_node}, thread_allocations.adapter_threads, !adapter_no_trim,
-                !primer_no_trim, custom_primer_file);
+                {current_sink_node}, thread_allocations.adapter_threads);
     }
-    if (barcode_enabled) {
-        std::vector<std::string> kit_as_vector{barcode_kit};
+    if (barcoding_info) {
+        client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
-                {current_sink_node}, thread_allocations.barcoder_threads, kit_as_vector,
-                barcode_both_ends, barcode_no_trim, std::move(allowed_barcodes), custom_kit,
-                custom_barcode_file);
+                {current_sink_node}, thread_allocations.barcoder_threads);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -324,10 +319,7 @@ void setup(const std::vector<std::string>& args,
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
 
-    DefaultClientInfo::PolyTailSettings polytail_settings{estimate_poly_a,
-                                                          is_rna_model(model_config), polya_config};
-    auto default_client_info = std::make_shared<DefaultClientInfo>(polytail_settings);
-    auto func = [default_client_info](ReadCommon& read) { read.client_info = default_client_info; };
+    auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
 
     // Run pipeline.
@@ -489,11 +481,9 @@ int basecaller(int argc, char* argv[]) {
             .help("Path to the sample sheet to use.")
             .default_value(std::string(""));
     parser.visible.add_argument("--barcode-arrangement")
-            .help("Path to file with custom barcode arrangement.")
-            .default_value(std::nullopt);
+            .help("Path to file with custom barcode arrangement.");
     parser.visible.add_argument("--barcode-sequences")
-            .help("Path to file with custom barcode sequences.")
-            .default_value(std::nullopt);
+            .help("Path to file with custom barcode sequences.");
     parser.visible.add_argument("--primer-sequences")
             .help("Path to file with custom primer sequences.")
             .default_value(std::nullopt);
@@ -617,14 +607,21 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::optional<std::string> custom_kit = std::nullopt;
-    if (parser.visible.is_used("--barcode-arrangement")) {
-        custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
-    }
+    std::shared_ptr<dorado::BarcodingInfo> barcoding_info{};
+    std::unique_ptr<const utils::SampleSheet> sample_sheet{};
+    if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
+        barcoding_info = std::make_shared<BarcodingInfo>();
+        barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
+        barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+        barcoding_info->trim = !no_trim_barcodes;
+        barcoding_info->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
+        barcoding_info->custom_seqs = parser.visible.present<std::string>("--barcode-sequences");
 
-    std::optional<std::string> custom_barcode_seqs = std::nullopt;
-    if (parser.visible.is_used("--barcode-sequences")) {
-        custom_barcode_seqs = parser.visible.get<std::string>("--barcode-sequences");
+        auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
+        if (!barcode_sample_sheet.empty()) {
+            sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+            barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
+        }
     }
 
     std::optional<std::string> custom_primer_file = std::nullopt;
@@ -684,12 +681,9 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),
-              parser.visible.get<std::string>("--resume-from"),
-              parser.visible.get<std::string>("--kit-name"),
-              parser.visible.get<bool>("--barcode-both-ends"), no_trim_barcodes, no_trim_adapters,
-              no_trim_primers, parser.visible.get<std::string>("--sample-sheet"), custom_kit,
-              custom_barcode_seqs, custom_primer_file, resume_parser,
-              parser.visible.get<bool>("--estimate-poly-a"), polya_config, model_selection);
+              parser.visible.get<std::string>("--resume-from"), no_trim_adapters, no_trim_primers,
+              custom_primer_file, resume_parser, parser.visible.get<bool>("--estimate-poly-a"),
+              polya_config, model_selection, std::move(barcoding_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(temp_download_paths);

@@ -3,6 +3,7 @@
 #include "dorado_version.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/read_output_progress_stats.h"
@@ -46,6 +47,25 @@ void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
         }
         record.get()->core.tid = int32_t(mapping.at(tid));
     }
+}
+
+std::shared_ptr<const dorado::BarcodingInfo> get_barcoding_info(
+        dorado::cli::ArgParser& parser,
+        const dorado::utils::SampleSheet* sample_sheet) {
+    auto result = std::make_shared<dorado::BarcodingInfo>();
+    result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
+    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
+    if (result->kit_name.empty() && !result->custom_kit) {
+        return nullptr;
+    }
+    result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+    result->trim = !parser.visible.get<bool>("--no-trim");
+    if (sample_sheet) {
+        result->allowed_barcodes = sample_sheet->get_barcode_values();
+    }
+    result->custom_seqs = parser.visible.present("--barcode-sequences");
+
+    return result;
 }
 
 }  // anonymous namespace
@@ -193,16 +213,6 @@ int demuxer(int argc, char* argv[]) {
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
-    std::optional<std::string> custom_kit = std::nullopt;
-    if (parser.visible.is_used("--barcode-arrangement")) {
-        custom_kit = parser.visible.get<std::string>("--barcode-arrangement");
-    }
-
-    std::optional<std::string> custom_barcode_file = std::nullopt;
-    if (parser.visible.is_used("--barcode-sequences")) {
-        custom_barcode_file = parser.visible.get<std::string>("--barcode-sequences");
-    }
-
     auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
 
     // Only allow `reads` to be empty if we're accepting input from a pipe
@@ -236,26 +246,22 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
-    BarcodingInfo::FilterSet allowed_barcodes;
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
-        allowed_barcodes = sample_sheet->get_barcode_values();
     }
+
+    auto client_info = std::make_shared<DefaultClientInfo>();
+    reader.set_client_info(client_info);
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
             std::move(sample_sheet), sort_bam);
 
-    if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
-        std::vector<std::string> kit_names;
-        if (auto names = parser.visible.present<std::vector<std::string>>("--kit-name")) {
-            kit_names = std::move(*names);
-        }
-        pipeline_desc.add_node<BarcodeClassifierNode>(
-                {demux_writer}, demux_threads, kit_names,
-                parser.visible.get<bool>("--barcode-both-ends"), no_trim,
-                std::move(allowed_barcodes), std::move(custom_kit), std::move(custom_barcode_file));
+    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
+    if (barcoding_info) {
+        client_info->contexts().register_context<const BarcodingInfo>(barcoding_info);
+        pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads);
     }
 
     // Create the Pipeline from our description.
@@ -313,6 +319,7 @@ int demuxer(int argc, char* argv[]) {
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader input_reader(all_files[input_idx].input, read_list);
+        input_reader.set_client_info(client_info);
         if (!strip_alignment) {
             input_reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
                 adjust_tid(sq_mapping[input_idx], record);

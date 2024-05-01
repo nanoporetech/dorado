@@ -1,5 +1,6 @@
 #include "ResumeLoaderNode.h"
 
+#include "DefaultClientInfo.h"
 #include "HtsReader.h"
 #include "utils/tty_utils.h"
 
@@ -40,6 +41,7 @@ void ResumeLoaderNode::copy_completed_reads() {
     HtsReader reader(m_resume_file, std::nullopt);
     spdlog::info("Resuming from file {}...", m_resume_file);
 
+    auto client_info = std::make_shared<DefaultClientInfo>();
     // Iterate over all reads and write to sink.
     try {
         while (reader.read()) {
@@ -54,7 +56,7 @@ void ResumeLoaderNode::copy_completed_reads() {
                 read_id = bam_get_qname(reader.record);
             }
             m_processed_read_ids.insert(read_id);
-            m_sink.push_message(BamPtr(bam_dup1(reader.record.get())));
+            m_sink.push_message(BamMessage{BamPtr(bam_dup1(reader.record.get())), client_info});
             if (is_safe_to_log && m_processed_read_ids.size() % 100 == 0) {
                 bar.tick();
             }

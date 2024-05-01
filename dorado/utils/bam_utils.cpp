@@ -455,8 +455,7 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     return cigar_str;
 }
 
-BamPtr new_unmapped_record(const BamPtr& record, std::string seq, std::vector<uint8_t> qual) {
-    bam1_t* input_record = record.get();
+BamPtr new_unmapped_record(bam1_t* input_record, std::string seq, std::vector<uint8_t> qual) {
     if (seq.empty()) {
         seq = extract_sequence(input_record);
         qual = extract_quality(input_record);

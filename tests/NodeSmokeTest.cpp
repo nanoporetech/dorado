@@ -3,6 +3,7 @@
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "models/models.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -45,6 +46,9 @@ protected:
     std::minstd_rand m_rng{Catch::rngSeed()};
     std::uniform_real_distribution<> m_dist;
 
+    std::shared_ptr<dorado::DefaultClientInfo> client_info =
+            std::make_shared<dorado::DefaultClientInfo>();
+
     float random_between(float min, float max) {
         typename decltype(m_dist)::param_type range(min, max);
         return float(m_dist(m_rng, range));
@@ -65,7 +69,7 @@ protected:
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read->read_common.attributes.fast5_filename = "test.fast5";
-        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+        read->read_common.client_info = client_info;
         return read;
     }
 
@@ -114,7 +118,7 @@ protected:
 };
 
 using NodeSmokeTestRead = NodeSmokeTestBase<dorado::SimplexReadPtr>;
-using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamPtr>;
+using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamMessage>;
 
 #define DEFINE_TEST(base, name) TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
 
@@ -301,7 +305,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
 }
 
 struct BarcodeKitInputs {
-    std::vector<std::string> kit_names;
+    std::string kit_name;
     std::optional<std::string> custom_kit;
     std::optional<std::string> custom_sequences;
 };
@@ -311,13 +315,13 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     auto kit_inputs =
-            GENERATE(BarcodeKitInputs{{"SQK-RPB004", "EXP-NBD196"}, std::nullopt, std::nullopt},
-                     BarcodeKitInputs{{},
+            GENERATE(BarcodeKitInputs{"SQK-RPB004", std::nullopt, std::nullopt},
+                     BarcodeKitInputs{"",
                                       (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
                                        "test_kit_single_ended.toml")
                                               .string(),
                                       std::nullopt},
-                     BarcodeKitInputs{{},
+                     BarcodeKitInputs{"",
                                       (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
                                        "test_kit_single_ended.toml")
                                               .string(),
@@ -329,42 +333,59 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     CAPTURE(kit_inputs);
     CAPTURE(pipeline_restart);
 
+    auto barcoding_info = std::make_shared<dorado::BarcodingInfo>();
+    barcoding_info->kit_name = kit_inputs.kit_name;
+    barcoding_info->barcode_both_ends = barcode_both_ends;
+    barcoding_info->trim = !no_trim;
+    barcoding_info->custom_kit = kit_inputs.custom_kit;
+    barcoding_info->custom_seqs = kit_inputs.custom_sequences;
+    client_info->contexts().register_context<const dorado::BarcodingInfo>(
+            std::move(barcoding_info));
+
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::BarcodeClassifierNode>(2, kit_inputs.kit_names, barcode_both_ends,
-                                                  no_trim, std::nullopt, kit_inputs.custom_kit,
-                                                  kit_inputs.custom_sequences);
+    run_smoke_test<dorado::BarcodeClassifierNode>(2);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
-    auto trim_adapters = GENERATE(false, true);
-    auto trim_primers = GENERATE(false, true);
+    auto adapter_info = std::make_shared<dorado::AdapterInfo>();
+    adapter_info->custom_seqs = std::nullopt;
+    adapter_info->trim_adapters = GENERATE(false, true);
+    adapter_info->trim_primers = GENERATE(false, true);
     auto pipeline_restart = GENERATE(false, true);
-    CAPTURE(trim_adapters);
-    CAPTURE(trim_primers);
+    CAPTURE(adapter_info->trim_adapters);
+    CAPTURE(adapter_info->trim_primers);
     CAPTURE(pipeline_restart);
 
+    client_info->contexts().register_context<const dorado::AdapterInfo>(std::move(adapter_info));
+
     set_pipeline_restart(pipeline_restart);
-    run_smoke_test<dorado::AdapterDetectorNode>(2, trim_adapters, trim_primers, std::nullopt);
+    run_smoke_test<dorado::AdapterDetectorNode>(2);
 }
 
-TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files") {
+TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files", "[SmokeTest]") {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    std::vector<std::string> kits = {"EXP-PBC096"};
+    std::string kit = {"EXP-PBC096"};
     bool barcode_both_ends = GENERATE(true, false);
     bool no_trim = GENERATE(true, false);
-    pipeline_desc.add_node<dorado::BarcodeClassifierNode>(
-            {sink}, 8, kits, barcode_both_ends, no_trim, std::nullopt, std::nullopt, std::nullopt);
-
+    pipeline_desc.add_node<dorado::BarcodeClassifierNode>({sink}, 8);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     fs::path data1 = fs::path(get_data_dir("barcode_demux/double_end_variant")) /
                      "EXP-PBC096_barcode_both_ends_pass.fastq";
     fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    auto barcoding_info = std::make_shared<dorado::BarcodingInfo>();
+    barcoding_info->kit_name = kit;
+    barcoding_info->barcode_both_ends = barcode_both_ends;
+    barcoding_info->trim = !no_trim;
+    client_info->contexts().register_context<const dorado::BarcodingInfo>(
+            std::move(barcoding_info));
     for (auto& test_file : {data1, data2}) {
         dorado::HtsReader reader(test_file.string(), std::nullopt);
+        reader.set_client_info(client_info);
         reader.read(*pipeline, 0);
     }
 }
@@ -377,12 +398,13 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    set_read_mutator([is_rna](dorado::SimplexReadPtr& read) {
+    client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculator>(
+            dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
+
+    set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
-        dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
-        read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
     });
 
     run_smoke_test<dorado::PolyACalculatorNode>(8, 1000);

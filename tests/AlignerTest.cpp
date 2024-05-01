@@ -1,13 +1,15 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "alignment/Minimap2Aligner.h"
+#include "alignment/alignment_info.h"
 #include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/ClientInfo.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
+#include "utils/types.h"
 
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
@@ -25,23 +27,6 @@ using Catch::Matchers::Equals;
 namespace fs = std::filesystem;
 
 namespace {
-
-class TestClientInfo : public dorado::ClientInfo {
-    const dorado::AlignmentInfo m_align_info;
-
-public:
-    TestClientInfo(dorado::AlignmentInfo align_info) : m_align_info(std::move(align_info)) {}
-
-    int32_t client_id() const override { return 1; }
-
-    const dorado::poly_tail::PolyTailCalculator* poly_a_calculator() const override {
-        return nullptr;
-    };
-
-    const dorado::AlignmentInfo& alignment_info() const override { return m_align_info; }
-
-    bool is_disconnected() const override { return false; }
-};
 
 std::unordered_map<std::string, std::string> get_tags_from_sam_line_fields(
         const std::vector<std::string>& fields) {
@@ -74,29 +59,51 @@ protected:
         pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     }
 
-    template <class... Args>
-    std::vector<dorado::BamPtr> RunPipelineWithBamMessages(dorado::HtsReader& reader,
-                                                           Args&&... args) {
+    std::vector<dorado::BamPtr> RunPipelineWithBamMessages(
+            dorado::HtsReader& reader,
+            const std::string& reference_file,
+            const std::string& bed_file,
+            const dorado::alignment::Minimap2Options& options,
+            int threads) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        create_pipeline(index_file_access, args...);
+        create_pipeline(index_file_access, reference_file, bed_file, options, threads);
+
+        auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+        auto alignment_info = std::make_shared<dorado::alignment::AlignmentInfo>();
+        alignment_info->minimap_options = options;
+        alignment_info->reference_file = reference_file;
+        client_info->contexts().register_context<const dorado::alignment::AlignmentInfo>(
+                alignment_info);
+        reader.set_client_info(client_info);
+
         reader.read(*pipeline, 100);
         pipeline->terminate({});
-        return ConvertMessages<dorado::BamPtr>(std::move(m_output_messages));
+        auto bam_messages = ConvertMessages<dorado::BamMessage>(std::move(m_output_messages));
+        std::vector<dorado::BamPtr> result{};
+        result.reserve(bam_messages.size());
+        for (auto& bam_message : bam_messages) {
+            result.push_back(std::move(bam_message.bam_ptr));
+        }
+        return result;
     }
 
     template <class MessageType, class MessageTypePtr = std::unique_ptr<MessageType>>
-    MessageTypePtr RunPipelineForRead(const dorado::AlignmentInfo& loaded_align_info,
-                                      const dorado::AlignmentInfo& client_align_info,
-                                      std::string read_id,
-                                      std::string sequence) {
+    MessageTypePtr RunPipelineForRead(
+            const std::shared_ptr<dorado::alignment::AlignmentInfo>& loaded_align_info,
+            const std::shared_ptr<dorado::alignment::AlignmentInfo>& client_align_info,
+            std::string read_id,
+            std::string sequence) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        CHECK(index_file_access->load_index(loaded_align_info.reference_file,
-                                            loaded_align_info.minimap_options,
+        CHECK(index_file_access->load_index(loaded_align_info->reference_file,
+                                            loaded_align_info->minimap_options,
                                             2) == dorado::alignment::IndexLoadResult::success);
         create_pipeline(index_file_access, 2);
 
         dorado::ReadCommon read_common{};
-        read_common.client_info = std::make_shared<TestClientInfo>(client_align_info);
+        auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+        client_info->contexts().register_context<const dorado::alignment::AlignmentInfo>(
+                client_align_info);
+        read_common.client_info = client_info;
         read_common.read_id = std::move(read_id);
         read_common.seq = std::move(sequence);
 
@@ -392,14 +399,14 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
         fs::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
 
-        dorado::AlignmentInfo align_info{};
-        align_info.minimap_options = dorado::alignment::dflt_options;
-        align_info.reference_file = ref.string();
+        auto align_info = std::make_shared<dorado::alignment::AlignmentInfo>();
+        align_info->minimap_options = dorado::alignment::dflt_options;
+        align_info->reference_file = ref.string();
 
         const std::string TEST_SEQUENCE{"ACGTACGTACGTACGT"};
 
         AND_GIVEN("client with no alignment requirements") {
-            const dorado::AlignmentInfo EMPTY_ALIGN_INFO{};
+            const auto EMPTY_ALIGN_INFO = std::make_shared<dorado::alignment::AlignmentInfo>();
             WHEN("push simplex read to pipeline") {
                 auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
                         align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
@@ -533,9 +540,9 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Get the sam line from ReadCommon pipeline
     auto [read_id, sequence] = get_read_id_and_sequence_from_fasta(query);
-    dorado::AlignmentInfo align_info{};
-    align_info.minimap_options = options;
-    align_info.reference_file = ref;
+    auto align_info = std::make_shared<dorado::alignment::AlignmentInfo>();
+    align_info->minimap_options = options;
+    align_info->reference_file = ref;
     auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
             align_info, align_info, std::move(read_id), std::move(sequence));
     auto sam_line_from_read_common = std::move(simplex_read->read_common.alignment_string);

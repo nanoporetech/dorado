@@ -180,7 +180,7 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
  * quality field. If seq and qual are both non-empty, then of course they must be the same
  * length.
  */
-BamPtr new_unmapped_record(const BamPtr& record, std::string seq, std::vector<uint8_t> qual);
+BamPtr new_unmapped_record(bam1_t* record, std::string seq, std::vector<uint8_t> qual);
 
 /*
  * Remove any alignment related tags from a BAM record.

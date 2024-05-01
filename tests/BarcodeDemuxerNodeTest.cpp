@@ -2,6 +2,7 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
@@ -59,10 +60,11 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         auto& demux_writer_ref = dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demuxer));
         demux_writer_ref.set_header(hdr.get());
 
+        auto client_info = std::make_shared<dorado::DefaultClientInfo>();
         for (auto bc : {"bc01", "bc02", "bc03"}) {
             auto records = create_bam_reader(bc);
             for (auto& rec : records) {
-                pipeline->push_message(std::move(rec));
+                pipeline->push_message(BamMessage{std::move(rec), client_info});
             }
         }
 

@@ -186,7 +186,7 @@ TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
-    auto trimmed_record = trimmer.trim_sequence(std::move(record), trim_interval);
+    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval);
     auto seqlen = trimmed_record->core.l_qseq;
 
     CHECK(seqlen == (trim_interval.second - trim_interval.first));
@@ -204,7 +204,7 @@ TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
-    auto trimmed_record = trimmer.trim_sequence(std::move(record), trim_interval);
+    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval);
 
     CHECK(trimmed_record->core.pos == -1);
     CHECK(trimmed_record->core.tid == -1);

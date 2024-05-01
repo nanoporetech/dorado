@@ -1,5 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "poly_tail/poly_tail_calculator.h"
 #include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -53,8 +54,10 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
-    dorado::DefaultClientInfo::PolyTailSettings settings{true, is_rna, ""};
-    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+    read->read_common.client_info->contexts()
+            .register_context<const dorado::poly_tail::PolyTailCalculator>(
+                    dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -88,8 +91,10 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     read->read_common.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
-    dorado::DefaultClientInfo::PolyTailSettings settings{true, false, config};
-    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>(settings);
+    read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
+    read->read_common.client_info->contexts()
+            .register_context<const dorado::poly_tail::PolyTailCalculator>(
+                    dorado::poly_tail::PolyTailCalculatorFactory::create(false, config));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));

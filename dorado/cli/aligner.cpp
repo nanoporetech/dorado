@@ -1,8 +1,10 @@
 #include "alignment/IndexFileAccess.h"
+#include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
@@ -154,8 +156,8 @@ int aligner(int argc, char* argv[]) {
     } else {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
-
-    auto index(parser.visible.get<std::string>("index"));
+    auto align_info = std::make_shared<alignment::AlignmentInfo>();
+    align_info->reference_file = parser.visible.get<std::string>("index");
     auto bed_file(parser.visible.get<std::string>("bed-file"));
     auto reads(parser.visible.get<std::string>("reads"));
     auto recursive_input = parser.visible.get<bool>("recursive");
@@ -170,7 +172,8 @@ int aligner(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
-    auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
+    align_info->minimap_options =
+            cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
@@ -200,16 +203,22 @@ int aligner(int argc, char* argv[]) {
 #endif
     }
 
-    auto index_file_access = load_index(index, options, aligner_threads);
+    auto index_file_access =
+            load_index(align_info->reference_file, align_info->minimap_options, aligner_threads);
 
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
             ReadOutputProgressStats::StatsCollectionMode::collector_per_input_file);
     progress_stats.set_post_processing_percentage(0.5f);
     progress_stats.start();
+
+    auto client_info = std::make_shared<DefaultClientInfo>();
+    client_info->contexts().register_context<const alignment::AlignmentInfo>(align_info);
+
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
         auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
+        reader->set_client_info(client_info);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
             return EXIT_FAILURE;
@@ -229,8 +238,9 @@ int aligner(int argc, char* argv[]) {
         }
         PipelineDescriptor pipeline_desc;
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
-        auto aligner = pipeline_desc.add_node<AlignerNode>({hts_writer}, index_file_access, index,
-                                                           bed_file, options, aligner_threads);
+        auto aligner = pipeline_desc.add_node<AlignerNode>(
+                {hts_writer}, index_file_access, align_info->reference_file, bed_file,
+                align_info->minimap_options, aligner_threads);
 
         // Create the Pipeline from our description.
         std::vector<dorado::stats::StatsReporter> stats_reporters;

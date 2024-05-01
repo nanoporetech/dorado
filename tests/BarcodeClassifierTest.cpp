@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
@@ -178,18 +179,9 @@ TEST_CASE(
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::vector<std::string> kits = {"SQK-RPB004"};
     const bool barcode_both_ends = GENERATE(true, false);
-    const bool use_per_read_barcoding = GENERATE(true, false);
     CAPTURE(barcode_both_ends);
-    CAPTURE(use_per_read_barcoding);
     constexpr bool no_trim = false;
-    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
-                                                        std::nullopt, std::nullopt, std::nullopt);
-    if (use_per_read_barcoding) {
-        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
-    } else {
-        pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                      std::nullopt, std::nullopt, std::nullopt);
-    }
+    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -208,9 +200,11 @@ TEST_CASE(
     read->read_common.read_id = "read_id";
     read->read_common.model_stride = stride;
 
-    if (use_per_read_barcoding) {
-        read->read_common.barcoding_info = barcoding_info;
-    }
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
+                                                        std::nullopt, std::nullopt, std::nullopt);
+    client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
+    read->read_common.client_info = client_info;
 
     std::vector<uint8_t> moves;
     for (size_t i = 0; i < read->read_common.seq.length(); i++) {
@@ -254,11 +248,8 @@ TEST_CASE(
     // Push a Read type.
     pipeline->push_message(std::move(read));
     // Push BamPtr type.
-    if (!use_per_read_barcoding) {
-        // The classifier node will only barcode Simplex reads so BamPtr is not relevant here
-        for (auto& rec : records) {
-            pipeline->push_message(std::move(rec));
-        }
+    for (auto& rec : records) {
+        pipeline->push_message(BamMessage{BamPtr(std::move(rec)), client_info});
     }
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
@@ -266,7 +257,7 @@ TEST_CASE(
 
     pipeline->terminate(DefaultFlushOptions());
 
-    const size_t num_expected_messages = use_per_read_barcoding ? 2 : 3;
+    constexpr size_t num_expected_messages = 3;
     CHECK(messages.size() == num_expected_messages);
 
     const std::string expected_bc = "SQK-RPB004_barcode01";
@@ -279,11 +270,11 @@ TEST_CASE(
             int(stride * 2 * front_flank.length());  // * 2 is because we have 2 moves per base
 
     for (auto& message : messages) {
-        if (std::holds_alternative<BamPtr>(message)) {
-            // Check trimming on the bam1_t struct.
-            auto msg_read = std::get<BamPtr>(std::move(message));
-            bam1_t* rec = msg_read.get();
+        if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+            bam1_t* rec = bam_message.bam_ptr.get();
 
+            // Check trimming on the bam1_t struct.
             CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
             auto seq = dorado::utils::extract_sequence(rec);
@@ -347,8 +338,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     std::vector<std::string> kits = {"SQK-16S024"};
     bool barcode_both_ends = false;
     bool no_trim = false;
-    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8, kits, barcode_both_ends, no_trim,
-                                                  std::nullopt, std::nullopt, std::nullopt);
+    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
@@ -357,24 +347,32 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     // First read should be unclassified.
     HtsReader reader(bc_file.string(), std::nullopt);
     reader.read();
+
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    auto barcoding_info = dorado::create_barcoding_info(kits, barcode_both_ends, !no_trim,
+                                                        std::nullopt, std::nullopt, std::nullopt);
+    client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
+
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());
     auto orig_seq1 = dorado::utils::extract_sequence(read1.get());
-    pipeline->push_message(std::move(read1));
+    pipeline->push_message(dorado::BamMessage{std::move(read1), client_info});
 
     // Second read should be classified.
     reader.read();
     BamPtr read2(bam_dup1(reader.record.get()));
     std::string id_in2 = bam_get_qname(read2.get());
     auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
-    pipeline->push_message(std::move(read2));
+    pipeline->push_message(dorado::BamMessage{std::move(read2), client_info});
 
     pipeline->terminate(DefaultFlushOptions());
 
     CHECK(messages.size() == 2);
 
-    read1 = std::get<BamPtr>(std::move(messages[0]));
-    read2 = std::get<BamPtr>(std::move(messages[1]));
+    auto bam_message = std::get<BamMessage>(std::move(messages[0]));
+    read1 = std::move(bam_message.bam_ptr);
+    bam_message = std::get<BamMessage>(std::move(messages[1]));
+    read2 = std::move(bam_message.bam_ptr);
 
     // Reads may not come back in the same order.
     std::string id_out1 = bam_get_qname(read1.get());

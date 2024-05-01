@@ -38,8 +38,8 @@ BarcodeDemuxerNode::~BarcodeDemuxerNode() { stop_input_processing(); }
 void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        auto aln = std::move(std::get<BamPtr>(message));
-        write(aln.get());
+        auto bam_message = std::move(std::get<BamMessage>(message));
+        write(bam_message.bam_ptr.get());
     }
 }
 

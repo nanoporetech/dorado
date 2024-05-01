@@ -4,6 +4,7 @@
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
 #include "read_pipeline/AdapterDetectorNode.h"
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -300,7 +301,7 @@ TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8, true, true, std::nullopt);
+    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -358,10 +359,17 @@ TEST_CASE(
 
     auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10, false);
 
+    auto client_info = std::make_shared<dorado::DefaultClientInfo>();
+    client_info->contexts().register_context<const dorado::AdapterInfo>(
+            std::make_shared<const dorado::AdapterInfo>(
+                    dorado::AdapterInfo{true, true, std::nullopt}));
+    read->read_common.client_info = std::move(client_info);
+
     // Push a Read type.
     pipeline->push_message(std::move(read));
-    dorado::ReadPair dummy_read_pair;
+
     // Push a type not used by the ClassifierNode.
+    dorado::ReadPair dummy_read_pair;
     pipeline->push_message(std::move(dummy_read_pair));
 
     pipeline->terminate(DefaultFlushOptions());
@@ -378,11 +386,11 @@ TEST_CASE(
             int(stride * 2 * flank_size);  // * 2 is because we have 2 moves per base
 
     for (auto& message : messages) {
-        if (std::holds_alternative<BamPtr>(message)) {
-            // Check trimming on the bam1_t struct.
-            auto msg_read = std::get<BamPtr>(std::move(message));
-            bam1_t* rec = msg_read.get();
+        if (std::holds_alternative<BamMessage>(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+            bam1_t* rec = bam_message.bam_ptr.get();
 
+            // Check trimming on the bam1_t struct.
             auto seq = dorado::utils::extract_sequence(rec);
             CHECK(nonbc_seq == seq);
 

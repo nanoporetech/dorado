@@ -1,5 +1,6 @@
 #include "HtsReader.h"
 
+#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
@@ -17,7 +18,7 @@ namespace dorado {
 
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
-        : m_read_list(std::move(read_list)) {
+        : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
     m_file = hts_open(filename.c_str(), "r");
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -38,6 +39,10 @@ HtsReader::~HtsReader() {
     sam_hdr_destroy(header);
     record.reset();
     hts_close(m_file);
+}
+
+void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
+    m_client_info = std::move(client_info);
 }
 
 void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
@@ -63,7 +68,9 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
         if (m_record_mutator) {
             m_record_mutator(record);
         }
-        pipeline.push_message(BamPtr(bam_dup1(record.get())));
+
+        BamMessage bam_message{BamPtr(bam_dup1(record.get())), m_client_info};
+        pipeline.push_message(std::move(bam_message));
         ++num_reads;
         if (max_reads > 0 && num_reads >= max_reads) {
             break;

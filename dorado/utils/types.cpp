@@ -27,7 +27,7 @@ std::shared_ptr<const BarcodingInfo> create_barcoding_info(
     auto result =
             BarcodingInfo{kit_name,   barcode_both_ends, trim_barcode, std::move(allowed_barcodes),
                           custom_kit, custom_seqs};
-    return std::make_shared<const dorado::BarcodingInfo>(std::move(result));
+    return std::make_shared<dorado::BarcodingInfo>(std::move(result));
 }
 
 void BamDestructor::operator()(bam1_t* bam) { bam_destroy1(bam); }

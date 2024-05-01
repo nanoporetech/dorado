@@ -127,9 +127,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
     return trim_interval;
 }
 
-BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
-    bam1_t* input_record = input.get();
-
+BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_interval) {
     bool is_seq_reversed = input_record->core.flag & BAM_FREVERSE;
 
     // Fetch components that need to be trimmed.
@@ -161,7 +159,7 @@ BamPtr Trimmer::trim_sequence(BamPtr input, std::pair<int, int> trim_interval) {
                             : trim_interval);
 
     // Create a new bam record to hold the trimmed read.
-    BamPtr output(utils::new_unmapped_record(input, trimmed_seq, trimmed_qual));
+    BamPtr output(utils::new_unmapped_record(input_record, trimmed_seq, trimmed_qual));
     bam1_t* out_record = output.get();
 
     // Insert the new tags and delete the old ones.
