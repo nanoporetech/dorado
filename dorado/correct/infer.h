@@ -41,15 +41,4 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
     return batch;
 }
 
-// Helper function to print tensor size.
-void print_size(const torch::Tensor& t, const std::string& name) {
-    std::string size = "";
-    for (auto s : t.sizes()) {
-        size += std::to_string(s) + ",";
-    }
-    std::stringstream ss;
-    ss << t.dtype();
-    spdlog::trace("{} tensor size {} dtype {}", name, size, ss.str());
-}
-
 }  // namespace dorado::correction

@@ -93,12 +93,12 @@ void CorrectionNode::decode_fn() {
             spdlog::trace("decoding window for {}", read_name);
             auto corrected_seqs = decode_windows(to_decode);
             if (corrected_seqs.size() == 1) {
-                auto rec = create_bam_record(read_name, corrected_seqs[0]);
+                BamMessage rec{create_bam_record(read_name, corrected_seqs[0]), nullptr};
                 send_message_to_sink(std::move(rec));
             } else {
                 for (size_t s = 0; s < corrected_seqs.size(); s++) {
                     const std::string new_name = read_name + ":" + std::to_string(s);
-                    auto rec = create_bam_record(new_name, corrected_seqs[s]);
+                    BamMessage rec{create_bam_record(new_name, corrected_seqs[s]), nullptr};
                     send_message_to_sink(std::move(rec));
                 }
             }
