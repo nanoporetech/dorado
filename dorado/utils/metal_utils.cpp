@@ -71,24 +71,28 @@ auto load_kernels(MTL::Device *const device) {
     ns_path[size] = '\0';
     fs::path exepth{ns_path};
 
-    // Check in the lib folder.
-    fs::path fspath = exepth.parent_path() / "../lib/default.metallib";
-    auto lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
-    auto kernels = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
+    // Check the default (ie compiled into the app on iOS)
+    auto kernels = NS::TransferPtr(device->newDefaultLibrary());
     if (kernels) {
+        spdlog::info("Using default metal library");
         return kernels;
     }
 
 #if TARGET_OS_IPHONE
     // If we're running inside MinKNOW then the lib will be in a different place.
     // TODO: is there a nicer way to do this without resorting to envvars?
-    fspath = exepth.parent_path() / "Frameworks/minknow_ios_framework.framework/default.metallib";
-    lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
+    auto fspath =
+            exepth.parent_path() / "Frameworks/minknow_ios_framework.framework/default.metallib";
+#else
+    // Check in the lib folder.
+    auto fspath = exepth.parent_path() / "../lib/default.metallib";
+#endif
+    auto lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
     kernels = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
     if (kernels) {
+        spdlog::info("Using metal library at {}", fspath.string());
         return kernels;
     }
-#endif  // TARGET_OS_IPHONE
 
     throw std::runtime_error("Failed to load metallib library");
 }
