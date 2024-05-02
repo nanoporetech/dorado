@@ -169,7 +169,6 @@ add_library(dorado_lib
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
-    
     dorado/demux/barcoding_info.h
     dorado/demux/parse_custom_sequences.cpp
     dorado/demux/parse_custom_sequences.h
@@ -272,7 +271,8 @@ add_library(dorado_lib
     dorado/correct/conversions.cpp
     dorado/correct/conversions.h
     dorado/correct/decode.cpp
-    dorado/correct/decode.h)
+    dorado/correct/decode.h
+)
 
 enable_warnings_as_errors(dorado_lib)
 
