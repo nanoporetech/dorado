@@ -1,5 +1,4 @@
 #pragma once
-#include "utils/types.h"
 
 #include <memory>
 #include <mutex>
@@ -9,6 +8,7 @@
 namespace dorado::demux {
 
 class BarcodeClassifier;
+struct BarcodingInfo;
 
 class BarcodeClassifierSelector final {
     std::mutex m_mutex{};

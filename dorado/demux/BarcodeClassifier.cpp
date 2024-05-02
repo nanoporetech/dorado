@@ -1,5 +1,6 @@
 #include "BarcodeClassifier.h"
 
+#include "barcoding_info.h"
 #include "parse_custom_sequences.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
@@ -108,7 +109,7 @@ int extract_barcode_penalty(std::string_view barcode,
     return penalty;
 }
 
-bool barcode_is_permitted(const BarcodingInfo::FilterSet& allowed_barcodes,
+bool barcode_is_permitted(const demux::BarcodingInfo::FilterSet& allowed_barcodes,
                           const std::string& barcode_name) {
     if (!allowed_barcodes.has_value()) {
         return true;

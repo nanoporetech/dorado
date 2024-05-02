@@ -15,6 +15,10 @@
 
 namespace dorado {
 
+namespace demux {
+struct BarcodingInfo;
+}
+
 class BarcodeClassifierNode : public MessageSink {
 public:
     BarcodeClassifierNode(int threads);
@@ -31,7 +35,7 @@ private:
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
     void input_thread_fn();
-    void barcode(BamPtr& read, const BarcodingInfo* barcoding_info);
+    void barcode(BamPtr& read, const demux::BarcodingInfo* barcoding_info);
     void barcode(SimplexRead& read);
 
     // Track how many reads were classified as each barcode for debugging

@@ -3,7 +3,6 @@
 #include "demux/AdapterDetectorSelector.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <atomic>
 #include <memory>
@@ -11,6 +10,10 @@
 #include <vector>
 
 namespace dorado {
+
+namespace demux {
+struct AdapterInfo;
+}
 
 class AdapterDetectorNode : public MessageSink {
 public:
@@ -29,7 +32,8 @@ private:
     void input_thread_fn();
     void process_read(BamMessage& bam_message);
     void process_read(SimplexRead& read);
-    std::shared_ptr<const demux::AdapterDetector> get_detector(const AdapterInfo& adapter_info);
+    std::shared_ptr<const demux::AdapterDetector> get_detector(
+            const demux::AdapterInfo& adapter_info);
 };
 
 }  // namespace dorado

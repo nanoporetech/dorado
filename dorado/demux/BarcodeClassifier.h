@@ -1,4 +1,5 @@
 #pragma once
+#include "barcoding_info.h"
 #include "utils/barcode_kits.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/stats.h"

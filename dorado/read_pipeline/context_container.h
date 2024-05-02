@@ -82,7 +82,7 @@ public:
 
     // returns the value if registered otherwise throws std::out_of_range
     template <typename T>
-    const T& get() const {
+    T& get() const {
         auto base_entry = get_base<T>();
         if (!base_entry) {
             throw std::out_of_range("Not a registered type");

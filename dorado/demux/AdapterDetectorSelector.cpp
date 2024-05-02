@@ -1,7 +1,7 @@
 #include "AdapterDetectorSelector.h"
 
 #include "AdapterDetector.h"
-#include "utils/types.h"
+#include "adapter_info.h"
 
 #include <spdlog/spdlog.h>
 

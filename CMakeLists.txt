@@ -160,6 +160,20 @@ add_library(dorado_lib
     dorado/api/runner_creation.h
     dorado/api/pipeline_creation.cpp
     dorado/api/pipeline_creation.h
+    dorado/demux/adapter_info.h
+    dorado/demux/AdapterDetector.cpp
+    dorado/demux/AdapterDetector.h
+    dorado/demux/AdapterDetectorSelector.h
+    dorado/demux/AdapterDetectorSelector.cpp
+    dorado/demux/BarcodeClassifier.cpp
+    dorado/demux/BarcodeClassifier.h
+    dorado/demux/BarcodeClassifierSelector.cpp
+    dorado/demux/BarcodeClassifierSelector.h
+    dorado/demux/barcoding_info.h
+    dorado/demux/parse_custom_sequences.cpp
+    dorado/demux/parse_custom_sequences.h
+    dorado/demux/Trimmer.cpp
+    dorado/demux/Trimmer.h
     dorado/read_pipeline/AdapterDetectorNode.cpp
     dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/AlignerNode.cpp
@@ -236,18 +250,6 @@ add_library(dorado_lib
     dorado/splitter/myers.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
-    dorado/demux/AdapterDetector.cpp
-    dorado/demux/AdapterDetector.h
-    dorado/demux/AdapterDetectorSelector.h
-    dorado/demux/AdapterDetectorSelector.cpp
-    dorado/demux/BarcodeClassifier.cpp
-    dorado/demux/BarcodeClassifier.h
-    dorado/demux/BarcodeClassifierSelector.cpp
-    dorado/demux/BarcodeClassifierSelector.h
-    dorado/demux/parse_custom_sequences.cpp
-    dorado/demux/parse_custom_sequences.h
-    dorado/demux/Trimmer.cpp
-    dorado/demux/Trimmer.h
     dorado/poly_tail/dna_poly_tail_calculator.cpp
     dorado/poly_tail/dna_poly_tail_calculator.h
     dorado/poly_tail/plasmid_poly_tail_calculator.cpp
@@ -353,7 +355,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/correct.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
-    )
+     )
 
     set_target_properties(dorado
         PROPERTIES
@@ -479,7 +481,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.h
         dorado/data_loader/ModelFinder.cpp
         dorado/data_loader/ModelFinder.h
-    )
+     )
 
     target_link_libraries(dorado_io_lib
         PUBLIC

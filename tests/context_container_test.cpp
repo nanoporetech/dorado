@@ -8,7 +8,9 @@
 
 namespace {
 
-struct SomeClass {};
+struct SomeClass {
+    int value;
+};
 
 struct SomeBaseClass {};
 
@@ -208,6 +210,19 @@ TEST_CASE(CUT_TAG " get<const T>() when T is registered returns the same instanc
     auto& actual_instance = cut.get<const SomeClass>();
 
     REQUIRE(&actual_instance == original_instance.get());
+}
+
+TEST_CASE(CUT_TAG " get<T>() when T is registered returns a non const reference", CUT_TAG) {
+    ContextContainer cut{};
+    auto original_instance = std::make_shared<SomeClass>();
+    cut.register_context<SomeClass>(original_instance);
+    constexpr int NEW_VALUE{42};
+    CHECK(original_instance->value != NEW_VALUE);
+
+    auto& retrieved_instance = cut.get<SomeClass>();
+    retrieved_instance.value = NEW_VALUE;
+
+    REQUIRE(original_instance->value == NEW_VALUE);
 }
 
 TEST_CASE(CUT_TAG " exists<T>() when T is registered returns true", CUT_TAG) {

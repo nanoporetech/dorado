@@ -1,4 +1,5 @@
 #include "cli/cli_utils.h"
+#include "demux/adapter_info.h"
 #include "dorado_version.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
@@ -148,13 +149,13 @@ int trim(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
-    auto adapter_info = std::make_shared<AdapterInfo>();
+    auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = true;
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
     adapter_info->custom_seqs = custom_primer_file;
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    client_info->contexts().register_context<const AdapterInfo>(adapter_info);
+    client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
     reader.set_client_info(client_info);
 
     pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads);

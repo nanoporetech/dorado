@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
+#include "demux/adapter_info.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
@@ -360,9 +361,9 @@ TEST_CASE(
     auto records = read->read_common.extract_sam_lines(true /* emit moves */, 10, false);
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    client_info->contexts().register_context<const dorado::AdapterInfo>(
-            std::make_shared<const dorado::AdapterInfo>(
-                    dorado::AdapterInfo{true, true, std::nullopt}));
+    client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
+            std::make_shared<const dorado::demux::AdapterInfo>(
+                    dorado::demux::AdapterInfo{true, true, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
     // Push a Read type.

@@ -9,6 +9,7 @@
 namespace dorado::demux {
 
 class AdapterDetector;
+struct AdapterInfo;
 
 class AdapterDetectorSelector final {
     std::mutex m_mutex{};

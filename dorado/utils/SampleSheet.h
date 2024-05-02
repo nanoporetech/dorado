@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "demux/barcoding_info.h"
 
 #include <bitset>
 #include <set>
@@ -55,7 +55,7 @@ public:
      * Get all of the barcodes that are present in the sample sheet.
      * @return All of the barcodes that are present, or std::nullopt if the sample sheet is not loaded.
      */
-    BarcodingInfo::FilterSet get_barcode_values() const;
+    demux::BarcodingInfo::FilterSet get_barcode_values() const;
 
     /**
      * Check whether the a list of allowed barcodes is set and, if so, whether the provided barcode is in it.
@@ -70,7 +70,7 @@ private:
     std::unordered_map<std::string, size_t> m_col_indices;
     std::vector<Row> m_rows;
     bool m_skip_index_matching;
-    BarcodingInfo::FilterSet m_allowed_barcodes;
+    demux::BarcodingInfo::FilterSet m_allowed_barcodes;
 
     void validate_headers(const std::vector<std::string>& col_names, const std::string& filename);
     bool check_index(const std::string& flow_cell_id, const std::string& position_id) const;
