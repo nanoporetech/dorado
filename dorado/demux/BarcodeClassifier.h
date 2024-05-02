@@ -36,8 +36,8 @@ private:
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
     std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
-    bool find_midstrand_barcode(std::string_view read_seq,
-                                const BarcodeCandidateKit& candidate) const;
+    float find_midstrand_barcode(std::string_view read_seq,
+                                 const BarcodeCandidateKit& candidate) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,

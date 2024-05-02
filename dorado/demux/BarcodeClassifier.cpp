@@ -416,12 +416,12 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
     return candidates_list;
 }
 
-bool BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
-                                               const BarcodeCandidateKit& candidate) const {
+float BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
+                                                const BarcodeCandidateKit& candidate) const {
     auto length_of_end_windows =
             m_scoring_params.front_barcode_window + m_scoring_params.rear_barcode_window;
     if ((int)read_seq.length() < length_of_end_windows) {
-        return false;
+        return 0.f;
     }
 
     std::string_view top_context_v1 = candidate.top_context;
@@ -435,7 +435,7 @@ bool BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
     if (length_without_end_windows <
         std::min({top_context_v1.length(), bottom_context_v1.length(), top_context_v2.length(),
                   bottom_context_v2.length()})) {
-        return false;
+        return 0.f;
     }
 
     auto read_mid =
@@ -467,12 +467,8 @@ bool BarcodeClassifier::find_midstrand_barcode(std::string_view read_seq,
     edlibFreeAlignResult(top_result_v2);
     edlibFreeAlignResult(bottom_result_v2);
     // Find the best variant of the two.
-    if (std::max({top_flank_score_v1, bottom_flank_score_v1, top_flank_score_v2,
-                  bottom_flank_score_v2}) >= m_scoring_params.min_flank_score) {
-        return true;
-    }
-
-    return false;
+    return std::max(
+            {top_flank_score_v1, bottom_flank_score_v1, top_flank_score_v2, bottom_flank_score_v2});
 }
 
 // Calculate barcode score for the following barcoding scenario:
@@ -847,8 +843,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
-    if (find_midstrand_barcode(fwd, *candidate)) {
-        spdlog::trace("Found midstrand barcode.");
+    auto midstrand_score = find_midstrand_barcode(fwd, *candidate);
+    const auto midstrand_thres = 0.8f;
+    if (midstrand_score >= midstrand_thres) {
+        spdlog::trace("Found midstrand barcode flanks with score {}, threshold {}", midstrand_score,
+                      midstrand_thres);
         return UNCLASSIFIED;
     }
 
