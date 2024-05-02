@@ -844,7 +844,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     auto midstrand_score = find_midstrand_barcode(fwd, *candidate);
-    const auto midstrand_thres = 0.8f;
+    const auto midstrand_thres = m_scoring_params.midstrand_flank_score;
     if (midstrand_score >= midstrand_thres) {
         spdlog::trace("Found midstrand barcode flanks with score {}, threshold {}", midstrand_score,
                       midstrand_thres);
