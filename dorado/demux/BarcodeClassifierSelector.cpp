@@ -1,7 +1,7 @@
 #include "BarcodeClassifierSelector.h"
 
 #include "BarcodeClassifier.h"
-#include "utils/types.h"
+#include "barcoding_info.h"
 
 #include <spdlog/spdlog.h>
 

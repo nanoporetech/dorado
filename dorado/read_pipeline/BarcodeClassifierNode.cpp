@@ -3,6 +3,7 @@
 #include "ClientInfo.h"
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
+#include "demux/barcoding_info.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/trim.h"
@@ -32,8 +33,8 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     return bc;
 }
 
-const dorado::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
-    auto info = client_info.contexts().get_ptr<const dorado::BarcodingInfo>();
+const dorado::demux::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo& client_info) {
+    auto info = client_info.contexts().get_ptr<const dorado::demux::BarcodingInfo>();
     if (!info || (info->kit_name.empty() && !info->custom_kit.has_value())) {
         return nullptr;
     }
@@ -73,7 +74,7 @@ void BarcodeClassifierNode::input_thread_fn() {
     }
 }
 
-void BarcodeClassifierNode::barcode(BamPtr& read, const BarcodingInfo* barcoding_info) {
+void BarcodeClassifierNode::barcode(BamPtr& read, const demux::BarcodingInfo* barcoding_info) {
     if (!barcoding_info) {
         return;
     }

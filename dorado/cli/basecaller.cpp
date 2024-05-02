@@ -4,6 +4,8 @@
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
+#include "demux/adapter_info.h"
+#include "demux/barcoding_info.h"
 #include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
 #include "models/kits.h"
@@ -116,7 +118,7 @@ void setup(const std::vector<std::string>& args,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelSelection& model_selection,
-           std::shared_ptr<const dorado::BarcodingInfo> barcoding_info,
+           std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     const auto model_config = basecall::load_crf_model_config(model_path);
 
@@ -220,16 +222,17 @@ void setup(const std::vector<std::string>& args,
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (adapter_trimming_enabled) {
-        auto adapter_info = std::make_shared<AdapterInfo>();
+        auto adapter_info = std::make_shared<demux::AdapterInfo>();
         adapter_info->trim_adapters = !adapter_no_trim;
         adapter_info->trim_primers = !primer_no_trim;
         adapter_info->custom_seqs = custom_primer_file;
-        client_info->contexts().register_context<const AdapterInfo>(std::move(adapter_info));
+        client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (barcoding_info) {
-        client_info->contexts().register_context<const BarcodingInfo>(std::move(barcoding_info));
+        client_info->contexts().register_context<const demux::BarcodingInfo>(
+                std::move(barcoding_info));
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }
@@ -607,10 +610,10 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::shared_ptr<dorado::BarcodingInfo> barcoding_info{};
+    std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
     std::unique_ptr<const utils::SampleSheet> sample_sheet{};
     if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
-        barcoding_info = std::make_shared<BarcodingInfo>();
+        barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
         barcoding_info->trim = !no_trim_barcodes;

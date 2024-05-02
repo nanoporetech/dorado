@@ -3,11 +3,11 @@
 #include "ClientInfo.h"
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
+#include "demux/adapter_info.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/trim.h"
-#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -47,7 +47,7 @@ void AdapterDetectorNode::input_thread_fn() {
 }
 
 std::shared_ptr<const demux::AdapterDetector> AdapterDetectorNode::get_detector(
-        const AdapterInfo& adapter_info) {
+        const demux::AdapterInfo& adapter_info) {
     if (!adapter_info.trim_adapters && !adapter_info.trim_primers) {
         return nullptr;
     }
@@ -64,7 +64,8 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    const auto& adapter_info = bam_message.client_info->contexts().get_ptr<const AdapterInfo>();
+    const auto& adapter_info =
+            bam_message.client_info->contexts().get_ptr<const demux::AdapterInfo>();
     if (!adapter_info) {
         return;
     }
@@ -103,7 +104,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
 
     const auto& adapter_info =
-            read.read_common.client_info->contexts().get_ptr<const AdapterInfo>();
+            read.read_common.client_info->contexts().get_ptr<const demux::AdapterInfo>();
     if (!adapter_info) {
         return;
     }

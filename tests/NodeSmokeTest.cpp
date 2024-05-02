@@ -2,6 +2,8 @@
 #include "TestUtils.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
+#include "demux/adapter_info.h"
+#include "demux/barcoding_info.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
@@ -333,13 +335,13 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     CAPTURE(kit_inputs);
     CAPTURE(pipeline_restart);
 
-    auto barcoding_info = std::make_shared<dorado::BarcodingInfo>();
+    auto barcoding_info = std::make_shared<dorado::demux::BarcodingInfo>();
     barcoding_info->kit_name = kit_inputs.kit_name;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
     barcoding_info->custom_kit = kit_inputs.custom_kit;
     barcoding_info->custom_seqs = kit_inputs.custom_sequences;
-    client_info->contexts().register_context<const dorado::BarcodingInfo>(
+    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
             std::move(barcoding_info));
 
     set_pipeline_restart(pipeline_restart);
@@ -348,7 +350,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
-    auto adapter_info = std::make_shared<dorado::AdapterInfo>();
+    auto adapter_info = std::make_shared<dorado::demux::AdapterInfo>();
     adapter_info->custom_seqs = std::nullopt;
     adapter_info->trim_adapters = GENERATE(false, true);
     adapter_info->trim_primers = GENERATE(false, true);
@@ -357,7 +359,8 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     CAPTURE(adapter_info->trim_primers);
     CAPTURE(pipeline_restart);
 
-    client_info->contexts().register_context<const dorado::AdapterInfo>(std::move(adapter_info));
+    client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
+            std::move(adapter_info));
 
     set_pipeline_restart(pipeline_restart);
     run_smoke_test<dorado::AdapterDetectorNode>(2);
@@ -377,11 +380,11 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
                      "EXP-PBC096_barcode_both_ends_pass.fastq";
     fs::path data2 = fs::path(get_data_dir("bam_utils")) / "test.sam";
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info = std::make_shared<dorado::BarcodingInfo>();
+    auto barcoding_info = std::make_shared<dorado::demux::BarcodingInfo>();
     barcoding_info->kit_name = kit;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    client_info->contexts().register_context<const dorado::BarcodingInfo>(
+    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
             std::move(barcoding_info));
     for (auto& test_file : {data1, data2}) {
         dorado::HtsReader reader(test_file.string(), std::nullopt);
