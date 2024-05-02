@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace dorado::demux {
 
