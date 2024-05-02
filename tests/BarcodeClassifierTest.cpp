@@ -22,7 +22,33 @@
 #define TEST_GROUP "[barcode_demux]"
 namespace fs = std::filesystem;
 
-using namespace dorado;
+namespace dorado::barcode_classifier_test {
+
+namespace {
+std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
+        const std::vector<std::string>& kit_names,
+        bool barcode_both_ends,
+        bool trim_barcode,
+        demux::BarcodingInfo::FilterSet allowed_barcodes,
+        const std::optional<std::string>& custom_kit,
+        const std::optional<std::string>& custom_seqs) {
+    if (kit_names.empty() && !custom_kit) {
+        return {};
+    }
+
+    // Use either the kit name, or the custom kit path as the "kit name" specifier since
+    // the custom kit's name is not determined till the kit is parsed.
+    std::string kit_name = "";
+    if (!kit_names.empty()) {
+        kit_name = kit_names[0];
+    }
+    auto result = demux::BarcodingInfo{kit_name,     barcode_both_ends,
+                                       trim_barcode, std::move(allowed_barcodes),
+                                       custom_kit,   custom_seqs};
+    return std::make_shared<demux::BarcodingInfo>(std::move(result));
+}
+
+}  // namespace
 
 TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     using Catch::Matchers::Contains;
@@ -202,8 +228,8 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info = dorado::demux::create_barcoding_info(
-            kits, barcode_both_ends, !no_trim, std::nullopt, std::nullopt, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt,
+                                                std::nullopt, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
@@ -350,8 +376,8 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     reader.read();
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info = dorado::demux::create_barcoding_info(
-            kits, barcode_both_ends, !no_trim, std::nullopt, std::nullopt, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt,
+                                                std::nullopt, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));
@@ -456,3 +482,5 @@ TEST_CASE(
             demux::BarcodeClassifier({}, kit_file.string(), std::nullopt),
             "Either custom kit must include kit arrangement or a kit name needs to be passed in.");
 }
+
+}  // namespace dorado::barcode_classifier_test

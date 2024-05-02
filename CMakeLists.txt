@@ -169,7 +169,7 @@ add_library(dorado_lib
     dorado/demux/BarcodeClassifier.h
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
-    dorado/demux/barcoding_info.cpp
+    
     dorado/demux/barcoding_info.h
     dorado/demux/parse_custom_sequences.cpp
     dorado/demux/parse_custom_sequences.h
@@ -272,8 +272,7 @@ add_library(dorado_lib
     dorado/correct/conversions.cpp
     dorado/correct/conversions.h
     dorado/correct/decode.cpp
-    dorado/correct/decode.h
- "dorado/demux/barcoding_info.cpp")
+    dorado/correct/decode.h)
 
 enable_warnings_as_errors(dorado_lib)
 
@@ -356,7 +355,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/correct.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
-     "dorado/demux/barcoding_info.cpp")
+     )
 
     set_target_properties(dorado
         PROPERTIES
@@ -482,7 +481,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         dorado/data_loader/DataLoader.h
         dorado/data_loader/ModelFinder.cpp
         dorado/data_loader/ModelFinder.h
-     "dorado/demux/barcoding_info.cpp")
+     )
 
     target_link_libraries(dorado_io_lib
         PUBLIC
