@@ -43,18 +43,6 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // Functions here that create autorelease objects should be called with an autorelease pool set up,
 // which on MacOS isn't the case unless something like ScopedAutoReleasePool is used.
 
-auto get_library_location() {
-    char ns_path[PATH_MAX + 1];
-    uint32_t size = sizeof(ns_path);
-    _NSGetExecutablePath(ns_path, &size);
-
-    fs::path exepth{ns_path};
-    fs::path mtllib{"../lib/default.metallib"};
-    fs::path fspath = exepth.parent_path() / mtllib;
-
-    return NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
-}
-
 void report_error(const NS::Error *error, const char *function) {
     if (error == nil) {
         return;
@@ -73,6 +61,41 @@ void report_error(const NS::Error *error, const char *function) {
         report_error(error_, #func_with_err);              \
         result;                                            \
     })
+
+auto load_kernels(MTL::Device *const device) {
+    char ns_path[PATH_MAX + 1];
+    uint32_t size = PATH_MAX;
+    if (_NSGetExecutablePath(ns_path, &size) < 0) {
+        throw std::runtime_error("Failed to build path to kernels");
+    }
+    ns_path[size] = '\0';
+    fs::path exepth{ns_path};
+
+    // Check the default (ie compiled into the app on iOS)
+    auto kernels = NS::TransferPtr(device->newDefaultLibrary());
+    if (kernels) {
+        spdlog::info("Using default metal library");
+        return kernels;
+    }
+
+#if TARGET_OS_IPHONE
+    // If we're running inside MinKNOW then the lib will be in a different place.
+    // TODO: is there a nicer way to do this without resorting to envvars?
+    auto fspath =
+            exepth.parent_path() / "Frameworks/minknow_ios_framework.framework/default.metallib";
+#else
+    // Check in the lib folder.
+    auto fspath = exepth.parent_path() / "../lib/default.metallib";
+#endif
+    auto lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
+    kernels = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
+    if (kernels) {
+        spdlog::info("Using metal library at {}", fspath.string());
+        return kernels;
+    }
+
+    throw std::runtime_error("Failed to load metallib library");
+}
 
 #if !TARGET_OS_IPHONE
 
@@ -134,15 +157,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         const std::string &name,
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const std::optional<int> max_total_threads_per_tg) {
-    auto default_library = NS::TransferPtr(device->newDefaultLibrary());
-
-    if (!default_library) {
-        auto lib_path = get_library_location();
-        default_library = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
-        if (!default_library) {
-            throw std::runtime_error("Failed to load metallib library.");
-        }
-    }
+    auto metal_kernels = load_kernels(device);
 
     auto constant_vals = NS::TransferPtr(FunctionConstantValues::alloc()->init());
     for (auto &[cname, constant] : named_constants) {
@@ -161,7 +176,7 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
 
     auto kernel_name = NS::String::string(name.c_str(), NS::ASCIIStringEncoding);
     auto kernel = NS::TransferPtr(
-            wrap_func_with_err(default_library->newFunction, kernel_name, constant_vals.get()));
+            wrap_func_with_err(metal_kernels->newFunction, kernel_name, constant_vals.get()));
     if (!kernel) {
         throw std::runtime_error("Failed to find the kernel: " + name);
     }
