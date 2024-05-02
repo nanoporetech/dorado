@@ -85,7 +85,7 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
     at::Tensor get_attn_window_mask(const int64_t size);
     at::Tensor build_attn_window_mask(const int64_t size) const;
 
-    const int d_model, nhead, head_dim;
+    const int d_model, nhead, head_dim, num_splits;
     const std::pair<int, int> attn_window;
     const at::TensorOptions options;
 

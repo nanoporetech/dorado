@@ -2,6 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "utils/dev_utils.h"
 #include "utils/gpu_profiling.h"
 
 #include <ATen/Functions.h>
@@ -98,26 +99,35 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
 };
 
 at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
+    // Input is NT3HD
     assert_forward_dims(qkv);
-    const int64_t seq_len = qkv.size(1);
+    const int64_t N = qkv.size(0);
+    const int64_t T = qkv.size(1);
+    const int64_t H = qkv.size(3);
+    const int64_t D = qkv.size(4);
 
     auto buffers = named_buffers();
-    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, seq_len);
-    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, seq_len);
+    const at::Tensor cos_buf = buffers["cos_freqs"].narrow(0, 0, T);
+    const at::Tensor sin_buf = buffers["sin_freqs"].narrow(0, 0, T);
 
-    using Slices = std::vector<at::indexing::TensorIndex>;
-    const Slices evens = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
-                          at::indexing::Slice(), at::indexing::Slice(at::indexing::None, dim / 2)};
-    const Slices odds = {at::indexing::Ellipsis, at::indexing::Slice(at::indexing::None, 2),
-                         at::indexing::Slice(), at::indexing::Slice(dim / 2, dim)};
+    auto qk_evens = qkv.slice(2, 0, 2).slice(4, 0, D / 2);
+    auto qk_odds = qkv.slice(2, 0, 2).slice(4, D / 2, D);
 
-    at::Tensor qk_evens = qkv.index(evens).clone();
-    at::Tensor qk_odds = qkv.index(odds);
+    // Allocate output tensor with memory layout as consumed by attention: 3NHTD
+    auto output = at::empty({3, N, H, T, D}, qkv.options());
+    // View as [3 (q|k|v), N, H, T, 2 (even|odd), D/2], narrow first dim to 2 (q|k), then
+    // permute as [2 (even|odd), N, T, 2 (q|k), H, D/2] which is compatible with assignment below
+    auto output_kv_even_odd =
+            output.view({3, N, H, T, 2, D / 2}).slice(0, 0, 2).permute({4, 1, 3, 0, 2, 5});
 
-    qkv.index_put_(evens, cos_buf * qk_evens - sin_buf * qk_odds);
-    qkv.index_put_(odds, sin_buf * qk_evens + cos_buf * qk_odds);
+    // Apply rotary embedding to Q and K
+    output_kv_even_odd[0] = cos_buf * qk_evens - sin_buf * qk_odds;
+    output_kv_even_odd[1] = sin_buf * qk_evens + cos_buf * qk_odds;
 
-    return qkv;
+    // Copy V to output
+    output.select(0, 2).permute({0, 2, 1, 3}) = qkv.select(2, 2);
+
+    return output;
 }
 
 void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
@@ -156,6 +166,8 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
         : d_model(d_model_),
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
+          // TODO: this may benefit from fine-tuning. 8 gives good performance at chunk size 12k
+          num_splits(utils::get_dev_opt<int>("mha_num_splits", 8)),
           attn_window(attn_window_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
@@ -189,7 +201,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const int64_t C = x.size(2);
 
     at::Tensor qkv;
-    at::Tensor attn_output;
+    at::Tensor attn_output_ntc;
     {
         utils::ScopedProfileRange spr("QKV", 3);
         // in_feat=512, out_feat=1536 (3*in), nhead=8, head_dim=64=(512/8), dim_ff=2048
@@ -202,20 +214,29 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     {
         utils::ScopedProfileRange spr("MEA", 3);
         // NT3HD -> N3HTD -> N[1]HTD
-        const auto qkv_ = qkv.permute({0, 2, 3, 1, 4}).chunk(3, 1);
         auto attn_window_mask = get_attn_window_mask(T);
-
-#if TORCH_VERSION_MAJOR < 2
-        attn_output =
-                scaled_dot_product_attention_naive(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
+        attn_output_ntc = at::empty({N, T, C}, x.options());
+        auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
+        const auto [win_upper, win_lower] = attn_window;
+        for (int i = 0; i < num_splits; ++i) {
+            auto qb = i * T / num_splits;
+            auto qe = (i + 1) * T / num_splits;
+            auto kvb = std::max<int64_t>(0, qb - win_lower);
+            auto kve = std::min<int64_t>(T, qe + win_upper);
+            const auto q = qkv[0].slice(-2, qb, qe);
+            const auto k = qkv[1].slice(-2, kvb, kve);
+            const auto v = qkv[2].slice(-2, kvb, kve);
+            const auto mask = attn_window_mask.index({Slice(qb, qe), Slice(kvb, kve)});
+#if TORCH_VERSION_MAJOR >= 2
+            attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, mask);
 #else
-        attn_output = at::scaled_dot_product_attention(qkv_[0], qkv_[1], qkv_[2], attn_window_mask);
+            attn_output.slice(-2, qb, qe) = scaled_dot_product_attention_naive(q, k, v, mask);
 #endif
-        attn_output = attn_output.permute({0, 1, 3, 2, 4}).reshape({N, T, C});
+        }
     }
     {
         utils::ScopedProfileRange spr("OUTP", 3);
-        x = out_proj(attn_output);
+        x = out_proj(attn_output_ntc);
     }
     return x;
 };
