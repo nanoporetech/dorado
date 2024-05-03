@@ -213,14 +213,6 @@ void setup(const std::vector<std::string>& args,
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
     auto client_info = std::make_shared<DefaultClientInfo>();
-    if (estimate_poly_a) {
-        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), polya_config);
-        client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
-                std::move(poly_tail_calculator));
-        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
-    }
     if (adapter_trimming_enabled) {
         auto adapter_info = std::make_shared<demux::AdapterInfo>();
         adapter_info->trim_adapters = !adapter_no_trim;
@@ -235,6 +227,14 @@ void setup(const std::vector<std::string>& args,
                 std::move(barcoding_info));
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
+    }
+    if (estimate_poly_a) {
+        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
+                is_rna_model(model_config), polya_config);
+        client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
+                std::move(poly_tail_calculator));
+        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
+                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
@@ -492,8 +492,7 @@ int basecaller(int argc, char* argv[]) {
             .default_value(std::nullopt);
     parser.visible.add_argument("--estimate-poly-a")
             .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
-                  "dRNA use cases. Note that if this flag is set, then adapter/primer/barcode "
-                  "trimming will be disabled.")
+                  "dRNA use cases.")
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--poly-a-config")
@@ -590,16 +589,6 @@ int basecaller(int argc, char* argv[]) {
 
     std::string polya_config = "";
     if (parser.visible.get<bool>("--estimate-poly-a")) {
-        if (trim_options == "primers" || trim_options == "adapters" || trim_options == "all") {
-            spdlog::error(
-                    "--trim cannot be used with options 'primers', 'adapters', or 'all', "
-                    "if you are also using --estimate-poly-a.");
-            return EXIT_FAILURE;
-        }
-        no_trim_primers = no_trim_adapters = no_trim_barcodes = true;
-        spdlog::info(
-                "Estimation of poly-a has been requested, so adapter/primer/barcode trimming has "
-                "been disabled.");
         polya_config = parser.visible.get<std::string>("--poly-a-config");
     }
 
