@@ -157,7 +157,9 @@ void ScalerNode::input_thread_fn() {
         bool trim_rapid_adapter = !is_rna_model && m_rapid_settings.active &&
                                   read->read_common.rapid_chemistry == models::RapidChemistry::V1;
 
-        if (trim_rapid_adapter) {
+        // Note: Temporarily disabling the rapid adapter trimming since in some datasets it overtrims
+        // the gisnal leading to barcode information being lost.
+        if (false && trim_rapid_adapter) {
             const auto trim_rapid_adapter_idx = utils::rapid::find_rapid_adapter_trim_pos(
                     read->read_common.raw_data, m_rapid_settings);
             if (trim_rapid_adapter_idx < 0) {
