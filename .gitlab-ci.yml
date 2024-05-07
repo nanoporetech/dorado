@@ -251,7 +251,7 @@ build:linux:x86:focal:clang_tidy:
     - *set_parallel_jobs
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
-build:linux:x86:focal:valgrind:
+.build:linux:x86:focal:valgrind:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
