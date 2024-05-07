@@ -361,7 +361,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  {},
                  DEFAULT_PARAMS,
          }},
-        {"TWIST-ALL",
+        {"TWIST-96A-UDI",
          {
                  "PGx",
                  true,
@@ -404,7 +404,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                   "AC12R_91", "AD12R_92", "AE12R_93", "AF12R_94", "AG12R_95", "AH12R_96"},
                  TWIST_PARAMS,
          }},
-        {"TWIST-16X",
+        {"TWIST-16-UDI",
          {
                  "PGx",
                  true,
