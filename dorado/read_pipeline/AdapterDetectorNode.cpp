@@ -7,6 +7,7 @@
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/sequence_utils.h"
 #include "utils/trim.h"
 
 #include <htslib/sam.h>
@@ -56,7 +57,11 @@ std::shared_ptr<const demux::AdapterDetector> AdapterDetectorNode::get_detector(
 
 void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     bam1_t* irecord = bam_message.bam_ptr.get();
+    bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string seq = utils::extract_sequence(irecord);
+    if (is_input_reversed) {
+        seq = utils::reverse_complement(seq);
+    }
     int seqlen = irecord->core.l_qseq;
 
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
