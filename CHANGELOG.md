@@ -2,6 +2,13 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.6.2] (8 May 2024)
+
+This release of Dorado disables trimming of the rapid adapter during basecalling which was causing some RBK datasets to have a high unclassified rate during demux.
+
+* a64492b69eb59c1d60d602fee1670085338450c4 - Fix bug with loading reverse aligned records in dorado demux and trim
+* 6cc278f4d7759a7aaaa9a9b336d843b127b0d7ed - Disable rapid adapter trimming to prevent signal overtrimming in some RBK datasets
+
 # [0.6.1] (23 April 2024)
 
 This release of Dorado fixes bugs in `dorado aligner` related to using presets incorrectly and in `dorado demux` which were causing demultiplexed outputs to be malformed.
