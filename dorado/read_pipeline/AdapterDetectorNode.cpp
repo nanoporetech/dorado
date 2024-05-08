@@ -4,6 +4,7 @@
 #include "demux/Trimmer.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/sequence_utils.h"
 #include "utils/trim.h"
 #include "utils/types.h"
 
@@ -57,7 +58,11 @@ void AdapterDetectorNode::input_thread_fn() {
 
 void AdapterDetectorNode::process_read(BamPtr& read) {
     bam1_t* irecord = read.get();
+    bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string seq = utils::extract_sequence(irecord);
+    if (is_input_reversed) {
+        seq = utils::reverse_complement(seq);
+    }
     int seqlen = irecord->core.l_qseq;
 
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
