@@ -652,7 +652,7 @@ const std::unordered_map<std::string, std::string> barcodes = {
         {"NB94", "GATTGTCCTCAAACTGCCACCTAC"},
         {"NB95", "CCTGTCTGGAAGAAGAATGGACTT"},
         {"NB96", "CTGAACGGTCATAGAGTCCACCAT"},
-        // Twist 96x barcodes
+        // Twist 96x A-plate barcodes
         {"AA01F_01", "GCTGAAGATA"},
         {"AA01R_01", "CCAATATTCG"},
         {"AB01F_02", "TATCCGTGCA"},
