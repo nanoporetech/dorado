@@ -154,23 +154,28 @@ void ScalerNode::input_thread_fn() {
             }
         }
 
+        // Note: Temporarily disabling the rapid adapter trimming since in some datasets it overtrims
+        // the signal leading to barcode information being lost.
+        // Further details in ticket DOR-695
+#if 0
         // Activate rapid adapter trimming when while basecalling DNA where the sequencing kit
         // has a rapid adapter
         bool trim_rapid_adapter = !is_rna_model && m_rapid_settings.active &&
-                                  read->read_common.rapid_chemistry == models::RapidChemistry::V1;
+            read->read_common.rapid_chemistry == models::RapidChemistry::V1;
 
         if (trim_rapid_adapter) {
             const auto trim_rapid_adapter_idx = utils::rapid::find_rapid_adapter_trim_pos(
                     read->read_common.raw_data, m_rapid_settings);
             if (trim_rapid_adapter_idx < 0) {
                 spdlog::trace("ScalerNode: {} rapid_adapter_trim - failed",
-                              read->read_common.read_id);
+                        read->read_common.read_id);
             } else {
                 spdlog::trace("ScalerNode: {} rapid_adapter_trim - trim_index: {}",
-                              read->read_common.read_id, trim_rapid_adapter_idx);
+                        read->read_common.read_id, trim_rapid_adapter_idx);
                 trim_start = static_cast<int>(trim_rapid_adapter_idx);
             }
         }
+#endif
 
         assert(read->read_common.raw_data.dtype() == at::kShort);
 
