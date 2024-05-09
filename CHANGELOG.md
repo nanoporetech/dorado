@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.6.2] (8 May 2024)
+# [0.6.2] (9 May 2024)
 
 This release of Dorado disables trimming of the rapid adapter during basecalling which was causing some RBK datasets to have a high unclassified rate during demux.
 
