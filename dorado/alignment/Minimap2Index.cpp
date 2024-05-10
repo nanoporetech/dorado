@@ -108,11 +108,12 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
     m_mapping_options->max_sw_mat = 50'000'000;
 }
 
-bool Minimap2Index::load_initial_index(const std::string& index_file,
-                                       int num_threads,
-                                       bool allow_split_index) {
+std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& index_file,
+                                                            int num_threads,
+                                                            bool allow_split_index) {
     m_index_reader = create_index_reader(index_file, *m_index_options);
-    m_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads), IndexDeleter());
+    std::shared_ptr<mm_idx_t> index(mm_idx_reader_read(m_index_reader.get(), num_threads),
+                                    IndexDeleter());
     if (!allow_split_index) {
         // If split index is not supported, then verify that the index doesn't
         // have multiple parts by loading the index again and making sure
@@ -120,24 +121,24 @@ bool Minimap2Index::load_initial_index(const std::string& index_file,
         IndexUniquePtr split_index{};
         split_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads));
         if (split_index != nullptr) {
-            return false;
+            return nullptr;
         }
     }
 
-    if (m_index->k != m_index_options->k || m_index->w != m_index_options->w) {
+    if (index->k != m_index_options->k || index->w != m_index_options->w) {
         spdlog::warn(
                 "Indexing parameters mismatch prebuilt index: using paramateres kmer "
                 "size={} and window size={} from prebuilt index.",
-                m_index->k, m_index->w);
+                index->k, index->w);
     }
 
     if (mm_verbose >= 3) {
-        mm_idx_stat(m_index.get());
+        mm_idx_stat(index.get());
     }
 
-    spdlog::debug("Loaded index with {} target seqs", m_index->n_seq);
+    spdlog::debug("Loaded index with {} target seqs", index->n_seq);
 
-    return true;
+    return index;
 }
 
 IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
@@ -198,11 +199,18 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
         return IndexLoadResult::reference_file_not_found;
     }
 
-    if (!load_initial_index(index_file, num_threads, allow_split_index)) {
+    auto index = load_initial_index(index_file, num_threads, allow_split_index);
+    if (!index) {
         return IndexLoadResult::split_index_not_supported;
     }
 
-    mm_mapopt_update(&m_mapping_options.value(), m_index.get());
+    mm_mapopt_update(&m_mapping_options.value(), index.get());
+
+    if (!m_options.junc_bed.empty()) {
+        mm_idx_bed_read(index.get(), m_options.junc_bed.c_str(), 1);
+    }
+
+    m_index = index;
 
     return IndexLoadResult::success;
 }

@@ -90,15 +90,17 @@ inline bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOpt
 }
 
 struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
+    std::string junc_bed;
     bool print_aln_seq;  // Not available to be set by the user, hence not optional
 };
 
 inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
     return static_cast<const Minimap2IndexOptions&>(l) == r &&
-           static_cast<const Minimap2MappingOptions&>(l) == r;
+           static_cast<const Minimap2MappingOptions&>(l) == r && l.junc_bed == r.junc_bed;
 }
 
 inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-static const Minimap2Options dflt_options{Minimap2IndexOptions{}, Minimap2MappingOptions{}, false};
+static const Minimap2Options dflt_options{Minimap2IndexOptions{}, Minimap2MappingOptions{},
+                                          std::string{}, false};
 }  // namespace dorado::alignment

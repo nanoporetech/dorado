@@ -28,7 +28,9 @@ class Minimap2Index {
     void set_mapping_options(const Minimap2MappingOptions& mapping_options);
 
     // returns false if a split index
-    bool load_initial_index(const std::string& index_file, int num_threads, bool allow_split_index);
+    std::shared_ptr<mm_idx_t> load_initial_index(const std::string& index_file,
+                                                 int num_threads,
+                                                 bool allow_split_index);
 
 public:
     bool initialise(Minimap2Options options);
