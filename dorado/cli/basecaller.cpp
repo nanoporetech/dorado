@@ -279,7 +279,7 @@ void setup(const std::vector<std::string>& args,
         // First token is the dorado binary name. Remove that because the
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
-        resume_parser.parse_args(tokens);
+        resume_parser.parse_known_args(tokens);
 
         const std::string model_arg = resume_parser.get<std::string>("model");
         const ModelSelection resume_selection = ModelComplexParser::parse(model_arg);

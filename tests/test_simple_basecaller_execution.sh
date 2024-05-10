@@ -214,7 +214,7 @@ fi
 if command -v truncate > /dev/null
 then
     echo dorado basecaller resume feature
-    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 > $output_dir/tmp.bam
+    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --skip-model-compatibility-check > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
     $dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
     samtools quickcheck -u $output_dir/calls.bam
