@@ -6,6 +6,7 @@
 #include "demux/barcoding_info.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
+#include "utils/sequence_utils.h"
 #include "utils/trim.h"
 #include "utils/types.h"
 
@@ -81,7 +82,11 @@ void BarcodeClassifierNode::barcode(BamPtr& read, const demux::BarcodingInfo* ba
     auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
     bam1_t* irecord = read.get();
+    bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string seq = utils::extract_sequence(irecord);
+    if (is_input_reversed) {
+        seq = utils::reverse_complement(seq);
+    }
 
     auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
@@ -125,6 +130,10 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     }
 
     m_num_records++;
+    {
+        std::lock_guard lock(m_barcode_count_mutex);
+        m_barcode_count[read.read_common.barcode]++;
+    }
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
