@@ -25,19 +25,6 @@ namespace {
 
 // Create edlib configuration for detecting barcode region
 // using the flanks.
-[[maybe_unused]] EdlibAlignConfig init_edlib_config_for_midstrand_flanks() {
-    EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
-    placement_config.mode = EDLIB_MODE_HW;
-    // The Ns are the barcode mask. The M is for the wobble base in the 16S barcode flanks.
-    static const EdlibEqualityPair additionalEqualities[7] = {
-            {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}, {'N', 'U'}, {'M', 'A'}, {'M', 'C'}};
-    placement_config.additionalEqualities = additionalEqualities;
-    placement_config.additionalEqualitiesLength = 7;
-    return placement_config;
-}
-
-// Create edlib configuration for detecting barcode region
-// using the flanks.
 EdlibAlignConfig init_edlib_config_for_flanks() {
     EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
     placement_config.mode = EDLIB_MODE_HW;
