@@ -5,6 +5,7 @@
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "utils/log_utils.h"
+#include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -25,6 +26,7 @@ namespace dorado {
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
 int correct(int argc, char* argv[]) {
+    utils::make_torch_deterministic();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Dorado read correction tool.");
     parser.add_argument("reads")
@@ -129,7 +131,7 @@ int correct(int argc, char* argv[]) {
 
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
-    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
+    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], 12 /*correct_threads*/, device,
                                            infer_threads, batch_size, model_path);
 
     // 1. Alignment node that generates alignments per read to be
@@ -150,7 +152,7 @@ int correct(int argc, char* argv[]) {
     std::vector<dorado::stats::StatsCallable> stats_callables;
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-    constexpr auto kStatsPeriod = 100ms;
+    constexpr auto kStatsPeriod = 5000ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.

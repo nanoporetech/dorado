@@ -164,7 +164,7 @@ struct ModBaseInfo {
 };
 
 // Enum for handling CIGAR ops
-enum CigarOpType { INS = 0, DEL, MATCH, MISMATCH };
+enum class CigarOpType : uint8_t { INS = 0, DEL, MATCH, MISMATCH };
 
 struct CigarOp {
     CigarOpType op;

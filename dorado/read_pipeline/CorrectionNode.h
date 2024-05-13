@@ -45,6 +45,9 @@ private:
     void infer_fn(const std::string& device, int mtx_idx);
     void decode_fn();
 
+    void concat_features_and_send(const std::vector<std::string>& seqs,
+                                  const std::string& read_name);
+
     utils::AsyncQueue<correction::WindowFeatures> m_features_queue;
     utils::AsyncQueue<correction::WindowFeatures> m_inferred_features_queue;
 
@@ -52,8 +55,9 @@ private:
     std::vector<std::thread> m_decode_threads;
 
     std::atomic<int> num_reads;
+    std::atomic<int> num_early_reads;
 
-    std::unordered_map<std::string, std::vector<correction::WindowFeatures>> m_features_by_id;
+    std::unordered_map<std::string, std::vector<std::string>> m_features_by_id;
     std::unordered_map<std::string, int> m_pending_features_by_id;
     std::mutex m_features_mutex;
 

@@ -7,6 +7,6 @@
 
 namespace dorado::correction {
 
-std::vector<std::string> decode_windows(const std::vector<WindowFeatures>& wfs);
+std::string decode_window(const WindowFeatures& wf);
 
 }  // namespace dorado::correction

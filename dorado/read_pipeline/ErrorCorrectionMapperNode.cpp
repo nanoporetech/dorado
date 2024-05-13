@@ -19,24 +19,12 @@
 #include <string>
 #include <vector>
 
+const size_t MAX_OVERLAPS_PER_READ = 500;
+
 namespace {
 
-[[maybe_unused]] std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
-    std::vector<dorado::CigarOp> cigar_ops;
-    cigar_ops.reserve(n_cigar);
-    for (uint32_t i = 0; i < n_cigar; i++) {
-        uint32_t op = cigar[i] & 0xf;
-        uint32_t len = cigar[i] >> 4;
-        if (op == MM_CIGAR_MATCH) {
-            cigar_ops.push_back({dorado::CigarOpType::MATCH, len});
-        } else if (op == MM_CIGAR_INS) {
-            cigar_ops.push_back({dorado::CigarOpType::INS, len});
-        } else if (op == MM_CIGAR_DEL) {
-            cigar_ops.push_back({dorado::CigarOpType::DEL, len});
-        } else {
-            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
-        }
-    }
+std::vector<uint32_t> copy_mm2_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+    std::vector<uint32_t> cigar_ops(cigar, cigar + n_cigar);
     return cigar_ops;
 }
 
@@ -51,7 +39,13 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
     for (int j = 0; j < hits; j++) {
         // mapping region
         auto aln = &reg[j];
+
         const std::string tname(m_index->index()->seq[aln->rid].name);
+
+        // Skip self alignment.
+        if (qname == tname) {
+            continue;
+        }
 
         std::unique_lock<std::mutex> lock(m_correction_mtx);
         if (m_read_mutex.find(tname) == m_read_mutex.end()) {
@@ -70,19 +64,25 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         ovlp.qlen = (int)qread.length();
 
         uint32_t n_cigar = aln->p ? aln->p->n_cigar : 0;
-        auto cigar = parse_cigar(aln->p->cigar, n_cigar);
+        auto cigar = copy_mm2_cigar(aln->p->cigar, n_cigar);
 
         std::lock_guard<std::mutex> aln_lock(mtx);
         auto& alignments = m_correction_records[tname];
+
+        // Cap total overlaps per read.
+        if (alignments.qnames.size() > MAX_OVERLAPS_PER_READ) {
+            continue;
+        }
+
         if (alignments.read_name.empty()) {
             alignments.read_name = tname;
         }
 
-        ovlp.qid = (int)alignments.seqs.size();
+        ovlp.qid = (int)alignments.qnames.size();
 
         alignments.qnames.push_back(qname);
 
-        alignments.cigars.push_back(std::move(cigar));
+        alignments.mm2_cigars.push_back(std::move(cigar));
         alignments.overlaps.push_back(std::move(ovlp));
     }
 }
@@ -96,19 +96,23 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
         std::tuple<mm_reg1_t*, int> mapping = m_aligner->get_mapping(read.get(), tbuf.get());
         mm_reg1_t* reg = std::get<0>(mapping);
         int hits = std::get<1>(mapping);
-
-        auto clear_alignments = utils::PostCondition([reg, hits]() {
-            for (int j = 0; j < hits; j++) {
-                free(reg[j].p);
-            }
-            free(reg);
-        });
         extract_alignments(reg, hits, read_seq, read_name);
         m_alignments_processed++;
         // TODO: Remove and move to ProgressTracker
         if (m_alignments_processed.load() % 10000 == 0) {
-            spdlog::debug("Alignments processed {}", m_alignments_processed.load());
+            std::unique_lock<std::mutex> lock(m_correction_mtx);
+            size_t total = 0;
+            for (auto& [_, r] : m_correction_records) {
+                total += r.size();
+            }
+            spdlog::debug("Alignments processed {}, total m_corrected_records size {} MB",
+                          m_alignments_processed.load(), (float)total / (1024 * 1024));
         }
+
+        for (int j = 0; j < hits; j++) {
+            free(reg[j].p);
+        }
+        free(reg);
     }
 }
 
@@ -127,14 +131,17 @@ void ErrorCorrectionMapperNode::load_read_fn() {
 }
 
 void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
+    (void)pipeline;
     while (!m_copy_terminate.load()) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
         m_copy_cv.wait(lock, [&] {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
+        size_t total = 0;
         spdlog::debug("Pushing {} records for correction", m_shadow_correction_records.size());
-        for (auto& [n, r] : m_shadow_correction_records) {
+        for (auto& [_, r] : m_shadow_correction_records) {
+            total += r.size();
             pipeline.push_message(std::move(r));
         }
         m_shadow_correction_records.clear();
@@ -154,9 +161,9 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
 
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
-        // 1. Start threads for aligning reads.
+        // 1. Start thread for generating reads.
         reader_thread = std::thread(&ErrorCorrectionMapperNode::load_read_fn, this);
-        // 2. Start thread for generating reads.
+        // 2. Start threads for aligning reads.
         for (int i = 0; i < m_num_threads; i++) {
             aligner_threads.push_back(
                     std::thread(&ErrorCorrectionMapperNode::input_thread_fn, this));
@@ -165,7 +172,6 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         if (reader_thread.joinable()) {
             reader_thread.join();
         }
-        //reader_thread.reset();
         for (auto& t : aligner_threads) {
             if (t.joinable()) {
                 t.join();
@@ -190,7 +196,6 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     if (copy_thread.joinable()) {
         copy_thread.join();
     }
-    //copy_thread.reset();
 }
 
 ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)
@@ -201,7 +206,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
-    options.index_batch_size = 800000000ull;
+    options.index_batch_size = 8000000000ull;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;

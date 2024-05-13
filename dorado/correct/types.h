@@ -7,7 +7,7 @@
 namespace dorado::correction {
 
 struct OverlapWindow {
-    size_t overlap_idx = 0;
+    int overlap_idx = -1;
     int tstart = -1;
     int qstart = -1;
     int qend = -1;
@@ -15,19 +15,40 @@ struct OverlapWindow {
     int cigar_start_offset = -1;
     int cigar_end_idx = -1;
     int cigar_end_offset = -1;
-    float accuracy = 0;
+    float accuracy = 0.f;
 };
 
 struct WindowFeatures {
     at::Tensor bases;
     at::Tensor quals;
     at::Tensor indices;
-    int length;
+    int length = 0;
     std::vector<std::pair<int, int>> supported;
     std::vector<char> inferred_bases;
     int n_alns = 0;
     std::string read_name = "";
     int window_idx = -1;
+
+    size_t size() {
+        size_t total = 0;
+        total += bases.numel() * bases.element_size();
+        total += quals.numel() * quals.element_size();
+        total += indices.numel() * indices.element_size();
+        total += supported.size() * sizeof(std::pair<int, int>);
+        total += inferred_bases.size();
+        total += sizeof(int);
+        total += read_name.length();
+        total += sizeof(int);
+        return total;
+    }
+
+    void clear() {
+        bases.reset();
+        quals.reset();
+        indices.reset();
+        supported.clear();
+        inferred_bases.clear();
+    }
 };
 
 }  // namespace dorado::correction

@@ -4,6 +4,7 @@
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
+#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <cstdint>
@@ -230,9 +231,42 @@ struct CorrectionAlignments {
     std::vector<uint8_t> read_qual;
     std::vector<Overlap> overlaps;
     std::vector<std::vector<CigarOp>> cigars;
+    std::vector<std::vector<uint32_t>> mm2_cigars;
     std::vector<std::string> seqs;
     std::vector<std::vector<uint8_t>> quals;
     std::vector<std::string> qnames;
+    std::vector<int> qids;
+
+    size_t size() {
+        size_t si = read_name.length() + read_seq.length();
+        si += read_qual.size();
+        for (auto& v : mm2_cigars) {
+            si += v.size() * sizeof(uint32_t);
+        }
+        for (auto& s : seqs) {
+            si += s.length();
+        }
+        for (auto& v : quals) {
+            si += v.size();
+        }
+        for (auto& s : qnames) {
+            si += s.length();
+        }
+        si += qids.size() * sizeof(int);
+
+        return si;
+    }
+
+    void clear() {
+        read_seq = "";
+        read_qual = {};
+        cigars = {};
+        mm2_cigars = {};
+        overlaps = {};
+        seqs = {};
+        quals = {};
+        qnames = {};
+    };
 };
 
 // The Message type is a std::variant that can hold different types of message objects.

@@ -21,6 +21,7 @@
 #include <ATen/Tensor.h>
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
+#include <minimap.h>
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
 
@@ -43,6 +44,25 @@ dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& 
     return dorado::BamPtr(rec);
 }
 
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+    std::vector<dorado::CigarOp> cigar_ops;
+    cigar_ops.resize(n_cigar);
+    for (uint32_t i = 0; i < n_cigar; i++) {
+        uint32_t op = cigar[i] & 0xf;
+        uint32_t len = cigar[i] >> 4;
+        if (op == MM_CIGAR_MATCH) {
+            cigar_ops[i] = {dorado::CigarOpType::MATCH, len};
+        } else if (op == MM_CIGAR_INS) {
+            cigar_ops[i] = {dorado::CigarOpType::INS, len};
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops[i] = {dorado::CigarOpType::DEL, len};
+        } else {
+            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
+        }
+    }
+    return cigar_ops;
+}
+
 void populate_alignments(dorado::CorrectionAlignments& alignments,
                          dorado::hts_io::FastxRandomReader* reader) {
     const auto& tname = alignments.read_name;
@@ -52,17 +72,58 @@ void populate_alignments(dorado::CorrectionAlignments& alignments,
     auto num_qnames = alignments.qnames.size();
     alignments.seqs.resize(num_qnames);
     alignments.quals.resize(num_qnames);
+    alignments.cigars.resize(num_qnames);
     for (size_t i = 0; i < num_qnames; i++) {
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = reader->fetch_seq(qname);
         alignments.quals[i] = reader->fetch_qual(qname);
         alignments.overlaps[i].tlen = tlen;
+        alignments.cigars[i] = parse_cigar(alignments.mm2_cigars[i].data(),
+                                           (uint32_t)alignments.mm2_cigars[i].size());
+        alignments.mm2_cigars[i] = {};
     }
+}
+
+std::vector<std::string> concatenate_corrected_windows(const std::vector<std::string>& cons) {
+    std::vector<std::string> corrected_seqs;
+
+    std::string corrected_seq = "";
+
+    for (const auto& s : cons) {
+        if (s.empty()) {
+            if (!corrected_seq.empty()) {
+                corrected_seqs.push_back(std::move(corrected_seq));
+                corrected_seq = "";
+            }
+        } else {
+            corrected_seq += s;
+        }
+    }
+    if (!corrected_seq.empty()) {
+        corrected_seqs.push_back(std::move(corrected_seq));
+    }
+    return corrected_seqs;
 }
 
 }  // namespace
 
 namespace dorado {
+
+void CorrectionNode::concat_features_and_send(const std::vector<std::string>& to_decode,
+                                              const std::string& read_name) {
+    LOG_TRACE("decoding window for {}", read_name);
+    auto corrected_seqs = concatenate_corrected_windows(to_decode);
+    if (corrected_seqs.size() == 1) {
+        BamMessage rec{create_bam_record(read_name, corrected_seqs[0]), nullptr};
+        send_message_to_sink(std::move(rec));
+    } else {
+        for (size_t s = 0; s < corrected_seqs.size(); s++) {
+            const std::string new_name = read_name + ":" + std::to_string(s);
+            BamMessage rec{create_bam_record(new_name, corrected_seqs[s]), nullptr};
+            send_message_to_sink(std::move(rec));
+        }
+    }
+}
 
 void CorrectionNode::decode_fn() {
     spdlog::debug("Starting decode thread!");
@@ -70,14 +131,20 @@ void CorrectionNode::decode_fn() {
     WindowFeatures item;
     while (m_inferred_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
         utils::ScopedProfileRange spr("decode_loop", 1);
-        std::vector<WindowFeatures> to_decode;
+        auto read_name = item.read_name;
+        std::vector<std::string> to_decode;
+        auto pos = item.window_idx;
+        auto corrected_seq = decode_window(item);
+        item.clear();
         {
-            auto pos = item.window_idx;
-            auto read_name = item.read_name;
             std::lock_guard<std::mutex> lock(m_features_mutex);
             auto find_iter = m_features_by_id.find(read_name);
+            if (find_iter == m_features_by_id.end()) {
+                spdlog::debug("Find iter is end! for {}", read_name);
+                continue;
+            }
             auto& output_features = find_iter->second;
-            output_features[pos] = std::move(item);
+            output_features[pos] = std::move(corrected_seq);
             auto& pending = m_pending_features_by_id.find(read_name)->second;
             pending--;
             if (pending == 0) {
@@ -89,19 +156,7 @@ void CorrectionNode::decode_fn() {
         }
 
         if (!to_decode.empty()) {
-            const std::string& read_name = to_decode[0].read_name;
-            spdlog::trace("decoding window for {}", read_name);
-            auto corrected_seqs = decode_windows(to_decode);
-            if (corrected_seqs.size() == 1) {
-                BamMessage rec{create_bam_record(read_name, corrected_seqs[0]), nullptr};
-                send_message_to_sink(std::move(rec));
-            } else {
-                for (size_t s = 0; s < corrected_seqs.size(); s++) {
-                    const std::string new_name = read_name + ":" + std::to_string(s);
-                    BamMessage rec{create_bam_record(new_name, corrected_seqs[s]), nullptr};
-                    send_message_to_sink(std::move(rec));
-                }
-            }
+            concat_features_and_send(to_decode, read_name);
         }
     }
 }
@@ -158,10 +213,8 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         auto length_tensor =
                 at::from_blob(lengths.data(), {(int)lengths.size()},
                               at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
-        auto batched_bases =
-                collate<int>(bases_batch, (int)11, torch::kInt32, m_bases_manager.get_next_ptr());
-        auto batched_quals =
-                collate<float>(quals_batch, 0.f, torch::kFloat32, m_quals_manager.get_next_ptr());
+        auto batched_bases = collate<int>(bases_batch, (int)11, torch::kInt32);
+        auto batched_quals = collate<float>(quals_batch, 0.f, torch::kFloat32);
 
         std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
@@ -187,12 +240,14 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             auto decoded_output = decode_preds(split_preds[w]);
             wfs[w].inferred_bases = decoded_output;
         }
+        std::string inf_bases = "";
+        for (auto c : wfs[0].inferred_bases) {
+            inf_bases += std::to_string(c) + ",";
+        }
 
         for (auto& wf : wfs) {
             m_inferred_features_queue.try_push(std::move(wf));
         }
-        m_bases_manager.return_ptr(batched_bases.data_ptr<int>());
-        m_quals_manager.return_ptr(batched_quals.data_ptr<float>());
 
         bases_batch.clear();
         quals_batch.clear();
@@ -204,7 +259,24 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     };
 
     WindowFeatures item;
-    while (m_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
+    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    while (true) {
+        const auto pop_status = m_features_queue.try_pop_until(
+                item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
+
+        if (pop_status == utils::AsyncQueueStatus::Terminate) {
+            break;
+        }
+
+        if (pop_status == utils::AsyncQueueStatus::Timeout) {
+            // Ended with a timeout, so run inference if there are samples.
+            if (bases_batch.size() > 0) {
+                batch_infer();
+            }
+            last_chunk_reserve_time = std::chrono::system_clock::now();
+            continue;
+        }
+
         utils::ScopedProfileRange spr("collect_features", 1);
         int required_batch_slots = ((int)item.bases.sizes()[1] / 5120) + 1;
         if (required_batch_slots > remaining_batch_slots) {
@@ -222,6 +294,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         sizes.push_back(wf.length);
         indices_batch.push_back(wf.indices);
         remaining_batch_slots -= required_batch_slots;
+        last_chunk_reserve_time = std::chrono::system_clock::now();
     }
 
     if (bases_batch.size() > 0) {
@@ -235,49 +308,69 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
 }
 
 void CorrectionNode::input_thread_fn() {
-    Message message;
-
     m_num_active_feature_threads++;
 
     auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
+
+    Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
-            auto alignments = std::get<CorrectionAlignments>(std::move(message));
             utils::ScopedProfileRange spr("input_loop", 1);
+
+            auto alignments = std::get<CorrectionAlignments>(std::move(message));
+            auto tname = alignments.read_name;
+            if (alignments.qnames.size() > 400) {
+                spdlog::debug("Skipping {}: {} alignments", tname, alignments.qnames.size());
+            }
             populate_alignments(alignments, fastx_reader.get());
+
             size_t n_windows = (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
-            spdlog::trace("num windows {} for read {}", n_windows, alignments.read_name);
+            LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
+            // Get the windows
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
-            // Get the windows
             extract_windows(windows, alignments, m_window_size);
             // Get the features
             auto wfs = extract_features(windows, alignments, m_window_size);
-            std::vector<WindowFeatures> features_to_infer;
 
-            // Move features that don't need inferring into an output
+            alignments.clear();
+            std::vector<std::string> corrected_seqs;
+            corrected_seqs.resize(wfs.size());
+
+            // Move windows that don't need inferring into an output
             // vector for later use.
+            std::vector<WindowFeatures> features_to_infer;
             for (size_t w = 0; w < wfs.size(); w++) {
                 if (wfs[w].n_alns > 1 && wfs[w].supported.size() > 0) {
                     features_to_infer.push_back(std::move(wfs[w]));
+                } else {
+                    corrected_seqs[w] = decode_window(wfs[w]);
+                    wfs[w].clear();
                 }
             }
-            {
+            if (features_to_infer.empty()) {
+                num_early_reads++;
+                concat_features_and_send(corrected_seqs, tname);
+            } else {
                 std::lock_guard<std::mutex> lock(m_features_mutex);
-                m_features_by_id.insert({alignments.read_name, std::move(wfs)});
-                m_pending_features_by_id.insert(
-                        {alignments.read_name, (int)features_to_infer.size()});
+                if (m_features_by_id.find(tname) == m_features_by_id.end()) {
+                    m_features_by_id.insert({tname, std::move(corrected_seqs)});
+                    m_pending_features_by_id.insert({tname, (int)features_to_infer.size()});
+                } else {
+                    spdlog::debug("Ftrs for {} already exists!", tname);
+                }
             }
             // Push the ones that need inference to another thread.
             for (auto& wf : features_to_infer) {
-                spdlog::trace("Pushing window idx {} to features queue", wf.window_idx);
+                LOG_TRACE("Pushing window idx {} to features queue", wf.window_idx);
                 m_features_queue.try_push(std::move(wf));
             }
             num_reads++;
 
             // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Corrected {} reads", num_reads.load());
+                spdlog::debug("Corrected {} reads early {}", num_reads.load(),
+                              num_early_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
