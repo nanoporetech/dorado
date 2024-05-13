@@ -919,7 +919,9 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     if (midstrand_score >= midstrand_thres) {
         spdlog::trace("Found midstrand barcode flanks with score {}, threshold {}", midstrand_score,
                       midstrand_thres);
-        return UNCLASSIFIED;
+        auto midstrand_res = UNCLASSIFIED;
+        midstrand_res.found_midstrand = true;
+        return midstrand_res;
     }
 
     // Then find the best barcode hit within that kit.

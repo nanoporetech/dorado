@@ -195,6 +195,38 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     }
 }
 
+TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended kit", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
+
+    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
+
+    // Check case where both ends do match.
+    auto bc_file = data_dir / "EXP-PBC096_midstrand.fasta";
+    HtsReader reader(bc_file.string(), std::nullopt);
+    while (reader.read()) {
+        std::string seq = utils::extract_sequence(reader.record.get());
+        auto res = classifier.barcode(seq, false, std::nullopt);
+        CHECK(res.barcode_name == "unclassified");
+        CHECK(res.found_midstrand);
+    }
+}
+
+TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended kit", TEST_GROUP) {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
+
+    demux::BarcodeClassifier classifier({"SQK-RBK114-96"}, std::nullopt, std::nullopt);
+
+    // Check case where both ends do match.
+    auto bc_file = data_dir / "SQK-RBK114-96_midstrand.fasta";
+    HtsReader reader(bc_file.string(), std::nullopt);
+    while (reader.read()) {
+        std::string seq = utils::extract_sequence(reader.record.get());
+        auto res = classifier.barcode(seq, false, std::nullopt);
+        CHECK(res.barcode_name == "unclassified");
+        CHECK(res.found_midstrand);
+    }
+}
+
 TEST_CASE(
         "BarcodeClassifierNode: check read messages are correctly updated after classification and "
         "trimming",
