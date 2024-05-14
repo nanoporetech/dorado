@@ -15,6 +15,17 @@
 #include <variant>
 #include <vector>
 
+namespace {
+
+template <typename T>
+void safe_erase(std::vector<T>& vec, size_t pos) {
+    if (vec.size() > pos) {
+        vec.erase(vec.begin() + pos);
+    }
+}
+
+}  // namespace
+
 namespace dorado {
 
 namespace details {
@@ -226,16 +237,42 @@ struct Overlap {
 
 // Overlaps for error correction
 struct CorrectionAlignments {
-    std::string read_name;
-    std::string read_seq;
-    std::vector<uint8_t> read_qual;
-    std::vector<Overlap> overlaps;
-    std::vector<std::vector<CigarOp>> cigars;
-    std::vector<std::vector<uint32_t>> mm2_cigars;
-    std::vector<std::string> seqs;
-    std::vector<std::vector<uint8_t>> quals;
-    std::vector<std::string> qnames;
-    std::vector<int> qids;
+    std::string read_name = "";
+    std::string read_seq = "";
+    std::vector<uint8_t> read_qual = {};
+    std::vector<Overlap> overlaps = {};
+    std::vector<std::vector<CigarOp>> cigars = {};
+    std::vector<std::vector<uint32_t>> mm2_cigars = {};
+    std::vector<std::string> seqs = {};
+    std::vector<std::vector<uint8_t>> quals = {};
+    std::vector<std::string> qnames = {};
+
+    // This is mostly to workaround an issue where sometimes
+    // the tend of an overlap is much bigger than the
+    // tlen of the read. This is unexpected and happens
+    // intermittently.
+    // TODO: Find root cause of the issue.
+    void remove_inconsistent_overlaps() {
+        std::vector<size_t> pos_to_remove;
+        for (size_t i = 0; i < overlaps.size(); i++) {
+            auto& ovlp = overlaps[i];
+            if (ovlp.tlen < ovlp.tend) {
+                spdlog::warn("Inconsistent alignment detected: tlen {} tstart {} tend {}",
+                             ovlp.tlen, ovlp.tstart, ovlp.tend);
+                pos_to_remove.push_back(i);
+            }
+        }
+        // pos_to_remove is in asecnding order, so move in reverse order
+        // to remove positions from the rear.
+        for (auto pos = pos_to_remove.rbegin(); pos != pos_to_remove.rend(); pos++) {
+            safe_erase(overlaps, *pos);
+            safe_erase(cigars, *pos);
+            safe_erase(mm2_cigars, *pos);
+            safe_erase(seqs, *pos);
+            safe_erase(quals, *pos);
+            safe_erase(qnames, *pos);
+        }
+    }
 
     size_t size() {
         size_t si = read_name.length() + read_seq.length();
@@ -252,7 +289,6 @@ struct CorrectionAlignments {
         for (auto& s : qnames) {
             si += s.length();
         }
-        si += qids.size() * sizeof(int);
 
         return si;
     }

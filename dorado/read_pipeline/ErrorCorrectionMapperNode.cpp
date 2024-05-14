@@ -63,6 +63,12 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         ovlp.tend = aln->re;
         ovlp.qlen = (int)qread.length();
 
+        if (ovlp.qlen < ovlp.qend) {
+            spdlog::warn("Inconsistent alignment detected: qlen {} qstart {} qend {}", ovlp.qlen,
+                         ovlp.qstart, ovlp.qend);
+            continue;
+        }
+
         uint32_t n_cigar = aln->p ? aln->p->n_cigar : 0;
         auto cigar = copy_mm2_cigar(aln->p->cigar, n_cigar);
 

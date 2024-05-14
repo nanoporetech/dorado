@@ -67,7 +67,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                     alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,
                     last_window, windows.size(), overlap.tlen, overlap.tstart, overlap.tend,
                     alignments.qnames[aln_idx], overlap.qlen, overlap.qstart, overlap.qend);
-            continue;
+            windows.clear();
+            break;
         }
 
         int tstart = overlap.tstart;

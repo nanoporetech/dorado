@@ -73,6 +73,10 @@ void populate_alignments(dorado::CorrectionAlignments& alignments,
     alignments.seqs.resize(num_qnames);
     alignments.quals.resize(num_qnames);
     alignments.cigars.resize(num_qnames);
+
+    // Some overlaps have alignment info inconsistent with reference length,
+    // so we track those and remove them from overlap list.
+    std::vector<size_t> pos_to_remove;
     for (size_t i = 0; i < num_qnames; i++) {
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = reader->fetch_seq(qname);
@@ -82,6 +86,8 @@ void populate_alignments(dorado::CorrectionAlignments& alignments,
                                            (uint32_t)alignments.mm2_cigars[i].size());
         alignments.mm2_cigars[i] = {};
     }
+
+    alignments.remove_inconsistent_overlaps();
 }
 
 std::vector<std::string> concatenate_corrected_windows(const std::vector<std::string>& cons) {
