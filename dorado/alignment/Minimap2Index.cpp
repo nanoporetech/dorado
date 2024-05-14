@@ -240,12 +240,12 @@ HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {
-    assert(m_index_options && "Access to indexing options require they are intialised.");
+    assert(m_index_options && "Access to indexing options require they are initialised.");
     return *m_index_options;
 }
 
 const mm_mapopt_t& Minimap2Index::mapping_options() const {
-    assert(m_mapping_options && "Access to mapping options require they are intialised.");
+    assert(m_mapping_options && "Access to mapping options require they are initialised.");
     return *m_mapping_options;
 }
 

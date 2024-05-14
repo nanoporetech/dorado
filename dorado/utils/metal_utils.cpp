@@ -74,7 +74,7 @@ auto load_kernels(MTL::Device *const device) {
     // Check the default (ie compiled into the app on iOS)
     auto kernels = NS::TransferPtr(device->newDefaultLibrary());
     if (kernels) {
-        spdlog::info("Using default metal library");
+        spdlog::trace("Using default metal library");
         return kernels;
     }
 
@@ -90,7 +90,7 @@ auto load_kernels(MTL::Device *const device) {
     auto lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
     kernels = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
     if (kernels) {
-        spdlog::info("Using metal library at {}", fspath.string());
+        spdlog::trace("Using metal library at {}", fspath.string());
         return kernels;
     }
 
