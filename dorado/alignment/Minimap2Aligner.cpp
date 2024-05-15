@@ -6,6 +6,7 @@
 
 #include <htslib/sam.h>
 #include <minimap.h>
+
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
 //Ask lh3 t  make some of these funcs publicly available?
 #include <mmpriv.h>
@@ -333,7 +334,8 @@ void Minimap2Aligner::add_tags(bam1_t* record,
         bam_aux_append(record, "nn", 'i', sizeof(nm), (uint8_t*)&nn);
 
         if (aln->p->trans_strand == 1 || aln->p->trans_strand == 2) {
-            bam_aux_append(record, "ts", 'A', 2, (uint8_t*)&("?+-?"[aln->p->trans_strand]));
+            bam_aux_append(record, "ts", 'A', sizeof(char),
+                           (uint8_t*)&("?+-?"[aln->p->trans_strand]));
         }
     }
 

@@ -212,6 +212,11 @@ inline void add_minimap2_arguments(ArgParser& parser, const std::string& default
             .help("minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
                   "specified as NUM,[NUM]");
 
+    parser.visible.add_argument("--junc-bed")
+            .help("Optional file with gene annotations in the BED12 format (aka 12-column BED), or "
+                  "intron positions in 5-column BED. With this option, minimap2 prefers splicing "
+                  "in annotations.");
+
     // Setting options to lr:hq which is appropriate for high quality nanopore reads.
     parser.visible.add_argument("--mm2-preset")
             .help("minimap2 preset for indexing and mapping. Alias for the -x "
@@ -285,6 +290,10 @@ Options process_minimap2_arguments(const ArgParser& parser) {
         }
     }
     res.soft_clipping = parser.visible.present<bool>("Y");
+    auto junc_bed = parser.visible.present<std::string>("--junc-bed");
+    if (junc_bed) {
+        res.junc_bed = std::move(*junc_bed);
+    }
     res.mm2_preset = parser.visible.get<std::string>("mm2-preset");
     res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
     res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
