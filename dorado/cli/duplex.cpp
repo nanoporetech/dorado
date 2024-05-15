@@ -17,6 +17,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #if DORADO_CUDA_BUILD
@@ -281,7 +282,7 @@ int duplex(int argc, char* argv[]) {
 
     std::set<fs::path> temp_model_paths;
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
 
         auto device(parser.visible.get<std::string>("-x"));
         auto model(parser.visible.get<std::string>("model"));

@@ -11,6 +11,7 @@
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -142,7 +143,7 @@ int aligner(int argc, char* argv[]) {
     cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;

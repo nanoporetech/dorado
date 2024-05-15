@@ -11,6 +11,7 @@
 #include "summary/summary.h"
 #include "utils/MergeHeaders.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -159,7 +160,7 @@ int demuxer(int argc, char* argv[]) {
             .help("Path to file with custom barcode sequences.");
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;

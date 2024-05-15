@@ -3,8 +3,8 @@
 
 #include "dorado_version.h"
 #include "models/kits.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
-#include "utils/dev_utils.h"
 
 #include <optional>
 #include <stdexcept>
@@ -42,15 +42,11 @@ namespace dorado {
 
 namespace cli {
 
-static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
-
-struct ArgParser {
-    ArgParser(std::string program_name)
-            : visible(std::move(program_name), DORADO_VERSION, argparse::default_arguments::help),
-              hidden(HIDDEN_PROGRAM_NAME){};
-    argparse::ArgumentParser visible;
-    argparse::ArgumentParser hidden;
-};
+using utils::arg_parse::ArgParser;
+using utils::arg_parse::HIDDEN_PROGRAM_NAME;
+using utils::arg_parse::parse_string_to_size;
+using utils::arg_parse::parse_string_to_sizes;
+using utils::arg_parse::parse_yes_or_no;
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
@@ -88,91 +84,6 @@ inline void add_pg_hdr(sam_hdr_t* hdr,
     pg << '\n';
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
-
-inline std::tuple<int, int, int> parse_version_str(const std::string& version) {
-    size_t first_pos = 0, pos = 0;
-    std::vector<int> tokens;
-    while ((pos = version.find('.', first_pos)) != std::string::npos) {
-        tokens.emplace_back(std::stoi(version.substr(first_pos, pos)));
-        first_pos = pos + 1;
-    }
-    tokens.emplace_back(std::stoi(version.substr(first_pos)));
-    if (tokens.size() == 3) {
-        return {tokens[0], tokens[1], tokens[2]};
-    } else if (tokens.size() == 2) {
-        return {tokens[0], tokens[1], 0};
-    } else if (tokens.size() == 1) {
-        return {tokens[0], 0, 0};
-    } else {
-        throw std::runtime_error(
-                "Could not parse version " + version +
-                ". Only version in the format x.y.z where x/y/z are integers is supported");
-    }
-}
-
-template <class T = int64_t>
-std::vector<T> parse_string_to_sizes(const std::string& str) {
-    std::vector<T> sizes;
-    const char* c_str = str.c_str();
-    char* p;
-    while (true) {
-        double x = strtod(c_str, &p);
-        if (p == c_str) {
-            throw std::runtime_error("Cannot parse size '" + str + "'.");
-        }
-        if (*p == 'G' || *p == 'g') {
-            x *= 1e9;
-            ++p;
-        } else if (*p == 'M' || *p == 'm') {
-            x *= 1e6;
-            ++p;
-        } else if (*p == 'K' || *p == 'k') {
-            x *= 1e3;
-            ++p;
-        }
-        sizes.emplace_back(static_cast<T>(std::round(x)));
-        if (*p == ',') {
-            c_str = ++p;
-            continue;
-        } else if (*p == 0) {
-            break;
-        }
-        throw std::runtime_error("Unknown suffix '" + std::string(p) + "'.");
-    }
-    return sizes;
-}
-
-template <class T = uint64_t>
-T parse_string_to_size(const std::string& str) {
-    return parse_string_to_sizes<T>(str)[0];
-}
-
-inline bool parse_yes_or_no(const std::string& str) {
-    if (str == "yes" || str == "y") {
-        return true;
-    }
-    if (str == "no" || str == "n") {
-        return false;
-    }
-    auto msg = "Unsupported value '" + str + "'; option only accepts '(y)es' or '(n)o'.";
-    throw std::runtime_error(msg);
-}
-
-inline std::string to_size(double value) {
-    std::stringstream res;
-    if (value < 1e3) {
-        res << value;
-    } else if (value < 1e6) {
-        res << value / 1e3 << 'K';
-    } else if (value < 1e9) {
-        res << value / 1e6 << 'M';
-    } else {
-        res << value / 1e9 << 'G';
-    }
-    return res.str();
-}
-
-inline std::string to_yes_or_no(bool value) { return value ? "yes" : "no"; }
 
 inline void add_internal_arguments(ArgParser& parser) {
     parser.hidden.add_argument("--skip-model-compatibility-check")
@@ -234,16 +145,6 @@ inline void add_minimap2_arguments(ArgParser& parser, const std::string& default
             .implicit_value(true);
 }
 
-inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
-    parser.hidden.add_argument("--devopts")
-            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
-            .default_value(std::string(""));
-    auto remaining_args = parser.visible.parse_known_args(argc, argv);
-    remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
-    parser.hidden.parse_args(remaining_args);
-    utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
-}
-
 template <typename TO, typename FROM>
 std::optional<TO> get_optional_as(const std::optional<FROM>& from_optional) {
     if (from_optional) {
@@ -261,7 +162,7 @@ Options process_minimap2_arguments(const ArgParser& parser) {
     auto index_batch_size = parser.visible.present<std::string>("I");
     if (index_batch_size) {
         res.index_batch_size =
-                std::make_optional(cli::parse_string_to_size<uint64_t>(*index_batch_size));
+                std::make_optional(parse_string_to_size<uint64_t>(*index_batch_size));
     }
     auto print_secondary = parser.visible.present<std::string>("--secondary");
     if (print_secondary) {
@@ -276,7 +177,7 @@ Options process_minimap2_arguments(const ArgParser& parser) {
 
     auto optional_bandwidth = parser.visible.present<std::string>("--bandwidth");
     if (optional_bandwidth) {
-        auto bandwidth = cli::parse_string_to_sizes<int>(*optional_bandwidth);
+        auto bandwidth = parse_string_to_sizes<int>(*optional_bandwidth);
         switch (bandwidth.size()) {
         case 1:
             res.bandwidth = std::make_optional<int>(bandwidth[0]);
