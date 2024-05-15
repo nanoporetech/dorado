@@ -75,9 +75,9 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
         // window.
         if (trim_interval.second <= trim_interval.first) {
             if (res.use_top) {
-                return {res.top_barcode_pos.first, res.top_barcode_pos.second + 1};
+                return {res.top_barcode_pos.second, seqlen};
             } else {
-                return {res.bottom_barcode_pos.first, res.bottom_barcode_pos.second + 1};
+                return {0, res.bottom_barcode_pos.first};
             }
         }
     } else {
