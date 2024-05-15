@@ -33,7 +33,7 @@ const std::string BC_1st_REAR = "TTAACCTTTCTGTTGGTGCTGATATTGC";
 const std::string BC_2nd_FRONT = "GGTGCTG";
 const std::string BC_2nd_REAR = "TTAACCTACTTGCCTGTCGCTCTATCTTC";
 
-const std::string NB_1st_FRONT = "AGGTTAA";
+const std::string NB_1st_FRONT = "ATTGCTAAGGTTAA";
 const std::string NB_1st_REAR = "CAGCACCT";
 const std::string NB_2nd_FRONT = "ATTGCTAAGGTTAA";
 const std::string NB_2nd_REAR = "CAGCACC";
