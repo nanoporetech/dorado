@@ -77,14 +77,18 @@ T parse_string_to_size(const std::string& str) {
     return parse_string_to_sizes<T>(str)[0];
 }
 
-inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
+inline void parse(ArgParser& parser, const std::vector<std::string>& arguments) {
     parser.hidden.add_argument("--devopts")
             .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
             .default_value(std::string(""));
-    auto remaining_args = parser.visible.parse_known_args(argc, argv);
+    auto remaining_args = parser.visible.parse_known_args(arguments);
     remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
     parser.hidden.parse_args(remaining_args);
     utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
+}
+
+inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
+    return parse(parser, {argv, argv + argc});
 }
 
 }  // namespace dorado::utils::arg_parse

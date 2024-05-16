@@ -2,10 +2,45 @@
 
 #include "Minimap2Options.h"
 #include "utils/arg_parse_ext.h"
+#include "utils/string_utils.h"
 
+#include <spdlog/spdlog.h>
+
+#include <algorithm>
+#include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
+
+using namespace std::literals;
 
 namespace dorado::alignment {
+
+constexpr inline std::string_view MM2_OPTS_ARG = "--mm2-opts";
+
+// call with extract_minimap2_args({argv, argv + argc}, remaining_args);
+inline std::string extract_minimap2_args(const std::vector<std::string>& args,
+                                         std::vector<std::string>& remaining_args) {
+    auto mm2_opt_key_itr = std::find(std::cbegin(args), std::cend(args), MM2_OPTS_ARG);
+    if (mm2_opt_key_itr == std::cend(args)) {
+        remaining_args = args;
+        return {};
+    }
+    auto mm2_opt_value_itr = mm2_opt_key_itr + 1;
+    if (mm2_opt_value_itr == std::cend(args)) {
+        throw std::runtime_error("Missing value for " + std::string{MM2_OPTS_ARG} +
+                                 " command line argument.");
+    }
+    remaining_args.insert(std::end(remaining_args), std::cbegin(args), mm2_opt_key_itr);
+    remaining_args.insert(std::end(remaining_args), mm2_opt_value_itr + 1, std::cend(args));
+    return *mm2_opt_value_itr;
+}
+
+inline void add_minimap2_opts_arg(utils::arg_parse::ArgParser& parser) {
+    parser.visible.add_argument(MM2_OPTS_ARG)
+            .help("Optional minimap2 options string. For multiple arguments surround with double "
+                  "quotes.");
+}
 
 inline void add_minimap2_arguments(utils::arg_parse::ArgParser& parser,
                                    const std::string& default_preset) {
@@ -109,6 +144,23 @@ inline Minimap2Options process_minimap2_arguments(const utils::arg_parse::ArgPar
     res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
     res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
     return res;
+}
+
+inline Minimap2Options process_minimap2_option_string(const std::string& minimap2_option_string) {
+    auto mm2_args = utils::split("minimap2_options " + minimap2_option_string, ' ');
+    utils::arg_parse::ArgParser parser("minimap2_options");
+    add_minimap2_arguments(parser, DEFAULT_MM_PRESET);
+
+    try {
+        utils::arg_parse::parse(parser, mm2_args);
+    } catch (const std::exception& e) {
+        std::ostringstream parser_stream;
+        parser_stream << parser.visible;
+        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        throw;
+    }
+
+    return process_minimap2_arguments(parser);
 }
 
 }  // namespace dorado::alignment
