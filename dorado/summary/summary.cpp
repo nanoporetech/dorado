@@ -168,7 +168,7 @@ bool SummaryData::write_rows_from_reader(
         auto duration = reader.get_tag<float>("du");
 
         auto seqlen = reader.record->core.l_qseq;
-        auto mean_qscore = reader.get_tag<int>("qs");
+        auto mean_qscore = reader.get_tag<float>("qs");
 
         auto num_samples = reader.get_tag<int>("ns");
         auto trim_samples = reader.get_tag<int>("ts");

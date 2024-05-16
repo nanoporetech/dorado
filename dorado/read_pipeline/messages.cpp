@@ -37,8 +37,8 @@ std::string ReadCommon::generate_read_group() const {
 }
 
 void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex_parent) const {
-    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
-    bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
+    float qs = calculate_mean_qscore();
+    bam_aux_append(aln, "qs", 'f', sizeof(qs), (uint8_t *)&qs);
 
     float du = (float)(get_raw_data_samples() + num_trimmed_samples) / (float)sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
@@ -108,8 +108,8 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
 }
 
 void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
-    int qs = static_cast<int>(std::round(calculate_mean_qscore()));
-    bam_aux_append(aln, "qs", 'i', sizeof(qs), (uint8_t *)&qs);
+    float qs = calculate_mean_qscore();
+    bam_aux_append(aln, "qs", 'f', sizeof(qs), (uint8_t *)&qs);
     uint32_t duplex = 1;
     bam_aux_append(aln, "dx", 'i', sizeof(duplex), (uint8_t *)&duplex);
 
