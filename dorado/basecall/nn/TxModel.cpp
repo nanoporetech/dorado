@@ -81,7 +81,7 @@ GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_)
 
 at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     at::Tensor t;
-#if DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
     if (utils::get_dev_opt<bool>("use_koi_swiglu", true) && koi_can_use_cutlass()) {
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         auto N = x.size(0);
