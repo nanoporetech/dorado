@@ -17,8 +17,6 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,
-        size_t batch_size,
-        size_t chunk_size,
         float memory_fraction,
         PipelineType pipeline_type,
         float batch_size_time_penalty);

@@ -109,3 +109,8 @@ dim_feedforward = 2048
 deepnorm_alpha = 2.4494897
 deepnorm_beta = 0.2886751
 attn_window = [127, 128]
+
+[basecaller]
+chunksize = 12000
+overlap = 600
+batchsize = 128

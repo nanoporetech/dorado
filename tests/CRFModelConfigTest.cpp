@@ -1,6 +1,7 @@
 #include "basecall/CRFModelConfig.h"
 
 #include "TestUtils.h"
+#include "utils/parameters.h"
 
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()
@@ -15,6 +16,32 @@
 
 using namespace dorado::basecall;
 namespace fs = std::filesystem;
+
+TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
+    SECTION("test on defaults") {
+        const fs::path path =
+                fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
+        CRFModelConfig config = load_crf_model_config(path);
+        config.normalise_basecaller_params();
+        CHECK(config.has_normalised_basecaller_params());
+    }
+
+    SECTION("test known non-normalised") {
+        const fs::path path =
+                fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
+        CRFModelConfig config = load_crf_model_config(path);
+
+        // Set chunksize to (12 * 10) + 1 to ensure it's not mod12
+        config.basecaller.set_chunk_size(121);
+        CHECK_FALSE(config.has_normalised_basecaller_params());
+
+        config.normalise_basecaller_params();
+        CHECK(config.has_normalised_basecaller_params());
+        CHECK(config.basecaller.chunk_size() % config.stride_inner() == 0);
+        // Expected (121 / 12) * 12
+        CHECK(config.basecaller.chunk_size() == 120);
+    }
+}
 
 TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TAG) {
     const fs::path path =
@@ -33,6 +60,10 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
     CHECK(config.out_features.has_value());
     CHECK(config.out_features.value() == 4096);
     CHECK(config.sample_type == SampleType::DNA);
+
+    CHECK(config.stride_inner() == 12);
+    CHECK(config.scale_factor() == 2);
+    CHECK(config.stride_inner() == config.stride * config.scale_factor());
 
     CHECK(config.qbias == 0.0f);
     CHECK(config.qscale == 1.0f);
@@ -109,6 +140,14 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
 
     CHECK(config.tx->upsample.scale_factor == 2);
     CHECK(config.tx->upsample.d_model == 512);
+
+    CHECK(config.basecaller.chunk_size() == 12000);
+    CHECK(config.basecaller.overlap() == 600);
+    // Model config basecaller.batchsize is always ignored - expect default
+    CHECK(config.basecaller.batch_size() == dorado::utils::default_parameters.batchsize);
+
+    // We know that chunksize and overlap over stride inner are zero (12000 % 12 && 600 % 12)
+    CHECK(config.has_normalised_basecaller_params());
 }
 
 TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
@@ -127,6 +166,10 @@ TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     CHECK(config.clamp == false);
     CHECK(config.out_features.has_value() == false);
     CHECK(config.sample_type == SampleType::DNA);
+
+    CHECK(config.stride_inner() == 5);
+    CHECK(config.scale_factor() == 1);
+    CHECK(config.stride_inner() == config.stride * config.scale_factor());
 
     CHECK(config.qbias == -0.1721f);
     CHECK(config.qscale == 0.9356f);

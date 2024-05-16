@@ -20,6 +20,8 @@
 #include "utils/parameters.h"
 #include "utils/trim_rapid_adapter.h"
 
+#include <optional>
+
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
@@ -189,7 +191,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     auto model_config = dorado::basecall::load_crf_model_config(model_path);
 
     // Use a fixed batch size otherwise we slow down CI autobatchsizing.
-    std::size_t batch_size = 128;
+    int batch_size = 128;
 
     std::string device;
     if (gpu) {
@@ -212,10 +214,14 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         device = "cpu";
     }
 
+    // Pass the batchsize into the config
+    model_config.basecaller.set_batch_size(batch_size);
+    model_config.normalise_basecaller_params();
+
     // Create runners
-    auto [runners, num_devices] = dorado::api::create_basecall_runners(
-            model_config, device, default_params.num_runners, 1, batch_size,
-            default_params.chunksize, 1.f, dorado::api::PipelineType::simplex, 0.f);
+    auto [runners, num_devices] =
+            dorado::api::create_basecall_runners(model_config, device, default_params.num_runners,
+                                                 1, 1.f, dorado::api::PipelineType::simplex, 0.f);
     CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap, model_name,

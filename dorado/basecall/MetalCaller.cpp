@@ -40,11 +40,11 @@ struct MetalCaller::NNTask {
     uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
 };
 
-MetalCaller::MetalCaller(const CRFModelConfig &model_config,
-                         int chunk_size,
-                         int batch_size,
-                         float memory_limit_fraction)
+MetalCaller::MetalCaller(const CRFModelConfig &model_config, float memory_limit_fraction)
         : m_config(model_config) {
+    assert(model_config.has_normalised_basecaller_params());
+    const auto chunk_size = model_config.basecaller.chunk_size();
+
     ScopedAutoReleasePool autorelease_pool;
 
     // Our metal builds assume shared memory, so it's safe to check host.
@@ -77,10 +77,10 @@ MetalCaller::MetalCaller(const CRFModelConfig &model_config,
 
     auto state_dict = load_crf_model_weights(model_config);
 
-    auto selected_batch_size = (batch_size == 0)
-                                       ? benchmark_batch_sizes(model_config, state_dict, chunk_size,
-                                                               memory_limit_fraction)
-                                       : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
+    const auto batch_size = model_config.basecaller.batch_size();
+    auto selected_batch_size = (batch_size == 0) ? benchmark_batch_sizes(model_config, state_dict,
+                                                                         memory_limit_fraction)
+                                                 : utils::pad_to(batch_size, MTL_CORE_BATCH_SIZE);
     set_chunk_batch_size(model_config, state_dict, chunk_size, selected_batch_size);
 
     start_threads();
@@ -156,10 +156,10 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
                                        const std::vector<at::Tensor> &state_dict,
                                        int chunk_size,
                                        int batch_size) {
+    // Chunk size already normalised to inner stride
+    m_in_chunk_size = chunk_size;
     // Chunk size after decimation via convolution stride.
-    m_out_chunk_size = (chunk_size / model_config.stride_inner()) * model_config.scale_factor();
-    // round chunk size down to a multiple of the stride
-    m_in_chunk_size = m_out_chunk_size * model_config.stride;
+    m_out_chunk_size = chunk_size / model_config.stride;
 
     m_batch_size = batch_size;
 
@@ -234,7 +234,6 @@ void MetalCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
 
 int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
                                        const std::vector<at::Tensor> &state_dict,
-                                       int chunk_size,
                                        float memory_limit_fraction) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
     const size_t usable_memory = physical_memory * memory_limit_fraction;
@@ -246,8 +245,9 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
     // remaining memory.  This generally constrains the batch size to use fewer than
     // the maximum GPU cores when running sup models on systems with a large GPU core
     // to system memory ratio.
-    const auto out_chunk_size = static_cast<size_t>((chunk_size / model_config.stride_inner()) *
-                                                    model_config.scale_factor());
+    const auto chunk_size = model_config.basecaller.chunk_size();
+    const auto out_chunk_size = chunk_size / model_config.stride;
+
     const auto decode_buffer_size_per_elem =
             static_cast<size_t>(out_chunk_size) *
             (static_cast<size_t>(model_config.outsize) +        // Scores
@@ -283,8 +283,8 @@ int MetalCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
     // To speed up test runs, use a smaller chunk size.  This means we will not see
     // the true effect of memory thrashing, so we are relying on the memory limit
     // above to avoid that scenario.
-    const int benchmark_chunk_size = std::min(chunk_size - chunk_size % model_config.stride_inner(),
-                                              model_config.stride * 300);
+    const int benchmark_chunk_size =
+            std::min(chunk_size, model_config.stride_inner() * 300 / model_config.scale_factor());
 
     // Iterate through batch size candidates to find the most efficient one.
     int best_batch_size = -1;

@@ -282,9 +282,7 @@ ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
     return load_lstm_model(model_config, options);
 }
 
-size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
-                                  size_t batch_size,
-                                  float memory_fraction) {
+size_t auto_calculate_num_runners(const CRFModelConfig &model_config, float memory_fraction) {
     auto model_name = std::filesystem::canonical(model_config.model_path).filename().string();
 
     // very hand-wavy determination
@@ -300,8 +298,10 @@ size_t auto_calculate_num_runners(const CRFModelConfig &model_config,
         return 1;
     }
 
+    // Should have set batch_size to non-zero value if device == cpu
+    assert(model_config.basecaller.batch_size() > 0);
     // numbers were determined with a batch_size of 128, assume this just scales
-    required_ram_per_runner_GB *= batch_size / 128.f;
+    required_ram_per_runner_GB *= model_config.basecaller.batch_size() / 128.f;
 
     auto free_ram_GB = utils::available_host_memory_GB() * memory_fraction;
     auto num_runners = static_cast<size_t>(free_ram_GB / required_ram_per_runner_GB);

@@ -19,6 +19,8 @@
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
+
+#include <optional>
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
@@ -51,6 +53,19 @@ namespace fs = std::filesystem;
 namespace dorado {
 
 namespace {
+
+basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
+    // Argparser has no method returning optional<T> if the argument is unset but it has a default value
+    auto get_opt = [&arg](const std::string& name) {
+        return arg.is_used(name) ? std::optional<int>(arg.get<int>(name)) : std::nullopt;
+    };
+
+    basecall::BasecallerParams basecaller{};
+    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG, get_opt("--chunksize"),
+                      get_opt("--overlap"), get_opt("--batchsize"));
+    return basecaller;
+}
+
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
@@ -97,8 +112,10 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::vector<std::string>& mod_bases,
                          const std::string& mod_bases_models,
                          const std::string& reads,
+                         const basecall::BasecallerParams& basecaller_params,
                          const bool recursive_file_loading,
-                         const bool skip_model_compatibility_check) {
+                         const bool skip_model_compatibility_check,
+                         const std::string& device) {
     using namespace dorado::models;
 
     ModelFinder model_finder = get_model_finder(model_arg, reads, recursive_file_loading);
@@ -153,16 +170,38 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_finder.get_simplex_model_name();
-    const auto model_config = basecall::load_crf_model_config(model_path);
+    auto model_config = basecall::load_crf_model_config(model_path);
+    model_config.basecaller.update(basecaller_params);
+    model_config.normalise_basecaller_params();
+
+    if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
+        // Force the batch size to 128
+        model_config.basecaller.set_batch_size(128);
+    }
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    const auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
+    auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
+    stereo_model_config.basecaller.update(basecaller_params);
+    stereo_model_config.normalise_basecaller_params();
+
+#if DORADO_METAL_BUILD
+    if (device == "metal" && stereo_model_config.is_lstm_model()) {
+        // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
+        // EXCEPT for on metal
+        // For now, the minimal batch size is used for the duplex model.
+        stereo_model_config.basecaller.set_batch_size(48);
+    }
+#endif
+    if (device == "cpu" && stereo_model_config.basecaller.batch_size() == 0) {
+        stereo_model_config.basecaller.set_batch_size(128);
+    }
 
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,
                         stereo_model_config, stereo_model_name,
                         mods_model_paths,    model_finder.downloaded_models()};
 }
+
 }  // namespace
 
 using dorado::utils::default_parameters;
@@ -455,12 +494,13 @@ int duplex(int argc, char* argv[]) {
                 throw std::runtime_error(err);
             }
 
+            const auto basecaller_params = get_basecaller_params(parser.visible);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const DuplexModels models =
-                    load_models(model, mod_bases, mod_bases_models, reads, recursive_file_loading,
-                                skip_model_compatibility_check);
+                    load_models(model, mod_bases, mod_bases_models, reads, basecaller_params,
+                                recursive_file_loading, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 
@@ -482,24 +522,14 @@ int duplex(int argc, char* argv[]) {
                                                            recursive_file_loading));
             utils::add_rg_headers(hdr.get(), read_groups);
 
-            int batch_size(parser.visible.get<int>("-b"));
-            int chunk_size(parser.visible.get<int>("-c"));
-            int overlap(parser.visible.get<int>("-o"));
             const size_t num_runners = default_parameters.num_runners;
 
-            int stereo_batch_size = 0;
-#if DORADO_METAL_BUILD
-            if (device == "metal") {
-                // For now, the minimal batch size is used for the duplex model.
-                stereo_batch_size = 48;
-            }
-#endif
             // Note: The memory assignment between simplex and duplex callers have been
             // performed based on empirical results considering a SUP model for simplex
             // calling.
-            auto [runners, num_devices] = api::create_basecall_runners(
-                    models.model_config, device, num_runners, 0, batch_size, chunk_size, 0.9f,
-                    api::PipelineType::duplex, 0.f);
+            auto [runners, num_devices] =
+                    api::create_basecall_runners(models.model_config, device, num_runners, 0, 0.9f,
+                                                 api::PipelineType::duplex, 0.f);
 
             std::vector<basecall::RunnerPtr> stereo_runners;
             // The fraction argument for GPU memory allocates the fraction of the
@@ -511,9 +541,9 @@ int duplex(int argc, char* argv[]) {
             // memory footprint for both model and decode function. This will increase the
             // chances for the stereo model to use the cached allocations from the simplex
             // model.
-            std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
-                    models.stereo_model_config, device, num_runners, 0, stereo_batch_size,
-                    chunk_size, 0.5f, api::PipelineType::duplex, 0.f);
+            std::tie(stereo_runners, std::ignore) =
+                    api::create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
+                                                 0.5f, api::PipelineType::duplex, 0.f);
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 
@@ -529,9 +559,8 @@ int duplex(int argc, char* argv[]) {
 
             api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
-                    std::move(mod_base_runners), overlap, mean_qscore_start_pos,
-                    int(num_devices * 2), int(num_devices),
-                    int(default_parameters.remora_threads * num_devices),
+                    std::move(mod_base_runners), mean_qscore_start_pos, int(num_devices * 2),
+                    int(num_devices), int(default_parameters.remora_threads * num_devices),
                     std::move(pairing_parameters), read_filter_node,
                     PipelineDescriptor::InvalidNodeHandle);
 

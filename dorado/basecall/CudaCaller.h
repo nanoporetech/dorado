@@ -23,8 +23,6 @@ namespace dorado::basecall {
 class CudaCaller {
 public:
     CudaCaller(const CRFModelConfig &model_config,
-               int chunk_size,
-               int batch_size,
                const std::string &device,
                float memory_limit_fraction,
                PipelineType pipeline_type,
