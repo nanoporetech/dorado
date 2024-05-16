@@ -981,7 +981,14 @@ std::string get_supported_model_info() {
                 if (!stereo_matches.empty()) {
                     result += "        stereo_models:\n";
                     for (const auto& stereo_model : stereo_matches) {
-                        result += "          - " + stereo_model.name + "\n";
+                        result += "          - " + stereo_model.name + ":\n";
+                        // If there is a newer model for this condition, add the outdated flag.
+                        const auto duplex_type_matches =
+                                find_models(stereo_models(), variant.first, simplex_model.simplex,
+                                            {stereo_model.mods.variant, ModelVersion::NONE});
+                        if (duplex_type_matches.back().name != stereo_model.name) {
+                            result += "              outdated: true\n";
+                        }
                     }
                 }
             }
