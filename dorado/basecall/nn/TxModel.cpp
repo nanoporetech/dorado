@@ -239,6 +239,27 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const int64_t T = x.size(1);
     const int64_t C = x.size(2);
 
+#if DORADO_CUDA_BUILD
+    bool use_koi_rote = utils::get_dev_opt<bool>("use_koi_rote", true) && d_model <= 512;
+    if (use_koi_rote) {
+        if (!wqkv_transposed) {
+            auto w = wqkv->weight;
+            wqkv->weight.view({3, -1, head_dim / 2, 2, d_model}).slice(0, 0, 2) =
+                    wqkv->weight.view({3, -1, 2, head_dim / 2, d_model})
+                            .slice(0, 0, 2)
+                            .transpose(2, 3)
+                            .clone();
+            if (wqkv->bias.numel()) {
+                wqkv->bias.view({3, -1, head_dim / 2, 2}).slice(0, 0, 2) =
+                        wqkv->bias.view({3, -1, 2, head_dim / 2})
+                                .slice(0, 0, 2)
+                                .transpose(2, 3)
+                                .clone();
+            }
+            wqkv_transposed = true;
+        }
+    }
+#endif
     at::Tensor qkv;
     at::Tensor attn_output_ntc;
     {
@@ -249,23 +270,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     {
         utils::ScopedProfileRange spr("ROTE", 3);
 #if DORADO_CUDA_BUILD
-        if (utils::get_dev_opt<bool>("use_koi_rote", true) && d_model <= 512) {
-            if (!wqkv_transposed) {
-                auto w = wqkv->weight;
-                wqkv->weight.view({3, -1, head_dim / 2, 2, d_model}).slice(0, 0, 2) =
-                        wqkv->weight.view({3, -1, 2, head_dim / 2, d_model})
-                                .slice(0, 0, 2)
-                                .transpose(2, 3)
-                                .clone();
-                if (wqkv->bias.numel()) {
-                    wqkv->bias.view({3, -1, head_dim / 2, 2}).slice(0, 0, 2) =
-                            wqkv->bias.view({3, -1, 2, head_dim / 2})
-                                    .slice(0, 0, 2)
-                                    .transpose(2, 3)
-                                    .clone();
-                }
-                wqkv_transposed = true;
-            }
+        if (use_koi_rote) {
             auto stream = at::cuda::getCurrentCUDAStream().stream();
             auto out = torch::empty({3, N, nhead, T, head_dim}, qkv.options());
             int res = host_rotary_embed_transpose_f16(stream, N, T, nhead, head_dim,
@@ -274,6 +279,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
             if (res != KOI_SUCCESS) {
                 throw std::runtime_error("Koi windowed attention failed.");
             }
+            qkv = out;
         } else
 #endif
         {
