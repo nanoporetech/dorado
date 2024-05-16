@@ -581,6 +581,62 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     return results;
 }
 
+float BarcodeClassifier::find_midstrand_barcode_different_double_ends(
+        std::string_view read_seq,
+        const BarcodeCandidateKit& candidate) const {
+    auto length_of_end_windows =
+            m_scoring_params.front_barcode_window + m_scoring_params.rear_barcode_window;
+    if ((int)read_seq.length() < length_of_end_windows) {
+        return 0.f;
+    }
+
+    std::string_view top_context_v1 = candidate.top_context;
+    std::string_view bottom_context_v1 = candidate.bottom_context_rev;
+
+    std::string_view top_context_v2 = candidate.bottom_context;
+    std::string_view bottom_context_v2 = candidate.top_context_rev;
+
+    auto length_without_end_windows = read_seq.length() - length_of_end_windows;
+
+    if (length_without_end_windows <
+        std::min({top_context_v1.length(), bottom_context_v1.length(), top_context_v2.length(),
+                  bottom_context_v2.length()})) {
+        return 0.f;
+    }
+
+    auto read_mid =
+            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+
+    // Try to find the location of the barcode + flanks in the top and bottom windows.
+    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+
+    int barcode_len = int(candidate.barcodes1[0].length());
+
+    // Fetch barcode mask locations for variant 1
+    auto [top_result_v1, top_flank_score_v1, top_bc_loc_v1] = extract_flank_fit(
+            top_context_v1, read_mid, barcode_len, placement_config, "midstrand flank top v1");
+
+    auto [bottom_result_v1, bottom_flank_score_v1, bottom_bc_loc_v1] =
+            extract_flank_fit(bottom_context_v1, read_mid, barcode_len, placement_config,
+                              "midstrand flank bottom v1");
+
+    // Fetch barcode mask locations for variant 2
+    auto [top_result_v2, top_flank_score_v2, top_bc_loc_v2] = extract_flank_fit(
+            top_context_v2, read_mid, barcode_len, placement_config, "midstrand flank top v2");
+
+    auto [bottom_result_v2, bottom_flank_score_v2, bottom_bc_loc_v2] =
+            extract_flank_fit(bottom_context_v2, read_mid, barcode_len, placement_config,
+                              "midstrand flank bottom v2");
+
+    edlibFreeAlignResult(top_result_v1);
+    edlibFreeAlignResult(bottom_result_v1);
+    edlibFreeAlignResult(top_result_v2);
+    edlibFreeAlignResult(bottom_result_v2);
+    // Find the best variant of the two.
+    return std::max(
+            {top_flank_score_v1, bottom_flank_score_v1, top_flank_score_v2, bottom_flank_score_v2});
+}
+
 // Calculate barcode score for the following barcoding scenario:
 // 5' >-=====--------------=====-> 3'
 //      BCXXX            RC(BCXXX)
@@ -675,6 +731,44 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
     return results;
 }
 
+float BarcodeClassifier::find_midstrand_barcode_double_ends(
+        std::string_view read_seq,
+        const BarcodeCandidateKit& candidate) const {
+    auto length_of_end_windows =
+            m_scoring_params.front_barcode_window + m_scoring_params.rear_barcode_window;
+    if ((int)read_seq.length() < length_of_end_windows) {
+        return 0.f;
+    }
+
+    std::string_view top_context = candidate.top_context;
+    std::string_view bottom_context = candidate.top_context_rev;
+
+    auto length_without_end_windows = read_seq.length() - length_of_end_windows;
+
+    if (length_without_end_windows < std::min({top_context.length(), bottom_context.length()})) {
+        return 0.f;
+    }
+
+    auto read_mid =
+            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+
+    // Try to find the location of the barcode + flanks in the top and bottom windows.
+    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+
+    int barcode_len = int(candidate.barcodes1[0].length());
+
+    auto [top_result, top_flank_score, top_bc_loc] = extract_flank_fit(
+            top_context, read_mid, barcode_len, placement_config, "midstrand flank top");
+
+    auto [bottom_result, bottom_flank_score, bottom_bc_loc] = extract_flank_fit(
+            bottom_context, read_mid, barcode_len, placement_config, "midstrand flank bottom");
+
+    edlibFreeAlignResult(top_result);
+    edlibFreeAlignResult(bottom_result);
+    // Find the best variant of the two.
+    return std::max({top_flank_score, bottom_flank_score});
+}
+
 // Calculate barcode score for the following barcoding scenario:
 // 5' >-=====---------------> 3'
 //      BCXXX
@@ -742,6 +836,38 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
     return results;
 }
 
+float BarcodeClassifier::find_midstrand_barcode_single_end(
+        std::string_view read_seq,
+        const BarcodeCandidateKit& candidate) const {
+    auto length_of_end_windows = m_scoring_params.front_barcode_window;
+    if ((int)read_seq.length() < length_of_end_windows) {
+        return 0.f;
+    }
+
+    std::string_view top_context = candidate.top_context;
+
+    auto length_without_end_windows = read_seq.length() - length_of_end_windows;
+
+    if (length_without_end_windows < top_context.length()) {
+        return 0.f;
+    }
+
+    auto read_mid =
+            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+
+    // Try to find the location of the barcode + flanks in the top and bottom windows.
+    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+
+    int barcode_len = int(candidate.barcodes1[0].length());
+
+    auto [top_result, top_flank_score, top_bc_loc] = extract_flank_fit(
+            top_context, read_mid, barcode_len, placement_config, "midstrand flank top");
+
+    edlibFreeAlignResult(top_result);
+    // Find the best variant of the two.
+    return top_flank_score;
+}
+
 // Score every barcode against the input read and returns the best match,
 // or an unclassified match, based on certain heuristics.
 BarcodeScoreResult BarcodeClassifier::find_best_barcode(
@@ -764,9 +890,31 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
+    const auto& kit = get_kit_info(candidate->kit);
+
+    // Detect presence of mid-strand barcode. If one is confident found, then
+    // treat that read as unclassified since it's most likely an unsplit read.
+    float midstrand_score = -1.f;
+    if (kit.double_ends) {
+        if (kit.ends_different) {
+            midstrand_score = find_midstrand_barcode_different_double_ends(fwd, *candidate);
+        } else {
+            midstrand_score = find_midstrand_barcode_double_ends(fwd, *candidate);
+        }
+    } else {
+        midstrand_score = find_midstrand_barcode_single_end(fwd, *candidate);
+    }
+    const auto midstrand_thres = m_scoring_params.midstrand_flank_score;
+    if (midstrand_score >= midstrand_thres) {
+        spdlog::trace("Found midstrand barcode flanks with score {}, threshold {}", midstrand_score,
+                      midstrand_thres);
+        auto midstrand_res = UNCLASSIFIED;
+        midstrand_res.found_midstrand = true;
+        return midstrand_res;
+    }
+
     // Then find the best barcode hit within that kit.
     std::vector<BarcodeScoreResult> results;
-    const auto& kit = get_kit_info(candidate->kit);
     if (kit.double_ends) {
         if (kit.ends_different) {
             auto out = calculate_barcode_score_different_double_ends(fwd, *candidate,

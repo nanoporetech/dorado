@@ -155,6 +155,9 @@ dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
     if (config.contains("min_flank_score")) {
         params.min_flank_score = toml::find<float>(config, "min_flank_score");
     }
+    if (config.contains("midstrand_flank_score")) {
+        params.midstrand_flank_score = toml::find<float>(config, "midstrand_flank_score");
+    }
 
     return params;
 }
