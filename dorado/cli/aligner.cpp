@@ -141,12 +141,11 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    alignment::minimap2::add_minimap2_opts_arg(parser);
-    alignment::minimap2::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
+    alignment::minimap2::add_mm2_opts_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
-    auto mm2_option_string = alignment::minimap2::extract_minimap2_args({argv, argv + argc},
-                                                                        args_excluding_mm2_opts);
+    auto mm2_option_string =
+            alignment::minimap2::extract_mm2_opts_arg({argv, argv + argc}, args_excluding_mm2_opts);
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
@@ -183,13 +182,7 @@ int aligner(int argc, char* argv[]) {
 
     auto max_reads(parser.visible.get<int>("max-reads"));
 
-    if (mm2_option_string.empty()) {
-        align_info->minimap_options = alignment::minimap2::process_minimap2_arguments(parser);
-    } else {
-        align_info->minimap_options =
-                alignment::minimap2::process_minimap2_option_string(mm2_option_string);
-    }
-
+    align_info->minimap_options = alignment::minimap2::process_option_string(mm2_option_string);
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
     if (!processing_items.initialise()) {

@@ -278,12 +278,17 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    alignment::minimap2::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
+
+    alignment::minimap2::add_mm2_opts_arg(parser);
+
+    std::vector<std::string> args_excluding_mm2_opts{};
+    auto mm2_option_string =
+            alignment::minimap2::extract_mm2_opts_arg({argv, argv + argc}, args_excluding_mm2_opts);
 
     std::set<fs::path> temp_model_paths;
     try {
-        utils::arg_parse::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
         auto device(parser.visible.get<std::string>("-x"));
         auto model(parser.visible.get<std::string>("model"));
@@ -380,7 +385,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = alignment::minimap2::process_minimap2_arguments(parser);
+            auto options = alignment::minimap2::process_option_string(mm2_option_string);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
