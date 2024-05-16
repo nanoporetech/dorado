@@ -173,7 +173,7 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     const float theta = 10000.0f;
-    const int64_t max_seq_len = 2000;
+    const int64_t max_seq_len = 2048;
     rotary_emb =
             register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
