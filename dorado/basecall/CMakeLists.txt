@@ -1,4 +1,6 @@
 add_library(dorado_basecall STATIC
+    BasecallerParams.cpp
+    BasecallerParams.h
     crf_utils.cpp
     crf_utils.h
     CRFModelConfig.cpp

@@ -35,8 +35,6 @@ struct CudaCaller::NNTask {
 };
 
 CudaCaller::CudaCaller(const CRFModelConfig &model_config,
-                       int chunk_size,
-                       int batch_size,
                        const std::string &device,
                        float memory_limit_fraction,
                        PipelineType pipeline_type,
@@ -49,6 +47,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
           m_pipeline_type(pipeline_type),
           m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
+    assert(model_config.has_normalised_basecaller_params());
 
     m_decoder_options.q_shift = model_config.qbias;
     m_decoder_options.q_scale = model_config.qscale;
@@ -57,6 +56,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     at::InferenceMode guard;
     m_module = load_crf_model(model_config, m_options);
 
+    const auto chunk_size = model_config.basecaller.chunk_size();
+    const auto batch_size = model_config.basecaller.batch_size();
     determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());

@@ -185,9 +185,9 @@ std::string SignalNormalisationParams::to_string() const {
     std::string str = "SignalNormalisationParams {";
     str += " strategy:" + dorado::basecall::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
-        str += quantile.to_string();
+        str += " " + quantile.to_string();
     } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
-        str += standarisation.to_string();
+        str += " " + standarisation.to_string();
     }
     str += "}";
     return str;
@@ -219,25 +219,26 @@ std::string CRFModelConfig::to_string() const {
     str += " num_features:" + std::to_string(num_features);
     str += " sample_rate:" + std::to_string(sample_rate);
     str += " mean_qscore_start_pos:" + std::to_string(mean_qscore_start_pos);
-    str += " signal_norm_params:" + signal_norm_params.to_string();
+    str += " " + signal_norm_params.to_string();
+    str += " " + basecaller.to_string();
     str += " convs: {";
     for (size_t c = 0; c < convs.size(); c++) {
         str += " " + std::to_string(c) + ": " + convs[c].to_string();
     }
-    str += "}";
+    str += "}";  // convs
     if (is_lstm_model()) {
-        str += " model_type: lstm";
+        str += " model_type: lstm {";
         str += " bias:" + std::to_string(bias);
         str += " outsize:" + std::to_string(outsize);
         str += " blank_score:" + std::to_string(blank_score);
         str += " scale:" + std::to_string(scale);
     }
     if (is_tx_model()) {
-        str += " model_type: tx";
+        str += " model_type: tx {";
         str += " crf_encoder: " + tx->crf.to_string();
         str += " transformer: " + tx->tx.to_string();
     }
-
+    str += "}}";  // model_type & CRFModelConfig
     return str;
 };
 
@@ -246,6 +247,7 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
 
     CRFModelConfig config;
     config.model_path = path;
+    config.basecaller.update(path);
 
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
@@ -500,6 +502,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     CRFModelConfig config;
 
     config.model_path = path;
+    config.basecaller.update(path);
 
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
     const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
@@ -566,6 +569,22 @@ void Params::check() const {
 }
 
 }  // namespace tx
+
+bool CRFModelConfig::has_normalised_basecaller_params() const {
+    bool is_normalised = true;
+    const auto si = stride_inner();
+    const auto cs = basecaller.chunk_size();
+    if (cs % si != 0) {
+        spdlog::error("Expected normalised chunksize - got: {} - for model stride: {}", cs, si);
+        is_normalised = false;
+    }
+    const auto ov = basecaller.overlap();
+    if (ov % si != 0) {
+        spdlog::error("Expected normalised overlap - got: {} - for model stride: {}", ov, si);
+        is_normalised = false;
+    }
+    return is_normalised;
+}
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);

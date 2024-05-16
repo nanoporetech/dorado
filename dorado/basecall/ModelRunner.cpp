@@ -6,22 +6,24 @@
 
 namespace dorado::basecall {
 
-ModelRunner::ModelRunner(const CRFModelConfig &model_config,
-                         const std::string &device,
-                         int chunk_size,
-                         int batch_size)
+ModelRunner::ModelRunner(const CRFModelConfig &model_config, const std::string &device)
         : m_config(model_config),
           m_decoder(decode::create_decoder(device, model_config)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
           m_module(load_crf_model(model_config, m_options)) {
+    assert(model_config.has_normalised_basecaller_params());
+
     m_decoder_options.q_shift = model_config.qbias;
     m_decoder_options.q_scale = model_config.qscale;
 
-    // adjust chunk size to be a multiple of the stride
-    chunk_size -= chunk_size % model_config.stride_inner();
+    // Should have set batch_size to non-zero value if device == cpu
+    assert(model_config.basecaller.batch_size() > 0);
+    const auto N = model_config.basecaller.batch_size();
+    ;
+    const auto C = model_config.num_features;
+    const auto T = model_config.basecaller.chunk_size();
 
-    m_input = at::zeros({batch_size, model_config.num_features, chunk_size},
-                        at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));
+    m_input = at::zeros({N, C, T}, at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));
 }
 
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {

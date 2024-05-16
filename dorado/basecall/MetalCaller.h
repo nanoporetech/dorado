@@ -18,10 +18,7 @@ namespace dorado::basecall {
 
 class MetalCaller {
 public:
-    MetalCaller(const CRFModelConfig &model_config,
-                int chunk_size,
-                int batch_size,
-                float memory_limit_fraction);
+    MetalCaller(const CRFModelConfig &model_config, float memory_limit_fraction);
     ~MetalCaller();
 
     void call_chunks(at::Tensor &input,
@@ -43,7 +40,6 @@ private:
                               int batch_size);
     int benchmark_batch_sizes(const CRFModelConfig &model_config,
                               const std::vector<at::Tensor> &state_dict,
-                              int chunk_size,
                               float memory_limit_fraction);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
 

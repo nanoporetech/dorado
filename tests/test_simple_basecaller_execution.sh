@@ -49,7 +49,7 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $outpu
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
 if ! uname -r | grep -q tegra; then
-    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
+    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
     dorado_check_bam_not_empty
 fi
 
