@@ -22,8 +22,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
     set(KOI_VERSION 0.4.6)
     if(BUILD_KOI_FROM_SOURCE)
-        message(STATUS "Building Koi from source")
-        set(KOI_DIR "${DORADO_3RD_PARTY_DOWNLOAD}/koi")
+        set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
+        if(NOT EXISTS ${KOI_DIR})
+            set(KOI_DIR "${DORADO_3RD_PARTY_DOWNLOAD}/koi")
+        endif()
+        message(STATUS "Building Koi from source: ${KOI_DIR}")
 
         if(NOT EXISTS ${KOI_DIR})
             if(DEFINED GITLAB_CI_TOKEN)
