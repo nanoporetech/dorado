@@ -273,9 +273,9 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         if (use_koi_rote) {
             auto stream = at::cuda::getCurrentCUDAStream().stream();
             auto out = torch::empty({3, N, nhead, T, head_dim}, qkv.options());
-            int res = host_rotary_embed_transpose_f16(stream, N, T, nhead, head_dim,
-                                                      rotary_emb->theta, qkv.data_ptr(),
-                                                      out.data_ptr());
+            int res = host_rotary_embed_transpose_f16(
+                    stream, static_cast<int>(N), static_cast<int>(T), nhead, head_dim,
+                    rotary_emb->theta, qkv.data_ptr(), out.data_ptr());
             if (res != KOI_SUCCESS) {
                 throw std::runtime_error("Koi windowed attention failed.");
             }
