@@ -148,6 +148,7 @@ add_library(dorado_lib
     dorado/alignment/BedFile.h
     dorado/alignment/IndexFileAccess.cpp
     dorado/alignment/IndexFileAccess.h
+    dorado/alignment/minimap2_arg_parsing.h
     dorado/alignment/Minimap2Aligner.cpp
     dorado/alignment/Minimap2Aligner.h
     dorado/alignment/Minimap2Index.cpp

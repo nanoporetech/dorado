@@ -1,6 +1,7 @@
 #include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
+#include "alignment/minimap2_arg_parsing.h"
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
@@ -88,7 +89,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 namespace dorado {
 
 int aligner(int argc, char* argv[]) {
-    cli::ArgParser parser("dorado aligner");
+    utils::arg_parse::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the lr:hq preset.\n"
@@ -140,7 +141,7 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
+    alignment::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
 
     try {
         utils::arg_parse::parse(parser, argc, argv);
@@ -177,8 +178,7 @@ int aligner(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
-    align_info->minimap_options =
-            cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
+    align_info->minimap_options = alignment::process_minimap2_arguments(parser);
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};

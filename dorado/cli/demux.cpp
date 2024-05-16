@@ -52,7 +52,7 @@ void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
 }
 
 std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
-        dorado::cli::ArgParser& parser,
+        dorado::utils::arg_parse::ArgParser& parser,
         const dorado::utils::SampleSheet* sample_sheet) {
     auto result = std::make_shared<dorado::demux::BarcodingInfo>();
     result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
@@ -75,7 +75,7 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
 namespace dorado {
 
 int demuxer(int argc, char* argv[]) {
-    cli::ArgParser parser("dorado demux");
+    utils::arg_parse::ArgParser parser("dorado demux");
     parser.visible.add_description(
             "Barcode demultiplexing tool. Users need to specify the kit name(s).");
     parser.visible.add_argument("reads")

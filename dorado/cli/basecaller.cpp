@@ -1,3 +1,4 @@
+#include "alignment/minimap2_arg_parsing.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
@@ -361,7 +362,7 @@ int basecaller(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    cli::ArgParser parser("dorado");
+    utils::arg_parse::ArgParser parser("dorado");
 
     parser.visible.add_argument("model").help(
             "model selection {fast,hac,sup}@v{version} for automatic model selection including "
@@ -500,7 +501,7 @@ int basecaller(int argc, char* argv[]) {
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
+    alignment::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
@@ -670,7 +671,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
               parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive,
-              cli::process_minimap2_arguments<alignment::Minimap2Options>(parser),
+              alignment::process_minimap2_arguments(parser),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

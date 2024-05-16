@@ -1,3 +1,4 @@
+#include "alignment/minimap2_arg_parsing.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
@@ -193,7 +194,7 @@ int duplex(int argc, char* argv[]) {
     //utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    cli::ArgParser parser("dorado");
+    utils::arg_parse::ArgParser parser("dorado");
     parser.visible.add_argument("model").help(
             "model selection {fast,hac,sup}@v{version} for automatic model selection including "
             "modbases, or path to existing model directory");
@@ -277,7 +278,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
+    alignment::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
 
     std::set<fs::path> temp_model_paths;
@@ -379,7 +380,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
+            auto options = alignment::process_minimap2_arguments(parser);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
