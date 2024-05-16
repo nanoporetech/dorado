@@ -23,7 +23,7 @@ namespace dorado::correction {
 // The logic of this code has been borrowed from the original
 // Rust code from the Herro code base -
 // https://github.com/lbcb-sci/herro/blob/main/src/windowing.rs#L41
-void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
+bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                      const CorrectionAlignments& alignments,
                      int window_size) {
     int num_alignments = (int)alignments.overlaps.size();
@@ -36,7 +36,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         LOG_TRACE("window for {}", alignments.qnames[aln_idx]);
 
         // Following the is_target == False logic form the rust code.
-        if (overlap.tend - overlap.tstart < window_size) {
+        if ((overlap.tend - overlap.tstart < window_size) ||
+            (overlap.qend - overlap.qstart < window_size)) {
             continue;
         }
 
@@ -67,8 +68,7 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                     alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,
                     last_window, windows.size(), overlap.tlen, overlap.tstart, overlap.tend,
                     alignments.qnames[aln_idx], overlap.qlen, overlap.qstart, overlap.qend);
-            windows.clear();
-            break;
+            return false;
         }
 
         int tstart = overlap.tstart;
@@ -244,6 +244,8 @@ void extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                     cigar.size());
         }
     }
+
+    return true;
 }
 
 }  // namespace dorado::correction

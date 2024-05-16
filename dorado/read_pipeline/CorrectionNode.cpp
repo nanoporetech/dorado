@@ -63,11 +63,16 @@ std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar
     return cigar_ops;
 }
 
-void populate_alignments(dorado::CorrectionAlignments& alignments,
+bool populate_alignments(dorado::CorrectionAlignments& alignments,
                          dorado::hts_io::FastxRandomReader* reader) {
     const auto& tname = alignments.read_name;
     alignments.read_seq = reader->fetch_seq(tname);
     alignments.read_qual = reader->fetch_qual(tname);
+    if (alignments.read_seq.length() != alignments.read_qual.size()) {
+        spdlog::error("Read len and read qual not same length! {} readlen {} qual {}", tname,
+                      alignments.read_seq.length(), alignments.read_qual.size());
+        throw std::runtime_error("");
+    }
     int tlen = (int)alignments.read_seq.length();
     auto num_qnames = alignments.qnames.size();
     alignments.seqs.resize(num_qnames);
@@ -80,14 +85,24 @@ void populate_alignments(dorado::CorrectionAlignments& alignments,
     for (size_t i = 0; i < num_qnames; i++) {
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = reader->fetch_seq(qname);
+        if ((int)alignments.seqs[i].length() != alignments.overlaps[i].qlen) {
+            spdlog::error("qlen from before {} and qlen from after {} don't match for {}",
+                          alignments.overlaps[i].qlen, alignments.seqs[i].length(), qname);
+            return false;
+        }
         alignments.quals[i] = reader->fetch_qual(qname);
+        if (alignments.overlaps[i].tlen != tlen) {
+            spdlog::error("tlen from before {} and tlen from after {} don't match for {}",
+                          alignments.overlaps[i].tlen, tlen, tname);
+            return false;
+        }
         alignments.overlaps[i].tlen = tlen;
         alignments.cigars[i] = parse_cigar(alignments.mm2_cigars[i].data(),
                                            (uint32_t)alignments.mm2_cigars[i].size());
         alignments.mm2_cigars[i] = {};
     }
 
-    alignments.remove_inconsistent_overlaps();
+    return alignments.check_inconsistent_overlaps();
 }
 
 std::vector<std::string> concatenate_corrected_windows(const std::vector<std::string>& cons) {
@@ -141,7 +156,7 @@ void CorrectionNode::decode_fn() {
         std::vector<std::string> to_decode;
         auto pos = item.window_idx;
         auto corrected_seq = decode_window(item);
-        item.clear();
+        //item.clear();
         {
             std::lock_guard<std::mutex> lock(m_features_mutex);
             auto find_iter = m_features_by_id.find(read_name);
@@ -328,18 +343,22 @@ void CorrectionNode::input_thread_fn() {
             if (alignments.qnames.size() > 400) {
                 spdlog::debug("Skipping {}: {} alignments", tname, alignments.qnames.size());
             }
-            populate_alignments(alignments, fastx_reader.get());
+            if (!populate_alignments(alignments, fastx_reader.get())) {
+                continue;
+            }
 
             size_t n_windows = (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
             LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
             // Get the windows
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
-            extract_windows(windows, alignments, m_window_size);
+            if (!extract_windows(windows, alignments, m_window_size)) {
+                continue;
+            }
             // Get the features
             auto wfs = extract_features(windows, alignments, m_window_size);
 
-            alignments.clear();
+            //alignments.clear();
             std::vector<std::string> corrected_seqs;
             corrected_seqs.resize(wfs.size());
 
@@ -351,7 +370,7 @@ void CorrectionNode::input_thread_fn() {
                     features_to_infer.push_back(std::move(wfs[w]));
                 } else {
                     corrected_seqs[w] = decode_window(wfs[w]);
-                    wfs[w].clear();
+                    //wfs[w].clear();
                 }
             }
             if (features_to_infer.empty()) {

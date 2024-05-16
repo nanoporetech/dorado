@@ -40,7 +40,12 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         // mapping region
         auto aln = &reg[j];
 
-        const std::string tname(m_index->index()->seq[aln->rid].name);
+        if (aln->p == 0) {
+            continue;
+        }
+
+        const auto& ref = m_index->index()->seq[aln->rid];
+        const std::string tname(ref.name);
 
         // Skip self alignment.
         if (qname == tname) {
@@ -50,46 +55,75 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         std::unique_lock<std::mutex> lock(m_correction_mtx);
         if (m_read_mutex.find(tname) == m_read_mutex.end()) {
             m_read_mutex.emplace(tname, std::make_unique<std::mutex>());
-            m_correction_records.emplace(tname, CorrectionAlignments{});
+            CorrectionAlignments new_aln;
+            m_correction_records.emplace(tname, std::move(new_aln));
+            m_processed_queries_per_target.emplace(tname, std::unordered_set<std::string>());
         }
         auto& mtx = *m_read_mutex[tname];
         lock.unlock();
 
+        {
+            std::lock_guard<std::mutex> aln_lock(mtx);
+            auto& processed_queries = m_processed_queries_per_target[tname];
+            if (processed_queries.find(qname) != processed_queries.end()) {
+                // Query/target pair has been processed before. Assume that
+                // the first one processed is the best one, and ignore
+                // the rest.
+                continue;
+            } else {
+                processed_queries.insert(qname);
+            }
+        }
+
         Overlap ovlp;
         ovlp.qstart = aln->qs;
         ovlp.qend = aln->qe;
+        ovlp.qlen = (int)qread.length();
         ovlp.fwd = !aln->rev;
         ovlp.tstart = aln->rs;
         ovlp.tend = aln->re;
-        ovlp.qlen = (int)qread.length();
+        ovlp.tlen = ref.len;
 
-        if (ovlp.qlen < ovlp.qend) {
-            spdlog::warn("Inconsistent alignment detected: qlen {} qstart {} qend {}", ovlp.qlen,
-                         ovlp.qstart, ovlp.qend);
+        if (ovlp.qlen < ovlp.qstart || ovlp.qlen < ovlp.qend) {
+            spdlog::warn(
+                    "Inconsistent query alignment detected: tname {} tlen {} tstart {} tend {} "
+                    "qname {} qlen {} qstart {} qend {}",
+                    tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
+                    ovlp.qend);
             continue;
         }
 
-        uint32_t n_cigar = aln->p ? aln->p->n_cigar : 0;
+        if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
+            spdlog::warn(
+                    "Inconsistent target alignment detected: tname {} tlen {} tstart {} tend {} "
+                    "qname {} qlen {} qstart {} qend {}",
+                    tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
+                    ovlp.qend);
+            continue;
+        }
+
+        uint32_t n_cigar = aln->p->n_cigar;
         auto cigar = copy_mm2_cigar(aln->p->cigar, n_cigar);
 
-        std::lock_guard<std::mutex> aln_lock(mtx);
-        auto& alignments = m_correction_records[tname];
+        {
+            std::lock_guard<std::mutex> aln_lock(mtx);
 
-        // Cap total overlaps per read.
-        if (alignments.qnames.size() > MAX_OVERLAPS_PER_READ) {
-            continue;
+            auto& alignments = m_correction_records[tname];
+
+            // Cap total overlaps per read.
+            if (alignments.qnames.size() >= MAX_OVERLAPS_PER_READ) {
+                continue;
+            }
+
+            if (alignments.read_name.empty()) {
+                alignments.read_name = tname;
+            }
+
+            alignments.qnames.push_back(qname);
+
+            alignments.mm2_cigars.push_back(std::move(cigar));
+            alignments.overlaps.push_back(std::move(ovlp));
         }
-
-        if (alignments.read_name.empty()) {
-            alignments.read_name = tname;
-        }
-
-        ovlp.qid = (int)alignments.qnames.size();
-
-        alignments.qnames.push_back(qname);
-
-        alignments.mm2_cigars.push_back(std::move(cigar));
-        alignments.overlaps.push_back(std::move(ovlp));
     }
 }
 
@@ -194,6 +228,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
 
         m_correction_records.clear();
         m_read_mutex.clear();
+        m_processed_queries_per_target.clear();
         // 4. Load next index and loop
         index++;
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);

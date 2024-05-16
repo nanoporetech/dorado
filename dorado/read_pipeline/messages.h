@@ -223,12 +223,9 @@ public:
 };
 
 struct Overlap {
-    // This tracks the read against which query was aligned.
-    int qid;
     int qstart;
     int qend;
     int qlen;
-    // This is the query itself.
     int tstart;
     int tend;
     int tlen;
@@ -252,14 +249,18 @@ struct CorrectionAlignments {
     // tlen of the read. This is unexpected and happens
     // intermittently.
     // TODO: Find root cause of the issue.
-    void remove_inconsistent_overlaps() {
+    bool check_inconsistent_overlaps() {
         std::vector<size_t> pos_to_remove;
         for (size_t i = 0; i < overlaps.size(); i++) {
             auto& ovlp = overlaps[i];
-            if (ovlp.tlen < ovlp.tend) {
-                spdlog::warn("Inconsistent alignment detected: tlen {} tstart {} tend {}",
-                             ovlp.tlen, ovlp.tstart, ovlp.tend);
+            if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
+                spdlog::warn(
+                        "Inconsistent alignment detected: tname {} tlen {} tstart {} tend {} qname "
+                        "{} qlen {} qstart {} qend {}",
+                        read_name, ovlp.tlen, ovlp.tstart, ovlp.tend, qnames[i], ovlp.qlen,
+                        ovlp.qstart, ovlp.qend);
                 pos_to_remove.push_back(i);
+                return false;
             }
         }
         // pos_to_remove is in asecnding order, so move in reverse order
@@ -272,6 +273,8 @@ struct CorrectionAlignments {
             safe_erase(quals, *pos);
             safe_erase(qnames, *pos);
         }
+
+        return true;
     }
 
     size_t size() {
