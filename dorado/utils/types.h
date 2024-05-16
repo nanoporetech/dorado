@@ -55,6 +55,7 @@ struct BarcodeScoreResult {
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
+    bool found_midstrand = false;
 };
 
 struct SingleEndResult {
