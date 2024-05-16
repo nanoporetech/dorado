@@ -15,17 +15,6 @@
 #include <variant>
 #include <vector>
 
-namespace {
-
-template <typename T>
-void safe_erase(std::vector<T>& vec, size_t pos) {
-    if (vec.size() > pos) {
-        vec.erase(vec.begin() + pos);
-    }
-}
-
-}  // namespace
-
 namespace dorado {
 
 namespace details {
@@ -247,39 +236,33 @@ struct CorrectionAlignments {
     // This is mostly to workaround an issue where sometimes
     // the tend of an overlap is much bigger than the
     // tlen of the read. This is unexpected and happens
-    // intermittently.
-    // TODO: Find root cause of the issue.
-    bool check_inconsistent_overlaps() {
-        std::vector<size_t> pos_to_remove;
+    // intermittently. Again this is was observed before the
+    // split index loading in mm2 was fixed. But keeping check around
+    // for now to catch any lingering issues.
+    // TODO: Remove this function if the error is not observed again.
+    bool check_consistent_overlaps() {
         for (size_t i = 0; i < overlaps.size(); i++) {
             auto& ovlp = overlaps[i];
             if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
-                spdlog::warn(
+                spdlog::error(
                         "Inconsistent alignment detected: tname {} tlen {} tstart {} tend {} qname "
                         "{} qlen {} qstart {} qend {}",
                         read_name, ovlp.tlen, ovlp.tstart, ovlp.tend, qnames[i], ovlp.qlen,
                         ovlp.qstart, ovlp.qend);
-                pos_to_remove.push_back(i);
                 return false;
             }
         }
-        // pos_to_remove is in asecnding order, so move in reverse order
-        // to remove positions from the rear.
-        for (auto pos = pos_to_remove.rbegin(); pos != pos_to_remove.rend(); pos++) {
-            safe_erase(overlaps, *pos);
-            safe_erase(cigars, *pos);
-            safe_erase(mm2_cigars, *pos);
-            safe_erase(seqs, *pos);
-            safe_erase(quals, *pos);
-            safe_erase(qnames, *pos);
-        }
-
         return true;
     }
 
     size_t size() {
-        size_t si = read_name.length() + read_seq.length();
-        si += read_qual.size();
+        size_t si = read_name.length() + read_seq.length() + read_qual.size();
+        for (auto& o : overlaps) {
+            si += sizeof(o);
+        }
+        for (auto& v : cigars) {
+            si += v.size() * sizeof(CigarOp);
+        }
         for (auto& v : mm2_cigars) {
             si += v.size() * sizeof(uint32_t);
         }
@@ -295,17 +278,6 @@ struct CorrectionAlignments {
 
         return si;
     }
-
-    void clear() {
-        read_seq = "";
-        read_qual = {};
-        cigars = {};
-        mm2_cigars = {};
-        overlaps = {};
-        seqs = {};
-        quals = {};
-        qnames = {};
-    };
 };
 
 // The Message type is a std::variant that can hold different types of message objects.

@@ -59,10 +59,8 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                                                             : overlap.tend / window_size);
 
         if (first_window < 0 || (last_window - 1) >= (int)windows.size()) {
-            spdlog::debug("{} num windows {} for read {} with readlen {}", alignments.read_name,
-                          windows.size(), alignments.read_name, alignments.read_seq.length());
-            spdlog::debug(
-                    "{} zeoth thres {} nth thres {} first win {} last win {} windows size {} "
+            spdlog::error(
+                    "{} zeroth thres {} nth thres {} first win {} last win {} windows size {} "
                     "overlap "
                     "tlen {} overlsp tstart {} overlap tend {} qname {} qlen {} qstart {} qend {}",
                     alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,

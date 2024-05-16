@@ -68,19 +68,18 @@ bool populate_alignments(dorado::CorrectionAlignments& alignments,
     const auto& tname = alignments.read_name;
     alignments.read_seq = reader->fetch_seq(tname);
     alignments.read_qual = reader->fetch_qual(tname);
-    if (alignments.read_seq.length() != alignments.read_qual.size()) {
-        spdlog::error("Read len and read qual not same length! {} readlen {} qual {}", tname,
-                      alignments.read_seq.length(), alignments.read_qual.size());
-        throw std::runtime_error("");
-    }
     int tlen = (int)alignments.read_seq.length();
     auto num_qnames = alignments.qnames.size();
     alignments.seqs.resize(num_qnames);
     alignments.quals.resize(num_qnames);
     alignments.cigars.resize(num_qnames);
 
-    // Some overlaps have alignment info inconsistent with reference length,
-    // so we track those and remove them from overlap list.
+    // In some cases the target read length reported by mm2 has differed from the
+    // read length when loaded from the fastq. So we check that here and skip
+    // any alignments where information is inconsisteny.
+    // TODO: This was mainly observed before a bug fix for proper loading
+    // of split mm2 indices was added. However the check is being kept around
+    // for now, and can be removed later.
     std::vector<size_t> pos_to_remove;
     for (size_t i = 0; i < num_qnames; i++) {
         const std::string& qname = alignments.qnames[i];
@@ -96,13 +95,12 @@ bool populate_alignments(dorado::CorrectionAlignments& alignments,
                           alignments.overlaps[i].tlen, tlen, tname);
             return false;
         }
-        alignments.overlaps[i].tlen = tlen;
         alignments.cigars[i] = parse_cigar(alignments.mm2_cigars[i].data(),
                                            (uint32_t)alignments.mm2_cigars[i].size());
         alignments.mm2_cigars[i] = {};
     }
 
-    return alignments.check_inconsistent_overlaps();
+    return alignments.check_consistent_overlaps();
 }
 
 std::vector<std::string> concatenate_corrected_windows(const std::vector<std::string>& cons) {
@@ -156,12 +154,11 @@ void CorrectionNode::decode_fn() {
         std::vector<std::string> to_decode;
         auto pos = item.window_idx;
         auto corrected_seq = decode_window(item);
-        //item.clear();
         {
             std::lock_guard<std::mutex> lock(m_features_mutex);
             auto find_iter = m_features_by_id.find(read_name);
             if (find_iter == m_features_by_id.end()) {
-                spdlog::debug("Find iter is end! for {}", read_name);
+                spdlog::error("Decoded feature list not found for {}.", read_name);
                 continue;
             }
             auto& output_features = find_iter->second;
@@ -261,10 +258,6 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             auto decoded_output = decode_preds(split_preds[w]);
             wfs[w].inferred_bases = decoded_output;
         }
-        std::string inf_bases = "";
-        for (auto c : wfs[0].inferred_bases) {
-            inf_bases += std::to_string(c) + ",";
-        }
 
         for (auto& wf : wfs) {
             m_inferred_features_queue.try_push(std::move(wf));
@@ -340,9 +333,6 @@ void CorrectionNode::input_thread_fn() {
 
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
             auto tname = alignments.read_name;
-            if (alignments.qnames.size() > 400) {
-                spdlog::debug("Skipping {}: {} alignments", tname, alignments.qnames.size());
-            }
             if (!populate_alignments(alignments, fastx_reader.get())) {
                 continue;
             }
@@ -358,7 +348,6 @@ void CorrectionNode::input_thread_fn() {
             // Get the features
             auto wfs = extract_features(windows, alignments, m_window_size);
 
-            //alignments.clear();
             std::vector<std::string> corrected_seqs;
             corrected_seqs.resize(wfs.size());
 
@@ -370,7 +359,6 @@ void CorrectionNode::input_thread_fn() {
                     features_to_infer.push_back(std::move(wfs[w]));
                 } else {
                     corrected_seqs[w] = decode_window(wfs[w]);
-                    //wfs[w].clear();
                 }
             }
             if (features_to_infer.empty()) {
@@ -382,7 +370,8 @@ void CorrectionNode::input_thread_fn() {
                     m_features_by_id.insert({tname, std::move(corrected_seqs)});
                     m_pending_features_by_id.insert({tname, (int)features_to_infer.size()});
                 } else {
-                    spdlog::debug("Ftrs for {} already exists!", tname);
+                    spdlog::error("Features for {} already exist! Skipping.", tname);
+                    continue;
                 }
             }
             // Push the ones that need inference to another thread.
@@ -394,7 +383,7 @@ void CorrectionNode::input_thread_fn() {
 
             // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Corrected {} reads early {}", num_reads.load(),
+                spdlog::debug("Corrected {} reads, decoded {} reads early, ", num_reads.load(),
                               num_early_reads.load());
             }
         } else {

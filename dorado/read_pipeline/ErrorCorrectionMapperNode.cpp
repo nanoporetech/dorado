@@ -171,17 +171,14 @@ void ErrorCorrectionMapperNode::load_read_fn() {
 }
 
 void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
-    (void)pipeline;
     while (!m_copy_terminate.load()) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
         m_copy_cv.wait(lock, [&] {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
-        size_t total = 0;
         spdlog::debug("Pushing {} records for correction", m_shadow_correction_records.size());
         for (auto& [_, r] : m_shadow_correction_records) {
-            total += r.size();
             pipeline.push_message(std::move(r));
         }
         m_shadow_correction_records.clear();

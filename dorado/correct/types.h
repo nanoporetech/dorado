@@ -36,18 +36,10 @@ struct WindowFeatures {
         total += indices.numel() * indices.element_size();
         total += supported.size() * sizeof(std::pair<int, int>);
         total += inferred_bases.size();
-        total += sizeof(int);
+        total += sizeof(n_alns);
         total += read_name.length();
-        total += sizeof(int);
+        total += sizeof(window_idx);
         return total;
-    }
-
-    void clear() {
-        bases.reset();
-        quals.reset();
-        indices.reset();
-        supported.clear();
-        inferred_bases.clear();
     }
 };
 
