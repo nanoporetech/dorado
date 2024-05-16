@@ -245,46 +245,14 @@ const KitSets sets_260bps = {{kit14::flowcells, kit14::kits_260bps}};
 }  // namespace kit14
 
 namespace kit10 {
-// Kit10 ~ R9.4.1 e8 - Split into two parts
-// TODO: Understand why this kit is in two parts. Is there something I'm missing here
+// Kit10 ~ R9.4.1 e8
 
-const std::vector<FC> flowcells_a = {
-        FC::FLO_PRO001,
-        FC::FLO_PRO002,
-        FC::FLO_PRO002_ECO,
-        FC::FLO_PRO002M,
+const std::vector<FC> flowcells = {
+        FC::FLO_FLG001, FC::FLO_MIN106,     FC::FLO_MINSP6,  FC::FLO_PRO001,
+        FC::FLO_PRO002, FC::FLO_PRO002_ECO, FC::FLO_PRO002M,
 };
 
-const std::vector<KC> kits_a = {
-        KC::SQK_LSK109,
-        KC::SQK_LSK109_XL,
-        KC::SQK_LSK110,
-        KC::SQK_LSK111,
-        KC::SQK_LSK111_XL,
-        KC::SQK_DCS109,
-        KC::SQK_PCS109,
-        KC::SQK_PCS111,
-        KC::VSK_VSK004,
-        // Barcoding
-        KC::SQK_MLK111_96_XL,
-        KC::SQK_NBD111_24,
-        KC::SQK_NBD111_96,
-        KC::SQK_PCB109,
-        KC::SQK_PCB110,
-        KC::SQK_PCB111_24,
-        KC::SQK_RBK111_24,
-        KC::SQK_RBK111_96,
-        KC::VSK_VMK004,
-};
-
-const std::vector<FC> flowcells_b = {
-        FC::FLO_FLG001,
-        FC::FLO_MIN106,
-        FC::FLO_MINSP6,
-        FC::FLO_PRO002M,
-};
-
-const std::vector<KC> kits_b = {
+const std::vector<KC> kits = {
         KC::SQK_CS9109,
         KC::SQK_DCS108,
         KC::SQK_DCS109,
@@ -336,7 +304,7 @@ const std::vector<KC> kits_b = {
         KC::VSK_VMK004,
 };
 
-const KitSets sets = {{kit10::flowcells_a, kit10::kits_a}, {kit10::flowcells_b, kit10::kits_b}};
+const KitSets sets = {{kit10::flowcells, kit10::kits}};
 }  // namespace kit10
 
 namespace rna002 {
@@ -359,6 +327,12 @@ const KitSets sets = {{rna004::flowcells, rna004::kits}};
 }  // namespace kit_sets
 
 namespace chemistry {
+
+const std::unordered_map<SampleType, std::string> sample_type_map = {
+        {SampleType::DNA, "DNA"},
+        {SampleType::RNA002, "RNA002"},
+        {SampleType::RNA004, "RNA004"},
+};
 
 const std::unordered_map<Chemistry, std::string> codes_map = {
         {Chemistry::DNA_R9_4_1_E8, "dna_r9.4.1_e8"},
@@ -407,6 +381,10 @@ std::string to_string(const ChemistryKey& ck) {
     const auto [fc, kc, sr] = ck;
     return "flowcell_code: '" + to_string(fc) + "' sequencing_kit: '" + to_string(kc) +
            "' sample_rate: " + std::to_string(sr);
+}
+
+const std::unordered_map<SampleType, std::string>& sample_types() {
+    return chemistry::sample_type_map;
 }
 
 const std::unordered_map<Chemistry, std::string>& chemistry_variants() {

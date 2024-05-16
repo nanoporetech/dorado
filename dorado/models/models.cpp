@@ -902,4 +902,93 @@ std::string extract_model_names_from_paths(const std::vector<std::filesystem::pa
     return model_names;
 }
 
+std::string get_supported_model_info() {
+    std::string result = "---\n";
+
+    const auto& canonical_base_map = mods_canonical_base_map();
+
+    for (const auto& variant : chemistry_variants()) {
+        if (variant.first == Chemistry::UNKNOWN) {
+            continue;
+        }
+
+        // Chemistry name
+        result += variant.second + ":\n";
+
+        const auto& flowcell_code_map = flowcell_codes();
+        const auto& kit_code_map = kit_codes();
+        // Add some info on compatible kits and flowcells
+        const auto& chemistry_kit_info = chemistry_kits().at(variant.first);
+        result += "  sample_type: " + sample_types().at(chemistry_kit_info.sample_type) + "\n";
+        result += "  sampling rate: " + std::to_string(chemistry_kit_info.sampling_rate) + "\n";
+
+        // Get the union of all supported flowcells and kits
+        std::set<Flowcell> supported_flowcell_codes;
+        std::set<KitCode> supported_kit_codes;
+        for (const auto& kitset : chemistry_kit_info.kit_sets) {
+            for (const auto& flowcell : kitset.first) {
+                supported_flowcell_codes.insert(flowcell);
+            }
+            for (const auto& kit : kitset.second) {
+                supported_kit_codes.insert(kit);
+            }
+        }
+
+        std::string flowcells, kits;
+        for (const auto& flowcell : supported_flowcell_codes) {
+            flowcells += "    - " + flowcell_code_map.at(flowcell).name + "\n";
+        }
+        for (const auto& kit : supported_kit_codes) {
+            kits += "    - " + kit_code_map.at(kit).name + "\n";
+        }
+        result += "  flowcells:\n" + flowcells;
+        result += "  kits:\n" + kits;
+
+        result += "  simplex_models:\n";
+        for (const auto& simplex_model : simplex_models()) {
+            if (simplex_model.chemistry == variant.first) {
+                result += "    - " + simplex_model.name + ":\n";
+
+                // If there is a newer model for this condition, add the outdated flag.
+                const auto simplex_matches = find_models(
+                        simplex_models(), variant.first,
+                        {simplex_model.simplex.variant, ModelVersion::NONE}, ModsVariantPair());
+                if (simplex_matches.back().name != simplex_model.name) {
+                    result += "        outdated: true\n";
+                }
+
+                // Dump out all the mod models that are compatible with this simplex model
+                const auto mod_matches = find_models(modified_models(), variant.first,
+                                                     simplex_model.simplex, ModsVariantPair());
+                if (!mod_matches.empty()) {
+                    result += "        modified_models:\n";
+                    for (const auto& mod_model : mod_matches) {
+                        result += "          - " + mod_model.name + ":\n";
+                        result += "              canonical_base: " +
+                                  canonical_base_map.at(mod_model.mods.variant) + "\n";
+                        // If there is a newer model for this condition, add the outdated flag.
+                        const auto mod_type_matches =
+                                find_models(modified_models(), variant.first, simplex_model.simplex,
+                                            {mod_model.mods.variant, ModelVersion::NONE});
+                        if (mod_type_matches.back().name != mod_model.name) {
+                            result += "              outdated: true\n";
+                        }
+                    }
+                }
+
+                const auto stereo_matches = find_models(stereo_models(), variant.first,
+                                                        simplex_model.simplex, ModsVariantPair());
+                if (!stereo_matches.empty()) {
+                    result += "        stereo_models:\n";
+                    for (const auto& stereo_model : stereo_matches) {
+                        result += "          - " + stereo_model.name + "\n";
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 }  // namespace dorado::models

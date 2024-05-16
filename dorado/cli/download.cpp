@@ -126,6 +126,10 @@ int download(int argc, char* argv[]) {
             .help("list the available models for download, as yaml, to stdout")
             .default_value(false)
             .implicit_value(true);
+    parser.add_argument("--list-structured")
+            .help("list the available models in a structured format, as yaml, to stdout")
+            .default_value(false)
+            .implicit_value(true);
 
     parser.add_argument("--data")
             .default_value(std::string())
@@ -162,9 +166,16 @@ int download(int argc, char* argv[]) {
 
     auto list = parser.get<bool>("--list");
     auto list_yaml = parser.get<bool>("--list-yaml");
+    auto list_structured = parser.get<bool>("--list-structured");
 
     if (list || list_yaml) {
         print_models(list_yaml);
+        return EXIT_SUCCESS;
+    }
+
+    if (list_structured) {
+        std::string structured_models = models::get_supported_model_info();
+        std::cout << structured_models << std::endl;
         return EXIT_SUCCESS;
     }
 

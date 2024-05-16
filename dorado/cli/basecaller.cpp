@@ -3,7 +3,6 @@
 #include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
-#include "data_loader/ModelFinder.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_sequences.h"
