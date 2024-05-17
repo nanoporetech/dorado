@@ -16,7 +16,8 @@
 #include "hts_io/FastxRandomReader.h"
 
 #if DORADO_CUDA_BUILD
-#include <c10/cuda/CUDAStream.h>
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
 #endif
 #include <ATen/Tensor.h>
 #include <htslib/faidx.h>
@@ -179,31 +180,31 @@ void CorrectionNode::decode_fn() {
     }
 }
 
-void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
-    spdlog::debug("Starting process thread!");
-
+void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
+    spdlog::debug("Starting process thread for {}!", device_str);
     m_num_active_infer_threads++;
+
+    torch::Device device = torch::Device(device_str);
+
+#if DORADO_CUDA_BUILD
+    c10::cuda::CUDAGuard device_guard(device);
+    auto stream = c10::cuda::getStreamFromPool(false, device.index());
+    c10::cuda::CUDAStreamGuard stream_guard(stream);
+#endif
+
+    torch::NoGradGuard no_grad;
 
     torch::jit::script::Module module;
     try {
-        module = torch::jit::load(m_model_path);
+        spdlog::debug("Loading model on {}...", device_str);
+        module = torch::jit::load(m_model_path, device);
+        spdlog::debug("Loaded model on {}!", device_str);
     } catch (const c10::Error& e) {
         throw std::runtime_error("Error loading model from " + m_model_path +
                                  " with error: " + e.what());
     }
-
-    spdlog::debug("Loaded model!");
-    torch::Device device = torch::Device(device_str);
-    torch::NoGradGuard no_grad;
-    module.to(device);
+    //module.to(device);
     module.eval();
-
-#if DORADO_CUDA_BUILD
-    auto stream = c10::cuda::getStreamFromPool(false, device.index());
-
-    torch::DeviceGuard device_guard(device);
-    torch::StreamGuard stream_guard(stream);
-#endif
 
     std::vector<at::Tensor> bases_batch;
     std::vector<at::Tensor> quals_batch;
@@ -212,7 +213,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
     std::vector<at::Tensor> indices_batch;
     std::vector<WindowFeatures> wfs;
     // If there are any windows > 5120, then reduce batch size by 1
-    int remaining_batch_slots = m_batch_size;
+    int remaining_batch_slots = batch_size;
 
     auto decode_preds = [](const at::Tensor& preds) {
         std::vector<char> bases;
@@ -246,7 +247,18 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
             inputs.push_back(indices_batch);
         }
 
-        auto output = module.forward(inputs);
+        c10::IValue output;
+        try {
+            output = module.forward(inputs);
+        } catch (std::runtime_error& e) {
+#if DORADO_CUDA_BUILD
+            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
+            c10::cuda::CUDACachingAllocator::emptyCache();
+            output = module.forward(inputs);
+#else
+            throw e;
+#endif
+        }
         lock.unlock();
         if (!output.isTuple()) {
             throw std::runtime_error("Expected inference result to be tuple.");
@@ -269,7 +281,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx) {
         sizes.clear();
         wfs.clear();
         indices_batch.clear();
-        remaining_batch_slots = m_batch_size;
+        remaining_batch_slots = batch_size;
     };
 
     WindowFeatures item;
@@ -402,14 +414,13 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
                                int threads,
                                const std::string& device,
                                int infer_threads,
-                               int batch_size,
+                               const int batch_size,
                                const std::string& model_path)
         : MessageSink(1000, threads),
           m_fastq(fastq),
-          m_batch_size(batch_size),
           m_model_path(model_path),
-          m_features_queue(1024),
-          m_inferred_features_queue(512),
+          m_features_queue(1000),
+          m_inferred_features_queue(500),
           m_bases_manager(batch_size),
           m_quals_manager(batch_size) {
     std::vector<std::string> devices;
@@ -424,10 +435,10 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
 #endif
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(device, "cuda")) {
-        if (!torch::cuda::is_available()) {
-            throw std::runtime_error("CUDA backend not available. Choose another one.");
-        }
         devices = dorado::utils::parse_cuda_device_string(device);
+        if (devices.empty()) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
     }
 #else
     else {
@@ -437,7 +448,16 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
     for (size_t d = 0; d < devices.size(); d++) {
         const auto& dev = devices[d];
         for (int i = 0; i < infer_threads; i++) {
-            m_infer_threads.push_back(std::thread(&CorrectionNode::infer_fn, this, dev, (int)d));
+            int device_batch_size = batch_size;
+            if (batch_size == 0) {
+                device_batch_size = calculate_batch_size(dev, 0.8f);
+                if (device_batch_size == 0) {
+                    throw std::runtime_error("Insufficient memory to run inference on " + dev);
+                }
+            }
+            spdlog::debug("Using batch size {} on device {}", device_batch_size, dev);
+            m_infer_threads.push_back(
+                    std::thread(&CorrectionNode::infer_fn, this, dev, (int)d, device_batch_size));
         }
     }
     for (int i = 0; i < 4; i++) {

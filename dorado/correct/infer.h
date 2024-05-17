@@ -43,4 +43,6 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::Sc
     return batch;
 }
 
+int calculate_batch_size(const std::string& device, float memory_fraction);
+
 }  // namespace dorado::correction

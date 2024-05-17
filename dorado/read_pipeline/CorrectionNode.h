@@ -42,7 +42,7 @@ private:
     int m_batch_size;
     std::string m_model_path;
 
-    void infer_fn(const std::string& device, int mtx_idx);
+    void infer_fn(const std::string& device, int mtx_idx, int batch_size);
     void decode_fn();
 
     void concat_features_and_send(const std::vector<std::string>& seqs,
