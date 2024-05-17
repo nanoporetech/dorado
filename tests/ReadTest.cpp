@@ -36,7 +36,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         REQUIRE(alignments.size() == 1);
         bam1_t* aln = alignments[0].get();
 
-        CHECK(bam_aux2i(bam_aux_get(aln, "qs")) == 14);
+        CHECK(bam_aux2f(bam_aux_get(aln, "qs")) == 14.0f);
         CHECK(bam_aux2i(bam_aux_get(aln, "ns")) == 4132);
         CHECK(bam_aux2i(bam_aux_get(aln, "ts")) == 132);
         CHECK(bam_aux2i(bam_aux_get(aln, "mx")) == 2);
