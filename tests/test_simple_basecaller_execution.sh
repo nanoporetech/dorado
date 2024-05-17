@@ -347,4 +347,12 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
     fi
 done
 
+# Test dorado correct command
+$dorado_bin correct $data_dir/read_correction/reads.fq > $output_dir/corrected_reads.fq
+num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq)
+if [[ ${num_corrected_reads} -ne "56" ]]; then
+    echo "dorado correct command failed to generate expected reads"
+    exit 1
+fi
+
 rm -rf $output_dir
