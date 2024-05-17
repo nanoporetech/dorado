@@ -55,8 +55,8 @@ private:
     std::vector<std::thread> m_infer_threads;
     std::vector<std::thread> m_decode_threads;
 
-    std::atomic<int> num_reads;
-    std::atomic<int> num_early_reads;
+    std::atomic<int> num_reads{0};
+    std::atomic<int> num_early_reads{0};
 
     std::unordered_map<std::string, std::vector<std::string>> m_features_by_id;
     std::unordered_map<std::string, int> m_pending_features_by_id;
