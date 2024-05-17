@@ -3,7 +3,9 @@
 #include "types.h"
 #include "utils/memory_utils.h"
 #ifdef __APPLE__
+#if DORADO_GPU_BUILD
 #include "utils/metal_utils.h"
+#endif
 #endif
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
@@ -24,9 +26,14 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
     float usable_memory = 0.f;
     if (device == "cpu") {
 #ifdef __APPLE__
+#if DORADO_GPU_BUILD
         size_t physical_memory =
                 utils::get_apple_physical_memory_bytes() / dorado::utils::BYTES_PER_GB;
         usable_memory = physical_memory * memory_fraction;
+#else
+        size_t free_ram_GB = utils::available_host_memory_GB();
+        usable_memory = free_ram_GB * memory_fraction;
+#endif
 #else
         size_t free_ram_GB = utils::available_host_memory_GB();
         usable_memory = free_ram_GB * memory_fraction;
@@ -48,7 +55,7 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
     if (usable_memory <= 0.f) {
         return 0;
     } else {
-        int batch_size = std::round(usable_memory / per_sample_mem);
+        int batch_size = static_cast<int>(std::round(usable_memory / per_sample_mem));
         // Round to nearest multiple of 4.
         batch_size = static_cast<int>(batch_size / 4) * 4;
         return batch_size;
