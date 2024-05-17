@@ -178,6 +178,13 @@ DuplexModels load_models(const std::string& model_arg,
         // Force the batch size to 128
         model_config.basecaller.set_batch_size(128);
     }
+#if DORADO_METAL_BUILD
+    else if (device == "metal" && model_config.is_tx_model() &&
+             model_config.basecaller.batch_size() == 0) {
+        // TODO: Remove with implementation of autobatch size calcuiaton for macos tx
+        model_config.basecaller.set_batch_size(32);
+    }
+#endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
     auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
@@ -190,6 +197,10 @@ DuplexModels load_models(const std::string& model_arg,
         // EXCEPT for on metal
         // For now, the minimal batch size is used for the duplex model.
         stereo_model_config.basecaller.set_batch_size(48);
+    } else if (device == "metal" && model_config.is_tx_model() &&
+               stereo_model_config.basecaller.batch_size() == 0) {
+        // TODO: Remove with implementation of autobatch size calcuiaton for macos tx
+        stereo_model_config.basecaller.set_batch_size(32);
     }
 #endif
     if (device == "cpu" && stereo_model_config.basecaller.batch_size() == 0) {

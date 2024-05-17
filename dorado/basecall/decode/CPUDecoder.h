@@ -6,6 +6,13 @@
 
 namespace dorado::basecall::decode {
 
+namespace inner {
+
+at::Tensor forward_scores(const at::Tensor& scores_TNC, float fixed_stay_score);
+at::Tensor backward_scores(const at::Tensor& scores_TNC, float fixed_stay_score);
+
+}  // namespace inner
+
 class CPUDecoder final : public Decoder {
 public:
     DecodeData beam_search_part_1(DecodeData data) const;

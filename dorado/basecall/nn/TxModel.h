@@ -54,6 +54,8 @@ struct RotaryEmbeddingImpl : torch::nn::Module {
     at::Tensor forward(at::Tensor &qkv);
     void assert_forward_dims(const at::Tensor &qkv) const;
 
+    at::Tensor get_inv_freqs() const;
+
     const int64_t dim, max_seq_len;
     const float theta;
     const at::TensorOptions options;
@@ -146,7 +148,7 @@ struct TxModelImpl : torch::nn::Module {
         utils::load_state_dict(*this, weights);
     }
 
-    at::Tensor forward(const at::Tensor &x);
+    at::Tensor forward(const at::Tensor &chunk_NCT);
 
     basecall::nn::ConvStack convs{nullptr};
     TxEncoderStack tx_encoder{nullptr};

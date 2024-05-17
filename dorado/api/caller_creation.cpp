@@ -24,7 +24,10 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
         const basecall::CRFModelConfig& model_config,
         float memory_limit_fraction) {
-    return std::make_shared<basecall::MetalCaller>(model_config, memory_limit_fraction);
+    if (model_config.is_tx_model()) {
+        return std::make_shared<basecall::MetalTxCaller>(model_config);
+    }
+    return std::make_shared<basecall::MetalLSTMCaller>(model_config, memory_limit_fraction);
 }
 #endif
 
