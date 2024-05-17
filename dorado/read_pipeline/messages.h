@@ -4,7 +4,6 @@
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
-#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <cstdint>
@@ -244,11 +243,6 @@ struct CorrectionAlignments {
         for (size_t i = 0; i < overlaps.size(); i++) {
             auto& ovlp = overlaps[i];
             if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
-                spdlog::error(
-                        "Inconsistent alignment detected: tname {} tlen {} tstart {} tend {} qname "
-                        "{} qlen {} qstart {} qend {}",
-                        read_name, ovlp.tlen, ovlp.tstart, ovlp.tend, qnames[i], ovlp.qlen,
-                        ovlp.qstart, ovlp.qend);
                 return false;
             }
         }
