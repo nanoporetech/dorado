@@ -244,7 +244,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
-    options.index_batch_size = 80000000ull;
+    options.index_batch_size = 8000000000ull;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;
