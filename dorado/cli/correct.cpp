@@ -95,13 +95,11 @@ int correct(int argc, char* argv[]) {
     auto batch_size(parser.get<int>("batch-size"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-    // The input thread is the total number of threads to use for dorado
-    // correct. Heuristically use 10% of threads for BAM
-    // generation and rest for correctming.
-    const int correct_threads = threads;
+    const int aligner_threads = threads;
+    const int correct_threads = std::max(4, static_cast<int>(threads / 4));
     const int correct_writer_threads = 1;
-    spdlog::debug("> correcting threads {}, writer threads {}", correct_threads,
-                  correct_writer_threads);
+    spdlog::debug("> aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
+                  correct_threads, correct_writer_threads);
 
     if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
@@ -152,12 +150,12 @@ int correct(int argc, char* argv[]) {
 
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
-    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], 12 /*correct_threads*/, device,
+    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
                                            infer_threads, batch_size, model_dir);
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
-    ErrorCorrectionMapperNode aligner(reads[0], correct_threads);
+    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

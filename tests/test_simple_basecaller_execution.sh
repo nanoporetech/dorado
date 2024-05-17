@@ -349,7 +349,7 @@ done
 
 # Test dorado correct command on all platforms except tegra.
 if ! uname -r | grep -q tegra; then
-    $dorado_bin correct $data_dir/read_correction/reads.fq > $output_dir/corrected_reads.fq
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir/corrected_reads.fq
     num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq)
     if [[ ${num_corrected_reads} -ne "56" ]]; then
         echo "dorado correct command failed to generate expected reads"
