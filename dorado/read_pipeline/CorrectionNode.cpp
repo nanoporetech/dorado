@@ -428,11 +428,6 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
         infer_threads = 1;
         devices.push_back(device);
     }
-#ifdef __APPLE__
-    else if (device == "mps") {
-        devices.push_back("mps");
-    }
-#endif
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(device, "cuda")) {
         devices = dorado::utils::parse_cuda_device_string(device);

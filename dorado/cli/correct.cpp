@@ -39,24 +39,26 @@ int correct(int argc, char* argv[]) {
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"mps\", \"cpu\" "
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
                   "etc..")
             .default_value(
 #if DORADO_CUDA_BUILD
                     std::string{"cuda:all"}
-#elif __APPLE__
-                    std::string{"mps"}
 #else
                     std::string{"cpu"}
 #endif
             );
     parser.add_argument("-i", "--infer-threads")
             .help("Number of threads per device.")
+#if DORADO_CUDA_BUILD
+            .default_value(2)
+#else
             .default_value(1)
+#endif
             .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
             .help("batch size for inference.")
-            .default_value(32)
+            .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-m", "--model-path").help("path t- torchscript model file.").required();
     parser.add_argument("-l", "--read-ids")

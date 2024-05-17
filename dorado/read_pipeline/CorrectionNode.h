@@ -39,7 +39,6 @@ private:
     const std::string m_fastq;
     void input_thread_fn();
     const int m_window_size = 4096;
-    int m_batch_size;
     std::string m_model_path;
 
     void infer_fn(const std::string& device, int mtx_idx, int batch_size);
