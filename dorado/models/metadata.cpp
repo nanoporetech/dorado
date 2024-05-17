@@ -39,7 +39,7 @@ const std::unordered_map<std::string, ModelVersion> map = {
         {"v3.5.2", ModelVersion::v3_5_2}, {"v3.6.0", ModelVersion::v3_6_0},
         {"v4.0.0", ModelVersion::v4_0_0}, {"v4.1.0", ModelVersion::v4_1_0},
         {"v4.2.0", ModelVersion::v4_2_0}, {"v4.3.0", ModelVersion::v4_3_0},
-        {"latest", ModelVersion::NONE}};
+        {"v5.0.0", ModelVersion::v5_0_0}, {"latest", ModelVersion::NONE}};
 }  // namespace version
 
 const std::unordered_map<std::string, ModelVariant>& model_variants_map() {

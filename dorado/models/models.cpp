@@ -372,6 +372,26 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
         },
 
+        // v5.0.0
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_fast@v5.0.0",
+                "2625e2191a2e2a15cf5df11bcbab32d7f2712070c04eed6dfbd5b770dd7bbbc2",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::FAST, VV::v5_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                "b09d5c73d403c44d0d3e3cefb5ddc5bcee1f3d8cec4efd0872c16a32eba5ff41",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+                "cbc7fa906cdfbbcaf5bf6d5dc0a20a63fa83e6ebefdd3aeda70724c47ca9f966",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+        },
+
         // RNA002
         ModelInfo{
                 "rna002_70bps_fast@v3",
@@ -405,6 +425,24 @@ const std::vector<ModelInfo> models = {
                 CC::RNA004_130BPS,
                 ModelVariantPair{ModelVariant::SUP, VV::v3_0_1},
         },
+        ModelInfo{
+                "rna004_130bps_fast@v5.0.0",
+                "3b45ecedf2e20c56e15033402deb77f3c4e67df49aea8d7b76acdbb4029e8ea0",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::FAST, VV::v5_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_hac@v5.0.0",
+                "7ca33d19824e41e1c438a60d4d844c86d449be25ea59b8df23adee385a2d9f5d",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.0.0",
+                "c1fdcbc4eb75ec89ed43363f5360cb41541eb67ffa4729aabef843105bb07bb6",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+        },
 };
 
 }  // namespace simplex
@@ -436,6 +474,12 @@ const std::vector<ModelInfo> models = {
                 "2631423b8843a82f69c8d4ab07fa554b7356a29f25c03424c26e7096d0e01418",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::NONE, VV::v4_3_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_5khz_stereo@v1.3",
+                "6942f2d13b6509ae88eb3bd4f7a9f149b72edce817b800fe22fded6c7566dc10",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::NONE, VV::v5_0_0},
         },
 };
 

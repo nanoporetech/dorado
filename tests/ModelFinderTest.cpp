@@ -133,6 +133,12 @@ TEST_CASE(TEST_TAG "  ModelFinder get_stereo_model_name", TEST_TAG) {
                         std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_3_0},
                                         "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
                                         "dna_r10.4.1_e8.2_5khz_stereo@v1.2"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::HAC, VV::v5_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.3"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v5_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.3"),
                 }));
 
         CAPTURE(expected_simplex);
