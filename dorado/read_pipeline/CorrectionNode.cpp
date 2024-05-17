@@ -194,13 +194,14 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
 
     torch::NoGradGuard no_grad;
 
+    auto model_path = (m_model_config.model_dir / m_model_config.weights_file).string();
     torch::jit::script::Module module;
     try {
         spdlog::debug("Loading model on {}...", device_str);
-        module = torch::jit::load(m_model_path, device);
+        module = torch::jit::load(model_path, device);
         spdlog::debug("Loaded model on {}!", device_str);
     } catch (const c10::Error& e) {
-        throw std::runtime_error("Error loading model from " + m_model_path +
+        throw std::runtime_error("Error loading model from " + model_path +
                                  " with error: " + e.what());
     }
     //module.to(device);
@@ -415,14 +416,16 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
                                const std::string& device,
                                int infer_threads,
                                const int batch_size,
-                               const std::string& model_path)
+                               const std::filesystem::path& model_dir)
         : MessageSink(1000, threads),
           m_fastq(fastq),
-          m_model_path(model_path),
+          m_model_config(parse_model_config(model_dir / "config.toml")),
           m_features_queue(1000),
           m_inferred_features_queue(500),
           m_bases_manager(batch_size),
           m_quals_manager(batch_size) {
+    m_window_size = m_model_config.window_size;
+
     std::vector<std::string> devices;
     if (device == "cpu") {
         infer_threads = 1;

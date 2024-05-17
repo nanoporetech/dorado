@@ -2,6 +2,7 @@
 
 #include <ATen/Tensor.h>
 
+#include <filesystem>
 #include <vector>
 
 namespace dorado::correction {
@@ -41,6 +42,14 @@ struct WindowFeatures {
         total += sizeof(window_idx);
         return total;
     }
+};
+
+struct ModelConfig {
+    int version;
+    int window_size;
+    std::string model_type;
+    std::string weights_file;
+    std::filesystem::path model_dir;
 };
 
 }  // namespace dorado::correction

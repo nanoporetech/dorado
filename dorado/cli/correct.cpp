@@ -1,15 +1,18 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
+#include "models/models.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -60,7 +63,7 @@ int correct(int argc, char* argv[]) {
             .help("batch size for inference.")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-m", "--model-path").help("path t- torchscript model file.").required();
+    parser.add_argument("-m", "--model-path").help("path to correction model folder.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
             .default_value(std::string(""));
@@ -90,7 +93,6 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
-    auto model_path(parser.get<std::string>("model-path"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -104,6 +106,23 @@ int correct(int argc, char* argv[]) {
     if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
         std::exit(EXIT_FAILURE);
+    }
+
+    std::filesystem::path model_dir;
+    bool remove_tmp_dir = false;
+    if (parser.is_used("--model-path")) {
+        model_dir = std::filesystem::path(parser.get<std::string>("model-path"));
+    } else {
+        // Download model
+        auto tmp_dir = utils::get_downloads_path(std::nullopt);
+        const std::string model_name = "herro-v1";
+        auto success = models::download_models(tmp_dir.string(), model_name);
+        if (!success) {
+            spdlog::error("Could not download model: {}", model_name);
+            std::exit(EXIT_FAILURE);
+        }
+        model_dir = (tmp_dir / "herro-v1");
+        remove_tmp_dir = true;
     }
 
     // The overall pipeline will be as follows -
@@ -134,7 +153,7 @@ int correct(int argc, char* argv[]) {
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
     pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], 12 /*correct_threads*/, device,
-                                           infer_threads, batch_size, model_path);
+                                           infer_threads, batch_size, model_dir);
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
@@ -174,6 +193,10 @@ int correct(int argc, char* argv[]) {
     tracker.summarize();
 
     spdlog::info("> finished correction");
+
+    if (remove_tmp_dir) {
+        std::filesystem::remove_all(model_dir.parent_path());
+    }
 
     return 0;
 }

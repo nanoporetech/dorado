@@ -5,6 +5,8 @@
 
 #include <torch/torch.h>
 
+#include <filesystem>
+
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
@@ -44,5 +46,7 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::Sc
 }
 
 int calculate_batch_size(const std::string& device, float memory_fraction);
+
+ModelConfig parse_model_config(const std::filesystem::path& config_path);
 
 }  // namespace dorado::correction

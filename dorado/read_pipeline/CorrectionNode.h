@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -28,7 +29,7 @@ public:
                    const std::string& device,
                    int infer_threads,
                    int bach_size,
-                   const std::string& model_path);
+                   const std::filesystem::path& model_dir);
     ~CorrectionNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
@@ -37,8 +38,9 @@ public:
 
 private:
     const std::string m_fastq;
+    correction::ModelConfig m_model_config;
     void input_thread_fn();
-    const int m_window_size = 4096;
+    int m_window_size;
     std::string m_model_path;
 
     void infer_fn(const std::string& device, int mtx_idx, int batch_size);

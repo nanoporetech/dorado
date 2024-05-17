@@ -1,5 +1,6 @@
 #include "infer.h"
 
+#include "types.h"
 #include "utils/memory_utils.h"
 #ifdef __APPLE__
 #include "utils/metal_utils.h"
@@ -10,6 +11,8 @@
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
+#include <toml.hpp>
+#include <toml/value.hpp>
 #include <torch/types.h>
 
 namespace dorado::correction {
@@ -49,6 +52,25 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
         batch_size = static_cast<int>(batch_size / 4) * 4;
         return batch_size;
     }
+}
+
+ModelConfig parse_model_config(const std::filesystem::path& config_path) {
+    const toml::value config_toml = toml::parse(config_path.string());
+
+    if (!config_toml.contains("model")) {
+        throw std::runtime_error("Model config must include [model] section");
+    }
+
+    ModelConfig cfg;
+
+    const auto& model = toml::find(config_toml, "model");
+    cfg.version = toml::find<int>(model, "version");
+    cfg.window_size = toml::find<int>(model, "window_size");
+    cfg.model_type = toml::find<std::string>(model, "model_type");
+    cfg.weights_file = toml::find<std::string>(model, "weights_file");
+    cfg.model_dir = config_path.parent_path();
+
+    return cfg;
 }
 
 }  // namespace dorado::correction
