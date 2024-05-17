@@ -232,6 +232,163 @@ kernel void forward_scan_add_softmax(
     }
 }
 
+
+
+kernel void backward_scan_float(
+    device const ScanArgs* const args,
+    device const half* const scores_in,
+    device ftype_out* const out,
+    KERNEL_INDEX_INPUTS)
+{
+    constexpr int kNumBases = 4;
+    constexpr int kNumTransitions = kNumBases + 1;
+    constexpr float kFixedStayScore = 2.0f;
+
+    const int T = args->T;
+    const int N = args->N;
+    const int num_states = args->C;
+    const int ts_states = num_states * kNumBases;
+    const int chunk = gid;
+
+    device const half* const chunk_in = scores_in + chunk * ts_states;
+    device ftype_out* const chunk_out = out + chunk * (T+1) * num_states;
+    device ftype_out* const alpha_init = chunk_out + num_states * T;
+    for (int c = tid; c < num_states; c += threads) {
+        alpha_init[c] = 0.0f;
+    }
+    for (int ts = 0; ts < T; ++ts) {
+        threadgroup_barrier(mem_flags::mem_device);
+        device const auto* const ts_in = chunk_in + N * ts_states * (T - ts - 1);
+        device ftype_out* const ts_alpha_in = alpha_init - num_states * ts;
+        device ftype_out* const ts_alpha_out = ts_alpha_in - num_states;
+
+        const int state = tid;
+        const int stay_state_idx = state;
+        const int step_state_idx_a = (state * kNumBases) % num_states;
+        const int step_trans_idx_a = step_state_idx_a * kNumBases +
+            ((state * kNumBases) / num_states);
+
+        float vals[kNumTransitions];
+        float max_val = vals[0] = ts_alpha_in[stay_state_idx] + kFixedStayScore;
+        for (int base = 0; base < kNumBases; ++base) {
+            vals[base + 1] = ts_alpha_in[step_state_idx_a + base] +
+                ts_in[step_trans_idx_a + base * kNumBases];
+            max_val = max(max_val, vals[base + 1]);
+        }
+        float sum = 0.0f;
+        for (int i = 0; i < kNumTransitions; ++i) {
+            sum += exp(vals[i] - max_val);
+        }
+        ts_alpha_out[tid] = max_val + log(sum);
+    }
+}
+
+// Performs the forward scan, writing out posterior probabilities as it goes.
+// Forward scan results exist only transiently in threadgroup memory.
+kernel void forward_scan_add_softmax_float(
+    device const ScanArgs* const args,
+    device const half* const scores_in,
+    device const ftype_out* const bwd,
+    device ftype_out* const posts,
+    KERNEL_INDEX_INPUTS)
+{
+    constexpr int kNumBases = 4;
+    constexpr int kNumTransitions = kNumBases + 1;
+    constexpr float kFixedStayScore = 2.0f;
+
+    const int T = args->T + 1;              // Time steps over which we iterate.
+    const int N = args->N;                  // Batch size.
+    const int num_states = args->C;         // kmer state space size
+    const int chunk = gid;                  // Batch element index.
+    const int kMsb = num_states / kNumBases;
+    const int ts_states = num_states * kNumBases;
+
+    // This batch element's scores.
+    device const half* const chunk_scores = scores_in + chunk * ts_states;
+
+    // TG buffers used to reduce max/sum across SIMD groups.
+    constexpr int kMaxSIMDGroups = 32;
+    threadgroup float sg_max_vals[kMaxSIMDGroups], sg_sums[kMaxSIMDGroups];
+    
+    // Alternating forward guide buffers used for successive time steps.
+    constexpr int kMaxStates = 1024;
+    threadgroup float ts_fwd[2][kMaxStates];
+
+    // The forward guide input for the first step is 0.
+    ts_fwd[0][tid] = 0.0f;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (int ts = 0; ts < T; ++ts) {
+        // We read forward guide values written to TG memory in the previous step as
+        // inputs to this step.  However, there has already been a TG barrier since
+        // they were written.
+
+        // This time step's scores.
+        device const auto* const ts_scores = chunk_scores + N * ts_states * ts;
+
+        // Alternating TG buffer twiddling.
+        threadgroup const auto* const ts_alpha_in = ts_fwd[ts & 1];
+        threadgroup auto* const ts_alpha_out = ts_fwd[(ts & 1) ^ 1];
+
+        // Calculate the next time step's forward guide from this time step's scores
+        // and forward guide.  It's written to threadgroup memory for use in the
+        // next iteration.
+        const int state = tid;
+        const int stay_state_idx = state;
+        const int step_state_idx_a = state / kNumBases;
+        const int step_trans_idx_a = state * kNumBases;
+        float vals[kNumTransitions];
+        float fwd_max_val = vals[0] = ts_alpha_in[stay_state_idx] + kFixedStayScore;
+        for (int base = 0; base < kNumBases; ++base) {
+            vals[base + 1] = ts_alpha_in[step_state_idx_a + base * kMsb] + 
+                ts_scores[step_trans_idx_a + base];
+            fwd_max_val = max(fwd_max_val, vals[base + 1]);
+        }
+        float fwd_sum = 0.0f;
+        for (int i = 0; i < kNumTransitions; ++i) {
+            fwd_sum += exp(vals[i] - fwd_max_val);
+        }
+        ts_alpha_out[tid] = fwd_max_val + log(fwd_sum);
+
+        // Load the forward guide value calculated in the last time step for use
+        // in this time step's posterior probability calculation.
+        const float fwd_val = ts_alpha_in[tid];
+
+        // Calculate fwd/bwd guide product in log space.
+        const int ts_idx = (chunk * T + ts) * num_states;
+        const float val = fwd_val + bwd[ts_idx + tid];
+
+        // Determine max across this SIMD group, and write the result to
+        // a threadgroup array with an entry for each SIMD group.
+        sg_max_vals[sid] = simd_max(val);
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+
+        // Find the max across all SIMD groups, and hence all entries
+        // for this time step.
+        float max_val = sg_max_vals[0];
+        for (uint i = 1; i < simdgroups; ++i) {
+            max_val = max(max_val, sg_max_vals[i]);
+        }
+
+        // Determine the sum of the exponentiated shifted log probabilities
+        // across this SIMD group, and write the result to a threadgroup array
+        // with an entry for each SIMD group.
+        const float exp_val = exp(val - max_val);
+        sg_sums[sid] = simd_sum(exp_val);
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+
+        // Find the sum across all SIMD groups, and hence all entries
+        // for this time step.
+        float sum = sg_sums[0];
+        for (uint i = 1; i < simdgroups; ++i) {
+            sum += sg_sums[i];
+        }
+
+        // Write out the posterior probability 
+        posts[ts_idx + tid] = static_cast<ftype_out>(exp_val / sum);
+    }
+}
+
 struct ConvArgs {
     int in_size;
     int win_size;

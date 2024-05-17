@@ -248,7 +248,7 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
     auto status = cb->status();
     bool success = (status == MTL::CommandBufferStatusCompleted);
     if (success) {
-        spdlog::debug("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+        spdlog::trace("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
                       1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
                       1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {

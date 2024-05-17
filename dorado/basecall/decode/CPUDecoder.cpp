@@ -12,6 +12,7 @@
 
 namespace {
 
+// Operates in TNC
 at::Tensor scan(const at::Tensor& Ms,
                 const float fixed_stay_score,
                 const at::Tensor& idx,
@@ -34,18 +35,21 @@ at::Tensor scan(const at::Tensor& Ms,
 
     return alpha;
 }
+}  // namespace
 
-at::Tensor forward_scores(const at::Tensor& scores, const float fixed_stay_score) {
-    const int T = int(scores.size(0));  // Signal len
-    const int N = int(scores.size(1));  // Num batches
-    const int C = int(scores.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
+namespace dorado::basecall::decode::inner {
+
+at::Tensor forward_scores(const at::Tensor& scores_TNC, const float fixed_stay_score) {
+    const int T = int(scores_TNC.size(0));  // Signal len
+    const int N = int(scores_TNC.size(1));  // Num batches
+    const int C = int(scores_TNC.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
 
     const int n_base = 4;
     const int state_len = int(std::log(C) / std::log(n_base) - 1);
 
     // Transition scores reshaped so that the 4 scores for each predecessor state are arranged along the
     // innermost dimension.
-    const at::Tensor Ms = scores.reshape({T, N, -1, n_base});
+    const at::Tensor Ms = scores_TNC.reshape({T, N, -1, n_base});
 
     // Number of states per timestep.
     const int num_states = int(pow(n_base, state_len));
@@ -60,9 +64,9 @@ at::Tensor forward_scores(const at::Tensor& scores, const float fixed_stay_score
     return scan(Ms, fixed_stay_score, idx, v0);
 }
 
-at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_score) {
-    const int N = int(scores.size(1));  // Num batches
-    const int C = int(scores.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
+at::Tensor backward_scores(const at::Tensor& scores_TNC, const float fixed_stay_score) {
+    const int N = int(scores_TNC.size(1));  // Num batches
+    const int C = int(scores_TNC.size(2));  // 4^state_len * 4 = 4^(state_len + 1)
 
     const int n_base = 4;
 
@@ -72,13 +76,13 @@ at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_scor
     const int num_states = int(pow(n_base, state_len));
 
     // Guide values at last timestep.
-    const at::Tensor vT = scores.new_full({N, num_states}, 0.0f);
+    const at::Tensor vT = scores_TNC.new_full({N, num_states}, 0.0f);
 
     const auto idx =
             at::arange(num_states).repeat_interleave(n_base).reshape({n_base, -1}).t().contiguous();
     auto idx_T = idx.flatten().argsort().reshape(idx.sizes());
 
-    const auto Ms_T = scores.index({at::indexing::Slice(), at::indexing::Slice(), idx_T});
+    const auto Ms_T = scores_TNC.index({at::indexing::Slice(), at::indexing::Slice(), idx_T});
 
     // For each state, the indices of the 4 states that could succeed it via a step transition.
     idx_T = at::bitwise_right_shift(idx_T, 2);
@@ -86,13 +90,14 @@ at::Tensor backward_scores(const at::Tensor& scores, const float fixed_stay_scor
     return scan(Ms_T.flip(0), fixed_stay_score, idx_T.to(at::kLong), vT).flip(0);
 }
 
-}  // namespace
+}  // namespace dorado::basecall::decode::inner
 
 namespace dorado::basecall::decode {
 
 DecodeData CPUDecoder::beam_search_part_1(DecodeData data) const { return data; }
 
 std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const {
+    // Expects data.data(TNC)
     const auto scores_cpu = data.data.to(at::kCPU);
     const auto num_chunks = data.num_chunks;
     const auto& options = data.options;
@@ -112,19 +117,22 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const 
                     i * chunks_per_thread + std::min(i, num_threads_with_one_more_chunk);
             int t_num_chunks = chunks_per_thread + int(i < num_threads_with_one_more_chunk);
 
+            // Slice TNC -> TnC
             using Slice = at::indexing::Slice;
             auto t_scores =
                     scores_cpu.index({Slice(), Slice(t_first_chunk, t_first_chunk + t_num_chunks)});
 
-            at::Tensor fwd = forward_scores(t_scores, options.blank_score);
-            at::Tensor bwd = backward_scores(t_scores, options.blank_score);
+            at::Tensor fwd = inner::forward_scores(t_scores, options.blank_score);
+            at::Tensor bwd = inner::backward_scores(t_scores, options.blank_score);
 
             at::Tensor posts = at::softmax(fwd + bwd, -1);
 
+            // Transpose TnC to nTC
             t_scores = t_scores.transpose(0, 1);
             bwd = bwd.transpose(0, 1).contiguous();
             posts = posts.transpose(0, 1).contiguous();
 
+            // Iter over n in nTC, passing TC tensors to beam_search_decode
             for (int chunk_idx = 0; chunk_idx < t_num_chunks; chunk_idx++) {
                 auto decode_result = beam_search_decode(t_scores[chunk_idx], bwd[chunk_idx],
                                                         posts[chunk_idx], options.beam_width,

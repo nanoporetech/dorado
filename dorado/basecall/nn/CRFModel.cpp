@@ -793,10 +793,6 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
 
 at::Tensor CRFModelImpl::forward(const at::Tensor &x) {
     utils::ScopedProfileRange spr("nn_forward", 1);
-    if (x.device() == torch::kCPU) {
-        // Output is [T, N, C], which CPU decoding requires.
-        return encoder->forward(x).transpose(0, 1);
-    }
 #if DORADO_CUDA_BUILD
     if (x.is_cuda() && x.dtype() == torch::kF16) {
         // Output is [N, T, C]

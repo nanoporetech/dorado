@@ -2,6 +2,8 @@
 
 #include "utils/simd.h"
 
+#include <c10/core/ScalarType.h>
+#include <c10/util/Half.h>
 #include <math.h>
 #include <spdlog/spdlog.h>
 
@@ -579,6 +581,19 @@ std::tuple<std::string, std::string, std::vector<uint8_t>> beam_search_decode(
                                      num_state_bits, num_blocks, max_beam_width, beam_cut,
                                      fixed_stay_score, states, moves, qual_data, byte_score_scale,
                                      posts_scale);
+
+    } else if (scores_t.dtype() == at::kHalf) {
+        if (posts_t.dtype() != at::ScalarType::Float) {
+            throw std::runtime_error(
+                    "beam_search_decode: only float32 posts are supported for int16 scores");
+        }
+
+        const auto scores = scores_block_contig.data_ptr<c10::Half>();
+        const auto back_guides = back_guides_contig->data_ptr<float>();
+        const auto posts = posts_contig->data_ptr<float>();
+        beam_search<c10::Half, float>(scores, scores_block_stride, back_guides, posts,
+                                      num_state_bits, num_blocks, max_beam_width, beam_cut,
+                                      fixed_stay_score, states, moves, qual_data, 1.0f, 1.0f);
 
     } else {
         throw std::runtime_error(std::string("beam_search_decode: unsupported tensor type ") +
