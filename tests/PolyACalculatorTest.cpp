@@ -113,7 +113,7 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     SECTION("Check failure with non-existent file.") {
         const std::string missing_file = "foo_bar_baz";
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(missing_file),
-                          "Failed to open file foo_bar_baz");
+                          "PolyA config file doesn't exist at foo_bar_baz");
     }
 
     SECTION("Only one primer is provided") {

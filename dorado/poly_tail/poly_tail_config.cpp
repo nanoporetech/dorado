@@ -5,6 +5,7 @@
 #include <toml.hpp>
 #include <toml/value.hpp>
 
+#include <filesystem>
 #include <fstream>
 #include <istream>
 #include <sstream>
@@ -77,6 +78,10 @@ PolyTailConfig prepare_config(std::istream& is) {
 
 PolyTailConfig prepare_config(const std::string& config_file) {
     if (!config_file.empty()) {
+        if (!std::filesystem::exists(config_file) ||
+            !std::filesystem::is_regular_file(config_file)) {
+            throw std::runtime_error("PolyA config file doesn't exist at " + config_file);
+        }
         std::ifstream file(config_file);  // Open the file for reading
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open file " + config_file);
