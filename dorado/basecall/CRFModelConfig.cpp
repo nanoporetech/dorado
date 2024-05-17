@@ -55,6 +55,27 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }  // namespace
 namespace dorado::basecall {
 
+void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml) {
+    if (config_toml.contains("qscore")) {
+        const auto &qscore = toml::find(config_toml, "qscore");
+        config.qbias = toml::find<float>(qscore, "bias");
+        config.qscale = toml::find<float>(qscore, "scale");
+        if (qscore.contains("mean_qscore_start_pos")) {
+            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
+        } else {
+            // If information is not present in the config, find start position by model name.
+            std::string model_name = config.model_path.filename().string();
+            config.mean_qscore_start_pos = get_mean_qscore_start_pos_by_model_name(model_name);
+        }
+        if (config.mean_qscore_start_pos < 0) {
+            throw std::runtime_error(
+                    "model config error - qscore.mean_qscore_start_pos cannot be < 0");
+        }
+    } else {
+        spdlog::debug("> no qscore calibration found");
+    }
+}
+
 // Parse the config to determine if there are any clamp layers
 bool has_clamp(const std::vector<toml::value> &sublayers) {
     for (const auto &segment : sublayers) {
@@ -249,23 +270,7 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
-    if (config_toml.contains("qscore")) {
-        const auto &qscore = toml::find(config_toml, "qscore");
-        config.qbias = toml::find<float>(qscore, "bias");
-        config.qscale = toml::find<float>(qscore, "scale");
-        if (qscore.contains("mean_qscore_start_pos")) {
-            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
-        } else {
-            // If information is not present in the config, find start position by model name.
-            std::string model_name = config.model_path.filename().string();
-            config.mean_qscore_start_pos = get_mean_qscore_start_pos_by_model_name(model_name);
-        }
-        if (config.mean_qscore_start_pos < 0) {
-            throw std::runtime_error("Mean q-score start position cannot be < 0");
-        }
-    } else {
-        spdlog::debug("> no qscore calibration found");
-    }
+    parse_qscore_params(config, config_toml);
 
     const auto &input = toml::find(config_toml, "input");
     config.num_features = toml::find<int>(input, "features");
@@ -504,6 +509,8 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
+    parse_qscore_params(config, config_toml);
+
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
     const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
     const CRFEncoderParams crf_encoder = parse_crf_encoder_params(config_toml);
@@ -533,18 +540,6 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
 
     config.state_len = config.tx->crf.state_len;
     config.num_features = config.convs.front().insize;
-
-    if (config_toml.contains("qscore")) {
-        spdlog::warn("> transformer qscore calibration not implemented");
-        const auto &qscore = toml::find(config_toml, "qscore");
-        config.qbias = toml::find<float>(qscore, "bias");
-        config.qscale = toml::find<float>(qscore, "scale");
-        if (qscore.contains("mean_qscore_start_pos")) {
-            config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
-        }
-    } else {
-        spdlog::debug("> no qscore calibration found");
-    }
 
     std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
     config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
