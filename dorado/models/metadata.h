@@ -54,6 +54,7 @@ enum class ModelVersion : uint8_t {
 
 const std::unordered_map<std::string, ModelVariant>& model_variants_map();
 const std::unordered_map<std::string, ModsVariant>& mods_variants_map();
+const std::unordered_map<ModsVariant, std::string>& mods_canonical_base_map();
 const std::unordered_map<std::string, ModelVersion>& version_map();
 
 ModelVariant get_model_variant(const std::string& variant);
@@ -72,6 +73,10 @@ struct ModelVariantPair {
     bool is_auto = false;
     bool has_variant() const { return variant != ModelVariant::NONE; }
     bool has_ver() const { return ver != ModelVersion::NONE; }
+
+    bool operator==(const ModelVariantPair& other) const {
+        return other.variant == variant && other.ver == ver;
+    }
 };
 
 struct ModsVariantPair {

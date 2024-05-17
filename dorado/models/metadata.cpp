@@ -26,7 +26,14 @@ const std::unordered_map<std::string, ModsVariant> map = {
         {"6mA", ModsVariant::M_6mA},
         {"m6A_DRACH", ModsVariant::M_m6A_DRACH},
 };
-}
+
+const std::unordered_map<ModsVariant, std::string> canonical_base_map = {
+        {ModsVariant::M_5mC_5hmC, "C"},   {ModsVariant::M_5mCG, "C"},
+        {ModsVariant::M_5mCG_5hmCG, "C"}, {ModsVariant::M_5mC, "C"},
+        {ModsVariant::M_6mA, "A"},        {ModsVariant::M_m6A_DRACH, "A"},
+};
+
+}  // namespace mods
 
 namespace version {
 const std::unordered_map<std::string, ModelVersion> map = {
@@ -46,6 +53,9 @@ const std::unordered_map<std::string, ModelVariant>& model_variants_map() {
     return model_variant::map;
 }
 const std::unordered_map<std::string, ModsVariant>& mods_variants_map() { return mods::map; }
+const std::unordered_map<ModsVariant, std::string>& mods_canonical_base_map() {
+    return mods::canonical_base_map;
+}
 const std::unordered_map<std::string, ModelVersion>& version_map() { return version::map; }
 
 namespace {

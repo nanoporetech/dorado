@@ -202,6 +202,7 @@ enum class Chemistry {
 
 std::string to_string(const Chemistry& chemistry);
 
+const std::unordered_map<SampleType, std::string>& sample_types();
 const std::unordered_map<Chemistry, std::string>& chemistry_variants();
 const std::unordered_map<Chemistry, ChemistryKits>& chemistry_kits();
 
