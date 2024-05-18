@@ -178,6 +178,8 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
 
                 // with single mods
                 std::make_tuple("auto,5mC", MS{"auto,5mC", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mC}}}),
+                std::make_tuple("hac,4mC_5mC",
+                                MS{"hac,4mC_5mC", MVP{MV::HAC}, {ModsVP{ModsV::M_4mC_5mC}}}),
                 std::make_tuple("fast,5mC_5hmC",
                                 MS{"fast,5mC_5hmC", MVP{MV::FAST}, {ModsVP{ModsV::M_5mC_5hmC}}}),
                 std::make_tuple("auto,5mCG",
@@ -188,7 +190,11 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
                 std::make_tuple("auto,6mA", MS{"auto,6mA", MVP{MV::AUTO}, {ModsVP{ModsV::M_6mA}}}),
                 std::make_tuple("auto,m6A_DRACH",
                                 MS{"auto,m6A_DRACH", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A_DRACH}}}),
-
+                std::make_tuple("auto,m6A", MS{"auto,m6A", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A}}}),
+                std::make_tuple("sup,pseU", MS{"sup,pseU", MVP{MV::SUP}, {ModsVP{ModsV::M_pseU}}}),
+                std::make_tuple("sup,pseU,m6A", MS{"sup,pseU,m6A",
+                                                   MVP{MV::SUP},
+                                                   {ModsVP{ModsV::M_pseU}, ModsVP{ModsV::M_m6A}}}),
                 // with single mods and version
                 std::make_tuple("sup@v4.1.0,5mC@v2", MS{"sup@v4.1.0,5mC@v2",
                                                         MVP{MV::SUP, VV::v4_1_0},

@@ -19,18 +19,19 @@ const std::unordered_map<std::string, ModelVariant> map = {
 
 namespace mods {
 const std::unordered_map<std::string, ModsVariant> map = {
-        {"5mC_5hmC", ModsVariant::M_5mC_5hmC},
-        {"5mCG", ModsVariant::M_5mCG},
-        {"5mCG_5hmCG", ModsVariant::M_5mCG_5hmCG},
-        {"5mC", ModsVariant::M_5mC},
-        {"6mA", ModsVariant::M_6mA},
-        {"m6A_DRACH", ModsVariant::M_m6A_DRACH},
+        {"4mC_5mC", ModsVariant::M_4mC_5mC}, {"5mC_5hmC", ModsVariant::M_5mC_5hmC},
+        {"5mCG", ModsVariant::M_5mCG},       {"5mCG_5hmCG", ModsVariant::M_5mCG_5hmCG},
+        {"5mC", ModsVariant::M_5mC},         {"6mA", ModsVariant::M_6mA},
+        {"m6A", ModsVariant::M_m6A},         {"m6A_DRACH", ModsVariant::M_m6A_DRACH},
+        {"pseU", ModsVariant::M_pseU},
 };
 
 const std::unordered_map<ModsVariant, std::string> canonical_base_map = {
-        {ModsVariant::M_5mC_5hmC, "C"},   {ModsVariant::M_5mCG, "C"},
-        {ModsVariant::M_5mCG_5hmCG, "C"}, {ModsVariant::M_5mC, "C"},
-        {ModsVariant::M_6mA, "A"},        {ModsVariant::M_m6A_DRACH, "A"},
+        {ModsVariant::M_4mC_5mC, "C"}, {ModsVariant::M_5mC_5hmC, "C"},
+        {ModsVariant::M_5mCG, "C"},    {ModsVariant::M_5mCG_5hmCG, "C"},
+        {ModsVariant::M_5mC, "C"},     {ModsVariant::M_6mA, "A"},
+        {ModsVariant::M_m6A, "A"},     {ModsVariant::M_m6A_DRACH, "A"},
+        {ModsVariant::M_pseU, "T"},
 };
 
 }  // namespace mods

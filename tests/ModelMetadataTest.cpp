@@ -52,35 +52,43 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
     const auto& mods = mods_variants_map();
 
     SECTION("Only expected ModsVariant exist") {
+        CHECK(mods.at("4mC_5mC") == ModsVariant::M_4mC_5mC);
         CHECK(mods.at("5mC_5hmC") == ModsVariant::M_5mC_5hmC);
         CHECK(mods.at("5mCG") == ModsVariant::M_5mCG);
         CHECK(mods.at("5mCG_5hmCG") == ModsVariant::M_5mCG_5hmCG);
         CHECK(mods.at("5mC") == ModsVariant::M_5mC);
         CHECK(mods.at("6mA") == ModsVariant::M_6mA);
+        CHECK(mods.at("m6A") == ModsVariant::M_m6A);
         CHECK(mods.at("m6A_DRACH") == ModsVariant::M_m6A_DRACH);
+        CHECK(mods.at("pseU") == ModsVariant::M_pseU);
         CHECK(mods.size() == static_cast<size_t>(ModsVariant::NONE));
     }
 
     SECTION("ModsVariant get_mods_code") {
+        CHECK(get_mods_variant("4mC_5mC") == ModsVariant::M_4mC_5mC);
         CHECK(get_mods_variant("5mC_5hmC") == ModsVariant::M_5mC_5hmC);
         CHECK(get_mods_variant("5mCG") == ModsVariant::M_5mCG);
         CHECK(get_mods_variant("5mCG_5hmCG") == ModsVariant::M_5mCG_5hmCG);
         CHECK(get_mods_variant("5mC") == ModsVariant::M_5mC);
         CHECK(get_mods_variant("6mA") == ModsVariant::M_6mA);
+        CHECK(get_mods_variant("m6A") == ModsVariant::M_m6A);
         CHECK(get_mods_variant("m6A_DRACH") == ModsVariant::M_m6A_DRACH);
-
+        CHECK(get_mods_variant("pseU") == ModsVariant::M_pseU);
         for (const auto& it : {"", "foo", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2"}) {
             CHECK(get_mods_variant(it) == ModsVariant::NONE);
         }
     }
 
     SECTION("ModsVariant to_string") {
+        CHECK(to_string(ModsVariant::M_4mC_5mC) == "4mC_5mC");
         CHECK(to_string(ModsVariant::M_5mC_5hmC) == "5mC_5hmC");
         CHECK(to_string(ModsVariant::M_5mCG) == "5mCG");
         CHECK(to_string(ModsVariant::M_5mCG_5hmCG) == "5mCG_5hmCG");
         CHECK(to_string(ModsVariant::M_5mC) == "5mC");
         CHECK(to_string(ModsVariant::M_6mA) == "6mA");
         CHECK(to_string(ModsVariant::M_m6A_DRACH) == "m6A_DRACH");
+        CHECK(to_string(ModsVariant::M_m6A) == "m6A");
+        CHECK(to_string(ModsVariant::M_pseU) == "pseU");
         CHECK_THROWS_AS(to_string(ModsVariant::NONE), std::logic_error);
     }
 
@@ -103,12 +111,15 @@ TEST_CASE(TEST_TAG "  mods_canonical_base_map", TEST_TAG) {
     const auto& mods = mods_canonical_base_map();
 
     SECTION("All expected ModsVariant exist") {
+        CHECK(mods.at(ModsVariant::M_4mC_5mC) == "C");
         CHECK(mods.at(ModsVariant::M_5mC_5hmC) == "C");
         CHECK(mods.at(ModsVariant::M_5mCG) == "C");
         CHECK(mods.at(ModsVariant::M_5mCG_5hmCG) == "C");
         CHECK(mods.at(ModsVariant::M_5mC) == "C");
         CHECK(mods.at(ModsVariant::M_6mA) == "A");
+        CHECK(mods.at(ModsVariant::M_m6A) == "A");
         CHECK(mods.at(ModsVariant::M_m6A_DRACH) == "A");
+        CHECK(mods.at(ModsVariant::M_pseU) == "T");
         CHECK(mods.size() == static_cast<size_t>(ModsVariant::NONE));
     }
 }
