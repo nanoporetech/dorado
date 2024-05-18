@@ -796,6 +796,20 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace modified
 
+namespace correction {
+
+const std::vector<ModelInfo> models = {
+        ModelInfo{
+                "herro-v1",
+                "c7077840f84b469f2c0fd2ae44649fa5f7fa45132540fb54536792c8e22dab9a",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+};
+
+}  // namespace correction
+
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
 const std::vector<ModelInfo>& modified_models() { return modified::models; }
@@ -824,7 +838,8 @@ std::vector<std::string> modified_model_variants() {
 
 // Returns true if model_name matches any configured model
 bool is_valid_model(const std::string& model_name) {
-    for (const auto& collection : {simplex::models, stereo::models, modified::models}) {
+    for (const auto& collection :
+         {simplex::models, stereo::models, modified::models, correction::models}) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return true;
@@ -856,6 +871,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
     download_model_set(simplex::models);
     download_model_set(stereo::models);
     download_model_set(modified::models);
+    download_model_set(correction::models);
 
     return success;
 }

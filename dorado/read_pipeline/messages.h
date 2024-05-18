@@ -211,12 +211,9 @@ public:
 };
 
 struct Overlap {
-    // This tracks the read against which query was aligned.
-    int qid;
     int qstart;
     int qend;
     int qlen;
-    // This is the query itself.
     int tstart;
     int tend;
     int tlen;
@@ -225,14 +222,56 @@ struct Overlap {
 
 // Overlaps for error correction
 struct CorrectionAlignments {
-    std::string read_name;
-    std::string read_seq;
-    std::vector<uint8_t> read_qual;
-    std::vector<Overlap> overlaps;
-    std::vector<std::vector<CigarOp>> cigars;
-    std::vector<std::string> seqs;
-    std::vector<std::vector<uint8_t>> quals;
-    std::vector<std::string> qnames;
+    std::string read_name = "";
+    std::string read_seq = "";
+    std::vector<uint8_t> read_qual = {};
+    std::vector<Overlap> overlaps = {};
+    std::vector<std::vector<CigarOp>> cigars = {};
+    std::vector<std::vector<uint32_t>> mm2_cigars = {};
+    std::vector<std::string> seqs = {};
+    std::vector<std::vector<uint8_t>> quals = {};
+    std::vector<std::string> qnames = {};
+
+    // This is mostly to workaround an issue where sometimes
+    // the tend of an overlap is much bigger than the
+    // tlen of the read. This is unexpected and happens
+    // intermittently. Again this is was observed before the
+    // split index loading in mm2 was fixed. But keeping check around
+    // for now to catch any lingering issues.
+    // TODO: Remove this function if the error is not observed again.
+    bool check_consistent_overlaps() {
+        for (size_t i = 0; i < overlaps.size(); i++) {
+            auto& ovlp = overlaps[i];
+            if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    size_t size() {
+        size_t si = read_name.length() + read_seq.length() + read_qual.size();
+        for (auto& o : overlaps) {
+            si += sizeof(o);
+        }
+        for (auto& v : cigars) {
+            si += v.size() * sizeof(CigarOp);
+        }
+        for (auto& v : mm2_cigars) {
+            si += v.size() * sizeof(uint32_t);
+        }
+        for (auto& s : seqs) {
+            si += s.length();
+        }
+        for (auto& v : quals) {
+            si += v.size();
+        }
+        for (auto& s : qnames) {
+            si += s.length();
+        }
+
+        return si;
+    }
 };
 
 // The Message type is a std::variant that can hold different types of message objects.

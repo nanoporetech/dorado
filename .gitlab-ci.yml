@@ -518,6 +518,7 @@ build_archive:macos:x64:
     BATCH: 384
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
+    TEST_DORADO_CORRECT: 1
   script:
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
@@ -580,6 +581,7 @@ test:linux:arm64:bionic:
     BATCH: 0
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
+    TEST_DORADO_CORRECT: 0
   needs:
     - build:linux:arm64:bionic
 

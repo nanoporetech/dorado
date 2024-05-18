@@ -1,14 +1,18 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
+#include "models/models.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
+#include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -25,6 +29,7 @@ namespace dorado {
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
 int correct(int argc, char* argv[]) {
+    utils::make_torch_deterministic();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Dorado read correction tool.");
     parser.add_argument("reads")
@@ -37,26 +42,28 @@ int correct(int argc, char* argv[]) {
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"mps\", \"cpu\" "
+            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
                   "etc..")
             .default_value(
 #if DORADO_CUDA_BUILD
                     std::string{"cuda:all"}
-#elif __APPLE__
-                    std::string{"mps"}
 #else
                     std::string{"cpu"}
 #endif
             );
     parser.add_argument("-i", "--infer-threads")
             .help("Number of threads per device.")
+#if DORADO_CUDA_BUILD
+            .default_value(2)
+#else
             .default_value(1)
+#endif
             .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
             .help("batch size for inference.")
-            .default_value(32)
+            .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-m", "--model-path").help("path t- torchscript model file.").required();
+    parser.add_argument("-m", "--model-path").help("path to correction model folder.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
             .default_value(std::string(""));
@@ -86,20 +93,34 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
-    auto model_path(parser.get<std::string>("model-path"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-    // The input thread is the total number of threads to use for dorado
-    // correct. Heuristically use 10% of threads for BAM
-    // generation and rest for correctming.
-    const int correct_threads = threads;
+    const int aligner_threads = threads;
+    const int correct_threads = std::max(4, static_cast<int>(threads / 4));
     const int correct_writer_threads = 1;
-    spdlog::debug("> correcting threads {}, writer threads {}", correct_threads,
-                  correct_writer_threads);
+    spdlog::debug("> aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
+                  correct_threads, correct_writer_threads);
 
     if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");
         std::exit(EXIT_FAILURE);
+    }
+
+    std::filesystem::path model_dir;
+    bool remove_tmp_dir = false;
+    if (parser.is_used("--model-path")) {
+        model_dir = std::filesystem::path(parser.get<std::string>("model-path"));
+    } else {
+        // Download model
+        auto tmp_dir = utils::get_downloads_path(std::nullopt);
+        const std::string model_name = "herro-v1";
+        auto success = models::download_models(tmp_dir.string(), model_name);
+        if (!success) {
+            spdlog::error("Could not download model: {}", model_name);
+            std::exit(EXIT_FAILURE);
+        }
+        model_dir = (tmp_dir / "herro-v1");
+        remove_tmp_dir = true;
     }
 
     // The overall pipeline will be as follows -
@@ -130,11 +151,11 @@ int correct(int argc, char* argv[]) {
     // 2. Window generation, encoding + inference and decoding to generate
     // final reads.
     pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
-                                           infer_threads, batch_size, model_path);
+                                           infer_threads, batch_size, model_dir);
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
-    ErrorCorrectionMapperNode aligner(reads[0], correct_threads);
+    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -150,7 +171,7 @@ int correct(int argc, char* argv[]) {
     std::vector<dorado::stats::StatsCallable> stats_callables;
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-    constexpr auto kStatsPeriod = 100ms;
+    constexpr auto kStatsPeriod = 5000ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
@@ -170,6 +191,10 @@ int correct(int argc, char* argv[]) {
     tracker.summarize();
 
     spdlog::info("> finished correction");
+
+    if (remove_tmp_dir) {
+        std::filesystem::remove_all(model_dir.parent_path());
+    }
 
     return 0;
 }

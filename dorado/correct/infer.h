@@ -3,17 +3,23 @@
 #include "types.h"
 #include "utils/gpu_profiling.h"
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
+
+#include <filesystem>
+
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#endif
 
 namespace dorado::correction {
 
 // Custom collate function. Replacement for torch::utils::rnn::pad_sequence
 // because that was running much slower than this version.
 template <typename T>
-torch::Tensor collate(std::vector<torch::Tensor>& tensors,
-                      T fill_val,
-                      torch::ScalarType type,
-                      T* mem_ptr) {
+torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::ScalarType type) {
     dorado::utils::ScopedProfileRange spr("collate", 1);
     auto max_length = std::max_element(tensors.begin(), tensors.end(),
                                        [](const torch::Tensor& a, const torch::Tensor& b) {
@@ -26,8 +32,7 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
                                       })
                              ->sizes()[1];
     auto options = torch::TensorOptions().dtype(type).device(torch::kCPU);
-    torch::Tensor batch =
-            torch::from_blob(mem_ptr, {(int)tensors.size(), max_length, max_reads}, options);
+    torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
     T* ptr = batch.data_ptr<T>();
     std::fill(ptr, ptr + batch.numel(), fill_val);
     // Copy over data for each tensor
@@ -36,9 +41,13 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors,
                                            torch::indexing::Slice(0, tensors[i].sizes()[1])});
         slice.copy_(tensors[i]);
     }
-    spdlog::trace("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
-                  batch.numel(), batch.sum().item<T>());
+    LOG_TRACE("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
+              batch.numel(), batch.sum().item<T>());
     return batch;
 }
+
+int calculate_batch_size(const std::string& device, float memory_fraction);
+
+ModelConfig parse_model_config(const std::filesystem::path& config_path);
 
 }  // namespace dorado::correction

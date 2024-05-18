@@ -347,4 +347,14 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
     fi
 done
 
+# Test dorado correct with auto detected platform. If that fails run on cpu.
+if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir/corrected_reads.fq
+    num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq | awk '{print $1}')
+    if [[ $num_corrected_reads -ne "12" ]]; then
+        echo "dorado correct command failed to generate expected reads"
+        exit 1
+    fi
+fi
+
 rm -rf $output_dir
