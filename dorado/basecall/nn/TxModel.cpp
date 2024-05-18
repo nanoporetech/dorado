@@ -206,7 +206,7 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
           // TODO: this may benefit from fine-tuning. 8 gives good performance at chunk size 12k
-          num_splits(utils::get_dev_opt<int>("mha_num_splits", 8)),
+          num_splits(utils::get_dev_opt<int>("mha_num_splits", 12)),
           attn_window(attn_window_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
@@ -305,7 +305,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
             c10::optional<at::Tensor> opt_mask;
             // Not using the mask gets us significantly better performance, at the cost of some
             // accuracy. Accuracy loss is minimised by larger num_splits.
-            if (utils::get_dev_opt<bool>("mha_use_mask", false)) {
+            if (utils::get_dev_opt<bool>("mha_use_mask", true)) {
                 opt_mask = mask;
             }
             attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, opt_mask);
