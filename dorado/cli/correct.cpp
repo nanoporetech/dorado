@@ -1,10 +1,10 @@
 #include "cli/cli_utils.h"
+#include "correct/CorrectionProgressTracker.h"
 #include "dorado_version.h"
 #include "models/models.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/ProgressTracker.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/torch_utils.h"
@@ -171,12 +171,16 @@ int correct(int argc, char* argv[]) {
     }
 
     // Set up stats counting.
-    ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    CorrectionProgressTracker tracker;
     tracker.set_description("Correcting");
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    stats_callables.push_back(
-            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-    constexpr auto kStatsPeriod = 5000ms;
+    // Aligner stats need to be passed separately since the aligner node
+    // is not part of the pipeline, so the stats are not automatically
+    // gathered.
+    stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
+        tracker.update_progress_bar(stats, aligner.sample_stats());
+    });
+    constexpr auto kStatsPeriod = 1000ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
@@ -189,7 +193,7 @@ int correct(int argc, char* argv[]) {
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
-    tracker.update_progress_bar(final_stats);
+    tracker.update_progress_bar(final_stats, aligner.sample_stats());
 
     // Report progress during output file finalisation.
     hts_file.finalise([&](size_t) {});

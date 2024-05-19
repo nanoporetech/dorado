@@ -11,6 +11,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
 * Initial support for [poly(A) tail estimation](#polya-tail-estimation).
+* Support for [single-read error correction](#read-rrror-correction).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.

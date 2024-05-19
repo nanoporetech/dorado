@@ -335,9 +335,13 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
 }
 
 void CorrectionNode::input_thread_fn() {
-    m_num_active_feature_threads++;
+    auto thread_id = m_num_active_feature_threads++;
 
     auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
+
+    if (thread_id == 0) {
+        total_reads_in_input = fastx_reader->num_entries();
+    }
 
     Message message;
     while (get_input_message(message)) {
@@ -493,7 +497,8 @@ void CorrectionNode::terminate(const FlushOptions&) {
 
 stats::NamedStats CorrectionNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
-    stats["reads_processed"] = double(num_reads.load());
+    stats["num_reads_corrected"] = double(num_reads.load());
+    stats["total_reads_in_input"] = total_reads_in_input;
     return stats;
 }
 
