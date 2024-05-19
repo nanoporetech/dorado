@@ -280,6 +280,23 @@ In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado
 
 Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences and estimation of interrupted tails can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
 
+### Read Error Correction
+
+Dorado supports single-read error correction with the integration of the [HERRO](https://github.com/lbcb-sci/herro) algorithm. HERRO uses all-vs-all alignment followed by haplotype-aware correction using a deep learning model to achieve higher single-read accuracies. The corrected reads are primarily useful for generating *de novo* assemblies of diploid organisms.
+
+To correct reads, run:
+```
+$ dorado correct reads.fastq(.gz) > corrected_reads.fasta
+```
+
+The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( >64 cores), large system memory ( >256GB) and a modern GPU with a large VRAM (> 32GB).
+
+All required model weights are downloaded automatically by Dorado. However, the weights can also be pre-downloaded and passed via command line in case of offline execution. To do so, run:
+```
+$ dorado download --model herro-v1
+$ dorado correct -m herro-v1 reads.fastq(.gz) > corrected_reads.fasta
+```
+
 ## Available basecalling models
 
 To download all available Dorado models, run:

@@ -236,7 +236,9 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     }
 }
 
-ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)
+ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file,
+                                                     int threads,
+                                                     uint64_t index_size)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
@@ -244,7 +246,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
-    options.index_batch_size = 8000000000ull;
+    options.index_batch_size = index_size;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;

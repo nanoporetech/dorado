@@ -51,7 +51,7 @@ int correct(int argc, char* argv[]) {
                     std::string{"cpu"}
 #endif
             );
-    parser.add_argument("-i", "--infer-threads")
+    parser.add_argument("--infer-threads")
             .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
             .default_value(2)
@@ -60,9 +60,13 @@ int correct(int argc, char* argv[]) {
 #endif
             .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
-            .help("batch size for inference.")
+            .help("Batch size for inference. Default: 0 for auto batch size detection")
             .default_value(0)
             .scan<'i', int>();
+    parser.add_argument("-i", "--index-size")
+            .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
+                  "lower memory footprint.")
+            .default_value("8G");
     parser.add_argument("-m", "--model-path").help("path to correction model folder.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
@@ -93,6 +97,7 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
+    auto index_size(cli::parse_string_to_size<uint64_t>(parser.get<std::string>("index-size")));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
@@ -155,7 +160,7 @@ int correct(int argc, char* argv[]) {
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
-    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads);
+    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads, index_size);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
