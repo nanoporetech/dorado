@@ -1,5 +1,7 @@
 #include "Minimap2Index.h"
 
+#include "minimap2_wrappers.h"
+
 #include <spdlog/spdlog.h>
 
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.

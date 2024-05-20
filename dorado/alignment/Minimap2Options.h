@@ -1,20 +1,28 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 
 namespace dorado::alignment {
 
-static const std::string DEFAULT_MM_PRESET{"lr:hq"};
+constexpr inline std::string_view DEFAULT_MM_PRESET{"lr:hq"};
+
+namespace minimap2 {
+class IdxOptHolder;
+class MapOptHolder;
+}  // namespace minimap2
 
 struct Minimap2IndexOptions {
+    Minimap2IndexOptions();
     std::optional<short> kmer_size;
     std::optional<short> window_size;
     std::optional<uint64_t> index_batch_size;
-    std::string mm2_preset =
-            DEFAULT_MM_PRESET;  // By default we use a preset, hence not an optional
+    std::string mm2_preset{DEFAULT_MM_PRESET};  // By default we use a preset, hence not an optional
+    std::shared_ptr<minimap2::IdxOptHolder> index_options;
 };
 
 inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
@@ -44,6 +52,7 @@ inline bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions
 }
 
 struct Minimap2MappingOptions {
+    Minimap2MappingOptions();
     std::optional<int> best_n_secondary;
     std::optional<int> bandwidth;
     std::optional<int> bandwidth_long;
@@ -57,6 +66,7 @@ struct Minimap2MappingOptions {
     std::optional<std::string> cs;
     std::optional<std::string> dual;
     std::optional<uint64_t> mini_batch_size;
+    std::shared_ptr<minimap2::MapOptHolder> mapping_options;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {

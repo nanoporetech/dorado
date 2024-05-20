@@ -1,5 +1,6 @@
 #include "minimap2_args.h"
 
+#include "minimap2_wrappers.h"
 #include "utils/string_utils.h"
 
 #include <minimap.h>
@@ -11,39 +12,39 @@
 
 namespace {
 
-//void mm_mapopt_override(mm_mapopt_t* mapopt) {
-//    // Force cigar generation.
-//    mapopt->flag |= MM_F_CIGAR;
-//
-//    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
-//    mapopt->cap_kalloc = 100'000'000;
-//    mapopt->max_sw_mat = 50'000'000;
-//}
-//
-//void mm_idxopt_override(mm_idxopt_t* idxopt) {
-//    idxopt->batch_size = 16000000000;
-//    idxopt->mini_batch_size = idxopt->batch_size;
-//}
-//
-//const mm_mapopt_t& mm_mapopt_default() {
-//    static const mm_mapopt_t instance = [] {
-//        mm_mapopt_t mapopt;
-//        mm_mapopt_init(&mapopt);
-//        mm_mapopt_override(&mapopt);
-//        return mapopt;
-//    }();
-//    return instance;
-//}
-//
-//const mm_idxopt_t mm_idxopt_default() {
-//    static const mm_idxopt_t instance = [] {
-//        mm_idxopt_t idxopt{};
-//        mm_idxopt_init(&idxopt);
-//        mm_idxopt_override(&idxopt);
-//        return idxopt;
-//    }();
-//    return instance;
-//}
+void mm_mapopt_override(mm_mapopt_t* mapopt) {
+    // Force cigar generation.
+    mapopt->flag |= MM_F_CIGAR;
+
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    mapopt->cap_kalloc = 100'000'000;
+    mapopt->max_sw_mat = 50'000'000;
+}
+
+void mm_idxopt_override(mm_idxopt_t* idxopt) {
+    idxopt->batch_size = 16000000000;
+    idxopt->mini_batch_size = idxopt->batch_size;
+}
+
+const mm_mapopt_t& mm_mapopt_default() {
+    static const mm_mapopt_t instance = [] {
+        mm_mapopt_t mapopt;
+        mm_mapopt_init(&mapopt);
+        mm_mapopt_override(&mapopt);
+        return mapopt;
+    }();
+    return instance;
+}
+
+const mm_idxopt_t mm_idxopt_default() {
+    static const mm_idxopt_t instance = [] {
+        mm_idxopt_t idxopt{};
+        mm_idxopt_init(&idxopt);
+        mm_idxopt_override(&idxopt);
+        return idxopt;
+    }();
+    return instance;
+}
 
 template <typename TO, typename FROM>
 std::optional<TO> get_optional_as(const std::optional<FROM>& from_optional) {
@@ -128,8 +129,22 @@ void add_arguments(utils::arg_parse::ArgParser& parser) {
             .implicit_value(true);
 }
 
+void apply_preset(Minimap2Options& options, const std::string& preset) {
+    if (preset.empty() || mm_set_opt(preset.c_str(), &options.index_options->get(),
+                                     &options.mapping_options->get()) == 0) {
+        return;
+    }
+    throw std::runtime_error("Cannot set mm2 options with preset: " + preset);
+}
+
 Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     Minimap2Options res{};
+    res.index_options->get() = mm_idxopt_default();
+    res.mapping_options->get() = mm_mapopt_default();
+
+    // apply any preset first.
+    apply_preset(res, parser.visible.get<std::string>("mm2-preset"));
+
     res.kmer_size = get_optional_as<short>(parser.visible.present<int>("k"));
     res.window_size = get_optional_as<short>(parser.visible.present<int>("w"));
     auto index_batch_size = parser.visible.present<std::string>("I");
