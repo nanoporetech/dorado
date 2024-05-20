@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 #include <edlib.h>
 
@@ -26,5 +27,9 @@ namespace dorado::utils {
  */
 
 std::string alignment_to_str(const char* query, const char* target, const EdlibAlignResult& result);
+
+std::vector<CigarOp> parse_cigar(std::string_view cigar);
+
+std::string serialize_cigar(const std::vector<CigarOp>& cigar);
 
 }  // namespace dorado::utils

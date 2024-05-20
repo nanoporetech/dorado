@@ -4,7 +4,9 @@
 #include "model_downloader/model_downloader.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
+#include "read_pipeline/ErrorCorrectionPafReaderNode.h"
 #include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/PafWriter.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
@@ -60,6 +62,11 @@ int correct(int argc, char* argv[]) {
                   "lower memory footprint.")
             .default_value(std::string{"8G"});
     parser.visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
+    parser.add_argument("-p", "--from-paf").help("path to PAF file with alignments.");
+    parser.add_argument("--to-paf")
+            .help("Generate PAF alignments.")
+            .default_value(false)
+            .implicit_value(true);
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
             .default_value(false)
@@ -100,6 +107,7 @@ int correct(int argc, char* argv[]) {
     auto batch_size(parser.visible.get<int>("batch-size"));
     auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(
             parser.visible.get<std::string>("index-size")));
+    auto to_paf(parser.get<bool>("to-paf"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
@@ -120,25 +128,6 @@ int correct(int argc, char* argv[]) {
 
     std::filesystem::path model_dir;
     bool remove_tmp_dir = false;
-    if (parser.visible.is_used("--model-path")) {
-        model_dir = std::filesystem::path(parser.visible.get<std::string>("model-path"));
-
-        if (!std::filesystem::exists(model_dir)) {
-            spdlog::error("Input model path {} does not exist!", model_dir.string());
-            std::exit(EXIT_FAILURE);
-        }
-    } else {
-        // Download model
-        auto tmp_dir = utils::get_downloads_path(std::nullopt);
-        const std::string model_name = "herro-v1";
-        auto success = model_downloader::download_models(tmp_dir.string(), model_name);
-        if (!success) {
-            spdlog::error("Could not download model: {}", model_name);
-            std::exit(EXIT_FAILURE);
-        }
-        model_dir = (tmp_dir / "herro-v1");
-        remove_tmp_dir = true;
-    }
 
     // The overall pipeline will be as follows -
     // 1. The Alignment node will be responsible
@@ -157,22 +146,46 @@ int correct(int argc, char* argv[]) {
     // the windows into a final corrected sequence.
     // 3. Corrected reads will be written out FASTA or BAM format.
 
-    // Setup outut file.
-    auto output_mode = OutputMode::FASTA;
-    utils::HtsFile hts_file("-", output_mode, correct_writer_threads, false);
-
+    std::unique_ptr<utils::HtsFile> hts_file;
     PipelineDescriptor pipeline_desc;
-    // 3. Corrected reads will be written out FASTA or BAM format.
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
-    // 2. Window generation, encoding + inference and decoding to generate
-    // final reads.
-    pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
-                                           infer_threads, batch_size, model_dir);
+    if (!to_paf) {
+        if (parser.visible.is_used("--model-path")) {
+            model_dir = std::filesystem::path(parser.visible.get<std::string>("model-path"));
 
-    // 1. Alignment node that generates alignments per read to be
-    // corrected.
-    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads, index_size);
+            if (!std::filesystem::exists(model_dir)) {
+                spdlog::error("Input model path {} does not exist!", model_dir.string());
+                std::exit(EXIT_FAILURE);
+            }
+
+        } else {
+            // Download model
+            auto tmp_dir = utils::get_downloads_path(std::nullopt);
+            const std::string model_name = "herro-v1";
+            auto success = model_downloader::download_models(tmp_dir.string(), model_name);
+            if (!success) {
+                spdlog::error("Could not download model: {}", model_name);
+                std::exit(EXIT_FAILURE);
+            }
+            model_dir = (tmp_dir / "herro-v1");
+            remove_tmp_dir = true;
+        }
+
+        // Setup outut file.
+        auto output_mode = OutputMode::FASTA;
+        hts_file =
+                std::make_unique<utils::HtsFile>("-", output_mode, correct_writer_threads, false);
+
+        // 3. Corrected reads will be written out FASTA or BAM format.
+        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
+
+        // 2. Window generation, encoding + inference and decoding to generate
+        // final reads.
+        pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
+                                               infer_threads, batch_size, model_dir);
+    } else {
+        pipeline_desc.add_node<PafWriter>({});
+    }
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -186,12 +199,25 @@ int correct(int argc, char* argv[]) {
     CorrectionProgressTracker tracker;
     tracker.set_description("Correcting");
     std::vector<dorado::stats::StatsCallable> stats_callables;
+
+    std::unique_ptr<MessageSink> aligner;
+
     // Aligner stats need to be passed separately since the aligner node
     // is not part of the pipeline, so the stats are not automatically
     // gathered.
+    if (parser.is_used("--from-paf")) {
+        auto paf_file(parser.get<std::string>("from-paf"));
+        aligner = std::make_unique<ErrorCorrectionPafReaderNode>(paf_file);
+    } else {
+        // 1. Alignment node that generates alignments per read to be
+        // corrected.
+        aligner =
+                std::make_unique<ErrorCorrectionMapperNode>(reads[0], aligner_threads, index_size);
+    }
     stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
-        tracker.update_progress_bar(stats, aligner.sample_stats());
+        tracker.update_progress_bar(stats, aligner->sample_stats());
     });
+
     constexpr auto kStatsPeriod = 1000ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
@@ -199,16 +225,22 @@ int correct(int argc, char* argv[]) {
 
     spdlog::info("> starting correction");
     // Start the pipeline.
-    aligner.process(*pipeline);
+    if (parser.is_used("--from-paf")) {
+        dynamic_cast<ErrorCorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
+    } else {
+        dynamic_cast<ErrorCorrectionMapperNode*>(aligner.get())->process(*pipeline);
+    }
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
-    tracker.update_progress_bar(final_stats, aligner.sample_stats());
+    tracker.update_progress_bar(final_stats, aligner->sample_stats());
 
     // Report progress during output file finalisation.
-    hts_file.finalise([&](size_t) {});
+    if (hts_file) {
+        hts_file->finalise([&](size_t) {});
+    }
     tracker.summarize();
 
     spdlog::info("> finished correction");

@@ -206,6 +206,8 @@ add_library(dorado_lib
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
     dorado/read_pipeline/ErrorCorrectionMapperNode.h
+    dorado/read_pipeline/ErrorCorrectionPafReaderNode.cpp
+    dorado/read_pipeline/ErrorCorrectionPafReaderNode.h
     dorado/read_pipeline/CorrectionNode.cpp
     dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
@@ -214,6 +216,8 @@ add_library(dorado_lib
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/PafWriter.cpp
+    dorado/read_pipeline/PafWriter.h
     dorado/read_pipeline/MessageSink.cpp
     dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp

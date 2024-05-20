@@ -18,7 +18,7 @@ add_executable(dorado_tests
     BamWriterTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
-    BarcodeDemuxerNodeTest.cpp    
+    BarcodeDemuxerNodeTest.cpp
     BasecallerParamsTest.cpp
     BedFileTest.cpp
     CliUtilsTest.cpp
@@ -63,7 +63,8 @@ add_executable(dorado_tests
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimRapidAdapterTest.cpp
-    TrimTest.cpp    
+    TrimTest.cpp
+    PafUtilsTest.cpp
 )
 if (NOT IOS)
     target_sources(dorado_tests

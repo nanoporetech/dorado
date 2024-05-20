@@ -60,7 +60,9 @@ add_library(dorado_utils
     types.h
     uuid_utils.cpp
     uuid_utils.h
-)
+    paf_utils.cpp
+    paf_utils.h
+ )
 
 target_compile_definitions(dorado_utils
     PUBLIC
