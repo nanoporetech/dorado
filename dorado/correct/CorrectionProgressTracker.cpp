@@ -76,9 +76,9 @@ void CorrectionProgressTracker::update_progress_bar(const stats::NamedStats& sta
     // 4. Progress of the last pipeline stage is how many of reads are left to be inferred.
     // 5. Overall progress is the sum of steps 3 and 4.
     if (total_reads_in_input > 0 && index_seqs > 0) {
-        const int num_indices = (total_reads_in_input / index_seqs) + 1;
+        const int64_t num_indices = (total_reads_in_input / index_seqs) + 1;
         // Since there will be one last inference stage which will not overlap with alignment
-        const int num_pipeline_stages = num_indices + 1;
+        const int64_t num_pipeline_stages = num_indices + 1;
 
         const float contribution_of_each_stage = 1.f / num_pipeline_stages;
 
