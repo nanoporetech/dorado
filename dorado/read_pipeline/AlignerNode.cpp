@@ -102,12 +102,17 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
         return;
     }
 
+    auto align_info = read_common.client_info->contexts().get_ptr<const alignment::AlignmentInfo>();
+    if (!align_info) {
+        return;
+    }
+
     auto index = get_index(*read_common.client_info);
     if (!index) {
         return;
     }
 
-    alignment::Minimap2Aligner(index).align(read_common, tbuf);
+    alignment::Minimap2Aligner(index).align(read_common, align_info->alignment_header, tbuf);
 }
 
 void AlignerNode::input_thread_fn() {
