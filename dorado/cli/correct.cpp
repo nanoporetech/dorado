@@ -66,7 +66,7 @@ int correct(int argc, char* argv[]) {
     parser.add_argument("-i", "--index-size")
             .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
                   "lower memory footprint.")
-            .default_value("8G");
+            .default_value(std::string{"8G"});
     parser.add_argument("-m", "--model-path").help("path to correction model folder.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
