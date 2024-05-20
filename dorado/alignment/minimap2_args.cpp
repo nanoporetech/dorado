@@ -178,6 +178,7 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
         switch (bandwidth.size()) {
         case 2:
             options.bw_long = bandwidth[1];
+            [[fallthrough]];
         case 1:
             options.bw = bandwidth[0];
             break;
