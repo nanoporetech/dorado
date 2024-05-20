@@ -285,7 +285,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
     std::vector<AlignmentResult> alignment_results{};
-    std::string alignment_string = alignment_header;
+    std::string alignment_string = alignment_header + "\n";
     if (n_regs == 0) {
         alignment_string = read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
     }
