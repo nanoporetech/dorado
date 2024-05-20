@@ -2,6 +2,51 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.7.0] (21 May 2024)
+
+## New feature highlights
+
+1. DNA, RNA and duplex basecalling models with improved single read accuracy.
+2. Support for 5mC_4mC methylation calling.
+3. PolyA tail estimation for transcripts with interrupted tails and plasmids.
+4. `dorado correct` subcommand for single-read error correction of diploid genomes (for assembly pipelines).
+5. Support for --junc-bed mm2 splice option.
+6. Faster BAM indexing and sorting code.
+
+## Changes to default behavior
+
+1. Data tyoe of mean Q-score tag (`qs` updated to `float`.
+
+## Backwards incompatible changes
+
+1. `TWIST` barcode names updated to better reflect kit composition.
+
+## All key changes
+
+* 159b73c7fea64d374b562af32abeaa382af54354 - Add new methylation calling models (5mC_4mC, m6A, pseU)
+* cf46f49c620633bf724904b834e8d394073d0bc4 - Raise error if PolyA config file is not found
+* dc50b97605762423d09d91ec74dd95ad2b5c97c9 - Add MacOS support for v5 basecalling model
+* d6b0f68b3617f34a321db676b780e1a1183b6060 - Change data type of mean Q-score (`qs` tag) to float
+* 7a09ca3d1d1e469570a7df1e5819c39e9dd2325e - Add v5 models for DNA, RNA and duplex
+* f938c415ddc9f458fe718af72c82001448d9c3c7 - List supported models in structured format
+* 70ff95d84b316adb4701f7f43a19151e73b58b5b - Enable `dorado summary` to run on trimmed BAM files
+* 6373792b686538758a16aacb063434c2b3260077 - Detect presence of midstrand barcodes to reduce false positive classifications
+* 68d40da45da886384508173219a9fb677fc50cef - Add support for --junc-bed mm2 splice option
+* 93632025d7df195be625654d968f62321c4a4136 - Update `TWIST` barcode kit names
+* 381f6c3038fb69523ea591b1942d3293d7e9b9aa - Enable adapter trimming when polyA estimation is requested
+* be8ac08652d5fe0b73c1126048b7fd96f29f3419 - Add `dorado correct` support for read error correction
+* a30c489c41bafb3e307060806c5b57caa2c610ef - Use new transformer Koi fused residual rmsnorm kernel
+* c443f75314708b7aed0aafa38fffdb8b2e76e9f2 - Output BAM from dorado trim command
+* eaf4ab28d958c4426a6f57eb9c2a7032d5e1fa80 - Update documentation to reflect new `dorado aligner` defaults
+* a3dce7ebe298ce3e17f3d61ad180b099700afb6a - Demux header merge improvements
+* 67dc5bab58d74ee636e492619a6802db38059534 - Plasmid polyA estimation
+* 6ccf0ed46d275c1e0209de3cb99d0bd56bf7f083 - Add support for v5 basecalling model
+* 08e2c7bb2538c2ba89203a68bbf153e6a6054535 - Index BAM while merging temp files
+* b8de2d900d9aeb1c349931a216db7e05aa2ff2c4 - Set max memory sizes in minimap2
+* b8de2d900d9aeb1c349931a216db7e05aa2ff2c4 - Calculate scaling for rna on non-adapter signal only
+* 949d13ffb41152aaba4df9004d01e8584c8038e3 - Write multiple temp files for sorted bam output
+* c88e9f753219f3c462c3678ddfad6b4561830f33 - Update CMake Minimum Version to 3.23
+
 # [0.6.2] (9 May 2024)
 
 This release of Dorado disables trimming of the rapid adapter during basecalling which was causing some RBK datasets to have a high unclassified rate during demux.
