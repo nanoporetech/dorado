@@ -13,6 +13,7 @@ namespace dorado {
 struct AlignmentInfo {
     alignment::Minimap2Options minimap_options;
     std::string reference_file;
+    std::string alignment_header;
 };
 
 class ClientInfo {
