@@ -17,8 +17,8 @@ This release of Dorado introduces new and more accurate v5 models for improved b
 
 ## Changes to default behavior
 
-1. Data tyoe of mean Q-score tag (`qs` updated to `float`.
-2. Adapter trimming enabled when PolyA estimation is requested.
+1. Data type of mean Q-score tag (`qs`) updated to `float`.
+2. Adapter trimming is enabled when PolyA estimation is requested.
 
 ## Backwards incompatible changes
 
@@ -68,7 +68,7 @@ This release of Dorado fixes bugs in `dorado aligner` related to using presets i
 * fa79f4a77fca737704d8a9e08d0495b9988f88ef - Fix reverse strand alignments when re-mapping a SAM/BAM file with `dorado aligner`
 * 3b2c8252d1a40bb0f941ca2ceca0849be15d15fa - Propagate `sv` tag to split reads
 * 11675a565da9af52de89a3f6614d15e57d10765d - Fix bug where errors were being swallowed in HtsFile class
-* 73046e19fd443dfb48f3fbb82c0b37c5c7cfb8d5 - Fx typo in Warnings.cmake
+* 73046e19fd443dfb48f3fbb82c0b37c5c7cfb8d5 - Fix typo in Warnings.cmake
 
 # [0.6.0] (1 April 2024)
 
