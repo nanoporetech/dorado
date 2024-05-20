@@ -1,5 +1,6 @@
 #include "Minimap2Aligner.h"
 
+#include "sam_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -281,6 +282,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) 
                              &m_minimap_index->mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
+    std::vector<AlignmentResult> alignment_results{};
     std::string alignment_string{};
     if (n_regs == 0) {
         alignment_string = read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
@@ -293,7 +295,8 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) 
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
-    read_common.alignment_string = alignment_string;
+    read_common.alignment_results =
+            parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
 }
 
 HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
