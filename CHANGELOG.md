@@ -4,6 +4,8 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.7.0] (21 May 2024)
 
+This release of Dorado introduces new and more accurate v5 models for improved basecalling. It also adds a new subcommand, `dorado correct`, for single-read error correction to help Nanopore based `de novo` assemblies of diploid genomes. In addition, this release contains a slew of bug fixes, stability enhancements and updates to barcode classification.
+
 ## New feature highlights
 
 1. DNA, RNA and duplex basecalling models with improved single read accuracy.
@@ -16,6 +18,7 @@ All notable changes to Dorado will be documented in this file.
 ## Changes to default behavior
 
 1. Data tyoe of mean Q-score tag (`qs` updated to `float`.
+2. Adapter trimming enabled when PolyA estimation is requested.
 
 ## Backwards incompatible changes
 
