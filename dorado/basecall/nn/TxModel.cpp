@@ -26,6 +26,11 @@
 extern "C" {
 #include "koi.h"
 }
+
+static bool koi_can_use_cutlass() {
+    cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
+    return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
+}
 #endif
 
 #include <filesystem>
@@ -69,19 +74,53 @@ at::Tensor RMSNormImpl::forward(at::Tensor x) {
     return x;
 }
 
-GatedMLPImpl::GatedMLPImpl(int in_features, int hidden_features) {
+GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_)
+        : in_features(in_features_), hidden_features(hidden_features_) {
     fc1 = register_module("fc1",
                           Linear(LinearOptions(in_features, 2 * hidden_features).bias(false)));
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
 };
 
 at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
-    const at::Tensor fc1_ = fc1(x);
-    const std::vector<at::Tensor> chunks = fc1_.chunk(2, -1);
-    const at::Tensor &y = chunks[0];
-    const at::Tensor &gate = chunks[1];
-    at::Tensor out = fc2(functional::silu(gate).mul_(y));
-    return out;
+    at::Tensor t;
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    if (utils::get_dev_opt<bool>("use_koi_swiglu", true) && koi_can_use_cutlass()) {
+        utils::ScopedProfileRange spr("FC1+SILU", 3);
+        auto N = x.size(0);
+        auto T = x.size(1);
+        if (!features_interleaved) {
+            fc1->weight = fc1->weight.view({2, hidden_features, -1})
+                                  .transpose(0, 1)
+                                  .contiguous()
+                                  .view({-1, in_features});
+            features_interleaved = true;
+        }
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        t = torch::empty({N, T, hidden_features}, x.options());
+        int res = host_linear_swiglu_f16(stream, int(N * T), 2 * hidden_features, in_features,
+                                         x.data_ptr(), fc1->weight.data_ptr(), t.data_ptr());
+        if (res != KOI_SUCCESS) {
+            throw std::runtime_error("Koi SwiGLU failed.");
+        }
+    } else
+#endif
+    {
+        {
+            utils::ScopedProfileRange spr("FC1", 3);
+            t = fc1(x);
+        }
+        {
+            utils::ScopedProfileRange spr("SILU", 3);
+            const auto chunks = t.chunk(2, -1);
+            const auto &y = chunks[0];
+            const auto &gate = chunks[1];
+            t = functional::silu(gate).mul_(y);
+        }
+    }
+    {
+        utils::ScopedProfileRange spr("FC2", 3);
+        return fc2(t);
+    }
 }
 
 RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
@@ -189,7 +228,7 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
           nhead(nhead_),
           head_dim(d_model_ / nhead_),
           // TODO: this may benefit from fine-tuning. 8 gives good performance at chunk size 12k
-          num_splits(utils::get_dev_opt<int>("mha_num_splits", 8)),
+          num_splits(utils::get_dev_opt<int>("mha_num_splits", 12)),
           attn_window(attn_window_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
@@ -222,6 +261,27 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     const int64_t T = x.size(1);
     const int64_t C = x.size(2);
 
+#if DORADO_CUDA_BUILD
+    bool use_koi_rote = utils::get_dev_opt<bool>("use_koi_rote", true) && d_model <= 512;
+    if (use_koi_rote) {
+        if (!wqkv_transposed) {
+            auto w = wqkv->weight;
+            wqkv->weight.view({3, -1, head_dim / 2, 2, d_model}).slice(0, 0, 2) =
+                    wqkv->weight.view({3, -1, 2, head_dim / 2, d_model})
+                            .slice(0, 0, 2)
+                            .transpose(2, 3)
+                            .clone();
+            if (wqkv->bias.numel()) {
+                wqkv->bias.view({3, -1, head_dim / 2, 2}).slice(0, 0, 2) =
+                        wqkv->bias.view({3, -1, 2, head_dim / 2})
+                                .slice(0, 0, 2)
+                                .transpose(2, 3)
+                                .clone();
+            }
+            wqkv_transposed = true;
+        }
+    }
+#endif
     at::Tensor qkv;
     at::Tensor attn_output_ntc;
     {
@@ -231,11 +291,25 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     }
     {
         utils::ScopedProfileRange spr("ROTE", 3);
-        qkv = rotary_emb(qkv);
+#if DORADO_CUDA_BUILD
+        if (use_koi_rote) {
+            auto stream = at::cuda::getCurrentCUDAStream().stream();
+            auto out = torch::empty({3, N, nhead, T, head_dim}, qkv.options());
+            int res = host_rotary_embed_transpose_f16(
+                    stream, static_cast<int>(N), static_cast<int>(T), nhead, head_dim,
+                    rotary_emb->theta, qkv.data_ptr(), out.data_ptr());
+            if (res != KOI_SUCCESS) {
+                throw std::runtime_error("Koi windowed attention failed.");
+            }
+            qkv = out;
+        } else
+#endif
+        {
+            qkv = rotary_emb(qkv);
+        }
     }
     {
         utils::ScopedProfileRange spr("MEA", 3);
-        // NT3HD -> N3HTD -> N[1]HTD
         auto attn_window_mask = get_attn_window_mask(T);
         attn_output_ntc = at::empty({N, T, C}, x.options());
         auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
@@ -250,7 +324,13 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
             const auto v = qkv[2].slice(-2, kvb, kve);
             const auto mask = attn_window_mask.index({Slice(qb, qe), Slice(kvb, kve)});
 #if TORCH_VERSION_MAJOR >= 2
-            attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, mask);
+            c10::optional<at::Tensor> opt_mask;
+            // Not using the mask gets us significantly better performance, at the cost of some
+            // accuracy. Accuracy loss is minimised by larger num_splits.
+            if (utils::get_dev_opt<bool>("mha_use_mask", true)) {
+                opt_mask = mask;
+            }
+            attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, opt_mask);
 #else
             attn_output.slice(-2, qb, qe) = scaled_dot_product_attention_naive(q, k, v, mask);
 #endif
@@ -350,7 +430,13 @@ LinearScaledCRFImpl::LinearScaledCRFImpl(const tx::CRFEncoderParams &params) {
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
 };
 
-at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) { return linear(x) * m_params.scale; }
+at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
+    if (!scale_applied) {
+        linear->weight *= m_params.scale;
+        scale_applied = true;
+    }
+    return linear(x);
+}
 
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {

@@ -40,6 +40,9 @@ struct GatedMLPImpl : torch::nn::Module {
 
     at::Tensor forward(const at::Tensor &x);
 
+    bool features_interleaved = false;
+    int in_features;
+    int hidden_features;
     torch::nn::Linear fc1{nullptr}, fc2{nullptr};
 };
 
@@ -90,6 +93,7 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
     const int d_model, nhead, head_dim, num_splits;
     const std::pair<int, int> attn_window;
     const at::TensorOptions options;
+    bool wqkv_transposed = false;
 
     std::unordered_map<MaskKey, at::Tensor, MaskKeyHash> mask_cache{};
 
@@ -135,6 +139,7 @@ struct LinearScaledCRFImpl : torch::nn::Module {
 
     at::Tensor forward(const at::Tensor &x);
 
+    bool scale_applied = false;
     torch::nn::Linear linear{nullptr};
     tx::CRFEncoderParams m_params;
 };
