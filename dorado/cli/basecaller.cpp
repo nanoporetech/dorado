@@ -4,7 +4,6 @@
 #include "basecall/CRFModelConfig.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
-#include "data_loader/ModelFinder.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_sequences.h"
@@ -27,6 +26,10 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+
+#include <argparse.hpp>
+
+#include <string>
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
@@ -81,6 +84,32 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
     return *custom_kit_info;
 }
 
+void set_basecaller_params(const argparse::ArgumentParser& arg,
+                           basecall::CRFModelConfig& model_config,
+                           const std::string& device) {
+    // Argparser has no method returning optional<T> if the argument is unset but it has a default value
+    auto get_opt = [&arg](const std::string& name) {
+        return arg.is_used(name) ? std::optional<int>(arg.get<int>(name)) : std::nullopt;
+    };
+    model_config.basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+                                   get_opt("--chunksize"), get_opt("--overlap"),
+                                   get_opt("--batchsize"));
+
+    if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
+        // Force the batch size to 128
+        // TODO: This is tuned for LSTM models - investigate Tx
+        model_config.basecaller.set_batch_size(128);
+    }
+#if DORADO_METAL_BUILD
+    else if (device == "metal" && model_config.is_tx_model() &&
+             model_config.basecaller.batch_size() == 0) {
+        model_config.basecaller.set_batch_size(32);
+    }
+#endif
+
+    model_config.normalise_basecaller_params();
+}
+
 }  // namespace
 
 using dorado::utils::default_parameters;
@@ -90,14 +119,11 @@ using namespace dorado::models;
 namespace fs = std::filesystem;
 
 void setup(const std::vector<std::string>& args,
-           const fs::path& model_path,
+           const basecall::CRFModelConfig& model_config,
            const std::string& data_path,
            const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
-           size_t chunk_size,
-           size_t overlap,
-           size_t batch_size,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
@@ -122,10 +148,8 @@ void setup(const std::vector<std::string>& args,
            const ModelSelection& model_selection,
            std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
-    const auto model_config = basecall::load_crf_model_config(model_path);
-
     spdlog::debug(model_config.to_string());
-    const std::string model_name = models::extract_model_name_from_path(model_path);
+    const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
     if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
@@ -161,9 +185,8 @@ void setup(const std::vector<std::string>& args,
             remora_models, device, default_parameters.mod_base_runners_per_caller,
             remora_batch_size);
 
-    auto [runners, num_devices] =
-            api::create_basecall_runners(model_config, device, num_runners, 0, batch_size,
-                                         chunk_size, 1.f, api::PipelineType::simplex, 0.f);
+    auto [runners, num_devices] = api::create_basecall_runners(
+            model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -245,8 +268,8 @@ void setup(const std::vector<std::string>& args,
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
 
     api::create_simplex_pipeline(
-            pipeline_desc, std::move(runners), std::move(remora_runners), overlap,
-            mean_qscore_start_pos, !adapter_no_trim, thread_allocations.scaler_node_threads,
+            pipeline_desc, std::move(runners), std::move(remora_runners), mean_qscore_start_pos,
+            !adapter_no_trim, thread_allocations.scaler_node_threads,
             true /* Enable read splitting */, thread_allocations.splitter_node_threads,
             thread_allocations.remora_threads, current_sink_node,
             PipelineDescriptor::InvalidNodeHandle);
@@ -665,16 +688,18 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
+    const auto device = parser.visible.get<std::string>("-x");
+    auto model_config = basecall::load_crf_model_config(model_path);
+    set_basecaller_params(parser.visible, model_config, device);
+
     spdlog::info("> Creating basecall pipeline");
 
     try {
-        setup(args, model_path, data, mods_model_paths, parser.visible.get<std::string>("-x"),
-              parser.visible.get<std::string>("--reference"), parser.visible.get<int>("-c"),
-              parser.visible.get<int>("-o"), parser.visible.get<int>("-b"),
-              default_parameters.num_runners, default_parameters.remora_batchsize,
-              default_parameters.remora_threads, methylation_threshold, output_mode,
-              parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
-              parser.visible.get<int>("--min-qscore"),
+        setup(args, model_config, data, mods_model_paths, device,
+              parser.visible.get<std::string>("--reference"), default_parameters.num_runners,
+              default_parameters.remora_batchsize, default_parameters.remora_threads,
+              methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
+              parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive,
               alignment::minimap2::process_option_string(mm2_option_string),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),

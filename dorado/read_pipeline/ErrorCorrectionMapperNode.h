@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado {
@@ -55,6 +56,7 @@ private:
     // Map to collects alignments by target id.
     std::mutex m_correction_mtx;
     std::unordered_map<std::string, CorrectionAlignments> m_correction_records;
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_processed_queries_per_target;
 
     std::mutex m_copy_mtx;
     std::condition_variable m_copy_cv;

@@ -24,8 +24,6 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const std::string& device,
         size_t num_gpu_runners,
         size_t num_cpu_runners,
-        size_t batch_size,
-        size_t chunk_size,
         float memory_fraction,
         PipelineType pipeline_type,
         float batch_size_time_penalty) {
@@ -43,34 +41,27 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         spdlog::warn("CPU basecalling is not supported on this platform. Results may be incorrect");
 #endif  // #ifdef DORADO_TX2
 
-        if (batch_size == 0) {
-            batch_size = 128;
-        }
         if (num_cpu_runners == 0) {
-            num_cpu_runners =
-                    basecall::auto_calculate_num_runners(model_config, batch_size, memory_fraction);
+            num_cpu_runners = basecall::auto_calculate_num_runners(model_config, memory_fraction);
         }
-        spdlog::debug("- CPU calling: set batch size to {}, num_cpu_runners to {}", batch_size,
-                      num_cpu_runners);
-
+        spdlog::debug("- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::ModelRunner>(
-                    model_config, device, int(chunk_size), int(batch_size)));
+            runners.push_back(std::make_unique<basecall::ModelRunner>(model_config, device));
+        }
+        if (runners.back()->batch_size() != (size_t)model_config.basecaller.batch_size()) {
+            spdlog::debug("- CPU calling: set batch_size to {}", runners.back()->batch_size());
         }
     }
 #if DORADO_METAL_BUILD
     else if (device == "metal") {
-        auto caller = create_metal_caller(model_config, int(chunk_size), int(batch_size),
-                                          memory_fraction);
+        auto caller = create_metal_caller(model_config, memory_fraction);
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
-        if (batch_size == 0) {
+        if (model_config.basecaller.batch_size() == 0) {
             spdlog::info(" - set batch size to {}", runners.back()->batch_size());
-        } else {
-            if (runners.back()->batch_size() != batch_size) {
-                spdlog::warn("- set batch size to {}", runners.back()->batch_size());
-            }
+        } else if (runners.back()->batch_size() != (size_t)model_config.basecaller.batch_size()) {
+            spdlog::warn("- set batch size to {}", runners.back()->batch_size());
         }
     }
 #endif  // DORADO_METAL_BUILD
@@ -89,8 +80,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         futures.reserve(devices.size());
         for (const auto& device_string : devices) {
             futures.push_back(pool.push(create_cuda_caller, std::cref(model_config),
-                                        int(chunk_size), int(batch_size), std::cref(device_string),
-                                        memory_fraction, pipeline_type, batch_size_time_penalty));
+                                        std::cref(device_string), memory_fraction, pipeline_type,
+                                        batch_size_time_penalty));
         }
 
         callers.reserve(futures.size());
@@ -115,13 +106,6 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     (void)num_gpu_runners;
     (void)batch_size_time_penalty;
 #endif
-
-    auto adjusted_chunk_size = runners.front()->chunk_size();
-    if (chunk_size != adjusted_chunk_size) {
-        spdlog::debug("- adjusted chunk size to match model stride: {} -> {}", chunk_size,
-                      adjusted_chunk_size);
-        chunk_size = adjusted_chunk_size;
-    }
 
     return {std::move(runners), num_devices};
 }

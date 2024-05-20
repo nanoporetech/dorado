@@ -8,6 +8,12 @@
 #include <spdlog/spdlog.h>
 #include <torch/types.h>
 
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#endif
+
 const int TOP_K = 30;
 
 namespace dorado::correction {
@@ -21,8 +27,8 @@ bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignm
             long_indel |= cigar[i].len >= 30;
         }
     }
-    spdlog::trace("filter ? tstart {} qstart {} qend {} res {}", overlap.tstart, overlap.qstart,
-                  overlap.qend, long_indel);
+    LOG_TRACE("filter ? tstart {} qstart {} qend {} res {}", overlap.tstart, overlap.qstart,
+              overlap.qend, long_indel);
     return long_indel;
 }
 
@@ -60,8 +66,8 @@ void calculate_accuracy(OverlapWindow& overlap,
         qseq = utils::reverse_complement(alignments.seqs[overlap_idx].substr(qstart, qlen));
     }
 
-    spdlog::trace("tstart {} tend {} qstart {} qend {} cig st {} cig end {}", tstart, tend, qstart,
-                  qend, overlap.cigar_start_idx, overlap.cigar_end_idx);
+    LOG_TRACE("tstart {} tend {} qstart {} qend {} cig st {} cig end {}", tstart, tend, qstart,
+              qend, overlap.cigar_start_idx, overlap.cigar_end_idx);
 
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
 
@@ -85,14 +91,14 @@ void calculate_accuracy(OverlapWindow& overlap,
             break;
         }
 
-        spdlog::trace("len {} tpos {} qpos {}", len, tpos, qpos);
+        LOG_TRACE("len {} tpos {} qpos {}", len, tpos, qpos);
 
         switch (cigar[idx].op) {
         case CigarOpType::MATCH:
             for (int j = 0; j < len; j++) {
                 auto tbase = tseq[tpos + j];
                 auto qbase = qseq[qpos + j];
-                spdlog::trace("{} tbase {}, {} qbase {}", tpos + j, tbase, qpos + j, qbase);
+                LOG_TRACE("{} tbase {}, {} qbase {}", tpos + j, tbase, qpos + j, qbase);
 
                 if (tbase == qbase) {
                     m += 1;
@@ -118,8 +124,8 @@ void calculate_accuracy(OverlapWindow& overlap,
     }
 
     overlap.accuracy = (static_cast<float>(m) / (m + s + i + d));
-    spdlog::trace("m {} s {} i {} d {}", m, s, i, d);
-    spdlog::trace("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
+    LOG_TRACE("m {} s {} i {} d {}", m, s, i, d);
+    LOG_TRACE("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
 }
 
 // Calculate the maximum number of possible inserts for each position of the
@@ -175,7 +181,9 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         int tstart,
         const std::vector<int>& max_ins) {
     static auto base_encoding = gen_base_encoding();
+#ifndef NDEBUG
     static auto base_decoding = gen_base_decoding();
+#endif
     auto bases_options = at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
     auto quals_options = at::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU);
 
@@ -201,14 +209,14 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         target_bases_tensor[tpos] = base_encoding[tseq[i + tstart]];
         target_quals_tensor[tpos] = normalize_quals(float(tqual[i + tstart] + 33));
 
-        spdlog::trace("tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]],
-                      target_quals_tensor[tpos]);
+        LOG_TRACE("tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]],
+                  target_quals_tensor[tpos]);
         tpos += 1 + max_ins[i];
     }
 
     // Write bases for each overlap in the window
     for (int w = 0; w < (int)overlaps.size(); w++) {
-        spdlog::trace("get_features_for_ol_window for window {}", w);
+        LOG_TRACE("get_features_for_ol_window for window {}", w);
         int* query_bases_tensor = &target_bases_tensor[length * (w + 1)];
         float* query_quals_tensor = &target_quals_tensor[length * (w + 1)];
         const auto& overlap = overlaps[w];
@@ -230,9 +238,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             qlen = qend - qstart;
         }
 
-        spdlog::trace(
-                "qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}",
-                qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
+        LOG_TRACE("qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}",
+                  qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
         int query_iter = 0;
         std::string qseq = alignments.seqs[overlap.overlap_idx].substr(qstart, qlen);
         std::vector<uint8_t> qqual(alignments.quals[overlap.overlap_idx].begin() + qstart,
@@ -251,8 +258,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         tpos = offset;
         int idx = offset + std::accumulate(max_ins.begin(), max_ins.begin() + offset, 0);
 
-        spdlog::trace("cigar_len {}, cigar_end {}, gap {}, tpos {}, idx {}, fwd {}", cigar_len,
-                      cigar_end, gap, tpos, idx, fwd ? '+' : '-');
+        LOG_TRACE("cigar_len {}, cigar_end {}, gap {}, tpos {}, idx {}, fwd {}", cigar_len,
+                  cigar_end, gap, tpos, idx, fwd ? '+' : '-');
 
         if (idx > 0) {
             std::fill(query_bases_tensor, query_bases_tensor + idx, base_encoding['.']);
@@ -271,7 +278,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                 l = overlap.cigar_end_offset;
             }
 
-            spdlog::trace("cigar_idx {} l {}", cigar_idx, l);
+            LOG_TRACE("cigar_idx {} l {}", cigar_idx, l);
 
             switch (op) {
             case CigarOpType::MATCH:
@@ -281,10 +288,10 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                     auto qual = qqual[query_iter];
 
                     query_bases_tensor[idx] = base;
-                    query_quals_tensor[idx] = normalize_quals((float)qual + 33);
+                    query_quals_tensor[idx] = normalize_quals((float)(qual + 33));
 
-                    spdlog::trace("idx {} base {}, qual {}", idx,
-                                  base_decoding[query_bases_tensor[idx]], query_quals_tensor[idx]);
+                    LOG_TRACE("idx {} base {}, qual {}", idx,
+                              base_decoding[query_bases_tensor[idx]], query_quals_tensor[idx]);
 
                     idx += 1 + max_ins[tpos + i];
                     query_iter++;
@@ -294,7 +301,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                 break;
             case CigarOpType::DEL:
                 for (uint32_t i = 0; i < l; i++) {
-                    spdlog::trace("idx {}", idx);
+                    LOG_TRACE("idx {}", idx);
                     idx += 1 + max_ins[tpos + i];
                 }
                 tpos += l;
@@ -306,11 +313,11 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                     auto qual = qqual[query_iter];
 
                     query_bases_tensor[(idx + i)] = base;
-                    query_quals_tensor[(idx + i)] = normalize_quals((float)qual + 33);
+                    query_quals_tensor[(idx + i)] = normalize_quals((float)(qual + 33));
 
-                    spdlog::trace("idx + i {} base {}, qual {}", idx + i,
-                                  base_decoding[query_bases_tensor[(idx + i)]],
-                                  query_quals_tensor[(idx + i)]);
+                    LOG_TRACE("idx + i {} base {}, qual {}", idx + i,
+                              base_decoding[query_bases_tensor[(idx + i)]],
+                              query_quals_tensor[(idx + i)]);
 
                     query_iter++;
                 }
@@ -323,7 +330,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             std::fill(query_bases_tensor + idx, query_bases_tensor + length, base_encoding['.']);
         }
 
-        spdlog::trace("sum of bases at at overlap {} {}", w, bases.sum().item<int>());
+        LOG_TRACE("sum of bases at at overlap {} {}", w, bases.sum().item<int>());
     }
 
     return {std::move(bases), std::move(quals)};
@@ -362,22 +369,22 @@ std::vector<std::pair<int, int>> get_supported(at::Tensor& bases) {
         counter.fill(0);
         for (int r = 0; r < reads; r++) {
             auto base = bases_ptr[r * length + c];
-            spdlog::trace("row {} base {}", r, base);
+            LOG_TRACE("row {} base {}", r, base);
             if (base == base_encoding['.']) {
                 continue;
             }
             counter[base_forward[base_decoding[base]]]++;
         }
 
-        spdlog::trace("col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'],
-                      counter['T'], counter['G'], counter['*']);
+        LOG_TRACE("col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'], counter['T'],
+                  counter['G'], counter['*']);
         int count = (int)std::count_if(counter.begin(), counter.end(),
                                        [](int num) { return num >= 3; });
         if (count >= 2) {
             supported.push_back({tpos, ins});
-            spdlog::trace("support added for {} {}", tpos, ins);
+            LOG_TRACE("support added for {} {}", tpos, ins);
         }
-        spdlog::trace("num supported {}", supported.size());
+        LOG_TRACE("num supported {}", supported.size());
     }
     return supported;
 }
@@ -416,7 +423,7 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
     std::vector<WindowFeatures> wfs;
     for (int w = 0; w < (int)windows.size(); w++) {
         int win_len = (w == (int)windows.size() - 1) ? tlen - window_size * w : window_size;
-        spdlog::trace("win idx {}: win len {}", w, win_len);
+        LOG_TRACE("win idx {}: win len {}", w, win_len);
         auto& overlap_windows = windows[w];
 
         // Filter overlaps with very large indels
@@ -426,8 +433,8 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                 filtered_overlaps.push_back(std::move(ovlp));
             }
         }
-        spdlog::trace("window {} pre filter windows {} post filter windows {}", w,
-                      overlap_windows.size(), filtered_overlaps.size());
+        LOG_TRACE("window {} pre filter windows {} post filter windows {}", w,
+                  overlap_windows.size(), filtered_overlaps.size());
         overlap_windows = std::move(filtered_overlaps);
 
         // Sort overlaps by score
@@ -444,12 +451,10 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
         overlap_windows.resize(std::min(TOP_K, (int)overlap_windows.size()));
 
         if (overlap_windows.size() == 1) {
-            spdlog::trace("window {} 1st {}-{}", w, overlap_windows[0].qstart,
-                          overlap_windows[0].qend);
+            LOG_TRACE("window {} 1st {}-{}", w, overlap_windows[0].qstart, overlap_windows[0].qend);
         } else if (overlap_windows.size() > 1) {
-            spdlog::trace("window {} 1st {}-{} 2nd {}-{}", w, overlap_windows[0].qstart,
-                          overlap_windows[0].qend, overlap_windows[1].qstart,
-                          overlap_windows[1].qend);
+            LOG_TRACE("window {} 1st {}-{} 2nd {}-{}", w, overlap_windows[0].qstart,
+                      overlap_windows[0].qend, overlap_windows[1].qstart, overlap_windows[1].qend);
         }
 
         WindowFeatures wf;

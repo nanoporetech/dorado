@@ -49,7 +49,7 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $outpu
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
 if ! uname -r | grep -q tegra; then
-    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG > $output_dir/calls.bam
+    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
     dorado_check_bam_not_empty
 fi
 
@@ -346,5 +346,15 @@ for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/d
         exit 1
     fi
 done
+
+# Test dorado correct with auto detected platform. If that fails run on cpu.
+if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir/corrected_reads.fq
+    num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq | awk '{print $1}')
+    if [[ $num_corrected_reads -ne "12" ]]; then
+        echo "dorado correct command failed to generate expected reads"
+        exit 1
+    fi
+fi
 
 rm -rf $output_dir

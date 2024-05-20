@@ -28,8 +28,6 @@ using dorado::basecall::PipelineType;
 #if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const basecall::CRFModelConfig& model_config,
-        int chunk_size,
-        int batch_size,
         const std::string& device,
         float memory_limit_fraction,
         PipelineType pipeline_type,
@@ -37,8 +35,6 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
         const basecall::CRFModelConfig& model_config,
-        int chunk_size,
-        int batch_size,
         float memory_limit_fraction);
 #endif
 

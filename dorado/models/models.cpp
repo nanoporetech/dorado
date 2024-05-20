@@ -372,6 +372,26 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
         },
 
+        // v5.0.0
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_fast@v5.0.0",
+                "2625e2191a2e2a15cf5df11bcbab32d7f2712070c04eed6dfbd5b770dd7bbbc2",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::FAST, VV::v5_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                "b09d5c73d403c44d0d3e3cefb5ddc5bcee1f3d8cec4efd0872c16a32eba5ff41",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+                "cbc7fa906cdfbbcaf5bf6d5dc0a20a63fa83e6ebefdd3aeda70724c47ca9f966",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+        },
+
         // RNA002
         ModelInfo{
                 "rna002_70bps_fast@v3",
@@ -405,6 +425,24 @@ const std::vector<ModelInfo> models = {
                 CC::RNA004_130BPS,
                 ModelVariantPair{ModelVariant::SUP, VV::v3_0_1},
         },
+        ModelInfo{
+                "rna004_130bps_fast@v5.0.0",
+                "3b45ecedf2e20c56e15033402deb77f3c4e67df49aea8d7b76acdbb4029e8ea0",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::FAST, VV::v5_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_hac@v5.0.0",
+                "7ca33d19824e41e1c438a60d4d844c86d449be25ea59b8df23adee385a2d9f5d",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.0.0",
+                "c1fdcbc4eb75ec89ed43363f5360cb41541eb67ffa4729aabef843105bb07bb6",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+        },
 };
 
 }  // namespace simplex
@@ -436,6 +474,12 @@ const std::vector<ModelInfo> models = {
                 "2631423b8843a82f69c8d4ab07fa554b7356a29f25c03424c26e7096d0e01418",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::NONE, VV::v4_3_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_5khz_stereo@v1.3",
+                "6942f2d13b6509ae88eb3bd4f7a9f149b72edce817b800fe22fded6c7566dc10",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::NONE, VV::v5_0_0},
         },
 };
 
@@ -739,6 +783,67 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
                 ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
         },
+        // DNA V5.0.0
+        // 4mC+5mC all-context HAC and SUP
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_4mC@v1",
+                "e765f669affb2f3a1450a49dc0070c3ddb3a0dfe0d7294fcc513a5eac984a1a2",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_4mC@v1",
+                "2e6361452cf860d2ab15e83cd3a70254c6235031f6c11c4b5c7a3554d82f0e39",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v1_0_0},
+        },
+        // 5mC+5hmC all-context HAC and SUP
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v1",
+                "77af422ac0ef9f9383c2f396d06aa225b618507124a797250dc2e491d4fd634b",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_5hmC@v1",
+                "f4b3e8ebe49b2f2f02be958e073fbff130995e55d158ec93c710824373fcfdd3",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
+        },
+        // 5mC+5hmC CG-context HAC and SUP
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mCG_5hmCG@v1",
+                "0311a4c1573cfd02e9075e4c23137cd17c59f7b235805daa6cd769f101facc33",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mCG_5hmCG@v1",
+                "fb6a25b50259e305e493d2b202e09973e08ae6347d5fd7554aa96a4c2264d82e",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
+        },
+        // 6mA all-context HAC and SUP
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v1",
+                "db064e9097f11a7f4eacffea4c85491b15176756c536cb92ed6b13dd8fa47305",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v1",
+                "01755ea73e722f6f7fe4e0bee1060c9cc1c62f0f9e8a5ebd762385691d1564cf",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
+        },
 
         // RNA004 v3.0.1
         ModelInfo{
@@ -748,9 +853,53 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v3_0_1},
                 ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
         },
-};
+        // RNA004 v5.0.0
+        // m6A - all context
+        ModelInfo{
+                "rna004_130bps_hac@v5.0.0_m6A@v1",
+                "34ae823429d00e38f9fe4a21e6ae0de70e6362e7f030da981752248c9d0f7f46",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_m6A, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.0.0_m6A@v1",
+                "83d0e0432f6021a560f7b9ee1eea9ed54dd734ed80cd3bfefa98a20eae81a319",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_m6A, VV::v1_0_0},
+        },
+        // pseU - all context
+        ModelInfo{
+                "rna004_130bps_hac@v5.0.0_pseU@v1",
+                "bdb219bae25676f4584293a5494be1813360ac1829bc694995e4eaf105ebac79",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_pseU, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.0.0_pseU@v1",
+                "d9ed391ce75eb47d10638dfaaea6081fa6bfb573feb4a4c7de040549559c2442",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_pseU, VV::v1_0_0},
+        }};
 
 }  // namespace modified
+
+namespace correction {
+
+const std::vector<ModelInfo> models = {
+        ModelInfo{
+                "herro-v1",
+                "c7077840f84b469f2c0fd2ae44649fa5f7fa45132540fb54536792c8e22dab9a",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+};
+
+}  // namespace correction
 
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
@@ -780,7 +929,8 @@ std::vector<std::string> modified_model_variants() {
 
 // Returns true if model_name matches any configured model
 bool is_valid_model(const std::string& model_name) {
-    for (const auto& collection : {simplex::models, stereo::models, modified::models}) {
+    for (const auto& collection :
+         {simplex::models, stereo::models, modified::models, correction::models}) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return true;
@@ -812,6 +962,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
     download_model_set(simplex::models);
     download_model_set(stereo::models);
     download_model_set(modified::models);
+    download_model_set(correction::models);
 
     return success;
 }
@@ -900,6 +1051,102 @@ std::string extract_model_names_from_paths(const std::vector<std::filesystem::pa
         model_names += models::extract_model_name_from_path(model_path);
     }
     return model_names;
+}
+
+std::string get_supported_model_info() {
+    std::string result = "---\n";
+
+    const auto& canonical_base_map = mods_canonical_base_map();
+
+    for (const auto& variant : chemistry_variants()) {
+        if (variant.first == Chemistry::UNKNOWN) {
+            continue;
+        }
+
+        // Chemistry name
+        result += variant.second + ":\n";
+
+        const auto& flowcell_code_map = flowcell_codes();
+        const auto& kit_code_map = kit_codes();
+        // Add some info on compatible kits and flowcells
+        const auto& chemistry_kit_info = chemistry_kits().at(variant.first);
+        result += "  sample_type: " + sample_types().at(chemistry_kit_info.sample_type) + "\n";
+        result += "  sampling rate: " + std::to_string(chemistry_kit_info.sampling_rate) + "\n";
+
+        // Get the union of all supported flowcells and kits
+        std::set<Flowcell> supported_flowcell_codes;
+        std::set<KitCode> supported_kit_codes;
+        for (const auto& kitset : chemistry_kit_info.kit_sets) {
+            for (const auto& flowcell : kitset.first) {
+                supported_flowcell_codes.insert(flowcell);
+            }
+            for (const auto& kit : kitset.second) {
+                supported_kit_codes.insert(kit);
+            }
+        }
+
+        std::string flowcells, kits;
+        for (const auto& flowcell : supported_flowcell_codes) {
+            flowcells += "    - " + flowcell_code_map.at(flowcell).name + "\n";
+        }
+        for (const auto& kit : supported_kit_codes) {
+            kits += "    - " + kit_code_map.at(kit).name + "\n";
+        }
+        result += "  flowcells:\n" + flowcells;
+        result += "  kits:\n" + kits;
+
+        result += "  simplex_models:\n";
+        for (const auto& simplex_model : simplex_models()) {
+            if (simplex_model.chemistry == variant.first) {
+                result += "    - " + simplex_model.name + ":\n";
+
+                // If there is a newer model for this condition, add the outdated flag.
+                const auto simplex_matches = find_models(
+                        simplex_models(), variant.first,
+                        {simplex_model.simplex.variant, ModelVersion::NONE}, ModsVariantPair());
+                if (simplex_matches.back().name != simplex_model.name) {
+                    result += "        outdated: true\n";
+                }
+
+                // Dump out all the mod models that are compatible with this simplex model
+                const auto mod_matches = find_models(modified_models(), variant.first,
+                                                     simplex_model.simplex, ModsVariantPair());
+                if (!mod_matches.empty()) {
+                    result += "        modified_models:\n";
+                    for (const auto& mod_model : mod_matches) {
+                        result += "          - " + mod_model.name + ":\n";
+                        result += "              canonical_base: " +
+                                  canonical_base_map.at(mod_model.mods.variant) + "\n";
+                        // If there is a newer model for this condition, add the outdated flag.
+                        const auto mod_type_matches =
+                                find_models(modified_models(), variant.first, simplex_model.simplex,
+                                            {mod_model.mods.variant, ModelVersion::NONE});
+                        if (mod_type_matches.back().name != mod_model.name) {
+                            result += "              outdated: true\n";
+                        }
+                    }
+                }
+
+                const auto stereo_matches = find_models(stereo_models(), variant.first,
+                                                        simplex_model.simplex, ModsVariantPair());
+                if (!stereo_matches.empty()) {
+                    result += "        stereo_models:\n";
+                    for (const auto& stereo_model : stereo_matches) {
+                        result += "          - " + stereo_model.name + ":\n";
+                        // If there is a newer model for this condition, add the outdated flag.
+                        const auto duplex_type_matches =
+                                find_models(stereo_models(), variant.first, simplex_model.simplex,
+                                            {stereo_model.mods.variant, ModelVersion::NONE});
+                        if (duplex_type_matches.back().name != stereo_model.name) {
+                            result += "              outdated: true\n";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
 }  // namespace dorado::models

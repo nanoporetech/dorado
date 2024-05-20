@@ -30,6 +30,7 @@ public:
 
 private:
     std::shared_ptr<MetalCaller> m_caller;
+    // LSTM: NTC - Tx: NCT
     at::Tensor m_input;
 
     // Performance monitoring stats.

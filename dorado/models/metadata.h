@@ -20,12 +20,15 @@ enum class ModelVariant : uint16_t {
 
 // Enumeration of modifications codes
 enum class ModsVariant : uint8_t {
+    M_4mC_5mC,
     M_5mC_5hmC,
     M_5mCG,
     M_5mCG_5hmCG,
     M_5mC,
     M_6mA,
+    M_m6A,
     M_m6A_DRACH,
+    M_pseU,
     NONE  // NONE must be last
 };
 
@@ -49,11 +52,13 @@ enum class ModelVersion : uint8_t {
     v4_1_0,
     v4_2_0,
     v4_3_0,
+    v5_0_0,
     NONE  // NONE must be last
 };
 
 const std::unordered_map<std::string, ModelVariant>& model_variants_map();
 const std::unordered_map<std::string, ModsVariant>& mods_variants_map();
+const std::unordered_map<ModsVariant, std::string>& mods_canonical_base_map();
 const std::unordered_map<std::string, ModelVersion>& version_map();
 
 ModelVariant get_model_variant(const std::string& variant);
@@ -72,6 +77,10 @@ struct ModelVariantPair {
     bool is_auto = false;
     bool has_variant() const { return variant != ModelVariant::NONE; }
     bool has_ver() const { return ver != ModelVersion::NONE; }
+
+    bool operator==(const ModelVariantPair& other) const {
+        return other.variant == variant && other.ver == ver;
+    }
 };
 
 struct ModsVariantPair {

@@ -133,6 +133,12 @@ TEST_CASE(TEST_TAG "  ModelFinder get_stereo_model_name", TEST_TAG) {
                         std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_3_0},
                                         "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
                                         "dna_r10.4.1_e8.2_5khz_stereo@v1.2"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::HAC, VV::v5_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.3"),
+                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v5_0_0},
+                                        "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+                                        "dna_r10.4.1_e8.2_5khz_stereo@v1.3"),
                 }));
 
         CAPTURE(expected_simplex);
@@ -172,6 +178,8 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
 
                 // with single mods
                 std::make_tuple("auto,5mC", MS{"auto,5mC", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mC}}}),
+                std::make_tuple("hac,4mC_5mC",
+                                MS{"hac,4mC_5mC", MVP{MV::HAC}, {ModsVP{ModsV::M_4mC_5mC}}}),
                 std::make_tuple("fast,5mC_5hmC",
                                 MS{"fast,5mC_5hmC", MVP{MV::FAST}, {ModsVP{ModsV::M_5mC_5hmC}}}),
                 std::make_tuple("auto,5mCG",
@@ -182,7 +190,11 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
                 std::make_tuple("auto,6mA", MS{"auto,6mA", MVP{MV::AUTO}, {ModsVP{ModsV::M_6mA}}}),
                 std::make_tuple("auto,m6A_DRACH",
                                 MS{"auto,m6A_DRACH", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A_DRACH}}}),
-
+                std::make_tuple("auto,m6A", MS{"auto,m6A", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A}}}),
+                std::make_tuple("sup,pseU", MS{"sup,pseU", MVP{MV::SUP}, {ModsVP{ModsV::M_pseU}}}),
+                std::make_tuple("sup,pseU,m6A", MS{"sup,pseU,m6A",
+                                                   MVP{MV::SUP},
+                                                   {ModsVP{ModsV::M_pseU}, ModsVP{ModsV::M_m6A}}}),
                 // with single mods and version
                 std::make_tuple("sup@v4.1.0,5mC@v2", MS{"sup@v4.1.0,5mC@v2",
                                                         MVP{MV::SUP, VV::v4_1_0},

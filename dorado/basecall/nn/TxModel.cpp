@@ -16,6 +16,8 @@
 #include <torch/serialize.h>
 #include <torch/types.h>
 #include <torch/version.h>
+
+#include <cmath>
 #if TORCH_VERSION_MAJOR >= 2
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
@@ -87,8 +89,7 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
                                          int max_seq_len_,
                                          const at::TensorOptions &options_)
         : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
-    const at::Tensor inv_freq =
-            torch::pow(theta, torch::arange(0, dim, 2, options) / dim).reciprocal();
+    const at::Tensor inv_freq = get_inv_freqs();
 
     // freqs.shape := {max_seq_len, 1, 1, dim/2}
     const at::Tensor freqs =
@@ -97,6 +98,27 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
     register_buffer("cos_freqs", torch::cos(freqs).to(options));
     register_buffer("sin_freqs", torch::sin(freqs).to(options));
 };
+
+at::Tensor RotaryEmbeddingImpl::get_inv_freqs() const {
+    // Torch2.0 does not have support for ATen::pow in the MPS(apple) backend.
+    // Use a vector and std::pow from cmath instead and cast to a tensor
+
+    // Equivalent to:
+    // const at::Tensor inv_freq =
+    //         torch::pow(theta, torch::arange(0, dim, 2, options) / dim).reciprocal();
+
+    // TODO: Remove when updating to torch2.1+
+    std::vector<double> vec;
+    vec.reserve(dim / 2);
+    for (float i = 0; i < dim; i += 2) {
+        vec.push_back(std::pow(static_cast<double>(theta), static_cast<double>(i / (float)dim)));
+    }
+    at::Tensor inv_freq =
+            torch::from_blob(vec.data(), vec.size(), torch::TensorOptions().dtype(torch::kDouble))
+                    .to(options)
+                    .reciprocal();
+    return inv_freq;
+}
 
 at::Tensor RotaryEmbeddingImpl::forward(at::Tensor &qkv) {
     // Input is NT3HD
@@ -173,7 +195,7 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
     const float theta = 10000.0f;
-    const int64_t max_seq_len = 2000;
+    const int64_t max_seq_len = 2048;
     rotary_emb =
             register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
@@ -338,11 +360,12 @@ TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::Tenso
     crf = register_module("crf", LinearScaledCRF(config.tx->crf));
 }
 
-at::Tensor TxModelImpl::forward(const at::Tensor &x) {
+at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT) {
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);
-        h = convs->forward(x);
+        // Returns: NTC
+        h = convs->forward(chunk_NCT);
     }
     {
         utils::ScopedProfileRange spr("TransEnc", 1);
@@ -356,6 +379,7 @@ at::Tensor TxModelImpl::forward(const at::Tensor &x) {
         utils::ScopedProfileRange spr("CRF", 1);
         h = crf(h);
     }
+    // Returns: NTC
     return h;
 }
 

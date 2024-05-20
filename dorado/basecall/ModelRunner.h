@@ -14,15 +14,12 @@ namespace dorado::basecall {
 
 class ModelRunner final : public ModelRunnerBase {
 public:
-    ModelRunner(const CRFModelConfig &model_config,
-                const std::string &device,
-                int chunk_size,
-                int batch_size);
+    ModelRunner(const CRFModelConfig &model_config, const std::string &device);
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const CRFModelConfig &config() const final { return m_config; };
-    size_t chunk_size() const final { return m_input.size(2); }
-    size_t batch_size() const final { return m_input.size(0); }
+    size_t chunk_size() const final { return m_input_NCT.size(2); }
+    size_t batch_size() const final { return m_input_NCT.size(0); }
     void terminate() final {}
     void restart() final {}
     std::string get_name() const final { return "ModelRunner"; }
@@ -34,7 +31,7 @@ private:
     at::TensorOptions m_options;
     decode::DecoderOptions m_decoder_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
-    at::Tensor m_input;
+    at::Tensor m_input_NCT;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

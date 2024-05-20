@@ -154,6 +154,7 @@ IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
     }
 
     m_index.reset(next_idx, IndexDeleter());
+    mm_mapopt_update(&m_mapping_options.value(), m_index.get());
     spdlog::debug("Loaded next index chunk with {} target seqs", m_index->n_seq);
     return IndexLoadResult::success;
 }

@@ -19,7 +19,6 @@ namespace dorado::api {
 void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<basecall::RunnerPtr>&& runners,
                              std::vector<modbase::RunnerPtr>&& modbase_runners,
-                             size_t overlap,
                              uint32_t mean_qscore_start_pos,
                              bool trim_adapter,
                              int scaler_node_threads,
@@ -29,13 +28,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              NodeHandle sink_node_handle,
                              NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
-    auto adjusted_overlap = (overlap / model_config.stride_inner()) * model_config.stride_inner();
-    if (overlap != adjusted_overlap) {
-        spdlog::debug("- adjusted overlap to match model stride: {} -> {}", overlap,
-                      adjusted_overlap);
-        overlap = adjusted_overlap;
-    }
-
+    const auto overlap = model_config.basecaller.overlap();
+    assert(overlap % model_config.stride_inner() == 0);
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
 
@@ -109,7 +103,6 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    std::vector<basecall::RunnerPtr>&& runners,
                                    std::vector<basecall::RunnerPtr>&& stereo_runners,
                                    std::vector<modbase::RunnerPtr>&& modbase_runners,
-                                   size_t overlap,
                                    uint32_t mean_qscore_start_pos,
                                    int scaler_node_threads,
                                    int splitter_node_threads,
@@ -124,13 +117,14 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto stereo_model_name =
             std::filesystem::canonical(stereo_model_config.model_path).filename().string();
     auto duplex_rg_name = std::string(model_name + "_" + stereo_model_name);
-    auto stereo_model_stride_inner = stereo_model_config.stride_inner();
-    auto adjusted_stereo_overlap =
-            (overlap / stereo_model_stride_inner) * stereo_model_stride_inner;
+
+    // configs should have called normalise_basecaller_params()
+    assert(model_config.has_normalised_basecaller_params());
+    assert(stereo_model_config.has_normalised_basecaller_params());
 
     auto stereo_basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {}, std::move(stereo_runners), adjusted_stereo_overlap, duplex_rg_name, 1000,
-            "StereoBasecallerNode", mean_qscore_start_pos);
+            {}, std::move(stereo_runners), stereo_model_config.basecaller.overlap(), duplex_rg_name,
+            1000, "StereoBasecallerNode", mean_qscore_start_pos);
 
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
@@ -165,13 +159,9 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     auto splitter_node = pipeline_desc.add_node<ReadSplitNode>(
             {pairing_node}, std::move(duplex_splitter), splitter_node_threads, 1000);
 
-    auto simplex_model_stride_inner = model_config.stride_inner();
-    auto adjusted_simplex_overlap =
-            (overlap / simplex_model_stride_inner) * simplex_model_stride_inner;
-
     auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
-            {splitter_node}, std::move(runners), adjusted_simplex_overlap, model_name, 1000,
-            "BasecallerNode", mean_qscore_start_pos);
+            {splitter_node}, std::move(runners), model_config.basecaller.overlap(), model_name,
+            1000, "BasecallerNode", mean_qscore_start_pos);
 
     // TODO: Do we want to trim rapid adapters in duplex?
 

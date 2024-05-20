@@ -33,6 +33,7 @@ struct BarcodeScoreResult {
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
+    bool found_midstrand = false;
 };
 
 struct SingleEndResult {
@@ -164,7 +165,7 @@ struct ModBaseInfo {
 };
 
 // Enum for handling CIGAR ops
-enum CigarOpType { INS = 0, DEL, MATCH, MISMATCH };
+enum class CigarOpType : uint8_t { INS = 0, DEL, MATCH, MISMATCH };
 
 struct CigarOp {
     CigarOpType op;

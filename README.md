@@ -315,9 +315,12 @@ The versioning of modification models is bound to the basecalling model. This me
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **dna_r10.4.1_e8.2_400bps_fast@v4.3.0** | | | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v4.3.0** | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_fast@v5.0.0** | | | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_fast@v4.3.0 | | | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_hac@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_sup@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
@@ -350,9 +353,12 @@ The versioning of modification models is bound to the basecalling model. This me
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **rna004_130bps_fast@v3.0.1** | N/A | N/A | 4 kHz |
-| **rna004_130bps_hac@v3.0.1** | N/A | N/A | 4 kHz |
-| **rna004_130bps_sup@v3.0.1** | m6A_DRACH | v1 | 4 kHz |
+| **rna004_130bps_fast@v5.0.0** | N/A | N/A | 4 kHz |
+| **rna004_130bps_hac@v5.0.0** | m6A<br />pseU | v1<br />v1<br />v1 | 4 kHz |
+| **rna004_130bps_sup@v5.0.0** | m6A<br />pseU | v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_fast@v3.0.1 | N/A | N/A | 4 kHz |
+| rna004_130bps_hac@v3.0.1 | N/A | N/A | 4 kHz |
+| rna004_130bps_sup@v3.0.1 | m6A_DRACH | v1 | 4 kHz |
 | rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
 | rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
 

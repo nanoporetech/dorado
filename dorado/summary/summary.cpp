@@ -168,7 +168,7 @@ bool SummaryData::write_rows_from_reader(
         auto duration = reader.get_tag<float>("du");
 
         auto seqlen = reader.record->core.l_qseq;
-        auto mean_qscore = reader.get_tag<int>("qs");
+        auto mean_qscore = reader.get_tag<float>("qs");
 
         auto num_samples = reader.get_tag<int>("ns");
         auto trim_samples = reader.get_tag<int>("ts");
@@ -178,8 +178,13 @@ bool SummaryData::write_rows_from_reader(
             barcode = "unclassified";
         }
 
-        float sample_rate = num_samples / duration;
-        float template_duration = (num_samples - trim_samples) / sample_rate;
+        float template_duration = duration;
+        if (num_samples > 0 && duration > 0) {
+            // If either num_samples or duration are 0 (due to missing tags), then
+            // we can't properly compute template_duration.
+            float sample_rate = num_samples / duration;
+            template_duration = (num_samples - trim_samples) / sample_rate;
+        }
         auto start_time = 0.0;
         auto exp_start_time_iter = read_group_exp_start_time.find(rg_value);
         if (exp_start_time_iter != read_group_exp_start_time.end()) {

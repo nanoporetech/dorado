@@ -1,5 +1,7 @@
 #pragma once
 
+#include "BasecallerParams.h"
+
 #include <cmath>
 #include <filesystem>
 #include <optional>
@@ -169,6 +171,8 @@ struct CRFModelConfig {
     // Tx Model Params
     std::optional<tx::Params> tx = std::nullopt;
 
+    BasecallerParams basecaller;
+
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }
     // True if this model config describes a transformer model
@@ -178,6 +182,11 @@ struct CRFModelConfig {
     int scale_factor() const { return is_tx_model() ? tx->upsample.scale_factor : 1; };
     // The model stride multiplied by the upsampling scale factor
     int stride_inner() const { return stride * scale_factor(); };
+
+    // Normalise the basecaller parameters `chunk_size` and `overlap` to the `strde_inner`
+    void normalise_basecaller_params() { basecaller.normalise(stride_inner()); }
+    // True if `chunk_size` and `overlap` is evenly divisible by the `strde_inner`
+    bool has_normalised_basecaller_params() const;
 
     std::string to_string() const;
 };
