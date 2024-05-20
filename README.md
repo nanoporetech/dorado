@@ -290,6 +290,8 @@ To correct reads, run:
 $ dorado correct reads.fastq(.gz) > corrected_reads.fasta
 ```
 
+An index file is generated for the input fastX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
+
 The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( >64 cores), large system memory ( >256GB) and a modern GPU with a large VRAM (> 32GB).
 
 All required model weights are downloaded automatically by Dorado. However, the weights can also be pre-downloaded and passed via command line in case of offline execution. To do so, run:
