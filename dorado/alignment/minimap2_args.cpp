@@ -137,6 +137,64 @@ void apply_preset(Minimap2Options& options, const std::string& preset) {
     throw std::runtime_error("Cannot set mm2 options with preset: " + preset);
 }
 
+void apply_indexing_options(const utils::arg_parse::ArgParser& parser, mm_idxopt_t& options) {
+    auto kmer = get_optional_as<short>(parser.visible.present<int>("k"));
+    if (kmer) {
+        options.k = *kmer;
+    }
+    auto window_size = get_optional_as<short>(parser.visible.present<int>("w"));
+    if (window_size) {
+        options.w = *window_size;
+    }
+    auto index_batch_size = parser.visible.present<std::string>("I");
+    if (index_batch_size) {
+        options.batch_size = utils::arg_parse::parse_string_to_size<uint64_t>(*index_batch_size);
+    }
+    options.mini_batch_size = options.batch_size;
+}
+
+void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_t& options) {
+    auto secondary = parser.visible.present<std::string>("--secondary");
+    bool print_secondary{true};
+    if (secondary && !utils::arg_parse::parse_yes_or_no(*secondary)) {
+        print_secondary = false;
+    }
+
+    auto best_n_secondary = parser.visible.present<int>("N");
+    if (best_n_secondary.value_or(1) == 0) {
+        spdlog::warn("Ignoring '-N 0', using preset default");
+        print_secondary = true;
+    } else {
+        options.best_n = best_n_secondary.value_or(options.best_n);
+    }
+
+    if (!print_secondary) {
+        options.flag |= MM_F_NO_PRINT_2ND;
+    }
+
+    auto optional_bandwidth = parser.visible.present<std::string>("--bandwidth");
+    if (optional_bandwidth) {
+        auto bandwidth = utils::arg_parse::parse_string_to_sizes<int>(*optional_bandwidth);
+        switch (bandwidth.size()) {
+        case 2:
+            options.bw_long = bandwidth[1];
+        case 1:
+            options.bw = bandwidth[0];
+            break;
+        default:
+            throw std::runtime_error(
+                    "Wrong number of arguments for minimap2 option '--bandwidth'.");
+        }
+    }
+    auto soft_clipping = parser.visible.present<bool>("Y");
+    if (soft_clipping.value_or(false)) {
+        options.flag |= MM_F_SOFTCLIP;
+    }
+    if (parser.hidden.get<bool>("secondary-seq")) {
+        options.flag |= MM_F_SECONDARY_SEQ;
+    }
+}
+
 Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     Minimap2Options res{};
     res.index_options->get() = mm_idxopt_default();
@@ -144,6 +202,14 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
 
     // apply any preset first.
     apply_preset(res, parser.visible.get<std::string>("mm2-preset"));
+
+    apply_indexing_options(parser, res.index_options->get());
+    apply_mapping_options(parser, res.mapping_options->get());
+
+    if (mm_check_opt(&res.index_options->get(), &res.mapping_options->get()) < 0) {
+        throw std::runtime_error(
+                "Invalid minimap2 options string, for details run with --verbose flag.");
+    }
 
     res.kmer_size = get_optional_as<short>(parser.visible.present<int>("k"));
     res.window_size = get_optional_as<short>(parser.visible.present<int>("w"));
@@ -180,12 +246,13 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
         }
     }
     res.soft_clipping = parser.visible.present<bool>("Y");
+    res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
+
     auto junc_bed = parser.visible.present<std::string>("--junc-bed");
     if (junc_bed) {
         res.junc_bed = std::move(*junc_bed);
     }
     res.mm2_preset = parser.visible.get<std::string>("mm2-preset");
-    res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
     res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
 
     //res.bandwidth = mm_mapopt_default().bw;
