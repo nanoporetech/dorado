@@ -178,6 +178,7 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
         });
 
         spdlog::debug("Pushing {} records for correction", m_shadow_correction_records.size());
+        m_reads_to_infer.store(m_reads_to_infer.load() + m_shadow_correction_records.size());
         for (auto& [_, r] : m_shadow_correction_records) {
             pipeline.push_message(std::move(r));
         }
@@ -190,9 +191,8 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     std::vector<std::thread> aligner_threads;
     std::thread copy_thread =
             std::thread(&ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
-    int index = 0;
     do {
-        spdlog::debug("Align with index {}", index);
+        spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
 
@@ -227,7 +227,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         m_read_mutex.clear();
         m_processed_queries_per_target.clear();
         // 4. Load next index and loop
-        index++;
+        m_current_index++;
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
     m_copy_terminate.store(true);
@@ -236,7 +236,9 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     }
 }
 
-ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file, int threads)
+ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file,
+                                                     int threads,
+                                                     uint64_t index_size)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
@@ -244,7 +246,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     alignment::Minimap2Options options = alignment::dflt_options;
     options.kmer_size = 25;
     options.window_size = 17;
-    options.index_batch_size = 8000000000ull;
+    options.index_batch_size = index_size;
     options.mm2_preset = "ava-ont";
     options.bandwidth = 150;
     options.bandwidth_long = 2000;
@@ -266,10 +268,16 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     } else {
         spdlog::debug("Loaded mm2 index.");
     }
+    m_index_seqs = m_index->index()->n_seq;
 }
 
 stats::NamedStats ErrorCorrectionMapperNode::sample_stats() const {
-    return stats::from_obj(m_work_queue);
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats["num_reads_aligned"] = m_alignments_processed.load();
+    stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());
+    stats["index_seqs"] = m_index_seqs;
+    stats["current_idx"] = m_current_index;
+    return stats;
 }
 
 }  // namespace dorado

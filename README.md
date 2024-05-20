@@ -11,6 +11,7 @@ Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nan
 * Simplex [barcode classification](#barcode-classification).
 * Support for aligned read output in SAM/BAM.
 * Initial support for [poly(A) tail estimation](#polya-tail-estimation).
+* Support for [single-read error correction](#read-error-correction).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance.
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -279,6 +280,25 @@ In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado
 ### Poly(A) tail estimation
 
 Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences and estimation of interrupted tails can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
+
+### Read Error Correction
+
+Dorado supports single-read error correction with the integration of the [HERRO](https://github.com/lbcb-sci/herro) algorithm. HERRO uses all-vs-all alignment followed by haplotype-aware correction using a deep learning model to achieve higher single-read accuracies. The corrected reads are primarily useful for generating *de novo* assemblies of diploid organisms.
+
+To correct reads, run:
+```
+$ dorado correct reads.fastq(.gz) > corrected_reads.fasta
+```
+
+Dorado correct only supports FASTX(.gz) as the input and generates a FASTA file as output. An index file is generated for the input FASTX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
+
+The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( > 64 cores), large system memory ( > 256GB) and a modern GPU with a large VRAM ( > 32GB).
+
+All required model weights are downloaded automatically by Dorado. However, the weights can also be pre-downloaded and passed via command line in case of offline execution. To do so, run:
+```
+$ dorado download --model herro-v1
+$ dorado correct -m herro-v1 reads.fastq(.gz) > corrected_reads.fasta
+```
 
 ## Available basecalling models
 

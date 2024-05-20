@@ -274,6 +274,8 @@ add_library(dorado_lib
     dorado/correct/decode.h
     dorado/correct/infer.cpp
     dorado/correct/infer.h
+    dorado/correct/CorrectionProgressTracker.cpp
+    dorado/correct/CorrectionProgressTracker.h
 )
 
 enable_warnings_as_errors(dorado_lib)
