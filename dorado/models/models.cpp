@@ -786,15 +786,15 @@ const std::vector<ModelInfo> models = {
         // DNA V5.0.0
         // 4mC+5mC all-context HAC and SUP
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_4mC@v1",
-                "e765f669affb2f3a1450a49dc0070c3ddb3a0dfe0d7294fcc513a5eac984a1a2",
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_4mC_5mC@v1",
+                "e3f8b05ac202a9023b800cd1619a01ebf9ffd0ef0e731722a425f258f0b205cd",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v1_0_0},
         },
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_4mC@v1",
-                "2e6361452cf860d2ab15e83cd3a70254c6235031f6c11c4b5c7a3554d82f0e39",
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_4mC_5mC@v1",
+                "dfbef77e122d69805dc59cb23afd238af597369e289c1ee1f5463c5221e6d61a",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v1_0_0},

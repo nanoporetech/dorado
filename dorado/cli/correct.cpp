@@ -1,10 +1,10 @@
 #include "cli/cli_utils.h"
+#include "correct/CorrectionProgressTracker.h"
 #include "dorado_version.h"
 #include "models/models.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/ProgressTracker.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/torch_utils.h"
@@ -51,7 +51,7 @@ int correct(int argc, char* argv[]) {
                     std::string{"cpu"}
 #endif
             );
-    parser.add_argument("-i", "--infer-threads")
+    parser.add_argument("--infer-threads")
             .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
             .default_value(2)
@@ -60,9 +60,13 @@ int correct(int argc, char* argv[]) {
 #endif
             .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
-            .help("batch size for inference.")
+            .help("Batch size for inference. Default: 0 for auto batch size detection")
             .default_value(0)
             .scan<'i', int>();
+    parser.add_argument("-i", "--index-size")
+            .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
+                  "lower memory footprint.")
+            .default_value(std::string{"8G"});
     parser.add_argument("-m", "--model-path").help("path to correction model folder.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to correct.")
@@ -93,6 +97,7 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
+    auto index_size(cli::parse_string_to_size<uint64_t>(parser.get<std::string>("index-size")));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
@@ -155,7 +160,7 @@ int correct(int argc, char* argv[]) {
 
     // 1. Alignment node that generates alignments per read to be
     // corrected.
-    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads);
+    ErrorCorrectionMapperNode aligner(reads[0], aligner_threads, index_size);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;
@@ -166,12 +171,16 @@ int correct(int argc, char* argv[]) {
     }
 
     // Set up stats counting.
-    ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    CorrectionProgressTracker tracker;
     tracker.set_description("Correcting");
     std::vector<dorado::stats::StatsCallable> stats_callables;
-    stats_callables.push_back(
-            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-    constexpr auto kStatsPeriod = 5000ms;
+    // Aligner stats need to be passed separately since the aligner node
+    // is not part of the pipeline, so the stats are not automatically
+    // gathered.
+    stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
+        tracker.update_progress_bar(stats, aligner.sample_stats());
+    });
+    constexpr auto kStatsPeriod = 1000ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
@@ -184,7 +193,7 @@ int correct(int argc, char* argv[]) {
     // final stats to allow accurate summarisation.
     auto final_stats = pipeline->terminate(DefaultFlushOptions());
     stats_sampler->terminate();
-    tracker.update_progress_bar(final_stats);
+    tracker.update_progress_bar(final_stats, aligner.sample_stats());
 
     // Report progress during output file finalisation.
     hts_file.finalise([&](size_t) {});

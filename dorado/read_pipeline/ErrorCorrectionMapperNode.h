@@ -25,7 +25,7 @@ namespace dorado {
 
 class ErrorCorrectionMapperNode : public MessageSink {
 public:
-    ErrorCorrectionMapperNode(const std::string& index_file, int threads);
+    ErrorCorrectionMapperNode(const std::string& index_file, int threads, uint64_t index_size);
     ~ErrorCorrectionMapperNode() = default;
     std::string get_name() const override { return "ErrorCorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
@@ -65,8 +65,11 @@ private:
     // Mutex per target id to prevent a global lock across all targets.
     std::unordered_map<std::string, std::unique_ptr<std::mutex>> m_read_mutex;
 
+    int m_index_seqs{0};
+    int m_current_index{0};
     std::atomic<int> m_reads_read{0};
     std::atomic<int> m_alignments_processed{0};
+    std::atomic<size_t> m_reads_to_infer{0};
 
     std::atomic<bool> m_copy_terminate{false};
 };
