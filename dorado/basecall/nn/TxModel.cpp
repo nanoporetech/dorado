@@ -309,7 +309,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         }
     }
     attn_output_ntc = at::empty({N, T, C}, x.options());
-#if DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
     int res = KOI_NOT_SUPPORTED;
     if (utils::get_dev_opt<bool>("use_koi_attention", true) && koi_can_use_cutlass()) {
         utils::ScopedProfileRange spr("KOI_MEA", 3);
