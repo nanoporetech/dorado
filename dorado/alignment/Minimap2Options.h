@@ -11,14 +11,12 @@ namespace dorado::alignment {
 
 constexpr inline std::string_view DEFAULT_MM_PRESET{"lr:hq"};
 
-namespace minimap2 {
-class IdxOptHolder;
-class MapOptHolder;
-}  // namespace minimap2
+class Minimap2IdxOptHolder;
+class Minimap2MapOptHolder;
 
 struct Minimap2IndexOptions {
     Minimap2IndexOptions();
-    std::shared_ptr<minimap2::IdxOptHolder> index_options;
+    std::shared_ptr<Minimap2IdxOptHolder> index_options;
     std::string junc_bed;
 };
 
@@ -31,7 +29,7 @@ bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
 
 struct Minimap2MappingOptions {
     Minimap2MappingOptions();
-    std::shared_ptr<minimap2::MapOptHolder> mapping_options;
+    std::shared_ptr<Minimap2MapOptHolder> mapping_options;
 };
 
 bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);

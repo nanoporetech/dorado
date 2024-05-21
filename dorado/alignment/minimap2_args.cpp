@@ -57,10 +57,10 @@ std::optional<TO> get_optional_as(const std::optional<FROM>& from_optional) {
 
 }  // namespace
 
-namespace dorado::alignment::minimap2 {
+namespace dorado::alignment {
 
-std::string extract_mm2_opts_arg(const std::vector<std::string>& args,
-                                 std::vector<std::string>& remaining_args) {
+std::string extract_minimap2_options_string_arg(const std::vector<std::string>& args,
+                                                std::vector<std::string>& remaining_args) {
     auto mm2_opt_key_itr = std::find(std::cbegin(args), std::cend(args), MM2_OPTS_ARG);
     if (mm2_opt_key_itr == std::cend(args)) {
         remaining_args = args;
@@ -76,7 +76,7 @@ std::string extract_mm2_opts_arg(const std::vector<std::string>& args,
     return *mm2_opt_value_itr;
 }
 
-void add_mm2_opts_arg(utils::arg_parse::ArgParser& parser) {
+void add_minimap2_options_string_arg(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument(MM2_OPTS_ARG)
             .help("Optional minimap2 options string. For multiple arguments surround with double "
                   "quotes.");
@@ -228,7 +228,7 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     return res;
 }
 
-Minimap2Options process_option_string(const std::string& minimap2_option_string) {
+Minimap2Options process_minimap2_options_string(const std::string& minimap2_option_string) {
     std::vector<std::string> mm2_args = [&minimap2_option_string] {
         if (minimap2_option_string.empty()) {
             return std::vector<std::string>{"minimap2_options"};
@@ -251,7 +251,7 @@ Minimap2Options process_option_string(const std::string& minimap2_option_string)
     return process_arguments(parser);
 }
 
-void apply_cs_option(Minimap2Options& options, const std::string& cs_opt) {
+void apply_minimap2_cs_option(Minimap2Options& options, const std::string& cs_opt) {
     if (cs_opt.empty()) {
         return;
     }
@@ -269,7 +269,7 @@ void apply_cs_option(Minimap2Options& options, const std::string& cs_opt) {
     }
 }
 
-void apply_dual_option(Minimap2Options& options, const std::string& dual) {
+void apply_minimap2_dual_option(Minimap2Options& options, const std::string& dual) {
     if (dual.empty()) {
         return;
     }
@@ -283,6 +283,6 @@ void apply_dual_option(Minimap2Options& options, const std::string& dual) {
     }
 }
 
-bool print_aln_seq() { return mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ; }
+bool minimap2_print_aln_seq() { return mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ; }
 
-}  // namespace dorado::alignment::minimap2
+}  // namespace dorado::alignment

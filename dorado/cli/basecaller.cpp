@@ -526,11 +526,11 @@ int basecaller(int argc, char* argv[]) {
 
     cli::add_internal_arguments(parser);
 
-    alignment::minimap2::add_mm2_opts_arg(parser);
+    alignment::add_minimap2_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
-    auto mm2_option_string =
-            alignment::minimap2::extract_mm2_opts_arg({argv, argv + argc}, args_excluding_mm2_opts);
+    auto mm2_option_string = alignment::extract_minimap2_options_string_arg(
+            {argv, argv + argc}, args_excluding_mm2_opts);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -701,7 +701,7 @@ int basecaller(int argc, char* argv[]) {
               methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive,
-              alignment::minimap2::process_option_string(mm2_option_string),
+              alignment::process_minimap2_options_string(mm2_option_string),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

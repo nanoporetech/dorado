@@ -24,7 +24,7 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         const dorado::alignment::Minimap2Options& options,
         const int threads) {
     int num_index_construction_threads{
-            dorado::alignment::minimap2::print_aln_seq() ? 1 : static_cast<int>(threads)};
+            dorado::alignment::minimap2_print_aln_seq() ? 1 : static_cast<int>(threads)};
     switch (index_file_access.load_index(index_file, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + index_file);

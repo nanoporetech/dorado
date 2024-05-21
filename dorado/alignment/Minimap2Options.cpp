@@ -6,11 +6,11 @@
 namespace dorado::alignment {
 
 Minimap2IndexOptions::Minimap2IndexOptions() {
-    index_options = std::make_shared<minimap2::IdxOptHolder>();
+    index_options = std::make_shared<Minimap2IdxOptHolder>();
 }
 
 Minimap2MappingOptions::Minimap2MappingOptions() {
-    mapping_options = std::make_shared<minimap2::MapOptHolder>();
+    mapping_options = std::make_shared<Minimap2MapOptHolder>();
 }
 
 auto comparable_index_options(const Minimap2IndexOptions& options) {
@@ -85,10 +85,10 @@ bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-Minimap2Options create_dflt_options() { return minimap2::process_option_string(""); }
+Minimap2Options create_dflt_options() { return process_minimap2_options_string(""); }
 
 Minimap2Options create_preset_options(const std::string& preset) {
-    return minimap2::process_option_string("-x " + preset);
+    return process_minimap2_options_string("-x " + preset);
 }
 
 }  // namespace dorado::alignment

@@ -163,7 +163,7 @@ TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     hts_file.finalise([](size_t) { /* noop */ });
 
     Minimap2Index cut{};
-    cut.initialise(minimap2::process_option_string("-I 10k"));
+    cut.initialise(process_minimap2_options_string("-I 10k"));
 
     SECTION("No split index allowed") {
         CHECK(cut.load(temp_input_file.string(), 1, false) ==

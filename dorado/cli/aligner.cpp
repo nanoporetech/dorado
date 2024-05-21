@@ -48,7 +48,7 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
 
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
     int num_index_construction_threads{
-            dorado::alignment::minimap2::print_aln_seq() ? 1 : static_cast<int>(num_threads)};
+            dorado::alignment::minimap2_print_aln_seq() ? 1 : static_cast<int>(num_threads)};
     switch (index_file_access->load_index(filename, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
@@ -142,11 +142,11 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    alignment::minimap2::add_mm2_opts_arg(parser);
+    alignment::add_minimap2_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
-    auto mm2_option_string =
-            alignment::minimap2::extract_mm2_opts_arg({argv, argv + argc}, args_excluding_mm2_opts);
+    auto mm2_option_string = alignment::extract_minimap2_options_string_arg(
+            {argv, argv + argc}, args_excluding_mm2_opts);
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
@@ -183,7 +183,7 @@ int aligner(int argc, char* argv[]) {
 
     auto max_reads(parser.visible.get<int>("max-reads"));
 
-    align_info->minimap_options = alignment::minimap2::process_option_string(mm2_option_string);
+    align_info->minimap_options = alignment::process_minimap2_options_string(mm2_option_string);
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
     if (!processing_items.initialise()) {

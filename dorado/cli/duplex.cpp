@@ -330,11 +330,11 @@ int duplex(int argc, char* argv[]) {
 
     cli::add_internal_arguments(parser);
 
-    alignment::minimap2::add_mm2_opts_arg(parser);
+    alignment::add_minimap2_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
-    auto mm2_option_string =
-            alignment::minimap2::extract_mm2_opts_arg({argv, argv + argc}, args_excluding_mm2_opts);
+    auto mm2_option_string = alignment::extract_minimap2_options_string_arg(
+            {argv, argv + argc}, args_excluding_mm2_opts);
 
     std::set<fs::path> temp_model_paths;
     try {
@@ -435,7 +435,7 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = alignment::minimap2::process_option_string(mm2_option_string);
+            auto options = alignment::process_minimap2_options_string(mm2_option_string);
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
                                                           std::thread::hardware_concurrency());
