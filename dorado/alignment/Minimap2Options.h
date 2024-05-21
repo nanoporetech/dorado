@@ -23,33 +23,15 @@ struct Minimap2IndexOptions {
     std::optional<uint64_t> index_batch_size;
     std::string mm2_preset{DEFAULT_MM_PRESET};  // By default we use a preset, hence not an optional
     std::shared_ptr<minimap2::IdxOptHolder> index_options;
+    std::string junc_bed;
 };
 
-inline bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return std::tie(l.kmer_size, l.window_size, l.index_batch_size, l.mm2_preset) <
-           std::tie(r.kmer_size, r.window_size, r.index_batch_size, r.mm2_preset);
-}
-
-inline bool operator>(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return r < l;
-}
-
-inline bool operator<=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return !(l > r);
-}
-
-inline bool operator>=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return !(l < r);
-}
-
-inline bool operator==(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return std::tie(l.kmer_size, l.window_size, l.index_batch_size, l.mm2_preset) ==
-           std::tie(r.kmer_size, r.window_size, r.index_batch_size, r.mm2_preset);
-}
-
-inline bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) {
-    return !(l == r);
-}
+bool operator<(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
+bool operator>(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
+bool operator<=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
+bool operator>=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
+bool operator==(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
+bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r);
 
 struct Minimap2MappingOptions {
     Minimap2MappingOptions();
@@ -69,48 +51,20 @@ struct Minimap2MappingOptions {
     std::shared_ptr<minimap2::MapOptHolder> mapping_options;
 };
 
-inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return std::tie(l.best_n_secondary, l.bandwidth, l.bandwidth_long, l.soft_clipping,
-                    l.secondary_seq, l.print_secondary) <
-           std::tie(r.best_n_secondary, r.bandwidth, r.bandwidth_long, r.soft_clipping,
-                    r.secondary_seq, r.print_secondary);
-}
-
-inline bool operator>(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return r < l;
-}
-
-inline bool operator<=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return !(l > r);
-}
-
-inline bool operator>=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return !(l < r);
-}
-
-inline bool operator==(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return std::tie(l.best_n_secondary, l.bandwidth, l.bandwidth_long, l.soft_clipping,
-                    l.secondary_seq, l.print_secondary) ==
-           std::tie(r.best_n_secondary, r.bandwidth, r.bandwidth_long, r.soft_clipping,
-                    r.secondary_seq, r.print_secondary);
-}
-
-inline bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {
-    return !(l == r);
-}
+bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
+bool operator>(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
+bool operator<=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
+bool operator>=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
+bool operator==(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
+bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
 
 struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
-    std::string junc_bed;
     bool print_aln_seq;  // Not available to be set by the user, hence not optional
 };
 
-inline bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
-    return static_cast<const Minimap2IndexOptions&>(l) == r &&
-           static_cast<const Minimap2MappingOptions&>(l) == r && l.junc_bed == r.junc_bed;
-}
+bool operator==(const Minimap2Options& l, const Minimap2Options& r);
+bool operator!=(const Minimap2Options& l, const Minimap2Options& r);
 
-inline bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
+Minimap2Options create_dflt_options();
 
-static const Minimap2Options dflt_options{Minimap2IndexOptions{}, Minimap2MappingOptions{},
-                                          std::string{}, false};
 }  // namespace dorado::alignment

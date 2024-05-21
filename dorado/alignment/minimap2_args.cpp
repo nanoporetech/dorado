@@ -116,7 +116,7 @@ void add_arguments(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument("--mm2-preset")
             .help("minimap2 preset for indexing and mapping. Alias for the -x "
                   "option in minimap2.")
-            .default_value(DEFAULT_MM_PRESET);
+            .default_value(std::string{DEFAULT_MM_PRESET});
 
     parser.hidden.add_argument("--secondary-seq")
             .help("minimap2 output seq/qual for secondary and supplementary alignments")
@@ -202,7 +202,8 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     res.mapping_options->get() = mm_mapopt_default();
 
     // apply any preset first.
-    apply_preset(res, parser.visible.get<std::string>("mm2-preset"));
+    auto preset = parser.visible.get<std::string>("mm2-preset");
+    apply_preset(res, preset);
 
     apply_indexing_options(parser, res.index_options->get());
     apply_mapping_options(parser, res.mapping_options->get());

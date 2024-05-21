@@ -142,7 +142,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "target.fq";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
@@ -178,7 +178,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     auto query = aligner_test_dir / "target.fq";
     auto bed = aligner_test_dir / "target.bed";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
@@ -218,7 +218,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
     auto ref = aligner_test_dir / "supplementary_aln_target.fa";
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
@@ -257,7 +257,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "rev_target.fq";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
@@ -291,7 +291,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = aligner_test_dir / "basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
@@ -318,7 +318,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     options.soft_clipping = GENERATE(true, false);
@@ -363,7 +363,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Run alignment with one set of k/w.
     {
-        auto options = dorado::alignment::dflt_options;
+        auto options = dorado::alignment::create_dflt_options();
         options.kmer_size = options.window_size = 28;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
@@ -373,7 +373,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Run alignment with another set of k/w.
     {
-        auto options = dorado::alignment::dflt_options;
+        auto options = dorado::alignment::create_dflt_options();
         options.kmer_size = options.window_size = 5;
         options.index_batch_size = 1'000'000'000ull;
         dorado::HtsReader reader(query.string(), std::nullopt);
@@ -386,7 +386,7 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "long_target.fa";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 5;
     options.index_batch_size = 1000ull;
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
@@ -400,7 +400,7 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
         auto ref = aligner_test_dir / "target.fq";
 
         auto align_info = std::make_shared<dorado::alignment::AlignmentInfo>();
-        align_info->minimap_options = dorado::alignment::dflt_options;
+        align_info->minimap_options = dorado::alignment::create_dflt_options();
         align_info->reference_file = ref.string();
 
         const std::string TEST_SEQUENCE{"ACGTACGTACGTACGT"};
@@ -528,7 +528,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = (aligner_test_dir / "target.fq").string();
     auto query = (aligner_test_dir / "query.fa").string();
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 5;
     options.index_batch_size = 1'000'000'000ull;
 
@@ -595,7 +595,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
     auto query = aligner_test_dir / "basecall_target.fa";
 
-    auto options = dorado::alignment::dflt_options;
+    auto options = dorado::alignment::create_dflt_options();
     options.kmer_size = options.window_size = 15;
     options.index_batch_size = 1'000'000'000ull;
     options.soft_clipping = GENERATE(true, false);

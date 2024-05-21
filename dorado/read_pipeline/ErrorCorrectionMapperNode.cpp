@@ -241,7 +241,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
           m_index_file(index_file),
           m_num_threads(threads),
           m_reads_queue(5000) {
-    alignment::Minimap2Options options = alignment::dflt_options;
+    alignment::Minimap2Options options = alignment::create_dflt_options();
     options.kmer_size = 25;
     options.window_size = 17;
     options.index_batch_size = 8000000000ull;
