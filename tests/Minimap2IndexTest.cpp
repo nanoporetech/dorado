@@ -1,6 +1,7 @@
 #include "alignment/Minimap2Index.h"
 
 #include "TestUtils.h"
+#include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
 #include "read_pipeline/HtsWriter.h"
 #include "utils/hts_file.h"
@@ -91,7 +92,7 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP
-                 " get_options() after load() successfully compare as equal to default options",
+                 " get_options() after successful load() compares as equal to default options",
                  TEST_GROUP) {
     CHECK(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 
@@ -161,26 +162,15 @@ TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     }
     hts_file.finalise([](size_t) { /* noop */ });
 
+    Minimap2Index cut{};
+    cut.initialise(minimap2::process_option_string("-I 10k"));
+
     SECTION("No split index allowed") {
-        Minimap2Index cut{};
-
-        auto options{create_dflt_options()};
-        options.index_batch_size = 10000;
-
-        cut.initialise(options);
-
         CHECK(cut.load(temp_input_file.string(), 1, false) ==
               IndexLoadResult::split_index_not_supported);
     }
 
     SECTION("Split index allowed") {
-        Minimap2Index cut{};
-
-        auto options{create_dflt_options()};
-        options.index_batch_size = 10000;
-
-        cut.initialise(options);
-
         CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
         CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
     }

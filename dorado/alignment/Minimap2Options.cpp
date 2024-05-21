@@ -37,6 +37,9 @@ bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) { 
 
 auto comparable_mapping_options(const Minimap2MappingOptions& options) {
     const auto& o = options.mapping_options->get();
+    // exclude mid_occ from the comparison as this is set with info from the index
+    // after it has been loaded, and we are interested in being able to compare mapping
+    // options as selected by the user.
     return std::tie(o.flag, o.seed, o.sdust_thres, o.max_qlen, o.bw, o.bw_long, o.max_gap,
                     o.max_gap_ref, o.max_frag_len, o.max_chain_skip, o.max_chain_iter, o.min_cnt,
                     o.min_chain_score, o.chain_gap_scale, o.chain_skip_scale, o.rmq_size_cap,
@@ -45,7 +48,7 @@ auto comparable_mapping_options(const Minimap2MappingOptions& options) {
                     o.transition, o.sc_ambi, o.noncan, o.junc_bonus, o.zdrop, o.zdrop_inv,
                     o.end_bonus, o.min_dp_max, o.min_ksw_len, o.anchor_ext_len, o.anchor_ext_shift,
                     o.max_clip_ratio, o.rank_min_len, o.rank_frac, o.pe_ori, o.pe_bonus,
-                    o.mid_occ_frac, o.q_occ_frac, o.min_mid_occ, o.max_mid_occ, o.mid_occ,
+                    o.mid_occ_frac, o.q_occ_frac, o.min_mid_occ, o.max_mid_occ, /*o.mid_occ,*/
                     o.max_occ, o.max_max_occ, o.occ_dist, o.mini_batch_size, o.max_sw_mat,
                     o.cap_kalloc);
 }
