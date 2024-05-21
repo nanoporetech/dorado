@@ -288,4 +288,36 @@ Minimap2Options process_option_string(const std::string& minimap2_option_string)
     return process_arguments(parser);
 }
 
+void apply_cs_option(Minimap2Options& options, const std::string& cs_opt) {
+    if (cs_opt.empty()) {
+        return;
+    }
+    auto& flag = options.mapping_options->get().flag;
+
+    flag |= MM_F_OUT_CS | MM_F_CIGAR;
+    if (cs_opt == "short") {
+        flag &= ~MM_F_OUT_CS_LONG;
+    } else if (cs_opt == "long") {
+        flag |= MM_F_OUT_CS_LONG;
+    } else if (cs_opt == "none") {
+        flag &= ~MM_F_OUT_CS;
+    } else {
+        spdlog::warn("Unrecognized options for --cs={}", cs_opt);
+    }
+}
+
+void apply_dual_option(Minimap2Options& options, const std::string& dual) {
+    if (dual.empty()) {
+        return;
+    }
+
+    if (dual == "yes") {
+        options.mapping_options->get().flag &= ~MM_F_NO_DUAL;
+    } else if (dual == "no") {
+        options.mapping_options->get().flag |= MM_F_NO_DUAL;
+    } else {
+        spdlog::warn("Unrecognized options for --dual={}", dual);
+    }
+}
+
 }  // namespace dorado::alignment::minimap2

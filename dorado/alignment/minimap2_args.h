@@ -20,4 +20,8 @@ void add_mm2_opts_arg(utils::arg_parse::ArgParser& parser);
 
 Minimap2Options process_option_string(const std::string& minimap2_option_string);
 
+// Helper functions for ErrorCorrectionNode which uses options we don't yet support in the command line
+void apply_cs_option(Minimap2Options& options, const std::string& cs_opt);
+void apply_dual_option(Minimap2Options& options, const std::string& dual_yes_or_no);
+
 }  // namespace dorado::alignment::minimap2
