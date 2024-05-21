@@ -145,8 +145,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     auto query = aligner_test_dir / "target.fq";
 
     auto options = dorado::alignment::create_dflt_options();
-    //options.kmer_size = options.window_size = 15;
-    //options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
@@ -181,8 +179,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     auto bed = aligner_test_dir / "target.bed";
 
     auto options = dorado::alignment::create_dflt_options();
-    //options.kmer_size = options.window_size = 15;
-    //options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), bed.string(), options, 10);
     REQUIRE(bam_records.size() == 1);
@@ -221,12 +217,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
 
     auto options = dorado::alignment::create_dflt_options();
-    //options.index_options->get().k = 15;
-    //options.index_options->get().w = 15;
-    //options.index_options->get().batch_size = 1'000'000'000ull;
-    //options.index_options->get().mini_batch_size = 1'000'000'000ull;
-    //options.kmer_size = options.window_size = 15;
-    //options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 2);
@@ -264,8 +254,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto query = aligner_test_dir / "rev_target.fq";
 
     auto options = dorado::alignment::create_dflt_options();
-    //options.kmer_size = options.window_size = 15;
-    //options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
@@ -298,8 +286,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto query = aligner_test_dir / "basecall.sam";
 
     auto options = dorado::alignment::create_dflt_options();
-    options.kmer_size = options.window_size = 15;
-    options.index_batch_size = 1'000'000'000ull;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 1);
@@ -327,15 +313,11 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto options = dorado::alignment::create_dflt_options();
     options.index_options->get().k = 15;
     options.index_options->get().w = 15;
-
     bool soft_clipping = GENERATE(true, false);
     if (soft_clipping) {
         options.mapping_options->get().flag |= MM_F_SOFTCLIP;
     }
 
-    options.kmer_size = options.window_size = 15;
-    options.index_batch_size = 1'000'000'000ull;
-    options.soft_clipping = soft_clipping;
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     REQUIRE(bam_records.size() == 3);

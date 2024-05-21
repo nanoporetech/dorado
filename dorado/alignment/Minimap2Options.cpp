@@ -15,6 +15,9 @@ Minimap2MappingOptions::Minimap2MappingOptions() {
 
 auto comparable_index_options(const Minimap2IndexOptions& options) {
     const auto& mm_opts = options.index_options->get();
+    // Include the --junc_bed in the comparison as this will be applied to the
+    // index once it is loaded. So different --junc_bed could mean two
+    // indexes are not compatible to be shared between pipelines.
     return std::tie(mm_opts.k, mm_opts.w, mm_opts.flag, mm_opts.bucket_bits,
                     mm_opts.mini_batch_size, mm_opts.batch_size, options.junc_bed);
 }
@@ -85,7 +88,7 @@ bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l
 Minimap2Options create_dflt_options() { return minimap2::process_option_string(""); }
 
 Minimap2Options create_preset_options(const std::string& preset) {
-    return minimap2::process_option_string("--mm2-preset " + preset);
+    return minimap2::process_option_string("-x " + preset);
 }
 
 }  // namespace dorado::alignment

@@ -264,17 +264,6 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     // --dual yes
     alignment::minimap2::apply_dual_option(options, "yes");
 
-    options.kmer_size = 25;
-    options.window_size = 17;
-    options.index_batch_size = index_size;
-    options.bandwidth = 150;
-    options.bandwidth_long = 2000;
-    options.min_chain_score = 4000;
-    options.zdrop = options.zdrop_inv = 200;
-    options.occ_dist = 200;
-    options.cs = "short";
-    options.dual = "yes";
-
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
         throw std::runtime_error("Failed to initialize with options.");

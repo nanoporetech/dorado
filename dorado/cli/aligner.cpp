@@ -47,7 +47,8 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
     spdlog::info("> loading index {}", filename);
 
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(num_threads)};
+    int num_index_construction_threads{
+            dorado::alignment::minimap2::print_aln_seq() ? 1 : static_cast<int>(num_threads)};
     switch (index_file_access->load_index(filename, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + filename);

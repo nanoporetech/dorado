@@ -103,9 +103,9 @@ void add_arguments(utils::arg_parse::ArgParser& parser) {
             .help("minimap2 uses soft clipping for supplementary alignments")
             .implicit_value(true);
 
-    parser.visible.add_argument("--bandwidth")
-            .help("minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
-                  "specified as NUM,[NUM]");
+    parser.visible.add_argument("-r").help(
+            "minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
+            "specified as NUM,[NUM]");
 
     parser.visible.add_argument("--junc-bed")
             .help("Optional file with gene annotations in the BED12 format (aka 12-column BED), or "
@@ -113,9 +113,8 @@ void add_arguments(utils::arg_parse::ArgParser& parser) {
                   "in annotations.");
 
     // Setting options to lr:hq which is appropriate for high quality nanopore reads.
-    parser.visible.add_argument("--mm2-preset")
-            .help("minimap2 preset for indexing and mapping. Alias for the -x "
-                  "option in minimap2.")
+    parser.visible.add_argument("-x")
+            .help("minimap2 preset for indexing and mapping.")
             .default_value(std::string{DEFAULT_MM_PRESET});
 
     parser.hidden.add_argument("--secondary-seq")
@@ -172,7 +171,7 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
         options.flag |= MM_F_NO_PRINT_2ND;
     }
 
-    auto optional_bandwidth = parser.visible.present<std::string>("--bandwidth");
+    auto optional_bandwidth = parser.visible.present<std::string>("-r");
     if (optional_bandwidth) {
         auto bandwidth = utils::arg_parse::parse_string_to_sizes<int>(*optional_bandwidth);
         switch (bandwidth.size()) {
@@ -184,7 +183,7 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
             break;
         default:
             throw std::runtime_error(
-                    "Wrong number of arguments for minimap2 option '--bandwidth'.");
+                    "Wrong number of arguments for minimap2 bandwidth option '-r'.");
         }
     }
     auto soft_clipping = parser.visible.present<bool>("Y");
@@ -202,7 +201,7 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     res.mapping_options->get() = mm_mapopt_default();
 
     // apply any preset first.
-    auto preset = parser.visible.get<std::string>("mm2-preset");
+    auto preset = parser.visible.get<std::string>("-x");
     apply_preset(res, preset);
 
     apply_indexing_options(parser, res.index_options->get());
@@ -215,52 +214,16 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
                 std::to_string(rc));
     }
 
-    res.kmer_size = get_optional_as<short>(parser.visible.present<int>("k"));
-    res.window_size = get_optional_as<short>(parser.visible.present<int>("w"));
-    auto index_batch_size = parser.visible.present<std::string>("I");
-    if (index_batch_size) {
-        res.index_batch_size = std::make_optional(
-                utils::arg_parse::parse_string_to_size<uint64_t>(*index_batch_size));
-    }
-    auto print_secondary = parser.visible.present<std::string>("--secondary");
-    if (print_secondary) {
-        res.print_secondary =
-                std::make_optional(utils::arg_parse::parse_yes_or_no(*print_secondary));
-    }
-    res.best_n_secondary = parser.visible.present<int>("N");
-    if (res.best_n_secondary.value_or(1) == 0) {
-        spdlog::warn("Ignoring '-N 0', using preset default");
-        res.print_secondary = std::nullopt;
-        res.best_n_secondary = std::nullopt;
-    }
-
-    auto optional_bandwidth = parser.visible.present<std::string>("--bandwidth");
-    if (optional_bandwidth) {
-        auto bandwidth = utils::arg_parse::parse_string_to_sizes<int>(*optional_bandwidth);
-        switch (bandwidth.size()) {
-        case 1:
-            res.bandwidth = std::make_optional<int>(bandwidth[0]);
-            break;
-        case 2:
-            res.bandwidth = std::make_optional<int>(bandwidth[0]);
-            res.bandwidth_long = std::make_optional<int>(bandwidth[1]);
-            break;
-        default:
-            throw std::runtime_error("Wrong number of arguments for option '-r'.");
-        }
-    }
-    res.soft_clipping = parser.visible.present<bool>("Y");
-    res.secondary_seq = parser.hidden.get<bool>("secondary-seq");
-
+    // Cache the --junc-bed arg with the index options for use when the index is loaded
     auto junc_bed = parser.visible.present<std::string>("--junc-bed");
     if (junc_bed) {
         res.junc_bed = std::move(*junc_bed);
     }
-    res.mm2_preset = parser.visible.get<std::string>("mm2-preset");
-    res.print_aln_seq = parser.hidden.get<bool>("print-aln-seq");
 
-    //res.bandwidth = mm_mapopt_default().bw;
-    //res.kmer_size = mm_idxopt_default().k;
+    if (parser.hidden.get<bool>("print-aln-seq")) {
+        // set the global flags
+        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
+    }
 
     return res;
 }
@@ -319,5 +282,7 @@ void apply_dual_option(Minimap2Options& options, const std::string& dual) {
         spdlog::warn("Unrecognized options for --dual={}", dual);
     }
 }
+
+bool print_aln_seq() { return mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ; }
 
 }  // namespace dorado::alignment::minimap2

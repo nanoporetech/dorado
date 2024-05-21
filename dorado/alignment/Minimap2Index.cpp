@@ -86,13 +86,6 @@ IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
 }
 
 bool Minimap2Index::initialise(Minimap2Options options) {
-    if (options.print_aln_seq) {
-        mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
-    }
-    spdlog::debug("> Map parameters input by user: dbg print qname={} and aln seq={}.",
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_QNAME),
-                  static_cast<bool>(mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ));
-
     if (mm_check_opt(&options.index_options->get(), &options.mapping_options->get()) < 0) {
         return false;
     }

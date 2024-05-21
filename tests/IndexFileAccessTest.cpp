@@ -49,8 +49,6 @@ const dorado::alignment::Minimap2Options& invalid_options() {
         dorado::alignment::Minimap2Options options{dorado::alignment::create_dflt_options()};
         options.mapping_options->get().bw_long = 1000;
         options.mapping_options->get().bw = options.mapping_options->get().bw_long + 1;
-        options.bandwidth_long = options.mapping_options->get().bw_long;
-        options.bandwidth = options.mapping_options->get().bw;
         return options;
     }();
     return result;
