@@ -4,13 +4,13 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.7.0] (21 May 2024)
 
-This release of Dorado introduces new and more accurate v5 models for improved basecalling. It also adds a new subcommand, `dorado correct`, for single-read error correction to help Nanopore based `de novo` assemblies of diploid genomes. In addition, this release contains a slew of bug fixes, stability enhancements and updates to barcode classification.
+This release of Dorado introduces new and more accurate v5 models for improved basecalling. It also adds a new subcommand, `dorado correct`, for single-read error correction to help Nanopore based `de novo` assemblies of haploid or diploid genomes. In addition, this release contains a slew of bug fixes, stability enhancements and updates to barcode classification.
 
 ## New feature highlights
 
 1. DNA, RNA and duplex basecalling models with improved single read accuracy.
-2. Support for 5mC_4mC methylation calling.
-3. PolyA tail estimation for transcripts with interrupted tails and plasmids.
+2. Support for 4mC_5mC methylation calling.
+3. PolyA tail estimation for plasmids and transcripts with interrupted tails.
 4. `dorado correct` subcommand for single-read error correction of diploid genomes (for assembly pipelines).
 5. Support for --junc-bed mm2 splice option.
 6. Faster BAM indexing and sorting code.
@@ -20,13 +20,9 @@ This release of Dorado introduces new and more accurate v5 models for improved b
 1. Data type of mean Q-score tag (`qs`) updated to `float`.
 2. Adapter trimming is enabled when PolyA estimation is requested.
 
-## Backwards incompatible changes
-
-1. `TWIST` barcode names updated to better reflect kit composition.
-
 ## All key changes
 
-* 159b73c7fea64d374b562af32abeaa382af54354 - Add new methylation calling models (5mC_4mC, m6A, pseU)
+* 159b73c7fea64d374b562af32abeaa382af54354 - Add new models for calling DNA and RNA base modifications (4mC_5mC, m6A, pseU)
 * cf46f49c620633bf724904b834e8d394073d0bc4 - Raise error if PolyA config file is not found
 * dc50b97605762423d09d91ec74dd95ad2b5c97c9 - Add MacOS support for v5 basecalling model
 * d6b0f68b3617f34a321db676b780e1a1183b6060 - Change data type of mean Q-score (`qs` tag) to float
@@ -35,7 +31,7 @@ This release of Dorado introduces new and more accurate v5 models for improved b
 * 70ff95d84b316adb4701f7f43a19151e73b58b5b - Enable `dorado summary` to run on trimmed BAM files
 * 6373792b686538758a16aacb063434c2b3260077 - Detect presence of midstrand barcodes to reduce false positive classifications
 * 68d40da45da886384508173219a9fb677fc50cef - Add support for --junc-bed mm2 splice option
-* 93632025d7df195be625654d968f62321c4a4136 - Update `TWIST` barcode kit names
+* 93632025d7df195be625654d968f62321c4a4136 - Update barcode kit names
 * 381f6c3038fb69523ea591b1942d3293d7e9b9aa - Enable adapter trimming when polyA estimation is requested
 * be8ac08652d5fe0b73c1126048b7fd96f29f3419 - Add `dorado correct` support for read error correction
 * a30c489c41bafb3e307060806c5b57caa2c610ef - Use new transformer Koi fused residual rmsnorm kernel
