@@ -317,7 +317,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     // trade-off between getting more accurate measurements and avoiding excessive startup time.
     const int chunk_size = std::min(m_batch_dims.back().T_in, m_config.stride * 300);
     // We limit the maximum when doing benchmarking to avoid excessive startup time.
-    const int max_batch_size_limit = 10240;
+    // The limit for transformer models should be increased at a later time.
+    const int max_batch_size_limit = m_config.is_tx_model() ? 512 : 10240;
     int max_batch_size = *std::max_element(max_batch_sizes.begin(), max_batch_sizes.end());
     max_batch_size = std::min(max_batch_size, max_batch_size_limit);
     spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,

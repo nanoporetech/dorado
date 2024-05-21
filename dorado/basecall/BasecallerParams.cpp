@@ -90,11 +90,9 @@ void BasecallerParams::update(const BasecallerParams &other) {
     merge(m_batch_size, other.m_batch_size, "batchsize");
 }
 
-void BasecallerParams::normalise(size_t divisor) {
-    const int div = static_cast<int>(divisor);
-
+void BasecallerParams::normalise(size_t chunk_size_divisor, size_t overlap_divisor) {
     // Apply normalised value with FORCE
-    auto normalise_param = [&, div](Value &self, const std::string &name) {
+    auto normalise_param = [&](Value &self, const std::string &name, int div) {
         const int before_val = self.val;
         const int new_val = (self.val / div) * div;
         if (set_value(self, Value{new_val, Priority::FORCE})) {
@@ -102,8 +100,8 @@ void BasecallerParams::normalise(size_t divisor) {
         }
     };
 
-    normalise_param(m_chunk_size, "chunksize");
-    normalise_param(m_overlap, "overlap");
+    normalise_param(m_chunk_size, "chunksize", static_cast<int>(chunk_size_divisor));
+    normalise_param(m_overlap, "overlap", static_cast<int>(overlap_divisor));
 }
 
 }  // namespace dorado::basecall
