@@ -146,6 +146,8 @@ add_library(dorado_lib
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
     dorado/alignment/Minimap2Options.h
+    dorado/alignment/sam_utils.cpp
+    dorado/alignment/sam_utils.h
     dorado/api/caller_creation.cpp
     dorado/api/caller_creation.h
     dorado/api/runner_creation.cpp

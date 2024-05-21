@@ -44,6 +44,7 @@ add_executable(dorado_tests
     ResumeLoaderTest.cpp
     RNASplitTest.cpp
     SampleSheetTests.cpp
+    SamUtilsTest.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp

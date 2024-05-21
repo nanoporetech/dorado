@@ -102,7 +102,8 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
         return;
     }
 
-    alignment::Minimap2Aligner(index).align(read_common, tbuf);
+    std::string alignment_header = read_common.client_info->alignment_info().alignment_header;
+    alignment::Minimap2Aligner(index).align(read_common, alignment_header, tbuf);
 }
 
 void AlignerNode::input_thread_fn() {
