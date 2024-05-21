@@ -90,6 +90,15 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP
+                 " get_options() after load() successfully compare as equal to default options",
+                 TEST_GROUP) {
+    CHECK(cut.load(reference_file, 1, false) == IndexLoadResult::success);
+
+    REQUIRE(cut.get_options() == dorado::alignment::create_dflt_options());
+}
+
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with valid options returns non-null",
                  TEST_GROUP) {
     cut.load(reference_file, 1, false);

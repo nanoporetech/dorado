@@ -208,9 +208,11 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     apply_indexing_options(parser, res.index_options->get());
     apply_mapping_options(parser, res.mapping_options->get());
 
-    if (mm_check_opt(&res.index_options->get(), &res.mapping_options->get()) < 0) {
+    auto rc = mm_check_opt(&res.index_options->get(), &res.mapping_options->get());
+    if (rc < 0) {
         throw std::runtime_error(
-                "Invalid minimap2 options string, for details run with --verbose flag.");
+                "Invalid minimap2 options string, for details run with --verbose flag. err_code: " +
+                std::to_string(rc));
     }
 
     res.kmer_size = get_optional_as<short>(parser.visible.present<int>("k"));
