@@ -38,8 +38,8 @@ TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
         config.normalise_basecaller_params();
         CHECK(config.has_normalised_basecaller_params());
         CHECK(config.basecaller.chunk_size() % config.stride_inner() == 0);
-        // Expected (121 / 12) * 12
-        CHECK(config.basecaller.chunk_size() == 120);
+        // Expected ((121 + 191) / 192) * 192
+        CHECK(config.basecaller.chunk_size() == 192);
     }
 }
 

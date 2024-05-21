@@ -184,7 +184,9 @@ struct CRFModelConfig {
     int stride_inner() const { return stride * scale_factor(); };
 
     // Normalise the basecaller parameters `chunk_size` and `overlap` to the `strde_inner`
-    void normalise_basecaller_params() { basecaller.normalise(stride_inner()); }
+    void normalise_basecaller_params() {
+        basecaller.normalise(stride_inner() * (is_tx_model() ? 16 : 1), stride_inner());
+    }
     // True if `chunk_size` and `overlap` is evenly divisible by the `strde_inner`
     bool has_normalised_basecaller_params() const;
 
