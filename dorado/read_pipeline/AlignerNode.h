@@ -42,11 +42,12 @@ private:
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ClientInfo& client_info);
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
+    void add_bed_hits_to_read(const std::string& genome, ReadCommon& read_common);
 
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
-    std::vector<std::string> m_header_sequences_for_bam_messages{};
+    std::vector<std::string> m_header_sequence_names{};
     std::shared_ptr<alignment::IndexFileAccess> m_index_file_access{};
-    alignment::BedFile m_bed_file_for_bam_messages{};
+    alignment::BedFile m_bed_file{};
 };
 
 }  // namespace dorado

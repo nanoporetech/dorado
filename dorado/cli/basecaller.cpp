@@ -122,6 +122,7 @@ void setup(const std::vector<std::string>& args,
            const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
+           const std::string& bed,
            size_t num_runners,
            size_t remora_batch_size,
            size_t num_remora_threads,
@@ -228,7 +229,7 @@ void setup(const std::vector<std::string>& args,
     if (enable_aligner) {
         auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
         aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access, ref,
-                                                      "", aligner_options,
+                                                      bed, aligner_options,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }
@@ -480,6 +481,10 @@ int basecaller(int argc, char* argv[]) {
     parser.visible.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
+    parser.visible.add_argument("--bed-file")
+            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
+                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
+            .default_value(std::string(""));
 
     parser.visible.add_argument("--kit-name")
             .help("Enable barcoding with the provided kit name. Choose from: " +
@@ -566,6 +571,12 @@ int basecaller(int argc, char* argv[]) {
 
     if (emit_fastq && emit_sam) {
         spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
+        return EXIT_FAILURE;
+    }
+
+    if (parser.visible.get<std::string>("--reference").empty() &&
+        !parser.visible.get<std::string>("--bed-file").empty()) {
+        spdlog::error("--bed-file cannot be used without --reference.");
         return EXIT_FAILURE;
     }
 
@@ -689,7 +700,8 @@ int basecaller(int argc, char* argv[]) {
 
     try {
         setup(args, model_config, data, mods_model_paths, device,
-              parser.visible.get<std::string>("--reference"), default_parameters.num_runners,
+              parser.visible.get<std::string>("--reference"),
+              parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
               methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),

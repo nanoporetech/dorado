@@ -41,6 +41,8 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
     return index_file_access.get_index(index_file, options);
 }
 
+std::string extract_genome_from_alignment_string(const std::string& alignment_string) {}
+
 }  // namespace
 
 namespace dorado {
@@ -56,9 +58,9 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_index_file_access(std::move(index_file_access)) {
     auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
     if (!bed_file.empty()) {
-        m_bed_file_for_bam_messages.load(bed_file);
+        m_bed_file.load(bed_file);
         for (const auto& entry : header_sequence_records) {
-            m_header_sequences_for_bam_messages.emplace_back(entry.first);
+            m_header_sequence_names.emplace_back(entry.first);
         }
     }
     start_input_processing(&AlignerNode::input_thread_fn, this);
@@ -108,6 +110,15 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 
     alignment::Minimap2Aligner(index).align(read_common, tbuf);
+    if (!m_bed_file.empty()) {
+        // Note that this is only used by dorado basecaller and dorado aligner. For the
+        // basecall server m_bed_file is always empty, and bed-file hits are checked in
+        // the core-cpp code.
+        auto genome = extract_genome_from_alignment_string(read_common.alignment_string);
+        if (!genome.empty()) {
+            add_bed_hits_to_read(genome, read_common);
+        }
+    }
 }
 
 void AlignerNode::input_thread_fn() {
@@ -123,11 +134,9 @@ void AlignerNode::input_thread_fn() {
             auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                    .align(bam_message.bam_ptr.get(), tbuf);
             for (auto& record : records) {
-                if (!m_bed_file_for_bam_messages.filename().empty() &&
-                    !(record->core.flag & BAM_FUNMAP)) {
+                if (!m_bed_file.filename().empty() && !(record->core.flag & BAM_FUNMAP)) {
                     auto ref_id = record->core.tid;
-                    add_bed_hits_to_record(m_header_sequences_for_bam_messages.at(ref_id),
-                                           record.get());
+                    add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
                 }
                 send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
             }
@@ -150,7 +159,7 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* reco
     size_t genome_end = bam_endpos(record);
     char direction = (bam_is_rev(record)) ? '-' : '+';
     int bed_hits = 0;
-    for (const auto& interval : m_bed_file_for_bam_messages.entries(genome)) {
+    for (const auto& interval : m_bed_file.entries(genome)) {
         if (!(interval.start >= genome_end || interval.end <= genome_start) &&
             (interval.strand == direction || interval.strand == '.')) {
             bed_hits++;
@@ -159,5 +168,7 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* reco
     // update the record.
     bam_aux_append(record, "bh", 'i', sizeof(bed_hits), (uint8_t*)&bed_hits);
 }
+
+void AlignerNode::add_bed_hits_to_read(const std::string& genome, ReadCommon& read_common) {}
 
 }  // namespace dorado
