@@ -18,8 +18,11 @@ std::string extract_options_string_arg(const std::vector<std::string>& args,
 // Adds the minimap2 options string argument to the parser.
 void add_options_string_arg(utils::arg_parse::ArgParser& parser);
 
+// Parses the given option string to a Minimap2Options instance.
+// Will throw if there is an error.
 Minimap2Options parse_options(const std::string& minimap2_option_string);
 
+// Tries to parse the given options string, returns nullopt and an error message if there is an error
 std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
                                                  std::string& error_message);
 
