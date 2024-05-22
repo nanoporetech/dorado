@@ -9,8 +9,11 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <string_view>
 
 namespace {
+
+constexpr inline std::string_view MM2_OPTS_ARG = "--mm2-opts";
 
 void mm_mapopt_override(mm_mapopt_t* mapopt) {
     // Force cigar generation.
@@ -57,10 +60,10 @@ std::optional<TO> get_optional_as(const std::optional<FROM>& from_optional) {
 
 }  // namespace
 
-namespace dorado::alignment {
+namespace dorado::alignment::mm2 {
 
-std::string extract_minimap2_options_string_arg(const std::vector<std::string>& args,
-                                                std::vector<std::string>& remaining_args) {
+std::string extract_options_string_arg(const std::vector<std::string>& args,
+                                       std::vector<std::string>& remaining_args) {
     auto mm2_opt_key_itr = std::find(std::cbegin(args), std::cend(args), MM2_OPTS_ARG);
     if (mm2_opt_key_itr == std::cend(args)) {
         remaining_args = args;
@@ -76,7 +79,7 @@ std::string extract_minimap2_options_string_arg(const std::vector<std::string>& 
     return *mm2_opt_value_itr;
 }
 
-void add_minimap2_options_string_arg(utils::arg_parse::ArgParser& parser) {
+void add_options_string_arg(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument(MM2_OPTS_ARG)
             .help("Optional minimap2 options string. For multiple arguments surround with double "
                   "quotes.");
@@ -195,22 +198,22 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
     }
 }
 
-Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
+std::optional<Minimap2Options> process_arguments(const utils::arg_parse::ArgParser& parser,
+                                                 std::string& error_message) {
     Minimap2Options res{};
     res.index_options->get() = mm_idxopt_default();
     res.mapping_options->get() = mm_mapopt_default();
 
-    // apply any preset first.
-    auto preset = parser.visible.get<std::string>("-x");
-    apply_preset(res, preset);
+    // apply preset before overwriting with other user supplied options.
+    apply_preset(res, parser.visible.get<std::string>("-x"));
 
     apply_indexing_options(parser, res.index_options->get());
     apply_mapping_options(parser, res.mapping_options->get());
 
     auto rc = mm_check_opt(&res.index_options->get(), &res.mapping_options->get());
     if (rc < 0) {
-        throw std::runtime_error("Invalid minimap2 options string. Error code: " +
-                                 std::to_string(rc));
+        error_message = "Invalid minimap2 options string. Error code: " + std::to_string(rc);
+        return std::nullopt;
     }
 
     // Cache the --junc-bed arg with the index options for use when the index is loaded
@@ -227,7 +230,26 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
     return res;
 }
 
-Minimap2Options process_minimap2_options_string(const std::string& minimap2_option_string) {
+std::string get_help_message() {
+    utils::arg_parse::ArgParser parser("minimap2_options");
+    add_arguments(parser);
+    std::ostringstream parser_stream;
+    parser_stream << parser.visible;
+    return parser_stream.str();
+}
+
+Minimap2Options parse_options(const std::string& minimap2_option_string) {
+    std::string error_message{};
+    auto minimap2_options = try_parse_options(minimap2_option_string, error_message);
+    if (!minimap2_options) {
+        spdlog::error("{}\n{}", error_message, get_help_message());
+        throw std::runtime_error(error_message);
+    }
+    return *minimap2_options;
+}
+
+std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
+                                                 std::string& error_message) {
     std::vector<std::string> mm2_args = [&minimap2_option_string] {
         if (minimap2_option_string.empty()) {
             return std::vector<std::string>{"minimap2_options"};
@@ -241,16 +263,14 @@ Minimap2Options process_minimap2_options_string(const std::string& minimap2_opti
     try {
         utils::arg_parse::parse(parser, mm2_args);
     } catch (const std::exception& e) {
-        std::ostringstream parser_stream;
-        parser_stream << parser.visible;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
-        throw;
+        error_message = e.what();
+        return std::nullopt;
     }
 
-    return process_arguments(parser);
+    return process_arguments(parser, error_message);
 }
 
-void apply_minimap2_cs_option(Minimap2Options& options, const std::string& cs_opt) {
+void apply_cs_option(Minimap2Options& options, const std::string& cs_opt) {
     if (cs_opt.empty()) {
         return;
     }
@@ -268,7 +288,7 @@ void apply_minimap2_cs_option(Minimap2Options& options, const std::string& cs_op
     }
 }
 
-void apply_minimap2_dual_option(Minimap2Options& options, const std::string& dual) {
+void apply_dual_option(Minimap2Options& options, const std::string& dual) {
     if (dual.empty()) {
         return;
     }
@@ -282,6 +302,6 @@ void apply_minimap2_dual_option(Minimap2Options& options, const std::string& dua
     }
 }
 
-bool minimap2_print_aln_seq() { return mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ; }
+bool print_aln_seq() { return mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ; }
 
-}  // namespace dorado::alignment
+}  // namespace dorado::alignment::mm2

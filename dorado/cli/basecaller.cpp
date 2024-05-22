@@ -134,7 +134,7 @@ void setup(const std::vector<std::string>& args,
            size_t min_qscore,
            const std::string& read_list_file_path,
            bool recursive_file_loading,
-           const alignment::Minimap2Options& aligner_options,
+           alignment::Minimap2Options aligner_options,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
@@ -526,11 +526,11 @@ int basecaller(int argc, char* argv[]) {
 
     cli::add_internal_arguments(parser);
 
-    alignment::add_minimap2_options_string_arg(parser);
+    alignment::mm2::add_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
-    auto mm2_option_string = alignment::extract_minimap2_options_string_arg(
-            {argv, argv + argc}, args_excluding_mm2_opts);
+    auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
+                                                                        args_excluding_mm2_opts);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -694,14 +694,20 @@ int basecaller(int argc, char* argv[]) {
 
     spdlog::info("> Creating basecall pipeline");
 
+    std::string err_msg{};
+    auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
+    if (!minimap_options) {
+        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        return EXIT_FAILURE;
+    }
+
     try {
         setup(args, model_config, data, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
               methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
-              parser.visible.get<std::string>("--read-ids"), recursive,
-              alignment::process_minimap2_options_string(mm2_option_string),
+              parser.visible.get<std::string>("--read-ids"), recursive, std::move(*minimap_options),
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

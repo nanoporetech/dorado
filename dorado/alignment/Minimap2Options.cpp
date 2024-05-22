@@ -85,20 +85,15 @@ bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
-Minimap2Options create_dflt_options() { return process_minimap2_options_string(""); }
+Minimap2Options create_dflt_options() { return mm2::parse_options(""); }
 
 Minimap2Options create_preset_options(const std::string& preset) {
-    return process_minimap2_options_string("-x " + preset);
+    return mm2::parse_options("-x " + preset);
 }
 
 std::optional<Minimap2Options> Minimap2Options::parse(const std::string& option_string,
                                                       std::string& error_message) {
-    try {
-        return process_minimap2_options_string(option_string);
-    } catch (const std::exception& e) {
-        error_message = e.what();
-    }
-    return std::nullopt;
+    return mm2::try_parse_options(option_string, error_message);
 }
 
 }  // namespace dorado::alignment

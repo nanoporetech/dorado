@@ -259,10 +259,10 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     mapping_options.occ_dist = 200;
 
     // --cs short
-    alignment::apply_minimap2_cs_option(options, "short");
+    alignment::mm2::apply_cs_option(options, "short");
 
     // --dual yes
-    alignment::apply_minimap2_dual_option(options, "yes");
+    alignment::mm2::apply_dual_option(options, "yes");
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {

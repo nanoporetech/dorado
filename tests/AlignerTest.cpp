@@ -359,7 +359,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Run alignment with one set of k/w.
     {
-        auto options = dorado::alignment::process_minimap2_options_string("-k 28 -w 28");
+        auto options = dorado::alignment::mm2::parse_options("-k 28 -w 28");
         dorado::HtsReader reader(query.string(), std::nullopt);
         auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 2);
         CHECK(bam_records.size() == 2);  // Generates 2 alignments.
@@ -367,7 +367,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Run alignment with another set of k/w.
     {
-        auto options = dorado::alignment::process_minimap2_options_string("-k 5 -w 5");
+        auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5");
         dorado::HtsReader reader(query.string(), std::nullopt);
         auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 2);
         CHECK(bam_records.size() == 1);  // Generates 1 alignment.
@@ -378,7 +378,7 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "long_target.fa";
 
-    auto options = dorado::alignment::process_minimap2_options_string("-k 5 -w 5 -I 1K");
+    auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5 -I 1K");
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
     CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), "", options, 1));
 }
@@ -518,7 +518,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = (aligner_test_dir / "target.fq").string();
     auto query = (aligner_test_dir / "query.fa").string();
 
-    auto options = dorado::alignment::process_minimap2_options_string("-k 5 -w 5");
+    auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5");
 
     // Get the sam line from BAM pipeline
     dorado::HtsReader bam_reader(query, std::nullopt);
@@ -588,7 +588,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     if (soft_clipping) {
         mm_options += " -Y";
     }
-    auto options = dorado::alignment::process_minimap2_options_string(mm_options);
+    auto options = dorado::alignment::mm2::parse_options(mm_options);
 
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 1);
