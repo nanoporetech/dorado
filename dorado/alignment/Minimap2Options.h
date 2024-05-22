@@ -1,11 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <tuple>
 
 namespace dorado::alignment {
 
@@ -39,7 +37,10 @@ bool operator>=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r
 bool operator==(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
 bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
 
-struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {};
+struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
+    static std::optional<Minimap2Options> parse(const std::string& option_string,
+                                                std::string& error_message);
+};
 
 bool operator==(const Minimap2Options& l, const Minimap2Options& r);
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r);

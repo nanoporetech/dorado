@@ -209,9 +209,8 @@ Minimap2Options process_arguments(const utils::arg_parse::ArgParser& parser) {
 
     auto rc = mm_check_opt(&res.index_options->get(), &res.mapping_options->get());
     if (rc < 0) {
-        throw std::runtime_error(
-                "Invalid minimap2 options string, for details run with --verbose flag. err_code: " +
-                std::to_string(rc));
+        throw std::runtime_error("Invalid minimap2 options string. Error code: " +
+                                 std::to_string(rc));
     }
 
     // Cache the --junc-bed arg with the index options for use when the index is loaded

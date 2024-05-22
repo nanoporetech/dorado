@@ -91,4 +91,14 @@ Minimap2Options create_preset_options(const std::string& preset) {
     return process_minimap2_options_string("-x " + preset);
 }
 
+std::optional<Minimap2Options> Minimap2Options::parse(const std::string& option_string,
+                                                      std::string& error_message) {
+    try {
+        return process_minimap2_options_string(option_string);
+    } catch (const std::exception& e) {
+        error_message = e.what();
+    }
+    return std::nullopt;
+}
+
 }  // namespace dorado::alignment
