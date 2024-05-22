@@ -299,7 +299,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
                     stream, static_cast<int>(N), static_cast<int>(T), nhead, head_dim,
                     rotary_emb->theta, qkv.data_ptr(), out.data_ptr());
             if (res != KOI_SUCCESS) {
-                throw std::runtime_error("Koi windowed attention failed.");
+                throw std::runtime_error("Koi rotary embedding failed.");
             }
             qkv = out;
         } else
@@ -308,10 +308,26 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
             qkv = rotary_emb(qkv);
         }
     }
+    attn_output_ntc = at::empty({N, T, C}, x.options());
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    int res = KOI_NOT_SUPPORTED;
+    if (utils::get_dev_opt<bool>("use_koi_attention", true) && koi_can_use_cutlass()) {
+        utils::ScopedProfileRange spr("KOI_MEA", 3);
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        const auto [win_upper, win_lower] = attn_window;
+        res = host_masked_attention_f16(stream, static_cast<int>(N), static_cast<int>(T), nhead,
+                                        head_dim, win_upper, win_lower, qkv[0].data_ptr(),
+                                        qkv[1].data_ptr(), qkv[2].data_ptr(),
+                                        attn_output_ntc.data_ptr());
+        if (res != KOI_SUCCESS && res != KOI_NOT_SUPPORTED) {
+            throw std::runtime_error("Koi windowed attention failed.");
+        }
+    }
+    if (res == KOI_NOT_SUPPORTED)
+#endif
     {
         utils::ScopedProfileRange spr("MEA", 3);
         auto attn_window_mask = get_attn_window_mask(T);
-        attn_output_ntc = at::empty({N, T, C}, x.options());
         auto attn_output = attn_output_ntc.view({N, T, nhead, head_dim}).transpose(1, 2);
         const auto [win_upper, win_lower] = attn_window;
         for (int i = 0; i < num_splits; ++i) {

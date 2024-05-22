@@ -20,7 +20,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.4.7)
+    set(KOI_VERSION 0.4.8)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
