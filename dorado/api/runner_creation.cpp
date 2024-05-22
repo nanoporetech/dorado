@@ -169,6 +169,9 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
 }
 
 #if DORADO_CUDA_BUILD
+size_t get_num_batch_dims(std::shared_ptr<basecall::CudaCaller> caller) {
+    return caller->num_batch_dims();
+}
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller,
                                            size_t batch_dims_idx) {
     return std::make_unique<basecall::CudaModelRunner>(std::move(caller), batch_dims_idx);
