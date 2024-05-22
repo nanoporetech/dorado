@@ -58,6 +58,7 @@ std::shared_ptr<const demux::AdapterDetector> AdapterDetectorNode::get_detector(
 void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     bam1_t* irecord = bam_message.bam_ptr.get();
     bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
+    std::string qname = bam_get_qname(irecord);
     std::string seq = utils::extract_sequence(irecord);
     if (is_input_reversed) {
         seq = utils::reverse_complement(seq);
@@ -90,8 +91,10 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
-                         trim_interval.first, trim_interval.second, seq);
+            spdlog::warn(
+                    "Adapter and/or primer detected for read {}, but could not be "
+                    "trimmed due to short length.",
+                    qname);
             bam_message.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
             return;
         }
@@ -127,8 +130,10 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::warn("Unexpected adapter/primer trim interval {}-{} for {}",
-                         trim_interval.first, trim_interval.second, read.read_common.seq);
+            spdlog::warn(
+                    "Adapter and/or primer detected for read {}, but could not be "
+                    "trimmed due to short length.",
+                    read.read_common.read_id);
             return;
         }
         demux::AdapterDetector::check_and_update_barcoding(read, trim_interval);
