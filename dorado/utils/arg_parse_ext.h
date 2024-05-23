@@ -24,7 +24,10 @@ static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
 struct ArgParser {
     ArgParser(std::string program_name)
             : visible(std::move(program_name), DORADO_VERSION, argparse::default_arguments::help),
-              hidden(HIDDEN_PROGRAM_NAME){};
+              hidden(HIDDEN_PROGRAM_NAME, DORADO_VERSION, argparse::default_arguments::none){};
+    ArgParser(std::string program_name, argparse::default_arguments add_args)
+            : visible(std::move(program_name), DORADO_VERSION, add_args),
+              hidden(HIDDEN_PROGRAM_NAME, DORADO_VERSION, argparse::default_arguments::none){};
     argparse::ArgumentParser visible;
     argparse::ArgumentParser hidden;
 };

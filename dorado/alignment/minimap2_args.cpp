@@ -248,18 +248,16 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
     return *minimap2_options;
 }
 
-std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
-                                                 std::string& error_message) {
+std::optional<Minimap2Options> try_parse_options_impl(utils::arg_parse::ArgParser& parser,
+                                                      const std::string& minimap2_option_string,
+                                                      std::string& error_message) {
     std::vector<std::string> mm2_args = [&minimap2_option_string] {
         if (minimap2_option_string.empty()) {
             return std::vector<std::string>{"minimap2_options"};
         }
         return utils::split("minimap2_options " + minimap2_option_string, ' ');
     }();
-
-    utils::arg_parse::ArgParser parser("minimap2_options");
     add_arguments(parser);
-
     try {
         utils::arg_parse::parse(parser, mm2_args);
     } catch (const std::exception& e) {
@@ -268,6 +266,18 @@ std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_opt
     }
 
     return process_arguments(parser, error_message);
+}
+
+std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
+                                                 std::string& error_message) {
+    utils::arg_parse::ArgParser parser("minimap2_options");
+    return try_parse_options_impl(parser, minimap2_option_string, error_message);
+}
+
+std::optional<Minimap2Options> try_parse_options_no_help(const std::string& minimap2_option_string,
+                                                         std::string& error_message) {
+    utils::arg_parse::ArgParser parser("minimap2_options", argparse::default_arguments::none);
+    return try_parse_options_impl(parser, minimap2_option_string, error_message);
 }
 
 void apply_cs_option(Minimap2Options& options, const std::string& cs_opt) {

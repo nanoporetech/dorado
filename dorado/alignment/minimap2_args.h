@@ -26,6 +26,13 @@ Minimap2Options parse_options(const std::string& minimap2_option_string);
 std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
                                                  std::string& error_message);
 
+// Tries to parse the given options string, returns nullopt and an error message if there is an error
+// The --help option will not parsed. This is important for the server usecase as ArgParse will call
+// std::exit as part of it's --help option processing, i.e. this prevents a client inadvertently
+// terminating the server by passing a minimap option string containing --help.
+std::optional<Minimap2Options> try_parse_options_no_help(const std::string& minimap2_option_string,
+                                                         std::string& error_message);
+
 // Returns the help text associated with the supported minimap options
 std::string get_help_message();
 

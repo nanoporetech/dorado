@@ -93,7 +93,7 @@ Minimap2Options create_preset_options(const std::string& preset) {
 
 std::optional<Minimap2Options> Minimap2Options::parse(const std::string& option_string,
                                                       std::string& error_message) {
-    return mm2::try_parse_options(option_string, error_message);
+    return mm2::try_parse_options_no_help(option_string, error_message);
 }
 
 }  // namespace dorado::alignment
