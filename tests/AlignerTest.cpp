@@ -394,6 +394,8 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
         align_info->reference_file = ref.string();
 
         const std::string TEST_SEQUENCE{"ACGTACGTACGTACGT"};
+        const std::string TEST_QUALITY{""};  // deliberately empty
+        const std::string POSTFIX = "\t" + TEST_SEQUENCE + "\t" + TEST_QUALITY;
 
         AND_GIVEN("client with no alignment requirements") {
             const auto EMPTY_ALIGN_INFO = std::make_shared<dorado::alignment::AlignmentInfo>();
@@ -401,16 +403,16 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
                 auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
                         align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
 
-                THEN("Output simplex read has empty alignment_string") {
-                    REQUIRE(simplex_read->read_common.alignment_string.empty());
+                THEN("Output simplex read has empty alignments") {
+                    REQUIRE(simplex_read->read_common.alignment_results.empty());
                 }
             }
 
             WHEN("push duplex read to pipeline") {
                 auto duplex_read = RunPipelineForRead<dorado::DuplexRead>(
                         align_info, EMPTY_ALIGN_INFO, READ_ID, TEST_SEQUENCE);
-                THEN("Output duplex read has empty alignment_string") {
-                    REQUIRE(duplex_read->read_common.alignment_string.empty());
+                THEN("Output duplex read has empty alignments") {
+                    REQUIRE(duplex_read->read_common.alignment_results.empty());
                 }
             }
         }
@@ -420,14 +422,18 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
                 auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(align_info, align_info,
                                                                             READ_ID, TEST_SEQUENCE);
 
-                THEN("Output simplex read has alignment_string populated") {
-                    REQUIRE_FALSE(simplex_read->read_common.alignment_string.empty());
+                THEN("Output simplex read has alignments populated") {
+                    REQUIRE_FALSE(simplex_read->read_common.alignment_results.empty());
                 }
 
                 THEN("Output simplex read has alignment_string containing unmapped sam line") {
-                    const std::string expected{READ_ID +
-                                               dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                    REQUIRE(simplex_read->read_common.alignment_string == expected);
+                    std::string expected{READ_ID + dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
+                    expected.insert(expected.size() - 1, POSTFIX);
+                    std::string sam_string;
+                    for (const auto& result : simplex_read->read_common.alignment_results) {
+                        sam_string += result.sam_string + "\n";
+                    }
+                    REQUIRE(sam_string == expected);
                 }
             }
 
@@ -436,13 +442,17 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
                                                                           READ_ID, TEST_SEQUENCE);
 
                 THEN("Output duplex read has alignment_string populated") {
-                    REQUIRE_FALSE(duplex_read->read_common.alignment_string.empty());
+                    REQUIRE_FALSE(duplex_read->read_common.alignment_results.empty());
                 }
 
                 THEN("Output duplex read has alignment_string containing unmapped sam line") {
-                    const std::string expected{READ_ID +
-                                               dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                    REQUIRE(duplex_read->read_common.alignment_string == expected);
+                    std::string expected{READ_ID + dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
+                    expected.insert(expected.size() - 1, POSTFIX);
+                    std::string sam_string;
+                    for (const auto& result : duplex_read->read_common.alignment_results) {
+                        sam_string += result.sam_string + "\n";
+                    }
+                    REQUIRE(sam_string == expected);
                 }
             }
 
@@ -458,13 +468,14 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
                     THEN("Output sam line has read_id as QNAME") {
                         const std::string expected{READ_ID +
                                                    dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                        REQUIRE(simplex_read->read_common.alignment_string.substr(
+                        REQUIRE(simplex_read->read_common.alignment_results[0].sam_string.substr(
                                         0, READ_ID.size()) == READ_ID);
                     }
 
                     THEN("Output sam line contains sequence string") {
-                        REQUIRE_FALSE(simplex_read->read_common.alignment_string.find(sequence) ==
-                                      std::string::npos);
+                        REQUIRE_FALSE(
+                                simplex_read->read_common.alignment_results[0].sam_string.find(
+                                        sequence) == std::string::npos);
                     }
                 }
 
@@ -475,13 +486,13 @@ SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GRO
                     THEN("Output sam line has read_id as QNAME") {
                         const std::string expected{READ_ID +
                                                    dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
-                        REQUIRE(duplex_read->read_common.alignment_string.substr(
+                        REQUIRE(duplex_read->read_common.alignment_results[0].sam_string.substr(
                                         0, READ_ID.size()) == READ_ID);
                     }
 
                     THEN("Output sam line contains sequence string") {
-                        REQUIRE_FALSE(duplex_read->read_common.alignment_string.find(sequence) ==
-                                      std::string::npos);
+                        REQUIRE_FALSE(duplex_read->read_common.alignment_results[0].sam_string.find(
+                                              sequence) == std::string::npos);
                     }
                 }
             }
@@ -533,7 +544,8 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     align_info->reference_file = ref;
     auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
             align_info, align_info, std::move(read_id), std::move(sequence));
-    auto sam_line_from_read_common = std::move(simplex_read->read_common.alignment_string);
+    auto sam_line_from_read_common =
+            std::move(simplex_read->read_common.alignment_results[0].sam_string);
 
     // Do the comparison checks
     CHECK_FALSE(sam_line_from_read_common.empty());
@@ -549,6 +561,9 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     CHECK(bam_fields.size() >= 11);
     // first 11 mandatory fields should be identical
     for (std::size_t field_index{0}; field_index < 11; ++field_index) {
+        CAPTURE(field_index);
+        CAPTURE(sam_line_from_bam_ptr);
+        CAPTURE(sam_line_from_read_common);
         CHECK(bam_fields[field_index] == read_common_fields[field_index]);
     }
 
@@ -556,7 +571,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     const auto read_common_tags = get_tags_from_sam_line_fields(read_common_fields);
     CHECK(bam_tags.size() == read_common_tags.size());
     for (const auto& [key, bam_value] : bam_tags) {
-        INFO(key);
+        CAPTURE(key);
         auto tag_entry = read_common_tags.find(key);
         REQUIRE(tag_entry != read_common_tags.end());
         // de:f tag compare to 4dp as this is the precision the minimap sam line generation function uses
