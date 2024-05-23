@@ -4,6 +4,7 @@
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/alignment_info.h"
+#include "alignment/minimap2_args.h"
 #include "messages.h"
 
 #include <htslib/sam.h>
@@ -22,7 +23,8 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         const std::string& index_file,
         const dorado::alignment::Minimap2Options& options,
         const int threads) {
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(threads)};
+    int num_index_construction_threads{
+            dorado::alignment::mm2::print_aln_seq() ? 1 : static_cast<int>(threads)};
     switch (index_file_access.load_index(index_file, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + index_file);

@@ -1,3 +1,4 @@
+#include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
@@ -21,6 +22,7 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -383,7 +385,7 @@ int basecaller(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    cli::ArgParser parser("dorado");
+    utils::arg_parse::ArgParser parser("dorado");
 
     parser.visible.add_argument("model").help(
             "model selection {fast,hac,sup}@v{version} for automatic model selection including "
@@ -522,8 +524,13 @@ int basecaller(int argc, char* argv[]) {
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
+
+    alignment::mm2::add_options_string_arg(parser);
+
+    std::vector<std::string> args_excluding_mm2_opts{};
+    auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
+                                                                        args_excluding_mm2_opts);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -531,7 +538,7 @@ int basecaller(int argc, char* argv[]) {
     auto resume_parser = parser.visible;
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
@@ -687,14 +694,20 @@ int basecaller(int argc, char* argv[]) {
 
     spdlog::info("> Creating basecall pipeline");
 
+    std::string err_msg{};
+    auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
+    if (!minimap_options) {
+        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        return EXIT_FAILURE;
+    }
+
     try {
         setup(args, model_config, data, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
               methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
-              parser.visible.get<std::string>("--read-ids"), recursive,
-              cli::process_minimap2_arguments<alignment::Minimap2Options>(parser),
+              parser.visible.get<std::string>("--read-ids"), recursive, *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

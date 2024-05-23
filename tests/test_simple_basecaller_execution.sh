@@ -117,7 +117,7 @@ dorado_aligner_options_test() (
     SKIP() { echo $*; cat err; }
 
     MM2_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
-    DOR_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "--bandwidth 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    DOR_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
     CHANGES=(false true    true     false     true             true   true        true true              false            )
     for ((i = 0; i < ${#MM_OPTIONS[@]}; i++)); do
         mm2_opt=${MM2_OPTIONS[$i]}

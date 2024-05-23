@@ -1,3 +1,4 @@
+#include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
@@ -17,6 +18,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 
@@ -242,7 +244,7 @@ int duplex(int argc, char* argv[]) {
     //utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    cli::ArgParser parser("dorado");
+    utils::arg_parse::ArgParser parser("dorado");
     parser.visible.add_argument("model").help(
             "model selection {fast,hac,sup}@v{version} for automatic model selection including "
             "modbases, or path to existing model directory");
@@ -326,12 +328,17 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
+
+    alignment::mm2::add_options_string_arg(parser);
+
+    std::vector<std::string> args_excluding_mm2_opts{};
+    auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
+                                                                        args_excluding_mm2_opts);
 
     std::set<fs::path> temp_model_paths;
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
         auto device(parser.visible.get<std::string>("-x"));
         auto model(parser.visible.get<std::string>("model"));
@@ -428,9 +435,15 @@ int duplex(int argc, char* argv[]) {
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
-            auto options = cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
+            std::string err_msg{};
+            auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
+            if (!minimap_options) {
+                spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+                return EXIT_FAILURE;
+            }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
-            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "", options,
+            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "",
+                                                          *minimap_options,
                                                           std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);

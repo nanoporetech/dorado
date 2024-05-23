@@ -11,6 +11,7 @@
 #include "summary/summary.h"
 #include "utils/MergeHeaders.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -51,7 +52,7 @@ void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
 }
 
 std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
-        dorado::cli::ArgParser& parser,
+        dorado::utils::arg_parse::ArgParser& parser,
         const dorado::utils::SampleSheet* sample_sheet) {
     auto result = std::make_shared<dorado::demux::BarcodingInfo>();
     result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
@@ -74,7 +75,7 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
 namespace dorado {
 
 int demuxer(int argc, char* argv[]) {
-    cli::ArgParser parser("dorado demux");
+    utils::arg_parse::ArgParser parser("dorado demux");
     parser.visible.add_description(
             "Barcode demultiplexing tool. Users need to specify the kit name(s).");
     parser.visible.add_argument("reads")
@@ -159,7 +160,7 @@ int demuxer(int argc, char* argv[]) {
             .help("Path to file with custom barcode sequences.");
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;

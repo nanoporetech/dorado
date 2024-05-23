@@ -7,10 +7,10 @@ endif()
 
 # dorado_tests
 add_executable(dorado_tests
-    FastxRandomReaderTest.cpp
     AdapterDetectorTest.cpp
     AlignerTest.cpp
     alignment_processing_items_test.cpp
+    arg_parse_ext_test.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp
@@ -26,6 +26,7 @@ add_executable(dorado_tests
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
+    FastxRandomReaderTest.cpp
     gpu_monitor_test.cpp
     HtsFileTest.cpp
     IndexFileAccessTest.cpp

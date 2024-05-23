@@ -5,6 +5,7 @@
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/torch_utils.h"
@@ -97,7 +98,8 @@ int correct(int argc, char* argv[]) {
     auto infer_threads(parser.get<int>("infer-threads"));
     auto device(parser.get<std::string>("device"));
     auto batch_size(parser.get<int>("batch-size"));
-    auto index_size(cli::parse_string_to_size<uint64_t>(parser.get<std::string>("index-size")));
+    auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(
+            parser.get<std::string>("index-size")));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
