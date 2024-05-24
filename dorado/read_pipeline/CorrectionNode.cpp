@@ -187,17 +187,14 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
     torch::Device device = torch::Device(device_str);
 
 #if DORADO_CUDA_BUILD
-    std::unique_ptr<c10::cuda::CUDAGuard> device_guard;
-    std::unique_ptr<c10::cuda::CUDAStreamGuard> stream_guard;
-
-    if (device_str != "cpu") {
-        device_guard = std::make_unique<c10::cuda::CUDAGuard>(device);
-        stream_guard = std::make_unique<c10::cuda::CUDAStreamGuard>(
-                c10::cuda::getStreamFromPool(false, device.index()));
+    c10::optional<c10::Stream> stream;
+    if (device.is_cuda()) {
+        stream = c10::cuda::getStreamFromPool(false, device.index());
     }
+    c10::cuda::OptionalCUDAStreamGuard guard(stream);
 #endif
 
-    torch::NoGradGuard no_grad;
+    at::InferenceMode infer_guard;
 
     auto model_path = (m_model_config.model_dir / m_model_config.weights_file).string();
     torch::jit::script::Module module;
