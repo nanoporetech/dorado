@@ -1,5 +1,6 @@
 #include "bam_utils.h"
 
+#include "PostCondition.h"
 #include "SampleSheet.h"
 #include "barcode_kits.h"
 #include "sequence_utils.h"
@@ -241,29 +242,38 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
 }
 
 std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
-                                                            const std::vector<std::string>& keys) {
+                                                            const std::vector<std::string>& keys,
+                                                            const char* ID_key,
+                                                            const char* ID_val) {
     std::map<std::string, std::string> pg_keys;
     auto file = hts_open(filename.c_str(), "r");
     if (!file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
+    auto close_file = PostCondition([&file]() { hts_close(file); });
     SamHdrPtr header(sam_hdr_read(file));
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
+    return extract_pg_keys_from_hdr(header.get(), keys, ID_key, ID_val);
+}
+
+std::map<std::string, std::string> extract_pg_keys_from_hdr(sam_hdr_t* header,
+                                                            const std::vector<std::string>& keys,
+                                                            const char* ID_key,
+                                                            const char* ID_val) {
+    std::map<std::string, std::string> pg_keys;
+    if (!header) {
+        throw std::runtime_error("Provided header cannot be a nullptr.");
+    }
     KString val_wrapper(1000000);
     auto val = val_wrapper.get();
     for (auto& k : keys) {
-        auto ret = sam_hdr_find_tag_id(header.get(), "PG", NULL, NULL, k.c_str(), &val);
-        if (ret != 0) {
-            throw std::runtime_error(std::string("Required key ")
-                                             .append(k)
-                                             .append(" not found in header of ")
-                                             .append(filename));
+        auto ret = sam_hdr_find_tag_id(header, "PG", ID_key, ID_val, k.c_str(), &val);
+        if (ret == 0) {
+            pg_keys[k] = std::string(val.s);
         }
-        pg_keys[k] = std::string(val.s);
     }
-    hts_close(file);
     return pg_keys;
 }
 

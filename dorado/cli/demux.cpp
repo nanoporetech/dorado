@@ -34,10 +34,6 @@ using namespace std::chrono_literals;
 
 namespace {
 
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_pg(hdr, "demux", "PN", "dorado", "VN", DORADO_VERSION, nullptr);
-}
-
 // This function allows us to map the reference id from input BAM records to what
 // they should be in the output file, based on the new ordering of references in
 // the merged header.
@@ -199,6 +195,7 @@ int demuxer(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto strip_alignment = !no_trim;
+    std::vector<std::string> args(argv, argv + argc);
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -244,7 +241,7 @@ int demuxer(int argc, char* argv[]) {
     hdr_merger.finalize_merge();
     auto sq_mapping = hdr_merger.get_sq_mapping();
     auto header = SamHdrPtr(sam_hdr_dup(hdr_merger.get_merged_header()));
-    add_pg_hdr(header.get());
+    cli::add_pg_hdr(header.get(), "demux", args, "cpu");
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;
