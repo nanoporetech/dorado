@@ -1,6 +1,5 @@
 #include "bam_utils.h"
 
-#include "PostCondition.h"
 #include "SampleSheet.h"
 #include "barcode_kits.h"
 #include "sequence_utils.h"
@@ -246,12 +245,11 @@ std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& f
                                                             const char* ID_key,
                                                             const char* ID_val) {
     std::map<std::string, std::string> pg_keys;
-    auto file = hts_open(filename.c_str(), "r");
+    auto file = HtsFilePtr(hts_open(filename.c_str(), "r"));
     if (!file) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    auto close_file = PostCondition([&file]() { hts_close(file); });
-    SamHdrPtr header(sam_hdr_read(file));
+    SamHdrPtr header(sam_hdr_read(file.get()));
     if (!header) {
         throw std::runtime_error("Could not open header from file: " + filename);
     }
