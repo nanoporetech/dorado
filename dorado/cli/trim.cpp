@@ -30,14 +30,6 @@ namespace dorado {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-namespace {
-
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_pg(hdr, "trim", "PN", "dorado", "VN", DORADO_VERSION, NULL);
-}
-
-}  // anonymous namespace
-
 int trim(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Adapter/primer trimming tool.");
@@ -91,6 +83,7 @@ int trim(int argc, char* argv[]) {
     auto reads(parser.get<std::vector<std::string>>("reads"));
     auto threads(parser.get<int>("threads"));
     auto max_reads(parser.get<int>("max-reads"));
+    std::vector<std::string> args(argv, argv + argc);
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
@@ -118,8 +111,7 @@ int trim(int argc, char* argv[]) {
 
     HtsReader reader(reads[0], read_list);
     auto header = SamHdrPtr(sam_hdr_dup(reader.header));
-    utils::add_hd_header_line(header.get());
-    add_pg_hdr(header.get());
+    cli::add_pg_hdr(header.get(), "trim", args, "cpu");
     // Always remove alignment information from input header
     // because at minimum the adapters are trimmed, which
     // invalidates the alignment record.

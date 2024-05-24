@@ -195,7 +195,7 @@ void setup(const std::vector<std::string>& args,
             barcoding_info != nullptr, adapter_trimming_enabled);
 
     SamHdrPtr hdr(sam_hdr_init());
-    cli::add_pg_hdr(hdr.get(), args, device);
+    cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
         std::unordered_map<std::string, std::string> custom_barcodes{};
@@ -295,7 +295,8 @@ void setup(const std::vector<std::string>& args,
         // Turn off warning logging as header info is fetched.
         auto initial_hts_log_level = hts_get_log_level();
         hts_set_log_level(HTS_LOG_OFF);
-        auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
+        auto pg_keys =
+                utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"}, "ID", "basecaller");
         hts_set_log_level(initial_hts_log_level);
 
         auto tokens = cli::extract_token_from_cli(pg_keys["CL"]);
