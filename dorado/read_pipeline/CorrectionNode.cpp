@@ -187,9 +187,14 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
     torch::Device device = torch::Device(device_str);
 
 #if DORADO_CUDA_BUILD
-    c10::cuda::CUDAGuard device_guard(device);
-    auto stream = c10::cuda::getStreamFromPool(false, device.index());
-    c10::cuda::CUDAStreamGuard stream_guard(stream);
+    std::unique_ptr<c10::cuda::CUDAGuard> device_guard;
+    std::unique_ptr<c10::cuda::CUDAStreamGuard> stream_guard;
+
+    if (device_str != "cpu") {
+        device_guard = std::make_unique<c10::cuda::CUDAGuard>(device);
+        stream_guard = std::make_unique<c10::cuda::CUDAStreamGuard>(
+                c10::cuda::getStreamFromPool(false, device.index()));
+    }
 #endif
 
     torch::NoGradGuard no_grad;
@@ -204,7 +209,6 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
         throw std::runtime_error("Error loading model from " + model_path +
                                  " with error: " + e.what());
     }
-    //module.to(device);
     module.eval();
 
     std::vector<at::Tensor> bases_batch;
