@@ -44,5 +44,8 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 echo dorado auto summary test stage
 %dorado_bin% summary calls.sam
 if %errorlevel% neq 0 exit /b %errorlevel%
+%dorado_bin% correct tests/data/read_correction/reads.fq --threads 1 -v > $output_dir/corrected.fasta 
+
+echo dorado correct test stage
 
 echo finished

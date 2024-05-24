@@ -475,7 +475,7 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
         }
         spdlog::debug("Created fastq index.");
     }
-    free(idx_name);
+    hts_free(idx_name);
     start_input_processing(&CorrectionNode::input_thread_fn, this);
 }
 
