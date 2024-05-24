@@ -418,7 +418,7 @@ int duplex(int argc, char* argv[]) {
         spdlog::debug("> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());
-        cli::add_pg_hdr(hdr.get(), args, device);
+        cli::add_pg_hdr(hdr.get(), "duplex", args, device);
 
         constexpr int WRITER_THREADS = 4;
         utils::HtsFile hts_file("-", output_mode, WRITER_THREADS, false);

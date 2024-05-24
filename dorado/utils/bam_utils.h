@@ -83,12 +83,31 @@ AlignmentOps get_alignment_op_counts(bam1_t* record);
  * Extract keys for PG header from BAM header.
  *
  * @param filepath Path to input BAM file.
- * @params keys Vector of keys to parse
+ * @param keys Vector of keys to parse
+ * @param ID_key Tag defining the line. E.g. "SN". Can be a nullptr.
+ * @param ID_val Tag value associated with the key above. If key is null, value can be null.
+ * @return Map of keys to their values
+ * @throws An error if a key is requested that doesn't exist.
+ */
+std::map<std::string, std::string> extract_pg_keys_from_hdr(sam_hdr_t* header,
+                                                            const std::vector<std::string>& keys,
+                                                            const char* ID_key,
+                                                            const char* ID_val);
+
+/**
+ * Extract keys for PG header from a BAM file.
+ *
+ * @param filepath Path to input BAM file.
+ * @param keys Vector of keys to parse
+ * @param ID_key Tag defining the line. E.g. "SN". Can be a nullptr.
+ * @param ID_val Tag value associated with the key above. If key is null, value can be null.
  * @return Map of keys to their values
  * @throws An error if a key is requested that doesn't exist.
  */
 std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,
-                                                            const std::vector<std::string>& keys);
+                                                            const std::vector<std::string>& keys,
+                                                            const char* ID_key,
+                                                            const char* ID_val);
 
 /*
  * Extract the sequence string.

@@ -55,10 +55,11 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
 }
 
 inline void add_pg_hdr(sam_hdr_t* hdr,
+                       const std::string& pg_id,
                        const std::vector<std::string>& args,
                        const std::string& device) {
     utils::add_hd_header_line(hdr);
-    auto safe_id = sam_hdr_pg_id(hdr, "basecaller");
+    auto safe_id = sam_hdr_pg_id(hdr, pg_id.c_str());
 
     std::stringstream pg;
     pg << "@PG\tID:" << safe_id << "\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
