@@ -391,10 +391,10 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # CUDA toolkit DLLs we depend on:
     set(VERSIONED_CUDA_LIBS
-        libcublas*.so.*
-        libcudart*.so.*
+        libcublas*.so*
+        libcudart*.so*
         libnvrtc*.so*
-        libnvToolsExt*.so.*
+        libnvToolsExt*.so*
     )
 
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
