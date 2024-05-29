@@ -33,9 +33,7 @@ int correct(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
     parser.add_description("Dorado read correction tool.");
-    parser.add_argument("reads")
-            .help("Path to a file with reads to correct in FASTQ format.")
-            .nargs(argparse::nargs_pattern::any);
+    parser.add_argument("reads").help("Path to a file with reads to correct in FASTQ format.");
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for adapter/primer detection and output generation. "
                   "Default uses "
