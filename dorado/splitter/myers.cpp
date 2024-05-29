@@ -114,7 +114,8 @@ std::vector<EdistResult> myers_align(std::string_view query,
     // hits:                 [^]   [^  ] [  ^   ]
     // where these hits should probably be grouped together.
     //
-    std::optional<std::size_t> current_range_end;
+    std::size_t current_range_end = 0;
+    bool in_range = false;
     std::size_t min_edist = max_edist + 1;
     for (std::size_t current_end = query_len; current_end < local_edists.size(); current_end++) {
         // See if this is a better match.
@@ -122,17 +123,18 @@ std::vector<EdistResult> myers_align(std::string_view query,
         if (current_edist <= max_edist && current_edist < min_edist) {
             min_edist = current_edist;
             current_range_end = current_end;
-        } else if (current_range_end.has_value() && current_edist > max_edist) {
+            in_range = true;
+        } else if (in_range && current_edist > max_edist) {
             // We're back out of the threshold, so end the current range.
-            add_match(*current_range_end, min_edist);
-            current_range_end.reset();
+            add_match(current_range_end, min_edist);
+            in_range = false;
             min_edist = max_edist + 1;
         }
     }
 
     // End the current range if we're in one.
-    if (current_range_end.has_value()) {
-        add_match(*current_range_end, min_edist);
+    if (in_range) {
+        add_match(current_range_end, min_edist);
     }
 
     // Deduplicate the ranges.
