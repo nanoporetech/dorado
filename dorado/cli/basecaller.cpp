@@ -211,7 +211,7 @@ void setup(const std::vector<std::string>& args,
         };
 
         std::vector<std::future<BasecallerRunners>> futures;
-        auto create_runners = [&](std::string device_id, float fraction) {
+        auto create_runners = [&](const std::string& device_id, float fraction) {
             BasecallerRunners basecaller_runners;
             std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                     api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
@@ -219,8 +219,9 @@ void setup(const std::vector<std::string>& args,
             return basecaller_runners;
         };
 
+        futures.reserve(gpu_fractions.size());
         for (const auto& [device_id, fraction] : gpu_fractions) {
-            futures.push_back(pool.push(create_runners, device_id, fraction));
+            futures.push_back(pool.push(create_runners, std::cref(device_id), fraction));
         }
 
         for (auto& future : futures) {

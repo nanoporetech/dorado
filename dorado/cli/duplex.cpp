@@ -564,7 +564,7 @@ int duplex(int argc, char* argv[]) {
                 };
 
                 std::vector<std::future<DuplexBasecallerRunners>> futures;
-                auto create_runners = [&](std::string device_id, float fraction) {
+                auto create_runners = [&](const std::string& device_id, float fraction) {
                     // Note: The memory assignment between simplex and duplex callers have been
                     // performed based on empirical results considering a SUP model for simplex
                     // calling.
@@ -591,8 +591,9 @@ int duplex(int argc, char* argv[]) {
                     return basecaller_runners;
                 };
 
+                futures.reserve(gpu_fractions.size());
                 for (const auto& [device_id, fraction] : gpu_fractions) {
-                    futures.push_back(pool.push(create_runners, device_id, fraction));
+                    futures.push_back(pool.push(create_runners, std::cref(device_id), fraction));
                 }
 
                 for (auto& future : futures) {
