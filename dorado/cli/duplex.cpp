@@ -22,7 +22,6 @@
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 
-#include <optional>
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
@@ -37,6 +36,7 @@
 #include "utils/tty_utils.h"
 #include "utils/types.h"
 
+#include <cxxpool.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/utils.h>
@@ -45,6 +45,7 @@
 #include <exception>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <unordered_set>
 #include <vector>
@@ -528,6 +529,9 @@ int duplex(int argc, char* argv[]) {
 
             temp_model_paths = models.temp_paths;
 
+#if DORADO_CUDA_BUILD
+            auto initial_device_info = utils::get_cuda_device_info(device, false);
+#endif
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
@@ -548,26 +552,86 @@ int duplex(int argc, char* argv[]) {
 
             const size_t num_runners = default_parameters.num_runners;
 
-            // Note: The memory assignment between simplex and duplex callers have been
-            // performed based on empirical results considering a SUP model for simplex
-            // calling.
-            auto [runners, num_devices] =
-                    api::create_basecall_runners(models.model_config, device, num_runners, 0, 0.9f,
-                                                 api::PipelineType::duplex, 0.f);
-
+            std::vector<basecall::RunnerPtr> runners;
             std::vector<basecall::RunnerPtr> stereo_runners;
-            // The fraction argument for GPU memory allocates the fraction of the
-            // _remaining_ memory to the caller. So, we allocate all of the available
-            // memory after simplex caller has been instantiated to the duplex caller.
-            // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
-            // except for on metal
-            // WORKAROUND: As a workaround to CUDA OOM, force stereo to have a smaller
-            // memory footprint for both model and decode function. This will increase the
-            // chances for the stereo model to use the cached allocations from the simplex
-            // model.
-            std::tie(stereo_runners, std::ignore) =
-                    api::create_basecall_runners(models.stereo_model_config, device, num_runners, 0,
-                                                 0.5f, api::PipelineType::duplex, 0.f);
+            size_t num_devices = 0;
+#if DORADO_CUDA_BUILD
+            if (device != "cpu") {
+                // Iterate over the separate devices to create the basecall runners.
+                // We may have multiple GPUs with different amounts of free memory left after the modbase runners were created.
+                // This allows us to set a different memory_limit_fraction in case we have a heterogeneous GPU setup
+                auto updated_device_info = utils::get_cuda_device_info(device, false);
+                std::vector<std::pair<std::string, float>> gpu_fractions;
+                for (size_t i = 0; i < updated_device_info.size(); ++i) {
+                    auto device_id = "cuda:" + std::to_string(updated_device_info[i].device_id);
+                    auto fraction = static_cast<float>(updated_device_info[i].free_mem) /
+                                    static_cast<float>(initial_device_info[i].free_mem);
+                    gpu_fractions.push_back(std::make_pair(device_id, fraction));
+                }
+
+                cxxpool::thread_pool pool{gpu_fractions.size()};
+                struct DuplexBasecallerRunners {
+                    std::vector<dorado::basecall::RunnerPtr> runners;
+                    std::vector<dorado::basecall::RunnerPtr> stereo_runners;
+                    size_t num_devices{};
+                };
+
+                std::vector<std::future<DuplexBasecallerRunners>> futures;
+                auto create_runners = [&](const std::string& device_id, float fraction) {
+                    // Note: The memory assignment between simplex and duplex callers have been
+                    // performed based on empirical results considering a SUP model for simplex
+                    // calling.
+                    DuplexBasecallerRunners basecaller_runners;
+                    std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
+                            api::create_basecall_runners(models.model_config, device_id,
+                                                         num_runners, 0, 0.9f * fraction,
+                                                         api::PipelineType::duplex, 0.f);
+
+                    // The fraction argument for GPU memory allocates the fraction of the
+                    // _remaining_ memory to the caller. So, we allocate all of the available
+                    // memory after simplex caller has been instantiated to the duplex caller.
+                    // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
+                    // except for on metal
+                    // WORKAROUND: As a workaround to CUDA OOM, force stereo to have a smaller
+                    // memory footprint for both model and decode function. This will increase the
+                    // chances for the stereo model to use the cached allocations from the simplex
+                    // model.
+                    std::tie(basecaller_runners.stereo_runners, std::ignore) =
+                            api::create_basecall_runners(models.stereo_model_config, device_id,
+                                                         num_runners, 0, 0.5f * fraction,
+                                                         api::PipelineType::duplex, 0.f);
+
+                    return basecaller_runners;
+                };
+
+                futures.reserve(gpu_fractions.size());
+                for (const auto& [device_id, fraction] : gpu_fractions) {
+                    futures.push_back(pool.push(create_runners, std::cref(device_id), fraction));
+                }
+
+                for (auto& future : futures) {
+                    auto data = future.get();
+                    runners.insert(runners.end(), std::make_move_iterator(data.runners.begin()),
+                                   std::make_move_iterator(data.runners.end()));
+                    stereo_runners.insert(stereo_runners.end(),
+                                          std::make_move_iterator(data.stereo_runners.begin()),
+                                          std::make_move_iterator(data.stereo_runners.end()));
+                    num_devices += data.num_devices;
+                }
+
+                if (num_devices == 0) {
+                    throw std::runtime_error("CUDA device requested but no devices found.");
+                }
+            } else
+#endif
+            {
+                std::tie(runners, num_devices) =
+                        api::create_basecall_runners(models.model_config, device, num_runners, 0,
+                                                     0.9f, api::PipelineType::duplex, 0.f);
+                std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
+                        models.stereo_model_config, device, num_runners, 0, 0.5f,
+                        api::PipelineType::duplex, 0.f);
+            }
 
             spdlog::info("> Starting Stereo Duplex pipeline");
 

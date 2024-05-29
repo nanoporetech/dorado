@@ -28,6 +28,7 @@
 #include "utils/basecaller_utils.h"
 
 #include <argparse.hpp>
+#include <cxxpool.h>
 
 #include <string>
 #if DORADO_CUDA_BUILD
@@ -180,13 +181,67 @@ void setup(const std::vector<std::string>& args,
 
     const bool enable_aligner = !ref.empty();
 
+#if DORADO_CUDA_BUILD
+    auto initial_device_info = utils::get_cuda_device_info(device, false);
+#endif
+
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = api::create_modbase_runners(
             remora_models, device, default_parameters.mod_base_runners_per_caller,
             remora_batch_size);
 
-    auto [runners, num_devices] = api::create_basecall_runners(
-            model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
+    std::vector<basecall::RunnerPtr> runners;
+    size_t num_devices = 0;
+#if DORADO_CUDA_BUILD
+    if (device != "cpu") {
+        // Iterate over the separate devices to create the basecall runners.
+        // We may have multiple GPUs with different amounts of free memory left after the modbase runners were created.
+        // This allows us to set a different memory_limit_fraction in case we have a heterogeneous GPU setup
+        auto updated_device_info = utils::get_cuda_device_info(device, false);
+        std::vector<std::pair<std::string, float>> gpu_fractions;
+        for (size_t i = 0; i < updated_device_info.size(); ++i) {
+            auto device_id = "cuda:" + std::to_string(updated_device_info[i].device_id);
+            auto fraction = static_cast<float>(updated_device_info[i].free_mem) /
+                            static_cast<float>(initial_device_info[i].free_mem);
+            gpu_fractions.push_back(std::make_pair(device_id, fraction));
+        }
+
+        cxxpool::thread_pool pool{gpu_fractions.size()};
+        struct BasecallerRunners {
+            std::vector<dorado::basecall::RunnerPtr> runners;
+            size_t num_devices{};
+        };
+
+        std::vector<std::future<BasecallerRunners>> futures;
+        auto create_runners = [&](const std::string& device_id, float fraction) {
+            BasecallerRunners basecaller_runners;
+            std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
+                    api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
+                                                 api::PipelineType::simplex, 0.f);
+            return basecaller_runners;
+        };
+
+        futures.reserve(gpu_fractions.size());
+        for (const auto& [device_id, fraction] : gpu_fractions) {
+            futures.push_back(pool.push(create_runners, std::cref(device_id), fraction));
+        }
+
+        for (auto& future : futures) {
+            auto data = future.get();
+            runners.insert(runners.end(), std::make_move_iterator(data.runners.begin()),
+                           std::make_move_iterator(data.runners.end()));
+            num_devices += data.num_devices;
+        }
+
+        if (num_devices == 0) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
+    } else
+#endif
+    {
+        std::tie(runners, num_devices) = api::create_basecall_runners(
+                model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
+    }
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -451,7 +506,7 @@ int basecaller(int argc, char* argv[]) {
                     spdlog::error("'{}' is not a supported modification please select from {}",
                                   value,
                                   std::accumulate(std::next(mods.begin()), mods.end(), mods[0],
-                                                  [](std::string const& a, std::string const& b) {
+                                                  [](const std::string& a, const std::string& b) {
                                                       return a + ", " + b;
                                                   }));
                     std::exit(EXIT_FAILURE);
