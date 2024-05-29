@@ -20,7 +20,6 @@
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 
-#include <optional>
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
 #endif
@@ -35,6 +34,7 @@
 #include "utils/tty_utils.h"
 #include "utils/types.h"
 
+#include <cxxpool.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/utils.h>
@@ -43,6 +43,7 @@
 #include <exception>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <unordered_set>
 #include <vector>
@@ -555,13 +556,23 @@ int duplex(int argc, char* argv[]) {
                     gpu_fractions.push_back(std::make_pair(device_id, fraction));
                 }
 
-                for (const auto& [device_id, fraction] : gpu_fractions) {
+                cxxpool::thread_pool pool{gpu_fractions.size()};
+                struct DuplexBasecallerRunners {
+                    std::vector<dorado::basecall::RunnerPtr> runners;
+                    std::vector<dorado::basecall::RunnerPtr> stereo_runners;
+                    size_t num_devices{};
+                };
+
+                std::vector<std::future<DuplexBasecallerRunners>> futures;
+                auto create_runners = [&](std::string device_id, float fraction) {
                     // Note: The memory assignment between simplex and duplex callers have been
                     // performed based on empirical results considering a SUP model for simplex
                     // calling.
-                    auto [cuda_runners, num_cuda_devices] = api::create_basecall_runners(
-                            models.model_config, device, num_runners, 0, 0.9f * fraction,
-                            api::PipelineType::duplex, 0.f);
+                    DuplexBasecallerRunners basecaller_runners;
+                    std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
+                            api::create_basecall_runners(models.model_config, device_id,
+                                                         num_runners, 0, 0.9f * fraction,
+                                                         api::PipelineType::duplex, 0.f);
 
                     // The fraction argument for GPU memory allocates the fraction of the
                     // _remaining_ memory to the caller. So, we allocate all of the available
@@ -572,16 +583,26 @@ int duplex(int argc, char* argv[]) {
                     // memory footprint for both model and decode function. This will increase the
                     // chances for the stereo model to use the cached allocations from the simplex
                     // model.
-                    auto [stereo_cuda_runners, unused] = api::create_basecall_runners(
-                            models.stereo_model_config, device, num_runners, 0, 0.5f * fraction,
-                            api::PipelineType::duplex, 0.f);
+                    std::tie(basecaller_runners.stereo_runners, std::ignore) =
+                            api::create_basecall_runners(models.stereo_model_config, device_id,
+                                                         num_runners, 0, 0.5f * fraction,
+                                                         api::PipelineType::duplex, 0.f);
 
-                    runners.insert(runners.end(), std::make_move_iterator(cuda_runners.begin()),
-                                   std::make_move_iterator(cuda_runners.end()));
+                    return basecaller_runners;
+                };
+
+                for (const auto& [device_id, fraction] : gpu_fractions) {
+                    futures.push_back(pool.push(create_runners, device_id, fraction));
+                }
+
+                for (auto& future : futures) {
+                    auto data = future.get();
+                    runners.insert(runners.end(), std::make_move_iterator(data.runners.begin()),
+                                   std::make_move_iterator(data.runners.end()));
                     stereo_runners.insert(stereo_runners.end(),
-                                          std::make_move_iterator(stereo_cuda_runners.begin()),
-                                          std::make_move_iterator(stereo_cuda_runners.end()));
-                    num_devices += num_cuda_devices;
+                                          std::make_move_iterator(data.stereo_runners.begin()),
+                                          std::make_move_iterator(data.stereo_runners.end()));
+                    num_devices += data.num_devices;
                 }
 
                 if (num_devices == 0) {

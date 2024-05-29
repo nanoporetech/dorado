@@ -26,6 +26,7 @@
 #include "utils/basecaller_utils.h"
 
 #include <argparse.hpp>
+#include <cxxpool.h>
 
 #include <string>
 #if DORADO_CUDA_BUILD
@@ -203,14 +204,30 @@ void setup(const std::vector<std::string>& args,
             gpu_fractions.push_back(std::make_pair(device_id, fraction));
         }
 
-        for (const auto& [device_id, fraction] : gpu_fractions) {
-            auto [cuda_runners, num_cuda_devices] =
+        cxxpool::thread_pool pool{gpu_fractions.size()};
+        struct BasecallerRunners {
+            std::vector<dorado::basecall::RunnerPtr> runners;
+            size_t num_devices{};
+        };
+
+        std::vector<std::future<BasecallerRunners>> futures;
+        auto create_runners = [&](std::string device_id, float fraction) {
+            BasecallerRunners basecaller_runners;
+            std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                     api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
                                                  api::PipelineType::simplex, 0.f);
+            return basecaller_runners;
+        };
 
-            runners.insert(runners.end(), std::make_move_iterator(cuda_runners.begin()),
-                           std::make_move_iterator(cuda_runners.end()));
-            num_devices += num_cuda_devices;
+        for (const auto& [device_id, fraction] : gpu_fractions) {
+            futures.push_back(pool.push(create_runners, device_id, fraction));
+        }
+
+        for (auto& future : futures) {
+            auto data = future.get();
+            runners.insert(runners.end(), std::make_move_iterator(data.runners.begin()),
+                           std::make_move_iterator(data.runners.end()));
+            num_devices += data.num_devices;
         }
 
         if (num_devices == 0) {
