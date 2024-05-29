@@ -20,10 +20,26 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
+First, download the relevant installer for your platform:
+
  - [dorado-0.7.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-linux-x64.tar.gz)
  - [dorado-0.7.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-linux-arm64.tar.gz)
  - [dorado-0.7.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-osx-arm64.zip)
  - [dorado-0.7.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-win64.zip)
+
+Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
+
+You can then call Dorado using the full path, for example:
+```
+$ /path/to/dorado-x.y.z-linux-x64/bin/dorado basecaller hac pod5s/ > calls.bam
+```
+
+Or you can add the bin path to your `$PATH` environment variable, and run with the `dorado` command instead, for example:
+```
+$ dorado basecaller hac pod5s/ > calls.bam
+```
+
+See [DEV.md](DEV.md) for details about building Dorado for development.
 
 ## Platforms
 
@@ -413,56 +429,6 @@ Here are a few examples of model complexes:
 | hac,5mCG_5hmCG@v2  | Latest compatible **hac** simplex model and **5mCG_5hmCG** modifications model with version `v2.0.0` |
 | sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and latest compatible **5mCG_5hmCG** and **6mA** modifications models |
 
-
-## Developer quickstart
-
-### Linux dependencies
-
-The following packages are necessary to build Dorado in a barebones environment (e.g. the official ubuntu:jammy docker image).
-
-```
-$ apt-get update && apt-get install -y --no-install-recommends \
-        curl \
-        git \
-        ca-certificates \
-        build-essential \
-        nvidia-cuda-toolkit \
-        libhdf5-dev \
-        libssl-dev \
-        libzstd-dev \
-        cmake \
-        autoconf \
-        automake
-```
-
-### Clone and build
-
-```
-$ git clone https://github.com/nanoporetech/dorado.git dorado
-$ cd dorado
-$ cmake -S . -B cmake-build
-$ cmake --build cmake-build --config Release -j
-$ ctest --test-dir cmake-build
-```
-
-The `-j` flag will use all available threads to build Dorado and usage is around 1-2 GB per thread. If you are constrained
-by the amount of available memory on your system, you can lower the number of threads i.e.` -j 4`.
-
-After building, you can run Dorado from the build directory `./cmake-build/bin/dorado` or install it somewhere else on your
-system i.e. `/opt` *(note: you will need the relevant permissions for the target installation directory)*.
-
-```
-$ cmake --install cmake-build --prefix /opt
-```
-
-### Pre-commit
-
-The project uses pre-commit to ensure code is consistently formatted; you can set this up using pip:
-
-```bash
-$ pip install pre-commit
-$ pre-commit install
-```
 
 ## Troubleshooting Guide
 
