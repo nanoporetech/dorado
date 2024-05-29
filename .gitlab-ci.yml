@@ -77,7 +77,7 @@ variables:
 .linux_dependencies: &linux_dependencies
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
     - pip install gcovr
 
 .set_parallel_jobs: &set_parallel_jobs
@@ -210,6 +210,15 @@ build:linux:x86:focal:install_deps:
 
 build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+  extends:
+    - .linux_dependencies
+    - .linux_runner
+    - .build_and_test_dorado
+
+build:linux:x86:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-22.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
