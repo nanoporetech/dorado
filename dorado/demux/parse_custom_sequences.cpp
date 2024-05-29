@@ -5,6 +5,8 @@
 
 #include <htslib/sam.h>
 
+#include <stdexcept>
+
 namespace dorado::demux {
 
 std::unordered_map<std::string, std::string> parse_custom_sequences(
