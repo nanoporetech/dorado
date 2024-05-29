@@ -65,7 +65,8 @@ samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
 samtools view -h $output_dir/calls.bam | grep "MN:i:"
 
 echo redirecting stderr to stdout: check output is still valid
-$dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} --emit-moves > $output_dir/calls.bam 2>&1
+# The debug layer prints to stderr to say that it's enabled, so disable it for this test.
+env -u MTL_DEBUG_LAYER $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} --emit-moves > $output_dir/calls.bam 2>&1
 samtools quickcheck -u $output_dir/calls.bam
 
 echo dorado aligner test stage

@@ -82,7 +82,8 @@ echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
 echo redirecting stderr to stdout: check output is still valid
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
+# The debug layer prints to stderr to say that it's enabled, so disable it for this test.
+env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
 dorado_check_bam_not_empty
 
 echo dorado aligner test stage
