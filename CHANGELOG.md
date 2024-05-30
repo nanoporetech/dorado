@@ -2,7 +2,7 @@
 
 All notable changes to Dorado will be documented in this file.
 
-# [0.7.1] (29 May 2024)
+# [0.7.1] (30 May 2024)
 
 This release of Dorado fixes out of memory errors when using the v5 SUP model, resolves several bugs in `dorado correct` and adds correct handling of the `BC:Z` tag when running `demux` multiple times.
 
