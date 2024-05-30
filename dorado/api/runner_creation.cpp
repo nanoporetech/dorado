@@ -166,7 +166,7 @@ basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller>
 size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>& caller) {
     return 1;  // Always 1 for Metal. Just needed for a unified interface for GPU builds.
 }
-basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller) {
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller, size_t) {
     return std::make_unique<basecall::MetalModelRunner>(std::move(caller));
 }
 #endif
