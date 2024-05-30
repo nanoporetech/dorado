@@ -43,8 +43,6 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
     return index_file_access.get_index(index_file, options);
 }
 
-std::string extract_genome_from_alignment_string(const std::string& alignment_string) {}
-
 }  // namespace
 
 namespace dorado {
