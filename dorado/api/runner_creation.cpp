@@ -163,7 +163,7 @@ basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller>
     return std::make_unique<basecall::CudaModelRunner>(std::move(caller), batch_dims_idx);
 }
 #elif DORADO_METAL_BUILD
-size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>& caller) {
+size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>&) {
     return 1;  // Always 1 for Metal. Just needed for a unified interface for GPU builds.
 }
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller, size_t) {
