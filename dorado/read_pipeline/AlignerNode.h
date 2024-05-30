@@ -42,7 +42,6 @@ private:
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ClientInfo& client_info);
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
-    void add_bed_hits_to_read(const std::string& genome, ReadCommon& read_common);
 
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::vector<std::string> m_header_sequence_names{};

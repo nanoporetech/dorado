@@ -56,7 +56,7 @@ public:
     void update(const BasecallerParams& other);
 
     // Normalise the `chunk_size` and `overlap` to the nearest evenly divisible integer of divisor (stride)
-    void normalise(size_t divisor);
+    void normalise(size_t chunk_size_divisor, size_t overlap_divisor);
 
     std::string to_string() const {
         std::string str = "BasecallerParams {";

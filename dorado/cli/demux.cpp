@@ -11,6 +11,7 @@
 #include "summary/summary.h"
 #include "utils/MergeHeaders.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
@@ -33,10 +34,6 @@ using namespace std::chrono_literals;
 
 namespace {
 
-void add_pg_hdr(sam_hdr_t* hdr) {
-    sam_hdr_add_pg(hdr, "demux", "PN", "dorado", "VN", DORADO_VERSION, nullptr);
-}
-
 // This function allows us to map the reference id from input BAM records to what
 // they should be in the output file, based on the new ordering of references in
 // the merged header.
@@ -51,7 +48,7 @@ void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
 }
 
 std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
-        dorado::cli::ArgParser& parser,
+        dorado::utils::arg_parse::ArgParser& parser,
         const dorado::utils::SampleSheet* sample_sheet) {
     auto result = std::make_shared<dorado::demux::BarcodingInfo>();
     result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
@@ -74,7 +71,7 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
 namespace dorado {
 
 int demuxer(int argc, char* argv[]) {
-    cli::ArgParser parser("dorado demux");
+    utils::arg_parse::ArgParser parser("dorado demux");
     parser.visible.add_description(
             "Barcode demultiplexing tool. Users need to specify the kit name(s).");
     parser.visible.add_argument("reads")
@@ -159,7 +156,7 @@ int demuxer(int argc, char* argv[]) {
             .help("Path to file with custom barcode sequences.");
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
@@ -198,6 +195,7 @@ int demuxer(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
     auto max_reads(parser.visible.get<int>("max-reads"));
     auto strip_alignment = !no_trim;
+    std::vector<std::string> args(argv, argv + argc);
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
@@ -243,7 +241,7 @@ int demuxer(int argc, char* argv[]) {
     hdr_merger.finalize_merge();
     auto sq_mapping = hdr_merger.get_sq_mapping();
     auto header = SamHdrPtr(sam_hdr_dup(hdr_merger.get_merged_header()));
-    add_pg_hdr(header.get());
+    cli::add_pg_hdr(header.get(), "demux", args, "cpu");
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
     std::unique_ptr<const utils::SampleSheet> sample_sheet;

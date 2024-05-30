@@ -72,7 +72,9 @@ TEST_CASE(TEST_GROUP "Linear") {
     // Order in LstmArgs struct (which is also used by reorder_input):
     // batch_tiles
     // chunk_size
-    const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size};
+    // time_step_begin
+    // time_step_end
+    const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size, 0, 0};
     const NS::SharedPtr<MTL::Buffer> args_reorder = create_vec_buffer(device.get(), args_reorder_);
     REQUIRE(args_reorder);
 

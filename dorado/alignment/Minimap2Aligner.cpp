@@ -1,5 +1,6 @@
 #include "Minimap2Aligner.h"
 
+#include "sam_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -280,7 +281,9 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     return results;
 }
 
-void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) {
+void Minimap2Aligner::align(dorado::ReadCommon& read_common,
+                            const std::string& alignment_header,
+                            mm_tbuf_t* buffer) {
     mm_bseq1_t query{};
     query.seq = const_cast<char*>(read_common.seq.c_str());
     query.name = const_cast<char*>(read_common.read_id.c_str());
@@ -291,7 +294,12 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) 
                              &m_minimap_index->mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
+    std::vector<AlignmentResult> alignment_results{};
     std::string alignment_string{};
+    if (!alignment_header.empty()) {
+        alignment_string += alignment_header + "\n";
+    }
+
     if (n_regs == 0) {
         alignment_string = read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
     }
@@ -303,7 +311,8 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common, mm_tbuf_t* buffer) 
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
-    read_common.alignment_string = alignment_string;
+    read_common.alignment_results =
+            parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
 }
 
 HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {

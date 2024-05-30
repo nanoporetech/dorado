@@ -1,6 +1,8 @@
 #include "alignment/Minimap2Index.h"
 
 #include "TestUtils.h"
+#include "alignment/minimap2_args.h"
+#include "alignment/minimap2_wrappers.h"
 #include "read_pipeline/HtsWriter.h"
 #include "utils/hts_file.h"
 #include "utils/stream_utils.h"
@@ -29,7 +31,7 @@ public:
         auto ref = aligner_test_dir / "target.fq";
         reference_file = ref.string();
 
-        cut.initialise(dorado::alignment::dflt_options);
+        cut.initialise(dorado::alignment::create_dflt_options());
     }
 };
 
@@ -40,57 +42,40 @@ namespace dorado::alignment::test {
 TEST_CASE(TEST_GROUP " initialise() with default options does not throw", TEST_GROUP) {
     Minimap2Index cut{};
 
-    REQUIRE_NOTHROW(cut.initialise(dflt_options));
+    REQUIRE_NOTHROW(cut.initialise(create_dflt_options()));
 }
 
 TEST_CASE(TEST_GROUP " initialise() with default options returns true", TEST_GROUP) {
     Minimap2Index cut{};
 
-    REQUIRE(cut.initialise(dflt_options));
+    REQUIRE(cut.initialise(create_dflt_options()));
 }
 
 TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing options", TEST_GROUP) {
     Minimap2Index cut{};
 
-    auto options{dflt_options};
-    options.kmer_size = 11;
-    options.window_size = 12;
-    options.index_batch_size = 123456789;
+    auto options{create_dflt_options()};
+    options.index_options->get().k = 11;
+    options.index_options->get().w = 12;
+    options.index_options->get().batch_size = 123456789;
 
     cut.initialise(options);
 
-    CHECK(cut.index_options().k == *options.kmer_size);
-    CHECK(cut.index_options().w == *options.window_size);
-    CHECK(cut.index_options().batch_size == *options.index_batch_size);
+    CHECK(cut.index_options().k == options.index_options->get().k);
+    CHECK(cut.index_options().w == options.index_options->get().w);
+    CHECK(cut.index_options().batch_size == options.index_options->get().batch_size);
 }
 
 TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
     Minimap2Index cut{};
-    auto options{dflt_options};
-    options.bandwidth = 300;
-    options.bandwidth_long = 12000;
-    options.best_n_secondary = 123456789;
-    options.soft_clipping = true;
+    auto options{create_dflt_options()};
+    options.mapping_options->get().bw = 300;
+    options.mapping_options->get().bw_long = 12000;
 
     cut.initialise(options);
 
-    CHECK(cut.mapping_options().bw == options.bandwidth);
-    CHECK(cut.mapping_options().bw_long == options.bandwidth_long);
-    CHECK(cut.mapping_options().best_n == options.best_n_secondary);
-    CHECK(cut.mapping_options().flag > 0);  // Just checking it's been updated.
-}
-
-TEST_CASE(TEST_GROUP " initialise() with invalid options returns false", TEST_GROUP) {
-    Minimap2Index cut{};
-    auto invalid_options{dflt_options};
-    invalid_options.bandwidth_long = 100;
-    invalid_options.bandwidth = *invalid_options.bandwidth_long + 1;
-
-    bool result{};
-    SuppressStderr::invoke(
-            [&result, &invalid_options, &cut] { result = cut.initialise(invalid_options); });
-
-    REQUIRE_FALSE(result);
+    CHECK(cut.mapping_options().bw == options.mapping_options->get().bw);
+    CHECK(cut.mapping_options().bw_long == options.mapping_options->get().bw_long);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
@@ -106,28 +91,20 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP " create_compatible_index() with invalid mapping options returns null",
+                 TEST_GROUP
+                 " get_options() after successful load() compares as equal to default options",
                  TEST_GROUP) {
-    cut.load(reference_file, 1, false);
-    Minimap2Options invalid_compatible_options{dflt_options};
-    invalid_compatible_options.bandwidth_long = 100;
-    invalid_compatible_options.bandwidth = *invalid_compatible_options.bandwidth_long + 1;
+    CHECK(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 
-    std::shared_ptr<Minimap2Index> compatible_index{};
-    {
-        SuppressStderr suppressed{};
-        compatible_index = cut.create_compatible_index(invalid_compatible_options);
-    }
-
-    REQUIRE(compatible_index == nullptr);
+    REQUIRE(cut.get_options() == dorado::alignment::create_dflt_options());
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " create_compatible_index() with valid options returns non-null",
                  TEST_GROUP) {
     cut.load(reference_file, 1, false);
-    Minimap2Options compatible_options{dflt_options};
-    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
+    Minimap2Options compatible_options{create_dflt_options()};
+    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
 }
@@ -138,8 +115,8 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  "underlying index",
                  TEST_GROUP) {
     cut.load(reference_file, 1, false);
-    Minimap2Options compatible_options{dflt_options};
-    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
+    Minimap2Options compatible_options{create_dflt_options()};
+    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
@@ -152,8 +129,8 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  "options updated",
                  TEST_GROUP) {
     cut.load(reference_file, 1, false);
-    Minimap2Options compatible_options{dflt_options};
-    compatible_options.best_n_secondary = cut.mapping_options().best_n + 1;
+    Minimap2Options compatible_options{create_dflt_options()};
+    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
@@ -185,26 +162,15 @@ TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     }
     hts_file.finalise([](size_t) { /* noop */ });
 
+    Minimap2Index cut{};
+    cut.initialise(mm2::parse_options("-I 10k"));
+
     SECTION("No split index allowed") {
-        Minimap2Index cut{};
-
-        auto options{dflt_options};
-        options.index_batch_size = 10000;
-
-        cut.initialise(options);
-
         CHECK(cut.load(temp_input_file.string(), 1, false) ==
               IndexLoadResult::split_index_not_supported);
     }
 
     SECTION("Split index allowed") {
-        Minimap2Index cut{};
-
-        auto options{dflt_options};
-        options.index_batch_size = 10000;
-
-        cut.initialise(options);
-
         CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
         CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
     }

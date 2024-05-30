@@ -58,7 +58,7 @@ public:
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
-    std::string alignment_string{};
+    std::vector<AlignmentResult> alignment_results{};
 
     // A unique identifier for each input read
     // Split (duplex) reads have the read_tag of the parent (template) and their own subread_id

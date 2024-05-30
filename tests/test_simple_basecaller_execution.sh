@@ -82,7 +82,8 @@ echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
 echo redirecting stderr to stdout: check output is still valid
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
+# The debug layer prints to stderr to say that it's enabled, so disable it for this test.
+env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
 dorado_check_bam_not_empty
 
 echo dorado aligner test stage
@@ -117,7 +118,7 @@ dorado_aligner_options_test() (
     SKIP() { echo $*; cat err; }
 
     MM2_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
-    DOR_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "--bandwidth 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
+    DOR_OPTIONS=(""    "-k 20" "-w 100" "-I 100K" "--secondary no" "-N 1" "-r 10,100" "-Y" "--secondary-seq" "--print-aln-seq")
     CHANGES=(false true    true     false     true             true   true        true true              false            )
     for ((i = 0; i < ${#MM_OPTIONS[@]}; i++)); do
         mm2_opt=${MM2_OPTIONS[$i]}

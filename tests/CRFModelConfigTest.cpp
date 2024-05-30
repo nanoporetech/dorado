@@ -31,15 +31,15 @@ TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
                 fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
         CRFModelConfig config = load_crf_model_config(path);
 
-        // Set chunksize to (12 * 10) + 1 to ensure it's not mod12
-        config.basecaller.set_chunk_size(121);
+        // Set chunksize to (12 * 16 * 10) + 1 to ensure it's not mod192
+        config.basecaller.set_chunk_size(1921);
         CHECK_FALSE(config.has_normalised_basecaller_params());
 
         config.normalise_basecaller_params();
         CHECK(config.has_normalised_basecaller_params());
         CHECK(config.basecaller.chunk_size() % config.stride_inner() == 0);
-        // Expected (121 / 12) * 12
-        CHECK(config.basecaller.chunk_size() == 120);
+        // Expected (1921 / 192) * 192
+        CHECK(config.basecaller.chunk_size() == 1920);
     }
 }
 

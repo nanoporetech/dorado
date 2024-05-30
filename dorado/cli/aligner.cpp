@@ -1,6 +1,7 @@
 #include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
+#include "alignment/minimap2_args.h"
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
@@ -11,6 +12,7 @@
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
@@ -45,7 +47,8 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
     spdlog::info("> loading index {}", filename);
 
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(num_threads)};
+    int num_index_construction_threads{
+            dorado::alignment::mm2::print_aln_seq() ? 1 : static_cast<int>(num_threads)};
     switch (index_file_access->load_index(filename, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
@@ -87,7 +90,7 @@ void add_pg_hdr(sam_hdr_t* hdr) {
 namespace dorado {
 
 int aligner(int argc, char* argv[]) {
-    cli::ArgParser parser("dorado aligner");
+    utils::arg_parse::ArgParser parser("dorado aligner");
     parser.visible.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the lr:hq preset.\n"
@@ -139,10 +142,13 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
+    alignment::mm2::add_options_string_arg(parser);
 
+    std::vector<std::string> args_excluding_mm2_opts{};
+    auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
+                                                                        args_excluding_mm2_opts);
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
@@ -176,9 +182,14 @@ int aligner(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
-    align_info->minimap_options =
-            cli::process_minimap2_arguments<alignment::Minimap2Options>(parser);
 
+    std::string err_msg{};
+    auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
+    if (!minimap_options) {
+        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        return EXIT_FAILURE;
+    }
+    align_info->minimap_options = std::move(*minimap_options);
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
     if (!processing_items.initialise()) {

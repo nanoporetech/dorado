@@ -4,6 +4,7 @@
 
 #include <htslib/sam.h>
 
+#include <limits>
 #include <numeric>
 #include <sstream>
 

@@ -1,6 +1,7 @@
 add_library(dorado_utils
     alignment_utils.cpp
     alignment_utils.h
+    arg_parse_ext.h
     AsyncQueue.h
     bam_utils.cpp
     bam_utils.h

@@ -148,12 +148,18 @@ add_library(dorado_lib
     dorado/alignment/BedFile.h
     dorado/alignment/IndexFileAccess.cpp
     dorado/alignment/IndexFileAccess.h
+    dorado/alignment/minimap2_args.cpp
+    dorado/alignment/minimap2_args.h
+    dorado/alignment/minimap2_wrappers.h
     dorado/alignment/Minimap2Aligner.cpp
     dorado/alignment/Minimap2Aligner.h
     dorado/alignment/Minimap2Index.cpp
     dorado/alignment/Minimap2Index.h
     dorado/alignment/Minimap2IndexSupportTypes.h
+    dorado/alignment/Minimap2Options.cpp
     dorado/alignment/Minimap2Options.h
+    dorado/alignment/sam_utils.cpp
+    dorado/alignment/sam_utils.h
     dorado/api/caller_creation.cpp
     dorado/api/caller_creation.h
     dorado/api/runner_creation.cpp
@@ -391,10 +397,10 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # CUDA toolkit DLLs we depend on:
     set(VERSIONED_CUDA_LIBS
-        libcublas*.so.*
-        libcudart*.so.*
-        libnvrtc*.so.*
-        libnvToolsExt*.so.*
+        libcublas*.so*
+        libcudart*.so*
+        libnvrtc*.so*
+        libnvToolsExt*.so*
     )
 
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
@@ -428,7 +434,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             endforeach()
         else()
             # bundle the libraries from the cuda toolkit
-            file(GLOB NATIVE_CUDA_LIBS "${CUDAToolkit_ROOT}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${LIB}")
+            file(GLOB NATIVE_CUDA_LIBS "${CUDAToolkit_TARGET_DIR}/targets/${CMAKE_SYSTEM_PROCESSOR}-linux/lib/${LIB}")
             install(FILES ${NATIVE_CUDA_LIBS} DESTINATION lib COMPONENT redist_libs)
         endif()
     endforeach()

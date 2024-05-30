@@ -4,6 +4,7 @@
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/alignment_info.h"
+#include "alignment/minimap2_args.h"
 #include "messages.h"
 
 #include <htslib/sam.h>
@@ -22,7 +23,8 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         const std::string& index_file,
         const dorado::alignment::Minimap2Options& options,
         const int threads) {
-    int num_index_construction_threads{options.print_aln_seq ? 1 : static_cast<int>(threads)};
+    int num_index_construction_threads{
+            dorado::alignment::mm2::print_aln_seq() ? 1 : static_cast<int>(threads)};
     switch (index_file_access.load_index(index_file, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
         throw std::runtime_error("AlignerNode reference path does not exist: " + index_file);
@@ -104,21 +106,17 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
         return;
     }
 
+    auto align_info = read_common.client_info->contexts().get_ptr<const alignment::AlignmentInfo>();
+    if (!align_info) {
+        return;
+    }
+
     auto index = get_index(*read_common.client_info);
     if (!index) {
         return;
     }
 
-    alignment::Minimap2Aligner(index).align(read_common, tbuf);
-    if (!m_bed_file.empty()) {
-        // Note that this is only used by dorado basecaller and dorado aligner. For the
-        // basecall server m_bed_file is always empty, and bed-file hits are checked in
-        // the core-cpp code.
-        auto genome = extract_genome_from_alignment_string(read_common.alignment_string);
-        if (!genome.empty()) {
-            add_bed_hits_to_read(genome, read_common);
-        }
-    }
+    alignment::Minimap2Aligner(index).align(read_common, align_info->alignment_header, tbuf);
 }
 
 void AlignerNode::input_thread_fn() {
@@ -168,7 +166,5 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* reco
     // update the record.
     bam_aux_append(record, "bh", 'i', sizeof(bed_hits), (uint8_t*)&bed_hits);
 }
-
-void AlignerNode::add_bed_hits_to_read(const std::string& genome, ReadCommon& read_common) {}
 
 }  // namespace dorado

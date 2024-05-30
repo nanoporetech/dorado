@@ -71,7 +71,7 @@ void reference_all_public_functions() {
     // alignment/IndexFileAccess.h
     force_reference(&dorado::alignment::validate_options);
     // alignment/Minimap2Options.h
-    force_reference(&dorado::alignment::dflt_options);
+    force_reference(&dorado::alignment::create_dflt_options);
     // api/caller_creation.h
     force_reference(&dorado::api::create_modbase_caller);
     // api/pipeline_creation.h

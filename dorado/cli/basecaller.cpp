@@ -1,3 +1,4 @@
+#include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
@@ -21,11 +22,13 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoaderNode.h"
 #include "utils/SampleSheet.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
 
 #include <argparse.hpp>
+#include <cxxpool.h>
 
 #include <string>
 #if DORADO_CUDA_BUILD
@@ -179,13 +182,67 @@ void setup(const std::vector<std::string>& args,
 
     const bool enable_aligner = !ref.empty();
 
+#if DORADO_CUDA_BUILD
+    auto initial_device_info = utils::get_cuda_device_info(device, false);
+#endif
+
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto remora_runners = api::create_modbase_runners(
             remora_models, device, default_parameters.mod_base_runners_per_caller,
             remora_batch_size);
 
-    auto [runners, num_devices] = api::create_basecall_runners(
-            model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
+    std::vector<basecall::RunnerPtr> runners;
+    size_t num_devices = 0;
+#if DORADO_CUDA_BUILD
+    if (device != "cpu") {
+        // Iterate over the separate devices to create the basecall runners.
+        // We may have multiple GPUs with different amounts of free memory left after the modbase runners were created.
+        // This allows us to set a different memory_limit_fraction in case we have a heterogeneous GPU setup
+        auto updated_device_info = utils::get_cuda_device_info(device, false);
+        std::vector<std::pair<std::string, float>> gpu_fractions;
+        for (size_t i = 0; i < updated_device_info.size(); ++i) {
+            auto device_id = "cuda:" + std::to_string(updated_device_info[i].device_id);
+            auto fraction = static_cast<float>(updated_device_info[i].free_mem) /
+                            static_cast<float>(initial_device_info[i].free_mem);
+            gpu_fractions.push_back(std::make_pair(device_id, fraction));
+        }
+
+        cxxpool::thread_pool pool{gpu_fractions.size()};
+        struct BasecallerRunners {
+            std::vector<dorado::basecall::RunnerPtr> runners;
+            size_t num_devices{};
+        };
+
+        std::vector<std::future<BasecallerRunners>> futures;
+        auto create_runners = [&](const std::string& device_id, float fraction) {
+            BasecallerRunners basecaller_runners;
+            std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
+                    api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
+                                                 api::PipelineType::simplex, 0.f);
+            return basecaller_runners;
+        };
+
+        futures.reserve(gpu_fractions.size());
+        for (const auto& [device_id, fraction] : gpu_fractions) {
+            futures.push_back(pool.push(create_runners, std::cref(device_id), fraction));
+        }
+
+        for (auto& future : futures) {
+            auto data = future.get();
+            runners.insert(runners.end(), std::make_move_iterator(data.runners.begin()),
+                           std::make_move_iterator(data.runners.end()));
+            num_devices += data.num_devices;
+        }
+
+        if (num_devices == 0) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
+    } else
+#endif
+    {
+        std::tie(runners, num_devices) = api::create_basecall_runners(
+                model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
+    }
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
@@ -196,7 +253,7 @@ void setup(const std::vector<std::string>& args,
             barcoding_info != nullptr, adapter_trimming_enabled);
 
     SamHdrPtr hdr(sam_hdr_init());
-    cli::add_pg_hdr(hdr.get(), args, device);
+    cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
         std::unordered_map<std::string, std::string> custom_barcodes{};
@@ -296,7 +353,8 @@ void setup(const std::vector<std::string>& args,
         // Turn off warning logging as header info is fetched.
         auto initial_hts_log_level = hts_get_log_level();
         hts_set_log_level(HTS_LOG_OFF);
-        auto pg_keys = utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"});
+        auto pg_keys =
+                utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"}, "ID", "basecaller");
         hts_set_log_level(initial_hts_log_level);
 
         auto tokens = cli::extract_token_from_cli(pg_keys["CL"]);
@@ -384,7 +442,7 @@ int basecaller(int argc, char* argv[]) {
     utils::make_torch_deterministic();
     torch::set_num_threads(1);
 
-    cli::ArgParser parser("dorado");
+    utils::arg_parse::ArgParser parser("dorado");
 
     parser.visible.add_argument("model").help(
             "model selection {fast,hac,sup}@v{version} for automatic model selection including "
@@ -449,7 +507,7 @@ int basecaller(int argc, char* argv[]) {
                     spdlog::error("'{}' is not a supported modification please select from {}",
                                   value,
                                   std::accumulate(std::next(mods.begin()), mods.end(), mods[0],
-                                                  [](std::string const& a, std::string const& b) {
+                                                  [](const std::string& a, const std::string& b) {
                                                       return a + ", " + b;
                                                   }));
                     std::exit(EXIT_FAILURE);
@@ -527,8 +585,13 @@ int basecaller(int argc, char* argv[]) {
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
-    cli::add_minimap2_arguments(parser, alignment::DEFAULT_MM_PRESET);
     cli::add_internal_arguments(parser);
+
+    alignment::mm2::add_options_string_arg(parser);
+
+    std::vector<std::string> args_excluding_mm2_opts{};
+    auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
+                                                                        args_excluding_mm2_opts);
 
     // Create a copy of the parser to use if the resume feature is enabled. Needed
     // to parse the model used for the file being resumed from. Note that this copy
@@ -536,7 +599,7 @@ int basecaller(int argc, char* argv[]) {
     auto resume_parser = parser.visible;
 
     try {
-        cli::parse(parser, argc, argv);
+        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser.visible;
@@ -698,6 +761,13 @@ int basecaller(int argc, char* argv[]) {
 
     spdlog::info("> Creating basecall pipeline");
 
+    std::string err_msg{};
+    auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
+    if (!minimap_options) {
+        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        return EXIT_FAILURE;
+    }
+
     try {
         setup(args, model_config, data, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
@@ -705,8 +775,7 @@ int basecaller(int argc, char* argv[]) {
               default_parameters.remora_batchsize, default_parameters.remora_threads,
               methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
-              parser.visible.get<std::string>("--read-ids"), recursive,
-              cli::process_minimap2_arguments<alignment::Minimap2Options>(parser),
+              parser.visible.get<std::string>("--read-ids"), recursive, *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),

@@ -20,10 +20,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 ## Installation
 
- - [dorado-0.6.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-linux-x64.tar.gz)
- - [dorado-0.6.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-linux-arm64.tar.gz)
- - [dorado-0.6.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-osx-arm64.zip)
- - [dorado-0.6.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.6.0-win64.zip)
+ - [dorado-0.7.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-linux-x64.tar.gz)
+ - [dorado-0.7.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-linux-arm64.tar.gz)
+ - [dorado-0.7.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-osx-arm64.zip)
+ - [dorado-0.7.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.0-win64.zip)
 
 ## Platforms
 
@@ -192,7 +192,13 @@ To basecall with alignment with duplex or simplex, run with the `--reference` op
 $ dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
-Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `lr:hq` preset. This can be overridden with the `--mm2-preset` option or using `-k` and `-w` options to set kmer and window size respectively.
+Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `lr:hq` preset. This can be overridden by passing a minimap option string, `--mm2-opts`, using the '-x <preset>' option and/or individual options such as `-k` and `-w` to set kmer and window size respectively. For a complete list of supported minimap2 options use '--mm2-opts --help'. For example:
+```
+$ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder> --mm2-opt "-x splice --junc-bed <annotations_file>"
+$ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder> --mm2-opt --help
+$ dorado basecaller <model> <reads> --reference <index> --mm2-opt "-k 15 -w 10" > calls.bam
+```
+
 
 ### Sequencing Summary
 
@@ -290,7 +296,7 @@ To correct reads, run:
 $ dorado correct reads.fastq(.gz) > corrected_reads.fasta
 ```
 
-Dorado correct only supports FASTX(.gz) as the input and generates a FASTA file as output. An index file is generated for the input FASTX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
+Dorado correct only supports FASTX(.gz) as the input and generates a FASTA file as output. The input can be uncompressed or compressed with `bgz`. An index file is generated for the input FASTX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
 
 The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( > 64 cores), large system memory ( > 256GB) and a modern GPU with a large VRAM ( > 32GB).
 
