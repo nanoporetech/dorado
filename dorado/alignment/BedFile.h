@@ -30,7 +30,6 @@ public:
     ~BedFile() = default;
 
     bool load(const std::string& index_filename);
-    bool empty() const { return m_file_name.empty(); }
 
     const Entries& entries(const std::string& genome) const;
 
