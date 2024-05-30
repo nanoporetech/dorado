@@ -28,7 +28,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         size_t remora_batch_size);
 
 #if DORADO_CUDA_BUILD
-size_t get_num_batch_dims(std::shared_ptr<basecall::CudaCaller> caller);
+size_t get_num_batch_dims(const std::shared_ptr<basecall::CudaCaller>& caller);
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller,
                                            size_t batch_dims_idx);
 #elif DORADO_METAL_BUILD
