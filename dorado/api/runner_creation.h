@@ -32,6 +32,7 @@ size_t get_num_batch_dims(const std::shared_ptr<basecall::CudaCaller>& caller);
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller,
                                            size_t batch_dims_idx);
 #elif DORADO_METAL_BUILD
+size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>& caller);
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller);
 #endif
 
