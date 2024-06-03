@@ -78,6 +78,9 @@ if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5
 fi
 set -e
 
+# Check that dorado handles degenerate reads without crashing
+$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate --skip-model-compatibility-check > $output_dir/error_condition.fq
+
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
