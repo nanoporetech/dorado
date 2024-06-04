@@ -54,14 +54,15 @@ void ReadSplitNode::input_thread_fn() {
         auto initial_read = std::get<SimplexReadPtr>(std::move(message));
         auto read_id = initial_read->read_common.read_id;
         auto tag = initial_read->read_common.read_tag;
-        auto split_reads = m_splitter->split(std::move(initial_read));
 
+        auto split_reads = m_splitter->split(std::move(initial_read));
         validate_split_results(split_reads, read_id, tag);
 
         for (auto& subread : split_reads) {
             //TODO correctly process end_reason when we have them
             send_message_to_sink(std::move(subread));
         }
+
         update_read_counters(split_reads.size());
     }
 }
