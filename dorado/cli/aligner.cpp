@@ -69,6 +69,16 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
     return index_file_access;
 }
 
+std::shared_ptr<dorado::alignment::BedFileAccess> load_bed(const std::string& filename) {
+    auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
+    if (!filename.empty()) {
+        if (!bed_file_access->load_bedfile(filename)) {
+            throw std::runtime_error("AlignerNode bed-file could not be loaded: " + filename);
+        }
+    }
+    return bed_file_access;
+}
+
 bool create_output_folder(const std::filesystem::path& output_folder) {
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
@@ -168,7 +178,7 @@ int aligner(int argc, char* argv[]) {
     }
     auto align_info = std::make_shared<alignment::AlignmentInfo>();
     align_info->reference_file = parser.visible.get<std::string>("index");
-    auto bed_file(parser.visible.get<std::string>("bed-file"));
+    align_info->bed_file = parser.visible.get<std::string>("bed-file");
     auto reads(parser.visible.get<std::string>("reads"));
     auto recursive_input = parser.visible.get<bool>("recursive");
     auto output_folder = parser.visible.get<std::string>("output-dir");
@@ -220,6 +230,7 @@ int aligner(int argc, char* argv[]) {
 
     auto index_file_access =
             load_index(align_info->reference_file, align_info->minimap_options, aligner_threads);
+    auto bed_file_access = load_bed(align_info->bed_file);
 
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
@@ -254,8 +265,8 @@ int aligner(int argc, char* argv[]) {
         PipelineDescriptor pipeline_desc;
         auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>(
-                {hts_writer}, index_file_access, align_info->reference_file, bed_file,
-                align_info->minimap_options, aligner_threads);
+                {hts_writer}, index_file_access, bed_file_access, align_info->reference_file,
+                align_info->bed_file, align_info->minimap_options, aligner_threads);
 
         // Create the Pipeline from our description.
         std::vector<dorado::stats::StatsReporter> stats_reporters;

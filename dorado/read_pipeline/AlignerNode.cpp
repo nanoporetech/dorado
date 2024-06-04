@@ -48,6 +48,7 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
 namespace dorado {
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
+                         std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                          const std::string& index_file,
                          const std::string& bed_file,
                          const alignment::Minimap2Options& options,
@@ -55,10 +56,12 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
         : MessageSink(10000, threads),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
-          m_index_file_access(std::move(index_file_access)) {
-    auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
+          m_index_file_access(std::move(index_file_access)),
+          m_bed_file_access(std::move(bed_file_access)) {
     if (!bed_file.empty()) {
-        m_bed_file.load(bed_file);
+        m_bed_file_access->load_bedfile(bed_file);
+        m_bedfile_for_bam_messages = m_bed_file_access->get_bedfile(bed_file);
+        auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
         for (const auto& entry : header_sequence_records) {
             m_header_sequence_names.emplace_back(entry.first);
         }
@@ -66,8 +69,12 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
     start_input_processing(&AlignerNode::input_thread_fn, this);
 }
 
-AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access, int threads)
-        : MessageSink(10000, threads), m_index_file_access(std::move(index_file_access)) {
+AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
+                         std::shared_ptr<alignment::BedFileAccess> bed_file_access,
+                         int threads)
+        : MessageSink(10000, threads),
+          m_index_file_access(std::move(index_file_access)),
+          m_bed_file_access(std::move(bed_file_access)) {
     start_input_processing(&AlignerNode::input_thread_fn, this);
 }
 
@@ -100,6 +107,7 @@ alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() 
 }
 
 void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
+    // Note: This code path is only used by the basecall server.
     if (read_common.client_info->is_disconnected()) {
         return;
     }
@@ -115,6 +123,24 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 
     alignment::Minimap2Aligner(index).align(read_common, align_info->alignment_header, tbuf);
+
+    if (m_bed_file_access && !align_info->bed_file.empty()) {
+        const auto& bed = m_bed_file_access->get_bedfile(align_info->bed_file);
+        for (auto& align_result : read_common.alignment_results) {
+            for (const auto& entry : bed->entries(align_result.genome)) {
+                if (!(entry.start > (size_t)align_result.genome_end ||
+                      entry.end < (size_t)align_result.genome_start) &&
+                    (entry.strand == align_result.direction || entry.strand == '.')) {
+                    // A hit
+                    align_result.bed_hits++;
+                    if (!align_result.bed_lines.empty()) {
+                        align_result.bed_lines += "\n";
+                    }
+                    align_result.bed_lines += entry.bed_line;
+                }
+            }
+        }
+    }
 }
 
 void AlignerNode::input_thread_fn() {
@@ -130,7 +156,7 @@ void AlignerNode::input_thread_fn() {
             auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                    .align(bam_message.bam_ptr.get(), tbuf);
             for (auto& record : records) {
-                if (!m_bed_file.filename().empty() && !(record->core.flag & BAM_FUNMAP)) {
+                if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
                     auto ref_id = record->core.tid;
                     add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
                 }
@@ -155,7 +181,7 @@ void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* reco
     size_t genome_end = bam_endpos(record);
     char direction = (bam_is_rev(record)) ? '-' : '+';
     int bed_hits = 0;
-    for (const auto& interval : m_bed_file.entries(genome)) {
+    for (const auto& interval : m_bedfile_for_bam_messages->entries(genome)) {
         if (!(interval.start >= genome_end || interval.end <= genome_start) &&
             (interval.strand == direction || interval.strand == '.')) {
             bed_hits++;

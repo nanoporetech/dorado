@@ -24,12 +24,12 @@ private:
 
 public:
     BedFile() = default;
-    BedFile(BedFile&& other) = delete;
-    BedFile(const BedFile&) = delete;
-    BedFile& operator=(const BedFile&) = delete;
+    BedFile(BedFile&& other) = default;
+    BedFile(const BedFile&) = default;
+    BedFile& operator=(const BedFile&) = default;
     ~BedFile() = default;
 
-    bool load(const std::string& index_filename);
+    bool load(const std::string& filename);
 
     const Entries& entries(const std::string& genome) const;
 

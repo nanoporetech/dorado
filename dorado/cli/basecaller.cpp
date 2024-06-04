@@ -285,8 +285,9 @@ void setup(const std::vector<std::string>& args,
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
         auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
-        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access, ref,
-                                                      bed, aligner_options,
+        auto bed_file_access = std::make_shared<alignment::BedFileAccess>();
+        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access,
+                                                      bed_file_access, ref, bed, aligner_options,
                                                       thread_allocations.aligner_threads);
         current_sink_node = aligner;
     }

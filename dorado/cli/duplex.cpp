@@ -443,8 +443,9 @@ int duplex(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
-            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "",
-                                                          *minimap_options,
+            auto bed_file_access = std::make_shared<alignment::BedFileAccess>();
+            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
+                                                          ref, "", *minimap_options,
                                                           std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
