@@ -298,6 +298,10 @@ int duplex(int argc, char* argv[]) {
     parser.visible.add_argument("--reference")
             .help("Path to reference for alignment.")
             .default_value(std::string(""));
+    parser.visible.add_argument("--bed-file")
+            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
+                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
+            .default_value(std::string(""));
 
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
@@ -349,6 +353,7 @@ int duplex(int argc, char* argv[]) {
         auto threads = static_cast<size_t>(parser.visible.get<int>("--threads"));
         auto min_qscore(parser.visible.get<int>("--min-qscore"));
         auto ref = parser.visible.get<std::string>("--reference");
+        auto bed = parser.visible.get<std::string>("--bed-file");
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.visible.get<bool>("--verbose")) {
@@ -382,6 +387,12 @@ int duplex(int argc, char* argv[]) {
 
         if (emit_fastq && emit_sam) {
             throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
+        }
+
+        if (parser.visible.get<std::string>("--reference").empty() &&
+            !parser.visible.get<std::string>("--bed-file").empty()) {
+            spdlog::error("--bed-file cannot be used without --reference.");
+            return EXIT_FAILURE;
         }
 
         if (emit_fastq) {
@@ -443,7 +454,7 @@ int duplex(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
-            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, "",
+            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, ref, bed,
                                                           *minimap_options,
                                                           std::thread::hardware_concurrency());
             hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
