@@ -5,7 +5,6 @@
 
 #include <atomic>
 #include <memory>
-#include <new>
 #include <string>
 #include <vector>
 
@@ -33,20 +32,9 @@ private:
 
     std::unique_ptr<const splitter::ReadSplitter> m_splitter;
 
-#ifdef _MSC_VER
-    // Disable warning C4324: 'dorado::ReadSplitNode': structure was padded due to alignment specifier
-    // as we do not care about the increased size of the ReadSplitNode.
-#pragma warning(push)
-#pragma warning(disable : 4324)
-#endif
-    alignas(std::hardware_destructive_interference_size) std::atomic_size_t
-            m_num_input_reads_pushed{};
-    alignas(std::hardware_destructive_interference_size) std::atomic_size_t m_num_reads_split{};
-    alignas(std::hardware_destructive_interference_size) std::atomic_size_t
-            m_total_num_reads_pushed{};
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+    std::atomic_size_t m_num_input_reads_pushed{};
+    std::atomic_size_t m_num_reads_split{};
+    std::atomic_size_t m_total_num_reads_pushed{};
 };
 
 }  // namespace dorado
