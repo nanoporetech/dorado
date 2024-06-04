@@ -159,8 +159,13 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
         m_processed_chunks.try_push(std::move(complete_chunk));
     }
 
+    if (m_batched_chunks[worker_id].size() == model_runner->batch_size()) {
+        ++m_num_batches_called;
+    } else {
+        ++m_num_partial_batches_called;
+    }
+
     m_batched_chunks[worker_id].clear();
-    ++m_num_batches_called;
 }
 
 void BasecallerNode::working_reads_manager() {
