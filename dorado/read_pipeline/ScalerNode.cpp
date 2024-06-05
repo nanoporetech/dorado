@@ -139,7 +139,8 @@ void ScalerNode::input_thread_fn() {
         int trim_start = 0;
         if (is_rna_model) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            if (m_trim_rna_adapter) {
+            if (m_trim_rna_adapter &&
+                size_t(trim_start) < read->read_common.get_raw_data_samples()) {
                 read->read_common.raw_data =
                         read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
                 read->read_common.rna_adapter_end_signal_pos = 0;
@@ -236,8 +237,12 @@ void ScalerNode::input_thread_fn() {
                         utils::DEFAULT_TRIM_MIN_ELEMENTS);
             }
 
-            read->read_common.raw_data =
-                    read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
+            if (size_t(trim_start) < read->read_common.get_raw_data_samples()) {
+                read->read_common.raw_data =
+                        read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
+            } else {
+                trim_start = 0;
+            }
         }
 
         read->read_common.num_trimmed_samples = trim_start;
