@@ -1,7 +1,8 @@
 #pragma once
 
-#include "read_pipeline/flush_options.h"
-#include "read_pipeline/messages.h"
+#include "ClientInfo.h"
+#include "flush_options.h"
+#include "messages.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -50,6 +51,8 @@ public:
     virtual void restart() = 0;
 
 protected:
+    virtual bool forward_on_disconnected() const { return true; }
+
     // Terminates waits on the input queue.
     void terminate_input_queue() { m_work_queue.terminate(); }
 
@@ -75,6 +78,14 @@ protected:
     // If terminating, returns false.
     bool get_input_message(Message& message) {
         auto status = m_work_queue.try_pop(message);
+        if (!m_sinks.empty() && forward_on_disconnected()) {
+            while (status == utils::AsyncQueueStatus::Success && is_read_message(message) &&
+                   get_read_common_data(message).client_info &&
+                   get_read_common_data(message).client_info->is_disconnected()) {
+                send_message_to_sink(0, std::move(message));
+                status = m_work_queue.try_pop(message);
+            }
+        }
         return status == utils::AsyncQueueStatus::Success;
     }
 
