@@ -68,7 +68,9 @@ protected:
             const dorado::alignment::Minimap2Options& options,
             int threads) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-        create_pipeline(index_file_access, reference_file, bed_file, options, threads);
+        auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
+        create_pipeline(index_file_access, bed_file_access, reference_file, bed_file, options,
+                        threads);
 
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();
         auto alignment_info = std::make_shared<dorado::alignment::AlignmentInfo>();
@@ -96,10 +98,11 @@ protected:
             std::string read_id,
             std::string sequence) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
+        auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
         CHECK(index_file_access->load_index(loaded_align_info->reference_file,
                                             loaded_align_info->minimap_options,
                                             2) == dorado::alignment::IndexLoadResult::success);
-        create_pipeline(index_file_access, 2);
+        create_pipeline(index_file_access, bed_file_access, 2);
 
         dorado::ReadCommon read_common{};
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();
@@ -380,7 +383,9 @@ TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", T
 
     auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5 -I 1K");
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    CHECK_THROWS(dorado::AlignerNode(index_file_access, ref.string(), "", options, 1));
+    auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
+    CHECK_THROWS(
+            dorado::AlignerNode(index_file_access, bed_file_access, ref.string(), "", options, 1));
 }
 
 SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GROUP) {
