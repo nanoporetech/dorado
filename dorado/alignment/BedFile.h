@@ -24,9 +24,9 @@ private:
 
 public:
     BedFile() = default;
-    BedFile(BedFile&& other) = default;
-    BedFile(const BedFile&) = default;
-    BedFile& operator=(const BedFile&) = default;
+    BedFile(BedFile&& other) = delete;
+    BedFile(const BedFile&) = delete;
+    BedFile& operator=(const BedFile&) = delete;
     ~BedFile() = default;
 
     bool load(const std::string& filename);
