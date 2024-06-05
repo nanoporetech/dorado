@@ -104,8 +104,8 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
     }
 
     // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
-    m_mapping_options->cap_kalloc = 100'000'000;
-    m_mapping_options->max_sw_mat = 50'000'000;
+    //m_mapping_options->cap_kalloc = 100'000'000;
+    //m_mapping_options->max_sw_mat = 50'000'000;
 }
 
 std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& index_file,

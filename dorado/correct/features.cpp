@@ -444,7 +444,13 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
             }
             // Sort the filtered overlaps by accuracy score
             std::sort(overlap_windows.begin(), overlap_windows.end(),
-                      [](const OverlapWindow& a, const OverlapWindow& b) {
+                      [&alignments](const OverlapWindow& a, const OverlapWindow& b) {
+                          if (std::fabs(a.accuracy - b.accuracy) < 1e-10) {
+                              const auto& a_qname = alignments.qnames[a.overlap_idx];
+                              const auto& b_qname = alignments.qnames[b.overlap_idx];
+                              return std::lexicographical_compare(a_qname.begin(), a_qname.end(),
+                                                                  b_qname.begin(), b_qname.end());
+                          }
                           return a.accuracy > b.accuracy;
                       });
         }
