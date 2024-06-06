@@ -69,6 +69,9 @@ protected:
             int threads) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
         auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
+        if (!bed_file.empty()) {
+            bed_file_access->load_bedfile(bed_file);
+        }
         create_pipeline(index_file_access, bed_file_access, reference_file, bed_file, options,
                         threads);
 

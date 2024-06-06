@@ -455,6 +455,12 @@ int duplex(int argc, char* argv[]) {
             }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             auto bed_file_access = std::make_shared<alignment::BedFileAccess>();
+            if (!bed.empty()) {
+                if (!bed_file_access->load_bedfile(bed)) {
+                    throw std::runtime_error("Could not load bed-file " + bed);
+                }
+            }
+
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
                                                           ref, bed, *minimap_options,
                                                           std::thread::hardware_concurrency());

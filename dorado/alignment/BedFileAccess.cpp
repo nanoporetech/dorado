@@ -25,10 +25,7 @@ std::shared_ptr<BedFile> BedFileAccess::get_bedfile(const std::string& bedfile) 
 
 void BedFileAccess::remove_bedfile(const std::string& bedfile) {
     std::lock_guard guard(m_mutex);
-    auto iter = m_bedfile_lut.find(bedfile);
-    if (iter != m_bedfile_lut.end()) {
-        m_bedfile_lut.erase(iter);
-    }
+    m_bedfile_lut.erase(bedfile);
 }
 
 }  // namespace dorado::alignment
