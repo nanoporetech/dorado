@@ -2,6 +2,17 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.7.1] (3 June 2024)
+
+This release of Dorado fixes out of memory errors when using the v5 SUP model with methylation calling, resolves several bugs in `dorado correct` and adds correct handling of the `BC:Z` tag when running `demux` multiple times.
+
+* a9c6f59bff450d2a822ca5b64b18162bfd9b9a09 - Fetch available memory correctly for autobatch calculation with modbase models
+* eb24124ba8f1a72c6730c1ce4b178f020c9d3565 - Move developer quickstart and extend installation instructions
+* 45b8acc730ddbe6b438cf17153a64c084d1af2fb - Package missing CUDA Toolkit dependencies with `dorado`
+* 33578e7c6d3af063389411ae6d7436ed6d0f94a1 - Update BC tag instead of adding a new one
+* 580ad61ccd0f193c88202c852cbea38790c50700 - Prevent creation of CUDA stream when device is CPU
+* 82078c5e0bc9545010f2405e92f93d8cff0c35db - Fix segfault with htslib pointer freeing in Windows
+
 # [0.7.0] (21 May 2024)
 
 This release of Dorado introduces new and more accurate v5 models for improved basecalling. It also adds a new subcommand, `dorado correct`, for single-read error correction to help Nanopore based *de novo* assemblies of haploid or diploid genomes. In addition, this release contains a slew of bug fixes, stability enhancements and updates to barcode classification.

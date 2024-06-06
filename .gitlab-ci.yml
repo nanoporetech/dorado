@@ -294,7 +294,7 @@ build:linux:x86:focal:clang_tidy:
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
 build:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -318,7 +318,7 @@ build:linux:arm64:bionic:
       - ${BUILD_DIR}/tests
 
 build:linux:arm64:bionic:unittests:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
   stage: build
   extends:
     - .linux_tegra_runner
@@ -466,7 +466,7 @@ build_archive:linux:x86:cuda12:
     - .on_nightly_or_manual
 
 build_archive:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
   extends:
     - .linux_arm64_runner
     - .build_dorado_archive
@@ -580,7 +580,7 @@ test:linux:x86:focal:
     expire_in: 1 day
 
 test:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
   extends:
     - .linux_dependencies
     - .linux_tegra_runner

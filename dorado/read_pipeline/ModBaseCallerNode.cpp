@@ -514,8 +514,13 @@ void ModBaseCallerNode::call_current_batch(
         m_processed_chunks.try_push(std::move(chunk));
     }
 
+    if (batched_chunks.size() == m_batch_size) {
+        ++m_num_batches_called;
+    } else {
+        ++m_num_partial_batches_called;
+    }
+
     batched_chunks.clear();
-    ++m_num_batches_called;
 }
 
 void ModBaseCallerNode::output_worker_thread() {

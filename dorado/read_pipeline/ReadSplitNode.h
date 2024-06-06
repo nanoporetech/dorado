@@ -3,8 +3,10 @@
 #include "read_pipeline/MessageSink.h"
 #include "utils/stats.h"
 
+#include <atomic>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace dorado {
 
@@ -26,7 +28,13 @@ public:
 private:
     void input_thread_fn();  // Worker thread performs splitting asynchronously.
 
+    void update_read_counters(std::size_t num_split_reads);
+
     std::unique_ptr<const splitter::ReadSplitter> m_splitter;
+
+    std::atomic_size_t m_num_input_reads_pushed{};
+    std::atomic_size_t m_num_reads_split{};
+    std::atomic_size_t m_total_num_reads_pushed{};
 };
 
 }  // namespace dorado
