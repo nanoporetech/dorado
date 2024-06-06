@@ -57,6 +57,9 @@ struct Minimap2MappingOptions {
     std::optional<std::string> cs;
     std::optional<std::string> dual;
     std::optional<uint64_t> mini_batch_size;
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    std::optional<int64_t> cap_kalloc = 100'000'000;
+    std::optional<int64_t> max_sw_mat = 50'000'000;
 };
 
 inline bool operator<(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r) {

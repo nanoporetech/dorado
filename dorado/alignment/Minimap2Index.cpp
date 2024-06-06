@@ -103,9 +103,11 @@ void Minimap2Index::set_mapping_options(const Minimap2MappingOptions& mapping_op
         }
     }
 
-    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
-    //m_mapping_options->cap_kalloc = 100'000'000;
-    //m_mapping_options->max_sw_mat = 50'000'000;
+    // Either use the default value for cap_kalloc and max_sw_mat defined in the dorado
+    // options initialization, or if it's set to nullopt use the minimap2 library default.
+    m_mapping_options->cap_kalloc = mapping_options.cap_kalloc.value_or(m_mapping_options->cap_kalloc);
+    m_mapping_options->max_sw_mat = mapping_options.max_sw_mat.value_or(m_mapping_options->max_sw_mat);
+
 }
 
 std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& index_file,

@@ -252,6 +252,8 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     options.occ_dist = 200;
     options.cs = "short";
     options.dual = "yes";
+    options.cap_kalloc = std::nullopt;
+    options.max_sw_mat = std::nullopt;
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
