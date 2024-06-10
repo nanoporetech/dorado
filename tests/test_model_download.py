@@ -139,7 +139,7 @@ def main() -> int:
     )
     parser.add_argument("--data", required=True, type=Path, help="path to test data")
     parser.add_argument(
-        "--models",
+        "--models-directory",
         required=False,
         type=Path,
         default=None,
@@ -162,7 +162,7 @@ def main() -> int:
     args = parser.parse_args()
     dorado_bin = Path(args.exe).resolve()
     test_dir = Path(args.data).resolve()
-    models_dir = Path(args.models).resolve() if args.models else None
+    models_dir = Path(args.models_directory).resolve() if args.models else None
     count_tested = run_tests(
         dorado_bin=dorado_bin,
         test_dir=test_dir,
