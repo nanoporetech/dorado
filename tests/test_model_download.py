@@ -52,7 +52,7 @@ def smoke_test_model(
 
 def unpack(listy_dict: Dict, key: str) -> Dict:
     """
-    The dowonloader --list-structured uses lists of dicts which are uniquely
+    The downloader --list-structured uses lists of dicts which are uniquely
     keyed. Flatten this list into a dict for ease of use.
     """
     if not listy_dict:

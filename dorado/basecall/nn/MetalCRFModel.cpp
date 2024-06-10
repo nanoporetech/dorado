@@ -4,6 +4,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <stdexcept>
+
 namespace {
 constexpr int kLstmGates = 4;
 // SIMD tile size dictated by the Metal spec.
@@ -44,18 +46,36 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
           stride(stride_),
           chunk_size(chunk_size_),
           batch_size(batch_size_) {
-    assert(layer >= 1 && layer <= 3);
+    if (layer < 1 || layer > 3) {
+        throw std::runtime_error("MetalCRFModel invalid config - only expected layers 1-3");
+    }
 
     // For layers 1 and 2 we only have kernels for particular in/out feature sizes.
     if (layer == 1) {
         // Simplex in_size == 1.  Duplex in_size == 13.
-        assert(in_size == 1 || in_size == 13);
-        assert(out_size == 4 || out_size == 16);
-        assert(win_size = 5);
+        if (!(in_size == 1 || in_size == 13)) {
+            throw std::runtime_error(
+                    "MetalCRFModel invalid config - layer 1 in_size must be 1 or 13");
+        }
+
+        if (!(out_size == 4 || out_size == 16)) {
+            throw std::runtime_error(
+                    "MetalCRFModel invalid config - layer 1 out_size must be 4 or 16");
+        }
+        if (win_size != 5) {
+            throw std::runtime_error("MetalCRFModel invalid config - layer 1 win_size must be 5");
+        }
     } else if (layer == 2) {
-        assert(in_size == 4 || in_size == 16);
-        assert(out_size == 16);
-        assert(win_size = 5);
+        if (!(in_size == 4 || in_size == 16)) {
+            throw std::runtime_error(
+                    "MetalCRFModel invalid config - layer 2 in_size must be 4 or 16");
+        }
+        if (out_size != 16) {
+            throw std::runtime_error("MetalCRFModel invalid config - layer 2 out_size must be 16");
+        }
+        if (win_size != 5) {
+            throw std::runtime_error("MetalCRFModel invalid config - layer 2 win_size must be 5");
+        }
     }
 
     if (layer != 3) {
@@ -279,7 +299,9 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
             "conv3", MetalConv1d(3, cv2.size, cv3.size, cv3.winlen, cv3.stride, cv3.activation,
                                  in_chunk_size, batch_size, device));
 
-    assert(cv3.size == config.lstm_size);
+    if (cv3.size != config.lstm_size) {
+        throw std::runtime_error("MetalCRFModel invalid config - conv_3.size != config.lstm_size");
+    }
     rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true));
     rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false));
     rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true));
