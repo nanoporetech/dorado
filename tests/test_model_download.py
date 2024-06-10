@@ -147,13 +147,13 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "--simplex_glob",
+        "--simplex-glob",
         required=False,
         type=str,
         help="optional glob expr to filter simplex models",
     )
     parser.add_argument(
-        "--mods_glob",
+        "--mods-glob",
         required=False,
         type=str,
         help="optional glob expr to filter simplex models",
