@@ -162,7 +162,9 @@ def main() -> int:
     args = parser.parse_args()
     dorado_bin = Path(args.exe).resolve()
     test_dir = Path(args.data).resolve()
-    models_dir = Path(args.models_directory).resolve() if args.models else None
+    models_dir = (
+        Path(args.models_directory).resolve() if args.models_directory else None
+    )
     count_tested = run_tests(
         dorado_bin=dorado_bin,
         test_dir=test_dir,
