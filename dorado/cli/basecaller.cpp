@@ -59,6 +59,12 @@
 #include <sstream>
 #include <thread>
 
+using dorado::utils::default_parameters;
+using OutputMode = dorado::utils::HtsFile::OutputMode;
+using namespace std::chrono_literals;
+using namespace dorado::models;
+namespace fs = std::filesystem;
+
 namespace dorado {
 
 namespace {
@@ -111,13 +117,41 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
     model_config.normalise_basecaller_params();
 }
 
-}  // namespace
+bool try_create_output_folder(const std::string& output_folder) {
+    std::error_code creation_error;
+    // N.B. No error code if folder already exists.
+    fs::create_directories(fs::path{output_folder}, creation_error);
+    if (creation_error) {
+        spdlog::error("Unable to create output folder {}. ErrorCode({}) {}", output_folder,
+                      creation_error.value(), creation_error.message());
+        return false;
+    }
+    return true;
+}
 
-using dorado::utils::default_parameters;
-using OutputMode = dorado::utils::HtsFile::OutputMode;
-using namespace std::chrono_literals;
-using namespace dorado::models;
-namespace fs = std::filesystem;
+bool get_output_file(std::optional<std::string> output_dir_param,
+                     bool emit_fastq,
+                     bool emit_sam,
+                     std::string& output_path) {
+    if (!output_dir_param) {
+        output_path = "-";
+        return true;
+    }
+    if (!try_create_output_folder(*output_dir_param)) {
+        return false;
+    }
+    //fs::path(m_output_folder) / input_relative_path
+    if (emit_fastq) {
+        output_path = (fs::path(*output_dir_param) / "calls.fastq").string();
+    } else if (emit_sam) {
+        output_path = (fs::path(*output_dir_param) / "calls.sam").string();
+    } else {
+        output_path = (fs::path(*output_dir_param) / "calls.bam").string();
+    }
+    return true;
+}
+
+}  // namespace
 
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
@@ -164,6 +198,9 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     parser.visible.add_argument("-c", "--chunksize")
             .default_value(default_parameters.chunksize)
             .scan<'i', int>();
+
+    parser.visible.add_argument("-o", "--output-dir")
+            .help("If specified output will be written to a calls file in the given folder");
 
     parser.visible.add_argument("-o", "--overlap")
             .default_value(default_parameters.overlap)
@@ -275,6 +312,7 @@ void setup(const std::vector<std::string>& args,
            size_t num_remora_threads,
            float methylation_threshold_pct,
            OutputMode output_mode,
+           const std::string& output_file,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -416,7 +454,7 @@ void setup(const std::vector<std::string>& args,
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads, false);
+    utils::HtsFile hts_file(output_file, output_mode, thread_allocations.writer_threads, false);
 
     PipelineDescriptor pipeline_desc;
     std::string gpu_names{};
@@ -645,6 +683,12 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    std::string output_file{};
+    if (!get_output_file(parser.visible.present<std::string>("--output-dir"), emit_fastq, emit_sam,
+                         output_file)) {
+        return EXIT_FAILURE;
+    }
+
     if (emit_fastq) {
         if (model_selection.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
             spdlog::error(
@@ -660,9 +704,9 @@ int basecaller(int argc, char* argv[]) {
         }
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = OutputMode::FASTQ;
-    } else if (emit_sam || utils::is_fd_tty(stdout)) {
+    } else if (emit_sam || (output_file == "-" && utils::is_fd_tty(stdout))) {
         output_mode = OutputMode::SAM;
-    } else if (utils::is_fd_pipe(stdout)) {
+    } else if (output_file == "-" && utils::is_fd_pipe(stdout)) {
         output_mode = OutputMode::UBAM;
     }
 
@@ -775,8 +819,9 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
-              methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
-              parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
+              methylation_threshold, output_mode, output_file,
+              parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
+              parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive, *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
