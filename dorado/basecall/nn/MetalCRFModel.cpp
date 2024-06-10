@@ -265,15 +265,21 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     constexpr int kMaxConv2OutChannels = 16;
     int mat_temp_elems = batch_size * kMaxConv2OutChannels * in_chunk_size;
 
-    conv1 = register_module(
-            "conv1", MetalConv1d(1, config.num_features, config.convs[0].size, 5, 1,
-                                 config.convs[0].activation, in_chunk_size, batch_size, device));
+    assert(config.convs.size() == 3);
+    const auto cv1 = config.convs[0];
+    conv1 = register_module("conv1",
+                            MetalConv1d(1, config.num_features, cv1.size, cv1.winlen, cv1.stride,
+                                        cv1.activation, in_chunk_size, batch_size, device));
+    const auto cv2 = config.convs[1];
     conv2 = register_module(
-            "conv2", MetalConv1d(2, config.convs[0].size, 16, 5, 1, config.convs[1].activation,
+            "conv2", MetalConv1d(2, cv1.size, cv2.size, cv2.winlen, cv2.stride, cv2.activation,
                                  in_chunk_size, batch_size, device));
+    const auto cv3 = config.convs[2];
     conv3 = register_module(
-            "conv3", MetalConv1d(3, 16, config.lstm_size, 19, config.stride,
-                                 config.convs[2].activation, in_chunk_size, batch_size, device));
+            "conv3", MetalConv1d(3, cv2.size, cv3.size, cv3.winlen, cv3.stride, cv3.activation,
+                                 in_chunk_size, batch_size, device));
+
+    assert(cv3.size == config.lstm_size);
     rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true));
     rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false));
     rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true));
@@ -316,8 +322,8 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         mat_temp_elems = std::max(mat_temp_elems,
                                   decomposition * (batch_size / out_split_) * lstm_chunk_size);
     } else {
-        const bool is_v3_model = (config.num_features == 1 && config.convs[0].size == 4) ||
-                                 (config.num_features == 13 && config.convs[0].size == 16);
+        const bool is_v3_model = (config.num_features == 1 && cv1.size == 4) ||
+                                 (config.num_features == 13 && cv1.size == 16);
         const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>(
                 {{"kLinearInSize", config.lstm_size},
                  {"kLinearOutSize", config.outsize},
