@@ -732,7 +732,7 @@ mlhub:sre_4k_260bps:
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
     DUPLEX_MODELS: '[]'
 
-mlhub:sre_4k_400bps:
+mlhub:sre_4k_400bps_v4_1:
   extends:
     .mlhub_sre
   variables:
@@ -741,14 +741,24 @@ mlhub:sre_4k_400bps:
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
     DUPLEX_MODELS: '[]'
 
-mlhub:sre_5k_400bps:
+mlhub:sre_5k_400bps_v4_3:
   extends:
     .mlhub_sre
   variables:
     CONDITION: '5k_400bps'
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
-    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.2.0","dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.3.0","dna_r10.4.1_e8.2_400bps_hac@v4.3.0","dna_r10.4.1_e8.2_400bps_sup@v4.3.0"]'
     DUPLEX_MODELS: '[]'
+
+mlhub:sre_5k_400bps_v5:
+  extends:
+    .mlhub_sre
+  variables:
+    CONDITION: '5k_400bps'
+    SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v5.0.0","dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
+    DUPLEX_MODELS: '[]'
+
 
 mlhub:sre_5k_400bps_duplex:
   extends:
@@ -756,8 +766,8 @@ mlhub:sre_5k_400bps_duplex:
   variables:
     CONDITION: '5k_400bps_duplex'
     SRE_CONFIG: "dna_r10.4.2-e8.2-5khz-400bps-prom.json"
-    MODELS: '["dna_r10.4.1_e8.2_400bps_hac@v4.2.0","dna_r10.4.1_e8.2_400bps_sup@v4.2.0"]'
-    DUPLEX_MODELS: '["dna_r10.4.1_e8.2_5khz_stereo@v1.1"]'
+    MODELS: '["dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
+    DUPLEX_MODELS: '["dna_r10.4.1_e8.2_5khz_stereo@v1.3"]'
 
 # MLHub - Remora
 mlhub:remora-validate:
