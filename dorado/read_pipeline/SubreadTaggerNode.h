@@ -24,6 +24,11 @@ public:
     void terminate(const FlushOptions &) override { terminate_impl(); }
     void restart() override { start_threads(); }
 
+protected:
+    // Ensure this node processes reads from disconnected clients, otherwise we may not properly
+    // calculate the subtag ids for duplex reads that are in-flight when a disconnect occurs
+    bool forward_on_disconnected() const override { return false; }
+
 private:
     void start_threads();
     void terminate_impl();

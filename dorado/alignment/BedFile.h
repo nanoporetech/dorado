@@ -29,7 +29,7 @@ public:
     BedFile& operator=(const BedFile&) = delete;
     ~BedFile() = default;
 
-    bool load(const std::string& index_filename);
+    bool load(const std::string& filename);
 
     const Entries& entries(const std::string& genome) const;
 
