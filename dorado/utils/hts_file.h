@@ -21,10 +21,13 @@ public:
 
     using ProgressCallback = std::function<void(size_t percentage)>;
 
-    HtsFile(const std::string& filename, OutputMode mode, size_t threads, bool sort_bam);
+    HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam);
     ~HtsFile();
     HtsFile(const HtsFile&) = delete;
     HtsFile& operator=(const HtsFile&) = delete;
+
+    // Support for setting threads after construction
+    void set_num_threads(std::size_t threads);
 
     void set_buffer_size(size_t buff_size);
     int set_header(const sam_hdr_t* header);
@@ -58,6 +61,7 @@ private:
     int write_to_file(const bam1_t* record);
     void cache_record(const bam1_t* record);
     bool merge_temp_files(ProgressUpdater& update_progress) const;
+    void initialise_threads();
 };
 
 }  // namespace dorado::utils

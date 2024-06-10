@@ -129,6 +129,13 @@ inline ModelFinder model_finder(const ModelSelection& model_selection,
     }
 }
 
+#include "utils/hts_file.h"
+
+struct BasecallingOutputParams {
+    dorado::utils::HtsFile::OutputMode output_mode;
+    std::string output_file;
+};
+
 }  // namespace cli
 
 }  // namespace dorado
