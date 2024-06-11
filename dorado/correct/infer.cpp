@@ -19,7 +19,7 @@ namespace dorado::correction {
 
 int calculate_batch_size(const std::string& device, float memory_fraction) {
     // These sizes are currently hard coded for version 1 model.
-    const float model_mem = 1.f;        // GB
+    const float model_mem = 1.f;       // GB
     const float per_sample_mem = 1.f;  // GB
     float usable_memory = 0.f;
     if (device == "cpu") {
