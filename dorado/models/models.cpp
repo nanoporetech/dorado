@@ -392,6 +392,13 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
         },
 
+        ModelInfo{
+                "dna_r10.4.1_e8.2_apk_sup@v5.0.0",
+                "863996f35e6857ff52140c0bfb5284d05efe40fcdab03faea7c97b9ab0747417",
+                CC::DNA_R10_4_1_E8_2_APK_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+        },
+
         // RNA002
         ModelInfo{
                 "rna002_70bps_fast@v3",
