@@ -14,7 +14,9 @@
 
 namespace {
 
-constexpr size_t MINIMUM_BUFFER_SIZE = 100000ul;  // The smallest allowed buffer size is 100 KB.
+constexpr size_t MINIMUM_BUFFER_SIZE{100000};  // The smallest allowed buffer size is 100 KB.
+constexpr size_t DEFAULT_BUFFER_SIZE{
+        20000000};  // Arbitrary 20 MB. Can be overridden by application code.
 
 }  // namespace
 
@@ -68,6 +70,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
         break;
     case OutputMode::BAM:
         if (m_filename != "-" && m_sort_bam) {
+            set_buffer_size(DEFAULT_BUFFER_SIZE);
             // We're doing sorted BAM output. We need to indicate this for the
             // finalise method.
             m_finalise_is_noop = false;
