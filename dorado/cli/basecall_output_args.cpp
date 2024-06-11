@@ -2,20 +2,27 @@
 
 #include "utils/tty_utils.h"
 
+#include <ctime>
 #include <filesystem>
+#include <mutex>
 #include <optional>
+#include <sstream>
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 namespace fs = std::filesystem;
 
-namespace {
-constexpr std::string_view OUTPUT_DIR_ARG{"--output-dir"};
-constexpr std::string_view EMIT_FASTQ_ARG{"--emit-fastq"};
-constexpr std::string_view EMIT_SAM_ARG{"--emit-sam"};
-}  // namespace
 namespace dorado::cli {
 
 namespace {
+
+constexpr std::string_view OUTPUT_DIR_ARG{"--output-dir"};
+constexpr std::string_view EMIT_FASTQ_ARG{"--emit-fastq"};
+constexpr std::string_view EMIT_SAM_ARG{"--emit-sam"};
+
+constexpr std::string_view OUTPUT_FILE_PREFIX{"calls_"};
+constexpr std::string_view FASTQ_EXT{".fastq"};
+constexpr std::string_view SAM_EXT{".sam"};
+constexpr std::string_view BAM_EXT{".bam"};
 
 bool try_create_output_folder(const std::string& output_folder) {
     std::error_code creation_error;
@@ -29,11 +36,19 @@ bool try_create_output_folder(const std::string& output_folder) {
     return true;
 }
 
+std::tm get_gmtime(const std::time_t* time) {
+    // gmtime is not threadsafe, so lock.
+    static std::mutex gmtime_mutex;
+    std::lock_guard lock(gmtime_mutex);
+    std::tm* time_buffer = gmtime(time);
+    return *time_buffer;
+}
+
 class HtsFileCreator {
-    utils::arg_parse::ArgParser& m_parser;
     const bool m_emit_fastq;
     const bool m_emit_sam;
     const bool m_reference_requested;
+    std::optional<std::string> m_output_dir;
 
     std::string m_output_file{};
     OutputMode m_output_mode{OutputMode::BAM};
@@ -44,24 +59,37 @@ class HtsFileCreator {
         return m_output_mode == OutputMode::BAM || m_output_mode == OutputMode::SAM;
     }
 
+    std::string_view get_output_file_extension() {
+        if (m_emit_fastq) {
+            return FASTQ_EXT;
+        }
+        if (m_emit_sam) {
+            return SAM_EXT;
+        }
+        return BAM_EXT;
+    }
+
+    std::string get_output_filename() {
+        time_t time_now = time(nullptr);
+        std::tm gm_time_now = get_gmtime(&time_now);
+        char timestamp_buffer[32];
+        strftime(timestamp_buffer, 32, "%F_T%H-%M-%S", &gm_time_now);
+
+        std::ostringstream oss{};
+        oss << OUTPUT_FILE_PREFIX << timestamp_buffer << get_output_file_extension();
+        return oss.str();
+    }
+
     bool try_set_output_file() {
-        auto output_dir = m_parser.visible.present<std::string>(OUTPUT_DIR_ARG);
-        if (!output_dir) {
+        if (!m_output_dir) {
             m_output_file = "-";
             return true;
         }
-        if (!try_create_output_folder(*output_dir)) {
+        if (!try_create_output_folder(*m_output_dir)) {
             return false;
         }
 
-        auto folder = fs::path(*output_dir);
-        if (m_emit_fastq) {
-            m_output_file = (folder / "calls.fastq").string();
-        } else if (m_emit_sam) {
-            m_output_file = (folder / "calls.sam").string();
-        } else {
-            m_output_file = (folder / "calls.bam").string();
-        }
+        m_output_file = (fs::path(*m_output_dir) / get_output_filename()).string();
         return true;
     }
 
@@ -92,11 +120,11 @@ class HtsFileCreator {
     }
 
 public:
-    HtsFileCreator(utils::arg_parse::ArgParser& parser)
-            : m_parser(parser),
-              m_emit_fastq(parser.visible.get<bool>(EMIT_FASTQ_ARG)),
+    HtsFileCreator(const utils::arg_parse::ArgParser& parser)
+            : m_emit_fastq(parser.visible.get<bool>(EMIT_FASTQ_ARG)),
               m_emit_sam(parser.visible.get<bool>(EMIT_SAM_ARG)),
-              m_reference_requested(!parser.visible.get<std::string>("--reference").empty()) {}
+              m_reference_requested(!parser.visible.get<std::string>("--reference").empty()),
+              m_output_dir(parser.visible.present<std::string>(OUTPUT_DIR_ARG)) {}
 
     std::unique_ptr<utils::HtsFile> create() {
         if (!try_set_output_file()) {
@@ -115,7 +143,7 @@ public:
 
 }  // namespace
 
-std::unique_ptr<utils::HtsFile> extract_hts_file(utils::arg_parse::ArgParser& parser) {
+std::unique_ptr<utils::HtsFile> extract_hts_file(const utils::arg_parse::ArgParser& parser) {
     HtsFileCreator hts_file_creator(parser);
     return hts_file_creator.create();
 }
