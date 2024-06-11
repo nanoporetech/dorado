@@ -1,7 +1,6 @@
 #include "AdapterDetector.h"
 
 #include "parse_custom_sequences.h"
-#include "utils/alignment_utils.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -27,7 +26,7 @@ const int PRIMER_TRIM_LENGTH = 150;
 EdlibAlignConfig init_edlib_config_for_adapters() {
     EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
     placement_config.mode = EDLIB_MODE_HW;
-    placement_config.task = EDLIB_TASK_PATH;
+    placement_config.task = EDLIB_TASK_LOC;
     // Currently none of our adapters or primers have Ns, but we should support them.
     static const EdlibEqualityPair additionalEqualities[4] = {
             {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}};
@@ -124,6 +123,11 @@ static SingleEndResult copy_results(const EdlibAlignResult& source,
                                     size_t length) {
     SingleEndResult dest;
     dest.name = name;
+
+    if (source.status != EDLIB_STATUS_OK || !source.startLocations || !source.endLocations) {
+        return dest;
+    }
+
     dest.score = 1.0f - float(source.editDistance) / length;
     dest.position = {source.startLocations[0], source.endLocations[0]};
     return dest;
@@ -219,8 +223,13 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
             }
         }
     }
-    result.front = front_results[best_front];
-    result.rear = rear_results[best_rear];
+
+    if (best_front != -1) {
+        result.front = front_results[best_front];
+    }
+    if (best_rear != -1) {
+        result.rear = rear_results[best_rear];
+    }
     return result;
 }
 
