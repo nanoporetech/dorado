@@ -50,6 +50,7 @@ std::string to_string(const Flowcell& fc);
 All supported sequencing and barcode sequencing kits.
 */
 enum class KitCode {
+    SQK_APK114,
     SQK_CS9109,
     SQK_DCS108,
     SQK_DCS109,
@@ -193,6 +194,7 @@ struct ChemistryKits {
 enum class Chemistry {
     DNA_R9_4_1_E8,
     DNA_R10_4_1_E8_2_260BPS,
+    DNA_R10_4_1_E8_2_APK_5KHZ,
     DNA_R10_4_1_E8_2_400BPS_4KHZ,
     DNA_R10_4_1_E8_2_400BPS_5KHZ,
     RNA002_70BPS,

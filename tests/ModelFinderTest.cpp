@@ -86,6 +86,8 @@ TEST_CASE(TEST_TAG "  ModelFinder get_simplex_model_name", TEST_TAG) {
                                 "dna_r10.4.1_e8.2_400bps_sup@v4.1.0"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_2_0},
                                 "dna_r10.4.1_e8.2_400bps_sup@v4.2.0"),
+                std::make_tuple(CC::DNA_R10_4_1_E8_2_APK_5KHZ, MVP{MV::SUP, VV::v5_0_0},
+                                "dna_r10.4.1_e8.2_apk_sup@v5.0.0"),
                 std::make_tuple(CC::RNA002_70BPS, MVP{MV::HAC, VV::v3_0_0}, "rna002_70bps_hac@v3"),
                 std::make_tuple(CC::RNA004_130BPS, MVP{MV::HAC, VV::v3_0_1},
                                 "rna004_130bps_hac@v3.0.1"),
