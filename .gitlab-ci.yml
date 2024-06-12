@@ -623,6 +623,7 @@ test:macos:x64:
     BATCH: 0
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
+  timeout: 1h 30m
 
 # Test that you can run dorado in a clean cuda 20.04 environment
 test_archive:linux:x86:20.04_nvidia:

@@ -82,7 +82,8 @@ set -e
 $dorado_bin basecaller $model_5k_v43 $data_dir/split/INSTX-5275 -b ${batch} --emit-fastq --dump_stats_file $output_dir/INSTX-5275_stats.txt > $output_dir/INSTX-5275.fq
 
 # Check that dorado handles degenerate reads without crashing
-$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate --skip-model-compatibility-check > $output_dir/error_condition.fq
+$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/trimming_bomb.pod5 -b ${batch} --skip-model-compatibility-check > $output_dir/error_condition.fq
+$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 -b ${batch} --skip-model-compatibility-check --kit-name EXP-NBD196 > $output_dir/error_condition.fq
 
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
