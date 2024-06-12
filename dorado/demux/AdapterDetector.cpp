@@ -121,7 +121,7 @@ const std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences
 static SingleEndResult copy_results(const EdlibAlignResult& source,
                                     const std::string& name,
                                     size_t length) {
-    SingleEndResult dest;
+    SingleEndResult dest{};
     dest.name = name;
 
     if (source.status != EDLIB_STATUS_OK || !source.startLocations || !source.endLocations) {
