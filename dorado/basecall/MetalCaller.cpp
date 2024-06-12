@@ -115,7 +115,7 @@ void MetalCaller::start_threads() {
 
 void MetalCaller::metal_thread_fn() {
     at::InferenceMode inference_mode_guard;
-    ScopedAutoReleasePool autorelease_pool;
+    ScopedAutoReleasePool outer_pool;
 
     // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
     // run i before the CPU has finished decoding all run i's chunks.
@@ -128,6 +128,8 @@ void MetalCaller::metal_thread_fn() {
     static std::mutex inter_caller_mutex;
 
     while (true) {
+        ScopedAutoReleasePool inner_pool;
+
         std::unique_lock<std::mutex> input_lock(m_input_lock);
         while (m_input_queue.empty() && !m_terminate.load()) {
             m_input_cv.wait_for(input_lock, 100ms);
@@ -463,10 +465,11 @@ DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
 }
 
 MetalTxCaller::MetalTxCaller(const CRFModelConfig &model_config) : MetalCaller(model_config) {
+    ScopedAutoReleasePool autorelease_pool;
+
     if (!model_config.is_tx_model()) {
         throw std::logic_error("MetalTxCaller got invalid model config");
     }
-    ScopedAutoReleasePool autorelease_pool;
 
     m_device = get_mtl_device();
     m_command_queue = NS::TransferPtr(m_device->newCommandQueue());

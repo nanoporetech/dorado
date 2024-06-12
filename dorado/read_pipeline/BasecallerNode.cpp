@@ -237,7 +237,7 @@ void BasecallerNode::working_reads_manager() {
 void BasecallerNode::basecall_worker_thread(int worker_id) {
 #if DORADO_METAL_BUILD
     // Model execution creates GPU-related autorelease objects.
-    utils::ScopedAutoReleasePool autorelease_pool;
+    utils::ScopedAutoReleasePool outer_pool;
 #endif
     at::InferenceMode inference_mode_guard;
 
@@ -247,6 +247,9 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     const int batch_timeout_ms = m_model_runners[worker_id]->batch_timeout_ms();
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     while (true) {
+#if DORADO_METAL_BUILD
+        utils::ScopedAutoReleasePool inner_pool;
+#endif
         std::unique_ptr<BasecallingChunk> chunk;
         const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(
                 chunk, last_chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
