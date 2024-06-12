@@ -20,12 +20,12 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock);
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of strings, one for
 // each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]. This function will validate that the device IDs
 // exist and will raise an exception if there is any issue with the string.
-std::vector<std::string> parse_cuda_device_string(std::string device_string);
+std::vector<std::string> parse_cuda_device_string(const std::string &device_string);
 
-// Try to parse the device string in the same maaner parse_cuda_device_string
-// In the event of an error it will return false and populate the error_message
-// with the failuer reason.
-bool try_parse_cuda_device_string(std::string device_string,
+// Try to parse the device string in the same manner parse_cuda_device_string
+// In the event of an error an exception will not be thrown, instead it will
+// return false and populate the error_message with the failure reason.
+bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> devices,
                                   std::string &error_message);
 
@@ -40,11 +40,12 @@ struct CUDADeviceInfo {
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a vector of CUDADeviceInfo for all
 // visible devices on the host machine, with information on whether they are in use or not
 // Set include_unused to true to skip unused devices
-std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused);
+std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_string,
+                                                 bool include_unused);
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a string containing
 // the set of types of gpu that will be used.
-std::string get_cuda_gpu_names(std::string device_string);
+std::string get_cuda_gpu_names(const std::string &device_string);
 
 // Reports the amount of available memory (in bytes) for a given device.
 size_t available_memory(torch::Device device);
@@ -65,7 +66,7 @@ void matmul_f16_torch(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 }  //  namespace details
 
 // Testability. Declared in header so that can be tested. num_devices passed as a parameter to also support testing.
-bool try_parse_device_ids(std::string device_string,
+bool try_parse_device_ids(const std::string &device_string,
                           const std::size_t num_devices,
                           std::vector<int> &device_ids,
                           std::string &error_message);

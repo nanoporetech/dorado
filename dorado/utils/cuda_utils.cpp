@@ -119,7 +119,7 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     selected_mat_mul(A, B, C);
 }
 
-bool try_parse_device_ids(std::string device_string,
+bool try_parse_device_ids(const std::string &device_string,
                           const std::size_t num_devices,
                           std::vector<int> &device_ids,
                           std::string &error_message) {
@@ -150,9 +150,13 @@ bool try_parse_device_ids(std::string device_string,
         try {
             device_idx = std::stoi(device_id_string);
         } catch (std::exception &) {
-            error_message = std::string("Invalid CUDA device string \"")
-                                    .append(device_string)
-                                    .append("\".");
+            error_message = "Invalid CUDA device string: " + device_string;
+            return false;
+        }
+
+        // std::stoi is more forgiving than we require, confirm it is +ve with no extraneous characters
+        if (std::to_string(device_idx) != device_id_string) {
+            error_message = "Invalid CUDA device string: " + device_string;
             return false;
         }
 
@@ -193,7 +197,7 @@ bool try_parse_device_ids(std::string device_string,
     return true;
 }
 
-bool try_parse_cuda_device_string(std::string device_string,
+bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> devices,
                                   std::string &error_message) {
     std::vector<int> device_ids{};
@@ -208,7 +212,7 @@ bool try_parse_cuda_device_string(std::string device_string,
     return true;
 }
 
-std::vector<std::string> parse_cuda_device_string(std::string device_string) {
+std::vector<std::string> parse_cuda_device_string(const std::string &device_string) {
     std::vector<std::string> devices{};
     std::string error_message{};
     if (!try_parse_cuda_device_string(device_string, devices, error_message)) {
@@ -218,7 +222,8 @@ std::vector<std::string> parse_cuda_device_string(std::string device_string) {
     return devices;
 }
 
-std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused) {
+std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_string,
+                                                 bool include_unused) {
     const auto num_devices = torch::cuda::device_count();
     std::string error_message{};
     std::vector<int> requested_device_ids{};
@@ -254,9 +259,8 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool
     return results;
 }
 
-std::string get_cuda_gpu_names(std::string device_string) {
-    auto dev_info =
-            utils::get_cuda_device_info(std::move(device_string), false);  // ignore unused GPUs
+std::string get_cuda_gpu_names(const std::string &device_string) {
+    auto dev_info = utils::get_cuda_device_info(device_string, false);  // ignore unused GPUs
     std::set<std::string> gpu_strs;
     std::string gpu_names;
 

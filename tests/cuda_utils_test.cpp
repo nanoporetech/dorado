@@ -155,4 +155,22 @@ DEFINE_TEST("try_parse_device_ids with cuda:0,a and num_devices 4 returns false"
     REQUIRE_FALSE(try_parse_device_ids("cuda:0,a", 4, device_ids, error_message));
 }
 
+DEFINE_TEST(
+        "try_parse_device_ids with unsupported range syntax cuda:1-3 and num_devices 4 returns "
+        "false") {
+    std::vector<int> device_ids{};
+    std::string error_message{};
+
+    REQUIRE_FALSE(try_parse_device_ids("cuda:1-3", 4, device_ids, error_message));
+}
+
+DEFINE_TEST(
+        "try_parse_device_ids with float device id cuda:1.2 and num_devices 4 returns "
+        "false") {
+    std::vector<int> device_ids{};
+    std::string error_message{};
+
+    REQUIRE_FALSE(try_parse_device_ids("cuda:1.2", 4, device_ids, error_message));
+}
+
 }  // namespace dorado::utils::cuda_utils
