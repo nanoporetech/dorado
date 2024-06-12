@@ -159,7 +159,7 @@ void add_basecaller_output_arguments(utils::arg_parse::ArgParser& parser) {
             .implicit_value(true);
     parser.visible.add_argument("-o", OUTPUT_DIR_ARG)
             .help("Optional output folder, if specified output will be written to a calls file "
-                  "(calls.sam, calls.bam or calls.fastq) in the given folder.");
+                  "(calls_<timestamp>.sam|.bam|.fastq) in the given folder.");
 }
 
 }  // namespace dorado::cli
