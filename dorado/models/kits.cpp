@@ -84,6 +84,7 @@ const ProtocolInfo not_rapid{true, RapidChemistry::NONE};
 const ProtocolInfo rapid_v1{true, RapidChemistry::V1};
 
 const std::unordered_map<KitCode, KitInfo> codes_map = {
+        {KC::SQK_APK114, {"SQK-APK114", 260}},
         {KC::SQK_CS9109, {"SQK-CS9109", 400}},
         {KC::SQK_DCS108, {"SQK-DCS108", 400}},
         {KC::SQK_DCS109, {"SQK-DCS109", 400}},
@@ -242,6 +243,8 @@ const KitSets sets_400bps_5khz = {
 };
 const KitSets sets_400bps = {{kit14::flowcells, kit14::kits_400bps}};
 const KitSets sets_260bps = {{kit14::flowcells, kit14::kits_260bps}};
+
+const KitSets sets_apk = {{kit14::flowcells, {KC::SQK_APK114}}};
 }  // namespace kit14
 
 namespace kit10 {
@@ -337,6 +340,7 @@ const std::unordered_map<SampleType, std::string> sample_type_map = {
 const std::unordered_map<Chemistry, std::string> codes_map = {
         {Chemistry::DNA_R9_4_1_E8, "dna_r9.4.1_e8"},
         {Chemistry::DNA_R10_4_1_E8_2_260BPS, "dna_r10.4.1_e8.2_260bps"},
+        {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ, "dna_r10.4.1_e8.2_apk_5khz"},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ, "dna_r10.4.1_e8.2_400bps_4khz"},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ, "dna_r10.4.1_e8.2_400bps_5khz"},
         {Chemistry::RNA002_70BPS, "rna002_70bps"},
@@ -352,6 +356,7 @@ const std::unordered_map<Chemistry, ChemistryKits> kit_map = {
         {Chemistry::UNKNOWN, {1, SampleType::DNA, {}}},
         {Chemistry::DNA_R9_4_1_E8, {4000, SampleType::DNA, kit_sets::kit10::sets}},
         {Chemistry::DNA_R10_4_1_E8_2_260BPS, {4000, SampleType::DNA, kit_sets::kit14::sets_260bps}},
+        {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ, {5000, SampleType::DNA, kit_sets::kit14::sets_apk}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ,
          {4000, SampleType::DNA, kit_sets::kit14::sets_400bps}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ,

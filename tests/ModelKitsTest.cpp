@@ -67,6 +67,7 @@ TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
     const auto& kits = kit_codes();
 
     SECTION("KitCode to_string") {
+        CHECK(to_string(KitCode::SQK_APK114) == "SQK-APK114");
         CHECK(to_string(KitCode::SQK_CS9109) == "SQK-CS9109");
         CHECK(to_string(KitCode::SQK_DCS108) == "SQK-DCS108");
         CHECK(to_string(KitCode::SQK_DCS109) == "SQK-DCS109");
@@ -166,16 +167,19 @@ TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
     }
 
     SECTION("KitCode motor speed") {
+        using namespace dorado::utils;
         for (const auto& kit : kits) {
-            if (kit.second.name.find("112") != std::string::npos) {
-                CHECK(kit.second.speed == 250);
-            } else if (dorado::utils::ends_with(kit.second.name, "-260")) {
-                CHECK(kit.second.speed == 260);
-            } else if (dorado::utils::ends_with(kit.second.name, "RNA002")) {
-                CHECK(kit.second.speed == 70);
-            } else if (dorado::utils::ends_with(kit.second.name, "RNA004")) {
-                CHECK(kit.second.speed == 130);
-            } else if (dorado::utils::ends_with(kit.second.name, "__UNKNOWN_KIT__")) {
+            const auto& name = kit.second.name;
+            const auto& speed = kit.second.speed;
+            if (name.find("112") != std::string::npos) {
+                CHECK(speed == 250);
+            } else if (ends_with(name, "-260") || ends_with(name, "APK114")) {
+                CHECK(speed == 260);
+            } else if (ends_with(name, "RNA002")) {
+                CHECK(speed == 70);
+            } else if (ends_with(name, "RNA004")) {
+                CHECK(speed == 130);
+            } else if (ends_with(name, "__UNKNOWN_KIT__")) {
                 continue;
             } else {
                 CHECK(kit.second.speed == 400);
