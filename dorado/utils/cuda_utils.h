@@ -4,6 +4,7 @@
 #include <torch/torch.h>
 
 #include <mutex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,13 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock);
 // each device (e.g ["cuda:0", "cuda:2", ..., "cuda:7"]. This function will validate that the device IDs
 // exist and will raise an exception if there is any issue with the string.
 std::vector<std::string> parse_cuda_device_string(std::string device_string);
+
+// Try to parse the device string in the same maaner parse_cuda_device_string
+// In the event of an error it will return false and populate the error_message
+// with the failuer reason.
+bool try_parse_cuda_device_string(std::string device_string,
+                                  std::vector<std::string> devices,
+                                  std::string &error_message);
 
 struct CUDADeviceInfo {
     size_t free_mem, total_mem;
@@ -55,5 +63,11 @@ void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 void matmul_f16_torch(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 
 }  //  namespace details
+
+// Testability. Declared in header so that can be tested. num_devices passed as a parameter to also support testing.
+bool try_parse_device_ids(std::string device_string,
+                          const std::size_t num_devices,
+                          std::vector<int> &device_ids,
+                          std::string &error_message);
 
 }  // namespace dorado::utils

@@ -10,6 +10,7 @@
 #include <cuda_runtime_api.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <chrono>
@@ -17,6 +18,7 @@
 #include <limits>
 #include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -117,84 +119,120 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     selected_mat_mul(A, B, C);
 }
 
-std::vector<std::string> parse_cuda_device_string(std::string device_string) {
-    std::vector<std::string> devices;
-    std::regex e("[0-9]+");
-    std::smatch m;
-
-    auto num_devices = torch::cuda::device_count();
+bool try_parse_device_ids(std::string device_string,
+                          const std::size_t num_devices,
+                          std::vector<int> &device_ids,
+                          std::string &error_message) {
     if (device_string.substr(0, 5) != "cuda:") {
-        return devices;  // empty vector;
-    } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        for (size_t i = 0; i < num_devices; i++) {
-            devices.push_back("cuda:" + std::to_string(i));
+        // Special handling. Not an error as non cuda device strings may be used, e.g. "cpu".
+        // existing code depends on this not being an error but returning an empty collection.
+        device_ids = {};
+        return true;
+    }
+
+    if (device_string == "cuda:all" || device_string == "cuda:auto") {
+        if (num_devices == 0) {
+            error_message =
+                    "device string set to " + device_string + " but no CUDA devices available.";
+            return false;
         }
-    } else {
-        while (std::regex_search(device_string, m, e)) {
-            for (auto x : m) {
-                std::string device_id = x.str();
-                int device_idx = std::stoi(device_id);
-                if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
-                                                     .append(device_id)
-                                                     .append("\" from device string ")
-                                                     .append(device_string)
-                                                     .append(", there are ")
-                                                     .append(std::to_string(num_devices))
-                                                     .append(" visible CUDA devices."));
-                }
-                devices.push_back("cuda:" + device_id);
-            }
-            device_string = m.suffix().str();
+        for (size_t i = 0; i < num_devices; ++i) {
+            device_ids.push_back(static_cast<int>(i));
         }
+        return true;
+    }
+
+    std::set<int> unique_device_ids{};
+    std::stringstream device_id_stream(device_string.substr(5));
+    std::string device_id_string{};
+    while (std::getline(device_id_stream, device_id_string, ',')) {
+        int device_idx{};
+        try {
+            device_idx = std::stoi(device_id_string);
+        } catch (std::exception &) {
+            error_message = std::string("Invalid CUDA device string \"")
+                                    .append(device_string)
+                                    .append("\".");
+            return false;
+        }
+
+        // In range?
+        if (device_idx >= static_cast<int>(num_devices) || device_idx < 0) {
+            error_message = std::string("Invalid CUDA device index \"")
+                                    .append(device_id_string)
+                                    .append("\" from device string ")
+                                    .append(device_string)
+                                    .append(", there are ")
+                                    .append(std::to_string(num_devices))
+                                    .append(" visible CUDA devices.");
+            return false;
+        }
+
+        // unique?
+        if (unique_device_ids.count(device_idx) > 0) {
+            error_message = std::string("Duplicate device index \"")
+                                    .append(device_id_string)
+                                    .append("\" from device string ")
+                                    .append(device_string)
+                                    .append(".");
+            return false;
+        }
+
+        unique_device_ids.insert(device_idx);
+    }
+
+    if (unique_device_ids.empty()) {
+        error_message = std::string("No device index found in CUDA device string \"")
+                                .append(device_string)
+                                .append("\".");
+        return false;
+    }
+
+    device_ids = std::vector(unique_device_ids.begin(), unique_device_ids.end());
+
+    return true;
+}
+
+bool try_parse_cuda_device_string(std::string device_string,
+                                  std::vector<std::string> devices,
+                                  std::string &error_message) {
+    std::vector<int> device_ids{};
+    if (!try_parse_device_ids(device_string, torch::cuda::device_count(), device_ids,
+                              error_message)) {
+        return false;
+    }
+
+    for (const auto device_id : device_ids) {
+        devices.push_back("cuda:" + device_id);
+    }
+    return true;
+}
+
+std::vector<std::string> parse_cuda_device_string(std::string device_string) {
+    std::vector<std::string> devices{};
+    std::string error_message{};
+    if (!try_parse_cuda_device_string(device_string, devices, error_message)) {
+        throw std::runtime_error(error_message);
     }
 
     return devices;
 }
 
 std::vector<CUDADeviceInfo> get_cuda_device_info(std::string device_string, bool include_unused) {
-    std::vector<CUDADeviceInfo> results;
-    std::regex e("[0-9]+");
-    std::smatch m;
-    auto num_devices = torch::cuda::device_count();
-
-    // Get the set of ids that are in use according to the device_string
-    std::set<int> device_ids;
-    if (device_string.substr(0, 5) != "cuda:") {
-        // Nothing to add to device_ids
-    } else if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        if (num_devices == 0) {
-            throw std::runtime_error("device string set to " + device_string +
-                                     " but no CUDA devices available.");
-        }
-        for (int i = 0; i < int(num_devices); i++) {
-            device_ids.insert(i);
-        }
-    } else {
-        while (std::regex_search(device_string, m, e)) {
-            for (auto x : m) {
-                std::string device_id = x.str();
-                int device_idx = std::stoi(device_id);
-                if (device_idx >= int(num_devices) || device_idx < 0) {
-                    throw std::runtime_error(std::string("Invalid CUDA device index \"")
-                                                     .append(device_id)
-                                                     .append("\" from device string ")
-                                                     .append(device_string)
-                                                     .append(", there are ")
-                                                     .append(std::to_string(num_devices))
-                                                     .append(" visible CUDA devices."));
-                }
-                device_ids.insert(device_idx);
-            }
-            device_string = m.suffix().str();
-        }
+    const auto num_devices = torch::cuda::device_count();
+    std::string error_message{};
+    std::vector<int> requested_device_ids{};
+    if (!try_parse_device_ids(device_string, num_devices, requested_device_ids, error_message)) {
+        throw std::runtime_error(error_message);
     }
 
     // Now inspect all the devices on the host to create the CUDADeviceInfo
+    std::vector<CUDADeviceInfo> results;
     for (int device_id = 0; device_id < int(num_devices); device_id++) {
         CUDADeviceInfo device_info;
         device_info.device_id = device_id;
-        device_info.in_use = device_ids.find(device_id) != device_ids.end();
+        device_info.in_use = std::find(requested_device_ids.begin(), requested_device_ids.end(),
+                                       device_id) != requested_device_ids.end();
         if (!include_unused && !device_info.in_use) {
             continue;
         }
