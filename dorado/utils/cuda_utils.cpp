@@ -1,5 +1,6 @@
 #include "cuda_utils.h"
 
+#include "PostCondition.h"
 #include "math_utils.h"
 
 #include <ATen/Functions.h>
@@ -29,6 +30,7 @@ using namespace std::chrono;
 namespace dorado::utils {
 
 namespace {
+const std::string_view USAGE_HELP{"CUDA device string format: \"cuda:0,...,N\" or \"cuda:all\"."};
 
 /**
  * Wrapper around CUDA events to measure GPU timings.
@@ -218,6 +220,11 @@ bool try_parse_device_ids(const std::string &device_string,
                           const std::size_t num_devices,
                           std::vector<int> &device_ids,
                           std::string &error_message) {
+    auto append_help_to_error_message = utils::PostCondition([&error_message] {
+        if (!error_message.empty()) {
+            error_message += "\n" + std::string{USAGE_HELP};
+        }
+    });
     if (!is_cuda_device_string(device_string)) {
         // Not an error as there are valid non cuda device strings, e.g. "cpu".
         device_ids = {};
