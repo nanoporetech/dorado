@@ -17,7 +17,6 @@
 #include <exception>
 #include <limits>
 #include <optional>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -131,7 +130,11 @@ bool try_parse_device_ids(const std::string &device_string,
     }
 
     if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        // Allow an empty container to be returned if zero devices
+        if (num_devices == 0) {
+            error_message =
+                    "device string set to " + device_string + " but no CUDA devices available.";
+            return false;
+        }
         for (size_t i = 0; i < num_devices; ++i) {
             device_ids.push_back(static_cast<int>(i));
         }

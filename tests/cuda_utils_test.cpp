@@ -60,20 +60,11 @@ DEFINE_TEST("try_parse_device_ids with cuda:all and 1 device returns true") {
     REQUIRE(try_parse_device_ids("cuda:all", 1, device_ids, error_message));
 }
 
-DEFINE_TEST("try_parse_device_ids with cuda:all and zero devices returns true") {
+DEFINE_TEST("try_parse_device_ids with cuda:all and zero devices returns false") {
     std::vector<int> device_ids{};
     std::string error_message{};
 
-    REQUIRE(try_parse_device_ids("cuda:all", 0, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:all and zero devices returns empty device_ids") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    try_parse_device_ids("cuda:all", 0, device_ids, error_message);
-
-    REQUIRE(device_ids.empty());
+    REQUIRE_FALSE(try_parse_device_ids("cuda:all", 0, device_ids, error_message));
 }
 
 DEFINE_TEST(

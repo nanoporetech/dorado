@@ -4,7 +4,6 @@
 #include <torch/torch.h>
 
 #include <mutex>
-#include <set>
 #include <string>
 #include <vector>
 
