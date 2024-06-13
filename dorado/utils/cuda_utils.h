@@ -26,7 +26,7 @@ std::vector<std::string> parse_cuda_device_string(const std::string &device_stri
 // In the event of an error an exception will not be thrown, instead it will
 // return false and populate the error_message with the failure reason.
 bool try_parse_cuda_device_string(const std::string &device_string,
-                                  std::vector<std::string> devices,
+                                  std::vector<std::string> &devices,
                                   std::string &error_message);
 
 struct CUDADeviceInfo {

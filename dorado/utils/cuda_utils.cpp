@@ -198,7 +198,7 @@ bool try_parse_device_ids(const std::string &device_string,
 }
 
 bool try_parse_cuda_device_string(const std::string &device_string,
-                                  std::vector<std::string> devices,
+                                  std::vector<std::string> &devices,
                                   std::string &error_message) {
     std::vector<int> device_ids{};
     if (!try_parse_device_ids(device_string, torch::cuda::device_count(), device_ids,
@@ -207,7 +207,7 @@ bool try_parse_cuda_device_string(const std::string &device_string,
     }
 
     for (const auto device_id : device_ids) {
-        devices.push_back("cuda:" + device_id);
+        devices.push_back("cuda:" + std::to_string(device_id));
     }
     return true;
 }
