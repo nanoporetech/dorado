@@ -15,6 +15,7 @@
 #include <cassert>
 #include <chrono>
 #include <exception>
+#include <iomanip>
 #include <limits>
 #include <optional>
 #include <sstream>
@@ -118,82 +119,116 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     selected_mat_mul(A, B, C);
 }
 
+bool is_cuda_device_string(const std::string &device_string) {
+    return device_string.substr(0, 5) == "cuda:";
+}
+
+std::optional<int> try_get_index(const std::string &index_string) {
+    int index{};
+    try {
+        index = std::stoi(index_string);
+    } catch (std::exception &) {
+        return std::nullopt;
+    }
+
+    // std::stoi is more forgiving than we require, confirm it has no extraneous characters
+    if (std::to_string(index) != index_string) {
+        return std::nullopt;
+    }
+
+    return index;
+}
+
+bool validate_device_id_in_range(const std::string &device_string,
+                                 const int device_id,
+                                 const std::size_t num_devices,
+                                 std::string &error_message) {
+    if (device_id < static_cast<int>(num_devices) && device_id >= 0) {
+        return true;
+    }
+    std::ostringstream oss{};
+    oss << "Invalid CUDA device index '" << device_id << "' from device string "
+        << std::quoted(device_string) << ", there are " << num_devices << " visible CUDA devices.";
+    error_message = oss.str();
+    return false;
+}
+
+bool try_add_unique_id(const std::string &device_string,
+                       const int device_id,
+                       std::set<int> &unique_ids,
+                       std::string &error_message) {
+    auto [_, inserted] = unique_ids.insert(device_id);
+    if (inserted) {
+        return true;
+    }
+    std::ostringstream oss{};
+    oss << "Duplicate device index '" << device_id << "' from device string "
+        << std::quoted(device_string) << ".";
+    error_message = oss.str();
+    return false;
+}
+
+bool try_add_all_devices(const std::string &device_string,
+                         const std::size_t num_devices,
+                         std::vector<int> &device_ids,
+                         std::string &error_message) {
+    if (num_devices == 0) {
+        error_message = "device string set to " + device_string + " but no CUDA devices available.";
+        return false;
+    }
+    for (size_t i = 0; i < num_devices; ++i) {
+        device_ids.push_back(static_cast<int>(i));
+    }
+    return true;
+}
+
+bool try_parse_id_list(const std::string &device_string,
+                       const std::size_t num_devices,
+                       std::vector<int> &device_ids,
+                       std::string &error_message) {
+    std::set<int> unique_ids{};
+    std::stringstream id_stream(device_string.substr(5));
+    std::string token{};
+    while (std::getline(id_stream, token, ',')) {
+        auto device_id = try_get_index(token);
+        if (!device_id) {
+            error_message = "Invalid CUDA device string: " + device_string;
+            return false;
+        }
+        if (!validate_device_id_in_range(device_string, *device_id, num_devices, error_message)) {
+            return false;
+        }
+        if (!try_add_unique_id(device_string, *device_id, unique_ids, error_message)) {
+            return false;
+        }
+    }
+
+    if (unique_ids.empty()) {
+        std::ostringstream oss{};
+        oss << "No device index found in CUDA device string " << std::quoted(device_string) << ".";
+        error_message = oss.str();
+        return false;
+    }
+    device_ids = std::vector(unique_ids.begin(), unique_ids.end());
+
+    return true;
+}
+
 bool try_parse_device_ids(const std::string &device_string,
                           const std::size_t num_devices,
                           std::vector<int> &device_ids,
                           std::string &error_message) {
-    if (device_string.substr(0, 5) != "cuda:") {
-        // Special handling. Not an error as non cuda device strings may be used, e.g. "cpu".
-        // existing code depends on this not being an error but returning an empty collection.
+    if (!is_cuda_device_string(device_string)) {
+        // Not an error as there are valid non cuda device strings, e.g. "cpu".
         device_ids = {};
         return true;
     }
 
     if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        if (num_devices == 0) {
-            error_message =
-                    "device string set to " + device_string + " but no CUDA devices available.";
-            return false;
-        }
-        for (size_t i = 0; i < num_devices; ++i) {
-            device_ids.push_back(static_cast<int>(i));
-        }
-        return true;
+        return try_add_all_devices(device_string, num_devices, device_ids, error_message);
     }
 
-    std::set<int> unique_device_ids{};
-    std::stringstream device_id_stream(device_string.substr(5));
-    std::string device_id_string{};
-    while (std::getline(device_id_stream, device_id_string, ',')) {
-        int device_idx{};
-        try {
-            device_idx = std::stoi(device_id_string);
-        } catch (std::exception &) {
-            error_message = "Invalid CUDA device string: " + device_string;
-            return false;
-        }
-
-        // std::stoi is more forgiving than we require, confirm it is +ve with no extraneous characters
-        if (std::to_string(device_idx) != device_id_string) {
-            error_message = "Invalid CUDA device string: " + device_string;
-            return false;
-        }
-
-        // In range?
-        if (device_idx >= static_cast<int>(num_devices) || device_idx < 0) {
-            error_message = std::string("Invalid CUDA device index \"")
-                                    .append(device_id_string)
-                                    .append("\" from device string ")
-                                    .append(device_string)
-                                    .append(", there are ")
-                                    .append(std::to_string(num_devices))
-                                    .append(" visible CUDA devices.");
-            return false;
-        }
-
-        // unique?
-        if (unique_device_ids.count(device_idx) > 0) {
-            error_message = std::string("Duplicate device index \"")
-                                    .append(device_id_string)
-                                    .append("\" from device string ")
-                                    .append(device_string)
-                                    .append(".");
-            return false;
-        }
-
-        unique_device_ids.insert(device_idx);
-    }
-
-    if (unique_device_ids.empty()) {
-        error_message = std::string("No device index found in CUDA device string \"")
-                                .append(device_string)
-                                .append("\".");
-        return false;
-    }
-
-    device_ids = std::vector(unique_device_ids.begin(), unique_device_ids.end());
-
-    return true;
+    return try_parse_id_list(device_string, num_devices, device_ids, error_message);
 }
 
 bool try_parse_cuda_device_string(const std::string &device_string,

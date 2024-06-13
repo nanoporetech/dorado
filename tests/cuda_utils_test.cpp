@@ -98,6 +98,13 @@ DEFINE_TEST("try_parse_device_ids with cuda:2 and num_devices 2 returns false") 
     CHECK_FALSE(try_parse_device_ids("cuda:2", 2, device_ids, error_message));
 }
 
+DEFINE_TEST("try_parse_device_ids with cuda:-1 and num_devices 1 returns false") {
+    std::vector<int> device_ids{};
+    std::string error_message{};
+
+    CHECK_FALSE(try_parse_device_ids("cuda:-1", 1, device_ids, error_message));
+}
+
 DEFINE_TEST("try_parse_device_ids with cuda:2 and num_devices 3 returns true") {
     std::vector<int> device_ids{};
     std::string error_message{};
@@ -132,6 +139,13 @@ DEFINE_TEST("try_parse_device_ids with cuda:0,0 and num_devices 4 returns false"
     std::string error_message{};
 
     REQUIRE_FALSE(try_parse_device_ids("cuda:0,0", 4, device_ids, error_message));
+}
+
+DEFINE_TEST("try_parse_device_ids with cuda:0,1,2,1 and num_devices 4 returns false") {
+    std::vector<int> device_ids{};
+    std::string error_message{};
+
+    REQUIRE_FALSE(try_parse_device_ids("cuda:0,1,2,1", 4, device_ids, error_message));
 }
 
 DEFINE_TEST("try_parse_device_ids with cuda:a and num_devices 4 returns false") {
