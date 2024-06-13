@@ -357,6 +357,8 @@ if(NOT DORADO_DISABLE_DORADO)
     add_executable(dorado
         dorado/main.cpp
         dorado/cli/aligner.cpp
+        dorado/cli/basecall_output_args.cpp
+        dorado/cli/basecall_output_args.h
         dorado/cli/demux.cpp
         dorado/cli/duplex.cpp
         dorado/cli/trim.cpp

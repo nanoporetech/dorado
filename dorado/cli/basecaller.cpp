@@ -2,6 +2,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
+#include "basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
@@ -59,6 +60,12 @@
 #include <sstream>
 #include <thread>
 
+using dorado::utils::default_parameters;
+using OutputMode = dorado::utils::HtsFile::OutputMode;
+using namespace std::chrono_literals;
+using namespace dorado::models;
+namespace fs = std::filesystem;
+
 namespace dorado {
 
 namespace {
@@ -112,12 +119,6 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
 }
 
 }  // namespace
-
-using dorado::utils::default_parameters;
-using OutputMode = dorado::utils::HtsFile::OutputMode;
-using namespace std::chrono_literals;
-using namespace dorado::models;
-namespace fs = std::filesystem;
 
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
@@ -200,15 +201,6 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    parser.visible.add_argument("--emit-fastq")
-            .help("Output in fastq format.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--emit-sam")
-            .help("Output in SAM format.")
-            .default_value(false)
-            .implicit_value(true);
-
     parser.visible.add_argument("--emit-moves").default_value(false).implicit_value(true);
 
     parser.visible.add_argument("--reference")
@@ -260,6 +252,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
 
+    cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 }
 
@@ -274,7 +267,7 @@ void setup(const std::vector<std::string>& args,
            size_t remora_batch_size,
            size_t num_remora_threads,
            float methylation_threshold_pct,
-           OutputMode output_mode,
+           std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -416,14 +409,14 @@ void setup(const std::vector<std::string>& args,
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    utils::HtsFile hts_file("-", output_mode, thread_allocations.writer_threads, false);
+    hts_file->set_num_threads(thread_allocations.writer_threads);
 
     PipelineDescriptor pipeline_desc;
     std::string gpu_names{};
 #if DORADO_CUDA_BUILD
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
+    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -494,7 +487,7 @@ void setup(const std::vector<std::string>& args,
         const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_file.set_header(hdr.get());
+    hts_file->set_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -542,7 +535,7 @@ void setup(const std::vector<std::string>& args,
     }
 
     // If we're doing alignment, post-processing takes longer due to bam file sorting.
-    float post_processing_percentage = (hts_file.finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
+    float post_processing_percentage = (hts_file->finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
 
     ProgressTracker tracker(int(num_reads), false, post_processing_percentage);
     tracker.set_description("Basecalling");
@@ -576,7 +569,7 @@ void setup(const std::vector<std::string>& args,
 
     // Report progress during output file finalisation.
     tracker.set_description("Sorting output files");
-    hts_file.finalise([&](size_t progress) {
+    hts_file->finalise([&](size_t progress) {
         tracker.update_post_processing_progress(static_cast<float>(progress));
     });
 
@@ -635,41 +628,24 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto output_mode = OutputMode::BAM;
-
-    auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
-    auto emit_sam = parser.visible.get<bool>("--emit-sam");
-
-    if (emit_fastq && emit_sam) {
-        spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
-        return EXIT_FAILURE;
-    }
-
     if (parser.visible.get<std::string>("--reference").empty() &&
         !parser.visible.get<std::string>("--bed-file").empty()) {
         spdlog::error("--bed-file cannot be used without --reference.");
         return EXIT_FAILURE;
     }
 
-    if (emit_fastq) {
+    auto hts_file = cli::extract_hts_file(parser);
+    if (!hts_file) {
+        return EXIT_FAILURE;
+    }
+
+    if (hts_file->get_output_mode() == OutputMode::FASTQ) {
         if (model_selection.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
             return EXIT_FAILURE;
         }
-        if (!parser.visible.get<std::string>("--reference").empty()) {
-            spdlog::error(
-                    "--emit-fastq cannot be used with --reference as FASTQ cannot store alignment "
-                    "results.");
-            return EXIT_FAILURE;
-        }
-        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
-        output_mode = OutputMode::FASTQ;
-    } else if (emit_sam || utils::is_fd_tty(stdout)) {
-        output_mode = OutputMode::SAM;
-    } else if (utils::is_fd_pipe(stdout)) {
-        output_mode = OutputMode::UBAM;
     }
 
     bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;
@@ -781,7 +757,7 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
-              methylation_threshold, output_mode, parser.visible.get<bool>("--emit-moves"),
+              methylation_threshold, std::move(hts_file), parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), recursive, *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
