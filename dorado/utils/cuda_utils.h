@@ -62,12 +62,11 @@ namespace details {
 void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 void matmul_f16_torch(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 
-}  //  namespace details
-
 // Testability. Declared in header so that can be tested. num_devices passed as a parameter to also support testing.
 bool try_parse_device_ids(const std::string &device_string,
                           const std::size_t num_devices,
                           std::vector<int> &device_ids,
                           std::string &error_message);
+}  //  namespace details
 
 }  // namespace dorado::utils

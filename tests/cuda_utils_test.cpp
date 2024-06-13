@@ -13,6 +13,8 @@ using namespace Catch::Matchers;
 
 namespace dorado::utils::cuda_utils {
 
+using details::try_parse_device_ids;
+
 DEFINE_TEST("matmul_f16") {
     // Seed RNG for repeatability in CI
     torch::manual_seed(0);

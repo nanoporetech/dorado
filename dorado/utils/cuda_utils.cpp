@@ -216,34 +216,12 @@ bool try_parse_id_list(const std::string &device_string,
     return true;
 }
 
-bool try_parse_device_ids(const std::string &device_string,
-                          const std::size_t num_devices,
-                          std::vector<int> &device_ids,
-                          std::string &error_message) {
-    auto append_help_to_error_message = utils::PostCondition([&error_message] {
-        if (!error_message.empty()) {
-            error_message += "\n" + std::string{USAGE_HELP};
-        }
-    });
-    if (!is_cuda_device_string(device_string)) {
-        // Not an error as there are valid non cuda device strings, e.g. "cpu".
-        device_ids = {};
-        return true;
-    }
-
-    if (device_string == "cuda:all" || device_string == "cuda:auto") {
-        return try_add_all_devices(device_string, num_devices, device_ids, error_message);
-    }
-
-    return try_parse_id_list(device_string, num_devices, device_ids, error_message);
-}
-
 bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> &devices,
                                   std::string &error_message) {
     std::vector<int> device_ids{};
-    if (!try_parse_device_ids(device_string, torch::cuda::device_count(), device_ids,
-                              error_message)) {
+    if (!details::try_parse_device_ids(device_string, torch::cuda::device_count(), device_ids,
+                                       error_message)) {
         return false;
     }
 
@@ -268,7 +246,8 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_strin
     const auto num_devices = torch::cuda::device_count();
     std::string error_message{};
     std::vector<int> requested_device_ids{};
-    if (!try_parse_device_ids(device_string, num_devices, requested_device_ids, error_message)) {
+    if (!details::try_parse_device_ids(device_string, num_devices, requested_device_ids,
+                                       error_message)) {
         throw std::runtime_error(error_message);
     }
 
@@ -368,6 +347,29 @@ void handle_cuda_result(int cuda_result) {
 }
 
 namespace details {
+
+bool try_parse_device_ids(const std::string &device_string,
+                          const std::size_t num_devices,
+                          std::vector<int> &device_ids,
+                          std::string &error_message) {
+    auto append_help_to_error_message = utils::PostCondition([&error_message] {
+        if (!error_message.empty()) {
+            error_message += "\n" + std::string{USAGE_HELP};
+        }
+    });
+    if (!is_cuda_device_string(device_string)) {
+        // Not an error as there are valid non cuda device strings, e.g. "cpu".
+        device_ids = {};
+        return true;
+    }
+
+    if (device_string == "cuda:all" || device_string == "cuda:auto") {
+        return try_add_all_devices(device_string, num_devices, device_ids, error_message);
+    }
+
+    return try_parse_id_list(device_string, num_devices, device_ids, error_message);
+}
+
 void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     constexpr uint16_t HALF_ZERO = 0;      // 0.0 in __half format
     constexpr uint16_t HALF_ONE = 0x3C00;  // 1.0 in __half format
