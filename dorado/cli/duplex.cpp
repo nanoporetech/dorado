@@ -2,6 +2,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
+#include "cli/basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "data_loader/ModelFinder.h"
@@ -255,11 +256,6 @@ int duplex(int argc, char* argv[]) {
             .default_value(std::string(""))
             .help("Space-delimited csv containing read ID pairs. If not provided, pairing will be "
                   "performed automatically");
-    parser.visible.add_argument("--emit-fastq").default_value(false).implicit_value(true);
-    parser.visible.add_argument("--emit-sam")
-            .help("Output in SAM format.")
-            .default_value(false)
-            .implicit_value(true);
     parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
 
     parser.visible.add_argument("-x", "--device")
@@ -333,6 +329,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
+    cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 
     alignment::mm2::add_options_string_arg(parser);
@@ -382,33 +379,10 @@ int duplex(int argc, char* argv[]) {
 
         auto output_mode = OutputMode::BAM;
 
-        auto emit_fastq = parser.visible.get<bool>("--emit-fastq");
-        auto emit_sam = parser.visible.get<bool>("--emit-sam");
-
-        if (emit_fastq && emit_sam) {
-            throw std::runtime_error("Only one of --emit-{fastq, sam} can be set (or none).");
-        }
-
         if (parser.visible.get<std::string>("--reference").empty() &&
             !parser.visible.get<std::string>("--bed-file").empty()) {
             spdlog::error("--bed-file cannot be used without --reference.");
             return EXIT_FAILURE;
-        }
-
-        if (emit_fastq) {
-            if (!parser.visible.get<std::string>("--reference").empty()) {
-                spdlog::error(
-                        "--emit-fastq cannot be used with --reference as FASTQ cannot store "
-                        "alignment results.");
-                return EXIT_FAILURE;
-            }
-            spdlog::info(
-                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
-            output_mode = OutputMode::FASTQ;
-        } else if (emit_sam || utils::is_fd_tty(stdout)) {
-            output_mode = OutputMode::SAM;
-        } else if (utils::is_fd_pipe(stdout)) {
-            output_mode = OutputMode::UBAM;
         }
 
         const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
@@ -432,8 +406,12 @@ int duplex(int argc, char* argv[]) {
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), "duplex", args, device);
 
+        auto hts_file = cli::extract_hts_file(parser);
+        if (!hts_file) {
+            return EXIT_FAILURE;
+        }
         constexpr int WRITER_THREADS = 4;
-        utils::HtsFile hts_file("-", output_mode, WRITER_THREADS, false);
+        hts_file->set_num_threads(WRITER_THREADS);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
@@ -444,7 +422,7 @@ int duplex(int argc, char* argv[]) {
         gpu_names = utils::get_cuda_gpu_names(device);
 #endif
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
             std::string err_msg{};
@@ -464,7 +442,7 @@ int duplex(int argc, char* argv[]) {
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
                                                           ref, bed, *minimap_options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
@@ -478,7 +456,7 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+        ProgressTracker tracker(int(num_reads), duplex, hts_file->finalise_is_noop() ? 0.f : 0.5f);
         tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
@@ -526,7 +504,7 @@ int duplex(int argc, char* argv[]) {
             }
 
             // Write header as no read group info is needed.
-            hts_file.set_header(hdr.get());
+            hts_file->set_header(hdr.get());
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -683,7 +661,7 @@ int duplex(int argc, char* argv[]) {
                         dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_file.set_header(hdr.get());
+            hts_file->set_header(hdr.get());
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
             loader.add_read_initialiser(client_info_init_func);
@@ -708,7 +686,7 @@ int duplex(int argc, char* argv[]) {
 
         // Report progress during output file finalisation.
         tracker.set_description("Sorting output files");
-        hts_file.finalise([&](size_t progress) {
+        hts_file->finalise([&](size_t progress) {
             tracker.update_post_processing_progress(static_cast<float>(progress));
         });
 

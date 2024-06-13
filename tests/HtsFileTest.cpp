@@ -1,16 +1,18 @@
 #include "TestUtils.h"
+#include "utils/PostCondition.h"
 #include "utils/hts_file.h"
 
 #include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <vector>
 
 #define TEST_GROUP "[hts_file]"
-static constexpr size_t NUM_THREADS = 4;
+static constexpr int NUM_THREADS = 4;
 
 namespace fs = std::filesystem;
 using namespace dorado;
@@ -18,20 +20,20 @@ using utils::HtsFile;
 
 namespace {
 struct Tester {
-    fs::path file_in_path, file_out_path;
+    dorado::tests::TempDir output_test_dir;
+    fs::path file_in_path;
+    fs::path file_out_path;
     std::vector<dorado::BamPtr> records;
     HtsFilePtr file_in;
     SamHdrPtr header_in, header_out;
     std::vector<size_t> indices;
-    dorado::tests::TempDir output_test_dir;
 
-    Tester() : output_test_dir(tests::make_temp_dir("hts_writer_output")) {}
+    Tester()
+            : output_test_dir(tests::make_temp_dir("hts_writer_output")),
+              file_in_path(fs::path(get_data_dir("hts_file")) / "test_data.bam"),
+              file_out_path(output_test_dir.m_path / "test_output.bam") {}
 
     void read_input_records() {
-        fs::path hts_file_test_dir = fs::path(get_data_dir("hts_file"));
-        file_in_path = hts_file_test_dir / "test_data.bam";
-        file_out_path = output_test_dir.m_path / "test_output.bam";
-
         // Read the test data into a vector of BAM records.
         file_in.reset(hts_open(file_in_path.string().c_str(), "r"));
         header_in.reset(sam_hdr_read(file_in.get()));
@@ -124,4 +126,35 @@ TEST_CASE("HtsFileTest: Write to multiple sorted files, and merge", TEST_GROUP) 
     REQUIRE(callback_calls > 4);
 
     tester.check_output(true);
+}
+
+TEST_CASE("HtsFileTest: construct with zero threads for sorted BAM does not throw", TEST_GROUP) {
+    Tester tester;
+    std::unique_ptr<HtsFile> cut{};
+    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
+
+    REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
+                                                    HtsFile::OutputMode::BAM, 0, true));
+}
+
+TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does not throw", TEST_GROUP) {
+    Tester tester;
+    std::unique_ptr<HtsFile> cut{};
+    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
+
+    REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
+                                                    HtsFile::OutputMode::BAM, 0, false));
+}
+
+TEST_CASE(
+        "HtsFileTest: set_num_threads with 2 after constructed with zero threads for unsorted BAM "
+        "does not throw",
+        TEST_GROUP) {
+    Tester tester;
+    std::unique_ptr<HtsFile> cut{};
+    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
+    cut = std::make_unique<HtsFile>(tester.file_out_path.string(), HtsFile::OutputMode::BAM, 0,
+                                    false);
+
+    cut->set_num_threads(2);
 }

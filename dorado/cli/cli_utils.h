@@ -6,9 +6,6 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 
-#include <optional>
-#include <stdexcept>
-
 #ifdef _WIN32
 // Unreachable code warnings are emitted from argparse, even though they should be disabled by the
 // MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
@@ -34,6 +31,7 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>

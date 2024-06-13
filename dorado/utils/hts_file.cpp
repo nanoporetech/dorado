@@ -14,7 +14,9 @@
 
 namespace {
 
-constexpr size_t MINIMUM_BUFFER_SIZE = 100000ul;  // The smallest allowed buffer size is 100 KB.
+constexpr size_t MINIMUM_BUFFER_SIZE{100000};  // The smallest allowed buffer size is 100 KB.
+constexpr size_t DEFAULT_BUFFER_SIZE{
+        20000000};  // Arbitrary 20 MB. Can be overridden by application code.
 
 }  // namespace
 
@@ -47,7 +49,7 @@ struct HtsFile::ProgressUpdater {
     }
 };
 
-HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, bool sort_bam)
+HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam)
         : m_filename(filename),
           m_threads(int(threads)),
           m_finalise_is_noop(true),
@@ -68,6 +70,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, b
         break;
     case OutputMode::BAM:
         if (m_filename != "-" && m_sort_bam) {
+            set_buffer_size(DEFAULT_BUFFER_SIZE);
             // We're doing sorted BAM output. We need to indicate this for the
             // finalise method.
             m_finalise_is_noop = false;
@@ -87,18 +90,38 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, size_t threads, b
                                  std::to_string(static_cast<int>(m_mode)));
     }
 
-    if (m_finalise_is_noop) {
-        if (!m_file) {
-            throw std::runtime_error("Could not open file: " + m_filename);
-        }
+    if (m_threads > 0) {
+        initialise_threads();
+    }
+}
 
-        if (m_file->format.compression == bgzf) {
-            auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
-            if (res < 0) {
-                throw std::runtime_error("Could not enable multi threading for BAM generation.");
-            }
+void HtsFile::initialise_threads() {
+    if (!m_finalise_is_noop) {
+        return;
+    }
+    if (!m_file) {
+        throw std::runtime_error("Could not open file: " + m_filename);
+    }
+
+    if (m_file->format.compression == bgzf) {
+        auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
+        if (res < 0) {
+            throw std::runtime_error("Could not enable multi threading for BAM generation.");
         }
     }
+}
+
+void HtsFile::set_num_threads(std::size_t threads) {
+    if (m_threads > 0) {
+        throw std::runtime_error("HtsFile num threads cannot be changed if already initialised");
+    }
+
+    if (threads < 1) {
+        throw std::runtime_error("HtsFile num threads must be greater than 0");
+    }
+
+    m_threads = static_cast<int>(threads);
+    initialise_threads();
 }
 
 HtsFile::~HtsFile() {
