@@ -20,6 +20,8 @@
 #include "utils/parameters.h"
 #include "utils/trim_rapid_adapter.h"
 
+#include <torch/cuda.h>
+
 #include <optional>
 
 #if DORADO_CUDA_BUILD
@@ -174,7 +176,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
-    auto gpu = GENERATE(true, false);
+    bool gpu{false};
+    if (torch::cuda::device_count() > 0) {
+        gpu = GENERATE(true, false);
+    }
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -229,7 +234,10 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
-    auto gpu = GENERATE(true, false);
+    bool gpu{false};
+    if (torch::cuda::device_count() > 0) {
+        gpu = GENERATE(true, false);
+    }
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);

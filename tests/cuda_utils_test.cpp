@@ -9,7 +9,11 @@
 #define CUT_TAG "[cuda_utils]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
-namespace {
+using namespace Catch::Matchers;
+
+namespace dorado::utils::cuda_utils {
+
+using details::try_parse_device_ids;
 
 DEFINE_TEST("matmul_f16") {
     // Seed RNG for repeatability in CI
@@ -33,8 +37,8 @@ DEFINE_TEST("matmul_f16") {
     auto C2 = torch::empty({L, N}, options);
 
     // Do it both ways
-    dorado::utils::details::matmul_f16_cublas(A, B, C1);
-    dorado::utils::details::matmul_f16_torch(A, B, C2);
+    details::matmul_f16_cublas(A, B, C1);
+    details::matmul_f16_torch(A, B, C2);
 
     // Compare results
     // Note that half precision floating point only has enough mantissa for
@@ -44,4 +48,34 @@ DEFINE_TEST("matmul_f16") {
     REQUIRE(torch::allclose(C1, C2, rtol, atol));
 }
 
-}  // namespace
+DEFINE_TEST("try_parse_device_ids parameterised test cases") {
+    auto [device_string, num_devices, expected_result, expected_ids] =
+            GENERATE(table<std::string, std::size_t, bool, std::vector<int>>({
+                    {"cpu", 0, true, {}},
+                    {"cpu", 1, true, {}},
+                    {"cuda:all", 1, true, {0}},
+                    {"cuda:all", 0, false, {}},
+                    {"cuda:all", 4, true, {0, 1, 2, 3}},
+                    {"cuda:2", 2, false, {}},
+                    {"cuda:-1", 1, false, {}},
+                    {"cuda:2", 3, true, {2}},
+                    {"cuda:2,0,3", 4, true, {0, 2, 3}},
+                    {"cuda:0,0", 4, false, {}},
+                    {"cuda:0,1,2,1", 4, false, {}},
+                    {"cuda:a", 4, false, {}},
+                    {"cuda:a,0", 4, false, {}},
+                    {"cuda:0,a", 4, false, {}},
+                    {"cuda:1-3", 4, false, {}},
+                    {"cuda:1.3", 4, false, {}},
+            }));
+    CAPTURE(device_string);
+    CAPTURE(num_devices);
+    std::vector<int> device_ids{};
+    std::string error_message{};
+
+    CHECK(try_parse_device_ids(device_string, num_devices, device_ids, error_message) ==
+          expected_result);
+    CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
+}
+
+}  // namespace dorado::utils::cuda_utils
