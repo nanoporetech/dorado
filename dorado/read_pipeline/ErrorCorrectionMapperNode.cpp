@@ -58,6 +58,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         if (m_read_mutex.find(tname) == m_read_mutex.end()) {
             m_read_mutex.emplace(tname, std::make_unique<std::mutex>());
             CorrectionAlignments new_aln;
+            new_aln.read_name = tname;
             m_correction_records.emplace(tname, std::move(new_aln));
             m_processed_queries_per_target.emplace(tname, std::unordered_set<std::string>());
         }
@@ -115,10 +116,6 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             // Cap total overlaps per read.
             if (alignments.qnames.size() >= MAX_OVERLAPS_PER_READ) {
                 continue;
-            }
-
-            if (alignments.read_name.empty()) {
-                alignments.read_name = tname;
             }
 
             alignments.qnames.push_back(qname);
@@ -263,6 +260,12 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
 
     // --dual yes
     alignment::mm2::apply_dual_option(options, "yes");
+
+    // reset to larger minimap2 defaults
+    mm_mapopt_t minimap_default_mapopt;
+    mm_mapopt_init(&minimap_default_mapopt);
+    mapping_options.cap_kalloc = minimap_default_mapopt.cap_kalloc;
+    mapping_options.max_sw_mat = minimap_default_mapopt.max_sw_mat;
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
