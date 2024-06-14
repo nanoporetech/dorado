@@ -20,7 +20,7 @@
 #include "utils/parameters.h"
 #include "utils/trim_rapid_adapter.h"
 
-#include <torch/torch.h>
+#include <torch/cuda.h>
 
 #include <optional>
 

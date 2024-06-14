@@ -48,145 +48,34 @@ DEFINE_TEST("matmul_f16") {
     REQUIRE(torch::allclose(C1, C2, rtol, atol));
 }
 
-DEFINE_TEST("try_parse_device_ids with non cuda string returns true") {
+DEFINE_TEST("try_parse_device_ids parameterised test cases") {
+    auto [device_string, num_devices, expected_result, expected_ids] =
+            GENERATE(table<std::string, std::size_t, bool, std::vector<int>>({
+                    {"cpu", 0, true, {}},
+                    {"cpu", 1, true, {}},
+                    {"cuda:all", 1, true, {0}},
+                    {"cuda:all", 0, false, {}},
+                    {"cuda:all", 4, true, {0, 1, 2, 3}},
+                    {"cuda:2", 2, false, {}},
+                    {"cuda:-1", 1, false, {}},
+                    {"cuda:2", 3, true, {2}},
+                    {"cuda:2,0,3", 4, true, {0, 2, 3}},
+                    {"cuda:0,0", 4, false, {}},
+                    {"cuda:0,1,2,1", 4, false, {}},
+                    {"cuda:a", 4, false, {}},
+                    {"cuda:a,0", 4, false, {}},
+                    {"cuda:0,a", 4, false, {}},
+                    {"cuda:1-3", 4, false, {}},
+                    {"cuda:1.3", 4, false, {}},
+            }));
+    CAPTURE(device_string);
+    CAPTURE(num_devices);
     std::vector<int> device_ids{};
     std::string error_message{};
 
-    REQUIRE(try_parse_device_ids("cpu", 1, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:all and 1 device returns true") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE(try_parse_device_ids("cuda:all", 1, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:all and zero devices returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:all", 0, device_ids, error_message));
-}
-
-DEFINE_TEST(
-        "try_parse_device_ids with cuda:all and num_devices 1 returns device_ids with single entry "
-        "'0'") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    try_parse_device_ids("cuda:all", 1, device_ids, error_message);
-
-    CHECK(device_ids.size() == 1);
-    CHECK(device_ids[0] == 0);
-}
-
-DEFINE_TEST(
-        "try_parse_device_ids with cuda:all and num_devices 4 returns device_ids with entries "
-        "'0,1,2,3'") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    try_parse_device_ids("cuda:all", 4, device_ids, error_message);
-
-    std::vector<int> expected_ids{0, 1, 2, 3};
+    CHECK(try_parse_device_ids(device_string, num_devices, device_ids, error_message) ==
+          expected_result);
     CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:2 and num_devices 2 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    CHECK_FALSE(try_parse_device_ids("cuda:2", 2, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:-1 and num_devices 1 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    CHECK_FALSE(try_parse_device_ids("cuda:-1", 1, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:2 and num_devices 3 returns true") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    CHECK(try_parse_device_ids("cuda:2", 3, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:2 and num_devices 3 returns device_ids '2'") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    try_parse_device_ids("cuda:2", 3, device_ids, error_message);
-
-    std::vector<int> expected_ids{2};
-    CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
-}
-
-DEFINE_TEST(
-        "try_parse_device_ids with cuda:2,0,3 and num_devices 4 returns device_ids containing "
-        "'0,2,3'") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    try_parse_device_ids("cuda:2,0,3", 4, device_ids, error_message);
-
-    std::vector<int> expected_ids{0, 2, 3};
-    CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:0,0 and num_devices 4 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:0,0", 4, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:0,1,2,1 and num_devices 4 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:0,1,2,1", 4, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:a and num_devices 4 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:a", 4, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:a,0 and num_devices 4 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:a,0", 4, device_ids, error_message));
-}
-
-DEFINE_TEST("try_parse_device_ids with cuda:0,a and num_devices 4 returns false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:0,a", 4, device_ids, error_message));
-}
-
-DEFINE_TEST(
-        "try_parse_device_ids with unsupported range syntax cuda:1-3 and num_devices 4 returns "
-        "false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:1-3", 4, device_ids, error_message));
-}
-
-DEFINE_TEST(
-        "try_parse_device_ids with float device id cuda:1.2 and num_devices 4 returns "
-        "false") {
-    std::vector<int> device_ids{};
-    std::string error_message{};
-
-    REQUIRE_FALSE(try_parse_device_ids("cuda:1.2", 4, device_ids, error_message));
 }
 
 }  // namespace dorado::utils::cuda_utils
