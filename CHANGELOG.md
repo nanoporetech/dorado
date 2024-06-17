@@ -2,6 +2,16 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.7.2] (18 June 2024)
+
+This release of Dorado resolves basecalling failures when running v5 SUP models on CPU-only devices or v5 RNA HAC on Apple silicon. It also fixes bugs in `dorado demux` and `dorado correct`, and corrects `sm` and `sd` tags to match the Dorado SAM specification.
+
+* 383527291e0553fa08d647af81a6c8a4bf4045a5 - Fix bug causing v5 SUP models to fail when running on CPU-only devices
+* c36f4443d982a2ca47dc84fb8b840929811ea087 - Fix bug causing RNA v5 HAC basecalling to fail on Apple silicon
+* 36218004593b0ebba37ff870eb3d92c8238fb0c6 - Fix bug causing segfault in `dorado demux`
+* 3b51c1b3c694453d7da04ea91030d7e98b4e9681 - Fix sub-par alignments in `dorado correct`
+* d0df79c49f29d2f7cdff3423071380be3b6c6918 - Correct shift and scale (`sm` and `sd`) SAM tags to match SAM specification
+
 # [0.7.1] (3 June 2024)
 
 This release of Dorado fixes out of memory errors when using the v5 SUP model with methylation calling, resolves several bugs in `dorado correct` and adds correct handling of the `BC:Z` tag when running `demux` multiple times.
