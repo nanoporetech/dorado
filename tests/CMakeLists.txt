@@ -182,10 +182,13 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         # To package data into the app we need to make it a source file.
         target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
 
+        # iOS bundle names can't contain underscores.
+        string(REPLACE "_" "-" IOS_BUNDLE_NAME "${TEST_BIN}")
+
         set_target_properties(${TEST_BIN} PROPERTIES
             BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${TEST_BIN}"
-            MACOSX_BUNDLE_BUNDLE_NAME ${TEST_BIN}
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${IOS_BUNDLE_NAME}"
+            MACOSX_BUNDLE_BUNDLE_NAME ${IOS_BUNDLE_NAME}
             MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
             RESOURCE "${DATA_RESOURCES}"
@@ -207,7 +210,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
                     # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
                     # when building for the sim.
                     --app_path ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
-                    --identifier com.ont.${TEST_BIN}
+                    --identifier com.ont.${IOS_BUNDLE_NAME}
                     --device booted
         )
         set_tests_properties(${TEST_BIN}
