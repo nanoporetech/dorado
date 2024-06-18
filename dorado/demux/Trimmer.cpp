@@ -138,6 +138,12 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
     int ns = bam_aux_get(input_record, "ns") ? int(bam_aux2i(bam_aux_get(input_record, "ns"))) : -1;
     auto [modbase_str, modbase_probs] = utils::extract_modbase_info(input_record);
 
+    // Any barcode/primer/adapter detection was done against the fwd sequence, so ensure we trim in that orientation too
+    if (is_seq_reversed) {
+        seq = utils::reverse_complement(seq);
+        std::reverse(std::begin(qual), std::end(qual));
+    }
+
     // Actually trim components.
     auto trimmed_seq = utils::trim_sequence(seq, trim_interval);
     auto trimmed_qual = utils::trim_quality(qual, trim_interval);
@@ -161,7 +167,7 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
     }
 
     auto [trimmed_modbase_str, trimmed_modbase_probs] = utils::trim_modbase_info(
-            is_seq_reversed ? utils::reverse_complement(seq) : seq, modbase_str, modbase_probs,
+            seq, modbase_str, modbase_probs,
             is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
                             : trim_interval);
 
