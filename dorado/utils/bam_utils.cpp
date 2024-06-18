@@ -467,7 +467,12 @@ BamPtr new_unmapped_record(bam1_t* input_record, std::string seq, std::vector<ui
     if (seq.empty()) {
         seq = extract_sequence(input_record);
         qual = extract_quality(input_record);
+        if (bam_is_rev(input_record)) {
+            seq = utils::reverse_complement(seq);
+            std::reverse(qual.begin(), qual.end());
+        }
     }
+
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
              bam_get_qname(input_record), 4 /*flag*/, -1 /*tid*/, -1 /*pos*/, 0 /*mapq*/,
