@@ -392,7 +392,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
 
 void BasecallerNode::start_threads() {
-    start_input_processing(&BasecallerNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "basecall_node");
 
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));

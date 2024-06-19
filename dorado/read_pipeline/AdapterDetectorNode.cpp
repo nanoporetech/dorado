@@ -23,7 +23,7 @@ namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
 AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {
-    start_input_processing(&AdapterDetectorNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "adapter_detect");
 }
 
 void AdapterDetectorNode::input_thread_fn() {

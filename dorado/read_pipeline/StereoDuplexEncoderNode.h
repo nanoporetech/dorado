@@ -19,7 +19,7 @@ public:
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { stop_input_processing(); }
     void restart() override {
-        start_input_processing(&StereoDuplexEncoderNode::input_thread_fn, this);
+        start_input_processing([this] { input_thread_fn(); }, "stereo_encode");
     }
 
 private:

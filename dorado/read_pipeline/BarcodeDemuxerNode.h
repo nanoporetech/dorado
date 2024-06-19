@@ -32,7 +32,9 @@ public:
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
-    void restart() override { start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "bc_demux");
+    }
 
     void set_header(const sam_hdr_t* header);
 

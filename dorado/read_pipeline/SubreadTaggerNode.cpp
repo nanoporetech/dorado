@@ -124,7 +124,7 @@ SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
 void SubreadTaggerNode::start_threads() {
     m_terminate.store(false);
     m_duplex_thread = std::make_unique<std::thread>(&SubreadTaggerNode::check_duplex_thread, this);
-    start_input_processing(&SubreadTaggerNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "subread_tagger");
 }
 
 void SubreadTaggerNode::terminate_impl() {

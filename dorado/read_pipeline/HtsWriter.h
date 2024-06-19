@@ -22,7 +22,9 @@ public:
     std::string get_name() const override { return "HtsWriter"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
-    void restart() override { start_input_processing(&HtsWriter::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "hts_writer");
+    }
 
     int write(const bam1_t* record);
     size_t get_total() const { return m_total; }

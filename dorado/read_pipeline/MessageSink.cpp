@@ -1,5 +1,8 @@
 #include "MessageSink.h"
 
+#include "application_context.h"
+#include "thread_naming.h"
+
 #include <cassert>
 
 namespace dorado {
@@ -18,6 +21,32 @@ void MessageSink::push_message_internal(Message &&message) {
 }
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
+
+void MessageSink::start_input_processing(std::function<void()> input_thread_fn,
+                                         std::string worker_name) {
+    if (m_num_input_threads <= 0) {
+        throw std::runtime_error("Attempting to start input processing with invalid thread count");
+    }
+
+    // Should only be called at construction time, or after stop_input_processing.
+    if (!m_input_threads.empty()) {
+        throw std::runtime_error("Input threads already started");
+    }
+
+    // The queue must be in started state before we attempt to pop an item,
+    // otherwise the pop will fail and the thread will terminate.
+    start_input_queue();
+    auto thread_naming = application::contexts().get_ptr<ThreadNaming>();
+    for (int i = 0; i < m_num_input_threads; ++i) {
+        std::thread worker([func = input_thread_fn, naming = thread_naming, name = worker_name] {
+            if (naming) {
+                naming->set_thread_name(name);
+            }
+            func();
+        });
+        m_input_threads.push_back(std::move(worker));
+    }
+}
 
 // Mark the input queue as terminating, and stop input processing threads.
 void MessageSink::stop_input_processing() {

@@ -71,7 +71,7 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
                              int num_worker_threads,
                              size_t max_reads)
         : MessageSink(max_reads, num_worker_threads), m_splitter(std::move(splitter)) {
-    start_input_processing(&ReadSplitNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "readsplit_node");
 }
 
 stats::NamedStats ReadSplitNode::sample_stats() const {

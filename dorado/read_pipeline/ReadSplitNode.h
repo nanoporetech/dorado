@@ -23,7 +23,9 @@ public:
     std::string get_name() const override { return "ReadSplitNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { stop_input_processing(); }
-    void restart() override { start_input_processing(&ReadSplitNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "readsplit_node");
+    }
 
 private:
     void input_thread_fn();  // Worker thread performs splitting asynchronously.

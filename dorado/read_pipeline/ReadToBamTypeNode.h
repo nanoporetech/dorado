@@ -25,7 +25,9 @@ public:
     std::string get_name() const override { return "ReadToBamType"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { stop_input_processing(); };
-    void restart() override { start_input_processing(&ReadToBamTypeNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "readtobam_node");
+    }
 
 private:
     void input_thread_fn();

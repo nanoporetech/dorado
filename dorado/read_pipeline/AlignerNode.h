@@ -36,7 +36,9 @@ public:
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override { stop_input_processing(); }
-    void restart() override { start_input_processing(&AlignerNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "aligner_node");
+    }
 
     alignment::HeaderSequenceRecords get_sequence_records_for_header() const;
 

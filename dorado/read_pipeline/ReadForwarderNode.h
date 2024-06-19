@@ -15,7 +15,9 @@ public:
     std::string get_name() const override { return "ReadForwarderNode"; }
     stats::NamedStats sample_stats() const override { return stats::from_obj(m_work_queue); }
     void terminate(const FlushOptions &) override { stop_input_processing(); }
-    void restart() override { start_input_processing(&ReadForwarderNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "read_forward");
+    }
 
 private:
     void input_thread_fn();
