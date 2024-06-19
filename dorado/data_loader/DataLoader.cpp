@@ -5,6 +5,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
+#include "utils/thread_naming.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
 #include "vbz_plugin_user_utils.h"
@@ -161,13 +162,14 @@ models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_d
     return key;
 }
 
-SimplexReadPtr process_pod5_read(
+SimplexReadPtr process_pod5_thread_fn(
         size_t row,
         Pod5ReadRecordBatch* batch,
         Pod5FileReader* file,
         const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
         const std::unordered_map<std::string, size_t>& read_id_to_index) {
+    utils::set_thread_name("process_pod5");
     uint16_t read_table_version = 0;
     ReadBatchRowInfo_t read_data;
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
@@ -851,8 +853,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, std::cref(path),
-                                            std::cref(m_reads_by_channel),
+                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
+                                            std::cref(path), std::cref(m_reads_by_channel),
                                             std::cref(m_read_id_to_index)));
             }
         }
@@ -911,8 +913,8 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, int(row), m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_read, row, batch, file, std::cref(path),
-                                            std::cref(m_reads_by_channel),
+                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
+                                            std::cref(path), std::cref(m_reads_by_channel),
                                             std::cref(m_read_id_to_index)));
             }
         }

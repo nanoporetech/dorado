@@ -1,7 +1,6 @@
 #include "MessageSink.h"
 
-#include "application_context.h"
-#include "thread_naming.h"
+#include "utils/thread_naming.h"
 
 #include <cassert>
 
@@ -36,15 +35,11 @@ void MessageSink::start_input_processing(const std::function<void()> &input_thre
     // The queue must be in started state before we attempt to pop an item,
     // otherwise the pop will fail and the thread will terminate.
     start_input_queue();
-    auto thread_naming = application::contexts().get_ptr<ThreadNaming>();
     for (int i = 0; i < m_num_input_threads; ++i) {
-        std::thread worker([func = input_thread_fn, naming = thread_naming, name = worker_name] {
-            if (naming) {
-                naming->set_thread_name(name);
-            }
+        m_input_threads.emplace_back([func = input_thread_fn, name = worker_name] {
+            dorado::utils::set_thread_name(name);
             func();
         });
-        m_input_threads.push_back(std::move(worker));
     }
 }
 

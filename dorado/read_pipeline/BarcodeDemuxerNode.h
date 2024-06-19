@@ -33,7 +33,7 @@ public:
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
     void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "bc_demux");
+        start_input_processing([this] { input_thread_fn(); }, "brcd_demux");
     }
 
     void set_header(const sam_hdr_t* header);

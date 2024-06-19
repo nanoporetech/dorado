@@ -239,8 +239,6 @@ add_library(dorado_lib
     dorado/read_pipeline/StereoDuplexEncoderNode.h
     dorado/read_pipeline/SubreadTaggerNode.cpp
     dorado/read_pipeline/SubreadTaggerNode.h
-    dorado/read_pipeline/application_context.cpp
-    dorado/read_pipeline/application_context.h    
     dorado/read_pipeline/messages.cpp
     dorado/read_pipeline/messages.h
     dorado/read_pipeline/flush_options.h
@@ -251,8 +249,7 @@ add_library(dorado_lib
     dorado/read_pipeline/stereo_features.cpp
     dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
-    dorado/read_pipeline/stitch.h
-    dorado/read_pipeline/thread_naming.h    
+    dorado/read_pipeline/stitch.h    
     dorado/splitter/DuplexReadSplitter.cpp
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp

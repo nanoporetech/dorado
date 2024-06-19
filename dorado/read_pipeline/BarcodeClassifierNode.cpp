@@ -47,7 +47,7 @@ const dorado::demux::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo&
 namespace dorado {
 
 BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {
-    start_input_processing([this] { input_thread_fn(); }, "bc_classifier");
+    start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
 }
 
 void BarcodeClassifierNode::input_thread_fn() {
