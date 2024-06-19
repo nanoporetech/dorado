@@ -96,7 +96,8 @@ protected:
 
     // Mark the input queue as active, and start input processing threads executing the
     // supplied functor.
-    void start_input_processing(std::function<void()> input_thread_fn, std::string worker_name);
+    void start_input_processing(const std::function<void()>& input_thread_fn,
+                                const std::string& worker_name);
 
     // Mark the input queue as terminating, and stop input processing threads.
     void stop_input_processing();

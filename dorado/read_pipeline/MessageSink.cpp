@@ -22,8 +22,8 @@ void MessageSink::push_message_internal(Message &&message) {
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
 
-void MessageSink::start_input_processing(std::function<void()> input_thread_fn,
-                                         std::string worker_name) {
+void MessageSink::start_input_processing(const std::function<void()> &input_thread_fn,
+                                         const std::string &worker_name) {
     if (m_num_input_threads <= 0) {
         throw std::runtime_error("Attempting to start input processing with invalid thread count");
     }
