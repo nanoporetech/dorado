@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace dorado::utils {
 
 // Call to set the name of the current thread.
