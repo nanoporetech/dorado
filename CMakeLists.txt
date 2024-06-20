@@ -249,7 +249,7 @@ add_library(dorado_lib
     dorado/read_pipeline/stereo_features.cpp
     dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
-    dorado/read_pipeline/stitch.h    
+    dorado/read_pipeline/stitch.h
     dorado/splitter/DuplexReadSplitter.cpp
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp
