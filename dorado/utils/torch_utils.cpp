@@ -35,7 +35,7 @@ void set_torch_allocator_max_split_size() {
     const char *pytorch_cuda_alloc_conf = std::getenv("PYTORCH_CUDA_ALLOC_CONF");
     if (pytorch_cuda_alloc_conf != nullptr) {
         std::string_view str(pytorch_cuda_alloc_conf);
-        if (str.find("max_split_size_mb") != std::string::npos) {
+        if (str.find("max_split_size_mb") != std::string_view::npos) {
             // user has set this via env_var - let torch parse and use their value
             return;
         }

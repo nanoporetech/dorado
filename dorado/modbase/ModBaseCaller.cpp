@@ -212,6 +212,7 @@ void ModBaseCaller::start_threads() {
 void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
     auto& caller_data = m_caller_data[model_id];
 #if DORADO_CUDA_BUILD
+    static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
     c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
 #endif
     while (true) {
@@ -231,6 +232,14 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
         caller_data->input_queue.pop_back();
         input_lock.unlock();
 
+#if DORADO_CUDA_BUILD
+        auto gpu_lock = [&] {
+            if (m_options.device().is_cuda()) {
+                return std::unique_lock(gpu_mutexes[m_options.device().index()]);
+            }
+            return std::unique_lock<std::mutex>{};
+        }();
+#endif
         std::unique_lock<std::mutex> task_lock(task->mut);
         stats::Timer timer;
         task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
