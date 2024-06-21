@@ -230,6 +230,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
     m_copy_terminate.store(true);
+    m_copy_cv.notify_all();
     if (copy_thread.joinable()) {
         copy_thread.join();
     }
