@@ -329,8 +329,8 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
         batch_infer();
     }
 
-    m_num_active_infer_threads--;
-    if (m_num_active_infer_threads.load() == 0) {
+    auto remaining_threads = --m_num_active_infer_threads;
+    if (remaining_threads == 0) {
         m_inferred_features_queue.terminate();
     }
 }
@@ -410,8 +410,8 @@ void CorrectionNode::input_thread_fn() {
         }
     }
 
-    m_num_active_feature_threads--;
-    if (m_num_active_feature_threads.load() == 0) {
+    auto remaining_threads = --m_num_active_feature_threads;
+    if (remaining_threads == 0) {
         m_features_queue.terminate();
     }
 }
