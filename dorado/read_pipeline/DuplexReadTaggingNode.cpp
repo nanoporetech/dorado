@@ -96,14 +96,14 @@ void DuplexReadTaggingNode::input_thread_fn() {
 }
 
 DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {
-    start_input_processing(&DuplexReadTaggingNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "duplex_tagging");
 }
 
 void DuplexReadTaggingNode::restart() {
     m_duplex_parents.clear();
     m_parents_processed.clear();
     m_parents_wanted.clear();
-    start_input_processing(&DuplexReadTaggingNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "duplex_tagging");
 }
 
 stats::NamedStats DuplexReadTaggingNode::sample_stats() const {

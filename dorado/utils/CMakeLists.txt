@@ -49,8 +49,8 @@ add_library(dorado_utils
     sys_stats.h
     tensor_utils.cpp
     tensor_utils.h
-    thread_utils.cpp
-    thread_utils.h
+    thread_naming.cpp
+    thread_naming.h
     time_utils.cpp
     time_utils.h
     torch_utils.cpp

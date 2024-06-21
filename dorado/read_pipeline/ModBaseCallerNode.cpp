@@ -85,7 +85,7 @@ void ModBaseCallerNode::start_threads() {
             ++m_num_active_runner_workers;
         }
     }
-    start_input_processing(&ModBaseCallerNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "modbase_node");
 }
 
 void ModBaseCallerNode::terminate_impl() {

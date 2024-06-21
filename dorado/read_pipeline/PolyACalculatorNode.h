@@ -18,7 +18,9 @@ public:
     std::string get_name() const override { return "PolyACalculator"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { terminate_impl(); };
-    void restart() override { start_input_processing(&PolyACalculatorNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");
+    }
 
 private:
     void terminate_impl();

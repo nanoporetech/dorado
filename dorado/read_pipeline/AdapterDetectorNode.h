@@ -22,7 +22,9 @@ public:
     std::string get_name() const override { return "AdapterDetectorNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override { stop_input_processing(); }
-    void restart() override { start_input_processing(&AdapterDetectorNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "adapter_detect");
+    }
 
 private:
     std::vector<std::unique_ptr<std::thread>> m_workers;

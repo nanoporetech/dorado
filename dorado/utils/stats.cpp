@@ -1,5 +1,7 @@
 #include "stats.h"
 
+#include "thread_naming.h"
+
 #include <ostream>
 #include <set>
 
@@ -72,6 +74,7 @@ void StatsSampler::dump_stats(std::ostream& out_stream,
 }
 
 void StatsSampler::sampling_thread_fn() {
+    utils::set_thread_name("stats_sampling");
     m_start_time = std::chrono::system_clock::now();
     while (!m_should_terminate) {
         // We could attempt to adjust for clock jitter, but so far

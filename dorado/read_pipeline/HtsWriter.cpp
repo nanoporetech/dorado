@@ -22,7 +22,7 @@ HtsWriter::HtsWriter(utils::HtsFile& file, std::string gpu_names)
     if (!m_gpu_names.empty()) {
         m_gpu_names = "gpu:" + m_gpu_names;
     }
-    start_input_processing(&HtsWriter::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "hts_writer");
 }
 
 HtsWriter::~HtsWriter() { stop_input_processing(); }
