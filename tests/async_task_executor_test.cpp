@@ -18,13 +18,13 @@ constexpr auto TIMEOUT{5s};
 DEFINE_TEST("Constructor with 1 thread does not throw") { REQUIRE_NOTHROW(AsyncTaskExecutor(1)); }
 
 DEFINE_TEST("send() with task does not thread") {
-    AsyncTaskExecutor cut{1};
+    AsyncTaskExecutor cut{1, "test_executor"};
 
     REQUIRE_NOTHROW(cut.send([] {}));
 }
 
 DEFINE_TEST("send() with task invokes the task") {
-    AsyncTaskExecutor cut{1};
+    AsyncTaskExecutor cut{1, "test_executor"};
 
     Flag invoked{};
 
@@ -34,7 +34,7 @@ DEFINE_TEST("send() with task invokes the task") {
 }
 
 DEFINE_TEST("send() invokes task on separate thread") {
-    AsyncTaskExecutor cut{1};
+    AsyncTaskExecutor cut{1, "test_executor"};
 
     Flag thread_id_assigned{};
 

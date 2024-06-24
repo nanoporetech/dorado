@@ -1,8 +1,19 @@
 #include "async_task_executor.h"
 
+#include "utils/thread_naming.h"
+
 namespace dorado::utils::concurrency {
 
-AsyncTaskExecutor::AsyncTaskExecutor(std::size_t num_threads) : m_num_threads(num_threads) {
+AsyncTaskExecutor::AsyncTaskExecutor(std::size_t num_threads) : m_num_threads{num_threads} {
+    initialise();
+}
+
+AsyncTaskExecutor::AsyncTaskExecutor(std::size_t num_threads, std::string name)
+        : m_num_threads{num_threads}, m_name{name} {
+    initialise();
+}
+
+void AsyncTaskExecutor::initialise() {
     for (std::size_t i{0}; i < m_num_threads; ++i) {
         m_threads.emplace_back([this] { process_task_queue(); });
     }
@@ -41,6 +52,7 @@ void AsyncTaskExecutor::send(TaskType task) {
 }
 
 void AsyncTaskExecutor::process_task_queue() {
+    set_thread_name(m_name);
     while (!m_done.load(std::memory_order_relaxed)) {
         auto waiting_task = wait_on_next_task();
         waiting_task->started.signal();

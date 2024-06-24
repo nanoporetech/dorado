@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -54,6 +55,7 @@ public:
     using TaskType = std::function<void()>;
 
     AsyncTaskExecutor(std::size_t num_threads);
+    AsyncTaskExecutor(std::size_t num_threads, std::string name);
     ~AsyncTaskExecutor();
 
     void send(TaskType task);
@@ -65,6 +67,7 @@ private:
         TaskType task;
         Flag started{};
     };
+    std::string m_name{"async_task_exec"};
     const std::size_t m_num_threads;
     std::vector<std::thread> m_threads{};
     std::atomic_bool m_done{false};  // Note that this flag is only accessed by the managed threads.
@@ -74,6 +77,7 @@ private:
     std::condition_variable m_message_received{};
     bool m_terminate{false};
 
+    void initialise();
     std::shared_ptr<WaitingTask> wait_on_next_task();
     void process_task_queue();
 };
