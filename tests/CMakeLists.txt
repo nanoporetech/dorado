@@ -12,6 +12,7 @@ add_executable(dorado_tests
     alignment_processing_items_test.cpp
     arg_parse_ext_test.cpp
     AsyncQueueTest.cpp
+    async_task_executor_test.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp
     BamWriterTest.cpp
@@ -55,10 +56,11 @@ add_executable(dorado_tests
     StereoDuplexTest.cpp
     StitchTest.cpp
     StringUtilsTest.cpp
+    synchronisation_test.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimRapidAdapterTest.cpp
-    TrimTest.cpp
+    TrimTest.cpp    
 )
 if (NOT IOS)
     target_sources(dorado_tests
