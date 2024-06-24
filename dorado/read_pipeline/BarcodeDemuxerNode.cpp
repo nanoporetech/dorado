@@ -30,7 +30,7 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
           m_sort_bam(sort_bam && !write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
-    start_input_processing(&BarcodeDemuxerNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "brcd_demux");
 }
 
 BarcodeDemuxerNode::~BarcodeDemuxerNode() { stop_input_processing(); }

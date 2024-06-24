@@ -34,7 +34,9 @@ public:
     std::string get_name() const override { return "CorrectionNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
-    void restart() override { start_input_processing(&CorrectionNode::input_thread_fn, this); }
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "corr_node");
+    }
 
 private:
     const std::string m_fastq;

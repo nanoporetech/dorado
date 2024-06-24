@@ -54,7 +54,7 @@ ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
           m_modbase_threshold(
                   static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
           m_sample_sheet(std::move(sample_sheet)) {
-    start_input_processing(&ReadToBamTypeNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "readtobam_node");
 }
 
 stats::NamedStats ReadToBamTypeNode::sample_stats() const { return stats::from_obj(m_work_queue); }

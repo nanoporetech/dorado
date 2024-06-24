@@ -7,7 +7,9 @@
 #include "utils/stats.h"
 
 #include <atomic>
+#include <iostream>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -93,30 +95,9 @@ protected:
     utils::AsyncQueue<Message> m_work_queue;
 
     // Mark the input queue as active, and start input processing threads executing the
-    // supplied input thread callable, input_thread_fn.
-    template <typename... Args>
-    void start_input_processing(Args&&... input_thread_fn) {
-        // std::thread constructor will silently do nothing if an empty parameter pack is
-        // supplied.
-        static_assert(sizeof...(input_thread_fn) > 0);
-
-        if (m_num_input_threads <= 0) {
-            throw std::runtime_error(
-                    "Attempting to start input processing with invalid thread count");
-        }
-
-        // Should only be called at construction time, or after stop_input_processing.
-        if (!m_input_threads.empty()) {
-            throw std::runtime_error("Input threads already started");
-        }
-
-        // The queue must be in started state before we attempt to pop an item,
-        // otherwise the pop will fail and the thread will terminate.
-        start_input_queue();
-        for (int i = 0; i < m_num_input_threads; ++i) {
-            m_input_threads.push_back(std::thread(input_thread_fn...));
-        }
-    }
+    // supplied functor.
+    void start_input_processing(const std::function<void()>& input_thread_fn,
+                                const std::string& worker_name);
 
     // Mark the input queue as terminating, and stop input processing threads.
     void stop_input_processing();

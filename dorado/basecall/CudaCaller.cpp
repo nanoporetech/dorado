@@ -4,6 +4,7 @@
 #include "utils/cuda_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
+#include "utils/thread_naming.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -394,6 +395,7 @@ void CudaCaller::start_threads() {
 }
 
 void CudaCaller::cuda_thread_fn() {
+    utils::set_thread_name("cuda_caller");
     at::InferenceMode guard;
     const std::string loop_scope_str =
             "cuda_thread_fn_device_" + std::to_string(m_options.device().index());

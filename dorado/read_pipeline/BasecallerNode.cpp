@@ -6,6 +6,7 @@
 #include "read_utils.h"
 #include "stitch.h"
 #include "utils/stats.h"
+#include "utils/thread_naming.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
@@ -169,6 +170,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
 }
 
 void BasecallerNode::working_reads_manager() {
+    utils::set_thread_name("bscl_reads_mgr");
     at::InferenceMode inference_mode_guard;
 
     std::unique_ptr<BasecallingChunk> chunk;
@@ -240,6 +242,7 @@ void BasecallerNode::working_reads_manager() {
 }
 
 void BasecallerNode::basecall_worker_thread(int worker_id) {
+    utils::set_thread_name("bscl_worker");
 #if DORADO_METAL_BUILD
     // Model execution creates GPU-related autorelease objects.
     utils::ScopedAutoReleasePool outer_pool;
@@ -392,7 +395,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
 
 void BasecallerNode::start_threads() {
-    start_input_processing(&BasecallerNode::input_thread_fn, this);
+    start_input_processing([this] { input_thread_fn(); }, "basecall_node");
 
     const size_t num_workers = m_model_runners.size();
     m_working_reads_managers.resize(std::max(size_t{1}, num_workers / 2));
