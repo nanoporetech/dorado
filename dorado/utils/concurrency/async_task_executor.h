@@ -75,7 +75,6 @@ private:
     std::mutex m_mutex{};
     std::queue<std::shared_ptr<WaitingTask>> m_task_queue{};
     std::condition_variable m_message_received{};
-    bool m_terminate{false};
 
     void initialise();
     std::shared_ptr<WaitingTask> wait_on_next_task();
