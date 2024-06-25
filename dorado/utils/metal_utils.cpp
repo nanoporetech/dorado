@@ -1,14 +1,15 @@
 #include "metal_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
-#if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
-#include <objc/objc-runtime.h>
-#endif
 #include <mach-o/dyld.h>
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
+
+#if !TARGET_OS_IPHONE
+#include <objc/objc-runtime.h>
+#endif
 
 #include <cstdint>
 #include <filesystem>
@@ -97,8 +98,6 @@ auto load_kernels(MTL::Device *const device) {
     throw std::runtime_error("Failed to load metallib library");
 }
 
-#if !TARGET_OS_IPHONE
-
 // Retrieves a single int64_t property associated with the given class/name.
 // Returns empty std::optional on failure.
 std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
@@ -109,7 +108,7 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
         return std::nullopt;
     }
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
+#if TARGET_OS_OSX && MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
     // These are the same variable, just renamed in macOS 12+.
     const mach_port_t kIOMainPortDefault = kIOMasterPortDefault;
 #endif
@@ -141,8 +140,6 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
     // It was not of the expected type.
     return std::nullopt;
 }
-
-#endif  // if !TARGET_OS_IPHONE
 
 }  // namespace
 
@@ -297,7 +294,6 @@ int get_mtl_device_core_count() {
         return gpu_core_count;
     }
 
-#if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
     if (auto core_count_opt = retrieve_ioreg_prop("AGXAccelerator", "gpu-core-count");
         core_count_opt.has_value()) {
@@ -305,7 +301,6 @@ int get_mtl_device_core_count() {
         spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
         return gpu_core_count;
     }
-#endif  // if !TARGET_OS_IPHONE
 
     // If querying failed, estimate the count based on the Metal device name,
     // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
