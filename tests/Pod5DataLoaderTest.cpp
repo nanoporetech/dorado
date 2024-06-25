@@ -1,6 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "data_loader/DataLoader.h"
+#include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <catch2/catch.hpp>
@@ -95,7 +96,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
     int start_channel_id = -1;
-    for (auto & i : reads) {
+    for (auto& i : reads) {
         CHECK(i->read_common.attributes.channel_number >= start_channel_id);
         start_channel_id = i->read_common.attributes.channel_number;
     }
@@ -137,12 +138,12 @@ TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by cha
     loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-    std::sort(reads.begin(), reads.end(), [](auto & a, auto & b) {
+    std::sort(reads.begin(), reads.end(), [](auto& a, auto& b) {
         return a->read_common.start_time_ms < b->read_common.start_time_ms;
     });
 
     std::string prev_read_id = "";
-    for (auto & i : reads) {
+    for (auto& i : reads) {
         CHECK(prev_read_id == i->prev_read);
         prev_read_id = i->read_common.read_id;
     }
@@ -151,5 +152,34 @@ TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by cha
     for (auto i = reads.rbegin(); i != reads.rend(); i++) {
         CHECK(next_read_id == (*i)->next_read);
         next_read_id = (*i)->read_common.read_id;
+    }
+}
+
+TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemisty", TEST_GROUP) {
+    using CC = dorado::models::Chemistry;
+    namespace fs = std::filesystem;
+
+    SECTION("get_chemistry from homogeneous datasets") {
+        auto [condition, expected] = GENERATE(table<std::string, CC>({
+                std::make_tuple("dna_r10.4.1_e8.2_260bps", CC::DNA_R10_4_1_E8_2_260BPS),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_4khz", CC::DNA_R10_4_1_E8_2_400BPS_4KHZ),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_5khz", CC::DNA_R10_4_1_E8_2_400BPS_5KHZ),
+                std::make_tuple("dna_r9.4.1_e8", CC::DNA_R9_4_1_E8),
+                std::make_tuple("rna002_70bps", CC::RNA002_70BPS),
+                std::make_tuple("rna004_130bps", CC::RNA004_130BPS),
+        }));
+
+        CAPTURE(condition);
+        auto data = fs::path(get_data_dir("pod5")) / condition;
+        CHECK(fs::exists(data));
+        auto result = dorado::DataLoader::get_unique_sequencing_chemisty(data.u8string(), false);
+        CHECK(result == expected);
+    }
+
+    SECTION("get_chemistry throws with inhomogeneous") {
+        auto data = fs::path(get_data_dir("pod5")) / "mixed";
+        CHECK_THROWS(dorado::DataLoader::get_unique_sequencing_chemisty(data.u8string(), true),
+                     Catch::Matchers::Contains(
+                             "Could not uniquely resolve chemistry from inhomogeneous data"));
     }
 }

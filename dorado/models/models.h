@@ -4,7 +4,6 @@
 #include "metadata.h"
 
 #include <filesystem>
-#include <optional>
 
 namespace dorado::models {
 
@@ -38,6 +37,7 @@ using ModelList = std::vector<ModelInfo>;
 const ModelList& simplex_models();
 const ModelList& stereo_models();
 const ModelList& modified_models();
+const ModelList& correction_models();
 
 std::vector<std::string> simplex_model_names();
 std::vector<std::string> stereo_model_names();
@@ -45,19 +45,25 @@ std::vector<std::string> modified_model_names();
 std::vector<std::string> modified_model_variants();
 
 bool is_valid_model(const std::string& selected_model);
-bool download_models(const std::string& target_directory, const std::string& selected_model);
+
+// Search for a model by name and return the ModelInfo - searches all simplex, mods and stereo models
+ModelInfo get_model_info(const std::string& model_name);
 
 // Search for a simplex model by name and return the ModelInfo
 ModelInfo get_simplex_model_info(const std::string& model_name);
 
 // finds the matching modification model for a given modification i.e. 5mCG and a simplex model
-// if the modification model is not found in the same model directory as the simplex
-// model then it is downloaded into the same directory.
-std::string get_modification_model(const std::filesystem::path& simplex_model,
-                                   const std::string& modification);
+ModelInfo get_modification_model(const std::filesystem::path& simplex_model,
+                                 const std::string& modification);
+
+ModelInfo get_modification_model(const ModelInfo& simplex_model_info,
+                                 const ModelVariantPair& model_variant);
 
 // get the sampling rate that the model is compatible with
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
+
+// Use the model name as a backup to deduce the sample_type - this is supreseded by run_info.sample_type config field
+SampleType get_sample_type_by_model_name(const std::string& model_name);
 
 // Extract the model name from the model path.
 std::string extract_model_name_from_path(const std::filesystem::path& model_path);

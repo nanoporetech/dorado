@@ -1,7 +1,6 @@
 #include "DataLoader.h"
 
 #include "models/kits.h"
-#include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
@@ -708,7 +707,7 @@ uint16_t DataLoader::get_sample_rate(const std::filesystem::path& data_path,
     }
 }
 
-std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
+std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistries(
         const std::filesystem::path& data_path,
         bool recursive_file_loading) {
     std::set<models::ChemistryKey> chemistries;
@@ -779,6 +778,44 @@ std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistry(
 
     iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
     return chemistries;
+}
+
+models::Chemistry DataLoader::get_unique_sequencing_chemisty(const std::string& data,
+                                                             bool recursive_file_loading) {
+    std::set<models::ChemistryKey> data_chemistries =
+            get_sequencing_chemistries(data, recursive_file_loading);
+
+    if (data_chemistries.empty()) {
+        throw std::runtime_error(
+                "Failed to determine sequencing chemistry from data. Please select a model by "
+                "path");
+    }
+
+    std::set<models::Chemistry> found;
+    for (const auto& dc : data_chemistries) {
+        const auto chemistry = models::get_chemistry(dc);
+        if (chemistry == models::Chemistry::UNKNOWN) {
+            spdlog::error("No supported chemistry found for {}", to_string(dc));
+            spdlog::error(
+                    "This is typically seen when using prototype kits. Please download an "
+                    "appropriate model for your data and select it by model path");
+
+            throw std::runtime_error("Could not resolve chemistry from data: Unknown chemistry");
+        }
+        found.insert(chemistry);
+    }
+    if (found.empty()) {
+        throw std::runtime_error("Could not resolve chemistry from data: No data");
+    }
+    if (found.size() > 1) {
+        spdlog::error("Multiple sequencing chemistries found in data");
+        for (auto f : found) {
+            spdlog::error("Found: {}", to_string(f));
+        }
+
+        throw std::runtime_error("Could not uniquely resolve chemistry from inhomogeneous data");
+    }
+    return *std::begin(found);
 }
 
 void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,

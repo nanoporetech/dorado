@@ -1,11 +1,9 @@
 #include "models/kits.h"
-#include "models/metadata.h"
 #include "utils/string_utils.h"
 
 #include <catch2/catch.hpp>
 
 #include <set>
-#include <stdexcept>
 
 #define TEST_TAG "[ModelKits]"
 

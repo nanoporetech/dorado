@@ -175,6 +175,11 @@ enum class SampleType {
     DNA,
     RNA002,
     RNA004,
+    UNKNOWN,
+};
+
+struct SampleTypeInfo {
+    const std::string name;
 };
 
 /*
@@ -185,6 +190,7 @@ is taken to generate a flowcell kit pairs.
 Combined with other metadata, each pair make keys for mapping to known chemistries.
 */
 struct ChemistryKits {
+    const std::string name;
     const SamplingRate sampling_rate;
     const SampleType sample_type;
     const KitSets kit_sets;
@@ -202,19 +208,22 @@ enum class Chemistry {
     UNKNOWN,
 };
 
-std::string to_string(const Chemistry& chemistry);
-
-const std::unordered_map<SampleType, std::string>& sample_types();
-const std::unordered_map<Chemistry, std::string>& chemistry_variants();
 const std::unordered_map<Chemistry, ChemistryKits>& chemistry_kits();
-
 using ChemistryKey = std::tuple<Flowcell, KitCode, SamplingRate>;
 using ChemistryMap = std::map<ChemistryKey, Chemistry>;
 
 const ChemistryMap& chemistry_map();
 Chemistry get_chemistry(const ChemistryKey& key);
+Chemistry get_chemistry(const std::string& chemistry);
 
 std::string to_string(const ChemistryKey& ck);
+std::string to_string(const Chemistry& chemistry);
+
+const std::unordered_map<SampleType, SampleTypeInfo>& sample_types();
+SampleType get_sample_type(const std::string& sample_type);
+SampleType get_sample_type_from_model_name(const std::string& model_name);
+SampleTypeInfo get_sample_type_info(const SampleType& sample_type);
+std::string to_string(const SampleType& sample_type);
 
 class ConditionInfo {
 public:
