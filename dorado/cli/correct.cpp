@@ -1,7 +1,7 @@
 #include "cli/cli_utils.h"
 #include "correct/CorrectionProgressTracker.h"
 #include "dorado_version.h"
-#include "models/models.h"
+#include "model_downloader/model_downloader.h"
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
@@ -119,7 +119,7 @@ int correct(int argc, char* argv[]) {
         // Download model
         auto tmp_dir = utils::get_downloads_path(std::nullopt);
         const std::string model_name = "herro-v1";
-        auto success = models::download_models(tmp_dir.string(), model_name);
+        auto success = model_downloader::download_models(tmp_dir.string(), model_name);
         if (!success) {
             spdlog::error("Could not download model: {}", model_name);
             std::exit(EXIT_FAILURE);

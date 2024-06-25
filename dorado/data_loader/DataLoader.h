@@ -1,5 +1,6 @@
 #pragma once
-#include "models/models.h"
+
+#include "models/kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -9,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -62,7 +64,12 @@ public:
     static uint16_t get_sample_rate(const std::filesystem::path& data_path,
                                     bool recursive_file_loading);
 
-    static std::set<models::ChemistryKey> get_sequencing_chemistry(
+    // Inspects the sequencing data metadata to determine the sequencing chemistry used.
+    // Calls get_sequencing_chemistries but will error if the data is inhomogeneous
+    static models::Chemistry get_unique_sequencing_chemisty(const std::string& data,
+                                                            bool recursive_file_loading);
+
+    static std::set<models::ChemistryKey> get_sequencing_chemistries(
             const std::filesystem::path& data_path,
             bool recursive_file_loading);
 

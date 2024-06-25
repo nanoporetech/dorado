@@ -1,32 +1,31 @@
-#include "model_downloader.h"
+#include "downloader.h"
 
 #include <Foundation/Foundation.h>
 #include <spdlog/spdlog.h>
 
-namespace dorado::models {
+namespace dorado::model_downloader {
 
-bool ModelDownloader::download_foundation(const std::string& model,
-                                          const ModelInfo& info,
-                                          const std::filesystem::path& archive) {
+bool Downloader::download_foundation(const models::ModelInfo& model,
+                                     const std::filesystem::path& archive) {
     @autoreleasepool {
-        spdlog::info(" - downloading {} with foundation", model);
+        spdlog::info(" - downloading {} with foundation", model.name);
 
         // Try and download it.
-        NSString* path = [NSString stringWithUTF8String:(get_url(model)).c_str()];
+        NSString* path = [NSString stringWithUTF8String:(get_url(model.name)).c_str()];
         NSURL* url = [NSURL URLWithString:path];
         NSError* error = nil;
         NSData* data = [NSData dataWithContentsOfURL:url
                                              options:NSDataReadingUncached
                                                error:&error];
         if (data == nil) {
-            spdlog::warn(" - failed to download {}: {}", model,
+            spdlog::warn(" - failed to download {}: {}", model.name,
                          error.localizedDescription.UTF8String);
             return false;
         }
 
         // Validate it.
         const std::string_view span(static_cast<const char*>(data.bytes), data.length);
-        if (!validate_checksum(span, info)) {
+        if (!validate_checksum(span, model)) {
             return false;
         }
 
@@ -37,4 +36,4 @@ bool ModelDownloader::download_foundation(const std::string& model,
     }
 }
 
-}  // namespace dorado::models
+}  // namespace dorado::model_downloader

@@ -1,5 +1,8 @@
 #include "CRFModelConfig.h"
 
+#include "models/kits.h"
+#include "models/models.h"
+
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <toml/get.hpp>
@@ -73,6 +76,31 @@ void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml)
         }
     } else {
         spdlog::debug("> no qscore calibration found");
+    }
+}
+
+void parse_run_info(CRFModelConfig &config,
+                    const std::string &model_name,
+                    const toml::value &config_toml) {
+    // Fetch run_info parameters.
+    // Do nothing if run_info is not available in config file.
+    if (config_toml.contains("run_info")) {
+        const auto &run_info = toml::find(config_toml, "run_info");
+        config.sample_rate = toml::find<int>(run_info, "sample_rate");
+
+        if (run_info.contains("sample_type")) {
+            config.sample_type =
+                    models::get_sample_type(toml::find<std::string>(run_info, "sample_type"));
+        }
+    }
+
+    using namespace dorado::models;
+    if (config.sample_type == SampleType::UNKNOWN) {
+        config.sample_type = get_sample_type_from_model_name(model_name);
+        if (config.sample_type == SampleType::UNKNOWN) {
+            throw std::runtime_error(
+                    "Failed to determine model sample type from model name or config");
+        }
     }
 }
 
@@ -190,18 +218,6 @@ void warn_unrecognised_sublayers(const std::vector<toml::value> &sublayers) {
     }
 }
 
-SampleType get_model_type(const std::string &model_name) {
-    if (model_name.find("rna004") != std::string::npos) {
-        return SampleType::RNA004;
-    } else if (model_name.find("rna002") != std::string::npos) {
-        return SampleType::RNA002;
-    } else if (model_name.find("dna") != std::string::npos) {
-        return SampleType::DNA;
-    } else {
-        throw std::runtime_error("Could not determine model type for " + model_name);
-    }
-}
-
 std::string SignalNormalisationParams::to_string() const {
     std::string str = "SignalNormalisationParams {";
     str += " strategy:" + dorado::basecall::to_string(strategy);
@@ -239,6 +255,7 @@ std::string CRFModelConfig::to_string() const {
     str += " scale:" + std::to_string(scale);
     str += " num_features:" + std::to_string(num_features);
     str += " sample_rate:" + std::to_string(sample_rate);
+    str += " sample_type:" + models::get_sample_type_info(sample_type).name;
     str += " mean_qscore_start_pos:" + std::to_string(mean_qscore_start_pos);
     str += " " + signal_norm_params.to_string();
     str += " " + basecaller.to_string();
@@ -331,13 +348,6 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
     config.outsize = PowerOf4(config.state_len + 1);
 
-    // Fetch run_info parameters.
-    // Do nothing if run_info is not available in config file.
-    if (config_toml.contains("run_info")) {
-        const auto &run_info = toml::find(config_toml, "run_info");
-        config.sample_rate = toml::find<int>(run_info, "sample_rate");
-    }
-
     std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
     config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
 
@@ -352,7 +362,7 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
                 std::to_string(config.convs[0].size));
     }
 
-    config.sample_type = get_model_type(model_name);
+    parse_run_info(config, model_name, config_toml);
 
     return config;
 }
@@ -534,21 +544,17 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.out_features = crf_encoder.out_features();
     config.outsize = crf_encoder.outsize();
 
-    if (config_toml.contains("run_info")) {
-        config.sample_rate = toml::find<int>(config_toml, "run_info", "sample_rate");
-    }
-
     config.state_len = config.tx->crf.state_len;
     config.num_features = config.convs.front().insize;
 
     std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
     config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
 
+    parse_run_info(config, model_name, config_toml);
+
     // Force downstream issue (negative lstm size) if a tx model config is incorrectly
     // used to define an LSTM model. Incorrect use should be guarded against by using is_tx_model()
     config.lstm_size = -1;
-
-    config.sample_type = get_model_type(model_name);
 
     return config;
 }

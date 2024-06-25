@@ -1,4 +1,6 @@
 
+#include "fs_utils.h"
+
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
@@ -8,6 +10,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 namespace fs = std::filesystem;
 
@@ -57,7 +60,7 @@ fs::path create_temporary_directory() {
 
         std::stringstream ss;
         ss << std::hex << rand(rng);
-        path = cwd / (".temp_dorado_model-" + ss.str());
+        path = cwd / (utils::TEMP_MODELS_DIR_PREFIX + ss.str());
         if (fs::create_directory(path)) {
             return path;
         }
@@ -75,7 +78,7 @@ fs::path get_downloads_path(const std::optional<fs::path>& override) {
 
 void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     for (const auto& path : paths) {
-        spdlog::trace("Cleaning temporary model path: {}", path.u8string());
+        spdlog::trace("Deleting temporary model path: {}", path.u8string());
         try {
             fs::remove_all(path);
         } catch (const fs::filesystem_error& e) {

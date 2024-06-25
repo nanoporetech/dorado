@@ -1,24 +1,19 @@
-#include "data_loader/ModelFinder.h"
-
-#include "TestUtils.h"
 #include "models/kits.h"
 #include "models/metadata.h"
+#include "models/model_complex.h"
 #include "models/models.h"
-#include "utils/string_utils.h"
 
 #include <catch2/catch.hpp>
 
-#include <filesystem>
-#include <set>
 #include <stdexcept>
 
-#define TEST_TAG "[ModelFinder]"
+#define TEST_TAG "[ModelComplexSearch]"
 
 using namespace dorado::models;
 namespace fs = std::filesystem;
 
-using MS = dorado::ModelSelection;
-using MF = dorado::ModelFinder;
+using MC = ModelComplex;
+using MCS = ModelComplexSearch;
 using MVP = ModelVariantPair;
 using MV = ModelVariant;
 using ModsV = ModsVariant;
@@ -26,42 +21,16 @@ using ModsVP = ModsVariantPair;
 using VV = ModelVersion;
 using CC = Chemistry;
 
-TEST_CASE(TEST_TAG "  ModelFinder get_chemistry", TEST_TAG) {
-    SECTION("get_chemistry from homogeneous datasets") {
-        auto [condition, expected] = GENERATE(table<std::string, Chemistry>({
-                std::make_tuple("dna_r10.4.1_e8.2_260bps", CC::DNA_R10_4_1_E8_2_260BPS),
-                std::make_tuple("dna_r10.4.1_e8.2_400bps_4khz", CC::DNA_R10_4_1_E8_2_400BPS_4KHZ),
-                std::make_tuple("dna_r10.4.1_e8.2_400bps_5khz", CC::DNA_R10_4_1_E8_2_400BPS_5KHZ),
-                std::make_tuple("dna_r9.4.1_e8", CC::DNA_R9_4_1_E8),
-                std::make_tuple("rna002_70bps", CC::RNA002_70BPS),
-                std::make_tuple("rna004_130bps", CC::RNA004_130BPS),
-        }));
-
-        CAPTURE(condition);
-        auto data = fs::path(get_data_dir("pod5")) / condition;
-        CHECK(fs::exists(data));
-        auto result = MF::inspect_chemistry(data.u8string(), false);
-        CHECK(result == expected);
-    }
-
-    SECTION("get_chemistry throws with inhomogeneous") {
-        auto data = fs::path(get_data_dir("pod5")) / "mixed";
-        CHECK_THROWS(MF::inspect_chemistry(data.u8string(), true),
-                     Catch::Matchers::Contains(
-                             "Could not uniquely resolve chemistry from inhomogeneous data"));
-    }
-}
-
-TEST_CASE(TEST_TAG "  ModelFinder get_simplex_model_name", TEST_TAG) {
+TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG) {
     SECTION("get_simplex_model_name all") {
         // given the model definitions the same model can be found
         for (const auto& mi : simplex_models()) {
             const auto complex =
                     to_string(mi.simplex.variant).append("@").append(to_string(mi.simplex.ver));
-            const auto mf = MF{mi.chemistry, MS{complex, mi.simplex}, false};
+            const auto mf = MCS{MC{complex, mi.simplex}, mi.chemistry, false};
             CAPTURE(mi.name);
             CAPTURE(complex);
-            CHECK(mf.get_simplex_model_name() == mi.name);
+            CHECK(mf.simplex().name == mi.name);
         }
     }
 
@@ -98,13 +67,13 @@ TEST_CASE(TEST_TAG "  ModelFinder get_simplex_model_name", TEST_TAG) {
         const auto variant = to_string(mvp.variant);
         const auto ver = to_string(mvp.ver);
         const auto complex = variant + "@" + ver;
-        const auto mf = MF{chemistry, MS{complex, mvp}, false};
+        const auto mf = MCS{MC{complex, mvp}, chemistry, false};
         CAPTURE(complex);
-        CHECK(mf.get_simplex_model_name() == expected);
+        CHECK(mf.simplex().name == expected);
     }
 }
 
-TEST_CASE(TEST_TAG "  ModelFinder get_stereo_model_name", TEST_TAG) {
+TEST_CASE(TEST_TAG "  ModelComplexSearch get_stereo_model_name", TEST_TAG) {
     SECTION("get_stereo_model_name all") {
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected_simplex, expected_stereo] =
@@ -149,77 +118,77 @@ TEST_CASE(TEST_TAG "  ModelFinder get_stereo_model_name", TEST_TAG) {
         const auto variant = to_string(mvp.variant);
         const auto ver = to_string(mvp.ver);
         const auto complex = variant + "@" + ver;
-        const auto mf = MF{chemistry, MS{complex, mvp}, false};
+        const auto mf = MCS{MC{complex, mvp}, chemistry, false};
         CAPTURE(complex);
-        CHECK(mf.get_simplex_model_name() == expected_simplex);
-        CHECK(mf.get_stereo_model_name() == expected_stereo);
+        CHECK(mf.simplex().name == expected_simplex);
+        CHECK(mf.stereo().name == expected_stereo);
     }
 }
 
-TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
+TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
     // const auto foo = MS{}
     SECTION("ModelComplexParser parse expected") {
-        auto [input, expected] = GENERATE(table<std::string, MS>({
+        auto [input, expected] = GENERATE(table<std::string, MC>({
                 // No version
-                std::make_tuple("auto", MS{"auto", MVP{MV::AUTO}}),
-                std::make_tuple("fast", MS{"fast", MVP{MV::FAST}}),
-                std::make_tuple("hac", MS{"hac", MVP{MV::HAC}}),
-                std::make_tuple("sup", MS{"sup", MVP{MV::SUP}}),
+                std::make_tuple("auto", MC{"auto", MVP{MV::AUTO}}),
+                std::make_tuple("fast", MC{"fast", MVP{MV::FAST}}),
+                std::make_tuple("hac", MC{"hac", MVP{MV::HAC}}),
+                std::make_tuple("sup", MC{"sup", MVP{MV::SUP}}),
 
                 // specific version
-                std::make_tuple("auto@v4.2.0", MS{"auto@v4.2.0", MVP{MV::AUTO, VV::v4_2_0}}),
-                std::make_tuple("fast@v4.0.0", MS{"fast@v4.0.0", MVP{MV::FAST, VV::v4_0_0}}),
-                std::make_tuple("hac@v4.2.0", MS{"hac@v4.2.0", MVP{MV::HAC, VV::v4_2_0}}),
-                std::make_tuple("sup@v4.1.0", MS{"sup@v4.1.0", MVP{MV::SUP, VV::v4_1_0}}),
+                std::make_tuple("auto@v4.2.0", MC{"auto@v4.2.0", MVP{MV::AUTO, VV::v4_2_0}}),
+                std::make_tuple("fast@v4.0.0", MC{"fast@v4.0.0", MVP{MV::FAST, VV::v4_0_0}}),
+                std::make_tuple("hac@v4.2.0", MC{"hac@v4.2.0", MVP{MV::HAC, VV::v4_2_0}}),
+                std::make_tuple("sup@v4.1.0", MC{"sup@v4.1.0", MVP{MV::SUP, VV::v4_1_0}}),
 
                 // latest version
-                std::make_tuple("auto@latest", MS{"autolatest", MVP{MV::AUTO}}),
-                std::make_tuple("fast@latest", MS{"fastlatest", MVP{MV::FAST}}),
-                std::make_tuple("hac@latest", MS{"hac@latest", MVP{MV::HAC}}),
-                std::make_tuple("sup@latest", MS{"sup@latest", MVP{MV::SUP}}),
+                std::make_tuple("auto@latest", MC{"autolatest", MVP{MV::AUTO}}),
+                std::make_tuple("fast@latest", MC{"fastlatest", MVP{MV::FAST}}),
+                std::make_tuple("hac@latest", MC{"hac@latest", MVP{MV::HAC}}),
+                std::make_tuple("sup@latest", MC{"sup@latest", MVP{MV::SUP}}),
 
                 // with single mods
-                std::make_tuple("auto,5mC", MS{"auto,5mC", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mC}}}),
+                std::make_tuple("auto,5mC", MC{"auto,5mC", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mC}}}),
                 std::make_tuple("hac,4mC_5mC",
-                                MS{"hac,4mC_5mC", MVP{MV::HAC}, {ModsVP{ModsV::M_4mC_5mC}}}),
+                                MC{"hac,4mC_5mC", MVP{MV::HAC}, {ModsVP{ModsV::M_4mC_5mC}}}),
                 std::make_tuple("fast,5mC_5hmC",
-                                MS{"fast,5mC_5hmC", MVP{MV::FAST}, {ModsVP{ModsV::M_5mC_5hmC}}}),
+                                MC{"fast,5mC_5hmC", MVP{MV::FAST}, {ModsVP{ModsV::M_5mC_5hmC}}}),
                 std::make_tuple("auto,5mCG",
-                                MS{"auto,5mCG", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mCG}}}),
+                                MC{"auto,5mCG", MVP{MV::AUTO}, {ModsVP{ModsV::M_5mCG}}}),
                 std::make_tuple("hac,5mCG_5hmCG",
-                                MS{"hac,5mCG_5hmCG", MVP{MV::HAC}, {ModsVP{ModsV::M_5mCG_5hmCG}}}),
+                                MC{"hac,5mCG_5hmCG", MVP{MV::HAC}, {ModsVP{ModsV::M_5mCG_5hmCG}}}),
 
-                std::make_tuple("auto,6mA", MS{"auto,6mA", MVP{MV::AUTO}, {ModsVP{ModsV::M_6mA}}}),
+                std::make_tuple("auto,6mA", MC{"auto,6mA", MVP{MV::AUTO}, {ModsVP{ModsV::M_6mA}}}),
                 std::make_tuple("auto,m6A_DRACH",
-                                MS{"auto,m6A_DRACH", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A_DRACH}}}),
-                std::make_tuple("auto,m6A", MS{"auto,m6A", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A}}}),
-                std::make_tuple("sup,pseU", MS{"sup,pseU", MVP{MV::SUP}, {ModsVP{ModsV::M_pseU}}}),
-                std::make_tuple("sup,pseU,m6A", MS{"sup,pseU,m6A",
+                                MC{"auto,m6A_DRACH", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A_DRACH}}}),
+                std::make_tuple("auto,m6A", MC{"auto,m6A", MVP{MV::AUTO}, {ModsVP{ModsV::M_m6A}}}),
+                std::make_tuple("sup,pseU", MC{"sup,pseU", MVP{MV::SUP}, {ModsVP{ModsV::M_pseU}}}),
+                std::make_tuple("sup,pseU,m6A", MC{"sup,pseU,m6A",
                                                    MVP{MV::SUP},
                                                    {ModsVP{ModsV::M_pseU}, ModsVP{ModsV::M_m6A}}}),
                 // with single mods and version
-                std::make_tuple("sup@v4.1.0,5mC@v2", MS{"sup@v4.1.0,5mC@v2",
+                std::make_tuple("sup@v4.1.0,5mC@v2", MC{"sup@v4.1.0,5mC@v2",
                                                         MVP{MV::SUP, VV::v4_1_0},
                                                         {ModsVP{ModsV::M_5mC, VV::v2_0_0}}}),
                 std::make_tuple("fast@latest,5mC_5hmC@v4.0.0",
-                                MS{"fast@latest,5mC_5hmC@v4.0.0",
+                                MC{"fast@latest,5mC_5hmC@v4.0.0",
                                    MVP{MV::FAST},
                                    {ModsVP{ModsV::M_5mC_5hmC, VV::v4_0_0}}}),
 
                 // Multi-mods
-                std::make_tuple("auto,5mC,6mA", MS{"auto,5mC,6mA",
+                std::make_tuple("auto,5mC,6mA", MC{"auto,5mC,6mA",
                                                    MVP{MV::AUTO},
                                                    {ModsVP{ModsV::M_5mC}, ModsVP{ModsV::M_6mA}}}),
 
                 std::make_tuple("fast@latest,m6A_DRACH@v1,5mC_5hmC@v4.0.0",
-                                MS{"fast@latest,m6A_DRACH@v1,5mC_5hmC@v4.0.0",
+                                MC{"fast@latest,m6A_DRACH@v1,5mC_5hmC@v4.0.0",
                                    MVP{MV::FAST},
                                    {ModsVP{ModsV::M_m6A_DRACH, VV::v1_0_0},
                                     ModsVP{ModsV::M_5mC_5hmC, VV::v4_0_0}}}),
         }));
 
         CAPTURE(input);
-        auto result = dorado::ModelComplexParser::parse(input);
+        auto result = ModelComplexParser::parse(input);
         CAPTURE(to_string(result.model.variant));
         CAPTURE(to_string(result.model.ver));
         CAPTURE(result.mods.size());
@@ -261,7 +230,7 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
         }));
 
         CAPTURE(input);
-        auto result = dorado::ModelComplexParser::parse(input);
+        auto result = ModelComplexParser::parse(input);
         CHECK(result.raw == input);
         CHECK(result.model.variant == ModelVariant::NONE);
         CHECK(result.model.ver == ModelVersion::NONE);
@@ -293,7 +262,7 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
         // clang-format on
 
         CAPTURE(input);
-        auto result = dorado::ModelComplexParser::parse_version(input);
+        auto result = ModelComplexParser::parse_version(input);
         CHECK(result == expected);
     }
 
@@ -309,35 +278,6 @@ TEST_CASE(TEST_TAG "  ModelFinder ModelComplexParser ", TEST_TAG) {
                 "v. 1a . t",
         }));
         CAPTURE(input);
-        CHECK_THROWS_AS(dorado::ModelComplexParser::parse_version(input), std::runtime_error);
-    }
-}
-
-TEST_CASE(TEST_TAG "  ModelFinder check_sampling_rates_compatible ", TEST_TAG) {
-    SECTION(" check_sampling_rates_compatible") {
-        auto [model_name, data_path, config_sample_rate] =
-                GENERATE(table<std::string, std::string, SamplingRate>({
-                        std::make_tuple("dna_r9.4.1_e8_sup@v3.6", "dna_r9.4.1_e8", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.0.0",
-                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
-                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
-                                        "dna_r10.4.1_e8.2_400bps_4khz", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.3.0",
-                                        "dna_r10.4.1_e8.2_400bps_5khz", 5000),
-                        std::make_tuple("rna002_70bps_hac@v3", "rna002_70bps", 3000),
-                        std::make_tuple("rna004_130bps_fast@v3.0.1", "rna004_130bps", 4000),
-                }));
-
-        CAPTURE(model_name);
-        const auto path = get_data_dir("pod5") / data_path;
-        REQUIRE(std::filesystem::exists(path));
-        CHECK_NOTHROW(dorado::check_sampling_rates_compatible(model_name, path, config_sample_rate,
-                                                              true));
+        CHECK_THROWS_AS(ModelComplexParser::parse_version(input), std::runtime_error);
     }
 }

@@ -1,18 +1,13 @@
 #include "models.h"
 
-#include "data_loader/ModelFinder.h"
 #include "kits.h"
 #include "metadata.h"
-#include "model_downloader.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cstdint>
-#include <exception>
 #include <filesystem>
-#include <optional>
 #include <stdexcept>
 
 namespace fs = std::filesystem;
@@ -911,6 +906,7 @@ const std::vector<ModelInfo> models = {
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
 const std::vector<ModelInfo>& modified_models() { return modified::models; }
+const std::vector<ModelInfo>& correction_models() { return correction::models; }
 
 namespace {
 std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
@@ -926,6 +922,8 @@ std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
 std::vector<std::string> simplex_model_names() { return unpack_names(simplex_models()); };
 std::vector<std::string> stereo_model_names() { return unpack_names(stereo_models()); };
 std::vector<std::string> modified_model_names() { return unpack_names(modified_models()); };
+std::vector<std::string> correction_model_names() { return unpack_names(correction_models()); };
+
 std::vector<std::string> modified_model_variants() {
     std::vector<std::string> variants;
     for (const auto& kv : mods_variants_map()) {
@@ -947,31 +945,71 @@ bool is_valid_model(const std::string& model_name) {
     return false;
 }
 
-bool download_models(const std::string& target_directory, const std::string& selected_model) {
-    if (selected_model != "all" && !is_valid_model(selected_model)) {
-        spdlog::error("Selected model doesn't exist: {}", selected_model);
-        return false;
+ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path,
+                                 const std::string& modification) {
+    if (!fs::exists(simplex_model_path)) {
+        throw std::runtime_error{
+                "Cannot find modification model for '" + modification +
+                "' reason: simplex model doesn't exist at: " + simplex_model_path.u8string()};
     }
 
-    ModelDownloader downloader(target_directory);
+    ModelInfo modification_model;
+    bool model_found = false;
+    auto simplex_name = simplex_model_path.filename().u8string();
 
-    bool success = true;
-    auto download_model_set = [&](const ModelList& models) {
-        for (const auto& model : models) {
-            if (selected_model == "all" || selected_model == model.name) {
-                if (!downloader.download(model.name, model)) {
-                    success = false;
-                }
+    if (is_valid_model(simplex_name)) {
+        std::string mods_prefix = simplex_name + "_" + modification + "@v";
+        for (const auto& info : modified_models()) {
+            // There is an assumption that models with multiple versions
+            // are named in a way that picking the last one after lexicographically
+            // sorting them finds the latest version.
+            if (utils::starts_with(info.name, mods_prefix)) {
+                modification_model = info;
+                model_found = true;
             }
         }
-    };
+    } else {
+        throw std::runtime_error{"Cannot find modification model for '" + modification +
+                                 "' reason: unknown simplex model '" + simplex_name + "'"};
+    }
 
-    download_model_set(simplex::models);
-    download_model_set(stereo::models);
-    download_model_set(modified::models);
-    download_model_set(correction::models);
+    if (!model_found) {
+        throw std::runtime_error{"Cannot find modification model for '" + modification +
+                                 "' matching simplex model: '" + simplex_name + "'"};
+    }
 
-    return success;
+    spdlog::debug("- matching modification model found: {}", modification_model.name);
+
+    return modification_model;
+}
+
+ModelInfo get_modification_model(const ModelInfo& simplex_model_info,
+                                 const ModsVariantPair& mods_variant) {
+    bool is_model_found = false;
+    ModelInfo mods_model;
+    assert(mods_variant.has_variant());
+    for (const auto& m : modified_models()) {
+        if (m.simplex == simplex_model_info.simplex) {
+            assert(m.mods.has_variant() && m.mods.has_ver());
+            // There is an assumption that models with multiple versions
+            // are named in a way that picking the last one after lexicographically
+            // sorting them finds the latest version.
+            if (mods_variant.has_ver() && mods_variant.ver != m.mods.ver) {
+                continue;
+            }
+            if (mods_variant.variant == m.mods.variant) {
+                is_model_found = true;
+                mods_model = m;
+            }
+        }
+    }
+    if (!is_model_found) {
+        throw std::runtime_error{"Cannot find modification model for '" +
+                                 to_string(mods_variant.variant) + "' matching simplex model: '" +
+                                 simplex_model_info.name + "'"};
+    }
+    spdlog::debug("- matching modification model found: {}", mods_model.name);
+    return mods_model;
 }
 
 ModelInfo get_simplex_model_info(const std::string& model_name) {
@@ -989,48 +1027,26 @@ ModelInfo get_simplex_model_info(const std::string& model_name) {
     return matches.back();
 }
 
-std::string get_modification_model(const std::filesystem::path& simplex_model_path,
-                                   const std::string& modification) {
-    std::string modification_model{""};
+ModelInfo get_model_info(const std::string& model_name) {
+    const auto& simplex_model_infos = simplex_models();
+    const auto& mods_model_infos = modified_models();
+    const auto& stereo_model_infos = stereo_models();
 
-    if (!fs::exists(simplex_model_path)) {
-        throw std::runtime_error{
-                "Cannot find modification model for '" + modification +
-                "' reason: simplex model doesn't exist at: " + simplex_model_path.u8string()};
+    auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
+    std::vector<ModelInfo> matches;
+    std::copy_if(simplex_model_infos.begin(), simplex_model_infos.end(),
+                 std::back_inserter(matches), is_name_match);
+    std::copy_if(mods_model_infos.begin(), mods_model_infos.end(), std::back_inserter(matches),
+                 is_name_match);
+    std::copy_if(stereo_model_infos.begin(), stereo_model_infos.end(), std::back_inserter(matches),
+                 is_name_match);
+
+    if (matches.empty()) {
+        throw std::runtime_error("Could not find information on model: " + model_name);
+    } else if (matches.size() > 1) {
+        throw std::logic_error("Found multiple models with name: " + model_name);
     }
-
-    auto model_dir = simplex_model_path.parent_path();
-    auto simplex_name = simplex_model_path.filename().u8string();
-
-    if (is_valid_model(simplex_name)) {
-        std::string mods_prefix = simplex_name + "_" + modification + "@v";
-        for (const auto& info : modified::models) {
-            // There is an assumption that models with multiple versions
-            // are named in a way that picking the last one after lexicographically
-            // sorting them finds the latest version.
-            if (utils::starts_with(info.name, mods_prefix)) {
-                modification_model = info.name;
-            }
-        }
-    } else {
-        throw std::runtime_error{"Cannot find modification model for '" + modification +
-                                 "' reason: unknown simplex model " + simplex_name};
-    }
-
-    if (modification_model.empty()) {
-        throw std::runtime_error{"could not find matching modification model for " + simplex_name};
-    }
-
-    spdlog::debug("- matching modification model found: {}", modification_model);
-
-    auto modification_path = model_dir / fs::path{modification_model};
-    if (!fs::exists(modification_path)) {
-        if (!download_models(model_dir.u8string(), modification_model)) {
-            throw std::runtime_error("Failed to download model: " + modification_model);
-        }
-    }
-
-    return modification_path.u8string();
+    return matches.back();
 }
 
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {
@@ -1065,19 +1081,23 @@ std::string get_supported_model_info() {
 
     const auto& canonical_base_map = mods_canonical_base_map();
 
-    for (const auto& variant : chemistry_variants()) {
-        if (variant.first == Chemistry::UNKNOWN) {
+    for (const auto& variant : chemistry_kits()) {
+        const auto& chemistry = variant.first;
+        const auto& chemistry_kit_info = variant.second;
+
+        if (chemistry == Chemistry::UNKNOWN) {
             continue;
         }
 
         // Chemistry name
-        result += variant.second + ":\n";
+        result += chemistry_kit_info.name + ":\n";
 
         const auto& flowcell_code_map = flowcell_codes();
         const auto& kit_code_map = kit_codes();
+
         // Add some info on compatible kits and flowcells
-        const auto& chemistry_kit_info = chemistry_kits().at(variant.first);
-        result += "  sample_type: " + sample_types().at(chemistry_kit_info.sample_type) + "\n";
+        const auto& sample_type_name = get_sample_type_info(chemistry_kit_info.sample_type).name;
+        result += "  sample_type: " + sample_type_name + "\n";
         result += "  sampling rate: " + std::to_string(chemistry_kit_info.sampling_rate) + "\n";
 
         // Get the union of all supported flowcells and kits

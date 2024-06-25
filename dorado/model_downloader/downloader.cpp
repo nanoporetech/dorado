@@ -1,11 +1,12 @@
-#include "model_downloader.h"
+#include "downloader.h"
 
-#include "models.h"
+#include "models/models.h"
 #include "utils/crypto_utils.h"
 
 #include <elzip/elzip.hpp>
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <sstream>
 
 #if DORADO_MODELS_HAS_HTTPLIB
@@ -24,7 +25,7 @@
 
 namespace fs = std::filesystem;
 
-namespace dorado::models {
+namespace dorado::model_downloader {
 
 namespace {
 
@@ -100,7 +101,7 @@ void set_ssl_cert_file() {
 }  // namespace
 
 #if DORADO_MODELS_HAS_HTTPLIB
-auto ModelDownloader::create_client() {
+auto Downloader::create_client() {
     set_ssl_cert_file();
 
     auto http = std::make_unique<httplib::Client>(urls::URL_ROOT);
@@ -136,32 +137,32 @@ auto ModelDownloader::create_client() {
 }
 #endif  // DORADO_MODELS_HAS_HTTPLIB
 
-ModelDownloader::ModelDownloader(fs::path directory) : m_directory(std::move(directory)) {
+Downloader::Downloader(fs::path directory) : m_directory(std::move(directory)) {
 #if DORADO_MODELS_HAS_HTTPLIB
     m_client = create_client();
 #endif
 }
 
-ModelDownloader::~ModelDownloader() = default;
+Downloader::~Downloader() = default;
 
-bool ModelDownloader::download(const std::string& model, const ModelInfo& info) {
-    auto archive = m_directory / (model + ".zip");
+bool Downloader::download(const models::ModelInfo& model) {
+    auto archive = m_directory / (model.name + ".zip");
 
     // Try and download using the native approach, falling back on httplib then on system curl.
     bool success = false;
 #if DORADO_MODELS_HAS_FOUNDATION
     if (!success) {
-        success = download_foundation(model, info, archive);
+        success = download_foundation(model, archive);
     }
 #endif
 #if DORADO_MODELS_HAS_HTTPLIB
     if (!success) {
-        success = download_httplib(model, info, archive);
+        success = download_httplib(model, archive);
     }
 #endif
 #if DORADO_MODELS_HAS_CURL_EXE
     if (!success) {
-        success = download_curl(model, info, archive);
+        success = download_curl(model, archive);
     }
 #endif
 
@@ -172,11 +173,11 @@ bool ModelDownloader::download(const std::string& model, const ModelInfo& info) 
     return success;
 }
 
-std::string ModelDownloader::get_url(const std::string& model) const {
+std::string Downloader::get_url(const std::string& model) const {
     return urls::URL_ROOT + urls::URL_PATH + model + ".zip";
 }
 
-bool ModelDownloader::validate_checksum(std::string_view data, const ModelInfo& info) const {
+bool Downloader::validate_checksum(std::string_view data, const models::ModelInfo& info) const {
     // Check that this matches the hash we expect.
     const auto checksum = calculate_checksum(data);
     if (checksum != info.checksum) {
@@ -187,23 +188,21 @@ bool ModelDownloader::validate_checksum(std::string_view data, const ModelInfo& 
     return true;
 }
 
-void ModelDownloader::extract(const fs::path& archive) const {
+void Downloader::extract(const fs::path& archive) const {
     elz::extractZip(archive, m_directory);
     fs::remove(archive);
 }
 
 #if DORADO_MODELS_HAS_HTTPLIB
-bool ModelDownloader::download_httplib(const std::string& model,
-                                       const ModelInfo& info,
-                                       const fs::path& archive) {
-    spdlog::info(" - downloading {} with httplib", model);
-    httplib::Result res = m_client->Get(get_url(model));
+bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path& archive) {
+    spdlog::info(" - downloading {} with httplib", model.name);
+    httplib::Result res = m_client->Get(get_url(model.name));
     if (!res) {
-        spdlog::error("Failed to download {}: {}", model, to_string(res.error()));
+        spdlog::error("Failed to download {}: {}", model.name, to_string(res.error()));
         return false;
     }
 
-    if (!validate_checksum(res->body, info)) {
+    if (!validate_checksum(res->body, model)) {
         return false;
     }
 
@@ -216,17 +215,15 @@ bool ModelDownloader::download_httplib(const std::string& model,
 #endif  // DORADO_MODELS_HAS_HTTPLIB
 
 #if DORADO_MODELS_HAS_CURL_EXE
-bool ModelDownloader::download_curl(const std::string& model,
-                                    const ModelInfo& info,
-                                    const fs::path& archive) {
-    spdlog::info(" - downloading {} with curl", model);
+bool Downloader::download_curl(const models::ModelInfo& model, const fs::path& archive) {
+    spdlog::info(" - downloading {} with curl", model.name);
 
     // Note: it's safe to call system() here since we're only going to be called with known models.
-    std::string args = "curl -L " + get_url(model) + " -o " + archive.string();
+    std::string args = "curl -L " + get_url(model.name) + " -o " + archive.string();
     errno = 0;
     int ret = system(args.c_str());
     if (ret != 0) {
-        spdlog::error("Failed to download {}: ret={}, errno={}", model, ret, errno);
+        spdlog::error("Failed to download {}: ret={}, errno={}", model.name, ret, errno);
         return false;
     }
 
@@ -237,8 +234,8 @@ bool ModelDownloader::download_curl(const std::string& model,
     buffer.resize(fs::file_size(archive));
     output.read(buffer.data(), buffer.size());
     output.close();
-    return validate_checksum(buffer, info);
+    return validate_checksum(buffer, model);
 }
 #endif  // DORADO_MODELS_HAS_CURL_EXE
 
-}  // namespace dorado::models
+}  // namespace dorado::model_downloader

@@ -49,7 +49,7 @@ std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingPar
     return {shift, scale};
 }
 
-using SampleType = dorado::basecall::SampleType;
+using SampleType = dorado::models::SampleType;
 using ScalingStrategy = dorado::basecall::ScalingStrategy;
 using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
 

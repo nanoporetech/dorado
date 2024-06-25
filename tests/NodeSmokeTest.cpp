@@ -4,6 +4,8 @@
 #include "basecall/CRFModelConfig.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "model_downloader/model_downloader.h"
+#include "models/kits.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
@@ -143,15 +145,14 @@ TempDir download_model(const std::string& model) {
     auto temp_dir = make_temp_dir("model");
 
     // Download it
-    REQUIRE(dorado::models::download_models(temp_dir.m_path.string(), model));
+    REQUIRE(dorado::model_downloader::download_models(temp_dir.m_path.string(), model));
     return temp_dir;
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
+    using SampleType = dorado::models::SampleType;
     auto pipeline_restart = GENERATE(false, true);
-    auto model_type =
-            GENERATE(dorado::basecall::SampleType::DNA, dorado::basecall::SampleType::RNA002,
-                     dorado::basecall::SampleType::RNA004);
+    auto model_type = GENERATE(SampleType::DNA, SampleType::RNA002, SampleType::RNA004);
     auto trim_rna_adapter = GENERATE(true, false);
     dorado::utils::rapid::Settings trim_rapid_adapter;
     CAPTURE(pipeline_restart);
@@ -162,7 +163,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     // Scaler node expects i16 input
     set_read_mutator([model_type](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kI16);
-        read->read_common.is_rna_model = model_type != dorado::basecall::SampleType::DNA;
+        read->read_common.is_rna_model = model_type != SampleType::DNA;
     });
 
     dorado::basecall::SignalNormalisationParams config;

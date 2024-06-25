@@ -1,11 +1,8 @@
 #include "models/kits.h"
-#include "models/metadata.h"
 #include "models/models.h"
 
 #include <catch2/catch.hpp>
 
-#include <filesystem>
-#include <fstream>
 #include <stdexcept>
 #include <tuple>
 

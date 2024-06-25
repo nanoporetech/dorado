@@ -1,6 +1,8 @@
 #include "cli/cli_utils.h"
-#include "data_loader/ModelFinder.h"
+#include "cli/model_resolution.h"
+#include "data_loader/DataLoader.h"
 #include "dorado_version.h"
+#include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/models.h"
 #include "utils/fs_utils.h"
@@ -48,50 +50,50 @@ void print_models(bool yaml) {
 
 using namespace dorado::models;
 
-std::vector<std::string> get_model_names(const ModelSelection& model_selection,
-                                         const fs::path& data,
-                                         bool recursive) {
-    std::vector<std::string> models;
+std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
+                                       const fs::path& data,
+                                       bool recursive) {
+    std::vector<ModelInfo> models;
 
-    const auto model_arg = model_selection.raw;
-    if (model_selection.is_path()) {
+    const auto model_arg = model_complex.raw;
+    if (model_complex.is_path()) {
         if (model_arg == "all") {
-            const auto& all_groups = {simplex_model_names(), modified_model_names(),
-                                      stereo_model_names()};
+            const auto& all_groups = {simplex_models(), modified_models(), stereo_models()};
             for (const auto& group : all_groups) {
-                for (const auto& model_name : group) {
-                    models.push_back(model_name);
+                for (const auto& info : group) {
+                    models.push_back(info);
                 }
             }
             return models;
         }
 
-        if (!is_valid_model(model_selection.raw)) {
-            spdlog::error("'{}' is not a valid model", model_selection.raw);
+        if (!is_valid_model(model_complex.raw)) {
+            spdlog::error("'{}' is not a valid model", model_complex.raw);
             print_models(false);
             std::exit(EXIT_FAILURE);
         }
 
-        models.push_back(model_arg);
+        models.push_back(models::get_model_info(model_arg));
         return models;
     }
 
-    if (data.empty() && model_selection.has_model_variant()) {
+    if (data.empty() && model_complex.has_model_variant()) {
         spdlog::error("Must set --data when using automatic model detection");
         std::exit(EXIT_FAILURE);
     }
 
     if (!data.empty()) {
-        const auto model_finder = cli::model_finder(model_selection, data, recursive, true);
+        const auto chemisty =
+                DataLoader::get_unique_sequencing_chemisty(data.u8string(), recursive);
+        auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
 
         try {
-            if (model_selection.has_model_variant()) {
-                models.push_back(model_finder.get_simplex_model_name());
+            if (model_complex.has_model_variant()) {
+                models.push_back(model_search.simplex());
             }
             // If user made a mods selection get it, otherwise get all mods
-            const auto mm = model_selection.has_mods_variant()
-                                    ? model_finder.get_mods_model_names()
-                                    : model_finder.get_mods_for_simplex_model();
+            const auto mm = model_complex.has_mods_variant() ? model_search.mods()
+                                                             : model_search.simplex_mods();
             models.insert(models.end(), mm.begin(), mm.end());
         } catch (std::exception& e) {
             spdlog::error(e.what());
@@ -99,7 +101,7 @@ std::vector<std::string> get_model_names(const ModelSelection& model_selection,
         }
 
         try {
-            models.push_back(model_finder.get_stereo_model_name());
+            models.push_back(model_search.stereo());
         } catch (std::exception& e) {
             spdlog::debug(e.what());
         }
@@ -116,9 +118,10 @@ int download(int argc, char* argv[]) {
 
     parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
 
-    parser.add_argument("--directory")
-            .default_value(std::string("."))
-            .help("the directory to download the models into");
+    auto& models_dir_arg = parser.add_argument("--models-directory")
+                                   .default_value(std::string("."))
+                                   .help("the directory to download the models into");
+    parser.add_hidden_alias_for(models_dir_arg, "--directory");
 
     parser.add_argument("--list").default_value(false).implicit_value(true).help(
             "list the available models for download");
@@ -183,19 +186,43 @@ int download(int argc, char* argv[]) {
     const auto data = parser.get<std::string>("--data");
     const auto recursive = parser.get<bool>("--recursive");
 
-    const auto model_selection = cli::parse_model_argument(model_arg);
-    const auto model_names = get_model_names(model_selection, data, recursive);
+    const auto model_complex = model_resolution::parse_model_argument(model_arg);
+    const auto model_infos = get_model_infos(model_complex, data, recursive);
 
-    const auto downloads_path = utils::get_downloads_path(parser.get<std::string>("--directory"));
+    std::filesystem::path models_directory;
+    auto models_directory_opt = model_resolution::get_models_directory(parser);
+    if (!models_directory_opt.has_value()) {
+        models_directory = std::filesystem::path(parser.get<std::string>("--models-directory"));
+    } else {
+        models_directory = models_directory_opt.value();
+    }
+
+    auto downloader = model_downloader::ModelDownloader(models_directory);
 
     const auto overwrite = parser.get<bool>("--overwrite");
-    for (auto& name : model_names) {
-        if (!overwrite && fs::exists(downloads_path / name)) {
-            spdlog::info(" - existing model found: {}", name);
-        } else if (!models::download_models(downloads_path.string(), name)) {
+    for (auto& info : model_infos) {
+        auto new_model_path = models_directory / info.name;
+        if (fs::exists(new_model_path)) {
+            if (!overwrite) {
+                spdlog::info(" - found existing model: '{}'", info.name);
+                spdlog::debug(" - model found at: '{}'", fs::canonical(new_model_path).u8string());
+                continue;
+            }
+            spdlog::debug(" - deleting existing model: {} at: '{}'", info.name,
+                          fs::canonical(new_model_path).u8string());
+            fs::remove_all(new_model_path);
+        }
+        try {
+            const auto actual_path = downloader.get(info, "your");
+            spdlog::debug(" - downloaded model: '{}' into '{}'", info.name,
+                          fs::canonical((actual_path)).u8string());
+        } catch (const std::exception& e) {
+            spdlog::debug("downloader exception: {}", e.what());
+            spdlog::error("Failed to download model: {}", info.name);
             return EXIT_FAILURE;
         }
     }
+
     return EXIT_SUCCESS;
 }
 

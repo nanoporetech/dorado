@@ -1,8 +1,8 @@
 // Add some utilities for CLI.
 #pragma once
 
+#include "data_loader/DataLoader.h"
 #include "dorado_version.h"
-#include "models/kits.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 
@@ -17,7 +17,6 @@
 #ifdef _WIN32
 #pragma warning(pop)
 #endif  // _WIN32
-#include "data_loader/ModelFinder.h"
 
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"
@@ -105,26 +104,13 @@ inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
     return tokens;
 }
 
-inline ModelSelection parse_model_argument(const std::string& model_arg) {
-    try {
-        return ModelComplexParser::parse(model_arg);
-    } catch (std::exception& e) {
-        spdlog::error("Failed to parse model argument. {}", e.what());
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-inline ModelFinder model_finder(const ModelSelection& model_selection,
-                                const std::filesystem::path& data,
-                                bool recursive,
-                                bool suggestions) {
-    try {
-        return ModelFinder(ModelFinder::inspect_chemistry(data.u8string(), recursive),
-                           model_selection, suggestions);
-    } catch (std::exception& e) {
-        spdlog::error(e.what());
-        std::exit(EXIT_FAILURE);
-    }
+// ArgumentParser has no method returning optional arguments with default values so this function returns
+// optional<T> which lets us determine if the value (including the default value) was explictly set by the user.
+template <typename T>
+inline std::optional<T> get_optional_argument(const std::string arg_name,
+                                              const argparse::ArgumentParser& parser) {
+    static_assert(std::is_default_constructible_v<T>, "T must be default constructible");
+    return parser.is_used(arg_name) ? std::optional<T>(parser.get<T>(arg_name)) : std::nullopt;
 }
 
 }  // namespace cli

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <string>
 
 namespace dorado::models {
 
@@ -331,21 +332,10 @@ const KitSets sets = {{rna004::flowcells, rna004::kits}};
 
 namespace chemistry {
 
-const std::unordered_map<SampleType, std::string> sample_type_map = {
-        {SampleType::DNA, "DNA"},
-        {SampleType::RNA002, "RNA002"},
-        {SampleType::RNA004, "RNA004"},
-};
-
-const std::unordered_map<Chemistry, std::string> codes_map = {
-        {Chemistry::DNA_R9_4_1_E8, "dna_r9.4.1_e8"},
-        {Chemistry::DNA_R10_4_1_E8_2_260BPS, "dna_r10.4.1_e8.2_260bps"},
-        {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ, "dna_r10.4.1_e8.2_apk_5khz"},
-        {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ, "dna_r10.4.1_e8.2_400bps_4khz"},
-        {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ, "dna_r10.4.1_e8.2_400bps_5khz"},
-        {Chemistry::RNA002_70BPS, "rna002_70bps"},
-        {Chemistry::RNA004_130BPS, "rna004_130bps"},
-        {Chemistry::UNKNOWN, "__UNKNOWN_CHEMISTRY__"},
+const std::unordered_map<SampleType, SampleTypeInfo> sample_type_map = {
+        {SampleType::DNA, {"DNA"}},
+        {SampleType::RNA002, {"RNA002"}},
+        {SampleType::RNA004, {"RNA004"}},
 };
 
 /*
@@ -353,16 +343,21 @@ Mapping of Chemistry to the complete set of sequencing kits associated with that
 The cross product of a chemistry's set of flowcells and kits is generated at runtime
 */
 const std::unordered_map<Chemistry, ChemistryKits> kit_map = {
-        {Chemistry::UNKNOWN, {1, SampleType::DNA, {}}},
-        {Chemistry::DNA_R9_4_1_E8, {4000, SampleType::DNA, kit_sets::kit10::sets}},
-        {Chemistry::DNA_R10_4_1_E8_2_260BPS, {4000, SampleType::DNA, kit_sets::kit14::sets_260bps}},
-        {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ, {5000, SampleType::DNA, kit_sets::kit14::sets_apk}},
+        {Chemistry::UNKNOWN, {"__UNKNOWN_CHEMISTRY__", 1, SampleType::DNA, {}}},
+        {Chemistry::DNA_R9_4_1_E8, {"dna_r9.4.1_e8", 4000, SampleType::DNA, kit_sets::kit10::sets}},
+        {Chemistry::DNA_R10_4_1_E8_2_260BPS,
+         {"dna_r10.4.1_e8.2_260bps", 4000, SampleType::DNA, kit_sets::kit14::sets_260bps}},
+        {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ,
+         {"dna_r10.4.1_e8.2_apk_5khz", 5000, SampleType::DNA, kit_sets::kit14::sets_apk}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ,
-         {4000, SampleType::DNA, kit_sets::kit14::sets_400bps}},
+         {"dna_r10.4.1_e8.2_400bps_4khz", 4000, SampleType::DNA, kit_sets::kit14::sets_400bps}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-         {5000, SampleType::DNA, kit_sets::kit14::sets_400bps_5khz}},
-        {Chemistry::RNA002_70BPS, {3000, SampleType::RNA002, kit_sets::rna002::sets}},
-        {Chemistry::RNA004_130BPS, {4000, SampleType::RNA004, kit_sets::rna004::sets}},
+         {"dna_r10.4.1_e8.2_400bps_5khz", 5000, SampleType::DNA,
+          kit_sets::kit14::sets_400bps_5khz}},
+        {Chemistry::RNA002_70BPS,
+         {"rna002_70bps", 3000, SampleType::RNA002, kit_sets::rna002::sets}},
+        {Chemistry::RNA004_130BPS,
+         {"rna004_130bps", 4000, SampleType::RNA004, kit_sets::rna004::sets}},
 };
 
 // Crate a map of flowcell and sequencing kit pairs to categorical chemistry
@@ -388,13 +383,10 @@ std::string to_string(const ChemistryKey& ck) {
            "' sample_rate: " + std::to_string(sr);
 }
 
-const std::unordered_map<SampleType, std::string>& sample_types() {
-    return chemistry::sample_type_map;
+std::string to_string(const Chemistry& chemistry) {
+    return get_info(chemistry, "chemistry", chemistry::kit_map).name;
 }
 
-const std::unordered_map<Chemistry, std::string>& chemistry_variants() {
-    return chemistry::codes_map;
-}
 const std::unordered_map<Chemistry, ChemistryKits>& chemistry_kits() { return chemistry::kit_map; }
 
 const ChemistryMap& chemistry_map() { return chemistry::chemistry_map; }
@@ -405,6 +397,38 @@ Chemistry get_chemistry(const ChemistryKey& key) {
     return it == map.end() ? Chemistry::UNKNOWN : it->second;
 }
 
+Chemistry get_chemistry(const std::string& chemistry) {
+    return get_code(chemistry, Chemistry::UNKNOWN, chemistry_kits());
+}
+
 KitInfo ConditionInfo::get_kit_info() const { return kit_info(m_kit); };
+
+const std::unordered_map<SampleType, SampleTypeInfo>& sample_types() {
+    return chemistry::sample_type_map;
+}
+
+SampleType get_sample_type(const std::string& sample_type) {
+    return get_code(sample_type, SampleType::UNKNOWN, sample_types());
+}
+
+SampleType get_sample_type_from_model_name(const std::string& model_name) {
+    if (model_name.find("rna004") != std::string::npos) {
+        return SampleType::RNA004;
+    } else if (model_name.find("rna002") != std::string::npos) {
+        return SampleType::RNA002;
+    } else if (model_name.find("dna") != std::string::npos) {
+        return SampleType::DNA;
+    } else {
+        return SampleType::UNKNOWN;
+    }
+}
+
+SampleTypeInfo get_sample_type_info(const SampleType& sample_type) {
+    return get_info(sample_type, "sample type", sample_types());
+}
+
+std::string to_string(const SampleType& sample_type) {
+    return get_sample_type_info(sample_type).name;
+}
 
 }  // namespace dorado::models
