@@ -313,7 +313,7 @@ int get_mtl_device_core_count() {
         gpu_core_count = 32;
     } else if (name == "Apple M1 Ultra") {
         gpu_core_count = 64;
-    } else if (name == "Apple M2 GPU") {
+    } else if (name == "Apple M2 GPU" || name == "Apple M4 GPU") {
         // M2 configurations with < 10 cores exist in e.g. MacBook Air, but it's
         // assumed that those configurations would be handled above via IORegistry
         // querying.  The M2 iPad Pro always has 10 GPU cores.  Note also that
