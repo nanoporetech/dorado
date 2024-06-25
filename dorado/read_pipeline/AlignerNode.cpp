@@ -70,7 +70,10 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const std::string& bed_file,
                          const alignment::Minimap2Options& options,
                          int threads)
-        : MessageSink(10000, threads),
+        : MessageSink(10000, 1),
+          m_task_executor(
+                  std::make_shared<utils::concurrency::AsyncTaskExecutor>(threads,
+                                                                          "align_node_exec")),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
@@ -96,7 +99,10 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                          int threads)
-        : MessageSink(10000, threads),
+        : MessageSink(10000, 1),
+          m_task_executor(
+                  std::make_shared<utils::concurrency::AsyncTaskExecutor>(threads,
+                                                                          "align_node_exec")),
           m_index_file_access(std::move(index_file_access)),
           m_bed_file_access(std::move(bed_file_access)) {
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");
@@ -167,25 +173,42 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
+//template<typename F>
+//auto shared_func(F&& f) {
+//    return [wrapped_func = std::make_shared<F>(f)] { return *wrapped_func();
+//    };
+//}
+
+template <class F>
+auto shared_func(F&& f) {
+    return [pf = std::make_shared<std::decay_t<F>>(std::forward<F>(f))]() -> decltype(auto) {
+        return (*pf)();
+    };
+}
+
 void AlignerNode::input_thread_fn() {
     Message message;
     mm_tbuf_t* tbuf = mm_tbuf_init();
     auto align_read = [this, tbuf](auto&& read) {
-        align_read_common(read->read_common, tbuf);
-        send_message_to_sink(std::move(read));
+        m_task_executor->send([this, tbuf, read = std::move(read)]() mutable {
+            align_read_common(read->read_common, tbuf);
+            send_message_to_sink(std::move(read));
+        });
     };
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            auto bam_message = std::get<BamMessage>(std::move(message));
-            auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                                   .align(bam_message.bam_ptr.get(), tbuf);
-            for (auto& record : records) {
-                if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
-                    auto ref_id = record->core.tid;
-                    add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
+            m_task_executor->send([this, tbuf,
+                                   bam_message = std::get<BamMessage>(std::move(message))] {
+                auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
+                                       .align(bam_message.bam_ptr.get(), tbuf);
+                for (auto& record : records) {
+                    if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
+                        auto ref_id = record->core.tid;
+                        add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
+                    }
+                    send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
                 }
-                send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
-            }
+            });
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             align_read(std::get<SimplexReadPtr>(std::move(message)));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
@@ -195,6 +218,7 @@ void AlignerNode::input_thread_fn() {
             continue;
         }
     }
+    m_task_executor->join();
     mm_tbuf_destroy(tbuf);
 }
 

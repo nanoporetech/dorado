@@ -58,7 +58,12 @@ public:
     AsyncTaskExecutor(std::size_t num_threads, std::string name);
     ~AsyncTaskExecutor();
 
-    void send(TaskType task);
+    template <typename TASK>
+    void send(TASK&& task) {
+        send_impl([task_wrapper = std::make_shared<std::decay_t<TASK>>(std::forward<TASK>(
+                           task))]() -> decltype(auto) { return (*task_wrapper)(); });
+    }
+
     void join();
 
 private:
@@ -76,6 +81,7 @@ private:
     std::queue<std::shared_ptr<WaitingTask>> m_task_queue{};
     std::condition_variable m_message_received{};
 
+    void send_impl(TaskType task);
     void initialise();
     std::shared_ptr<WaitingTask> wait_on_next_task();
     void process_task_queue();

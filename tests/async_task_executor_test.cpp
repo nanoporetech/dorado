@@ -64,6 +64,33 @@ DEFINE_TEST("send() invokes task on separate thread") {
     REQUIRE(invocation_thread != std::this_thread::get_id());
 }
 
+DEFINE_TEST("join() with 2 active threads completes") {
+    constexpr std::size_t num_threads{2};
+    AsyncTaskExecutor cut{num_threads, "test_executor"};
+    Flag release_busy_tasks{};
+    auto producer_threads = create_producer_threads(
+            cut, num_threads, [&release_busy_tasks] { release_busy_tasks.wait(); });
+    auto join_producer_threads = PostCondition([&producer_threads, &release_busy_tasks] {
+        release_busy_tasks.signal();
+        for (auto& producer_thread : producer_threads) {
+            producer_thread.join();
+        }
+    });
+
+    Flag joined_flag{};
+    producer_threads.emplace_back([&cut, &joined_flag] {
+        cut.join();
+        joined_flag.signal();
+    });
+
+    // Check the join is blocked waiting on the busy threads
+    CHECK_FALSE(joined_flag.wait_for(1s));
+
+    release_busy_tasks.signal();
+
+    REQUIRE(joined_flag.wait_for(TIMEOUT));
+}
+
 DEFINE_TEST("send() when all threads busy blocks") {
     constexpr std::size_t num_threads{2};
     AsyncTaskExecutor cut{num_threads, "test_executor"};

@@ -12,6 +12,7 @@ add_library(dorado_utils
     concurrency/async_task_executor.cpp
     concurrency/async_task_executor.h
     concurrency/synchronisation.h
+    concurrency/task_executor.h
     crypto_utils.h
     crypto_utils.cpp
     dev_utils.cpp
