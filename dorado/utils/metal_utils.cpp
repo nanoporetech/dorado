@@ -16,10 +16,6 @@
 #include <optional>
 #include <string>
 
-namespace MTL {
-auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
-}  // namespace MTL
-
 using namespace MTL;
 
 namespace fs = std::filesystem;
@@ -249,8 +245,8 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
                       1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
                       1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {
-        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
-                     try_count);
+        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
+                     fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
             const auto *const error_ptr = cb->error();
             if (error_ptr) {
