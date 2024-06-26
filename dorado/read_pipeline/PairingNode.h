@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ReadPipeline.h"
+#include "alignment/minimap2_helper.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -117,7 +118,7 @@ private:
                                                int tid);
 
     // Store the minimap2 buffers used for mapping. One buffer per thread.
-    std::vector<MmTbufPtr> m_tbufs;
+    std::vector<alignment::MmTbufPtr> m_tbufs;
 
     // Track reads which need to be emptied from the cache but are still being
     // evaluated for pairs by other threads.

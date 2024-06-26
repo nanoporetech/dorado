@@ -10,7 +10,6 @@
 
 struct bam1_t;
 struct htsFile;
-struct mm_tbuf_s;
 struct sam_hdr_t;
 struct kstring_t;
 
@@ -135,11 +134,6 @@ struct BamDestructor {
     void operator()(bam1_t *);
 };
 using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
-
-struct MmTbufDestructor {
-    void operator()(mm_tbuf_s *);
-};
-using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
 
 struct SamHdrDestructor {
     void operator()(sam_hdr_t *);

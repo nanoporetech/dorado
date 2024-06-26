@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "alignment/minimap2_helper.h"
 
 #include <array>
 #include <cstdint>
@@ -56,7 +56,7 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
                                              const std::string& query_name,
                                              const std::string& target_seq,
                                              const std::string& target_name,
-                                             MmTbufPtr& working_buffer);
+                                             alignment::MmTbufPtr& working_buffer);
 
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.

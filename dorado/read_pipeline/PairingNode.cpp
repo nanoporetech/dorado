@@ -113,7 +113,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
     const std::string nvtx_id = "pairing_map_" + std::to_string(tid);
     nvtx3::scoped_range loop{nvtx_id};
 
-    MmTbufPtr& working_buffer = m_tbufs[tid];
+    alignment::MmTbufPtr& working_buffer = m_tbufs[tid];
     const auto overlap_result =
             utils::compute_overlap(temp.read_common.seq, temp.read_common.read_id,
                                    comp.read_common.seq, comp.read_common.read_id, working_buffer);
@@ -486,7 +486,7 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
 void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
-        m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
+        m_tbufs.push_back(alignment::MmTbufPtr(mm_tbuf_init()));
         m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
         ++m_num_active_worker_threads;
     }

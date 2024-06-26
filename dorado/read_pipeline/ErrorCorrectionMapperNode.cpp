@@ -7,6 +7,7 @@
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
 #include "alignment/minimap2_args.h"
+#include "alignment/minimap2_helper.h"
 #include "alignment/minimap2_wrappers.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
@@ -130,7 +131,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
 void ErrorCorrectionMapperNode::input_thread_fn() {
     utils::set_thread_name("errcorr_node");
     BamPtr read;
-    MmTbufPtr tbuf(mm_tbuf_init());
+    alignment::MmTbufPtr tbuf(mm_tbuf_init());
     while (m_reads_queue.try_pop(read) != utils::AsyncQueueStatus::Terminate) {
         const std::string read_name = bam_get_qname(read.get());
         const std::string read_seq = utils::extract_sequence(read.get());

@@ -265,7 +265,7 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
                                              const std::string& query_name,
                                              const std::string& target_seq,
                                              const std::string& target_name,
-                                             MmTbufPtr& working_buffer) {
+                                             alignment::MmTbufPtr& working_buffer) {
     std::optional<OverlapResult> overlap_result;
 
     // Add mm2 based overlap check.
@@ -284,7 +284,7 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
     mm_mapopt_update(&map_opt, index);
 
     if (!working_buffer) {
-        working_buffer = MmTbufPtr(mm_tbuf_init());
+        working_buffer = alignment::MmTbufPtr(mm_tbuf_init());
     }
 
     int hits = 0;
@@ -323,7 +323,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves) {
     // We are going to compute the overlap between the two reads
-    MmTbufPtr working_buffer;
+    alignment::MmTbufPtr working_buffer;
     const auto overlap_result =
             compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
 
