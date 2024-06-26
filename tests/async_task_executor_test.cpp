@@ -19,7 +19,7 @@ constexpr auto TIMEOUT{5s};
 
 std::vector<std::thread> create_producer_threads(AsyncTaskExecutor& cut,
                                                  std::size_t count,
-                                                 std::function<void()> task) {
+                                                 const std::function<void()>& task) {
     std::vector<std::thread> producer_threads{};
     for (std::size_t index{0}; index < count; ++index) {
         producer_threads.emplace_back([&cut, task] { cut.send(task); });

@@ -78,7 +78,7 @@ public:
 
 private:
     struct WaitingTask {
-        WaitingTask(TaskType task_) : task(task_) {}
+        WaitingTask(TaskType task_) : task(std::move(task_)) {}
         TaskType task;
         Flag started{};
     };
