@@ -346,6 +346,28 @@ void handle_cuda_result(int cuda_result) {
     }
 }
 
+KoiTensorExt::KoiTensorExt(at::Tensor &t, std::vector<int> &dim_tags) {
+    data_ptr = t.data_ptr();
+    ndims = t.ndim();
+    if (t.dtype() == torch::kF16) {
+        type_id = KOI_F16;
+    } else if (t.dtype() == torch::kI8) {
+        type_id = KOI_I8;
+    } else {
+        spdlog::error("KoiTensor unsupported dtype");
+        exit(EXIT_FAILURE);
+    }
+    if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
+        spdlog::error("KoiTensor dimension mismatch");
+        exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < ndims; ++i) {
+        dims[i].tag = dim_tags[i];
+        dims[i].size = t.size(i);
+        dims[i].stride = t.stride(i);
+    }
+}
+
 namespace details {
 
 bool try_parse_device_ids(const std::string &device_string,

@@ -104,7 +104,7 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const basecall::tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
 
@@ -116,16 +116,18 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
+    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
 
-    at::Tensor forward(const at::Tensor &x) { return stack->forward(x); };
+    bool use_koi_tiled{false};
+    tx::TxEncoderParams params;
+    at::Tensor forward(const at::Tensor &x);
     torch::nn::Sequential stack{nullptr};
 };
 
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const basecall::tx::EncoderUpsampleParams &params);
+    LinearUpsampleImpl(const tx::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
     const int scale_factor;

@@ -424,15 +424,89 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
-                                       const at::TensorOptions &options) {
-    const auto &tx_enc_params = config.tx->tx;
+TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params_,
+                                       const at::TensorOptions &options)
+        : params(params_) {
     stack = Sequential();
-    for (int i = 0; i < tx_enc_params.depth; ++i) {
+    for (int i = 0; i < params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(tx_enc_params, options)));
+                                         TxEncoder(params, options)));
     }
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    // TODO: make sure these are all the requirements
+    use_koi_tiled = koi_tc_is_available(KOI_F16) && (params.d_model == 512) &&
+                    (params.dim_feedforward == 2048);
+#endif
 };
+
+at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    if (use_koi_tiled) {
+        const int N = static_cast<int>(x.size(0));
+        const int T = static_cast<int>(x.size(1));
+        const int C = static_cast<int>(x.size(2));
+        const int D = head_dim;
+        const int H = nhead;
+        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        x = x.view({N, T / 16, 16, C / 8, 8}).transpose(2, 3).contiguous();
+
+        for (int i = 0; i < params.depth; ++i) {
+            auto ctr = torch::zeros({4}, x.options().dtype(torch::kI32));
+            // TODO: initialise (i.e. transpose) all weight tensors once
+            const float alpha = params.deepnorm_alpha;
+            qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
+            auto w = wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
+            auto sincos_bfr = torch::empty({T / 16, D / 8, 16, 8}, x.options());
+
+            KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'});
+            KoiTensorExt weights_qkv(w, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'});
+            KoiTensorExt sincos(sincos_bfr, {'T', 'D', 't', 'd'});
+            KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
+
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_qkv_rotary(stream, rotary_emb->theta, &in, &weights_qkv, &sincos,
+                                         &out_qkv, ctr[0].data_ptr());
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_linear(stream, &out_attn, &proj_w, &proj_b, &out_proj,
+                                     ctr[1].data_ptr());
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_rmsnorm_residual(stream, &out_proj, &in, alpha, &res_weights, &in);
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_mm_swiglu(stream, &in, &fc1_wts, &fc1_out, ctr[2].data_ptr());
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_linear(stream, &fc1_out, &fc2_wts, nullptr, &fc2_out,
+                                     ctr[3].data_ptr());
+                // TODO: handle result
+            }
+            {
+                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                int res = koi_rmsnorm_residual(stream, &fc2_out, &in, alpha, &res2_weights, &in);
+                // TODO: handle result
+            }
+        }
+        return x.transpose(2, 3).contiguous().view({N, T, C});
+    }
+#endif
+    return stack->forward(x);
+}
 
 LinearUpsampleImpl::LinearUpsampleImpl(const tx::EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
@@ -466,7 +540,7 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
-    tx_encoder = register_module("transformer_encoder", TxEncoderStack(config, m_options));
+    tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));
     tx_decoder = register_module("transformer_decoder", LinearUpsample(config.tx->upsample));
     crf = register_module("crf", LinearScaledCRF(config.tx->crf));
 }
