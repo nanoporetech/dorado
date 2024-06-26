@@ -48,6 +48,23 @@ DEFINE_TEST("send() with task invokes the task") {
     REQUIRE(invoked.wait_for(TIMEOUT));
 }
 
+DEFINE_TEST("send() with non-copyable task invokes the task") {
+    AsyncTaskExecutor cut{1, "test_executor"};
+
+    Flag invoked{};
+    struct Signaller {
+        Signaller(Flag& flag) : m_flag(flag) {}
+        void signal() { m_flag.signal(); }
+
+        Flag& m_flag;
+    };
+    auto non_copyable_signaller = std::make_unique<Signaller>(invoked);
+
+    cut.send([signaller = std::move(non_copyable_signaller)] { signaller->signal(); });
+
+    REQUIRE(invoked.wait_for(TIMEOUT));
+}
+
 DEFINE_TEST("send() invokes task on separate thread") {
     AsyncTaskExecutor cut{1, "test_executor"};
 

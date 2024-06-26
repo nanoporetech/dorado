@@ -6,6 +6,7 @@
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "messages.h"
+#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
@@ -173,12 +174,6 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
-//template<typename F>
-//auto shared_func(F&& f) {
-//    return [wrapped_func = std::make_shared<F>(f)] { return *wrapped_func();
-//    };
-//}
-
 template <class F>
 auto shared_func(F&& f) {
     return [pf = std::make_shared<std::decay_t<F>>(std::forward<F>(f))]() -> decltype(auto) {
@@ -188,19 +183,19 @@ auto shared_func(F&& f) {
 
 void AlignerNode::input_thread_fn() {
     Message message;
-    mm_tbuf_t* tbuf = mm_tbuf_init();
-    auto align_read = [this, tbuf](auto&& read) {
-        m_task_executor->send([this, tbuf, read = std::move(read)]() mutable {
-            align_read_common(read->read_common, tbuf);
+    auto align_read = [this](auto&& read) {
+        m_task_executor->send([this, read = std::move(read)]() mutable {
+            thread_local MmTbufPtr tbuf = MmTbufPtr(mm_tbuf_init());
+            align_read_common(read->read_common, tbuf.get());
             send_message_to_sink(std::move(read));
         });
     };
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            m_task_executor->send([this, tbuf,
-                                   bam_message = std::get<BamMessage>(std::move(message))] {
+            m_task_executor->send([this, bam_message = std::get<BamMessage>(std::move(message))] {
+                thread_local MmTbufPtr tbuf = MmTbufPtr(mm_tbuf_init());
                 auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                                       .align(bam_message.bam_ptr.get(), tbuf);
+                                       .align(bam_message.bam_ptr.get(), tbuf.get());
                 for (auto& record : records) {
                     if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
                         auto ref_id = record->core.tid;
@@ -219,7 +214,6 @@ void AlignerNode::input_thread_fn() {
         }
     }
     m_task_executor->join();
-    mm_tbuf_destroy(tbuf);
 }
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

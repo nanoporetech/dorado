@@ -10,6 +10,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace dorado::utils::concurrency {
@@ -58,9 +59,18 @@ public:
     AsyncTaskExecutor(std::size_t num_threads, std::string name);
     ~AsyncTaskExecutor();
 
-    template <typename TASK>
-    void send(TASK&& task) {
-        send_impl([task_wrapper = std::make_shared<std::decay_t<TASK>>(std::forward<TASK>(
+    template <typename T,
+              typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
+    void send(T&& task) {
+        send_impl(task);
+    }
+
+    template <typename T,
+              typename std::enable_if<!std::is_copy_constructible<T>{}, bool>::type = true>
+    void send(T&& task) {
+        // The task contains a non-copyable such as a SimplexReadPtr so wrap it in a
+        // shared_ptr so it can be assigned to a std::function
+        send_impl([task_wrapper = std::make_shared<std::decay_t<T>>(std::forward<T>(
                            task))]() -> decltype(auto) { return (*task_wrapper)(); });
     }
 
