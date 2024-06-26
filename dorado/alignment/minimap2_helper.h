@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 struct mm_tbuf_s;
 
 namespace dorado::alignment {
