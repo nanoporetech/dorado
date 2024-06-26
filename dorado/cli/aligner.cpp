@@ -51,9 +51,9 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
             dorado::alignment::mm2::print_aln_seq() ? 1 : static_cast<int>(num_threads)};
     switch (index_file_access->load_index(filename, options, num_index_construction_threads)) {
     case dorado::alignment::IndexLoadResult::reference_file_not_found:
-        throw std::runtime_error("AlignerNode reference path does not exist: " + filename);
+        throw std::runtime_error("Alignment reference path does not exist: " + filename);
     case dorado::alignment::IndexLoadResult::validation_error:
-        throw std::runtime_error("AlignerNode validation error checking minimap options");
+        throw std::runtime_error("Validation error checking minimap options");
     case dorado::alignment::IndexLoadResult::split_index_not_supported:
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger "
@@ -228,9 +228,21 @@ int aligner(int argc, char* argv[]) {
 #endif
     }
 
-    auto index_file_access =
-            load_index(align_info->reference_file, align_info->minimap_options, aligner_threads);
-    auto bed_file_access = load_bed(align_info->bed_file);
+    std::shared_ptr<dorado::alignment::IndexFileAccess> index_file_access;
+    try {
+        index_file_access = load_index(align_info->reference_file, align_info->minimap_options,
+                                       aligner_threads);
+    } catch (const std::exception& e) {
+        spdlog::error("Index file loading failed: {}", e.what());
+        return EXIT_FAILURE;
+    }
+    std::shared_ptr<dorado::alignment::BedFileAccess> bed_file_access;
+    try {
+        bed_file_access = load_bed(align_info->bed_file);
+    } catch (const std::exception& e) {
+        spdlog::error("bed file loading failed: {}", e.what());
+        return EXIT_FAILURE;
+    }
 
     ReadOutputProgressStats progress_stats(
             std::chrono::seconds{progress_stats_frequency}, all_files.size(),
