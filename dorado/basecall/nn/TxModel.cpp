@@ -435,7 +435,8 @@ TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params_,
 #if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
     // TODO: make sure these are all the requirements
     use_koi_tiled = koi_tc_is_available(KOI_F16) && (params.d_model == 512) &&
-                    (params.dim_feedforward == 2048);
+                    (params.nhead == 8) && (params.attn_window.first == 128) &&
+                    (params.attn_window.second == 127) && (params.dim_feedforward == 2048);
 #endif
 };
 
@@ -444,14 +445,16 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
     if (use_koi_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
-        const int C = static_cast<int>(x.size(2));
-        const int D = head_dim;
-        const int H = nhead;
+        const int C = params.d_model;
+        const int D = params.d_model / params.nhead;
+        const int H = params.nhead;
+        const auto [win_upper, win_lower] = params.attn_window;
         auto stream = at::cuda::getCurrentCUDAStream().stream();
         x = x.view({N, T / 16, 16, C / 8, 8}).transpose(2, 3).contiguous();
 
+        auto ctr = torch::zeros({params.depth, 4}, x.options().dtype(torch::kI32));
         for (int i = 0; i < params.depth; ++i) {
-            auto ctr = torch::zeros({4}, x.options().dtype(torch::kI32));
+            utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
             // TODO: initialise (i.e. transpose) all weight tensors once
             const float alpha = params.deepnorm_alpha;
             qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
@@ -464,40 +467,40 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
             KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
 
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("QKV+ROTE", 3);
                 int res = koi_qkv_rotary(stream, rotary_emb->theta, &in, &weights_qkv, &sincos,
-                                         &out_qkv, ctr[0].data_ptr());
+                                         &out_qkv, ctr[i][0].data_ptr());
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("MEA", 3);
                 int res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("OUTP", 3);
                 int res = koi_linear(stream, &out_attn, &proj_w, &proj_b, &out_proj,
-                                     ctr[1].data_ptr());
+                                     ctr[i][1].data_ptr());
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("LNORM1", 3);
                 int res = koi_rmsnorm_residual(stream, &out_proj, &in, alpha, &res_weights, &in);
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
-                int res = koi_mm_swiglu(stream, &in, &fc1_wts, &fc1_out, ctr[2].data_ptr());
+                utils::ScopedProfileRange spr("FC1+SILU", 3);
+                int res = koi_mm_swiglu(stream, &in, &fc1_wts, &fc1_out, ctr[i][2].data_ptr());
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("FC2", 3);
                 int res = koi_linear(stream, &fc1_out, &fc2_wts, nullptr, &fc2_out,
-                                     ctr[3].data_ptr());
+                                     ctr[i][3].data_ptr());
                 // TODO: handle result
             }
             {
-                utils::ScopedProfileRange spr("QKV_ROTE", 3);
+                utils::ScopedProfileRange spr("LNORM2", 3);
                 int res = koi_rmsnorm_residual(stream, &fc2_out, &in, alpha, &res2_weights, &in);
                 // TODO: handle result
             }
