@@ -7,7 +7,7 @@
 
 #include <utility>
 
-#define CUT_TAG "[dorado::utils::concurrency::AsyncTaskExecutor]"
+#define CUT_TAG "[dorado::utils::concurrency::NoQueueThreadPool]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
 using namespace std::chrono_literals;
@@ -17,7 +17,7 @@ namespace dorado::utils::concurrency::async_task_executor {
 namespace {
 constexpr auto TIMEOUT{5s};
 
-std::vector<std::thread> create_producer_threads(AsyncTaskExecutor& cut,
+std::vector<std::thread> create_producer_threads(NoQueueThreadPool& cut,
                                                  std::size_t count,
                                                  const std::function<void()>& task) {
     std::vector<std::thread> producer_threads{};
@@ -30,16 +30,16 @@ std::vector<std::thread> create_producer_threads(AsyncTaskExecutor& cut,
 
 }  // namespace
 
-DEFINE_TEST("Constructor with 1 thread does not throw") { REQUIRE_NOTHROW(AsyncTaskExecutor(1)); }
+DEFINE_TEST("Constructor with 1 thread does not throw") { REQUIRE_NOTHROW(NoQueueThreadPool(1)); }
 
 DEFINE_TEST("send() with task does not thread") {
-    AsyncTaskExecutor cut{1, "test_executor"};
+    NoQueueThreadPool cut{1, "test_executor"};
 
     REQUIRE_NOTHROW(cut.send([] {}));
 }
 
 DEFINE_TEST("send() with task invokes the task") {
-    AsyncTaskExecutor cut{1, "test_executor"};
+    NoQueueThreadPool cut{1, "test_executor"};
 
     Flag invoked{};
 
@@ -49,7 +49,7 @@ DEFINE_TEST("send() with task invokes the task") {
 }
 
 DEFINE_TEST("send() with non-copyable task invokes the task") {
-    AsyncTaskExecutor cut{1, "test_executor"};
+    NoQueueThreadPool cut{1, "test_executor"};
 
     Flag invoked{};
     struct Signaller {
@@ -66,7 +66,7 @@ DEFINE_TEST("send() with non-copyable task invokes the task") {
 }
 
 DEFINE_TEST("send() invokes task on separate thread") {
-    AsyncTaskExecutor cut{1, "test_executor"};
+    NoQueueThreadPool cut{1, "test_executor"};
 
     Flag thread_id_assigned{};
 
@@ -83,7 +83,7 @@ DEFINE_TEST("send() invokes task on separate thread") {
 
 DEFINE_TEST("join() with 2 active threads completes") {
     constexpr std::size_t num_threads{2};
-    AsyncTaskExecutor cut{num_threads, "test_executor"};
+    NoQueueThreadPool cut{num_threads, "test_executor"};
     Flag release_busy_tasks{};
     auto producer_threads = create_producer_threads(
             cut, num_threads, [&release_busy_tasks] { release_busy_tasks.wait(); });
@@ -110,7 +110,7 @@ DEFINE_TEST("join() with 2 active threads completes") {
 
 DEFINE_TEST("send() when all threads busy blocks") {
     constexpr std::size_t num_threads{2};
-    AsyncTaskExecutor cut{num_threads, "test_executor"};
+    NoQueueThreadPool cut{num_threads, "test_executor"};
     Flag release_busy_tasks{};
     auto producer_threads = create_producer_threads(
             cut, num_threads, [&release_busy_tasks] { release_busy_tasks.wait(); });

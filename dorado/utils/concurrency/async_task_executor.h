@@ -51,13 +51,13 @@ namespace dorado::utils::concurrency {
 // Suitable for usecases where a producer thread should not be allowed to
 // enqueue a large amount of tasks ahead of a second producer thread
 // beginning to enqueue tasks.
-class AsyncTaskExecutor {
+class NoQueueThreadPool {
 public:
     using TaskType = std::function<void()>;
 
-    AsyncTaskExecutor(std::size_t num_threads);
-    AsyncTaskExecutor(std::size_t num_threads, std::string name);
-    ~AsyncTaskExecutor();
+    NoQueueThreadPool(std::size_t num_threads);
+    NoQueueThreadPool(std::size_t num_threads, std::string name);
+    ~NoQueueThreadPool();
 
     template <typename T,
               typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
@@ -96,4 +96,5 @@ private:
     std::shared_ptr<WaitingTask> wait_on_next_task();
     void process_task_queue();
 };
+
 }  // namespace dorado::utils::concurrency
