@@ -17,12 +17,24 @@ namespace dorado::utils::concurrency {
 class AsyncTaskExecutor {
     std::shared_ptr<NoQueueThreadPool> m_thread_pool;
 
+    void send_impl(NoQueueThreadPool::TaskType task);
+
 public:
     AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool);
 
-    template <typename T>
+    template <typename T,
+              typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
     void send(T&& task) {
-        m_thread_pool->send(std::forward<T>(task));
+        send_impl(std::forward<T>(task));
+    }
+
+    template <typename T,
+              typename std::enable_if<!std::is_copy_constructible<T>{}, bool>::type = true>
+    void send(T&& task) {
+        // The task contains a non-copyable such as a SimplexReadPtr so wrap it in a
+        // shared_ptr so it can be assigned to a std::function
+        send_impl([task_wrapper = std::make_shared<std::decay_t<T>>(std::forward<T>(
+                           task))]() -> decltype(auto) { return (*task_wrapper)(); });
     }
 };
 

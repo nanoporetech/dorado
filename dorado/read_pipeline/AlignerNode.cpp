@@ -71,9 +71,9 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const alignment::Minimap2Options& options,
                          int threads)
         : MessageSink(10000, 1),
-          m_task_executor(
+          m_task_executor(std::make_shared<utils::concurrency::AsyncTaskExecutor>(
                   std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                          "align_node_exec")),
+                                                                          "align_node_exec"))),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
@@ -100,9 +100,9 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                          int threads)
         : MessageSink(10000, 1),
-          m_task_executor(
+          m_task_executor(std::make_shared<utils::concurrency::AsyncTaskExecutor>(
                   std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                          "align_node_exec")),
+                                                                          "align_node_exec"))),
           m_index_file_access(std::move(index_file_access)),
           m_bed_file_access(std::move(bed_file_access)) {
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");
@@ -212,7 +212,7 @@ void AlignerNode::input_thread_fn() {
             continue;
         }
     }
-    m_task_executor->join();
+    //m_task_executor->join();
 }
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

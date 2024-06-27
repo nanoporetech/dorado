@@ -28,20 +28,7 @@ public:
     NoQueueThreadPool(std::size_t num_threads, std::string name);
     ~NoQueueThreadPool();
 
-    template <typename T,
-              typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
-    void send(T&& task) {
-        send_impl(std::forward<T>(task));
-    }
-
-    template <typename T,
-              typename std::enable_if<!std::is_copy_constructible<T>{}, bool>::type = true>
-    void send(T&& task) {
-        // The task contains a non-copyable such as a SimplexReadPtr so wrap it in a
-        // shared_ptr so it can be assigned to a std::function
-        send_impl([task_wrapper = std::make_shared<std::decay_t<T>>(std::forward<T>(
-                           task))]() -> decltype(auto) { return (*task_wrapper)(); });
-    }
+    void send(TaskType task);
 
     void join();
 

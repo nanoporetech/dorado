@@ -51,7 +51,7 @@ private:
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 
-    std::shared_ptr<utils::concurrency::NoQueueThreadPool> m_task_executor{};
+    std::shared_ptr<utils::concurrency::AsyncTaskExecutor> m_task_executor{};
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<const alignment::BedFile> m_bedfile_for_bam_messages{};
     std::vector<std::string> m_header_sequence_names{};
