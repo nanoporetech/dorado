@@ -212,7 +212,7 @@ void AlignerNode::input_thread_fn() {
             continue;
         }
     }
-    //m_task_executor->join();
+    m_task_executor->flush();
 }
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

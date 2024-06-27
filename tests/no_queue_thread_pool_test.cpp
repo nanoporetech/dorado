@@ -75,7 +75,9 @@ DEFINE_TEST("NoQueueThreadPool::join() with 2 active threads completes") {
     auto join_producer_threads = PostCondition([&producer_threads, &release_busy_tasks] {
         release_busy_tasks.signal();
         for (auto& producer_thread : producer_threads) {
-            producer_thread.join();
+            if (producer_thread.joinable()) {
+                producer_thread.join();
+            }
         }
     });
 
@@ -86,7 +88,7 @@ DEFINE_TEST("NoQueueThreadPool::join() with 2 active threads completes") {
     });
 
     // Check the join is blocked waiting on the busy threads
-    CHECK_FALSE(joined_flag.wait_for(1s));
+    CHECK_FALSE(joined_flag.wait_for(200ms));
 
     release_busy_tasks.signal();
 
@@ -117,7 +119,7 @@ DEFINE_TEST("NoQueueThreadPool::send() when all threads busy blocks") {
         cut.send([&test_task_started] { test_task_started.signal(); });
     });
 
-    CHECK_FALSE(test_task_started.wait_for(1s));
+    CHECK_FALSE(test_task_started.wait_for(200ms));
 
     SECTION("send() is unblocked when thread can be assigned.") {
         release_busy_tasks.signal();

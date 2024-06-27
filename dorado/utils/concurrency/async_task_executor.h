@@ -1,8 +1,10 @@
 #pragma once
 
 #include "no_queue_thread_pool.h"
+#include "synchronisation.h"
 
 #include <memory>
+#include <mutex>
 
 namespace dorado::utils::concurrency {
 
@@ -13,11 +15,17 @@ namespace dorado::utils::concurrency {
 // the underlying thread pool.
 // Useful if a Node sharing a thread pool across pipelines needs
 // to flush it's tasks without waiting for other pipleines to
-// aslo flush.
+// also flush.
 class AsyncTaskExecutor {
     std::shared_ptr<NoQueueThreadPool> m_thread_pool;
+    std::mutex m_mutex{};
+    std::size_t m_num_tasks_in_flight{};
+    std::unique_ptr<Latch> m_flushing_counter;
 
     void send_impl(NoQueueThreadPool::TaskType task);
+    void decrement_tasks_in_flight();
+    void increment_tasks_in_flight();
+    void create_flushing_counter();
 
 public:
     AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool);
@@ -36,6 +44,10 @@ public:
         send_impl([task_wrapper = std::make_shared<std::decay_t<T>>(std::forward<T>(
                            task))]() -> decltype(auto) { return (*task_wrapper)(); });
     }
+
+    // Blocks until all queued tasks are completed.
+    // After invoking no further tasks may be enqueued by this executor.
+    void flush();
 };
 
 }  // namespace dorado::utils::concurrency
