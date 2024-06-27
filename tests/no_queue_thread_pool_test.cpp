@@ -70,8 +70,12 @@ DEFINE_TEST("NoQueueThreadPool::join() with 2 active threads completes") {
     constexpr std::size_t num_threads{2};
     NoQueueThreadPool cut{num_threads, "test_executor"};
     Flag release_busy_tasks{};
-    auto producer_threads = create_producer_threads(
-            cut, num_threads, [&release_busy_tasks] { release_busy_tasks.wait(); });
+    Latch all_busy_tasks_started{num_threads};
+    auto producer_threads = create_producer_threads(cut, num_threads,
+                                                    [&release_busy_tasks, &all_busy_tasks_started] {
+                                                        all_busy_tasks_started.count_down();
+                                                        release_busy_tasks.wait();
+                                                    });
     auto join_producer_threads = PostCondition([&producer_threads, &release_busy_tasks] {
         release_busy_tasks.signal();
         for (auto& producer_thread : producer_threads) {
@@ -81,6 +85,8 @@ DEFINE_TEST("NoQueueThreadPool::join() with 2 active threads completes") {
         }
     });
 
+    // Once we know all the pool threads are busy try to join
+    all_busy_tasks_started.wait();
     Flag joined_flag{};
     producer_threads.emplace_back([&cut, &joined_flag] {
         cut.join();

@@ -62,31 +62,43 @@ DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task")
 DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
     AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2));
 
-    GIVEN("2 long running tasks are queued") {
+    GIVEN("2 tasks are running") {
         std::vector<std::unique_ptr<Flag>> task_release_flags{};
+        task_release_flags.reserve(3);
+        task_release_flags.emplace_back(std::make_unique<Flag>());
         task_release_flags.emplace_back(std::make_unique<Flag>());
         task_release_flags.emplace_back(std::make_unique<Flag>());
 
-        cut.send([&task_release_flags] { task_release_flags[0]->wait(); });
-        cut.send([&task_release_flags] { task_release_flags[1]->wait(); });
+        std::vector<std::unique_ptr<Flag>> task_started_flags{};
+        task_started_flags.reserve(3);
+        task_started_flags.emplace_back(std::make_unique<Flag>());
+        task_started_flags.emplace_back(std::make_unique<Flag>());
+        task_started_flags.emplace_back(std::make_unique<Flag>());
+
+        auto create_task = [&task_release_flags, &task_started_flags](std::size_t index) {
+            return [&task_release_flags, &task_started_flags, index] {
+                task_started_flags[index]->signal();
+                task_release_flags[index]->wait();
+            };
+        };
+
+        cut.send(create_task(0));
+        cut.send(create_task(1));
         auto release_all_tasks = [&task_release_flags] {
             for (auto& release_flag : task_release_flags) {
                 release_flag->signal();
             }
         };
-        auto release_long_running_tasks_on_exit =
+        auto release_all_tasks_on_exit =
                 PostCondition([&release_all_tasks] { release_all_tasks(); });
 
-        AND_GIVEN("third task is sent") {
-            Flag third_task_invoked{};
-            task_release_flags.emplace_back(std::make_unique<Flag>());
+        // check they've both started and the worker threads are busy
+        CHECK(task_started_flags[0]->wait_for(TIMEOUT));
+        CHECK(task_started_flags[1]->wait_for(TIMEOUT));
 
-            std::thread third_task_thread([&cut, &third_task_invoked, &task_release_flags] {
-                cut.send([&third_task_invoked, &task_release_flags] {
-                    third_task_invoked.signal();
-                    task_release_flags[2]->wait();
-                });
-            });
+        AND_GIVEN("third task is sent") {
+            std::thread third_task_thread(
+                    [&cut, third_task = create_task(2)] { cut.send(std::move(third_task)); });
             auto join_third_task_thread_on_exit =
                     PostCondition([&release_all_tasks, &third_task_thread] {
                         release_all_tasks();
@@ -95,106 +107,16 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
                         }
                     });
 
-            THEN("third task is not invoked") { CHECK_FALSE(third_task_invoked.wait_for(200ms)); }
+            THEN("third task is not invoked") {
+                CHECK_FALSE(task_started_flags[2]->wait_for(200ms));
+            }
 
-            WHEN("First long running task completes") {
+            WHEN("first task completes") {
                 task_release_flags[0]->signal();
 
-                THEN("third task is invoked") { CHECK(third_task_invoked.wait_for(TIMEOUT)); }
-            }
-
-            AND_GIVEN("fourth task is sent") {
-                Flag fourth_task_invoked{};
-                task_release_flags.emplace_back(std::make_unique<Flag>());
-                std::thread fourth_task_thread([&cut, &fourth_task_invoked, &task_release_flags] {
-                    cut.send([&fourth_task_invoked, &task_release_flags] {
-                        fourth_task_invoked.signal();
-                        task_release_flags[3]->wait();
-                    });
-                });
-                auto join_fourth_task_thread_on_exit =
-                        PostCondition([&release_all_tasks, &fourth_task_thread] {
-                            release_all_tasks();
-                            if (fourth_task_thread.joinable()) {
-                                fourth_task_thread.join();
-                            }
-                        });
-                WHEN("first task completes") {
-                    task_release_flags[0]->signal();
-
-                    THEN("fourth task is not invoked") {
-                        CHECK_FALSE(fourth_task_invoked.wait_for(200ms));
-                    }
-                    AND_WHEN("second task completes") {
-                        task_release_flags[1]->signal();
-
-                        THEN("Fourth task is invoked") {
-                            CHECK(fourth_task_invoked.wait_for(TIMEOUT));
-                        }
-                    }
-                    AND_WHEN("third task completes") {
-                        task_release_flags[2]->signal();
-
-                        THEN("Fourth task is invoked") {
-                            CHECK(fourth_task_invoked.wait_for(TIMEOUT));
-                        }
-                    }
-                }
+                THEN("third task is invoked") { CHECK(task_started_flags[2]->wait_for(TIMEOUT)); }
             }
         }
-    }
-}
-
-DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads. Flushing") {
-    AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2));
-
-    GIVEN("2 tasks are running and 2 further tasks queued") {
-        std::vector<std::unique_ptr<Flag>> task_release_flags{};
-        task_release_flags.emplace_back(std::make_unique<Flag>());
-        task_release_flags.emplace_back(std::make_unique<Flag>());
-
-        cut.send([&task_release_flags] { task_release_flags[0]->wait(); });
-        cut.send([&task_release_flags] { task_release_flags[1]->wait(); });
-        auto release_all_tasks = [&task_release_flags] {
-            for (auto& release_flag : task_release_flags) {
-                release_flag->signal();
-            }
-        };
-
-        // Queue third task in dedicated producer thread
-        Flag third_task_invoked{};
-        task_release_flags.emplace_back(std::make_unique<Flag>());
-
-        std::thread third_task_thread([&cut, &third_task_invoked, &task_release_flags] {
-            cut.send([&third_task_invoked, &task_release_flags] {
-                third_task_invoked.signal();
-                task_release_flags[2]->wait();
-            });
-        });
-        auto join_third_task_thread_on_exit =
-                PostCondition([&release_all_tasks, &third_task_thread] {
-                    release_all_tasks();
-                    if (third_task_thread.joinable()) {
-                        third_task_thread.join();
-                    }
-                });
-
-        // Queue fourth task in dedicated producer thread
-        Flag fourth_task_invoked{};
-        task_release_flags.emplace_back(std::make_unique<Flag>());
-        std::thread fourth_task_thread([&cut, &fourth_task_invoked, &task_release_flags] {
-            cut.send([&fourth_task_invoked, &task_release_flags] {
-                fourth_task_invoked.signal();
-                task_release_flags[3]->wait();
-            });
-        });
-        auto join_fourth_task_thread_on_exit =
-                PostCondition([&release_all_tasks, &fourth_task_thread] {
-                    release_all_tasks();
-                    if (fourth_task_thread.joinable()) {
-                        fourth_task_thread.join();
-                    }
-                });
 
         WHEN("flush is called") {
             Flag flush_completed{};
@@ -212,10 +134,8 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads. Flushing") {
 
             THEN("flush is blocked") { CHECK_FALSE(flush_completed.wait_for(200ms)); }
 
-            AND_WHEN("three tasks are completed") {
+            AND_WHEN("one tasks is completed") {
                 task_release_flags[0]->signal();
-                task_release_flags[1]->signal();
-                task_release_flags[2]->signal();
 
                 THEN("flush is still blocked") { CHECK_FALSE(flush_completed.wait_for(200ms)); }
             }

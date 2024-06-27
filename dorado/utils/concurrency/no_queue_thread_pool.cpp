@@ -9,7 +9,7 @@ NoQueueThreadPool::NoQueueThreadPool(std::size_t num_threads) : m_num_threads{nu
 }
 
 NoQueueThreadPool::NoQueueThreadPool(std::size_t num_threads, std::string name)
-        : m_name{name}, m_num_threads{num_threads} {
+        : m_name{std::move(name)}, m_num_threads{num_threads} {
     initialise();
 }
 
