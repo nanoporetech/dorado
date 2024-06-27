@@ -65,4 +65,7 @@ void NoQueueThreadPool::process_task_queue() {
     }
 }
 
+AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool)
+        : m_thread_pool(std::move(thread_pool)) {}
+
 }  // namespace dorado::utils::concurrency

@@ -5,7 +5,6 @@
 #include "alignment/Minimap2Index.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
-#include "alignment/minimap2_helper.h"
 #include "messages.h"
 
 #include <htslib/sam.h>
@@ -185,7 +184,7 @@ void AlignerNode::input_thread_fn() {
     Message message;
     auto align_read = [this](auto&& read) {
         m_task_executor->send([this, read = std::move(read)]() mutable {
-            thread_local alignment::MmTbufPtr tbuf{mm_tbuf_init()};
+            thread_local MmTbufPtr tbuf{mm_tbuf_init()};
             align_read_common(read->read_common, tbuf.get());
             send_message_to_sink(std::move(read));
         });
@@ -193,7 +192,7 @@ void AlignerNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
             m_task_executor->send([this, bam_message = std::get<BamMessage>(std::move(message))] {
-                thread_local alignment::MmTbufPtr tbuf{mm_tbuf_init()};
+                thread_local MmTbufPtr tbuf{mm_tbuf_init()};
                 auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                        .align(bam_message.bam_ptr.get(), tbuf.get());
                 for (auto& record : records) {

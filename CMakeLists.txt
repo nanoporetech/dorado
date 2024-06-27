@@ -152,8 +152,6 @@ add_library(dorado_lib
     dorado/alignment/IndexFileAccess.h
     dorado/alignment/minimap2_args.cpp
     dorado/alignment/minimap2_args.h
-    dorado/alignment/minimap2_helper.cpp
-    dorado/alignment/minimap2_helper.h
     dorado/alignment/minimap2_wrappers.h
     dorado/alignment/Minimap2Aligner.cpp
     dorado/alignment/Minimap2Aligner.h

@@ -15,37 +15,6 @@
 
 namespace dorado::utils::concurrency {
 
-//namespace details {
-///**
-// * Helper class providing a thread safe messaging queue which can be pushed to and waited on.
-// * Pushing messages while the queue is at full capacity will cause the  pushing thread to block
-// * until a message has been popped and a new message can be enqueued.
-// *
-// * TODO: consider a fair polling mutex to prevent the same thread consistently winning the race
-// * to enqueu the next task.
-// */
-//template <typename T>
-//class BlockingMessageQueue final {
-//    typedef T message_type;
-//
-//    BlockingMessageQueue(const MessageQueue &) = delete;
-//
-//    BlockingMessageQueue &operator=(BlockingMessageQueue &) = delete;
-//
-//    std::mutex m_mutex;
-//    std::queue<message_type> m_message_queue;
-//    std::condition_variable m_message_received;
-//
-//public:
-//    MessageQueue() = default;
-//
-//    auto send(message_type message) -> void;
-//
-//    auto receive() -> message_type;
-//};
-//
-//}  // namespace details
-
 // Thread pool which blocks new tasks being added while all
 // threads are busy.
 // Suitable for usecases where a producer thread should not be allowed to
@@ -62,7 +31,7 @@ public:
     template <typename T,
               typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
     void send(T&& task) {
-        send_impl(task);
+        send_impl(std::forward<T>(task));
     }
 
     template <typename T,
@@ -95,6 +64,26 @@ private:
     void initialise();
     std::shared_ptr<WaitingTask> wait_on_next_task();
     void process_task_queue();
+};
+
+// Executor for posting tasks to an underlying thread pool
+// Many executors can be assigned to the same thread pool.
+// Allows tasks posted to a single instance of the executor
+// to be waited on instead of waiting on all tasks posted to
+// the underlying thread pool.
+// Useful if a Node sharing a thread pool across pipelines needs
+// to flush it's tasks without waiting for other pipleines to
+// aslo flush.
+class AsyncTaskExecutor {
+    std::shared_ptr<NoQueueThreadPool> m_thread_pool;
+
+public:
+    AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool);
+
+    template <typename T>
+    void send(T&& task) {
+        m_thread_pool->send(std::forward<T>(task));
+    }
 };
 
 }  // namespace dorado::utils::concurrency
