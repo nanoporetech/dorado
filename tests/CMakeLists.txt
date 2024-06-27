@@ -40,6 +40,7 @@ add_executable(dorado_tests
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     myers_test.cpp
+    no_queue_thread_pool_test.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     PolyACalculatorTest.cpp
