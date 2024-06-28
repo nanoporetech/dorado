@@ -15,6 +15,11 @@
 
 namespace dorado::utils::concurrency {
 
+enum class TaskPriority {
+    normal,
+    high,
+};
+
 // Thread pool which blocks new tasks being added while all
 // threads are busy.
 // Suitable for usecases where a producer thread should not be allowed to
@@ -28,7 +33,7 @@ public:
     NoQueueThreadPool(std::size_t num_threads, std::string name);
     ~NoQueueThreadPool();
 
-    void send(TaskType task);
+    void send(TaskType task, TaskPriority priority);
 
     void join();
 
@@ -47,7 +52,6 @@ private:
     std::queue<std::shared_ptr<WaitingTask>> m_task_queue{};
     std::condition_variable m_message_received{};
 
-    void send_impl(TaskType task);
     void initialise();
     std::shared_ptr<WaitingTask> wait_on_next_task();
     void process_task_queue();

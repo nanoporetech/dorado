@@ -4,32 +4,34 @@
 
 namespace dorado::utils::concurrency {
 
-AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool)
-        : m_thread_pool(std::move(thread_pool)) {}
+AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool,
+                                     TaskPriority priority)
+        : m_thread_pool(std::move(thread_pool)), m_priority(priority) {}
 
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 
 void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
     increment_tasks_in_flight();
 
-    m_thread_pool->send([task = std::move(task), this] {
-        task();
-        decrement_tasks_in_flight();
-    });
+    m_thread_pool->send(
+            [task = std::move(task), this] {
+                task();
+                decrement_tasks_in_flight();
+            },
+            m_priority);
 }
 
 std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(NoQueueThreadPool::TaskType task) {
     increment_tasks_in_flight();
 
-    auto sending_thread = std::make_unique<std::thread>(
-            [this,
-             task = std::move(
-                     task)]() mutable {  // mutable to allow task to be moved to the thread pool
-                m_thread_pool->send([task = std::move(task), this] {
+    auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)]() mutable {
+        m_thread_pool->send(
+                [task = std::move(task), this] {
                     task();
                     decrement_tasks_in_flight();
-                });
-            });
+                },
+                m_priority);
+    });
 
     return sending_thread;
 }

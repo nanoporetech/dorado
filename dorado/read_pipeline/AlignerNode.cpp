@@ -71,9 +71,8 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const alignment::Minimap2Options& options,
                          int threads)
         : MessageSink(10000, 1),
-          m_task_executor(std::make_shared<utils::concurrency::AsyncTaskExecutor>(
-                  std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                          "align_node_exec"))),
+          m_thread_pool(std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
+                                                                                "align_node_pool")),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
@@ -100,9 +99,8 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                          int threads)
         : MessageSink(10000, 1),
-          m_task_executor(std::make_shared<utils::concurrency::AsyncTaskExecutor>(
-                  std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                          "align_node_exec"))),
+          m_thread_pool(std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
+                                                                                "align_node_pool")),
           m_index_file_access(std::move(index_file_access)),
           m_bed_file_access(std::move(bed_file_access)) {
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");
@@ -182,8 +180,10 @@ auto shared_func(F&& f) {
 
 void AlignerNode::input_thread_fn() {
     Message message;
-    auto align_read = [this](auto&& read) {
-        m_task_executor->send([this, read = std::move(read)]() mutable {
+    utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool,
+                                                        utils::concurrency::TaskPriority::normal};
+    auto align_read = [this, &task_executor](auto&& read) {
+        task_executor.send([this, read = std::move(read)]() mutable {
             thread_local MmTbufPtr tbuf{mm_tbuf_init()};
             align_read_common(read->read_common, tbuf.get());
             send_message_to_sink(std::move(read));
@@ -191,7 +191,7 @@ void AlignerNode::input_thread_fn() {
     };
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            m_task_executor->send([this, bam_message = std::get<BamMessage>(std::move(message))] {
+            task_executor.send([this, bam_message = std::get<BamMessage>(std::move(message))] {
                 thread_local MmTbufPtr tbuf{mm_tbuf_init()};
                 auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                        .align(bam_message.bam_ptr.get(), tbuf.get());
@@ -212,7 +212,6 @@ void AlignerNode::input_thread_fn() {
             continue;
         }
     }
-    m_task_executor->flush();
 }
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

@@ -38,7 +38,7 @@ void NoQueueThreadPool::join() {
     }
 }
 
-void NoQueueThreadPool::send(TaskType task) {
+void NoQueueThreadPool::send(TaskType task, TaskPriority) {
     auto waiting_task = std::make_shared<WaitingTask>(std::move(task));
     {
         std::unique_lock lock(m_mutex);

@@ -19,6 +19,7 @@ namespace dorado::utils::concurrency {
 // also flush.
 class AsyncTaskExecutor {
     std::shared_ptr<NoQueueThreadPool> m_thread_pool;
+    const TaskPriority m_priority;
     std::mutex m_mutex{};
     std::size_t m_num_tasks_in_flight{};
     std::unique_ptr<Latch> m_flushing_counter;
@@ -29,7 +30,7 @@ class AsyncTaskExecutor {
     void create_flushing_counter();
 
 public:
-    AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool);
+    AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool, TaskPriority priority);
     ~AsyncTaskExecutor();
 
     template <typename T,
