@@ -21,12 +21,15 @@ void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
 std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(NoQueueThreadPool::TaskType task) {
     increment_tasks_in_flight();
 
-    auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)] {
-        m_thread_pool->send([task = std::move(task), this] {
-            task();
-            decrement_tasks_in_flight();
-        });
-    });
+    auto sending_thread = std::make_unique<std::thread>(
+            [this,
+             task = std::move(
+                     task)]() mutable {  // mutable to allow task to be moved to the thread pool
+                m_thread_pool->send([task = std::move(task), this] {
+                    task();
+                    decrement_tasks_in_flight();
+                });
+            });
 
     return sending_thread;
 }
