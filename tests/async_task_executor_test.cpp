@@ -163,9 +163,9 @@ DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
             third_task_thread->join();
         }
     });
+    Flag unblock_tasks{};
     {
         AsyncTaskExecutor cut(thread_pool);
-        Flag unblock_tasks{};
         Latch two_tasks_running{2};
         producer_thread = std::make_unique<std::thread>(
                 [&cut, &num_completed_tasks, &unblock_tasks, &two_tasks_running] {
