@@ -22,8 +22,10 @@ std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(NoQueueThreadPool::Ta
     increment_tasks_in_flight();
 
     auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)] {
-        task();
-        decrement_tasks_in_flight();
+        m_thread_pool->send([task = std::move(task), this] {
+            task();
+            decrement_tasks_in_flight();
+        });
     });
 
     return sending_thread;
