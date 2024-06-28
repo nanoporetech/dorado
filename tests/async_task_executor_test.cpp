@@ -5,6 +5,7 @@
 
 #include <catch2/catch.hpp>
 
+#include <atomic>
 #include <memory>
 #include <thread>
 #include <utility>
@@ -152,7 +153,7 @@ DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
     auto thread_pool = std::make_shared<NoQueueThreadPool>(2);
 
     constexpr std::size_t NUM_TASKS{3};
-    std::size_t num_completed_tasks{0};
+    std::atomic_size_t num_completed_tasks{0};
     std::unique_ptr<std::thread> producer_thread{};
     std::unique_ptr<std::thread> third_task_thread{};
     auto join_producer_threads_on_exit = PostCondition([&producer_thread, &third_task_thread] {
