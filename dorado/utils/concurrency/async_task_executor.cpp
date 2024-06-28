@@ -7,6 +7,8 @@ namespace dorado::utils::concurrency {
 AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool)
         : m_thread_pool(std::move(thread_pool)) {}
 
+AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
+
 void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
     increment_tasks_in_flight();
 
@@ -16,10 +18,21 @@ void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
     });
 }
 
+std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(NoQueueThreadPool::TaskType task) {
+    increment_tasks_in_flight();
+
+    auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)] {
+        task();
+        decrement_tasks_in_flight();
+    });
+
+    return sending_thread;
+}
+
 void AsyncTaskExecutor::create_flushing_counter() {
     std::lock_guard lock(m_mutex);
     if (m_flushing_counter) {
-        throw std::runtime_error("Multiple calls to flush on AsyncTaskExecutor are not allowed");
+        return;
     }
     m_flushing_counter = std::make_unique<Latch>(m_num_tasks_in_flight);
 }

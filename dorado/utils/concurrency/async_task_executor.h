@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace dorado::utils::concurrency {
 
@@ -29,6 +30,7 @@ class AsyncTaskExecutor {
 
 public:
     AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool);
+    ~AsyncTaskExecutor();
 
     template <typename T,
               typename std::enable_if<std::is_copy_constructible<T>{}, bool>::type = true>
@@ -48,6 +50,9 @@ public:
     // Blocks until all queued tasks are completed.
     // After invoking no further tasks may be enqueued by this executor.
     void flush();
+
+    // Testability. Do NOT use outside utests
+    std::unique_ptr<std::thread> send_async(NoQueueThreadPool::TaskType task);
 };
 
 }  // namespace dorado::utils::concurrency

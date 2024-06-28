@@ -148,4 +148,48 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
     }
 }
 
+DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
+    auto thread_pool = std::make_shared<NoQueueThreadPool>(2);
+
+    constexpr std::size_t NUM_TASKS{3};
+    std::size_t num_completed_tasks{0};
+    std::unique_ptr<std::thread> producer_thread{};
+    std::unique_ptr<std::thread> third_task_thread{};
+    auto join_producer_threads_on_exit = PostCondition([&producer_thread, &third_task_thread] {
+        if (producer_thread && producer_thread->joinable()) {
+            producer_thread->join();
+        }
+        if (third_task_thread && third_task_thread->joinable()) {
+            third_task_thread->join();
+        }
+    });
+    {
+        AsyncTaskExecutor cut(thread_pool);
+        Flag unblock_tasks{};
+        Latch two_tasks_running{2};
+        producer_thread = std::make_unique<std::thread>(
+                [&cut, &num_completed_tasks, &unblock_tasks, &two_tasks_running] {
+                    for (std::size_t i{0}; i < 2; ++i) {
+                        cut.send([&num_completed_tasks, &unblock_tasks, &two_tasks_running] {
+                            two_tasks_running.count_down();
+                            unblock_tasks.wait();
+                            ++num_completed_tasks;
+                        });
+                    }
+                });
+        // When we know both pool threads are busy so post another task to that will have
+        // to wait to be started.
+        two_tasks_running.wait();
+        third_task_thread = cut.send_async([&unblock_tasks, &num_completed_tasks] {
+            unblock_tasks.wait();
+            ++num_completed_tasks;
+        });
+
+        // 2 tasks running + 1 task enqueued, so now unblock the tasks and immediately let
+        // the AsyncTaskExecutor go out of scope and check that all tasks completed
+        unblock_tasks.signal();
+    }
+    REQUIRE(num_completed_tasks == NUM_TASKS);
+}
+
 }  // namespace dorado::utils::concurrency::async_task_executor
