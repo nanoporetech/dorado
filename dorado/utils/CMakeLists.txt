@@ -104,6 +104,11 @@ target_include_directories(dorado_utils
     ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
+target_include_directories(dorado_utils
+    PRIVATE
+    ${KOI_INCLUDE}
+)
+
 target_link_libraries(dorado_utils
     PUBLIC
         ${TORCH_LIBRARIES}

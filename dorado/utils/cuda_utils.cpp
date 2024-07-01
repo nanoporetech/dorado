@@ -348,7 +348,7 @@ void handle_cuda_result(int cuda_result) {
 
 KoiTensorExt::KoiTensorExt(at::Tensor &t, std::vector<int> &dim_tags) {
     data_ptr = t.data_ptr();
-    ndims = t.ndim();
+    ndims = t.dim();
     if (t.dtype() == torch::kF16) {
         type_id = KOI_F16;
     } else if (t.dtype() == torch::kI8) {

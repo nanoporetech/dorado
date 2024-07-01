@@ -63,7 +63,7 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 void handle_cuda_result(int cuda_result);
 
 struct KoiTensorExt : public KoiTensor {
-    KoiTensorExt(at::Tensor &t, std::vector<int> dim_tags);
+    KoiTensorExt(at::Tensor &t, std::vector<int> &dim_tags);
 };
 
 namespace details {
