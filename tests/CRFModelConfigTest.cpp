@@ -1,6 +1,7 @@
 #include "basecall/CRFModelConfig.h"
 
 #include "TestUtils.h"
+#include "models/kits.h"
 #include "utils/parameters.h"
 
 #include <torch/torch.h>
@@ -15,6 +16,8 @@
 #define CUT_TAG "[CRFModelConfig]"
 
 using namespace dorado::basecall;
+using SampleType = dorado::models::SampleType;
+
 namespace fs = std::filesystem;
 
 TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
@@ -572,4 +575,20 @@ TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     CHECK(conv3.size == 768);
     CHECK(conv3.stride == 5);
     CHECK(conv3.winlen == 19);
+}
+
+TEST_CASE(CUT_TAG ": test sample_type", CUT_TAG) {
+    SECTION("test sample type dna") {
+        const fs::path path =
+                fs::path(get_data_dir("model_configs/sample_type_d_e8.2_400bps_sup@v5.0.0"));
+        const CRFModelConfig config = load_crf_model_config(path);
+
+        CHECK(config.sample_type == dorado::models::SampleType::DNA);
+    }
+    SECTION("test sample type rna004") {
+        const fs::path path = fs::path(get_data_dir("model_configs/sample_type_130bps_sup@v3.0.1"));
+        const CRFModelConfig config = load_crf_model_config(path);
+
+        CHECK(config.sample_type == dorado::models::SampleType::RNA004);
+    }
 }

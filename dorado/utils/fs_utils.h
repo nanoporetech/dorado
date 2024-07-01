@@ -6,6 +6,8 @@
 
 namespace dorado::utils {
 
+const std::string TEMP_MODELS_DIR_PREFIX{".temp_dorado_model-"};
+
 // True if the caller has permission to write to files in directory. If directory
 // does not exist, then it is created. Exceptions are discarded but error messages are issued.
 bool has_write_permission(const std::filesystem::path& directory);

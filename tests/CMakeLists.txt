@@ -71,7 +71,7 @@ if (NOT IOS)
             Fast5DataLoaderTest.cpp
             Pod5DataLoaderTest.cpp
             # No dorado_io_lib on iOS
-            ModelFinderTest.cpp
+            ModelSearchTest.cpp
     )
 endif()
 target_compile_definitions(dorado_tests
@@ -152,6 +152,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_tests_common
             dorado_lib
             dorado_models_lib
+            dorado_model_downloader_lib
             dorado_basecall
             dorado_modbase
             minimap2

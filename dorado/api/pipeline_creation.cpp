@@ -168,7 +168,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     utils::rapid::Settings trim_rapid_adapter_settings;
     trim_rapid_adapter_settings.active = false;
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, basecall::SampleType::DNA, false,
+            {basecaller_node}, model_config.signal_norm_params, models::SampleType::DNA, false,
             trim_rapid_adapter_settings, scaler_node_threads, 1000);
 
     // if we've been provided a source node, connect it to the start of our pipeline

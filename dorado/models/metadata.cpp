@@ -1,5 +1,6 @@
 #include "metadata.h"
 
+#include "kits.h"
 #include "utils/string_utils.h"
 
 #include <algorithm>
@@ -113,16 +114,6 @@ std::string to_string(const std::set<ModelVariant>& variants, const std::string&
 
 std::string to_string(const ModelVersion& version) {
     return to_string(version, "model version", version_map());
-}
-
-std::string to_string(const Chemistry& chemistry) {
-    const auto& chemistries = chemistry_variants();
-    auto it = chemistries.find(chemistry);
-    if (it == std::end(chemistries)) {
-        throw std::logic_error("Unknown chemistry enum: " +
-                               std::to_string(static_cast<int>(chemistry)));
-    }
-    return it->second;
 }
 
 }  // namespace dorado::models

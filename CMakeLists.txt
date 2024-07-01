@@ -131,6 +131,7 @@ enable_testing()
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/models)
+add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
@@ -369,6 +370,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/correct.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
+        dorado/cli/model_resolution.h
      )
 
     set_target_properties(dorado
@@ -391,6 +393,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_lib
         dorado_io_lib
         dorado_models_lib
+        dorado_model_downloader_lib
         dorado_compat
         minimap2
     )
@@ -493,14 +496,11 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(dorado_io_lib
         dorado/data_loader/DataLoader.cpp
         dorado/data_loader/DataLoader.h
-        dorado/data_loader/ModelFinder.cpp
-        dorado/data_loader/ModelFinder.h
      )
 
     target_link_libraries(dorado_io_lib
         PUBLIC
             dorado_lib
-            dorado_models_lib
         PRIVATE
             ${POD5_LIBRARIES}
             HDF5::HDF5

@@ -75,7 +75,7 @@ To see all options and their defaults, run `dorado -h` and `dorado <subcommand> 
 
 ### Model selection foreword
 
-Dorado can automatically select a basecalling model using a selection of model speed (`fast`, `hac`, `sup`) and the pod5 data. This feature is **not** supported for fast5 data. If the model does not exist locally, dorado will automatically downloaded the model and delete it when finished. To re-use downloaded models, manually download models using `dorado download`.
+Dorado can automatically select a basecalling model using a selection of model speed (`fast`, `hac`, `sup`) and the pod5 data. This feature is **not** supported for fast5 data. If the model does not exist locally, dorado will automatically download the model and use it.
 
 Dorado continues to support model paths.
 
@@ -429,6 +429,16 @@ Here are a few examples of model complexes:
 | hac,5mCG_5hmCG@v2  | Latest compatible **hac** simplex model and **5mCG_5hmCG** modifications model with version `v2.0.0` |
 | sup,5mCG_5hmCG,6mA  | Latest compatible **sup** model and latest compatible **5mCG_5hmCG** and **6mA** modifications models |
 
+### Model search directory and temporary model downloads
+
+Once the automatic model selection process has found the appropriate model given the input data, it will search for existing model directories to avoid downloading models unnecessarily. The behaviour of this search can be controlled as follows:
+
+1. Setting the `--models-directory` CLI argument - The `--models-directory` argument can be used to specify a directory where models will be searched.
+2. Setting the `DORADO_MODELS_DIRECTORY` environment variable - This is the same as setting `--models-directory` but has lower priority than the CLI equivalent.
+3. If neither `--models-directory` or `DORADO_MODELS_DIRECORY` are set then the current working directory is searched.
+
+If `--models-directory` or `DORADO_MODELS_DIRECTORY` is set automatically downloaded models will persist, otherwise models will be downloaded into a local temporary directory
+and deleted after dorado has finished.
 
 ## Troubleshooting Guide
 

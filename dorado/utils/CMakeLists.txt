@@ -138,16 +138,14 @@ if(APPLE)
     if (DORADO_GPU_BUILD)
         find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
         find_library(APPLE_FWK_METAL Metal REQUIRED)
+        find_library(IOKIT IOKit REQUIRED)
         add_dependencies(dorado_utils metal-lib)
         target_link_libraries(dorado_utils
             PUBLIC
                 ${APPLE_FWK_QUARTZ_CORE}
                 ${APPLE_FWK_METAL}
+                ${IOKIT}
         )
-    endif()
-    if (NOT IOS)
-        find_library(IOKIT IOKit REQUIRED)
-        target_link_libraries(dorado_utils PUBLIC ${IOKIT})
     endif()
 endif()
 

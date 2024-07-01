@@ -4,11 +4,12 @@
 #include "basecall/CRFModelConfig.h"
 #include "cli/basecall_output_args.h"
 #include "cli/cli_utils.h"
+#include "cli/model_resolution.h"
 #include "data_loader/DataLoader.h"
-#include "data_loader/ModelFinder.h"
 #include "dorado_version.h"
-#include "models/kits.h"
+#include "model_downloader/model_downloader.h"
 #include "models/metadata.h"
+#include "models/model_complex.h"
 #include "models/models.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BaseSpaceDuplexCallerNode.h"
@@ -58,15 +59,15 @@ namespace dorado {
 
 namespace {
 
-basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    // Argparser has no method returning optional<T> if the argument is unset but it has a default value
-    auto get_opt = [&arg](const std::string& name) {
-        return arg.is_used(name) ? std::optional<int>(arg.get<int>(name)) : std::nullopt;
-    };
+using namespace dorado::models;
+using namespace dorado::model_resolution;
 
+basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
     basecall::BasecallerParams basecaller{};
-    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG, get_opt("--chunksize"),
-                      get_opt("--overlap"), get_opt("--batchsize"));
+    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+                      cli::get_optional_argument<int>("--chunksize", arg),
+                      cli::get_optional_argument<int>("--overlap", arg),
+                      cli::get_optional_argument<int>("--batchsize", arg));
     return basecaller;
 }
 
@@ -84,56 +85,54 @@ struct DuplexModels {
     std::set<std::filesystem::path> temp_paths{};
 };
 
-// If given a model path, create a ModelFinder by looking up the model info by name and extracting
-// the chemistry, sampling rate etc that way. Otherwise, the user passed a model complex which
-// is parsed and the data is inspected to find the conditions.
-ModelFinder get_model_finder(const std::string& model_arg,
-                             const std::string& reads,
-                             const bool recursive_file_loading) {
-    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
-    if (model_selection.is_path()) {
+// If given a model path, create a ModelComplexSearch by looking up the model info by name and extracting
+// the chemistry, sampling rate etc. Ordinarily this would fail but the user should have provided a known
+// simplex model otherwise there's no way to match a stereo model.
+// Otherwise, the user passed a ModelComplex which is parsed and the data is inspected to find the conditions.
+ModelComplexSearch get_model_search(const std::string& model_arg,
+                                    const std::string& reads,
+                                    const bool recursive_file_loading) {
+    const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
+    if (model_complex.is_path()) {
         // Get the model name
         const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
         const auto model_name = model_path.filename().string();
 
-        // Try to find the model
-        const auto model_info = ModelFinder::get_simplex_model_info(model_name);
+        // Find the simplex model - it must a known model otherwise we cannot match a stero model
+        const auto model_info = get_simplex_model_info(model_name);
 
         // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
         // There are no mods variants if model_arg is a path
-        const auto inferred_selection = ModelSelection{
-                models::to_string(model_info.simplex.variant), model_info.simplex, {}};
+        const auto inferred_selection =
+                ModelComplex{to_string(model_info.simplex.variant), model_info.simplex, {}};
 
-        // Return the ModelFinder which hasn't needed to inspect any data
-        return ModelFinder{model_info.chemistry, inferred_selection, false};
+        // Return the searcher which hasn't needed to inspect any data
+        return ModelComplexSearch(inferred_selection, model_info.chemistry, false);
     }
 
-    // Model complex given, inspect data to find chemistry.
-    return cli::model_finder(model_selection, reads, recursive_file_loading, true);
+    // Inspect data to find chemistry.
+    const auto chemistry =
+            DataLoader::get_unique_sequencing_chemisty(reads, recursive_file_loading);
+    return ModelComplexSearch(model_complex, chemistry, true);
 }
 
 DuplexModels load_models(const std::string& model_arg,
                          const std::vector<std::string>& mod_bases,
                          const std::string& mod_bases_models,
+                         const std::optional<std::filesystem::path>& model_directory,
                          const std::string& reads,
                          const basecall::BasecallerParams& basecaller_params,
                          const bool recursive_file_loading,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
-    using namespace dorado::models;
+    ModelComplexSearch model_search = get_model_search(model_arg, reads, recursive_file_loading);
+    const ModelComplex inferred_model_complex = model_search.complex();
 
-    ModelFinder model_finder = get_model_finder(model_arg, reads, recursive_file_loading);
-    const ModelSelection inferred_selection = model_finder.get_selection();
+    if (!mods_model_arguments_valid(inferred_model_complex, mod_bases, mod_bases_models)) {
+        std::exit(EXIT_FAILURE);
+    }
 
-    auto ways = {inferred_selection.has_mods_variant(), !mod_bases.empty(),
-                 !mod_bases_models.empty()};
-    if (std::count(ways.begin(), ways.end(), true) > 1) {
-        throw std::runtime_error(
-                "Only one of --modified-bases, --modified-bases-models, or modified models set "
-                "via models argument can be used at once");
-    };
-
-    if (inferred_selection.model.variant == ModelVariant::FAST) {
+    if (inferred_model_complex.model.variant == ModelVariant::FAST) {
         spdlog::warn("Duplex is not supported for fast models.");
     }
 
@@ -141,39 +140,56 @@ DuplexModels load_models(const std::string& model_arg,
     std::filesystem::path stereo_model_path;
     std::vector<std::filesystem::path> mods_model_paths;
 
+    model_downloader::ModelDownloader downloader(model_directory);
+
     // Cannot use inferred_selection as it has the ModelVariant set differently.
     if (ModelComplexParser::parse(model_arg).is_path()) {
         model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
-        stereo_model_path = model_path.parent_path() / model_finder.get_stereo_model_name();
+        stereo_model_path = model_path.parent_path() / model_search.stereo().name;
         if (!std::filesystem::exists(stereo_model_path)) {
-            stereo_model_path = model_finder.fetch_stereo_model();
+            stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
         }
 
         if (!skip_model_compatibility_check) {
             const auto model_config = basecall::load_crf_model_config(model_path);
             const auto model_name = model_path.filename().string();
-            check_sampling_rates_compatible(model_name, reads, model_config.sample_rate,
-                                            recursive_file_loading);
+            const auto model_sample_rate = model_config.sample_rate < 0
+                                                   ? get_sample_rate_by_model_name(model_name)
+                                                   : model_config.sample_rate;
+            bool inspect_ok = true;
+            models::SamplingRate data_sample_rate = 0;
+            try {
+                data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
+            } catch (const std::exception& e) {
+                inspect_ok = false;
+                spdlog::warn(
+                        "Could not check that model sampling rate and data sampling rate match. "
+                        "Proceed with caution. Reason: {}",
+                        e.what());
+            }
+            if (inspect_ok) {
+                check_sampling_rates_compatible(model_sample_rate, data_sample_rate);
+            }
         }
         mods_model_paths =
-                dorado::get_non_complex_mods_models(model_path, mod_bases, mod_bases_models);
+                get_non_complex_mods_models(model_path, mod_bases, mod_bases_models, downloader);
 
     } else {
         try {
-            model_path = model_finder.fetch_simplex_model();
-            stereo_model_path = model_finder.fetch_stereo_model();
+            model_path = downloader.get(model_search.simplex(), "simplex");
+            stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
             // Either get the mods from the model complex or resolve from --modified-bases args
-            mods_model_paths = inferred_selection.has_mods_variant()
-                                       ? model_finder.fetch_mods_models()
-                                       : dorado::get_non_complex_mods_models(model_path, mod_bases,
-                                                                             mod_bases_models);
+            mods_model_paths = inferred_model_complex.has_mods_variant()
+                                       ? downloader.get(model_search.mods(), "mods")
+                                       : get_non_complex_mods_models(model_path, mod_bases,
+                                                                     mod_bases_models, downloader);
         } catch (const std::exception&) {
-            utils::clean_temporary_models(model_finder.downloaded_models());
+            utils::clean_temporary_models(downloader.temporary_models());
             throw;
         }
     }
 
-    const auto model_name = model_finder.get_simplex_model_name();
+    const auto model_name = model_path.filename().string();
     auto model_config = basecall::load_crf_model_config(model_path);
     model_config.basecaller.update(basecaller_params);
     model_config.normalise_basecaller_params();
@@ -214,7 +230,7 @@ DuplexModels load_models(const std::string& model_arg,
     return DuplexModels{model_path,          model_name,
                         model_config,        stereo_model_path,
                         stereo_model_config, stereo_model_name,
-                        mods_model_paths,    model_finder.downloaded_models()};
+                        mods_model_paths,    downloader.temporary_models()};
 }
 
 }  // namespace
@@ -280,6 +296,10 @@ int duplex(int argc, char* argv[]) {
             .default_value(false)
             .implicit_value(true)
             .help("Recursively scan through directories to load FAST5 and POD5 files");
+
+    parser.visible.add_argument("--models-directory")
+            .default_value(std::string("."))
+            .help("directory to search for existing models or download new models into");
 
     parser.visible.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
@@ -519,9 +539,10 @@ int duplex(int argc, char* argv[]) {
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
-            const DuplexModels models =
-                    load_models(model, mod_bases, mod_bases_models, reads, basecaller_params,
-                                recursive_file_loading, skip_model_compatibility_check, device);
+            const auto models_directory = model_resolution::get_models_directory(parser.visible);
+            const DuplexModels models = load_models(
+                    model, mod_bases, mod_bases_models, models_directory, reads, basecaller_params,
+                    recursive_file_loading, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 

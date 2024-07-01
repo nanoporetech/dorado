@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BasecallerParams.h"
+#include "models/kits.h"
 
 #include <cmath>
 #include <filesystem>
@@ -67,12 +68,6 @@ struct ConvParams {
     Activation activation;
 
     std::string to_string() const;
-};
-
-enum SampleType {
-    DNA,
-    RNA002,
-    RNA004,
 };
 
 namespace tx {
@@ -163,7 +158,7 @@ struct CRFModelConfig {
     // short reads.
     int32_t mean_qscore_start_pos = -1;
 
-    SampleType sample_type;
+    models::SampleType sample_type{models::SampleType::UNKNOWN};
 
     // convolution layer params
     std::vector<ConvParams> convs;
@@ -200,5 +195,7 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
 
 bool is_rna_model(const CRFModelConfig& model_config);
 bool is_duplex_model(const CRFModelConfig& model_config);
+
+models::Chemistry parse_model_chemistry(const std::filesystem::path& path);
 
 }  // namespace dorado::basecall

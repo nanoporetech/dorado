@@ -4,12 +4,15 @@
 #include "basecall/CRFModelConfig.h"
 #include "basecall_output_args.h"
 #include "cli/cli_utils.h"
+#include "cli/model_resolution.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
+#include "model_downloader/model_downloader.h"
 #include "models/kits.h"
+#include "models/model_complex.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator.h"
 #include "read_pipeline/AdapterDetectorNode.h"
@@ -40,7 +43,6 @@
 #include "utils/parameters.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
-#include "utils/string_utils.h"
 #include "utils/sys_stats.h"
 #include "utils/torch_utils.h"
 #include "utils/tty_utils.h"
@@ -54,7 +56,6 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -64,6 +65,7 @@ using dorado::utils::default_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
 using namespace dorado::models;
+using namespace dorado::model_resolution;
 namespace fs = std::filesystem;
 
 namespace dorado {
@@ -95,13 +97,10 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
 void set_basecaller_params(const argparse::ArgumentParser& arg,
                            basecall::CRFModelConfig& model_config,
                            const std::string& device) {
-    // Argparser has no method returning optional<T> if the argument is unset but it has a default value
-    auto get_opt = [&arg](const std::string& name) {
-        return arg.is_used(name) ? std::optional<int>(arg.get<int>(name)) : std::nullopt;
-    };
     model_config.basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
-                                   get_opt("--chunksize"), get_opt("--overlap"),
-                                   get_opt("--batchsize"));
+                                   cli::get_optional_argument<int>("--chunksize", arg),
+                                   cli::get_optional_argument<int>("--overlap", arg),
+                                   cli::get_optional_argument<int>("--batchsize", arg));
 
     if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
         // Force the batch size to 128
@@ -174,6 +173,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
             .default_value(false)
             .implicit_value(true)
             .help("Recursively scan through directories to load FAST5 and POD5 files");
+
+    parser.visible.add_argument("--models-directory")
+            .default_value(std::string("."))
+            .help("optional directory to search for existing models or download new models into");
 
     parser.visible.add_argument("--modified-bases")
             .nargs(argparse::nargs_pattern::at_least_one)
@@ -283,7 +286,7 @@ void setup(const std::vector<std::string>& args,
            const std::optional<std::string>& custom_primer_file,
            bool estimate_poly_a,
            const std::string& polya_config,
-           const ModelSelection& model_selection,
+           const ModelComplex& model_complex,
            std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::debug(model_config.to_string());
@@ -304,10 +307,25 @@ void setup(const std::vector<std::string>& args,
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
-    // Sampling rate is checked by ModelFinder when a complex is given, only test for a path
-    if (model_selection.is_path() && !skip_model_compatibility_check) {
-        check_sampling_rates_compatible(model_name, data_path, model_config.sample_rate,
-                                        recursive_file_loading);
+    // Sampling rate is checked by ModelComplexSearch when a complex is given, only test for a path
+    if (model_complex.is_path() && !skip_model_compatibility_check) {
+        const auto model_sample_rate = model_config.sample_rate < 0
+                                               ? get_sample_rate_by_model_name(model_name)
+                                               : model_config.sample_rate;
+        bool inspect_ok = true;
+        models::SamplingRate data_sample_rate = 0;
+        try {
+            data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
+        } catch (const std::exception& e) {
+            inspect_ok = false;
+            spdlog::warn(
+                    "Could not check that model sampling rate and data sampling rate match. "
+                    "Proceed with caution. Reason: {}",
+                    e.what());
+        }
+        if (inspect_ok) {
+            check_sampling_rates_compatible(model_sample_rate, data_sample_rate);
+        }
     }
 
     if (is_rna_model(model_config)) {
@@ -511,9 +529,9 @@ void setup(const std::vector<std::string>& args,
         resume_parser.visible.parse_known_args(tokens);
 
         const std::string model_arg = resume_parser.visible.get<std::string>("model");
-        const ModelSelection resume_selection = ModelComplexParser::parse(model_arg);
+        const ModelComplex resume_model_complex = ModelComplexParser::parse(model_arg);
 
-        if (resume_selection.is_path()) {
+        if (resume_model_complex.is_path()) {
             // If the model selection is a path, check it exists and matches
             const auto resume_model_name =
                     models::extract_model_name_from_path(fs::path(model_arg));
@@ -522,10 +540,10 @@ void setup(const std::vector<std::string>& args,
                         "Resume only works if the same model is used. Resume model was " +
                         resume_model_name + " and current model is " + model_name);
             }
-        } else if (resume_selection != model_selection) {
+        } else if (resume_model_complex != model_complex) {
             throw std::runtime_error(
                     "Resume only works if the same model is used. Resume model complex was " +
-                    resume_selection.raw + " and current model is " + model_selection.raw);
+                    resume_model_complex.raw + " and current model is " + model_complex.raw);
         }
 
         // Resume functionality injects reads directly into the writer node.
@@ -620,7 +638,11 @@ int basecaller(int argc, char* argv[]) {
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
-    const ModelSelection model_selection = cli::parse_model_argument(model_arg);
+    const ModelComplex model_complex = parse_model_argument(model_arg);
+
+    if (!mods_model_arguments_valid(model_complex, mod_bases, mod_bases_models)) {
+        return EXIT_FAILURE;
+    }
 
     auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
     if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
@@ -640,7 +662,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     if (hts_file->get_output_mode() == OutputMode::FASTQ) {
-        if (model_selection.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
+        if (model_complex.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
@@ -702,39 +724,32 @@ int basecaller(int argc, char* argv[]) {
         custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
     }
 
-    // Assert that only one of --modified-bases, --modified-bases-models or mods model complex is set
-    auto ways = {model_selection.has_mods_variant(), !mod_bases.empty(), !mod_bases_models.empty()};
-    if (std::count(ways.begin(), ways.end(), true) > 1) {
-        spdlog::error(
-                "Only one of --modified-bases, --modified-bases-models, or modified models set "
-                "via models argument can be used at once");
-        return EXIT_FAILURE;
-    };
-
     fs::path model_path;
     std::vector<fs::path> mods_model_paths;
-    std::set<fs::path> temp_download_paths;
 
-    if (model_selection.is_path()) {
+    const auto model_directory = model_resolution::get_models_directory(parser.visible);
+    model_downloader::ModelDownloader downloader(model_directory);
+
+    if (model_complex.is_path()) {
         model_path = fs::path(model_arg);
-        mods_model_paths =
-                dorado::get_non_complex_mods_models(model_path, mod_bases, mod_bases_models);
+        mods_model_paths = model_resolution::get_non_complex_mods_models(
+                model_path, mod_bases, mod_bases_models, downloader);
     } else {
-        auto model_finder = cli::model_finder(model_selection, data, recursive, true);
+        const auto chemistry = DataLoader::get_unique_sequencing_chemisty(data, recursive);
+        const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
-            model_path = model_finder.fetch_simplex_model();
-            if (model_selection.has_mods_variant()) {
+            model_path = downloader.get(model_search.simplex(), "simplex");
+            if (model_complex.has_mods_variant()) {
                 // Get mods models from complex - we assert above that there's only one method
-                mods_model_paths = model_finder.fetch_mods_models();
+                mods_model_paths = downloader.get(model_search.mods(), "mods");
             } else {
                 // Get mods models from args
-                mods_model_paths = dorado::get_non_complex_mods_models(model_path, mod_bases,
-                                                                       mod_bases_models);
+                mods_model_paths = model_resolution::get_non_complex_mods_models(
+                        model_path, mod_bases, mod_bases_models, downloader);
             }
-            temp_download_paths = model_finder.downloaded_models();
         } catch (std::exception& e) {
             spdlog::error(e.what());
-            utils::clean_temporary_models(model_finder.downloaded_models());
+            utils::clean_temporary_models(downloader.temporary_models());
             return EXIT_FAILURE;
         }
     }
@@ -765,14 +780,14 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<std::string>("--dump_stats_filter"),
               parser.visible.get<std::string>("--resume-from"), no_trim_adapters, no_trim_primers,
               custom_primer_file, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
-              model_selection, std::move(barcoding_info), std::move(sample_sheet));
+              model_complex, std::move(barcoding_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
-        utils::clean_temporary_models(temp_download_paths);
+        utils::clean_temporary_models(downloader.temporary_models());
         return EXIT_FAILURE;
     }
 
-    utils::clean_temporary_models(temp_download_paths);
+    utils::clean_temporary_models(downloader.temporary_models());
     spdlog::info("> Finished");
     return EXIT_SUCCESS;
 }

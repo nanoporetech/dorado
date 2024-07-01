@@ -1,23 +1,21 @@
 #include "metal_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
-#if !TARGET_OS_IPHONE
 #include <IOKit/IOKitLib.h>
-#include <objc/objc-runtime.h>
-#endif
 #include <mach-o/dyld.h>
 #include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
+#include <torch/version.h>
+
+#if !TARGET_OS_IPHONE
+#include <objc/objc-runtime.h>
+#endif
 
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
-
-namespace MTL {
-auto format_as(CommandBufferStatus status) { return fmt::underlying(status); }
-}  // namespace MTL
 
 using namespace MTL;
 
@@ -97,8 +95,6 @@ auto load_kernels(MTL::Device *const device) {
     throw std::runtime_error("Failed to load metallib library");
 }
 
-#if !TARGET_OS_IPHONE
-
 // Retrieves a single int64_t property associated with the given class/name.
 // Returns empty std::optional on failure.
 std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
@@ -109,7 +105,7 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
         return std::nullopt;
     }
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
+#if TARGET_OS_OSX && MAC_OS_X_VERSION_MIN_REQUIRED < 120000 /* MAC_OS_VERSION_12_0 */
     // These are the same variable, just renamed in macOS 12+.
     const mach_port_t kIOMainPortDefault = kIOMasterPortDefault;
 #endif
@@ -141,8 +137,6 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
     // It was not of the expected type.
     return std::nullopt;
 }
-
-#endif  // if !TARGET_OS_IPHONE
 
 }  // namespace
 
@@ -252,8 +246,8 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
                       1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
                       1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {
-        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label, status,
-                     try_count);
+        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
+                     fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
             const auto *const error_ptr = cb->error();
             if (error_ptr) {
@@ -268,7 +262,11 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
 static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : at::Allocator {
-    at::DataPtr allocate(size_t n) const override {
+    at::DataPtr allocate(size_t n)
+#if !(TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 3)
+            const
+#endif  // < 2.3
+            override {
         if (n == 0) {
             return at::DataPtr(nullptr, at::DeviceType::CPU);
         } else if (n >= (size_t(1) << 32)) {
@@ -279,6 +277,12 @@ struct MTLAllocator : at::Allocator {
     }
 
     static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
+
+#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 3
+    void copy_data(void *dest, const void *src, std::size_t count) const override {
+        default_copy_data(dest, src, count);
+    }
+#endif  // < 2.3
 };
 static MTLAllocator mtl_allocator;
 
@@ -297,7 +301,6 @@ int get_mtl_device_core_count() {
         return gpu_core_count;
     }
 
-#if !TARGET_OS_IPHONE
     // Attempt to directly query the GPU core count.
     if (auto core_count_opt = retrieve_ioreg_prop("AGXAccelerator", "gpu-core-count");
         core_count_opt.has_value()) {
@@ -305,7 +308,6 @@ int get_mtl_device_core_count() {
         spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
         return gpu_core_count;
     }
-#endif  // if !TARGET_OS_IPHONE
 
     // If querying failed, estimate the count based on the Metal device name,
     // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
@@ -318,7 +320,7 @@ int get_mtl_device_core_count() {
         gpu_core_count = 32;
     } else if (name == "Apple M1 Ultra") {
         gpu_core_count = 64;
-    } else if (name == "Apple M2 GPU") {
+    } else if (name == "Apple M2 GPU" || name == "Apple M4 GPU") {
         // M2 configurations with < 10 cores exist in e.g. MacBook Air, but it's
         // assumed that those configurations would be handled above via IORegistry
         // querying.  The M2 iPad Pro always has 10 GPU cores.  Note also that

@@ -13,7 +13,7 @@ namespace dorado {
 class ScalerNode : public MessageSink {
 public:
     ScalerNode(const basecall::SignalNormalisationParams& config,
-               basecall::SampleType model_type,
+               models::SampleType model_type,
                bool trim_rna_adapter,
                const utils::rapid::Settings& m_rapid_settings,
                int num_worker_threads,
@@ -30,7 +30,7 @@ private:
     void input_thread_fn();
 
     const basecall::SignalNormalisationParams m_scaling_params;
-    const basecall::SampleType m_model_type;
+    const models::SampleType m_model_type;
     const bool m_trim_rna_adapter;
     const utils::rapid::Settings m_rapid_settings;
 
