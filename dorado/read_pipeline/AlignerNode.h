@@ -32,7 +32,8 @@ public:
                 int threads);
     AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                 std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                int threads);
+                std::shared_ptr<utils::concurrency::NoQueueThreadPool> thread_pool,
+                utils::concurrency::TaskPriority pipeline_priority);
     ~AlignerNode() { stop_input_processing(); }
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -52,6 +53,7 @@ private:
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 
     std::shared_ptr<utils::concurrency::NoQueueThreadPool> m_thread_pool{};
+    utils::concurrency::TaskPriority m_pipeline_priority{utils::concurrency::TaskPriority::normal};
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<const alignment::BedFile> m_bedfile_for_bam_messages{};
     std::vector<std::string> m_header_sequence_names{};

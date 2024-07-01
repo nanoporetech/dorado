@@ -11,6 +11,8 @@ add_library(dorado_utils
     basecaller_utils.h
     concurrency/async_task_executor.cpp
     concurrency/async_task_executor.h
+    concurrency/detail/priority_task_queue.cpp
+    concurrency/detail/priority_task_queue.h
     concurrency/no_queue_thread_pool.cpp
     concurrency/no_queue_thread_pool.h
     concurrency/synchronisation.h

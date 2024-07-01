@@ -105,7 +105,9 @@ protected:
         CHECK(index_file_access->load_index(loaded_align_info->reference_file,
                                             loaded_align_info->minimap_options,
                                             2) == dorado::alignment::IndexLoadResult::success);
-        create_pipeline(index_file_access, bed_file_access, 2);
+        auto thread_pool = std::make_shared<dorado::utils::concurrency::NoQueueThreadPool>(2);
+        create_pipeline(index_file_access, bed_file_access, thread_pool,
+                        dorado::utils::concurrency::TaskPriority::normal);
 
         dorado::ReadCommon read_common{};
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();

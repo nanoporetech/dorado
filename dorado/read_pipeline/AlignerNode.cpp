@@ -97,10 +97,11 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                         int threads)
+                         std::shared_ptr<utils::concurrency::NoQueueThreadPool> thread_pool,
+                         utils::concurrency::TaskPriority pipeline_priority)
         : MessageSink(10000, 1),
-          m_thread_pool(std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                                "align_node_pool")),
+          m_thread_pool(std::move(thread_pool)),
+          m_pipeline_priority(pipeline_priority),
           m_index_file_access(std::move(index_file_access)),
           m_bed_file_access(std::move(bed_file_access)) {
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");
@@ -180,8 +181,7 @@ auto shared_func(F&& f) {
 
 void AlignerNode::input_thread_fn() {
     Message message;
-    utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool,
-                                                        utils::concurrency::TaskPriority::normal};
+    utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool, m_pipeline_priority};
     auto align_read = [this, &task_executor](auto&& read) {
         task_executor.send([this, read = std::move(read)]() mutable {
             thread_local MmTbufPtr tbuf{mm_tbuf_init()};

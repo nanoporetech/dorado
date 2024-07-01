@@ -10,7 +10,7 @@ AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_p
 
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 
-void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
+void AsyncTaskExecutor::send_impl(TaskType task) {
     increment_tasks_in_flight();
 
     m_thread_pool->send(
@@ -21,7 +21,7 @@ void AsyncTaskExecutor::send_impl(NoQueueThreadPool::TaskType task) {
             m_priority);
 }
 
-std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(NoQueueThreadPool::TaskType task) {
+std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(TaskType task) {
     increment_tasks_in_flight();
 
     auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)]() mutable {

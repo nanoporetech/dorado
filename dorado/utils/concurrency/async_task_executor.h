@@ -24,7 +24,7 @@ class AsyncTaskExecutor {
     std::size_t m_num_tasks_in_flight{};
     std::unique_ptr<Latch> m_flushing_counter;
 
-    void send_impl(NoQueueThreadPool::TaskType task);
+    void send_impl(TaskType task);
     void decrement_tasks_in_flight();
     void increment_tasks_in_flight();
     void create_flushing_counter();
@@ -53,7 +53,7 @@ public:
     void flush();
 
     // Testability. Do NOT use outside utests
-    std::unique_ptr<std::thread> send_async(NoQueueThreadPool::TaskType task);
+    std::unique_ptr<std::thread> send_async(TaskType task);
 };
 
 }  // namespace dorado::utils::concurrency

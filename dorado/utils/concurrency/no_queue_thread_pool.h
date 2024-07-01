@@ -1,10 +1,12 @@
 #pragma once
 
+#include "detail/priority_task_queue.h"
 #include "synchronisation.h"
 
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -15,10 +17,8 @@
 
 namespace dorado::utils::concurrency {
 
-enum class TaskPriority {
-    normal,
-    high,
-};
+using TaskPriority = detail::TaskPriority;
+using TaskType = detail::TaskType;
 
 // Thread pool which blocks new tasks being added while all
 // threads are busy.
@@ -27,8 +27,6 @@ enum class TaskPriority {
 // beginning to enqueue tasks.
 class NoQueueThreadPool {
 public:
-    using TaskType = std::function<void()>;
-
     NoQueueThreadPool(std::size_t num_threads);
     NoQueueThreadPool(std::size_t num_threads, std::string name);
     ~NoQueueThreadPool();
@@ -38,23 +36,26 @@ public:
     void join();
 
 private:
-    struct WaitingTask {
-        WaitingTask(TaskType task_) : task(std::move(task_)) {}
-        TaskType task;
-        Flag started{};
-    };
     std::string m_name{"async_task_exec"};
     const std::size_t m_num_threads;
+    const std::size_t m_num_expansion_low_prio_threads;
     std::vector<std::thread> m_threads{};
+    //std::unique_ptr<Latch> m_all_pool_threads_started{};
     std::atomic_bool m_done{false};  // Note that this flag is only accessed by the managed threads.
 
     std::mutex m_mutex{};
-    std::queue<std::shared_ptr<WaitingTask>> m_task_queue{};
+    detail::PriorityTaskQueue m_task_queue{};
     std::condition_variable m_message_received{};
+    std::size_t m_normal_prio_tasks_in_flight{};
+    std::size_t m_high_prio_tasks_in_flight{};
+    std::shared_ptr<detail::WaitingTask> m_next_task{};
 
     void initialise();
-    std::shared_ptr<WaitingTask> wait_on_next_task();
+    std::shared_ptr<detail::WaitingTask> wait_on_next_task(
+            std::shared_ptr<detail::WaitingTask>& last_task);
     void process_task_queue();
+    bool try_pop_next_task();
+    std::size_t num_tasks_in_flight();
 };
 
 }  // namespace dorado::utils::concurrency
