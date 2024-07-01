@@ -194,6 +194,7 @@ pre-commit:
     GIT_SUBMODULE_STRATEGY: none
   stage: pre-flight
   script:
+    - echo "Pipeline source is ${CI_PIPELINE_SOURCE}"
     - pip install pre-commit
     - pre-commit run --all-files
   tags:
