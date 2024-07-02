@@ -91,8 +91,12 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
                 release_flag->signal();
             }
         };
-        auto release_all_tasks_on_exit =
-                PostCondition([&release_all_tasks] { release_all_tasks(); });
+        auto complete_all_tasks_on_exit = PostCondition([&release_all_tasks, &cut] {
+            release_all_tasks();
+            // Need to also ensure flushed before allowing the flags used by the tasks running
+            // in the thread pool to go out of scope.
+            cut.flush();
+        });
 
         // it's required that both tasks have started to proceed
         REQUIRE(task_started_flags[0]->wait_for(TIMEOUT));
