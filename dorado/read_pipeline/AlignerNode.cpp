@@ -172,34 +172,42 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
+template <typename READ>
+void AlignerNode::align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read) {
+    executor.send([this, read = std::move(read)]() mutable {
+        thread_local MmTbufPtr tbuf{mm_tbuf_init()};
+        align_read_common(read->read_common, tbuf.get());
+        send_message_to_sink(std::move(read));
+    });
+}
+
+void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
+                                    BamMessage&& bam_message) {
+    executor.send([this, bam_message = std::move(bam_message)] {
+        thread_local MmTbufPtr tbuf{mm_tbuf_init()};
+        auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
+                               .align(bam_message.bam_ptr.get(), tbuf.get());
+        for (auto& record : records) {
+            if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
+                auto ref_id = record->core.tid;
+                add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
+            }
+            send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
+        }
+    });
+}
+
 void AlignerNode::input_thread_fn() {
     Message message;
+    // create an executor for the pool whose destructor will block till all tasks completed.
     utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool, m_pipeline_priority};
-    auto align_read = [this, &task_executor](auto&& read) {
-        task_executor.send([this, read = std::move(read)]() mutable {
-            thread_local MmTbufPtr tbuf{mm_tbuf_init()};
-            align_read_common(read->read_common, tbuf.get());
-            send_message_to_sink(std::move(read));
-        });
-    };
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            task_executor.send([this, bam_message = std::get<BamMessage>(std::move(message))] {
-                thread_local MmTbufPtr tbuf{mm_tbuf_init()};
-                auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                                       .align(bam_message.bam_ptr.get(), tbuf.get());
-                for (auto& record : records) {
-                    if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
-                        auto ref_id = record->core.tid;
-                        add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
-                    }
-                    send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
-                }
-            });
+            align_bam_message(task_executor, std::get<BamMessage>(std::move(message)));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
-            align_read(std::get<SimplexReadPtr>(std::move(message)));
+            align_read(task_executor, std::get<SimplexReadPtr>(std::move(message)));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
-            align_read(std::get<DuplexReadPtr>(std::move(message)));
+            align_read(task_executor, std::get<DuplexReadPtr>(std::move(message)));
         } else {
             send_message_to_sink(std::move(message));
             continue;

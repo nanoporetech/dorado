@@ -49,6 +49,12 @@ private:
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ClientInfo& client_info);
     std::shared_ptr<dorado::alignment::BedFile> get_bedfile(const ClientInfo& client_info,
                                                             const std::string& bedfile);
+    template <typename READ>
+    void align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read);
+
+    void align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
+                           BamMessage&& bam_message);
+
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 

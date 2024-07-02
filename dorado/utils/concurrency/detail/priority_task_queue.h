@@ -25,6 +25,11 @@ struct WaitingTask {
     TaskPriority priority;
 };
 
+/* 
+ * Queue allowing tasks to be pushed and popped, also allows pop to be called
+ * with a priority which will remove and return the next task with that priority
+ * from the queue.
+ */
 class PriorityTaskQueue {
     using WaitingTaskList = std::list<std::shared_ptr<detail::WaitingTask>>;
     WaitingTaskList m_task_list{};
