@@ -299,14 +299,12 @@ DEFINE_TEST_FIXTURE_METHOD("Thread pool size 8 sending normal and high priority 
             cut->send(create_task(index), TaskPriority::high);
         }
 
+        producer_threads.emplace_back(std::make_unique<std::thread>(
+                [this] { cut->send(create_task(16), TaskPriority::normal); }));
+        producer_threads.emplace_back(std::make_unique<std::thread>(
+                [this] { cut->send(create_task(17), TaskPriority::high); }));
         constexpr std::size_t WAITING_LOW_PRIO_ID{16};
         constexpr std::size_t WAITING_HIGH_PRIO_ID{17};
-        producer_threads.emplace_back(std::make_unique<std::thread>([this, WAITING_LOW_PRIO_ID] {
-            cut->send(create_task(WAITING_LOW_PRIO_ID), TaskPriority::normal);
-        }));
-        producer_threads.emplace_back(std::make_unique<std::thread>([this, WAITING_HIGH_PRIO_ID] {
-            cut->send(create_task(WAITING_HIGH_PRIO_ID), TaskPriority::high);
-        }));
 
         WHEN("6 normal tasks complete") {
             for (std::size_t index{1}; index < 7; ++index) {

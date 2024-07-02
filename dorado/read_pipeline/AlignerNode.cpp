@@ -172,13 +172,6 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
-template <class F>
-auto shared_func(F&& f) {
-    return [pf = std::make_shared<std::decay_t<F>>(std::forward<F>(f))]() -> decltype(auto) {
-        return (*pf)();
-    };
-}
-
 void AlignerNode::input_thread_fn() {
     Message message;
     utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool, m_pipeline_priority};
