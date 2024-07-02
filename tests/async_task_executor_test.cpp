@@ -94,9 +94,9 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
         auto release_all_tasks_on_exit =
                 PostCondition([&release_all_tasks] { release_all_tasks(); });
 
-        // check they've both started and the worker threads are busy
-        CHECK(task_started_flags[0]->wait_for(TIMEOUT));
-        CHECK(task_started_flags[1]->wait_for(TIMEOUT));
+        // it's required that both tasks have started to proceed
+        REQUIRE(task_started_flags[0]->wait_for(TIMEOUT));
+        REQUIRE(task_started_flags[1]->wait_for(TIMEOUT));
 
         AND_GIVEN("third task is sent") {
             std::thread third_task_thread(

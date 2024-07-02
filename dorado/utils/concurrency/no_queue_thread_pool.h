@@ -40,7 +40,6 @@ private:
     const std::size_t m_num_threads;
     const std::size_t m_num_expansion_low_prio_threads;
     std::vector<std::thread> m_threads{};
-    //std::unique_ptr<Latch> m_all_pool_threads_started{};
     std::atomic_bool m_done{false};  // Note that this flag is only accessed by the managed threads.
 
     std::mutex m_mutex{};

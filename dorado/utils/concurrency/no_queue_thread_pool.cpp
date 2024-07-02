@@ -27,11 +27,9 @@ void NoQueueThreadPool::initialise() {
     // Total number of threads are m_num_threads + expansion space for the
     // same number of high prio tasks, in case all threads are busy with a
     //// normal prio task when a high prio task arrives.
-    //m_all_pool_threads_started = std::make_unique<Latch>(m_num_threads * 2);
     for (std::size_t i{0}; i < m_num_threads * 2; ++i) {
         m_threads.emplace_back([this] { process_task_queue(); });
     }
-    //m_all_pool_threads_started->wait()
 }
 
 NoQueueThreadPool::~NoQueueThreadPool() { join(); }
