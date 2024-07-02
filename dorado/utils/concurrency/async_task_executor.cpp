@@ -59,10 +59,15 @@ void AsyncTaskExecutor::increment_tasks_in_flight() {
 }
 
 void AsyncTaskExecutor::decrement_tasks_in_flight() {
-    std::lock_guard lock(m_mutex);
-    --m_num_tasks_in_flight;
-    if (!m_flushing_counter) {
-        return;
+    {
+        std::lock_guard lock(m_mutex);
+        --m_num_tasks_in_flight;
+        if (!m_flushing_counter) {
+            return;
+        }
+        // The flush operation in the destructor is waiting on the m_flushing_counter.
+        // After signalling m_flushing_counter the mutex will be destructed, so
+        // ensure the lock_guard has released the mutex before signalling.
     }
     m_flushing_counter->count_down();
 }
