@@ -3,7 +3,7 @@
 #include "utils/thread_naming.h"
 
 #include <algorithm>
-#include <assert>
+#include <cassert>
 #include <iterator>
 
 namespace dorado::utils::concurrency {
