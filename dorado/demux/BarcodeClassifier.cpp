@@ -866,8 +866,11 @@ float BarcodeClassifier::find_midstrand_barcode_single_end(
         return 0.f;
     }
 
-    auto read_mid =
-            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+    // DNA:
+    //    auto read_mid =
+    //            read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
+    // RNA:
+    auto read_mid = read_seq.substr(0, length_without_end_windows);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
     EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
@@ -998,9 +1001,19 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         if (((penalty_dist >= m_scoring_params.min_barcode_penalty_dist &&
               are_penalties_acceptable(*best_result)) ||
              (penalty_dist >= m_scoring_params.min_separation_only_dist)) &&
+            // RNA
+            (best_result->top_barcode_pos.first >=
+                     int(read_seq.length() - m_scoring_params.barcode_end_proximity) ||
+             best_result->bottom_barcode_pos.second <= m_scoring_params.barcode_end_proximity)
+
+            // DNA
+            /*
             (best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity ||
              best_result->bottom_barcode_pos.second >=
-                     int(read_seq.length() - m_scoring_params.barcode_end_proximity))) {
+                     int(read_seq.length() - m_scoring_params.barcode_end_proximity))
+                     */
+
+        ) {
             out = *best_result;
         }
     }
