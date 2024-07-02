@@ -3,10 +3,6 @@
 #include <cuda_runtime.h>
 #include <torch/torch.h>
 
-extern "C" {
-#include "koi.h"
-}
-
 #include <mutex>
 #include <string>
 #include <vector>
@@ -61,10 +57,6 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);
 
 // Deal with a result from a cudaGetLastError call.  May raise an exception to provide information to the user.
 void handle_cuda_result(int cuda_result);
-
-struct KoiTensorExt : public KoiTensor {
-    KoiTensorExt(at::Tensor &t, std::vector<int> &dim_tags);
-};
 
 namespace details {
 void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C);

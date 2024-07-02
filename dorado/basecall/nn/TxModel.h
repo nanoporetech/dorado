@@ -104,10 +104,10 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
-
+  TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options, bool use_koi_tiled);
+    bool use_koi_tiled;
     at::Tensor forward(at::Tensor x);
-
+    tx::TxEncoderParams params;
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
     RMSNorm norm1{nullptr}, norm2{nullptr};
@@ -116,10 +116,8 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
-
     bool use_koi_tiled{false};
-    tx::TxEncoderParams params;
+    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
     at::Tensor forward(const at::Tensor &x);
     torch::nn::Sequential stack{nullptr};
 };
