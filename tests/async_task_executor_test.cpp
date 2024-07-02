@@ -99,8 +99,7 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
         REQUIRE(task_started_flags[1]->wait_for(TIMEOUT));
 
         AND_GIVEN("third task is sent") {
-            std::thread third_task_thread(
-                    [&cut, third_task = create_task(2)] { cut.send(std::move(third_task)); });
+            std::thread third_task_thread([&cut, &create_task] { cut.send(create_task(2)); });
             auto join_third_task_thread_on_exit =
                     PostCondition([&release_all_tasks, &third_task_thread] {
                         release_all_tasks();
