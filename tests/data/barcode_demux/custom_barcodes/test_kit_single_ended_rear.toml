@@ -1,0 +1,9 @@
+[arrangement]
+name = "test_kit_single_ended_rear_only"
+first_index = 1
+last_index = 4
+kit = "BC"
+mask1_front = "C"
+mask1_rear = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA"
+barcode1_pattern = "BC%02i"
+rear_only_barcodes = true
