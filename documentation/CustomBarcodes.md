@@ -9,11 +9,17 @@ The format to define a custom arrangement is inspired by the arrangement specifi
 A double-ended barcode with different flanks and barcode sequences for front and rear barcodes is described here.
 
 ```
-5' ---- ADAPTER/PRIMER ---- LEADING_FLANK_1 ---- BARCODE_1 ---- TRAILING_FLANK_1 --- READ --- RC(TRAILING_FLANK_2) --- RC(BARCODE_2) --- RC(LEADING_FLANK_2) --- 3'
+5' --- ADAPTER/PRIMER --- LEADING_FLANK_1 --- BARCODE_1 --- TRAILING_FLANK_1 --- READ --- RC(TRAILING_FLANK_2) --- RC(BARCODE_2) --- RC(LEADING_FLANK_2) --- 3'
 ```
 
 * For single-ended barcodes, there is no barcode sequence at the rear of the read.
 * For double-ended barcodes which are symmetric, the flank and barcode sequences for front and rear windows are same.
+
+For single-ended barcodes with the `rear_only_barcodes` flag set (see below), e.g. RNA kits, the sequence description would look like this:
+
+```
+5' --- READ --- LEADING_FLANK_1 --- BARCODE_1 --- TRAILING_FLANK_1 --- ADAPTER/PRIMER --- 3'
+```
 
 ## Specification Format
 
@@ -38,6 +44,7 @@ barcode1_pattern = "BC%02i"
 barcode2_pattern = "BC%02i"
 first_index = 1
 last_index = 96
+rear_only_barcodes = true
 
 ## Scoring options
 [scoring]
@@ -68,6 +75,7 @@ The table below describes the arrangement options in more detail.
 | barcode2_pattern | (Optional) An expression capturing the sequences to use for the rear barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
 | last_index | (Required) End index for range of barcode sequences to use in the arrangement. Used in combination with the `first_index`. |
+| rear_only_barcodes | (Optional) For single ended barcodes, the barcode is at the rear of the read rather than the front (e.g for an RNA kit). |
 
 The pre-built barcode sequence in Dorado can be found in this [file](../dorado/utils/barcode_kits.cpp) under the `barcodes` map.
 
@@ -90,8 +98,8 @@ If a candidate meets (1) or (2) AND (3), and the location of the start/end of th
 | Scoring option | Description |
 | -- | -- |
 | max_barcode_penalty | The maximum edit distance allowed for a classified barcode. Considered in conjunction with the `min_barcode_penalty_dist` parameter. |
-| min_barcode_penalty_dist | The minimum penalty difference between top-2 barcodes required for classification. Used in conjunction with `max_barcode_cost`. |
-| min_separation_only_dist | The minimum penalty difference between the top-2 barcodes required for classification when the `max_barcode_cost` is not met. |
+| min_barcode_penalty_dist | The minimum penalty difference between top-2 barcodes required for classification. Used in conjunction with `max_barcode_penalty`. |
+| min_separation_only_dist | The minimum penalty difference between the top-2 barcodes required for classification when the `max_barcode_penalty` is not met. |
 | barcode_end_proximity | Proximity of the end of the barcode construct to the ends of the read required for classification. |
 | flank_left_pad | Number of bases to use from preceding flank during barcode alignment. |
 | flank_right_pad | Number of bases to use from succeeding flank during barcode alignment. |
