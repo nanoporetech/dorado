@@ -104,10 +104,14 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-  TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options, bool use_koi_tiled);
-    bool use_koi_tiled;
+    TxEncoderImpl(const tx::TxEncoderParams &params,
+                  const at::TensorOptions &options,
+                  bool use_koi_tiled);
+
     at::Tensor forward(at::Tensor x);
+
     tx::TxEncoderParams params;
+    bool use_koi_tiled;
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
     RMSNorm norm1{nullptr}, norm2{nullptr};
@@ -116,9 +120,11 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    bool use_koi_tiled{false};
     TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
+
     at::Tensor forward(const at::Tensor &x);
+
+    bool use_koi_tiled{false};
     torch::nn::Sequential stack{nullptr};
 };
 
@@ -128,6 +134,7 @@ struct LinearUpsampleImpl : torch::nn::Module {
     LinearUpsampleImpl(const tx::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
+
     const int scale_factor;
     torch::nn::Linear linear{nullptr};
 };

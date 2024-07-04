@@ -42,32 +42,29 @@ namespace dorado::basecall {
 
 namespace nn {
 
-
 struct KoiTensorExt : public KoiTensor {
-
-KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) {
-    data_ptr = t.data_ptr();
-    ndims = t.dim();
-    if (t.dtype() == torch::kF16) {
-        type_id = KOI_F16;
-    } else if (t.dtype() == torch::kI8) {
-        type_id = KOI_I8;
-    } else {
-        spdlog::error("KoiTensor unsupported dtype");
-        exit(EXIT_FAILURE);
+    KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) {
+        data_ptr = t.data_ptr();
+        ndims = t.dim();
+        if (t.dtype() == torch::kF16) {
+            type_id = KOI_F16;
+        } else if (t.dtype() == torch::kI8) {
+            type_id = KOI_I8;
+        } else {
+            spdlog::error("KoiTensor unsupported dtype");
+            exit(EXIT_FAILURE);
+        }
+        if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
+            spdlog::error("KoiTensor dimension mismatch");
+            exit(EXIT_FAILURE);
+        }
+        for (int i = 0; i < ndims; ++i) {
+            dims[i].tag = dim_tags[i];
+            dims[i].size = t.size(i);
+            dims[i].stride = t.stride(i);
+        }
     }
-    if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
-        spdlog::error("KoiTensor dimension mismatch");
-        exit(EXIT_FAILURE);
-    }
-    for (int i = 0; i < ndims; ++i) {
-        dims[i].tag = dim_tags[i];
-        dims[i].size = t.size(i);
-        dims[i].stride = t.stride(i);
-    }
-}
 };
-
 
 using namespace torch::nn;
 namespace Idx = torch::indexing;
@@ -391,10 +388,10 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-  TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_, const at::TensorOptions &options, bool use_koi_tiled_): use_koi_tiled(use_koi_tiled_),
-															   params(params_)
-															 
-  {
+TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_,
+                             const at::TensorOptions &options,
+                             bool use_koi_tiled_)
+        : params(params_), use_koi_tiled(use_koi_tiled_) {
     self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
                                                                 true, params.attn_window, options));
     ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
@@ -405,141 +402,131 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
-  at::Tensor TxEncoderImpl::forward(at::Tensor x) {
-
+at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 #if DORADO_CUDA_BUILD
-  if (use_koi_tiled){
-
+    if (use_koi_tiled) {
         const int N = static_cast<int>(x.size(0));
-        const int T = static_cast<int>(x.size(1));
+        const int T = static_cast<int>(x.size(1)) * 16;
         const int C = params.d_model;
         const int D = params.d_model / params.nhead;
         const int H = params.nhead;
-	const int E = params.dim_feedforward * 2;
+        const int E = params.dim_feedforward * 2;
         const auto [win_upper, win_lower] = params.attn_window;
         auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-
-	// Atomic counter, need 4 buffers of 4B each of working memory
+        // Atomic counter, need 4 buffers of 4B each of working memory
         auto ctr = torch::zeros({4}, x.options().dtype(torch::kI32));
 
-    utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
-            // TODO: initialise (i.e. transpose) all weight tensors once
-            const float alpha = params.deepnorm_alpha;
+        utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
+        // TODO: initialise (i.e. transpose) all weight tensors once
+        const float alpha = params.deepnorm_alpha;
 
-	    // output of the QKV matmuls (the torch tensor)
-            auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
-	    // Weights for the Q,K and V tensors which will be multiplied with the inputs
-	    // We need to access this WQKV buffer - there is one tensor per encoder and it is a member of the TXEncoderimpl
-            auto w = self_attn->wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
-	    //Rotary embedding a s atorch tensor (needs filling in with the correct values)
-            auto sincos_bfr = torch::empty({T / 16, D / 8, 16, 8}, x.options());
+        // output of the QKV matmuls (the torch tensor)
+        auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
+        // Weights for the Q,K and V tensors which will be multiplied with the inputs
+        // We need to access this WQKV buffer - there is one tensor per encoder and it is a member of the TXEncoderimpl
+        auto w = self_attn->wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
+        //Rotary embedding a s atorch tensor (needs filling in with the correct values)
+        auto sincos_bfr = torch::empty({T / 16, D / 8, 16, 8}, x.options());
 
+        auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, x.options());
 
-	    auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, x.options());
+        auto proj_weight = torch::empty({C / 16, C / 8, 16, 8}, x.options());
 
-	    auto proj_weight = torch::empty({C / 16, C / 8, 16, 8}, x.options());
+        auto proj_bias = torch::empty({C}, x.options());
 
-	    auto proj_bias = torch::empty({C}, x.options());
+        auto t_res_weights = torch::empty({C}, x.options());
+        auto t_res2_weights = torch::empty({C}, x.options());
 
-	    auto t_res_weights = torch::empty({C}, x.options());
- 	    auto t_res2_weights = torch::empty({C}, x.options());
-		    
+        auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
 
-	    auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
+        auto t_fc1_wts = torch::empty({E / 16, C / 8, 16, 8}, x.options());
+        auto t_fc2_wts = torch::empty({C / 16, E / 16, 16, 8}, x.options());
 
+        auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, x.options());
+        auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
 
-	    auto t_fc1_wts = torch::empty({E/16, C / 8, 16, 8}, x.options());
-   	    auto t_fc2_wts = torch::empty({C/16, E / 16, 16, 8}, x.options());
+        //Define Koi Tensors for the above buffers.
+        KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'});
+        KoiTensorExt in_mk(x.view({-1, C / 8, 16, 8}), {'M', 'K', 'm', 'k'});
+        KoiTensorExt weights_qkv(w, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'});
+        KoiTensorExt sincos(sincos_bfr, {'T', 'D', 't', 'd'});
+        KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
+        KoiTensorExt out_attn(t_out_attn, {'N', 'T', 'H', 'D', 't', 'd'});
+        KoiTensorExt out_attn_mk(t_out_attn.view({-1, C / 8, 16, 8}), {'M', 'K', 'm', 'k'});
+        KoiTensorExt proj_w(proj_weight, {'N', 'K', 'n', 'k'});
+        KoiTensorExt proj_b(proj_bias, {'N'});
+        KoiTensorExt out_proj_mn(t_out_proj.view({-1, C / 8, 16, 8}), {'M', 'N', 'm', 'n'});
+        KoiTensorExt out_proj_ntc(t_out_proj, {'N', 'T', 'C', 't', 'c'});
+        KoiTensorExt res_weights(t_res_weights, {'C'});
+        KoiTensorExt fc1_wts(t_fc1_wts, {'N', 'K', 'n', 'k'});
+        KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
+        KoiTensorExt fc1_out_mk(t_fc1_out, {'M', 'K', 'm', 'k'});
+        KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
+        KoiTensorExt fc2_out_mn(t_fc2_out.view({-1, C / 8, 16, 8}), {'M', 'N', 'm', 'n'});
+        KoiTensorExt fc2_out_ntc(t_fc2_out, {'N', 'T', 'C', 't', 'c'});
+        KoiTensorExt res2_weights(t_res2_weights, {'C'});
 
+        {
+            // Fused QKV Matmul Plus Rotary embedding
+            utils::ScopedProfileRange spr("QKV+ROTE", 3);
+            int res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv,
+                                     &sincos, &out_qkv, ctr[0].data_ptr<int>());
+            std::cerr << res;
+            // TODO: handle result
+        }
+        {
+            // Apply masket attention
+            utils::ScopedProfileRange spr("MEA", 3);
+            int res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
+            // TODO: handle result
+            std::cerr << res;
+        }
+        {
+            // Koi linear matmul
+            utils::ScopedProfileRange spr("OUTP", 3);
+            int res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
+                                 ctr[1].data_ptr<int>());
+            // TODO: handle result
+            std::cerr << res;
+        }
+        {
+            // RMS residual
+            utils::ScopedProfileRange spr("LNORM1", 3);
+            int res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in, alpha, &res_weights, &in);
+            // TODO: handle result
+            std::cerr << res;
+        }
+        {
+            // Matmul + SWIGLU
+            utils::ScopedProfileRange spr("FC1+SILU", 3);
+            int res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>());
+            // TODO: handle result
+            std::cerr << res;
+        }
+        {
+            // Fully connected
+            utils::ScopedProfileRange spr("FC2", 3);
+            int res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
+                                 ctr[3].data_ptr<int>());
 
-	    auto t_fc1_out = torch::empty({N*T/16, E/16, 16, 8}, x.options());
-	    auto t_fc2_out = torch::empty({N, T/16, C/8, 16, 8}, x.options());
-		    
-	    //Define Koi Tensors for the above buffers.
-	    KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'});
-            KoiTensorExt weights_qkv(w, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'});
-            KoiTensorExt sincos(sincos_bfr, {'T', 'D', 't', 'd'});
-            KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
-	    KoiTensorExt out_attn(t_out_attn, {'N', 'T', 'H', 'D', 't', 'd'});
-	    KoiTensorExt proj_w(proj_weight, {'N', 'K', 'n', 'k'});
-	    KoiTensorExt proj_b(proj_bias, {'N'});
-	    KoiTensorExt out_proj_mn(t_out_proj.view({-1, C / 8, 16, 8}), {'M', 'N', 'm', 'n'});
-	    KoiTensorExt out_proj_ntc(t_out_proj, {'N', 'T', 'C', 't', 'c'});
-	    KoiTensorExt res_weights(t_res_weights, {'C'});
-	    KoiTensorExt fc1_wts(t_fc1_wts, {'N', 'K', 'n', 'k'});
-	    KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
-	    KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
-	    KoiTensorExt fc2_out_mn(t_fc2_out.view({-1, C/8, 16, 8}), {'M', 'N', 'm', 'n'});
- 	    KoiTensorExt fc2_out_ntc(t_fc2_out, {'N', 'T', 'C', 't', 'c'});
-	    KoiTensorExt res2_weights(t_res2_weights, {'C'});
-	    
-            {
-	      // Fused QKV Matmul Plus Rotary embedding
-                utils::ScopedProfileRange spr("QKV+ROTE", 3);
-                int res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv, &sincos,
-                                         &out_qkv, ctr[0].data_ptr<int>());
-		std::cerr << res;
-                // TODO: handle result
-            }
-            {
-	      // Apply masket attention
-	      utils::ScopedProfileRange spr("MEA", 3);
-                int res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
-                // TODO: handle result
-				std::cerr << res;
-            }
-            {
-	      // Koi linear matmul
-                utils::ScopedProfileRange spr("OUTP", 3);
-                int res = koi_linear(stream, &out_attn, &proj_w, &proj_b, &out_proj_mn,
-                                     ctr[1].data_ptr<int>());
-                // TODO: handle result
-				std::cerr << res;
-            }
-            {
-	      // RMS residual
-                utils::ScopedProfileRange spr("LNORM1", 3);
-                int res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in, alpha, &res_weights, &in);
-                // TODO: handle result
-				std::cerr << res;
-            }
-            {
-
-	      // Matmul + SWIGLU
-                utils::ScopedProfileRange spr("FC1+SILU", 3);
-                int res = koi_mm_swiglu(stream, &in, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>());
-                // TODO: handle result
-				std::cerr << res;
-            }
-            {
-
-	      // Fully connected
-                utils::ScopedProfileRange spr("FC2", 3);
-                int res = koi_linear(stream, &fc1_out, &fc2_wts, nullptr, &fc2_out_mn,
-                                     ctr[3].data_ptr<int>());
-
-				std::cerr << res;
-                // TODO: handle result
-            }
-            {
-
-	      // RMS Norm Residual again
-                utils::ScopedProfileRange spr("LNORM2", 3);
-                int res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in, alpha, &res2_weights, &in);
-                // TODO: handle result
-				std::cerr << res;
-            }
-  return x;
-  }
+            std::cerr << res;
+            // TODO: handle result
+        }
+        {
+            // RMS Norm Residual again
+            utils::ScopedProfileRange spr("LNORM2", 3);
+            int res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in, alpha, &res2_weights, &in);
+            // TODO: handle result
+            std::cerr << res;
+        }
+        std::cerr << "/";
+        return x;
+    }
 #endif
 
-
-  
-
-  at::Tensor attn, f;
+    at::Tensor attn, f;
     const auto deepnorm_alpha = named_buffers()["deepnorm_alpha"];
-    
 #if DORADO_CUDA_BUILD
     const int N = static_cast<int>(x.size(0));
     const int T = static_cast<int>(x.size(1));
@@ -587,17 +574,16 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 }
 
 TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
-                                       const at::TensorOptions &options){
-
-  use_koi_tiled = false;
+                                       const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
     // TODO: make sure these are all the requirements
-    use_koi_tiled = koi_tc_is_available(KOI_F16) && (params.d_model == 512) &&
-                    (params.nhead == 8) && (params.attn_window.first == 128) &&
-                    (params.attn_window.second == 127) && (params.dim_feedforward == 2048);
+    use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
+                    (params.nhead == 8) && (params.attn_window.first == 127) &&
+                    (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    spdlog::info("TxEncoderStack: use_koi_tiled {}. {}", use_koi_tiled);
 #endif
 
-  stack = Sequential();
+    stack = Sequential();
     for (int i = 0; i < params.depth; ++i) {
         stack->push_back(register_module("transformer_encoder" + std::to_string(i),
                                          TxEncoder(params, options, use_koi_tiled)));
@@ -611,10 +597,10 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
         const int T = static_cast<int>(x.size(1));
         const int C = static_cast<int>(x.size(2));
 
-	// Transform the tensor into the tiled format.
+        // Transform the tensor into the tiled format.
         auto x_tiled = x.view({N, T / 16, 16, C / 8, 8}).transpose(2, 3).contiguous();
 
-	x_tiled = stack->forward(x_tiled);
+        x_tiled = stack->forward(x_tiled);
 
         return x_tiled.transpose(2, 3).contiguous().view({N, T, C});
     }

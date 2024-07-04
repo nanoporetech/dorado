@@ -346,7 +346,6 @@ void handle_cuda_result(int cuda_result) {
     }
 }
 
-
 namespace details {
 
 bool try_parse_device_ids(const std::string &device_string,
