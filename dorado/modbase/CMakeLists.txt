@@ -30,6 +30,7 @@ target_link_libraries(dorado_modbase
         torch_lib
     PRIVATE
         dorado_utils
+        dorado_torch_utils
         spdlog::spdlog
 )
 

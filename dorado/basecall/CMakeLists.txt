@@ -55,6 +55,7 @@ target_include_directories(dorado_basecall
 target_link_libraries(dorado_basecall
     PUBLIC
         torch_lib
+        dorado_torch_utils
         dorado_utils
     PRIVATE
         spdlog::spdlog
