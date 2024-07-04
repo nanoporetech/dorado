@@ -107,6 +107,7 @@ target_include_directories(dorado_torch_utils
 target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
+    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
