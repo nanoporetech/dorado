@@ -15,8 +15,6 @@ add_library(dorado_utils
     dev_utils.h
     fs_utils.cpp
     fs_utils.h
-    gpu_monitor.cpp
-    gpu_monitor.h
     hts_file.cpp
     hts_file.h
     locale_utils.cpp
@@ -59,6 +57,8 @@ add_library(dorado_utils
 add_library(dorado_torch_utils
     duplex_utils.cpp
     duplex_utils.h
+    gpu_monitor.cpp
+    gpu_monitor.h
     gpu_profiling.h
     tensor_utils.cpp
     tensor_utils.h
@@ -85,6 +85,13 @@ if (DORADO_GPU_BUILD)
         )
     endif()
 endif()
+
+target_compile_definitions(dorado_utils
+    PUBLIC
+        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
+        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
+        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
+)
 
 target_compile_definitions(dorado_torch_utils
     PUBLIC
