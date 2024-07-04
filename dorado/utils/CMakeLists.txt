@@ -186,6 +186,7 @@ endif()
 
 if(NOT WIN32)
     add_dependencies(dorado_utils htslib_project)
+    add_dependencies(dorado_torch_utils htslib_project)
 endif()
 
 # GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
