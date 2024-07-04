@@ -66,7 +66,7 @@ TEST_CASE("Parse double ended barcode arrangement", "[barcode_demux]") {
     CHECK(kit_info.bottom_rear_flank == "GTTTTCG");
 
     CHECK(kit_info.double_ends);
-    CHECK_FALSE(kit_info.ends_different);
+    CHECK(!kit_info.ends_different);
 }
 
 TEST_CASE("Parse double ended barcode arrangement with different flanks", "[barcode_demux]") {
@@ -108,7 +108,7 @@ TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[ba
 
     CHECK(kit_info.double_ends);
     CHECK(kit_info.ends_different);
-    CHECK(!kit_info.rear_only_barcodes);
+    CHECK_FALSE(kit_info.rear_only_barcodes);
 }
 
 TEST_CASE("Parse kit with bad indices", "[barcode_demux]") {
