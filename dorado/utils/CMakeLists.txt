@@ -13,8 +13,6 @@ add_library(dorado_utils
     crypto_utils.cpp
     dev_utils.cpp
     dev_utils.h
-    duplex_utils.cpp
-    duplex_utils.h
     fs_utils.cpp
     fs_utils.h
     gpu_monitor.cpp
@@ -51,23 +49,26 @@ add_library(dorado_utils
     thread_naming.h
     time_utils.cpp
     time_utils.h
-    trim_rapid_adapter.cpp
-    trim_rapid_adapter.h
-    trim.cpp
-    trim.h
     tty_utils.h
     types.cpp
     types.h
     uuid_utils.cpp
     uuid_utils.h
- )
+)
 
- add_library(dorado_torch_utils
+add_library(dorado_torch_utils
+    duplex_utils.cpp
+    duplex_utils.h
+    gpu_profiling.h
     tensor_utils.cpp
     tensor_utils.h
     torch_utils.cpp
     torch_utils.h
- )
+    trim_rapid_adapter.cpp
+    trim_rapid_adapter.h
+    trim.cpp
+    trim.h
+)
 
 if (DORADO_GPU_BUILD)
     if(APPLE)
