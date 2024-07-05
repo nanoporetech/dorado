@@ -108,7 +108,7 @@ If a candidate meets (1) or (2) AND (3), and the location of the start/end of th
 | min_flank_score | Minimum score for the flank alignment. Score here is 1.f - (edit distance) / flank_length |
 | midstrand_flank_score | Minimum score for a flank alignment that is not at read ends to be considered as a mid-strand barcode. Score here is 1.f - (edit distance) / flank_length |
 
-For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases is typically good. Note that errors from this padding region are also part of the barcode alignment penalty. Therefore a bigger padding region may require a higher `max_barcode_cost` for classification.
+For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases is typically good. Note that errors from this padding region are also part of the barcode alignment penalty. Therefore a bigger padding region may require a higher `max_barcode_penalty` for classification.
 
 ### Custom Sequences File 
 
