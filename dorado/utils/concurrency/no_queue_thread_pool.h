@@ -2,6 +2,7 @@
 
 #include "detail/priority_task_queue.h"
 #include "synchronisation.h"
+#include "task_priority.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -17,7 +18,6 @@
 
 namespace dorado::utils::concurrency {
 
-using TaskPriority = detail::TaskPriority;
 using TaskType = detail::TaskType;
 
 // Thread pool which blocks new tasks being added while all
@@ -47,13 +47,12 @@ private:
     std::condition_variable m_message_received{};
     std::size_t m_normal_prio_tasks_in_flight{};
     std::size_t m_high_prio_tasks_in_flight{};
-    std::shared_ptr<detail::WaitingTask> m_next_task{};
 
     void initialise();
     std::shared_ptr<detail::WaitingTask> wait_on_next_task(
             std::shared_ptr<detail::WaitingTask>& last_task);
     void process_task_queue();
-    bool try_pop_next_task();
+    bool try_pop_next_task(std::shared_ptr<detail::WaitingTask>& next_task);
     std::size_t num_tasks_in_flight();
 };
 

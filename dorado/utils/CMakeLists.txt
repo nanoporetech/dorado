@@ -16,6 +16,7 @@ add_library(dorado_utils
     concurrency/no_queue_thread_pool.cpp
     concurrency/no_queue_thread_pool.h
     concurrency/synchronisation.h
+    concurrency/task_priority.h
     crypto_utils.h
     crypto_utils.cpp
     dev_utils.cpp

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../synchronisation.h"
+#include "../task_priority.h"
 
 #include <cstddef>
 #include <functional>
@@ -9,11 +10,6 @@
 #include <queue>
 
 namespace dorado::utils::concurrency::detail {
-
-enum class TaskPriority {
-    normal,
-    high,
-};
 
 using TaskType = std::function<void()>;
 

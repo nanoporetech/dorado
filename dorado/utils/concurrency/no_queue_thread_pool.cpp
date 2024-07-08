@@ -66,14 +66,13 @@ std::size_t NoQueueThreadPool::num_tasks_in_flight() {
     return m_normal_prio_tasks_in_flight + m_high_prio_tasks_in_flight;
 }
 
-bool NoQueueThreadPool::try_pop_next_task() {
-    assert(!m_next_task && "try_pop_next_task when next task already assigned");
+bool NoQueueThreadPool::try_pop_next_task(std::shared_ptr<detail::WaitingTask>& next_task) {
     if (m_task_queue.empty()) {
         return false;
     }
     if (num_tasks_in_flight() < m_num_threads) {
-        m_next_task = m_task_queue.pop();
-        if (m_next_task->priority == TaskPriority::normal) {
+        next_task = m_task_queue.pop();
+        if (next_task->priority == TaskPriority::normal) {
             ++m_normal_prio_tasks_in_flight;
         } else {
             ++m_high_prio_tasks_in_flight;
@@ -82,14 +81,14 @@ bool NoQueueThreadPool::try_pop_next_task() {
     }
 
     if (m_high_prio_tasks_in_flight < m_num_threads && !m_task_queue.empty(TaskPriority::high)) {
-        m_next_task = m_task_queue.pop(TaskPriority::high);
+        next_task = m_task_queue.pop(TaskPriority::high);
         ++m_high_prio_tasks_in_flight;
         return true;
     }
 
     if (m_normal_prio_tasks_in_flight < m_num_expansion_low_prio_threads &&
         !m_task_queue.empty(TaskPriority::normal)) {
-        m_next_task = m_task_queue.pop(TaskPriority::normal);
+        next_task = m_task_queue.pop(TaskPriority::normal);
         ++m_normal_prio_tasks_in_flight;
         return true;
     }
@@ -107,10 +106,9 @@ std::shared_ptr<detail::WaitingTask> NoQueueThreadPool::wait_on_next_task(
             --m_high_prio_tasks_in_flight;
         }
     }
-    m_message_received.wait(lock, [this] { return try_pop_next_task(); });
-    std::shared_ptr<detail::WaitingTask> result{};
-    std::swap(result, m_next_task);
-    return result;
+    std::shared_ptr<detail::WaitingTask> next_task{};
+    m_message_received.wait(lock, [this, &next_task] { return try_pop_next_task(next_task); });
+    return next_task;
 }
 
 void NoQueueThreadPool::process_task_queue() {

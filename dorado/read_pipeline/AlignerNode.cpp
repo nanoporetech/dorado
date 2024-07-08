@@ -6,6 +6,8 @@
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "messages.h"
+#include "utils/concurrency/async_task_executor.h"
+#include "utils/concurrency/no_queue_thread_pool.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>

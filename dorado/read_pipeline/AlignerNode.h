@@ -5,7 +5,7 @@
 #include "alignment/Minimap2Options.h"
 #include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/MessageSink.h"
-#include "utils/concurrency/async_task_executor.h"
+#include "utils/concurrency/task_priority.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -17,6 +17,11 @@ struct bam1_t;
 typedef struct mm_tbuf_s mm_tbuf_t;
 
 namespace dorado {
+
+namespace utils::concurrency {
+class AsyncTaskExecutor;
+class NoQueueThreadPool;
+}  // namespace utils::concurrency
 
 namespace alignment {
 class Minimap2Index;
