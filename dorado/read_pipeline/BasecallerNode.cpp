@@ -387,9 +387,6 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
     }
 
     initialization_time = std::chrono::system_clock::now();
-
-    // Spin up any workers last so that we're not mutating |this| underneath them
-    start_threads();
 }
 
 BasecallerNode::~BasecallerNode() { terminate_impl(); }

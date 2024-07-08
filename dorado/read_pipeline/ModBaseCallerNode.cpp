@@ -67,9 +67,6 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));
     }
-
-    // Spin up the processing threads:
-    start_threads();
 }
 
 ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(); }

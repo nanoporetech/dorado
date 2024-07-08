@@ -14,6 +14,9 @@ TEST_CASE(TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("resume_loader"));
     auto sam = aligner_test_dir / "basecall.sam";
 
+    // Manually start the node.
+    sink.restart();
+
     dorado::ResumeLoaderNode loader(sink, sam.string());
     loader.copy_completed_reads();
     sink.terminate(dorado::DefaultFlushOptions());

@@ -47,9 +47,7 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
           m_min_read_length(min_read_length),
           m_read_ids_to_filter(std::move(read_ids_to_filter)),
           m_num_simplex_reads_filtered(0),
-          m_num_duplex_reads_filtered(0) {
-    start_input_processing([this] { input_thread_fn(); }, "readfilter_node");
-}
+          m_num_duplex_reads_filtered(0) {}
 
 stats::NamedStats ReadFilterNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);

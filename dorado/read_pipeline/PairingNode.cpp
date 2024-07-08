@@ -456,7 +456,6 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     }
 
     m_pairing_func = &PairingNode::pair_list_worker_thread;
-    start_threads();
 }
 
 PairingNode::PairingNode(DuplexPairingParameters pairing_params,
@@ -480,7 +479,6 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
                                  dorado::to_string(pairing_params.read_order));
     }
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
-    start_threads();
 }
 
 void PairingNode::start_threads() {

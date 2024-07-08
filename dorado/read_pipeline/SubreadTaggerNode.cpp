@@ -111,9 +111,7 @@ void SubreadTaggerNode::check_duplex_thread() {
 }
 
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads, num_worker_threads) {
-    start_threads();
-}
+        : MessageSink(max_reads, num_worker_threads) {}
 
 ::dorado::stats::NamedStats SubreadTaggerNode::sample_stats() const {
     ::dorado::stats::NamedStats stats = ::dorado::stats::from_obj(m_work_queue);

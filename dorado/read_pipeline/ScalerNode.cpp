@@ -272,8 +272,6 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
           m_scaling_params(config),
           m_model_type(model_type),
           m_trim_rna_adapter(trim_rna_adapter),
-          m_rapid_settings(rapid_settings) {
-    start_input_processing([this] { input_thread_fn(); }, "scaler_node");
-}
+          m_rapid_settings(rapid_settings) {}
 
 }  // namespace dorado

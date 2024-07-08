@@ -189,9 +189,7 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
         : MessageSink(1000, 0),
           m_num_worker_threads(threads),
           m_template_complement_map(std::move(template_complement_map)),
-          m_reads(std::move(reads)) {
-    start_threads();
-}
+          m_reads(std::move(reads)) {}
 
 void BaseSpaceDuplexCallerNode::start_threads() {
     m_worker_thread =
