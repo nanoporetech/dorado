@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../synchronisation.h"
-#include "../task_priority.h"
+#include "utils/concurrency/synchronisation.h"
+#include "utils/concurrency/task_priority.h"
 
 #include <cstddef>
 #include <functional>
