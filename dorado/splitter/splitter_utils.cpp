@@ -70,6 +70,7 @@ SimplexReadPtr subread(const SimplexRead& read,
                 seq_range->first, seq_range->second - seq_range->first);
         subread->read_common.qstring = subread->read_common.qstring.substr(
                 seq_range->first, seq_range->second - seq_range->first);
+        subread->read_common.pre_trim_seq_length = subread->read_common.seq.length();
         subread->read_common.moves = std::vector<uint8_t>(
                 subread->read_common.moves.begin() + signal_range.first / stride,
                 subread->read_common.moves.begin() + signal_range.second / stride);
