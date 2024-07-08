@@ -25,6 +25,28 @@ TEST_CASE("Parse custom single ended barcode arrangement", "[barcode_demux]") {
 
     CHECK(!kit_info.double_ends);
     CHECK(!kit_info.ends_different);
+    CHECK(!kit_info.rear_only_barcodes);
+}
+
+TEST_CASE("Parse custom single ended barcode arrangement with rear barcodes", "[barcode_demux]") {
+    fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
+    const auto test_file = data_dir / "test_kit_single_ended_rear.toml";
+
+    auto [kit_name, kit_info] = *dorado::barcode_kits::parse_custom_arrangement(test_file.string());
+
+    CHECK(kit_name == "test_kit_single_ended_rear_only");
+    CHECK(kit_info.barcodes.size() == 4);
+
+    CHECK(kit_info.name == "BC");
+    CHECK(kit_info.top_front_flank == "C");
+    CHECK(kit_info.top_rear_flank == "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA");
+    CHECK(kit_info.bottom_front_flank.empty());
+    CHECK(kit_info.bottom_rear_flank.empty());
+    CHECK(kit_info.barcodes2.empty());
+
+    CHECK(!kit_info.double_ends);
+    CHECK(!kit_info.ends_different);
+    CHECK(kit_info.rear_only_barcodes);
 }
 
 TEST_CASE("Parse double ended barcode arrangement", "[barcode_demux]") {
@@ -65,6 +87,7 @@ TEST_CASE("Parse double ended barcode arrangement with different flanks", "[barc
 
     CHECK(kit_info.double_ends);
     CHECK(kit_info.ends_different);
+    CHECK_FALSE(kit_info.rear_only_barcodes);
 }
 
 TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[barcode_demux]") {
@@ -85,6 +108,7 @@ TEST_CASE("Parse double ended barcode arrangement with different barcodes", "[ba
 
     CHECK(kit_info.double_ends);
     CHECK(kit_info.ends_different);
+    CHECK_FALSE(kit_info.rear_only_barcodes);
 }
 
 TEST_CASE("Parse kit with bad indices", "[barcode_demux]") {

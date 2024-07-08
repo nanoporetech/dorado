@@ -90,8 +90,11 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
         : m_source_to_sink_order(std::move(source_to_sink_order)) {
     for (auto &[desc_node, _] : descriptor.m_node_descriptors) {
         m_nodes.push_back(std::move(desc_node));
-        if (stats_reporters) {
-            stats_reporters->push_back(stats::make_stats_reporter(*m_nodes.back()));
+    }
+
+    if (stats_reporters) {
+        for (auto node_index : m_source_to_sink_order) {
+            stats_reporters->push_back(stats::make_stats_reporter(*m_nodes.at(node_index)));
         }
     }
 

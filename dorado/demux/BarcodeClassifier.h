@@ -41,7 +41,8 @@ private:
     float find_midstrand_barcode_double_ends(std::string_view read_seq,
                                              const BarcodeCandidateKit& candidate) const;
     float find_midstrand_barcode_single_end(std::string_view read_seq,
-                                            const BarcodeCandidateKit& candidate) const;
+                                            const BarcodeCandidateKit& candidate,
+                                            bool rear_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
@@ -53,7 +54,8 @@ private:
     std::vector<BarcodeScoreResult> calculate_barcode_score(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
-            const BarcodingInfo::FilterSet& allowed_barcodes) const;
+            const BarcodingInfo::FilterSet& allowed_barcodes,
+            bool rear_barcodes) const;
     BarcodeScoreResult find_best_barcode(const std::string& read_seq,
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
