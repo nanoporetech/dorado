@@ -385,8 +385,6 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                         chunk_queue_size));
         spdlog::debug("BasecallerNode chunk size {}", s);
     }
-
-    initialization_time = std::chrono::system_clock::now();
 }
 
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
@@ -420,7 +418,6 @@ void BasecallerNode::terminate_impl() {
         }
     }
     m_working_reads_managers.clear();
-    termination_time = std::chrono::system_clock::now();
 }
 
 void BasecallerNode::restart() {

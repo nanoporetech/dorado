@@ -27,7 +27,6 @@ public:
     }
 
 private:
-    std::vector<std::unique_ptr<std::thread>> m_workers;
     std::atomic<int> m_num_records{0};
     demux::AdapterDetectorSelector m_detector_selector{};
 

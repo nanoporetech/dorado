@@ -1,10 +1,11 @@
+#include "read_pipeline/ResumeLoader.h"
+
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/ResumeLoaderNode.h"
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "[read_pipeline][ResumeLoaderNode]"
+#define TEST_GROUP "[read_pipeline][ResumeLoader]"
 
 namespace fs = std::filesystem;
 
@@ -17,7 +18,7 @@ TEST_CASE(TEST_GROUP) {
     // Manually start the node.
     sink.restart();
 
-    dorado::ResumeLoaderNode loader(sink, sam.string());
+    dorado::ResumeLoader loader(sink, sam.string());
     loader.copy_completed_reads();
     sink.terminate(dorado::DefaultFlushOptions());
     CHECK(messages.size() == 2);

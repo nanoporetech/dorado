@@ -1,5 +1,4 @@
 #include "TestUtils.h"
-#include "read_pipeline/NullNode.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 
