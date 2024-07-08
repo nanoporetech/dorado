@@ -14,9 +14,9 @@ void PriorityTaskQueue::push(std::shared_ptr<WaitingTask> task) {
     }
 }
 
-std::size_t PriorityTaskQueue::size() { return m_task_list.size(); }
+std::size_t PriorityTaskQueue::size() const { return m_task_list.size(); }
 
-std::size_t PriorityTaskQueue::size(TaskPriority priority) {
+std::size_t PriorityTaskQueue::size(TaskPriority priority) const {
     return priority == TaskPriority::high ? m_high_queue.size() : m_low_queue.size();
 }
 
@@ -46,8 +46,8 @@ std::shared_ptr<WaitingTask> PriorityTaskQueue::pop(TaskPriority priority) {
     return result;
 }
 
-bool PriorityTaskQueue::empty() { return size() == 0; }
+bool PriorityTaskQueue::empty() const { return size() == 0; }
 
-bool PriorityTaskQueue::empty(TaskPriority priority) { return size(priority) == 0; }
+bool PriorityTaskQueue::empty(TaskPriority priority) const { return size(priority) == 0; }
 
 }  // namespace dorado::utils::concurrency::detail

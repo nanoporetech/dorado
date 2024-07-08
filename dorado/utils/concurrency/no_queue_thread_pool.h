@@ -10,6 +10,7 @@
 #include <list>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <string>
 #include <thread>
@@ -47,10 +48,11 @@ private:
     std::condition_variable m_message_received{};
     std::size_t m_normal_prio_tasks_in_flight{};
     std::size_t m_high_prio_tasks_in_flight{};
+    void decrement_in_flight_tasks(TaskPriority priority);
 
     void initialise();
-    std::shared_ptr<detail::WaitingTask> wait_on_next_task(
-            std::shared_ptr<detail::WaitingTask>& last_task);
+    std::shared_ptr<detail::WaitingTask> decrement_in_flight_and_wait_on_next_task(
+            std::optional<TaskPriority> last_task_priority);
     void process_task_queue();
     bool try_pop_next_task(std::shared_ptr<detail::WaitingTask>& next_task);
     std::size_t num_tasks_in_flight();

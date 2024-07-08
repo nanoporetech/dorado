@@ -8,24 +8,10 @@
 
 namespace dorado::utils::concurrency {
 
-namespace details {
-
-// Implicitly deleted move operators as no there are no defaults and there are user
-// declared copy/assignment operators.
-template <typename T>
-class copy_and_move_disabled {
-protected:
-    copy_and_move_disabled<T>(const copy_and_move_disabled<T> &) = delete;
-    copy_and_move_disabled<T> &operator=(const copy_and_move_disabled<T> &) = delete;
-    copy_and_move_disabled<T>() = default;
-};
-
-}  // namespace details
-
 /**
  * use to block threads till a counter reaches zero
  */
-class Latch final : private details::copy_and_move_disabled<Latch> {
+class Latch final {
     std::size_t m_count;
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_condition;
@@ -82,7 +68,7 @@ public:
 /**
  * Adapter providing a single signalled state interface over a latch with a count of one
  */
-class Flag final : private details::copy_and_move_disabled<Flag> {
+class Flag final {
     Latch m_latch;
 
 public:
@@ -111,7 +97,7 @@ public:
 /**
  * Adapter providing multiple flag slots, all of which must be signalled for wait to return.
  */
-class CompositeFlag final : private details::copy_and_move_disabled<CompositeFlag> {
+class CompositeFlag final {
     std::vector<std::unique_ptr<Flag>> m_flags;
 
 public:
@@ -122,7 +108,7 @@ public:
      */
     explicit CompositeFlag(std::size_t size) : m_flags(size) {
         for (auto &flag : m_flags) {
-            flag.reset(new Flag());
+            flag = std::make_unique<Flag>();
         }
     }
 

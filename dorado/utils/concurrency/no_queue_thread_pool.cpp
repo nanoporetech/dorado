@@ -96,15 +96,23 @@ bool NoQueueThreadPool::try_pop_next_task(std::shared_ptr<detail::WaitingTask>& 
     return false;
 }
 
-std::shared_ptr<detail::WaitingTask> NoQueueThreadPool::wait_on_next_task(
-        std::shared_ptr<detail::WaitingTask>& last_task) {
+void NoQueueThreadPool::decrement_in_flight_tasks(TaskPriority priority) {
+    if (priority == TaskPriority::normal) {
+        --m_normal_prio_tasks_in_flight;
+    } else {
+        --m_high_prio_tasks_in_flight;
+    }
+}
+
+std::shared_ptr<detail::WaitingTask> NoQueueThreadPool::decrement_in_flight_and_wait_on_next_task(
+        std::optional<TaskPriority> last_task_priority) {
+    // Design flaw: doing both decrement and wait, an SRP violation - weak cohesion, because we don't
+    // want to unlock between the decrement and the wait, and it is a lesser "evil" than the
+    // alternative design flaw of passing a lock between functions, high coupling, as threading is
+    // easier to reason about if the locking is encapsulated.
     std::unique_lock lock(m_mutex);
-    if (last_task) {
-        if (last_task->priority == TaskPriority::normal) {
-            --m_normal_prio_tasks_in_flight;
-        } else {
-            --m_high_prio_tasks_in_flight;
-        }
+    if (last_task_priority) {
+        decrement_in_flight_tasks(*last_task_priority);
     }
     std::shared_ptr<detail::WaitingTask> next_task{};
     m_message_received.wait(lock, [this, &next_task] { return try_pop_next_task(next_task); });
@@ -115,17 +123,14 @@ void NoQueueThreadPool::process_task_queue() {
     set_thread_name(m_name);
     std::shared_ptr<detail::WaitingTask> waiting_task{};
     while (!m_done.load(std::memory_order_relaxed)) {
-        waiting_task = wait_on_next_task(waiting_task);
+        waiting_task = decrement_in_flight_and_wait_on_next_task(
+                waiting_task ? std::make_optional(waiting_task->priority) : std::nullopt);
         waiting_task->started.signal();
         waiting_task->task();
     }
     if (waiting_task) {
         std::unique_lock lock(m_mutex);
-        if (waiting_task->priority == TaskPriority::normal) {
-            --m_normal_prio_tasks_in_flight;
-        } else {
-            --m_high_prio_tasks_in_flight;
-        }
+        decrement_in_flight_tasks(waiting_task->priority);
         // Signal so that the condition variable will be checked by waiting threads
         // This is necessary since it is possible join() was called before all the threads
         // in the thread pool had begun waiting on the condition variable, in which case

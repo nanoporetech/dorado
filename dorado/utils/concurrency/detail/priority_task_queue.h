@@ -38,11 +38,11 @@ public:
     std::shared_ptr<WaitingTask> pop();
     std::shared_ptr<WaitingTask> pop(TaskPriority priority);
 
-    std::size_t size();
-    std::size_t size(TaskPriority priority);
+    std::size_t size() const;
+    std::size_t size(TaskPriority priority) const;
 
-    bool empty();
-    bool empty(TaskPriority priority);
+    bool empty() const;
+    bool empty(TaskPriority priority) const;
 };
 
 }  // namespace dorado::utils::concurrency::detail
