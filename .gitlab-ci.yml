@@ -450,9 +450,9 @@ build_archive:linux:x86:focal:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
-  image: nvcr.io/nvidia/pytorch:23.01-py3
+  image: nvcr.io/nvidia/pytorch:24.06-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch"
   extends:
     - .linux_dependencies
     - .linux_runner
