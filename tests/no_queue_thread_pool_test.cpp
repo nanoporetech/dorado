@@ -9,7 +9,6 @@
 
 #define CUT_TAG "[dorado::utils::concurrency::NoQueueThreadPool]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
-#define DEFINE_SCENARIO(name) SCENARIO(CUT_TAG " " name, CUT_TAG)
 #define DEFINE_TEST_FIXTURE_METHOD(name) \
     TEST_CASE_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
 #define DEFINE_SCENARIO_METHOD(name) \
@@ -202,7 +201,7 @@ DEFINE_TEST_FIXTURE_METHOD(
     REQUIRE(task_started_flags[2]->wait_for(TIMEOUT));
 }
 
-DEFINE_TEST_FIXTURE_METHOD("Thread pool size 8 sending normal and high priority tasks") {
+DEFINE_SCENARIO_METHOD("Thread pool size 8 sending normal and high priority tasks") {
     initialise(8);
     GIVEN("8 busy normal tasks") {
         for (std::size_t index{0}; index < 8; ++index) {
