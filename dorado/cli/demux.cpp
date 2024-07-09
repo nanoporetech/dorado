@@ -21,6 +21,7 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>

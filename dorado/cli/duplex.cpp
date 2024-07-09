@@ -46,6 +46,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <thread>
