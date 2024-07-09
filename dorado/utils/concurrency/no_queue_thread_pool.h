@@ -26,6 +26,18 @@ using TaskType = detail::TaskType;
 // Suitable for usecases where a producer thread should not be allowed to
 // enqueue a large amount of tasks ahead of a second producer thread
 // beginning to enqueue tasks.
+//
+// N.B. If the pool is initialised with N threads then the actual number of
+// threads managed by the pool will be 2*N, allowing the pool to expand under
+// certain circumstances.
+//
+// This is to support the usecase where N threads are under full load running
+// normal priority tasks and then high priority tasks start to be received.
+// Instead of blocking these high prio tasks the pool is allowed to expand up to 2*N.
+//
+// There is a similar behaviour for normal tasks but only N/4 expansion threads are
+// allowed, this is to ensure normal pipelines aren't "frozen" while high prioity
+// tasks are being processed.
 class NoQueueThreadPool {
 public:
     NoQueueThreadPool(std::size_t num_threads);
