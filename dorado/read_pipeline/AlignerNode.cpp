@@ -202,7 +202,7 @@ void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& execu
 void AlignerNode::input_thread_fn() {
     Message message;
     // create an executor for the pool whose destructor will block till all tasks completed.
-    utils::concurrency::AsyncTaskExecutor task_executor{m_thread_pool, m_pipeline_priority};
+    utils::concurrency::AsyncTaskExecutor task_executor{*m_thread_pool, m_pipeline_priority};
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
             align_bam_message(task_executor, std::get<BamMessage>(std::move(message)));

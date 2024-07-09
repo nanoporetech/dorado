@@ -25,18 +25,20 @@ constexpr auto TIMEOUT{10s};
 }  // namespace
 
 DEFINE_TEST("AsyncTaskExecutor constructor with valid thread pool does not throw") {
-    REQUIRE_NOTHROW(
-            AsyncTaskExecutor(std::make_shared<NoQueueThreadPool>(1), TaskPriority::normal));
+    NoQueueThreadPool pool{1};
+    REQUIRE_NOTHROW(AsyncTaskExecutor(pool, TaskPriority::normal));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() does not throw") {
-    AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2), TaskPriority::normal);
+    NoQueueThreadPool pool{2};
+    AsyncTaskExecutor cut(pool, TaskPriority::normal);
 
     REQUIRE_NOTHROW(cut.send([] {}));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
-    AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2), TaskPriority::normal);
+    NoQueueThreadPool pool{2};
+    AsyncTaskExecutor cut(pool, TaskPriority::normal);
     Flag invoked{};
 
     cut.send([&invoked] { invoked.signal(); });
@@ -45,7 +47,8 @@ DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task") {
-    AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2), TaskPriority::normal);
+    NoQueueThreadPool pool{2};
+    AsyncTaskExecutor cut(pool, TaskPriority::normal);
 
     Flag invoked{};
     struct Signaller {
@@ -62,7 +65,8 @@ DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task")
 }
 
 DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
-    AsyncTaskExecutor cut(std::make_shared<NoQueueThreadPool>(2), TaskPriority::normal);
+    NoQueueThreadPool pool{2};
+    AsyncTaskExecutor cut(pool, TaskPriority::normal);
 
     GIVEN("2 tasks are running") {
         std::vector<std::unique_ptr<Flag>> task_release_flags{};
@@ -154,7 +158,7 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
 }
 
 DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
-    auto thread_pool = std::make_shared<NoQueueThreadPool>(2);
+    NoQueueThreadPool thread_pool{2};
 
     constexpr std::size_t NUM_TASKS{3};
     std::atomic_size_t num_completed_tasks{0};

@@ -4,16 +4,15 @@
 
 namespace dorado::utils::concurrency {
 
-AsyncTaskExecutor::AsyncTaskExecutor(std::shared_ptr<NoQueueThreadPool> thread_pool,
-                                     TaskPriority priority)
-        : m_thread_pool(std::move(thread_pool)), m_priority(priority) {}
+AsyncTaskExecutor::AsyncTaskExecutor(NoQueueThreadPool& thread_pool, TaskPriority priority)
+        : m_thread_pool(thread_pool), m_priority(priority) {}
 
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 
 void AsyncTaskExecutor::send_impl(TaskType task) {
     increment_tasks_in_flight();
 
-    m_thread_pool->send(
+    m_thread_pool.send(
             [task = std::move(task), this] {
                 task();
                 decrement_tasks_in_flight();
@@ -25,7 +24,7 @@ std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(TaskType task) {
     increment_tasks_in_flight();
 
     auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)]() mutable {
-        m_thread_pool->send(
+        m_thread_pool.send(
                 [task = std::move(task), this] {
                     task();
                     decrement_tasks_in_flight();
