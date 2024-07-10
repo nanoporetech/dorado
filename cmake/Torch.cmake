@@ -264,21 +264,21 @@ if (USING_STATIC_TORCH_LIB)
             ${TORCH_LIB}/lib/libbreakpad_common.a
 
             # Some of the CUDA libs have inter-dependencies, so group them together
-            -Wl,--start-group
-                CUDA::cudart_static
-                CUDA::cublas_static
-                CUDA::cublasLt_static
+            $<LINK_GROUP:RESCAN,
+                CUDA::cudart_static,
+                CUDA::cublas_static,
+                CUDA::cublasLt_static,
                 # AFAICT Torch doesn't provide the symbol required for the callback, so use the nocallback variant
-                CUDA::cufft_static_nocallback
-                CUDA::cusolver_static
+                CUDA::cufft_static_nocallback,
+                CUDA::cusolver_static,
                 # cusolver is missing this and I don't know why
-                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
-                CUDA::cusparse_static
-                CUDA::cupti
-                CUDA::curand_static
-                CUDA::nvrtc
+                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a,
+                CUDA::cusparse_static,
+                CUDA::cupti,
+                CUDA::curand_static,
+                CUDA::nvrtc,
                 CUDA::culibos
-            -Wl,--end-group
+            >
             # OMP implementation (i=Intel, g=GNU)
             ${TORCH_LIB}/lib/libgomp.so.1.0.0
             # BLAS rather than MKL
@@ -364,9 +364,9 @@ if (USING_STATIC_TORCH_LIB)
             target_link_libraries(dorado_torch_lib PRIVATE
                 ${TORCH_LIBRARIES}
                 # Some of the CUDA libs have inter-dependencies, so group them together
-                -Wl,--start-group
+                $<LINK_GROUP:RESCAN,
                     ${ont_cuda_internal_linkage_libs}
-                -Wl,--end-group
+                >
             )
             target_include_directories(dorado_torch_lib PUBLIC
                 ${TORCH_INCLUDE_DIRS}
@@ -379,16 +379,16 @@ if (USING_STATIC_TORCH_LIB)
 
         list(APPEND TORCH_LIBRARIES
             # Some of the CUDA libs have inter-dependencies, so group them together
-            -Wl,--start-group
-                CUDA::cudart_static
-                CUDA::cublas_static
-                CUDA::cublasLt_static
-                CUDA::cufft_static_nocallback
-                CUDA::cusolver_static
-                CUDA::cusparse_static
-                ${ont_cuda_internal_linkage_libs}
+            $<LINK_GROUP:RESCAN,
+                CUDA::cudart_static,
+                CUDA::cublas_static,
+                CUDA::cublasLt_static,
+                CUDA::cufft_static_nocallback,
+                CUDA::cusolver_static,
+                CUDA::cusparse_static,
+                ${ont_cuda_internal_linkage_libs},
                 ${ont_torch_extra_cuda_libs}
-            -Wl,--end-group
+            >
             ${ont_torch_extra_platform_libs}
         )
 
