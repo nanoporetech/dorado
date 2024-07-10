@@ -25,7 +25,7 @@ if (DORADO_GPU_BUILD)
         target_sources(dorado_basecall
             PRIVATE
             MetalCaller.cpp
-            MetalCaller.h            
+            MetalCaller.h
             MetalModelRunner.cpp
             MetalModelRunner.h
             nn/MetalCRFModel.cpp
@@ -61,15 +61,16 @@ target_link_libraries(dorado_basecall
 )
 
 if (TARGET koi)
-    target_link_libraries(dorado_basecall
-        PRIVATE
-            # koi needs cuda which is provided by torch, but we can't add torch as a
-            # dependency to koi because it's defined in another project.
-            $<LINK_GROUP:RESCAN,
-                koi,
-                torch_lib
-            >
-    )
+    target_link_libraries(dorado_basecall PRIVATE koi)
+
+    # Current koi can't be linked to directly since it doesn't provide an include path.
+    # TODO: once koi is updated we can remove this.
+    if (BUILD_KOI_FROM_SOURCE)
+        if (KOI_VERSION VERSION_GREATER "0.4.8")
+            message(FATAL_ERROR "This should no longer be necessary")
+        endif()
+        target_include_directories(dorado_basecall PRIVATE ${KOI_DIR}/koi/lib)
+    endif()
 endif()
 
 enable_warnings_as_errors(dorado_basecall)
