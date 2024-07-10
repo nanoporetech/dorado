@@ -3,6 +3,7 @@
 #include "sam_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
+#include "utils/section_timing.h"
 #include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
@@ -95,6 +96,7 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
 }
 
 std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
+    DORADO_SECTION_TIMING("Minimap2Aligner::align(bam1_t)");
     // some where for the hits
     std::vector<BamPtr> results;
 
@@ -284,6 +286,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
+    DORADO_SECTION_TIMING("Minimap2Aligner::align(ReadCommon)");
     mm_bseq1_t query{};
     query.seq = const_cast<char*>(read_common.seq.c_str());
     query.name = const_cast<char*>(read_common.read_id.c_str());
