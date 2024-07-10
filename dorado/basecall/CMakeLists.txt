@@ -57,14 +57,20 @@ target_link_libraries(dorado_basecall
         torch_lib
         dorado_utils
     PRIVATE
-        ${KOI_LIBRARIES}
         spdlog::spdlog
 )
 
-target_include_directories(dorado_basecall
-    PRIVATE
-        ${KOI_INCLUDE}
-)
+if (TARGET koi)
+    target_link_libraries(dorado_basecall
+        PRIVATE
+            # koi needs cuda which is provided by torch, but we can't add torch as a
+            # dependency to koi because it's defined in another project.
+            $<LINK_GROUP:RESCAN,
+                koi,
+                torch_lib
+            >
+    )
+endif()
 
 enable_warnings_as_errors(dorado_basecall)
 
