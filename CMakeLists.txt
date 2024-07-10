@@ -305,7 +305,6 @@ target_include_directories(dorado_lib
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${TORCH_INCLUDE_DIRS}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -328,7 +327,7 @@ endif()
 
 target_link_libraries(dorado_lib
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
         htslib
         edlib
         dorado_utils

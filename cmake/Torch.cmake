@@ -400,3 +400,8 @@ if (USING_STATIC_TORCH_LIB)
         endif()
     endif()
 endif()
+
+# Create the target which other libraries can link to
+add_library(torch_lib INTERFACE)
+target_link_libraries(torch_lib INTERFACE ${TORCH_LIBRARIES})
+target_include_directories(torch_lib SYSTEM INTERFACE ${TORCH_INCLUDE_DIRS})

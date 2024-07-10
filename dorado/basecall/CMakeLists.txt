@@ -54,7 +54,7 @@ target_include_directories(dorado_basecall
 
 target_link_libraries(dorado_basecall
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
         dorado_utils
     PRIVATE
         ${KOI_LIBRARIES}
