@@ -922,10 +922,12 @@ std::string barcode_kits_list_str() {
 std::string normalize_barcode_name(const std::string& barcode_name) {
     std::string digits = "";
     // Normalize using only the digits at the end of the barcode name.
+    bool found_digits = false;
     for (auto rit = barcode_name.rbegin(); rit != barcode_name.rend(); ++rit) {
         if (std::isdigit(static_cast<unsigned char>(*rit))) {
             digits += *rit;
-        } else {
+            found_digits = true;
+        } else if (found_digits) {
             break;
         }
     }
