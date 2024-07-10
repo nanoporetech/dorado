@@ -1,5 +1,6 @@
 #include "async_task_executor.h"
 
+#include "utils/section_timing.h"
 #include "utils/thread_naming.h"
 
 namespace dorado::utils::concurrency {
@@ -10,6 +11,7 @@ AsyncTaskExecutor::AsyncTaskExecutor(NoQueueThreadPool& thread_pool, TaskPriorit
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 
 void AsyncTaskExecutor::send_impl(TaskType task) {
+    DORADO_SECTION_TIMING("AsyncTaskExecutor::send_impl");
     increment_tasks_in_flight();
 
     m_thread_pool.send(

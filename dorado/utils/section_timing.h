@@ -37,8 +37,10 @@ public:
     }
 
     ~SectionTiming() {
-        duration_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - m_enter)
-                               .count();
+        duration_ns.fetch_add(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - m_enter)
+                        .count(),
+                std::memory_order_relaxed);
     }
 
     static std::string report() {
@@ -77,7 +79,7 @@ std::once_flag SectionTiming<T>::register_once{};
  * output:
  * SectionTiming_MyClass::some_function : count: 1787519, duration (ms): 152544
  */
-//#define DORADO_SECTION_TIMING_ENABLED  // comment/uncomment to enable
+#define DORADO_SECTION_TIMING_ENABLED  // comment/uncomment to enable
 #ifdef DORADO_SECTION_TIMING_ENABLED
 #define DORADO_SECTION_TIMING(name)                                                       \
     class dorado_section_timing_t final                                                   \
