@@ -452,7 +452,8 @@ build_archive:linux:x86:focal:
 build_archive:linux:x86:cuda12:
   image: nvcr.io/nvidia/pytorch:24.06-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch"
+    # Note: the linker flag is a workaround for the provided torch forgetting to link to cublas.
+    BUILD_OPTIONS: "-D DORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch -D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--copy-dt-needed-entries'"
   extends:
     - .linux_dependencies
     - .linux_runner
