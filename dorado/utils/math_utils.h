@@ -17,8 +17,12 @@ T div_round_closest(const T n, const T d) {
     return ((n < 0) ^ (d < 0)) ? ((n - d / 2) / d) : ((n + d / 2) / d);
 }
 template <typename T>
+T div_round_up(const T a, const T b) {
+    return (a + b - 1) / b;
+}
+template <typename T>
 T pad_to(const T a, const T b) {
-    return ((a + b - 1) / b) * b;
+    return div_round_up(a, b) * b;
 }
 
 // Adapted from https://stackoverflow.com/questions/11964552/finding-quartiles
