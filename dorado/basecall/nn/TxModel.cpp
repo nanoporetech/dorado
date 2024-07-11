@@ -341,13 +341,13 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         const auto elems_per_split =
                 utils::pad_to(utils::div_round_up(T, int64_t{num_splits}), int64_t{4});
         for (int i = 0; i < num_splits; ++i) {
-            auto qb = i * elems_per_split;
+            const auto qb = i * elems_per_split;
             if (qb >= T) {
                 break;
             }
-            auto qe = std::min(T, qb + elems_per_split);
-            auto kvb = std::max<int64_t>(0, qb - win_lower);
-            auto kve = std::min<int64_t>(T, qe + win_upper);
+            const auto qe = std::min(T, qb + elems_per_split);
+            const auto kvb = std::max<int64_t>(0, qb - win_lower);
+            const auto kve = std::min<int64_t>(T, qe + win_upper);
             const auto q = qkv[0].slice(-2, qb, qe);
             const auto k = qkv[1].slice(-2, kvb, kve);
             const auto v = qkv[2].slice(-2, kvb, kve);
