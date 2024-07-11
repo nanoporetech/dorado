@@ -27,7 +27,7 @@ target_include_directories(dorado_modbase
 
 target_link_libraries(dorado_modbase
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
     PRIVATE
         dorado_utils
         spdlog::spdlog

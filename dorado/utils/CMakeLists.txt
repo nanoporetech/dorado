@@ -98,7 +98,6 @@ target_include_directories(dorado_utils
 target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
-    ${TORCH_INCLUDE_DIRS}
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
     ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -106,7 +105,7 @@ target_include_directories(dorado_utils
 
 target_link_libraries(dorado_utils
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
         date::date
         edlib
         spdlog::spdlog
