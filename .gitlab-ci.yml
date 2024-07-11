@@ -687,6 +687,7 @@ test:model_download:macos:arm:
     - build:macos:arm
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+  timeout: 1h 30m
 
 # MLHub
 
