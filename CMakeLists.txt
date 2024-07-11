@@ -422,6 +422,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # torch may bundle it's own specific copy of the cuda libs. if it does, we want everything to point at them
         file(GLOB TORCH_CUDA_LIBS "${TORCH_LIB}/lib/${LIB}")
         if(TORCH_CUDA_LIBS)
+            # Sort the list so that we process in order: libX.so -> libX.so.1 -> libX.so.1.1.1
+            list(SORT TORCH_CUDA_LIBS)
             foreach(TORCH_CUDA_LIB IN LISTS TORCH_CUDA_LIBS)
                 # create links to the torch bundled libs with hashes in the name
                 # e.g. libcublas.so.11 => libcublas-3b81d170.so.11
@@ -429,14 +431,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 string(REGEX REPLACE "-[0-9a-f]+[.]" "." link ${target})
                 get_filename_component(target_name ${target} NAME)
                 get_filename_component(link_name ${link} NAME)
-                execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
+                if (NOT target_name STREQUAL link_name)
+                    execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
 
-                # create links to the versioned links above
-                # e.g. libcublas.so => libcublas.so.11
-                string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
-                execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
+                    # create links to the versioned links above
+                    # e.g. libcublas.so => libcublas.so.11
+                    string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
+                    if (NOT base_link STREQUAL link_name)
+                        execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
+                    endif()
+                endif()
             endforeach()
         else()
             # bundle the libraries from the cuda toolkit
