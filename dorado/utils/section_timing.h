@@ -33,7 +33,7 @@ public:
         std::call_once(register_once, [&name] {
             details::add_report_provider("SectionTiming_" + name, []() { return report(); });
         });
-        ++count;
+        count.fetch_add(1, std::memory_order_relaxed);
     }
 
     ~SectionTiming() {
@@ -70,7 +70,7 @@ std::once_flag SectionTiming<T>::register_once{};
  *     DORADO_SECTION_TIMING("MyClass::some_function");
  *     ...
  * }
- * }
+ * };
  *
  * To enable ensure DORADO_SECTION_TIMING_ENABLED is defined
  * and any instrumented functions will be reported to stdout assuming that, on exit, the application calls:

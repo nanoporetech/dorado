@@ -28,7 +28,7 @@ void NoQueueThreadPool::initialise() {
     // Total number of threads are m_num_threads + expansion space for the
     // same number of high prio tasks, in case all threads are busy with a
     //// normal prio task when a high prio task arrives.
-    for (std::size_t i{0}; i < m_num_threads; ++i) {
+    for (std::size_t i{0}; i < m_num_threads * 2; ++i) {
         m_threads.emplace_back([this] { process_task_queue(); });
     }
 }
@@ -37,7 +37,7 @@ NoQueueThreadPool::~NoQueueThreadPool() { join(); }
 
 void NoQueueThreadPool::join() {
     // post as many done messages as there are threads to make sure all waiting threads will receive a wakeup
-    for (uint32_t thread_index{0}; thread_index < m_num_threads; ++thread_index) {
+    for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
         {
             std::unique_lock lock(m_mutex);
             m_task_queue.push(std::make_shared<detail::WaitingTask>(
@@ -61,7 +61,7 @@ void NoQueueThreadPool::send(TaskType task, TaskPriority priority) {
         m_task_queue.push(waiting_task);
     }
     m_message_received.notify_one();
-    //waiting_task->started.wait();
+    waiting_task->started.wait();
 }
 
 std::size_t NoQueueThreadPool::num_tasks_in_flight() {
