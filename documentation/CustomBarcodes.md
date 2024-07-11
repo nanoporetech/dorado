@@ -49,7 +49,7 @@ flank_left_pad = 5
 flank_right_pad = 10
 front_barcode_window = 175
 rear_barcode_window = 175
-midstrand_flank_score = 0.8
+midstrand_flank_score = 0.95
 ```
 
 #### Arrangement Options
