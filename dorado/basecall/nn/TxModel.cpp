@@ -467,60 +467,49 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         KoiTensorExt fc2_out_ntc(t_fc2_out, {'N', 'T', 'C', 't', 'c'});
         KoiTensorExt res2_weights(t_res2_weights, {'C'});
 
-        {
+        int res = KOI_SUCCESS;
+        if (res == KOI_SUCCESS) {
             // Fused QKV Matmul Plus Rotary embedding
             utils::ScopedProfileRange spr("QKV+ROTE", 3);
-            int res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv,
-                                     &sincos, &out_qkv, ctr[0].data_ptr<int>());
-            std::cerr << res;
-            // TODO: handle result
+            res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv, &sincos,
+                                 &out_qkv, ctr[0].data_ptr<int>());
         }
-        {
+        if (res == KOI_SUCCESS) {
             // Apply masket attention
             utils::ScopedProfileRange spr("MEA", 3);
-            int res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
-            // TODO: handle result
-            std::cerr << res;
+            res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
         }
-        {
+        if (res == KOI_SUCCESS) {
             // Koi linear matmul
             utils::ScopedProfileRange spr("OUTP", 3);
-            int res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
-                                 ctr[1].data_ptr<int>());
-            // TODO: handle result
-            std::cerr << res;
+            res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
+                             ctr[1].data_ptr<int>());
         }
-        {
+        if (res == KOI_SUCCESS) {
             // RMS residual
             utils::ScopedProfileRange spr("LNORM1", 3);
-            int res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in, alpha, &res_weights, &in);
-            // TODO: handle result
-            std::cerr << res;
+            res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in, alpha, &res_weights, &in);
         }
-        {
+        if (res == KOI_SUCCESS) {
             // Matmul + SWIGLU
             utils::ScopedProfileRange spr("FC1+SILU", 3);
-            int res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>());
-            // TODO: handle result
-            std::cerr << res;
+            res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>());
         }
-        {
+        if (res == KOI_SUCCESS) {
             // Fully connected
             utils::ScopedProfileRange spr("FC2", 3);
-            int res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
-                                 ctr[3].data_ptr<int>());
-
-            std::cerr << res;
-            // TODO: handle result
+            res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
+                             ctr[3].data_ptr<int>());
         }
-        {
+        if (res == KOI_SUCCESS) {
             // RMS Norm Residual again
             utils::ScopedProfileRange spr("LNORM2", 3);
-            int res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in, alpha, &res2_weights, &in);
-            // TODO: handle result
-            std::cerr << res;
+            res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in, alpha, &res2_weights, &in);
         }
-        std::cerr << "/";
+        // TODO: handle result
+        if (res != KOI_SUCCESS) {
+            spdlog::error("Koi tiled path failed");
+        }
         return x;
     }
 #endif
@@ -580,7 +569,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
     use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
                     (params.nhead == 8) && (params.attn_window.first == 127) &&
                     (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
-    spdlog::info("TxEncoderStack: use_koi_tiled {}. {}", use_koi_tiled);
+    spdlog::info("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 #endif
 
     stack = Sequential();
