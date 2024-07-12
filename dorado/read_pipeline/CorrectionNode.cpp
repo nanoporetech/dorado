@@ -9,7 +9,7 @@
 #include "utils/gpu_profiling.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 #include "utils/types.h"
 #if DORADO_CUDA_BUILD
 #include "utils/cuda_utils.h"

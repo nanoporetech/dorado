@@ -8,7 +8,7 @@
 #include "alignment/Minimap2Options.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
