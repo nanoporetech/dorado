@@ -73,12 +73,6 @@ DEFINE_SCENARIO("prioritised pushing and popping with 2 high queues and one norm
         return [&task_id, id] { task_id = id; };
     };
 
-    auto check_sizes = [&cut](std::size_t num_normal, std::size_t num_high, std::size_t total) {
-        CHECK(cut.size(TaskPriority::normal) == num_normal);
-        CHECK(cut.size(TaskPriority::high) == num_high);
-        CHECK(cut.size() == total);
-    };
-
     auto check_task = [&task_id](WaitingTask waiting_task, TaskPriority priority,
                                  const std::string& expected_task_id) {
         CHECK(waiting_task.priority == priority);
