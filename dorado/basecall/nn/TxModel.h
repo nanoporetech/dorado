@@ -112,6 +112,11 @@ struct TxEncoderImpl : torch::nn::Module {
 
     tx::TxEncoderParams params;
     bool use_koi_tiled;
+
+    // Rearranged weights for Koi tiled codepath
+    at::Tensor wqkv_weights, sincos_bfr, proj_weight, proj_bias;
+    at::Tensor t_res_weights, t_res2_weights, t_fc1_wts, t_fc2_wts;
+
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
     RMSNorm norm1{nullptr}, norm2{nullptr};

@@ -27,20 +27,11 @@ extern "C" {
 #include "koi.h"
 }
 
-static bool koi_can_use_cutlass() {
+namespace {
+bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
 }
-#endif
-
-#include <filesystem>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-namespace dorado::basecall {
-
-namespace nn {
 
 struct KoiTensorExt : public KoiTensor {
     KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) {
@@ -65,6 +56,18 @@ struct KoiTensorExt : public KoiTensor {
         }
     }
 };
+}  // anonymous namespace
+
+#endif
+
+#include <filesystem>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace dorado::basecall {
+
+namespace nn {
 
 using namespace torch::nn;
 namespace Idx = torch::indexing;
@@ -421,42 +424,41 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         // TODO: initialise (i.e. transpose) all weight tensors once
         const float alpha = params.deepnorm_alpha;
 
-        // output of the QKV matmuls (the torch tensor)
-	// MV - this doesn't need to be set because it's calculated here
+        if (!wqkv_weights.numel()) {
+            // Weights for the Q,K and V tensors which will be multiplied with the inputs
+            wqkv_weights = self_attn->wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
+
+            //Rotary embedding as atorch tensor
+            auto rot_bfrs = self_attn->rotary_emb->named_buffers();
+            auto max_T = 16 * (rot_bfrs["sin_freqs"].size(0) / 16);
+            sincos_bfr = torch::empty({max_T, D / 2, 2}, x.options());
+            sincos_bfr.select(2, 0) = rot_bfrs["sin_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+            sincos_bfr.select(2, 1) = rot_bfrs["cos_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+            sincos_bfr = sincos_bfr.view({max_T / 16, 16, D / 8, 8}).transpose(1, 2).contiguous();
+
+            // Need rearranging to correct tiled format
+            proj_weight = self_attn->out_proj->weight.view({C / 16, C / 8, 16, 8});
+            proj_bias = self_attn->out_proj->bias.view({C});
+
+            t_res_weights = norm1->weight.view({C});
+            t_res2_weights = norm2->weight.view({C});
+
+            t_fc1_wts = ff->fc1->weight.view({E / 16, C / 8, 16, 8});
+            t_fc2_wts = ff->fc2->weight.view({C / 16, E / 16, 16, 8});
+        }
+
+        // Output buffers
         auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
-        // Weights for the Q,K and V tensors which will be multiplied with the inputs
-        // We need to access this WQKV buffer - there is one tensor per encoder and it is a member of the TXEncoderimpl
-        auto w = self_attn->wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
-        //Rotary embedding a s atorch tensor (needs filling in with the correct values)
-        auto sincos_bfr = torch::empty({T / 16, D / 8, 16, 8}, x.options());
-
-	// Output buffers
         auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, x.options());
-
-	// Need rearranging to correct tiled format
-        auto proj_weight = self_attn->out_proj->weight.view({C/16, C/8, 16, 8});
-        auto proj_bias = self_attn->out_proj->bias.view({C});
-
-	// Need rearranging to correct tiled format
-	auto t_res_weights = norm1->weight.view({C});
-	auto t_res2_weights = norm2->weight.view({C});
-
-	// Output buffer
-	auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
-
-	// Need rearranging to correc tiled format
-	auto t_fc1_wts = ff->fc1->weight.view({E / 16, C / 8, 16, 8});
-        auto t_fc2_wts = ff->fc2->weight.view({C / 16, E / 16, 16, 8});
-
-	// Output buffers
+        auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
         auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, x.options());
         auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
 
         //Define Koi Tensors for the above buffers.
         KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'});
         KoiTensorExt in_mk(x.view({-1, C / 8, 16, 8}), {'M', 'K', 'm', 'k'});
-        KoiTensorExt weights_qkv(w, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'});
-        KoiTensorExt sincos(sincos_bfr, {'T', 'D', 't', 'd'});
+        KoiTensorExt weights_qkv(wqkv_weights, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'});
+        KoiTensorExt sincos(sincos_bfr.slice(0, 0, T / 16), {'T', 'D', 't', 'd'});
         KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
         KoiTensorExt out_attn(t_out_attn, {'N', 'T', 'H', 'D', 't', 'd'});
         KoiTensorExt out_attn_mk(t_out_attn.view({-1, C / 8, 16, 8}), {'M', 'K', 'm', 'k'});

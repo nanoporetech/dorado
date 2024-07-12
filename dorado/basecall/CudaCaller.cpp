@@ -314,9 +314,10 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     }
 
     float best_time = std::numeric_limits<float>::max();
-    // 300 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
-    // trade-off between getting more accurate measurements and avoiding excessive startup time.
-    const int chunk_size = std::min(m_batch_dims.back().T_in, m_config.stride * 300);
+    // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
+    // trade-off between getting more accurate measurements and avoiding excessive startup time,
+    // while making chunk size a multiple of 16 * stride as required by koi transformer kernels.
+    const int chunk_size = std::min(m_batch_dims.back().T_in, m_config.stride * 288);
     // We limit the maximum when doing benchmarking to avoid excessive startup time.
     // The limit for transformer models should be increased at a later time.
     const int max_batch_size_limit = m_config.is_tx_model() ? 512 : 10240;
