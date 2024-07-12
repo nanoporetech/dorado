@@ -21,24 +21,25 @@ namespace dorado::utils::concurrency::async_task_executor {
 namespace {
 
 constexpr auto TIMEOUT{10s};
+constexpr std::size_t MAX_QUEUE_SIZE{100};
 
 }  // namespace
 
 DEFINE_TEST("AsyncTaskExecutor constructor with valid thread pool does not throw") {
     MultiQueueThreadPool pool{1};
-    REQUIRE_NOTHROW(AsyncTaskExecutor(pool, TaskPriority::normal));
+    REQUIRE_NOTHROW(AsyncTaskExecutor(pool, TaskPriority::normal, MAX_QUEUE_SIZE));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() does not throw") {
     MultiQueueThreadPool pool{2};
-    AsyncTaskExecutor cut(pool, TaskPriority::normal);
+    AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
 
     REQUIRE_NOTHROW(cut.send([] {}));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
     MultiQueueThreadPool pool{2};
-    AsyncTaskExecutor cut(pool, TaskPriority::normal);
+    AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
     Flag invoked{};
 
     cut.send([&invoked] { invoked.signal(); });
@@ -48,7 +49,7 @@ DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
 
 DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task") {
     MultiQueueThreadPool pool{2};
-    AsyncTaskExecutor cut(pool, TaskPriority::normal);
+    AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
 
     Flag invoked{};
     struct Signaller {
@@ -66,7 +67,7 @@ DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task")
 
 DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
     MultiQueueThreadPool pool{2};
-    AsyncTaskExecutor cut(pool, TaskPriority::normal);
+    AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
 
     GIVEN("2 tasks are running") {
         std::vector<std::unique_ptr<Flag>> task_release_flags{};
@@ -174,7 +175,7 @@ DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
     });
     Flag unblock_tasks{};
     {
-        AsyncTaskExecutor cut(thread_pool, TaskPriority::normal);
+        AsyncTaskExecutor cut(thread_pool, TaskPriority::normal, MAX_QUEUE_SIZE);
         Latch two_tasks_running{2};
         producer_thread = std::make_unique<std::thread>(
                 [&cut, &num_completed_tasks, &unblock_tasks, &two_tasks_running] {

@@ -20,6 +20,9 @@
 
 namespace {
 
+constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
+constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};
+
 std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         dorado::alignment::IndexFileAccess& index_file_access,
         const std::string& index_file,
@@ -203,7 +206,8 @@ void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& execu
 void AlignerNode::input_thread_fn() {
     Message message;
     // create an executor for the pool whose destructor will block till all tasks completed.
-    utils::concurrency::AsyncTaskExecutor task_executor{*m_thread_pool, m_pipeline_priority};
+    utils::concurrency::AsyncTaskExecutor task_executor{*m_thread_pool, m_pipeline_priority,
+                                                        MAX_PROCESSING_QUEUE_SIZE};
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
             align_bam_message(task_executor, std::get<BamMessage>(std::move(message)));

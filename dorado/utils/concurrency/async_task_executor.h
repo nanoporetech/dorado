@@ -3,6 +3,7 @@
 #include "multi_queue_thread_pool.h"
 #include "synchronisation.h"
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -21,8 +22,10 @@ class AsyncTaskExecutor {
     std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> m_thread_pool_queue;
     const TaskPriority m_priority;
     std::mutex m_mutex{};
+    std::condition_variable m_tasks_in_flight_cv{};
     std::size_t m_num_tasks_in_flight{};
     std::unique_ptr<Latch> m_flushing_counter;
+    std::size_t m_max_tasks_in_flight;
 
     void send_impl(TaskType task);
     void decrement_tasks_in_flight();
@@ -30,7 +33,9 @@ class AsyncTaskExecutor {
     void create_flushing_counter();
 
 public:
-    AsyncTaskExecutor(MultiQueueThreadPool& thread_pool, TaskPriority priority);
+    AsyncTaskExecutor(MultiQueueThreadPool& thread_pool,
+                      TaskPriority priority,
+                      std::size_t max_queue_size);
     ~AsyncTaskExecutor();
 
     template <typename T,
