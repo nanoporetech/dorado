@@ -422,6 +422,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         const float alpha = params.deepnorm_alpha;
 
         // output of the QKV matmuls (the torch tensor)
+	// MV - this doesn't need to be set because it's calculated here
         auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, x.options());
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
         // We need to access this WQKV buffer - there is one tensor per encoder and it is a member of the TXEncoderimpl
@@ -429,20 +430,25 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         //Rotary embedding a s atorch tensor (needs filling in with the correct values)
         auto sincos_bfr = torch::empty({T / 16, D / 8, 16, 8}, x.options());
 
+	// Output buffers
         auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, x.options());
 
-        auto proj_weight = torch::empty({C / 16, C / 8, 16, 8}, x.options());
+	// Need rearranging to correct tiled format
+        auto proj_weight = self_attn->out_proj->weight.view({C/16, C/8, 16, 8});
+        auto proj_bias = self_attn->out_proj->bias.view({C});
 
-        auto proj_bias = torch::empty({C}, x.options());
+	// Need rearranging to correct tiled format
+	auto t_res_weights = norm1->weight.view({C});
+	auto t_res2_weights = norm2->weight.view({C});
 
-        auto t_res_weights = torch::empty({C}, x.options());
-        auto t_res2_weights = torch::empty({C}, x.options());
+	// Output buffer
+	auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
 
-        auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
+	// Need rearranging to correc tiled format
+	auto t_fc1_wts = ff->fc1->weight.view({E / 16, C / 8, 16, 8});
+        auto t_fc2_wts = ff->fc2->weight.view({C / 16, E / 16, 16, 8});
 
-        auto t_fc1_wts = torch::empty({E / 16, C / 8, 16, 8}, x.options());
-        auto t_fc2_wts = torch::empty({C / 16, E / 16, 16, 8}, x.options());
-
+	// Output buffers
         auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, x.options());
         auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, x.options());
 
