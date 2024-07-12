@@ -35,13 +35,13 @@ int correct(int argc, char* argv[]) {
     parser.add_description("Dorado read correction tool.");
     parser.add_argument("reads").help("Path to a file with reads to correct in FASTQ format.");
     parser.add_argument("-t", "--threads")
-            .help("Combined number of threads for adapter/primer detection and output generation. "
+            .help("Number of threads for processing. "
                   "Default uses "
                   "all available threads.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
+            .help("Device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
                   "etc..")
             .default_value(
 #if DORADO_CUDA_BUILD
@@ -59,17 +59,14 @@ int correct(int argc, char* argv[]) {
 #endif
             .scan<'i', int>();
     parser.add_argument("-b", "--batch-size")
-            .help("Batch size for inference. Default: 0 for auto batch size detection")
+            .help("Batch size for inference. Default: 0 for auto batch size detection.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-i", "--index-size")
             .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
                   "lower memory footprint.")
             .default_value(std::string{"8G"});
-    parser.add_argument("-m", "--model-path").help("path to correction model folder.");
-    parser.add_argument("-l", "--read-ids")
-            .help("A file with a newline-delimited list of reads to correct.")
-            .default_value(std::string(""));
+    parser.add_argument("-m", "--model-path").help("Path to correction model folder.");
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
             .default_value(false)
