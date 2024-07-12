@@ -8,6 +8,7 @@
 #include "alignment/Minimap2Options.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
+#include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
@@ -125,6 +126,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
 }
 
 void ErrorCorrectionMapperNode::input_thread_fn() {
+    utils::set_thread_name("errcorr_node");
     BamPtr read;
     MmTbufPtr tbuf(mm_tbuf_init());
     while (m_reads_queue.try_pop(read) != utils::AsyncQueueStatus::Terminate) {
@@ -154,6 +156,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
 }
 
 void ErrorCorrectionMapperNode::load_read_fn() {
+    utils::set_thread_name("errcorr_load");
     m_reads_queue.restart();
     HtsReader reader(m_index_file, {});
     while (reader.read()) {
@@ -168,6 +171,7 @@ void ErrorCorrectionMapperNode::load_read_fn() {
 }
 
 void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
+    utils::set_thread_name("errcorr_copy");
     while (!m_copy_terminate.load()) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
         m_copy_cv.wait(lock, [&] {
@@ -228,6 +232,7 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
     m_copy_terminate.store(true);
+    m_copy_cv.notify_all();
     if (copy_thread.joinable()) {
         copy_thread.join();
     }
