@@ -13,8 +13,8 @@ add_library(dorado_utils
     concurrency/async_task_executor.h
     concurrency/detail/priority_task_queue.cpp
     concurrency/detail/priority_task_queue.h
-    concurrency/no_queue_thread_pool.cpp
-    concurrency/no_queue_thread_pool.h
+    concurrency/multi_queue_thread_pool.cpp
+    concurrency/multi_queue_thread_pool.h
     concurrency/synchronisation.h
     concurrency/task_priority.h
     crypto_utils.h

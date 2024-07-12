@@ -20,7 +20,7 @@ namespace dorado {
 
 namespace utils::concurrency {
 class AsyncTaskExecutor;
-class NoQueueThreadPool;
+class MultiQueueThreadPool;
 }  // namespace utils::concurrency
 
 namespace alignment {
@@ -37,7 +37,7 @@ public:
                 int threads);
     AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                 std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                std::shared_ptr<utils::concurrency::NoQueueThreadPool> thread_pool,
+                std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
                 utils::concurrency::TaskPriority pipeline_priority);
     ~AlignerNode() { stop_input_processing(); }
     std::string get_name() const override { return "AlignerNode"; }
@@ -63,7 +63,7 @@ private:
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 
-    std::shared_ptr<utils::concurrency::NoQueueThreadPool> m_thread_pool{};
+    std::shared_ptr<utils::concurrency::MultiQueueThreadPool> m_thread_pool{};
     utils::concurrency::TaskPriority m_pipeline_priority{utils::concurrency::TaskPriority::normal};
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<const alignment::BedFile> m_bedfile_for_bam_messages{};

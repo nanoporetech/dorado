@@ -5,7 +5,7 @@
 
 namespace dorado::utils::concurrency {
 
-AsyncTaskExecutor::AsyncTaskExecutor(NoQueueThreadPool& thread_pool, TaskPriority priority)
+AsyncTaskExecutor::AsyncTaskExecutor(MultiQueueThreadPool& thread_pool, TaskPriority priority)
         : m_thread_pool_queue(thread_pool.create_task_queue(priority)), m_priority(priority) {}
 
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }

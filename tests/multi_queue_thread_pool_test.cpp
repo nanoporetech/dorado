@@ -1,4 +1,4 @@
-#include "utils/concurrency/no_queue_thread_pool.h"
+#include "utils/concurrency/multi_queue_thread_pool.h"
 
 #include "utils/PostCondition.h"
 #include "utils/concurrency/synchronisation.h"
@@ -7,7 +7,7 @@
 
 #include <utility>
 
-#define CUT_TAG "[dorado::utils::concurrency::NoQueueThreadPool]"
+#define CUT_TAG "[dorado::utils::concurrency::MultiQueueThreadPool]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
 #define DEFINE_TEST_FIXTURE_METHOD(name) \
     TEST_CASE_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
@@ -16,14 +16,14 @@
 
 using namespace std::chrono_literals;
 
-namespace dorado::utils::concurrency::no_queue_thread_pool {
+namespace dorado::utils::concurrency::multi_queue_thread_pool {
 
 namespace {
 
 constexpr auto TIMEOUT{10s};
 constexpr auto FAST_TIMEOUT{100ms};  // when checking
 
-std::vector<std::thread> create_producer_threads(NoQueueThreadPool::ThreadPoolQueue& pool_queue,
+std::vector<std::thread> create_producer_threads(MultiQueueThreadPool::ThreadPoolQueue& pool_queue,
                                                  std::size_t count,
                                                  const std::function<void()>& task) {
     std::vector<std::thread> producer_threads{};
@@ -40,7 +40,7 @@ protected:
     const std::size_t DEFAULT_THREAD_POOL_SIZE{2};
     std::vector<std::unique_ptr<Flag>> task_release_flags{};
     std::vector<std::unique_ptr<Flag>> task_started_flags{};
-    std::unique_ptr<NoQueueThreadPool> cut{};
+    std::unique_ptr<MultiQueueThreadPool> cut{};
     std::vector<std::unique_ptr<std::thread>> producer_threads{};
 
     void release_all_tasks() {
@@ -57,7 +57,7 @@ protected:
     };
 
     void initialise(std::size_t thread_pool_size) {
-        cut = std::make_unique<NoQueueThreadPool>(thread_pool_size, "test_executor");
+        cut = std::make_unique<MultiQueueThreadPool>(thread_pool_size, "test_executor");
     }
 
 public:
@@ -84,7 +84,7 @@ public:
 }  // namespace
 
 DEFINE_TEST("create_task_queue returns non-null object") {
-    NoQueueThreadPool cut{1, "test_executor"};
+    MultiQueueThreadPool cut{1, "test_executor"};
 
     auto task_queue = cut.create_task_queue(TaskPriority::normal);
 
@@ -92,14 +92,14 @@ DEFINE_TEST("create_task_queue returns non-null object") {
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue does not throw") {
-    NoQueueThreadPool cut{2, "test_executor"};
+    MultiQueueThreadPool cut{2, "test_executor"};
     auto task_queue = cut.create_task_queue(TaskPriority::normal);
 
     REQUIRE_NOTHROW(task_queue->push([] {}));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue invokes the task") {
-    NoQueueThreadPool cut{2, "test_executor"};
+    MultiQueueThreadPool cut{2, "test_executor"};
     auto task_queue = cut.create_task_queue(TaskPriority::normal);
 
     Flag invoked{};
@@ -109,7 +109,7 @@ DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue invokes the task") {
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
-    NoQueueThreadPool cut{1, "test_executor"};
+    MultiQueueThreadPool cut{1, "test_executor"};
     auto task_queue = cut.create_task_queue(TaskPriority::normal);
 
     Flag thread_id_assigned{};
@@ -125,9 +125,9 @@ DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
     REQUIRE(invocation_thread != std::this_thread::get_id());
 }
 
-DEFINE_TEST("NoQueueThreadPool::join() with 2 active threads completes") {
+DEFINE_TEST("MultiQueueThreadPool::join() with 2 active threads completes") {
     constexpr std::size_t num_threads{2};
-    NoQueueThreadPool cut{num_threads, "test_executor"};
+    MultiQueueThreadPool cut{num_threads, "test_executor"};
     auto task_queue = cut.create_task_queue(TaskPriority::normal);
     Flag release_busy_tasks{};
     Latch all_busy_tasks_started{num_threads};
@@ -306,4 +306,4 @@ DEFINE_TEST_FIXTURE_METHOD(
 //    }
 //}
 
-}  // namespace dorado::utils::concurrency::no_queue_thread_pool
+}  // namespace dorado::utils::concurrency::multi_queue_thread_pool

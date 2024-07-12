@@ -38,11 +38,11 @@ using TaskType = detail::TaskType;
 // There is a similar behaviour for normal tasks but only N/4 expansion threads are
 // allowed, this is to ensure normal pipelines aren't "frozen" while high prioity
 // tasks are being processed.
-class NoQueueThreadPool {
+class MultiQueueThreadPool {
 public:
-    NoQueueThreadPool(std::size_t num_threads);
-    NoQueueThreadPool(std::size_t num_threads, std::string name);
-    ~NoQueueThreadPool();
+    MultiQueueThreadPool(std::size_t num_threads);
+    MultiQueueThreadPool(std::size_t num_threads, std::string name);
+    ~MultiQueueThreadPool();
 
     void send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue);
 
@@ -76,11 +76,11 @@ private:
     std::size_t num_tasks_in_flight();
 
     class ThreadPoolQueueImpl : public ThreadPoolQueue {
-        NoQueueThreadPool* m_parent;
+        MultiQueueThreadPool* m_parent;
         std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> m_task_queue;
 
     public:
-        ThreadPoolQueueImpl(NoQueueThreadPool* parent,
+        ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
                             std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue);
         void push(TaskType task) override;
     };

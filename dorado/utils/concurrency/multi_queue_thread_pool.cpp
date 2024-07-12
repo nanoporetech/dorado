@@ -1,4 +1,4 @@
-#include "no_queue_thread_pool.h"
+#include "multi_queue_thread_pool.h"
 
 #include "utils/section_timing.h"
 #include "utils/thread_naming.h"
@@ -10,14 +10,14 @@
 
 namespace dorado::utils::concurrency {
 
-NoQueueThreadPool::NoQueueThreadPool(std::size_t num_threads)
+MultiQueueThreadPool::MultiQueueThreadPool(std::size_t num_threads)
         : m_num_threads{num_threads},
           m_num_expansion_low_prio_threads(std::max(static_cast<std::size_t>(1),
                                                     static_cast<std::size_t>(num_threads / 4))) {
     initialise();
 }
 
-NoQueueThreadPool::NoQueueThreadPool(std::size_t num_threads, std::string name)
+MultiQueueThreadPool::MultiQueueThreadPool(std::size_t num_threads, std::string name)
         : m_name{std::move(name)},
           m_num_threads{num_threads},
           m_num_expansion_low_prio_threads(std::max(static_cast<std::size_t>(1),
@@ -25,7 +25,7 @@ NoQueueThreadPool::NoQueueThreadPool(std::size_t num_threads, std::string name)
     initialise();
 }
 
-void NoQueueThreadPool::initialise() {
+void MultiQueueThreadPool::initialise() {
     // Total number of threads are m_num_threads + expansion space for the
     // same number of high prio tasks, in case all threads are busy with a
     //// normal prio task when a high prio task arrives.
@@ -34,9 +34,9 @@ void NoQueueThreadPool::initialise() {
     }
 }
 
-NoQueueThreadPool::~NoQueueThreadPool() { join(); }
+MultiQueueThreadPool::~MultiQueueThreadPool() { join(); }
 
-void NoQueueThreadPool::join() {
+void MultiQueueThreadPool::join() {
     // post as many done messages as there are threads to make sure all waiting threads will receive a wakeup
     auto terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
     for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
@@ -53,31 +53,20 @@ void NoQueueThreadPool::join() {
     }
 }
 
-//void NoQueueThreadPool::send(TaskType task, TaskPriority priority) {
-//    DORADO_SECTION_TIMING("NoQueueThreadPool::send");
-//    auto waiting_task = std::make_shared<detail::WaitingTask>(std::move(task), priority);
-//    {
-//        std::unique_lock lock(m_mutex);
-//        m_task_queue.push(waiting_task);
-//    }
-//    m_message_received.notify_one();
-//    waiting_task->started.wait();
-//}
-
-void NoQueueThreadPool::send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue) {
-    DORADO_SECTION_TIMING("NoQueueThreadPool::send(task, task_queue)");
+void MultiQueueThreadPool::send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue) {
+    DORADO_SECTION_TIMING("MultiQueueThreadPool::send(task, task_queue)");
     {
         std::unique_lock lock(m_mutex);
         task_queue.push(std::move(task));
+        m_message_received.notify_one();
     }
-    m_message_received.notify_one();
 }
 
-std::size_t NoQueueThreadPool::num_tasks_in_flight() {
+std::size_t MultiQueueThreadPool::num_tasks_in_flight() {
     return m_normal_prio_tasks_in_flight + m_high_prio_tasks_in_flight;
 }
 
-bool NoQueueThreadPool::try_pop_next_task(detail::WaitingTask& next_task) {
+bool MultiQueueThreadPool::try_pop_next_task(detail::WaitingTask& next_task) {
     if (m_priority_task_queue.empty()) {
         return false;
     }
@@ -108,7 +97,7 @@ bool NoQueueThreadPool::try_pop_next_task(detail::WaitingTask& next_task) {
     return false;
 }
 
-void NoQueueThreadPool::decrement_in_flight_tasks(TaskPriority priority) {
+void MultiQueueThreadPool::decrement_in_flight_tasks(TaskPriority priority) {
     if (priority == TaskPriority::normal) {
         --m_normal_prio_tasks_in_flight;
     } else {
@@ -116,7 +105,7 @@ void NoQueueThreadPool::decrement_in_flight_tasks(TaskPriority priority) {
     }
 }
 
-detail::WaitingTask NoQueueThreadPool::decrement_in_flight_and_wait_on_next_task(
+detail::WaitingTask MultiQueueThreadPool::decrement_in_flight_and_wait_on_next_task(
         std::optional<TaskPriority> last_task_priority) {
     // Design flaw: doing both decrement and wait, an SRP violation - weak cohesion, because we don't
     // want to unlock between the decrement and the wait, and it is a lesser "evil" than the
@@ -131,7 +120,7 @@ detail::WaitingTask NoQueueThreadPool::decrement_in_flight_and_wait_on_next_task
     return next_task;
 }
 
-void NoQueueThreadPool::process_task_queue() {
+void MultiQueueThreadPool::process_task_queue() {
     set_thread_name(m_name);
     detail::WaitingTask waiting_task{};
     std::optional<TaskPriority> last_task_priority{std::nullopt};
@@ -151,16 +140,16 @@ void NoQueueThreadPool::process_task_queue() {
     }
 }
 
-NoQueueThreadPool::ThreadPoolQueueImpl::ThreadPoolQueueImpl(
-        NoQueueThreadPool* parent,
+MultiQueueThreadPool::ThreadPoolQueueImpl::ThreadPoolQueueImpl(
+        MultiQueueThreadPool* parent,
         std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue)
         : m_parent(parent), m_task_queue(std::move(task_queue)) {}
 
-void NoQueueThreadPool::ThreadPoolQueueImpl::push(TaskType task) {
+void MultiQueueThreadPool::ThreadPoolQueueImpl::push(TaskType task) {
     m_parent->send(std::move(task), *m_task_queue);
 }
 
-std::unique_ptr<NoQueueThreadPool::ThreadPoolQueue> NoQueueThreadPool::create_task_queue(
+std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> MultiQueueThreadPool::create_task_queue(
         TaskPriority priority) {
     std::lock_guard lock(m_mutex);
     return std::make_unique<ThreadPoolQueueImpl>(this,

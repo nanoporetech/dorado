@@ -7,7 +7,7 @@
 #include "alignment/minimap2_args.h"
 #include "messages.h"
 #include "utils/concurrency/async_task_executor.h"
-#include "utils/concurrency/no_queue_thread_pool.h"
+#include "utils/concurrency/multi_queue_thread_pool.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
@@ -73,8 +73,9 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const alignment::Minimap2Options& options,
                          int threads)
         : MessageSink(10000, 1),
-          m_thread_pool(std::make_shared<utils::concurrency::NoQueueThreadPool>(threads,
-                                                                                "align_node_pool")),
+          m_thread_pool(
+                  std::make_shared<utils::concurrency::MultiQueueThreadPool>(threads,
+                                                                             "align_node_pool")),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
@@ -99,7 +100,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                         std::shared_ptr<utils::concurrency::NoQueueThreadPool> thread_pool,
+                         std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
                          utils::concurrency::TaskPriority pipeline_priority)
         : MessageSink(10000, 1),
           m_thread_pool(std::move(thread_pool)),

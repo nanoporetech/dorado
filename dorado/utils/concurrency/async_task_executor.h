@@ -1,6 +1,6 @@
 #pragma once
 
-#include "no_queue_thread_pool.h"
+#include "multi_queue_thread_pool.h"
 #include "synchronisation.h"
 
 #include <memory>
@@ -18,7 +18,7 @@ namespace dorado::utils::concurrency {
 // to flush it's tasks without waiting for other pipleines to
 // also flush.
 class AsyncTaskExecutor {
-    std::unique_ptr<NoQueueThreadPool::ThreadPoolQueue> m_thread_pool_queue;
+    std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> m_thread_pool_queue;
     const TaskPriority m_priority;
     std::mutex m_mutex{};
     std::size_t m_num_tasks_in_flight{};
@@ -30,7 +30,7 @@ class AsyncTaskExecutor {
     void create_flushing_counter();
 
 public:
-    AsyncTaskExecutor(NoQueueThreadPool& thread_pool, TaskPriority priority);
+    AsyncTaskExecutor(MultiQueueThreadPool& thread_pool, TaskPriority priority);
     ~AsyncTaskExecutor();
 
     template <typename T,
