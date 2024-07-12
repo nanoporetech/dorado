@@ -426,7 +426,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 
         if (!wqkv_weights.numel()) {
             // Weights for the Q,K and V tensors which will be multiplied with the inputs
-            wqkv_weights = self_attn->wqkv->weight.view({3, H, D / 16, C / 8, 16, 8});
+	  wqkv_weights = self_attn->wqkv->weight.view({3, H, D / 16, 16, C / 8, 8}).transpose(-2,-3).contiguous();
 
             //Rotary embedding as atorch tensor
             auto rot_bfrs = self_attn->rotary_emb->named_buffers();
@@ -437,14 +437,14 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
             sincos_bfr = sincos_bfr.view({max_T / 16, 16, D / 8, 8}).transpose(1, 2).contiguous();
 
             // Need rearranging to correct tiled format
-            proj_weight = self_attn->out_proj->weight.view({C / 16, C / 8, 16, 8});
+            proj_weight = self_attn->out_proj->weight.view({C / 16, 16, C/8, 8}).transpose(1,2).contiguous();
             proj_bias = self_attn->out_proj->bias.view({C});
 
             t_res_weights = norm1->weight.view({C});
             t_res2_weights = norm2->weight.view({C});
 
-            t_fc1_wts = ff->fc1->weight.view({E / 16, C / 8, 16, 8});
-            t_fc2_wts = ff->fc2->weight.view({C / 16, E / 16, 16, 8});
+            t_fc1_wts = ff->fc1->weight.view({E / 16, 16, C/8, 8}).transpose(1,2).contiguous();
+            t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1,2).contiguous();
         }
 
         // Output buffers
