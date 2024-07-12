@@ -19,19 +19,17 @@ public:
 
 private:
     void start_threads() {
-        m_worker_thread = std::make_unique<std::thread>(
-                std::thread(&MessageSinkToVector::worker_thread, this));
+        m_worker_thread = std::thread([this] { worker_thread(); });
     }
 
     void terminate_impl() {
         terminate_input_queue();
-        if (m_worker_thread && m_worker_thread->joinable()) {
-            m_worker_thread->join();
+        if (m_worker_thread.joinable()) {
+            m_worker_thread.join();
         }
-        m_worker_thread.reset();
     }
 
-    std::unique_ptr<std::thread> m_worker_thread;
+    std::thread m_worker_thread;
     std::vector<dorado::Message>& m_messages;
 
     void worker_thread() {

@@ -4,6 +4,7 @@
 #include "MotifMatcher.h"
 #include "nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
+#include "utils/thread_naming.h"
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
@@ -172,7 +173,7 @@ void ModBaseCaller::terminate() {
         caller_data->input_cv.notify_one();
     }
     for (auto& task_thread : m_task_threads) {
-        task_thread->join();
+        task_thread.join();
     }
     m_task_threads.clear();
 }
@@ -194,12 +195,12 @@ stats::NamedStats ModBaseCaller::sample_stats() const {
 
 void ModBaseCaller::start_threads() {
     for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
-        m_task_threads.push_back(std::make_unique<std::thread>(
-                &ModBaseCaller::modbase_task_thread_fn, this, model_id));
+        m_task_threads.emplace_back([=] { modbase_task_thread_fn(model_id); });
     }
 }
 
 void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
+    utils::set_thread_name("modbase_thread");
     auto& caller_data = m_caller_data[model_id];
 #if DORADO_CUDA_BUILD
     static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());

@@ -64,8 +64,8 @@ private:
      */
     void pair_generating_worker_thread(int tid);
 
-    std::vector<std::unique_ptr<std::thread>> m_workers;
-    int m_num_worker_threads = 0;
+    std::vector<std::thread> m_workers;
+    const int m_num_worker_threads;
     std::atomic<int> m_num_active_worker_threads = 0;
     std::atomic<bool> m_preserve_cache_during_flush = false;
 

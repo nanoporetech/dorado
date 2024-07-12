@@ -409,15 +409,11 @@ void BasecallerNode::start_threads() {
 void BasecallerNode::terminate_impl() {
     stop_input_processing();
     for (auto &t : m_basecall_workers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_basecall_workers.clear();
     for (auto &t : m_working_reads_managers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_working_reads_managers.clear();
 }

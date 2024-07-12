@@ -113,10 +113,9 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
 void CudaCaller::terminate() {
     m_terminate.store(true);
     m_input_cv.notify_one();
-    if (m_cuda_thread && m_cuda_thread->joinable()) {
-        m_cuda_thread->join();
+    if (m_cuda_thread.joinable()) {
+        m_cuda_thread.join();
     }
-    m_cuda_thread.reset();
 }
 
 void CudaCaller::restart() {
@@ -389,7 +388,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
 }
 
 void CudaCaller::start_threads() {
-    m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
+    m_cuda_thread = std::thread([this] { cuda_thread_fn(); });
 }
 
 void CudaCaller::cuda_thread_fn() {

@@ -64,19 +64,19 @@ private:
     void cuda_thread_fn();
 
     const CRFModelConfig m_config;
-    std::string m_device;
+    const std::string m_device;
     std::unique_ptr<decode::Decoder> m_decoder;
     decode::DecoderOptions m_decoder_options;
-    at::TensorOptions m_options;
+    const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::atomic<bool> m_terminate{false};
     std::deque<std::shared_ptr<NNTask>> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
-    std::unique_ptr<std::thread> m_cuda_thread;
+    std::thread m_cuda_thread;
     int m_num_input_features;
-    bool m_low_latency;
-    PipelineType m_pipeline_type;
+    const bool m_low_latency;
+    const PipelineType m_pipeline_type;
     c10::cuda::CUDAStream m_stream;
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to

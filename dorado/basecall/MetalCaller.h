@@ -56,12 +56,12 @@ protected:
     std::deque<std::shared_ptr<NNTask>> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
-    std::unique_ptr<std::thread> m_metal_thread;
+    std::thread m_metal_thread;
 
     std::deque<std::shared_ptr<NNTask>> m_decode_queue;
     std::mutex m_decode_lock;
     std::condition_variable m_decode_cv;
-    std::vector<std::unique_ptr<std::thread>> m_decode_threads;
+    std::vector<std::thread> m_decode_threads;
     NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
 
     decode::DecoderOptions m_decoder_options;

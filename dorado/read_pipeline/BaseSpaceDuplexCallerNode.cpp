@@ -2,6 +2,7 @@
 
 #include "torch_utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/thread_naming.h"
 
 #include <cxxpool.h>
 #include <edlib.h>
@@ -68,6 +69,7 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
 namespace dorado {
 
 void BaseSpaceDuplexCallerNode::worker_thread() {
+    utils::set_thread_name("duplex_worker");
     cxxpool::thread_pool pool{m_num_worker_threads};
     std::vector<std::future<void>> futures;
 
@@ -192,16 +194,14 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
           m_reads(std::move(reads)) {}
 
 void BaseSpaceDuplexCallerNode::start_threads() {
-    m_worker_thread =
-            std::make_unique<std::thread>(&BaseSpaceDuplexCallerNode::worker_thread, this);
+    m_worker_thread = std::thread([this] { worker_thread(); });
 }
 
 void BaseSpaceDuplexCallerNode::terminate_impl() {
     terminate_input_queue();
-    if (m_worker_thread && m_worker_thread->joinable()) {
-        m_worker_thread->join();
+    if (m_worker_thread.joinable()) {
+        m_worker_thread.join();
     }
-    m_worker_thread.reset();
 }
 
 void BaseSpaceDuplexCallerNode::restart() {

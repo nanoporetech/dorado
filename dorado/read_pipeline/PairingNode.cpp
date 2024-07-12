@@ -2,6 +2,7 @@
 
 #include "ClientInfo.h"
 #include "utils/sequence_utils.h"
+#include "utils/thread_naming.h"
 
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
@@ -162,6 +163,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
 }
 
 void PairingNode::pair_list_worker_thread(int tid) {
+    utils::set_thread_name("pair_list_thrd");
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
@@ -247,6 +249,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
+    utils::set_thread_name("pair_gen_thrd");
     at::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const SimplexReadPtr& read1, const SimplexReadPtr& read2) {
@@ -485,7 +488,7 @@ void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
+        m_workers.emplace_back([=] { (this->*m_pairing_func)(i); });
         ++m_num_active_worker_threads;
     }
 }
@@ -499,9 +502,7 @@ void PairingNode::terminate(const FlushOptions& flush_options) {
 void PairingNode::terminate_impl() {
     terminate_input_queue();
     for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
+        m.join();
     }
     m_workers.clear();
 

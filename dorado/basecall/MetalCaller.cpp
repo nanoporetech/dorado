@@ -7,6 +7,7 @@
 #include "torch_utils/metal_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
+#include "utils/thread_naming.h"
 
 #include <spdlog/spdlog.h>
 
@@ -71,14 +72,11 @@ void MetalCaller::terminate() {
     m_terminate.store(true);
     m_input_cv.notify_one();
     m_decode_cv.notify_all();
-    if (m_metal_thread && m_metal_thread->joinable()) {
-        m_metal_thread->join();
+    if (m_metal_thread.joinable()) {
+        m_metal_thread.join();
     }
-    m_metal_thread.reset();
     for (auto &thr : m_decode_threads) {
-        if (thr->joinable()) {
-            thr->join();
-        }
+        thr.join();
     }
     m_decode_threads.clear();
 }
@@ -92,16 +90,17 @@ void MetalCaller::restart() {
 }
 
 void MetalCaller::start_threads() {
-    m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
+    m_metal_thread = std::thread([this] { metal_thread_fn(); });
 
     int num_decode_threads = std::max(1, get_apple_cpu_perf_core_count() - 1);
     m_decode_threads.reserve(num_decode_threads);
     for (int i = 0; i < num_decode_threads; ++i) {
-        m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this));
+        m_decode_threads.emplace_back([this] { decode_thread_fn(); });
     }
 }
 
 void MetalCaller::metal_thread_fn() {
+    utils::set_thread_name("metal_worker");
     at::InferenceMode inference_mode_guard;
     ScopedAutoReleasePool outer_pool;
 
@@ -153,6 +152,7 @@ void MetalCaller::metal_thread_fn() {
 }
 
 void MetalCaller::decode_thread_fn() {
+    utils::set_thread_name("metal_decode");
     at::InferenceMode inference_mode_guard;
     while (true) {
         std::unique_lock<std::mutex> decode_lock(m_decode_lock);
