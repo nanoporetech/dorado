@@ -123,6 +123,7 @@ variables:
   artifacts:
     paths:
       - dist
+      # Uploading these allows us to avoid checking out the repo in tests.
       - tests/*.sh
       - tests/*.bat
       - tests/data
@@ -525,6 +526,10 @@ build_archive:macos:x64:
     MODEL_VERSION: v4.2.0
     TEST_DORADO_CORRECT: 1
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
@@ -534,6 +539,10 @@ build_archive:macos:x64:
   variables:
     GIT_STRATEGY: none
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive: &test_archive
