@@ -44,9 +44,15 @@ public:
     NoQueueThreadPool(std::size_t num_threads, std::string name);
     ~NoQueueThreadPool();
 
-    void send(TaskType task, TaskPriority priority);
+    void send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue);
 
     void join();
+
+    class ThreadPoolQueue {
+    public:
+        virtual void push(TaskType task) = 0;
+    };
+    std::unique_ptr<ThreadPoolQueue> create_task_queue(TaskPriority priority);
 
 private:
     std::string m_name{"async_task_exec"};
@@ -56,18 +62,28 @@ private:
     std::atomic_bool m_done{false};  // Note that this flag is only accessed by the managed threads.
 
     std::mutex m_mutex{};
-    detail::PriorityTaskQueue m_task_queue{};
+    detail::PriorityTaskQueue m_priority_task_queue{};
     std::condition_variable m_message_received{};
     std::size_t m_normal_prio_tasks_in_flight{};
     std::size_t m_high_prio_tasks_in_flight{};
-    void decrement_in_flight_tasks(TaskPriority priority);
 
+    void decrement_in_flight_tasks(TaskPriority priority);
     void initialise();
-    std::shared_ptr<detail::WaitingTask> decrement_in_flight_and_wait_on_next_task(
+    detail::WaitingTask decrement_in_flight_and_wait_on_next_task(
             std::optional<TaskPriority> last_task_priority);
     void process_task_queue();
-    bool try_pop_next_task(std::shared_ptr<detail::WaitingTask>& next_task);
+    bool try_pop_next_task(detail::WaitingTask& next_task);
     std::size_t num_tasks_in_flight();
+
+    class ThreadPoolQueueImpl : public ThreadPoolQueue {
+        NoQueueThreadPool* m_parent;
+        std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> m_task_queue;
+
+    public:
+        ThreadPoolQueueImpl(NoQueueThreadPool* parent,
+                            std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue);
+        void push(TaskType task) override;
+    };
 };
 
 }  // namespace dorado::utils::concurrency

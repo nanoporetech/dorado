@@ -8,17 +8,18 @@
 #include <list>
 #include <memory>
 #include <queue>
+#include <utility>
 
 namespace dorado::utils::concurrency::detail {
 
 using TaskType = std::function<void()>;
 
 struct WaitingTask {
+    WaitingTask() {}
     WaitingTask(TaskType task_, TaskPriority priority_)
             : task(std::move(task_)), priority(priority_) {}
-    TaskType task;
-    Flag started{};
-    TaskPriority priority;
+    TaskType task{};
+    TaskPriority priority{TaskPriority::normal};
 };
 
 /* 
@@ -27,22 +28,52 @@ struct WaitingTask {
  * from the queue.
  */
 class PriorityTaskQueue {
-    using WaitingTaskList = std::list<std::shared_ptr<detail::WaitingTask>>;
-    WaitingTaskList m_task_list{};
-    std::queue<WaitingTaskList::iterator> m_low_queue{};
-    std::queue<WaitingTaskList::iterator> m_high_queue{};
-
 public:
-    void push(std::shared_ptr<WaitingTask> task);
+    class TaskQueue {
+    public:
+        virtual void push(TaskType task) = 0;
+    };
+    std::unique_ptr<TaskQueue> create_task_queue(TaskPriority priority);
 
-    std::shared_ptr<WaitingTask> pop();
-    std::shared_ptr<WaitingTask> pop(TaskPriority priority);
+    //void push(std::shared_ptr<WaitingTask> task);
+
+    WaitingTask pop();
+    WaitingTask pop(TaskPriority priority);
 
     std::size_t size() const;
     std::size_t size(TaskPriority priority) const;
 
     bool empty() const;
     bool empty(TaskPriority priority) const;
+
+private:
+    class ProducerQueue : public TaskQueue {
+        PriorityTaskQueue* m_parent;
+        TaskPriority m_priority;
+        std::queue<TaskType> m_producer_queue{};
+
+    public:
+        ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
+
+        TaskPriority priority() const { return m_priority; };
+
+        void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
+        TaskType pop();                     // pop, if not empty parent.push
+    };
+
+    using ProducerQueueList = std::list<ProducerQueue*>;
+    ProducerQueueList m_producer_queue_list{};
+    std::queue<ProducerQueueList::iterator> m_low_producer_queue{};
+    std::queue<ProducerQueueList::iterator> m_high_producer_queue{};
+    std::size_t m_num_normal_prio{};
+    std::size_t m_num_high_prio{};
+
+    using WaitingTaskList = std::list<std::shared_ptr<detail::WaitingTask>>;
+    WaitingTaskList m_task_list{};
+    std::queue<WaitingTaskList::iterator> m_low_queue{};
+    std::queue<WaitingTaskList::iterator> m_high_queue{};
+
+    void queue_producer_task(ProducerQueue* producer_queue);
 };
 
 }  // namespace dorado::utils::concurrency::detail
