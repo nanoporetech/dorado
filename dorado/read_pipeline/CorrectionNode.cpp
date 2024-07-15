@@ -472,10 +472,10 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
     // Create index for fastq file.
     char* idx_name = fai_path(fastq.c_str());
     spdlog::debug("Looking for idx {}", idx_name);
-    if (!std::filesystem::exists(idx_name)) {
+    if (idx_name && !std::filesystem::exists(idx_name)) {
         if (fai_build(fastq.c_str()) != 0) {
             spdlog::error("Failed to build index for file {}", fastq);
-            throw std::runtime_error("");
+            throw std::runtime_error{"Failed to build index for file " + fastq + "."};
         }
         spdlog::debug("Created fastq index.");
     }
