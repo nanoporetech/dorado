@@ -5,14 +5,14 @@
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
+#include "torch_utils/gpu_profiling.h"
 #include "utils/bam_utils.h"
-#include "utils/gpu_profiling.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_naming.h"
 #include "utils/types.h"
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 #include "hts_io/FastxRandomReader.h"
 

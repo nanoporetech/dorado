@@ -4,9 +4,9 @@
 #include "crf_utils.h"
 #include "decode/beam_search.h"
 #include "nn/TxModel.h"
+#include "torch_utils/metal_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
-#include "utils/metal_utils.h"
 
 #include <spdlog/spdlog.h>
 

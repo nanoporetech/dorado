@@ -2,7 +2,7 @@
 
 #include "CudaCaller.h"
 #include "decode/Decoder.h"
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 
 #include <c10/cuda/CUDAGuard.h>

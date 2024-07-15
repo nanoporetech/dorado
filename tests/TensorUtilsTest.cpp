@@ -1,4 +1,4 @@
-#include "utils/tensor_utils.h"
+#include "torch_utils/tensor_utils.h"
 
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()

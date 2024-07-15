@@ -1,8 +1,8 @@
 #include "Trimmer.h"
 
+#include "torch_utils/trim.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 
 #include <ATen/TensorIndexing.h>
 #include <htslib/sam.h>

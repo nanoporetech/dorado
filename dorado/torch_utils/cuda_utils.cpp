@@ -1,7 +1,7 @@
 #include "cuda_utils.h"
 
-#include "PostCondition.h"
-#include "math_utils.h"
+#include "utils/PostCondition.h"
+#include "utils/math_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/cuda/CUDAContext.h>

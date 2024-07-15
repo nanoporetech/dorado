@@ -1,4 +1,4 @@
-#include "../utils/tensor_utils.h"
+#include "../torch_utils/tensor_utils.h"
 #include "dorado_version.h"
 
 #include <ATen/ATen.h>

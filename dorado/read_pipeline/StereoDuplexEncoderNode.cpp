@@ -1,6 +1,6 @@
 #include "StereoDuplexEncoderNode.h"
 
-#include "utils/duplex_utils.h"
+#include "torch_utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <ATen/Functions.h>

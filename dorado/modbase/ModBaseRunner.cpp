@@ -3,8 +3,8 @@
 #include "ModBaseCaller.h"
 #include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/tensor_utils.h"
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>

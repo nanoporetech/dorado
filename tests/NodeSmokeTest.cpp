@@ -18,16 +18,16 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "torch_utils/trim_rapid_adapter.h"
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
-#include "utils/trim_rapid_adapter.h"
 
 #include <torch/cuda.h>
 
 #include <optional>
 
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 
 #include <ATen/Functions.h>

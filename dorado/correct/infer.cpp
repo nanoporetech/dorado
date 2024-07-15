@@ -6,7 +6,7 @@
 #include "utils/metal_utils.h"
 #endif
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 #include "utils/string_utils.h"
 

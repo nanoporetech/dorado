@@ -130,6 +130,7 @@ enable_testing()
 
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/utils)
+add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/basecall)
