@@ -108,10 +108,21 @@ int correct(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
+    if (!std::filesystem::exists(reads.front())) {
+        spdlog::error("Input reads file {} does not exist!", reads.front());
+        std::exit(EXIT_FAILURE);
+    }
+
     std::filesystem::path model_dir;
     bool remove_tmp_dir = false;
     if (parser.is_used("--model-path")) {
         model_dir = std::filesystem::path(parser.get<std::string>("model-path"));
+
+        if (!std::filesystem::exists(model_dir)) {
+            spdlog::error("Input model path {} does not exist!", model_dir.string());
+            std::exit(EXIT_FAILURE);
+        }
+
     } else {
         // Download model
         auto tmp_dir = utils::get_downloads_path(std::nullopt);
