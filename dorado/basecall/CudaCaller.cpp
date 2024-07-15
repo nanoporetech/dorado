@@ -84,13 +84,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     start_threads();
 }
 
-CudaCaller::~CudaCaller() {
-    m_terminate.store(true);
-    m_input_cv.notify_one();
-    if (m_cuda_thread && m_cuda_thread->joinable()) {
-        m_cuda_thread->join();
-    }
-}
+CudaCaller::~CudaCaller() { terminate(); }
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
                                                           at::Tensor &output,
@@ -126,9 +120,8 @@ void CudaCaller::terminate() {
 }
 
 void CudaCaller::restart() {
-    // This can be called more than one, via multiple runners.
-    if (m_terminate.load()) {
-        m_terminate.store(false);
+    // This can be called more than once, via multiple runners.
+    if (m_terminate.exchange(false)) {
         start_threads();
     }
 }

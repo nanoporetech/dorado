@@ -44,18 +44,7 @@ struct MetalCaller::NNTask {
     uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
 };
 
-MetalCaller::~MetalCaller() {
-    m_terminate.store(true);
-    m_input_cv.notify_one();
-    m_decode_cv.notify_all();
-
-    if (m_metal_thread && m_metal_thread->joinable()) {
-        m_metal_thread->join();
-    }
-    for (auto &thr : m_decode_threads) {
-        thr->join();
-    }
-}
+MetalCaller::~MetalCaller() { terminate(); }
 
 void MetalCaller::call_chunks(at::Tensor &input,
                               int num_chunks,
@@ -95,9 +84,8 @@ void MetalCaller::terminate() {
 }
 
 void MetalCaller::restart() {
-    // This can be called more than one, via multiple runners.
-    if (m_terminate.load()) {
-        m_terminate.store(false);
+    // This can be called more than once, via multiple runners.
+    if (m_terminate.exchange(false)) {
         m_terminate_decode.store(false);
         start_threads();
     }

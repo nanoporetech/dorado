@@ -110,16 +110,7 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     start_threads();
 }
 
-ModBaseCaller::~ModBaseCaller() {
-    m_terminate.store(true);
-    for (auto& caller_data : m_caller_data) {
-        caller_data->input_cv.notify_one();
-    }
-
-    for (auto& task_thread : m_task_threads) {
-        task_thread->join();
-    }
-}
+ModBaseCaller::~ModBaseCaller() { terminate(); }
 
 std::vector<at::Tensor> ModBaseCaller::create_input_sig_tensors() const {
     auto opts = at::TensorOptions()
@@ -187,8 +178,7 @@ void ModBaseCaller::terminate() {
 }
 
 void ModBaseCaller::restart() {
-    if (m_terminate.load()) {
-        m_terminate.store(false);
+    if (m_terminate.exchange(false)) {
         start_threads();
     }
 }
