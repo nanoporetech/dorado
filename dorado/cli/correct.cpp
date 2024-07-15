@@ -5,10 +5,10 @@
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/torch_utils.h"
 
 #include <spdlog/spdlog.h>
 

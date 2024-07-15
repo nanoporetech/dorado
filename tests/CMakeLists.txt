@@ -97,6 +97,7 @@ add_library(dorado_tests_common STATIC
 )
 target_link_libraries(dorado_tests_common
     PUBLIC
+        dorado_torch_utils
         dorado_utils
         dorado_compat
 )

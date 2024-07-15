@@ -4,11 +4,11 @@
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
+#include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>

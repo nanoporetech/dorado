@@ -1,7 +1,7 @@
 #pragma once
 
+#include "torch_utils/gpu_profiling.h"
 #include "types.h"
-#include "utils/gpu_profiling.h"
 
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>

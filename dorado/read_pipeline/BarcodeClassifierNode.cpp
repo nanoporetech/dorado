@@ -4,10 +4,10 @@
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
 #include "demux/barcoding_info.h"
+#include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 #include "utils/types.h"
 
 #include <htslib/sam.h>

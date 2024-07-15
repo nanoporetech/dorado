@@ -1,7 +1,7 @@
 #include "CudaCaller.h"
 
 #include "crf_utils.h"
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/thread_naming.h"

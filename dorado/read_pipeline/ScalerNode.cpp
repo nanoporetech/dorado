@@ -2,9 +2,9 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "models/kits.h"
-#include "utils/tensor_utils.h"
-#include "utils/trim.h"
-#include "utils/trim_rapid_adapter.h"
+#include "torch_utils/tensor_utils.h"
+#include "torch_utils/trim.h"
+#include "torch_utils/trim_rapid_adapter.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>

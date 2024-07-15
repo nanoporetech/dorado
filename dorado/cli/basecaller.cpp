@@ -36,15 +36,15 @@
 
 #include <string>
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
+#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/sys_stats.h"
-#include "utils/torch_utils.h"
 #include "utils/tty_utils.h"
 
 #include <htslib/sam.h>

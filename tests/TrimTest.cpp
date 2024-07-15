@@ -1,4 +1,4 @@
-#include "utils/trim.h"
+#include "torch_utils/trim.h"
 
 #include "TestUtils.h"
 #include "demux/Trimmer.h"

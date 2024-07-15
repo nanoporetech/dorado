@@ -17,7 +17,7 @@
 #include <cstdlib>
 
 #if DORADO_METAL_BUILD
-#include "utils/metal_utils.h"
+#include "torch_utils/metal_utils.h"
 #endif
 
 using namespace std::chrono_literals;

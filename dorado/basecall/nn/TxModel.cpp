@@ -2,8 +2,8 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "torch_utils/gpu_profiling.h"
 #include "utils/dev_utils.h"
-#include "utils/gpu_profiling.h"
 #include "utils/math_utils.h"
 
 #include <ATen/Functions.h>

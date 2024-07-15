@@ -1,8 +1,8 @@
 #include "read_utils.h"
 
+#include "torch_utils/trim.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 
 #include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>

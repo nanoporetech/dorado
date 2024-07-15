@@ -1,7 +1,7 @@
 #pragma once
 
 #include "basecall/CRFModelConfig.h"
-#include "utils/metal_utils.h"
+#include "torch_utils/metal_utils.h"
 
 #include <torch/nn.h>
 

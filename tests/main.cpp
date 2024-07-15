@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_RUNNER
 
+#include "torch_utils/torch_utils.h"
 #include "utils/locale_utils.h"
-#include "utils/torch_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
 #include <torch/utils.h>

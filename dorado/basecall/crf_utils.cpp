@@ -3,8 +3,8 @@
 #include "CRFModelConfig.h"
 #include "nn/CRFModel.h"
 #include "nn/TxModel.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/memory_utils.h"
-#include "utils/tensor_utils.h"
 
 #include <algorithm>
 #include <thread>
