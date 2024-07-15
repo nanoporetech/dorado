@@ -85,12 +85,6 @@ target_link_libraries(dorado_utils
         htslib
 )
 
-if (DORADO_ENABLE_PCH)
-    add_subdirectory(pch)
-    target_link_libraries(dorado_utils PUBLIC dorado_pch)
-    target_precompile_headers(dorado_utils REUSE_FROM dorado_pch)
-endif()
-
 if (NOT APPLE)
     target_link_libraries(dorado_utils PRIVATE OpenSSL::SSL)
 endif()

@@ -323,7 +323,7 @@ if(NOT SKIP_HDF_PLUGINS)
 endif()
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_lib REUSE_FROM dorado_utils)
+    target_precompile_headers(dorado_lib REUSE_FROM dorado_torch_utils)
 endif()
 
 target_link_libraries(dorado_lib

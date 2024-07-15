@@ -64,6 +64,7 @@ target_link_libraries(dorado_torch_utils
 )
 
 if (DORADO_ENABLE_PCH)
+    add_subdirectory(pch)
     target_link_libraries(dorado_torch_utils PUBLIC dorado_pch)
     target_precompile_headers(dorado_torch_utils REUSE_FROM dorado_pch)
 endif()
