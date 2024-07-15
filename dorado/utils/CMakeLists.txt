@@ -76,7 +76,6 @@ target_include_directories(dorado_utils
 
 target_link_libraries(dorado_utils
     PUBLIC
-        torch_lib
         date::date
         edlib
         spdlog::spdlog
