@@ -5,6 +5,20 @@
 
 namespace dorado::utils::concurrency::detail {
 
+class PriorityTaskQueue::ProducerQueue : public TaskQueue {
+    PriorityTaskQueue* m_parent;
+    TaskPriority m_priority;
+    std::queue<TaskType> m_producer_queue{};
+
+public:
+    ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
+
+    TaskPriority priority() const { return m_priority; };
+
+    void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
+    TaskType pop();                     // pop, if not empty parent.push
+};
+
 //void PriorityTaskQueue::push(std::shared_ptr<WaitingTask> task) {
 //    m_task_list.push_back(std::move(task));
 //    auto task_itr = std::prev(m_task_list.end());

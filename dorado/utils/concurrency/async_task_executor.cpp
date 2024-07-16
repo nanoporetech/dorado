@@ -10,7 +10,6 @@ AsyncTaskExecutor::AsyncTaskExecutor(MultiQueueThreadPool& thread_pool,
                                      TaskPriority priority,
                                      std::size_t max_queue_size)
         : m_thread_pool_queue(thread_pool.create_task_queue(priority)),
-          m_priority(priority),
           m_max_tasks_in_flight(max_queue_size) {}
 
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }

@@ -10,20 +10,20 @@ class SectionTimings {
     std::map<std::string, std::function<std::string()>> m_report_providers;
 
 public:
-    static SectionTimings & instance() {
+    static SectionTimings &instance() {
         static SectionTimings the_instance;
         return the_instance;
     }
 
-    void add_report_provider(std::string section_name,
+    void add_report_provider(const std::string &section_name,
                              std::function<std::string()> report_provider) {
         std::lock_guard lock(m_mutex);
-        m_report_providers[section_name] = report_provider;
+        m_report_providers[section_name] = std::move(report_provider);
     }
 
     void report() {
         std::lock_guard lock(m_mutex);
-        for (auto report : m_report_providers) {
+        for (const auto &report : m_report_providers) {
             std::cout << report.first << " : " << report.second() << std::endl;
         }
     }
@@ -33,8 +33,9 @@ public:
 namespace dorado::utils::timings {
 
 namespace details {
-void add_report_provider(std::string section_name, std::function<std::string()> report_provider) {
-    SectionTimings::instance().add_report_provider(section_name, report_provider);
+void add_report_provider(const std::string &section_name,
+                         std::function<std::string()> report_provider) {
+    SectionTimings::instance().add_report_provider(section_name, std::move(report_provider));
 }
 }  // namespace details
 

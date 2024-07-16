@@ -15,7 +15,9 @@ void report();
 
 namespace details {
 
-void add_report_provider(std::string section_name, std::function<std::string()> report_provider);
+void add_report_provider(const std::string &section_name,
+                         std::function<std::string()> report_provider);
+
 }  // namespace details
 
 template <typename T>

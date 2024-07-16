@@ -140,14 +140,26 @@ void MultiQueueThreadPool::process_task_queue() {
     }
 }
 
-MultiQueueThreadPool::ThreadPoolQueueImpl::ThreadPoolQueueImpl(
+namespace {
+
+class ThreadPoolQueueImpl : public MultiQueueThreadPool::ThreadPoolQueue {
+    MultiQueueThreadPool* m_parent;
+    std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> m_task_queue;
+
+public:
+    ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
+                        std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue);
+    void push(TaskType task) override;
+};
+
+ThreadPoolQueueImpl::ThreadPoolQueueImpl(
         MultiQueueThreadPool* parent,
         std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue)
         : m_parent(parent), m_task_queue(std::move(task_queue)) {}
 
-void MultiQueueThreadPool::ThreadPoolQueueImpl::push(TaskType task) {
-    m_parent->send(std::move(task), *m_task_queue);
-}
+void ThreadPoolQueueImpl::push(TaskType task) { m_parent->send(std::move(task), *m_task_queue); }
+
+}  // namespace
 
 std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> MultiQueueThreadPool::create_task_queue(
         TaskPriority priority) {

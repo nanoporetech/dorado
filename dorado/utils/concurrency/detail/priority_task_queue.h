@@ -31,6 +31,7 @@ class PriorityTaskQueue {
 public:
     class TaskQueue {
     public:
+        virtual ~TaskQueue() = default;
         virtual void push(TaskType task) = 0;
     };
     std::unique_ptr<TaskQueue> create_task_queue(TaskPriority priority);
@@ -47,19 +48,7 @@ public:
     bool empty(TaskPriority priority) const;
 
 private:
-    class ProducerQueue : public TaskQueue {
-        PriorityTaskQueue* m_parent;
-        TaskPriority m_priority;
-        std::queue<TaskType> m_producer_queue{};
-
-    public:
-        ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
-
-        TaskPriority priority() const { return m_priority; };
-
-        void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
-        TaskType pop();                     // pop, if not empty parent.push
-    };
+    class ProducerQueue;
 
     using ProducerQueueList = std::list<ProducerQueue*>;
     ProducerQueueList m_producer_queue_list{};

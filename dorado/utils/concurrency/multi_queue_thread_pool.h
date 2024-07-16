@@ -50,6 +50,7 @@ public:
 
     class ThreadPoolQueue {
     public:
+        virtual ~ThreadPoolQueue() = default;
         virtual void push(TaskType task) = 0;
     };
     std::unique_ptr<ThreadPoolQueue> create_task_queue(TaskPriority priority);
@@ -74,16 +75,6 @@ private:
     void process_task_queue();
     bool try_pop_next_task(detail::WaitingTask& next_task);
     std::size_t num_tasks_in_flight();
-
-    class ThreadPoolQueueImpl : public ThreadPoolQueue {
-        MultiQueueThreadPool* m_parent;
-        std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> m_task_queue;
-
-    public:
-        ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                            std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue);
-        void push(TaskType task) override;
-    };
 };
 
 }  // namespace dorado::utils::concurrency

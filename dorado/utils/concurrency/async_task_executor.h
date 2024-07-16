@@ -20,7 +20,6 @@ namespace dorado::utils::concurrency {
 // also flush.
 class AsyncTaskExecutor {
     std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> m_thread_pool_queue;
-    const TaskPriority m_priority;
     std::mutex m_mutex{};
     std::condition_variable m_tasks_in_flight_cv{};
     std::size_t m_num_tasks_in_flight{};
