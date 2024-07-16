@@ -224,7 +224,12 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
     }
 #ifdef DORADO_TX2
-    m_batch_dims[0].N = 256;
+    if (requested_batch_size == 0) {
+        m_batch_dims[0].N = 256;
+    } else {
+        requested_batch_size = utils::pad_to(requested_batch_size, granularity);
+        m_batch_dims[0].N = std::clamp(requested_batch_size, granularity, 256);
+    }
     return;
 #endif
 
