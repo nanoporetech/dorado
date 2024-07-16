@@ -55,6 +55,7 @@ add_library(dorado_utils
     thread_naming.h
     time_utils.cpp
     time_utils.h
+    timer_high_res.h
     tty_utils.h
     types.cpp
     types.h
