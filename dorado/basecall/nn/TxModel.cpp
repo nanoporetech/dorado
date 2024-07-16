@@ -36,7 +36,7 @@ bool koi_can_use_cutlass() {
 struct KoiTensorExt : public KoiTensor {
     KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) {
         data_ptr = t.data_ptr();
-        ndims = t.dim();
+        ndims = static_cast<int>(t.dim());
         if (t.dtype() == torch::kF16) {
             type_id = KOI_F16;
         } else if (t.dtype() == torch::kI8) {
@@ -406,7 +406,7 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_,
 };
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
-#if DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
     if (use_koi_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1)) * 16;
