@@ -46,7 +46,7 @@ protected:
     void decode_thread_fn();
 
     virtual DecodedData decode(int chunk_idx) const = 0;
-    virtual void call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex) = 0;
+    virtual void call_task(NNTask &task, std::mutex &inter_caller_mutex) = 0;
 
     const CRFModelConfig m_config;
 
@@ -73,7 +73,7 @@ class MetalLSTMCaller : public MetalCaller {
 public:
     MetalLSTMCaller(const CRFModelConfig &model_config, float memory_limit_fraction);
 
-    at::Tensor create_input_tensor() const {
+    at::Tensor create_input_tensor() const override {
         // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
         // is to be submitted directly then it must also have this arrangement.
         // Note that this is not the same as other caller implementations, which
@@ -90,8 +90,8 @@ private:
                               const std::vector<at::Tensor> &state_dict,
                               float memory_limit_fraction);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
-    DecodedData decode(int chunk_idx) const;
-    void call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex);
+    DecodedData decode(int chunk_idx) const override;
+    void call_task(NNTask &task, std::mutex &inter_caller_mutex) override;
 
     nn::MetalCRFModel m_model{nullptr};
     torch::ScalarType m_scores_dtype = torch::kChar;
@@ -121,7 +121,7 @@ class MetalTxCaller : public MetalCaller {
 public:
     MetalTxCaller(const CRFModelConfig &model_config);
 
-    at::Tensor create_input_tensor() const {
+    at::Tensor create_input_tensor() const override {
         // NCT
         return torch::zeros({m_batch_size, m_config.num_features, m_in_chunk_size}, torch::kF16);
     }
@@ -129,8 +129,8 @@ public:
 private:
     void load_tx_model(const CRFModelConfig &model_config);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
-    DecodedData decode(int chunk_idx) const;
-    void call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex);
+    DecodedData decode(int chunk_idx) const override;
+    void call_task(NNTask &task, std::mutex &inter_caller_mutex) override;
 
     nn::TxModel m_model{nullptr};
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;

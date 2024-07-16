@@ -118,19 +118,22 @@ void MetalCaller::metal_thread_fn() {
     while (true) {
         ScopedAutoReleasePool inner_pool;
 
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
-        while (m_input_queue.empty() && !m_terminate.load()) {
-            m_input_cv.wait_for(input_lock, 100ms);
-        }
+        // Pop the next task, or return if we're terminated.
+        std::shared_ptr<NNTask> task;
+        {
+            std::unique_lock<std::mutex> input_lock(m_input_lock);
+            while (m_input_queue.empty() && !m_terminate.load()) {
+                m_input_cv.wait_for(input_lock, 100ms);
+            }
 
-        if (m_input_queue.empty() && m_terminate.load()) {
-            m_terminate_decode.store(true);
-            return;
-        }
+            if (m_input_queue.empty() && m_terminate.load()) {
+                m_terminate_decode.store(true);
+                return;
+            }
 
-        auto task = std::move(m_input_queue.back());
-        m_input_queue.pop_back();
-        input_lock.unlock();
+            task = std::move(m_input_queue.back());
+            m_input_queue.pop_back();
+        }
 
         // Assign this task a unique decode completion event ID.
         // This ID will be signalled by the CPU once it has finished relevant decoding work,
@@ -138,12 +141,13 @@ void MetalCaller::metal_thread_fn() {
         task->decode_complete_event_id = next_decode_complete_event_id++;
 
         // Basecall the chunk and run the scan kernels on GPU
-        call_task(task, inter_caller_mutex);
+        call_task(*task, inter_caller_mutex);
 
         // Pass task on to decode threads
-        std::unique_lock<std::mutex> decode_lock(m_decode_lock);
-        m_decode_queue.push_front(task);
-        decode_lock.unlock();
+        {
+            std::lock_guard decode_lock(m_decode_lock);
+            m_decode_queue.push_front(std::move(task));
+        }
         m_decode_cv.notify_all();
     }
 }
@@ -401,7 +405,7 @@ bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_cou
     return finishCommandBuffer("linear/scan/softmax", cb, try_count);
 }
 
-void MetalLSTMCaller::call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex) {
+void MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex) {
     // We retry the entire set of kernels up to 5 times, to deal with seemingly
     // random intermittent errors with command buffer submissions.
     // TODO: find a more robust way of dealing with Metal kernel launch issues
@@ -412,8 +416,8 @@ void MetalLSTMCaller::call_task(std::shared_ptr<NNTask> task, std::mutex &inter_
         // The linear layer should not execute until the previous batch has been decoded,
         // since the same buffers are used for successive batches' scores, fwd/bwd scans.
         MTL::CommandBuffer *const cb =
-                m_model->forward_async(*task->input, m_decode_complete_event.get(),
-                                       task->decode_complete_event_id - 1, try_count, m_scores_TNC);
+                m_model->forward_async(*task.input, m_decode_complete_event.get(),
+                                       task.decode_complete_event_id - 1, try_count, m_scores_TNC);
         if (cb == nullptr) {
             // A command buffer submission part of forward_async failed, so we should retry.
             std::this_thread::sleep_for(20ms);
@@ -540,37 +544,36 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
     return finishCommandBuffer("linear/scan/softmax", cb, try_count);
 }
 
-void MetalTxCaller::call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex) {
-    auto scores_TNC = m_model->forward(task->input->to(m_model->m_options))
+void MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex) {
+    auto scores_TNC = m_model->forward(task.input->to(m_model->m_options))
                               .transpose(0, 1)
                               .contiguous()
                               .to(m_scores_dtype);
-    {
-        MTL::CommandBuffer *const cb = m_command_queue->commandBuffer();
-        if (m_decode_complete_event) {
-            // wait for the previous decode task to complete - this acts as a mutex
-            // previous scores are processed in the decode threads
-            cb->encodeWait(m_decode_complete_event.get(), task->decode_complete_event_id - 1);
-        }
 
-        m_scores_TNC.index_put_({at::indexing::Ellipsis}, scores_TNC);
+    MTL::CommandBuffer *const cb = m_command_queue->commandBuffer();
+    if (m_decode_complete_event) {
+        // wait for the previous decode task to complete - this acts as a mutex
+        // previous scores are processed in the decode threads
+        cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
+    }
 
-        std::lock_guard<std::mutex> lock(inter_caller_mutex);
-        bool cb_success = false;
-        for (int attempt = 0; attempt < 5; attempt++) {
-            if (run_scan_kernels(cb, attempt)) {
-                cb_success = true;
-                break;
-            }
-            // linear/scan/softmax CB failed, so retry.
-            std::this_thread::sleep_for(20ms);
-        }
+    m_scores_TNC.index_put_({at::indexing::Ellipsis}, scores_TNC);
 
-        // If we repeatedly submitted CBs without success, we give up.
-        if (!cb_success) {
-            spdlog::critical("Failed to successfully submit GPU command buffers.");
-            throw std::runtime_error("Failed to successfully submit GPU command buffers.");
+    std::lock_guard<std::mutex> lock(inter_caller_mutex);
+    bool cb_success = false;
+    for (int attempt = 0; attempt < 5; attempt++) {
+        if (run_scan_kernels(cb, attempt)) {
+            cb_success = true;
+            break;
         }
+        // linear/scan/softmax CB failed, so retry.
+        std::this_thread::sleep_for(20ms);
+    }
+
+    // If we repeatedly submitted CBs without success, we give up.
+    if (!cb_success) {
+        spdlog::critical("Failed to successfully submit GPU command buffers.");
+        throw std::runtime_error("Failed to successfully submit GPU command buffers.");
     }
 }
 
