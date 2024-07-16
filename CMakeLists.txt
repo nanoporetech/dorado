@@ -541,7 +541,11 @@ if (GENERATE_TEST_COVERAGE)
             EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
             DEPENDENCIES dorado_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
+            EXCLUDE 
+                "${DORADO_3RD_PARTY_SOURCE}/*"
+                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
+                "${PROJECT_SOURCE_DIR}/tests/*"
+                "${CMAKE_BINARY_DIR}/3rdparty/*"
             )
     endif()
 endif()
