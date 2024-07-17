@@ -46,7 +46,7 @@ protected:
     void decode_thread_fn();
 
     virtual DecodedData decode(int chunk_idx) const = 0;
-    virtual void call_task(NNTask &task, std::mutex &inter_caller_mutex) = 0;
+    virtual bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) = 0;
 
     const CRFModelConfig m_config;
 
@@ -91,7 +91,7 @@ private:
                               float memory_limit_fraction);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
     DecodedData decode(int chunk_idx) const override;
-    void call_task(NNTask &task, std::mutex &inter_caller_mutex) override;
+    bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
     nn::MetalCRFModel m_model{nullptr};
     torch::ScalarType m_scores_dtype = torch::kChar;
@@ -130,7 +130,7 @@ private:
     void load_tx_model(const CRFModelConfig &model_config);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
     DecodedData decode(int chunk_idx) const override;
-    void call_task(NNTask &task, std::mutex &inter_caller_mutex) override;
+    bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
     nn::TxModel m_model{nullptr};
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
