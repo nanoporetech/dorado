@@ -1090,7 +1090,7 @@ std::string get_supported_model_info() {
         }
 
         // Chemistry name
-        result += "\"" + chemistry_kit_info.name + "\": {\n";
+        result += "\"" + chemistry_kit_info.name + "\":{\n";
 
         const auto& flowcell_code_map = flowcell_codes();
         const auto& kit_code_map = kit_codes();
@@ -1144,41 +1144,41 @@ std::string get_supported_model_info() {
                 const auto mod_matches = find_models(modified_models(), variant.first,
                                                      simplex_model.simplex, ModsVariantPair());
                 if (!mod_matches.empty()) {
-                    result += ",\n        \"modified_models\":{\n";
+                    result += ",\n      \"modified_models\":{\n";
                     for (const auto& mod_model : mod_matches) {
-                        result += "          \"" + mod_model.name + "\":{\n";
-                        result += "              \"canonical_base\": \"" +
+                        result += "        \"" + mod_model.name + "\":{\n";
+                        result += "            \"canonical_base\": \"" +
                                   canonical_base_map.at(mod_model.mods.variant) + "\"";
                         // If there is a newer model for this condition, add the outdated flag.
                         const auto mod_type_matches =
                                 find_models(modified_models(), variant.first, simplex_model.simplex,
                                             {mod_model.mods.variant, ModelVersion::NONE});
                         if (mod_type_matches.back().name != mod_model.name) {
-                            result += ",\n              \"outdated\": true";
+                            result += ",\n            \"outdated\": true";
                         }
-                        result += "\n          },\n";
+                        result += "\n        },\n";
                     }
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
-                    result += "\n        }";
+                    result += "\n      }";
                 }
 
                 const auto stereo_matches = find_models(stereo_models(), variant.first,
                                                         simplex_model.simplex, ModsVariantPair());
                 if (!stereo_matches.empty()) {
-                    result += ",\n        \"stereo_models\":{\n";
+                    result += ",\n      \"stereo_models\":{\n";
                     for (const auto& stereo_model : stereo_matches) {
-                        result += "          \"" + stereo_model.name + "\":{\n";
+                        result += "        \"" + stereo_model.name + "\":{\n";
                         // If there is a newer model for this condition, add the outdated flag.
                         const auto duplex_type_matches =
                                 find_models(stereo_models(), variant.first, simplex_model.simplex,
                                             {stereo_model.mods.variant, ModelVersion::NONE});
                         if (duplex_type_matches.back().name != stereo_model.name) {
-                            result += ",\n              \"outdated\": true";
+                            result += ",\n            \"outdated\": true";
                         }
-                        result += "\n          },\n";
+                        result += "\n        },\n";
                     }
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
-                    result += "\n        }";
+                    result += "\n      }";
                 }
                 result += "\n    },\n";
             }
