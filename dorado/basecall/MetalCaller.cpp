@@ -141,16 +141,33 @@ void MetalCaller::metal_thread_fn() {
 
         // Basecall the chunk and run the scan kernels on GPU
         {
+            auto retry_delay = 100ms;
+            auto sleep_before_retry = [&] {
+                std::this_thread::sleep_for(retry_delay);
+                retry_delay *= 2;
+                // These are rare enough that sleeping for a few seconds shouldn't impact
+                // speed, and should give the system plenty of time to recover.
+                if (retry_delay > 5s) {
+                    retry_delay = 5s;
+                }
+            };
+
             // We retry the entire set of kernels up to 5 times, to deal with seemingly
             // random intermittent errors with command buffer submissions.
+            // On iOS we can't bail here, so we need to keep retrying.
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             bool cb_success = false;
-            for (int try_count = 0; try_count < 5; ++try_count) {
+#if TARGET_OS_IPHONE
+            for (int try_count = 0; !cb_success; ++try_count)
+#else   // TARGET_OS_IPHONE
+            for (int try_count = 0; try_count < 5; ++try_count)
+#endif  // TARGET_OS_IPHONE
+            {
                 cb_success = call_task(*task, inter_caller_mutex, try_count);
                 if (cb_success) {
                     break;
                 } else {
-                    std::this_thread::sleep_for(20ms);
+                    sleep_before_retry();
                 }
             }
 
