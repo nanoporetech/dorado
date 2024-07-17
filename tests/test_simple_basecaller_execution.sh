@@ -25,6 +25,8 @@ mkdir -p $output_dir
 test_output_file=$test_dir/${output_dir_name}_output.log
 
 echo dorado download models
+$dorado_bin download --list
+$dorado_bin download --list-structured
 $dorado_bin download --model ${model_name} --directory ${output_dir}
 model=${output_dir}/${model_name}
 $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
