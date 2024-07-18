@@ -41,12 +41,12 @@ def smoke_test_model(
     ]
 
     if batch_size is not None:
-        args.extend(["--batchsize", batch_size])
+        args.extend(["--batchsize", str(int(batch_size))])
 
     if mods_model:
         mods_path = models_dir / mods_model
         assert mods_path.exists(), f"mods model does not exist at {mods_path}"
-        args.extend(["--modified-bases-models", mods_path])
+        args.extend(["--modified-bases-models", str(mods_path)])
 
     cmd = " ".join([str(v) for v in args])
     print(f"Running: '{cmd}'")
