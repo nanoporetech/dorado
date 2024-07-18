@@ -11,7 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fnmatch import fnmatch
-import yaml
+import json
 
 Job = Tuple[str, str, Optional[str]]
 
@@ -55,12 +55,12 @@ def unpack(listy_dict: Dict, key: str) -> Dict:
     The downloader --list-structured uses lists of dicts which are uniquely
     keyed. Flatten this list into a dict for ease of use.
     """
-    if not listy_dict:
+    if not listy_dict or not key in listy_dict:
         return {}
 
     out = {}
-    for dct in listy_dict.get(key, []):
-        out.update(dct)
+    for model_name, item in listy_dict[key].items():
+        out.update({model_name: item})
     return out
 
 
@@ -74,7 +74,7 @@ def get_jobs(dorado_bin: Path) -> List[Job]:
     structured_models_result = subprocess.check_output(
         [dorado_bin, "download", "--list-structured"]
     )
-    structured_models_dict = yaml.load(structured_models_result, Loader=yaml.Loader)
+    structured_models_dict = json.loads(structured_models_result)
 
     for condition, cond_i in structured_models_dict.items():
         for sm, si in unpack(cond_i, "simplex_models").items():
