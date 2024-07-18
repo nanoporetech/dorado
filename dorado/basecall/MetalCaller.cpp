@@ -7,6 +7,7 @@
 #include "torch_utils/metal_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
+#include "utils/thread_naming.h"
 
 #include <spdlog/spdlog.h>
 
@@ -44,18 +45,7 @@ struct MetalCaller::NNTask {
     uint64_t decode_complete_event_id = static_cast<uint64_t>(0);
 };
 
-MetalCaller::~MetalCaller() {
-    m_terminate.store(true);
-    m_input_cv.notify_one();
-    m_decode_cv.notify_all();
-
-    if (m_metal_thread && m_metal_thread->joinable()) {
-        m_metal_thread->join();
-    }
-    for (auto &thr : m_decode_threads) {
-        thr->join();
-    }
-}
+MetalCaller::~MetalCaller() { terminate(); }
 
 void MetalCaller::call_chunks(at::Tensor &input,
                               int num_chunks,
@@ -82,38 +72,35 @@ void MetalCaller::terminate() {
     m_terminate.store(true);
     m_input_cv.notify_one();
     m_decode_cv.notify_all();
-    if (m_metal_thread && m_metal_thread->joinable()) {
-        m_metal_thread->join();
+    if (m_metal_thread.joinable()) {
+        m_metal_thread.join();
     }
-    m_metal_thread.reset();
     for (auto &thr : m_decode_threads) {
-        if (thr->joinable()) {
-            thr->join();
-        }
+        thr.join();
     }
     m_decode_threads.clear();
 }
 
 void MetalCaller::restart() {
-    // This can be called more than one, via multiple runners.
-    if (m_terminate.load()) {
-        m_terminate.store(false);
+    // This can be called more than once, via multiple runners.
+    if (m_terminate.exchange(false)) {
         m_terminate_decode.store(false);
         start_threads();
     }
 }
 
 void MetalCaller::start_threads() {
-    m_metal_thread.reset(new std::thread(&MetalCaller::metal_thread_fn, this));
+    m_metal_thread = std::thread([this] { metal_thread_fn(); });
 
     int num_decode_threads = std::max(1, get_apple_cpu_perf_core_count() - 1);
     m_decode_threads.reserve(num_decode_threads);
     for (int i = 0; i < num_decode_threads; ++i) {
-        m_decode_threads.emplace_back(new std::thread(&MetalCaller::decode_thread_fn, this));
+        m_decode_threads.emplace_back([this] { decode_thread_fn(); });
     }
 }
 
 void MetalCaller::metal_thread_fn() {
+    utils::set_thread_name("metal_worker");
     at::InferenceMode inference_mode_guard;
     ScopedAutoReleasePool outer_pool;
 
@@ -130,19 +117,22 @@ void MetalCaller::metal_thread_fn() {
     while (true) {
         ScopedAutoReleasePool inner_pool;
 
-        std::unique_lock<std::mutex> input_lock(m_input_lock);
-        while (m_input_queue.empty() && !m_terminate.load()) {
-            m_input_cv.wait_for(input_lock, 100ms);
-        }
+        // Pop the next task, or return if we're terminated.
+        std::shared_ptr<NNTask> task;
+        {
+            std::unique_lock<std::mutex> input_lock(m_input_lock);
+            while (m_input_queue.empty() && !m_terminate.load()) {
+                m_input_cv.wait_for(input_lock, 100ms);
+            }
 
-        if (m_input_queue.empty() && m_terminate.load()) {
-            m_terminate_decode.store(true);
-            return;
-        }
+            if (m_input_queue.empty() && m_terminate.load()) {
+                m_terminate_decode.store(true);
+                return;
+            }
 
-        auto task = std::move(m_input_queue.back());
-        m_input_queue.pop_back();
-        input_lock.unlock();
+            task = std::move(m_input_queue.back());
+            m_input_queue.pop_back();
+        }
 
         // Assign this task a unique decode completion event ID.
         // This ID will be signalled by the CPU once it has finished relevant decoding work,
@@ -150,17 +140,55 @@ void MetalCaller::metal_thread_fn() {
         task->decode_complete_event_id = next_decode_complete_event_id++;
 
         // Basecall the chunk and run the scan kernels on GPU
-        call_task(task, inter_caller_mutex);
+        {
+            auto retry_delay = 100ms;
+            auto sleep_before_retry = [&] {
+                std::this_thread::sleep_for(retry_delay);
+                retry_delay *= 2;
+                // These are rare enough that sleeping for a few seconds shouldn't impact
+                // speed, and should give the system plenty of time to recover.
+                if (retry_delay > 5s) {
+                    retry_delay = 5s;
+                }
+            };
+
+            // We retry the entire set of kernels up to 5 times, to deal with seemingly
+            // random intermittent errors with command buffer submissions.
+            // On iOS we can't bail here, so we need to keep retrying.
+            // TODO: find a more robust way of dealing with Metal kernel launch issues
+            bool cb_success = false;
+#if TARGET_OS_IPHONE
+            for (int try_count = 0; !cb_success; ++try_count)
+#else   // TARGET_OS_IPHONE
+            for (int try_count = 0; try_count < 5; ++try_count)
+#endif  // TARGET_OS_IPHONE
+            {
+                cb_success = call_task(*task, inter_caller_mutex, try_count);
+                if (cb_success) {
+                    break;
+                } else {
+                    sleep_before_retry();
+                }
+            }
+
+            // If we repeatedly submitted CBs without success, we give up.
+            if (!cb_success) {
+                spdlog::critical("Failed to successfully submit GPU command buffers.");
+                throw std::runtime_error("Failed to successfully submit GPU command buffers.");
+            }
+        }
 
         // Pass task on to decode threads
-        std::unique_lock<std::mutex> decode_lock(m_decode_lock);
-        m_decode_queue.push_front(task);
-        decode_lock.unlock();
+        {
+            std::lock_guard decode_lock(m_decode_lock);
+            m_decode_queue.push_front(std::move(task));
+        }
         m_decode_cv.notify_all();
     }
 }
 
 void MetalCaller::decode_thread_fn() {
+    utils::set_thread_name("metal_decode");
     at::InferenceMode inference_mode_guard;
     while (true) {
         std::unique_lock<std::mutex> decode_lock(m_decode_lock);
@@ -413,39 +441,19 @@ bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_cou
     return finishCommandBuffer("linear/scan/softmax", cb, try_count);
 }
 
-void MetalLSTMCaller::call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex) {
-    // We retry the entire set of kernels up to 5 times, to deal with seemingly
-    // random intermittent errors with command buffer submissions.
-    // TODO: find a more robust way of dealing with Metal kernel launch issues
-    bool cb_success = false;
-    for (int try_count = 0; try_count < 5; ++try_count) {
-        std::lock_guard<std::mutex> lock(inter_caller_mutex);
+bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
+    std::lock_guard lock(inter_caller_mutex);
 
-        // The linear layer should not execute until the previous batch has been decoded,
-        // since the same buffers are used for successive batches' scores, fwd/bwd scans.
-        MTL::CommandBuffer *const cb =
-                m_model->forward_async(*task->input, m_decode_complete_event.get(),
-                                       task->decode_complete_event_id - 1, try_count, m_scores_TNC);
-        if (cb == nullptr) {
-            // A command buffer submission part of forward_async failed, so we should retry.
-            std::this_thread::sleep_for(20ms);
-            continue;
-        }
-
-        if (run_scan_kernels(cb, try_count)) {
-            cb_success = true;
-            break;
-        }
-
-        // linear/scan/softmax CB failed, so retry.
-        std::this_thread::sleep_for(20ms);
+    // The linear layer should not execute until the previous batch has been decoded,
+    // since the same buffers are used for successive batches' scores, fwd/bwd scans.
+    MTL::CommandBuffer *const cb =
+            m_model->forward_async(*task.input, m_decode_complete_event.get(),
+                                   task.decode_complete_event_id - 1, try_count, m_scores_TNC);
+    if (cb == nullptr) {
+        return false;
     }
 
-    // If we repeatedly submitted CBs without success, we give up.
-    if (!cb_success) {
-        spdlog::critical("Failed to successfully submit GPU command buffers.");
-        throw std::runtime_error("Failed to successfully submit GPU command buffers.");
-    }
+    return run_scan_kernels(cb, try_count);
 }
 
 DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
@@ -552,38 +560,23 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
     return finishCommandBuffer("linear/scan/softmax", cb, try_count);
 }
 
-void MetalTxCaller::call_task(std::shared_ptr<NNTask> task, std::mutex &inter_caller_mutex) {
-    auto scores_TNC = m_model->forward(task->input->to(m_model->m_options))
+bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
+    auto scores_TNC = m_model->forward(task.input->to(m_model->m_options))
                               .transpose(0, 1)
                               .contiguous()
                               .to(m_scores_dtype);
-    {
-        MTL::CommandBuffer *const cb = m_command_queue->commandBuffer();
-        if (m_decode_complete_event) {
-            // wait for the previous decode task to complete - this acts as a mutex
-            // previous scores are processed in the decode threads
-            cb->encodeWait(m_decode_complete_event.get(), task->decode_complete_event_id - 1);
-        }
 
-        m_scores_TNC.index_put_({at::indexing::Ellipsis}, scores_TNC);
-
-        std::lock_guard<std::mutex> lock(inter_caller_mutex);
-        bool cb_success = false;
-        for (int attempt = 0; attempt < 5; attempt++) {
-            if (run_scan_kernels(cb, attempt)) {
-                cb_success = true;
-                break;
-            }
-            // linear/scan/softmax CB failed, so retry.
-            std::this_thread::sleep_for(20ms);
-        }
-
-        // If we repeatedly submitted CBs without success, we give up.
-        if (!cb_success) {
-            spdlog::critical("Failed to successfully submit GPU command buffers.");
-            throw std::runtime_error("Failed to successfully submit GPU command buffers.");
-        }
+    MTL::CommandBuffer *const cb = m_command_queue->commandBuffer();
+    if (m_decode_complete_event) {
+        // wait for the previous decode task to complete - this acts as a mutex
+        // previous scores are processed in the decode threads
+        cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
     }
+
+    m_scores_TNC.index_put_({at::indexing::Ellipsis}, scores_TNC);
+
+    std::lock_guard lock(inter_caller_mutex);
+    return run_scan_kernels(cb, try_count);
 }
 
 DecodedData MetalTxCaller::decode(int chunk_idx) const {

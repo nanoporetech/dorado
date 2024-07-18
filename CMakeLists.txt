@@ -233,8 +233,8 @@ add_library(dorado_lib
     dorado/read_pipeline/ReadSplitNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/ResumeLoaderNode.cpp
-    dorado/read_pipeline/ResumeLoaderNode.h
+    dorado/read_pipeline/ResumeLoader.cpp
+    dorado/read_pipeline/ResumeLoader.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/StereoDuplexEncoderNode.cpp

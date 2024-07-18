@@ -47,9 +47,7 @@ void MessageSink::start_input_processing(const std::function<void()> &input_thre
 void MessageSink::stop_input_processing() {
     terminate_input_queue();
     for (auto &t : m_input_threads) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_input_threads.clear();
 }

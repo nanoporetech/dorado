@@ -24,7 +24,7 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
-#include "read_pipeline/ResumeLoaderNode.h"
+#include "read_pipeline/ResumeLoader.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
@@ -547,7 +547,7 @@ void setup(const std::vector<std::string>& args,
         }
 
         // Resume functionality injects reads directly into the writer node.
-        ResumeLoaderNode resume_loader(hts_writer_ref, resume_from_file);
+        ResumeLoader resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
         reads_already_processed = resume_loader.get_processed_read_ids();
     }

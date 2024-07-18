@@ -110,9 +110,7 @@ void StereoDuplexEncoderNode::input_thread_fn() {
 
 StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
         : MessageSink(1000, std::thread::hardware_concurrency()),
-          m_input_signal_stride(input_signal_stride) {
-    start_input_processing([this] { input_thread_fn(); }, "stereo_encode");
-}
+          m_input_signal_stride(input_signal_stride) {}
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = m_work_queue.sample_stats();

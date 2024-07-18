@@ -48,8 +48,7 @@ public:
     // restart is subsequently called.
     virtual void terminate(const FlushOptions& flush_options) = 0;
 
-    // Restarts the node following a terminate call.
-    // Has no effect if terminate has not been called.
+    // Starts or restarts the node following initial setup or a terminate call.
     virtual void restart() = 0;
 
 protected:

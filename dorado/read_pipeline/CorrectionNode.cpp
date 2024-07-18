@@ -480,21 +480,16 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
         spdlog::debug("Created fastq index.");
     }
     hts_free(idx_name);
-    start_input_processing([this] { input_thread_fn(); }, "corr_node");
 }
 
 void CorrectionNode::terminate(const FlushOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
-        if (infer_thread.joinable()) {
-            infer_thread.join();
-        }
+        infer_thread.join();
     }
     m_infer_threads.clear();
     for (auto& decode_thread : m_decode_threads) {
-        if (decode_thread.joinable()) {
-            decode_thread.join();
-        }
+        decode_thread.join();
     }
     m_decode_threads.clear();
 }

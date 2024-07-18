@@ -67,9 +67,7 @@ void PolyACalculatorNode::input_thread_fn() {
 }
 
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {
-    start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");
-}
+        : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {}
 
 void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
 

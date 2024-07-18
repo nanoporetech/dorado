@@ -8,6 +8,7 @@
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
+#include "utils/thread_naming.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
@@ -67,21 +68,16 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));
     }
-
-    // Spin up the processing threads:
-    start_threads();
 }
 
 ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(); }
 
 void ModBaseCallerNode::start_threads() {
-    m_output_worker = std::make_unique<std::thread>(&ModBaseCallerNode::output_worker_thread, this);
+    m_output_worker = std::thread([this] { output_worker_thread(); });
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_callers(); ++model_id) {
-            auto t = std::make_unique<std::thread>(&ModBaseCallerNode::modbasecall_worker_thread,
-                                                   this, worker_id, model_id);
-            m_runner_workers.push_back(std::move(t));
+            m_runner_workers.emplace_back([=] { modbasecall_worker_thread(worker_id, model_id); });
             ++m_num_active_runner_workers;
         }
     }
@@ -98,15 +94,12 @@ void ModBaseCallerNode::terminate_impl() {
     // Wait for runner workers to join, now that they have been asked to via chunk queue
     // termination.
     for (auto& t : m_runner_workers) {
-        if (t->joinable()) {
-            t->join();
-        }
+        t.join();
     }
     m_runner_workers.clear();
-    if (m_output_worker && m_output_worker->joinable()) {
-        m_output_worker->join();
+    if (m_output_worker.joinable()) {
+        m_output_worker.join();
     }
-    m_output_worker.reset();
 }
 
 void ModBaseCallerNode::restart() {
@@ -427,6 +420,7 @@ void ModBaseCallerNode::input_thread_fn() {
 }
 
 void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t caller_id) {
+    utils::set_thread_name("modbase_worker");
     at::InferenceMode inference_mode_guard;
 
     auto& runner = m_runners[worker_id];
@@ -524,6 +518,7 @@ void ModBaseCallerNode::call_current_batch(
 }
 
 void ModBaseCallerNode::output_worker_thread() {
+    utils::set_thread_name("modbase_out");
     at::InferenceMode inference_mode_guard;
 
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all

@@ -143,30 +143,32 @@ void BasecallerNode::input_thread_fn() {
 void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto &model_runner = m_model_runners[worker_id];
-    dorado::stats::Timer timer;
+    auto &batched_chunks = m_batched_chunks[worker_id];
     spdlog::trace("Basecalling batch T={}, N={}, chunks={}, worker={}", model_runner->chunk_size(),
-                  model_runner->batch_size(), m_batched_chunks[worker_id].size(), worker_id);
-    auto decode_results = model_runner->call_chunks(int(m_batched_chunks[worker_id].size()));
-    m_num_samples_incl_padding += model_runner->chunk_size() * model_runner->batch_size();
+                  model_runner->batch_size(), batched_chunks.size(), worker_id);
+
+    dorado::stats::Timer timer;
+    auto decode_results = model_runner->call_chunks(int(batched_chunks.size()));
     m_call_chunks_ms += timer.GetElapsedMS();
 
-    for (size_t i = 0; i < m_batched_chunks[worker_id].size(); i++) {
-        m_batched_chunks[worker_id][i]->seq = decode_results[i].sequence;
-        m_batched_chunks[worker_id][i]->qstring = decode_results[i].qstring;
-        m_batched_chunks[worker_id][i]->moves = decode_results[i].moves;
+    for (size_t i = 0; i < batched_chunks.size(); i++) {
+        batched_chunks[i]->seq = std::move(decode_results[i].sequence);
+        batched_chunks[i]->qstring = std::move(decode_results[i].qstring);
+        batched_chunks[i]->moves = std::move(decode_results[i].moves);
     }
 
-    for (auto &complete_chunk : m_batched_chunks[worker_id]) {
+    for (auto &complete_chunk : batched_chunks) {
         m_processed_chunks.try_push(std::move(complete_chunk));
     }
 
-    if (m_batched_chunks[worker_id].size() == model_runner->batch_size()) {
+    m_num_samples_incl_padding += model_runner->chunk_size() * model_runner->batch_size();
+    if (batched_chunks.size() == model_runner->batch_size()) {
         ++m_num_batches_called;
     } else {
         ++m_num_partial_batches_called;
     }
 
-    m_batched_chunks[worker_id].clear();
+    batched_chunks.clear();
 }
 
 void BasecallerNode::working_reads_manager() {
@@ -385,11 +387,6 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                         chunk_queue_size));
         spdlog::debug("BasecallerNode chunk size {}", s);
     }
-
-    initialization_time = std::chrono::system_clock::now();
-
-    // Spin up any workers last so that we're not mutating |this| underneath them
-    start_threads();
 }
 
 BasecallerNode::~BasecallerNode() { terminate_impl(); }
@@ -412,18 +409,13 @@ void BasecallerNode::start_threads() {
 void BasecallerNode::terminate_impl() {
     stop_input_processing();
     for (auto &t : m_basecall_workers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_basecall_workers.clear();
     for (auto &t : m_working_reads_managers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_working_reads_managers.clear();
-    termination_time = std::chrono::system_clock::now();
 }
 
 void BasecallerNode::restart() {

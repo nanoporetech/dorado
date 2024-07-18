@@ -104,6 +104,8 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
         for (const auto sink_handle : sink_handles) {
             node->add_sink(dynamic_cast<MessageSink &>(*m_nodes.at(sink_handle)));
         }
+        // Start the node.
+        node->restart();
     }
 }
 
