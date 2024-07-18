@@ -48,7 +48,7 @@ def smoke_test_model(
         assert mods_path.exists(), f"mods model does not exist at {mods_path}"
         args.extend(["--modified-bases-models", mods_path])
 
-    cmd = " ".join(args)
+    cmd = " ".join([str(v) for v in args])
     print(f"Running: '{cmd}'")
 
     subprocess.check_call(
