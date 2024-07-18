@@ -685,7 +685,7 @@ test:model_download:linux:x86:focal:
   needs:
     - build:linux:x86:focal
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 64
 
 test:model_download:macos:arm:
   extends:
@@ -695,7 +695,7 @@ test:model_download:macos:arm:
   needs:
     - build:macos:arm
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 32
   timeout: 1h 30m
 
 # MLHub
