@@ -151,8 +151,10 @@ Beyond the traditional A, T, C, and G basecalling, Dorado can also detect modifi
 To call modifications, extend the models argument with a comma-separated list of modifications:
 
 ```
-$ dorado basecaller hac,5mCG_5hmCG pod5s/ > calls.bam
+$ dorado basecaller hac,5mCG_5hmCG,6mA pod5s/ > calls.bam
 ```
+
+In the example above, basecalling is performed with the detection of both 5mC/5hmC in CG contexts and 6mA in all contexts.
 
 Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
 
