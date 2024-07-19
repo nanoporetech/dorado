@@ -95,7 +95,7 @@ variables:
 
 .setup_ccache:
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
-  -   export CCACHE_DIR=/data/gitlab-ci-cache
+  - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
 
@@ -154,10 +154,10 @@ variables:
     # produces should be ready to be notarized. That can be done asynchronously, but
     # doing everything in one pass (--wait flag) saves complicating the jobs.
     - ${NOTARYTOOL[@]} submit archive/dorado-*.zip
-        --apple-id ${APPLE_NOTARIZATION_ID}
-        --password ${APPLE_NOTARIZATION_PASSWORD}
-        --team-id ${APPLE_NOTARIZATION_TEAM}
-        --progress --verbose --wait
+      --apple-id ${APPLE_NOTARIZATION_ID}
+      --password ${APPLE_NOTARIZATION_PASSWORD}
+      --team-id ${APPLE_NOTARIZATION_TEAM}
+      --progress --verbose --wait
     # If notarization fails you need to run `xcrun notarytool log <request id>` to get
     # information about what failed.
     #
@@ -174,11 +174,11 @@ variables:
 # Run this job manually, but always run on nightly.
 .on_nightly_or_manual:
   rules:
-      - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE != "schedule"
-        when: manual
-        # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
-        allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+      allow_failure: true
 
 # Pre-flight stages
 
@@ -272,10 +272,10 @@ build:linux:x86:focal:clang_tidy:
     - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
     - tar -xvf valgrind-${VALGRIND_VERSION}.tar.bz2
     - pushd valgrind-${VALGRIND_VERSION}
-    -   ./autogen.sh
-    -   ./configure
-    -   make -j ${PARALLEL_JOBS}
-    -   valgrind=$(pwd)/vg-in-place
+    - ./autogen.sh
+    - ./configure
+    - make -j ${PARALLEL_JOBS}
+    - valgrind=$(pwd)/vg-in-place
     - popd
     # We need symbols otherwise the generated reports are useless.
     - export CFLAGS="${CFLAGS} -g"
@@ -604,7 +604,7 @@ test:linux:arm64:focal:
   extends:
     - .linux_dependencies
     - .linux_orin_runner
-    - .test_dorado  
+    - .test_dorado
   needs:
     - build:linux:arm64:focal
 
@@ -689,13 +689,13 @@ test:model_download:linux:x86:focal:
 
 test:model_download:macos:arm:
   extends:
-    - .macos_arm_runner 
+    - .macos_arm_runner
     - .on_nightly_or_manual
   stage: test
   needs:
     - build:macos:arm
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 32
+    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
   timeout: 1h 30m
 
 # MLHub
@@ -735,47 +735,41 @@ test:model_download:macos:arm:
       ${MLHUB_TRIGGER_URL}
 
 mlhub:sre_4k_260bps:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '4k_260bps'
+    CONDITION: "4k_260bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-260bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_4k_400bps_v4_1:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '4k_400bps'
+    CONDITION: "4k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_v4_3:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps'
+    CONDITION: "5k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.3.0","dna_r10.4.1_e8.2_400bps_hac@v4.3.0","dna_r10.4.1_e8.2_400bps_sup@v4.3.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_v5:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps'
+    CONDITION: "5k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v5.0.0","dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
-    DUPLEX_MODELS: '[]'
-
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_duplex:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps_duplex'
+    CONDITION: "5k_400bps_duplex"
     SRE_CONFIG: "dna_r10.4.2-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
     DUPLEX_MODELS: '["dna_r10.4.1_e8.2_5khz_stereo@v1.3"]'
@@ -804,9 +798,9 @@ mlhub:remora-validate:
       ${MLHUB_TRIGGER_URL}
   parallel:
     matrix:
-      - DEVICE: 
-        - "cuda:all"
-        - "cpu"
+      - DEVICE:
+          - "cuda:all"
+          - "cpu"
 
 # MLHub - Dorado integration test
 mlhub:sweeper:
@@ -855,7 +849,7 @@ deploy:all:
   variables:
     GIT_STRATEGY: none
   script:
-   - ls -lh archive
+    - ls -lh archive
   extends:
     - .on_nightly_or_manual
   artifacts:
