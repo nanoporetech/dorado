@@ -10,17 +10,11 @@ namespace dorado::utils::concurrency::detail::priority_task_queue_test {
 
 DEFINE_TEST("constructor does not throw") { REQUIRE_NOTHROW(PriorityTaskQueue{}); }
 
-DEFINE_TEST("create_task_queue() returns non-null") {
-    PriorityTaskQueue cut{};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
-    REQUIRE(task_queue != nullptr);
-}
-
 DEFINE_TEST("size() after TaskQueue(high)::push") {
     PriorityTaskQueue cut{};
-    auto task_queue = cut.create_task_queue(TaskPriority::high);
+    auto& task_queue = cut.create_task_queue(TaskPriority::high);
 
-    task_queue->push([] {});
+    task_queue.push([] {});
 
     CHECK(cut.size() == 1);
     CHECK(cut.size(TaskPriority::high) == 1);
@@ -29,9 +23,9 @@ DEFINE_TEST("size() after TaskQueue(high)::push") {
 
 DEFINE_TEST("size() after TaskQueue(normal)::push") {
     PriorityTaskQueue cut{};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
+    auto& task_queue = cut.create_task_queue(TaskPriority::normal);
 
-    task_queue->push([] {});
+    task_queue.push([] {});
 
     CHECK(cut.size() == 1);
     CHECK(cut.size(TaskPriority::high) == 0);
@@ -40,21 +34,21 @@ DEFINE_TEST("size() after TaskQueue(normal)::push") {
 
 DEFINE_TEST("size() after pushing to multiple tasks to multiple queues") {
     PriorityTaskQueue cut{};
-    auto normal_queue_1 = cut.create_task_queue(TaskPriority::normal);
-    auto normal_queue_2 = cut.create_task_queue(TaskPriority::normal);
-    normal_queue_1->push([] {});
-    normal_queue_2->push([] {});
-    normal_queue_2->push([] {});
+    auto& normal_queue_1 = cut.create_task_queue(TaskPriority::normal);
+    auto& normal_queue_2 = cut.create_task_queue(TaskPriority::normal);
+    normal_queue_1.push([] {});
+    normal_queue_2.push([] {});
+    normal_queue_2.push([] {});
 
-    auto high_queue_1 = cut.create_task_queue(TaskPriority::high);
-    auto high_queue_2 = cut.create_task_queue(TaskPriority::high);
-    auto high_queue_3 = cut.create_task_queue(TaskPriority::high);
-    high_queue_1->push([] {});
-    high_queue_2->push([] {});
-    high_queue_2->push([] {});
-    high_queue_3->push([] {});
-    high_queue_3->push([] {});
-    high_queue_3->push([] {});
+    auto& high_queue_1 = cut.create_task_queue(TaskPriority::high);
+    auto& high_queue_2 = cut.create_task_queue(TaskPriority::high);
+    auto& high_queue_3 = cut.create_task_queue(TaskPriority::high);
+    high_queue_1.push([] {});
+    high_queue_2.push([] {});
+    high_queue_2.push([] {});
+    high_queue_3.push([] {});
+    high_queue_3.push([] {});
+    high_queue_3.push([] {});
 
     CHECK(cut.size() == 9);
     CHECK(cut.size(TaskPriority::high) == 6);
@@ -63,10 +57,10 @@ DEFINE_TEST("size() after pushing to multiple tasks to multiple queues") {
 
 DEFINE_SCENARIO("prioritised pushing and popping with 2 high queues and one normal queue") {
     PriorityTaskQueue cut{};
-    auto normal_queue_1 = cut.create_task_queue(TaskPriority::normal);
+    auto& normal_queue_1 = cut.create_task_queue(TaskPriority::normal);
 
-    auto high_queue_1 = cut.create_task_queue(TaskPriority::high);
-    auto high_queue_2 = cut.create_task_queue(TaskPriority::high);
+    auto& high_queue_1 = cut.create_task_queue(TaskPriority::high);
+    auto& high_queue_2 = cut.create_task_queue(TaskPriority::high);
 
     std::string task_id{};
     auto create_task = [&task_id](const std::string& id) {
@@ -81,8 +75,8 @@ DEFINE_SCENARIO("prioritised pushing and popping with 2 high queues and one norm
     };
 
     GIVEN("2 tasks pushed to normal queue") {
-        normal_queue_1->push(create_task("n1"));
-        normal_queue_1->push(create_task("n2"));
+        normal_queue_1.push(create_task("n1"));
+        normal_queue_1.push(create_task("n2"));
 
         THEN("pop() returns first normal") { check_task(cut.pop(), TaskPriority::normal, "n1"); }
         THEN("pop(normal) returns first normal") {
@@ -94,13 +88,13 @@ DEFINE_SCENARIO("prioritised pushing and popping with 2 high queues and one norm
         }
     }
     GIVEN("1 tasks pushed to normal queue") {
-        normal_queue_1->push(create_task("n1"));
-        normal_queue_1->push(create_task("n2"));
+        normal_queue_1.push(create_task("n1"));
+        normal_queue_1.push(create_task("n2"));
         AND_GIVEN("2 tasks pushed to first high_prio queue then second high prio queue") {
-            high_queue_1->push(create_task("h1.1"));
-            high_queue_1->push(create_task("h1.2"));
-            high_queue_2->push(create_task("h2.1"));
-            high_queue_2->push(create_task("h2.2"));
+            high_queue_1.push(create_task("h1.1"));
+            high_queue_1.push(create_task("h1.2"));
+            high_queue_2.push(create_task("h2.1"));
+            high_queue_2.push(create_task("h2.2"));
 
             AND_GIVEN("1 further task to first high_prio queue") {
                 THEN("all tasks popped in order of cycling queues") {

@@ -38,11 +38,11 @@ MultiQueueThreadPool::~MultiQueueThreadPool() { join(); }
 
 void MultiQueueThreadPool::join() {
     // post as many done messages as there are threads to make sure all waiting threads will receive a wakeup
-    auto terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
+    auto& terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
     for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
         {
             std::unique_lock lock(m_mutex);
-            terminate_task_queue->push([this] { m_done.store(true, std::memory_order_relaxed); });
+            terminate_task_queue.push([this] { m_done.store(true, std::memory_order_relaxed); });
         }
         m_message_received.notify_one();
     }
@@ -144,20 +144,19 @@ namespace {
 
 class ThreadPoolQueueImpl : public MultiQueueThreadPool::ThreadPoolQueue {
     MultiQueueThreadPool* m_parent;
-    std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> m_task_queue;
+    detail::PriorityTaskQueue::TaskQueue& m_task_queue;
 
 public:
     ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                        std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue);
+                        detail::PriorityTaskQueue::TaskQueue& task_queue);
     void push(TaskType task) override;
 };
 
-ThreadPoolQueueImpl::ThreadPoolQueueImpl(
-        MultiQueueThreadPool* parent,
-        std::unique_ptr<detail::PriorityTaskQueue::TaskQueue> task_queue)
-        : m_parent(parent), m_task_queue(std::move(task_queue)) {}
+ThreadPoolQueueImpl::ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
+                                         detail::PriorityTaskQueue::TaskQueue& task_queue)
+        : m_parent(parent), m_task_queue(task_queue) {}
 
-void ThreadPoolQueueImpl::push(TaskType task) { m_parent->send(std::move(task), *m_task_queue); }
+void ThreadPoolQueueImpl::push(TaskType task) { m_parent->send(std::move(task), m_task_queue); }
 
 }  // namespace
 

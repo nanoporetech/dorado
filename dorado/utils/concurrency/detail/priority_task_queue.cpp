@@ -5,20 +5,6 @@
 
 namespace dorado::utils::concurrency::detail {
 
-class PriorityTaskQueue::ProducerQueue : public TaskQueue {
-    PriorityTaskQueue* m_parent;
-    TaskPriority m_priority;
-    std::queue<TaskType> m_producer_queue{};
-
-public:
-    ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
-
-    TaskPriority priority() const { return m_priority; };
-
-    void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
-    TaskType pop();                     // pop, if not empty parent.push
-};
-
 //void PriorityTaskQueue::push(std::shared_ptr<WaitingTask> task) {
 //    m_task_list.push_back(std::move(task));
 //    auto task_itr = std::prev(m_task_list.end());
@@ -135,9 +121,9 @@ TaskType PriorityTaskQueue::ProducerQueue::pop() {
     return result;
 }
 
-std::unique_ptr<PriorityTaskQueue::TaskQueue> PriorityTaskQueue::create_task_queue(
-        TaskPriority priority) {
-    return std::make_unique<ProducerQueue>(this, priority);
+PriorityTaskQueue::TaskQueue& PriorityTaskQueue::create_task_queue(TaskPriority priority) {
+    m_queue_repository.emplace_back(std::make_unique<ProducerQueue>(this, priority));
+    return *m_queue_repository.back();
 }
 
 }  // namespace dorado::utils::concurrency::detail

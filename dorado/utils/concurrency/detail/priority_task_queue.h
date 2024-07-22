@@ -9,6 +9,7 @@
 #include <memory>
 #include <queue>
 #include <utility>
+#include <vector>
 
 namespace dorado::utils::concurrency::detail {
 
@@ -34,7 +35,7 @@ public:
         virtual ~TaskQueue() = default;
         virtual void push(TaskType task) = 0;
     };
-    std::unique_ptr<TaskQueue> create_task_queue(TaskPriority priority);
+    TaskQueue& create_task_queue(TaskPriority priority);
 
     //void push(std::shared_ptr<WaitingTask> task);
 
@@ -48,8 +49,21 @@ public:
     bool empty(TaskPriority priority) const;
 
 private:
-    class ProducerQueue;
+    class ProducerQueue : public TaskQueue {
+        PriorityTaskQueue* m_parent;
+        TaskPriority m_priority;
+        std::queue<TaskType> m_producer_queue{};
 
+    public:
+        ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
+
+        TaskPriority priority() const { return m_priority; };
+
+        void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
+        TaskType pop();                     // pop, if not empty parent.push
+    };
+    std::vector<std::unique_ptr<ProducerQueue>>
+            m_queue_repository{};  // ownership of producer queues
     using ProducerQueueList = std::list<ProducerQueue*>;
     ProducerQueueList m_producer_queue_list{};
     std::queue<ProducerQueueList::iterator> m_low_producer_queue{};
