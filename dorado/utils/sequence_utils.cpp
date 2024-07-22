@@ -1,7 +1,6 @@
 #include "sequence_utils.h"
 
 #include "simd.h"
-#include "types.h"
 
 #include <edlib.h>
 #include <minimap.h>

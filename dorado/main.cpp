@@ -1,5 +1,6 @@
 #include "cli/cli.h"
 #include "dorado_version.h"
+#include "utils/PostCondition.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -60,7 +61,6 @@ int main(int argc, char* argv[]) {
     // Load logging settings from environment/command-line.
     spdlog::cfg::load_env_levels();
     dorado::utils::InitLogging();
-
     dorado::utils::ensure_user_locale_may_be_set();
 
     const std::map<std::string, entry_ptr> subcommands = {
