@@ -188,9 +188,6 @@ void ScalerNode::input_thread_fn() {
             read->read_common.raw_data =
                     ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
                             .to(at::ScalarType::Half);
-
-            read->read_common.scale = scale;
-            read->read_common.shift = shift;
         } else {
             // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
             auto scaling_data = read->read_common.raw_data.index(
@@ -205,10 +202,10 @@ void ScalerNode::input_thread_fn() {
             read->read_common.raw_data =
                     ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
                             .to(at::ScalarType::Half);
-            // move the shift and scale into pA.
-            read->read_common.scale = read->scaling * scale;
-            read->read_common.shift = read->scaling * (shift + read->offset);
         }
+        // move the shift and scale into pA.
+        read->read_common.scale = read->scaling * scale;
+        read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna_model) {
