@@ -8,7 +8,6 @@
 #include <list>
 #include <memory>
 #include <queue>
-#include <utility>
 #include <vector>
 
 namespace dorado::utils::concurrency::detail {

@@ -3,7 +3,6 @@
 #include "utils/PostCondition.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
-#include "utils/section_timing.h"
 #include "utils/string_utils.h"
 
 #include <minimap.h>
@@ -62,11 +61,7 @@ int main(int argc, char* argv[]) {
     // Load logging settings from environment/command-line.
     spdlog::cfg::load_env_levels();
     dorado::utils::InitLogging();
-
     dorado::utils::ensure_user_locale_may_be_set();
-
-    auto show_instrumented_timings_on_exit =
-            dorado::utils::PostCondition([] { dorado::utils::timings::report(); });
 
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},

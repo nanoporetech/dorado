@@ -6,15 +6,11 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <functional>
-#include <list>
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <queue>
 #include <string>
 #include <thread>
-#include <type_traits>
 #include <vector>
 
 namespace dorado::utils::concurrency {

@@ -44,8 +44,6 @@ add_library(dorado_utils
     SampleSheet.h
     scoped_trace_log.cpp
     scoped_trace_log.h
-    section_timing.cpp
-    section_timing.h
     sequence_utils.cpp
     sequence_utils.h
     stats.cpp

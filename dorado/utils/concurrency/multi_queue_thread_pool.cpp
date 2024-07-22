@@ -1,12 +1,8 @@
 #include "multi_queue_thread_pool.h"
 
-#include "utils/section_timing.h"
 #include "utils/thread_naming.h"
 
 #include <algorithm>
-#include <cassert>
-#include <iterator>
-#include <tuple>
 
 namespace dorado::utils::concurrency {
 
@@ -54,7 +50,6 @@ void MultiQueueThreadPool::join() {
 }
 
 void MultiQueueThreadPool::send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue) {
-    DORADO_SECTION_TIMING("MultiQueueThreadPool::send(task, task_queue)");
     {
         std::lock_guard lock(m_mutex);
         task_queue.push(std::move(task));
