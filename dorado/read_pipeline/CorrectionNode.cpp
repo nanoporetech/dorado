@@ -5,14 +5,14 @@
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
+#include "torch_utils/gpu_profiling.h"
 #include "utils/bam_utils.h"
-#include "utils/gpu_profiling.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_naming.h"
 #include "utils/types.h"
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 #include "hts_io/FastxRandomReader.h"
 
@@ -480,21 +480,16 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
         spdlog::debug("Created fastq index.");
     }
     hts_free(idx_name);
-    start_input_processing([this] { input_thread_fn(); }, "corr_node");
 }
 
 void CorrectionNode::terminate(const FlushOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
-        if (infer_thread.joinable()) {
-            infer_thread.join();
-        }
+        infer_thread.join();
     }
     m_infer_threads.clear();
     for (auto& decode_thread : m_decode_threads) {
-        if (decode_thread.joinable()) {
-            decode_thread.join();
-        }
+        decode_thread.join();
     }
     m_decode_threads.clear();
 }

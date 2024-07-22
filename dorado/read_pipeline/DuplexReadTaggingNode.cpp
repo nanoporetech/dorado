@@ -95,9 +95,7 @@ void DuplexReadTaggingNode::input_thread_fn() {
     }
 }
 
-DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {
-    start_input_processing([this] { input_thread_fn(); }, "duplex_tagging");
-}
+DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {}
 
 void DuplexReadTaggingNode::restart() {
     m_duplex_parents.clear();

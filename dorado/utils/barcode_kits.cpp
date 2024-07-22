@@ -120,6 +120,7 @@ const BarcodeKitScoringParams RBK114_PARAMS{
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
         /*min_flank_score*/ 0.0f,
+        /*midstrand_flank_score*/ 0.95f,
 };
 
 const BarcodeKitScoringParams TWIST_PARAMS{
@@ -132,6 +133,7 @@ const BarcodeKitScoringParams TWIST_PARAMS{
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
         /*min_flank_score*/ 0.5f,
+        /*midstrand_flank_score*/ 0.95f,
 };
 
 // Some arrangement names are just aliases of each other. This is because they were released
@@ -934,10 +936,12 @@ std::string barcode_kits_list_str() {
 std::string normalize_barcode_name(const std::string& barcode_name) {
     std::string digits = "";
     // Normalize using only the digits at the end of the barcode name.
+    bool found_digits = false;
     for (auto rit = barcode_name.rbegin(); rit != barcode_name.rend(); ++rit) {
         if (std::isdigit(static_cast<unsigned char>(*rit))) {
             digits += *rit;
-        } else {
+            found_digits = true;
+        } else if (found_digits) {
             break;
         }
     }

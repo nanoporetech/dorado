@@ -9,9 +9,7 @@
 class MessageSinkToVector : public dorado::MessageSink {
 public:
     MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
-            : MessageSink(max_messages, 0), m_messages(messages) {
-        start_threads();
-    }
+            : MessageSink(max_messages, 0), m_messages(messages) {}
     ~MessageSinkToVector() { terminate_impl(); }
     void terminate(const dorado::FlushOptions&) override { terminate_impl(); }
     void restart() override {
@@ -21,19 +19,17 @@ public:
 
 private:
     void start_threads() {
-        m_worker_thread = std::make_unique<std::thread>(
-                std::thread(&MessageSinkToVector::worker_thread, this));
+        m_worker_thread = std::thread([this] { worker_thread(); });
     }
 
     void terminate_impl() {
         terminate_input_queue();
-        if (m_worker_thread && m_worker_thread->joinable()) {
-            m_worker_thread->join();
+        if (m_worker_thread.joinable()) {
+            m_worker_thread.join();
         }
-        m_worker_thread.reset();
     }
 
-    std::unique_ptr<std::thread> m_worker_thread;
+    std::thread m_worker_thread;
     std::vector<dorado::Message>& m_messages;
 
     void worker_thread() {

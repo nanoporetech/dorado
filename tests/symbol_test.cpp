@@ -19,20 +19,20 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/SubreadTaggerNode.h"
 #include "read_pipeline/read_utils.h"
+#include "torch_utils/gpu_monitor.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/barcode_kits.h"
-#include "utils/gpu_monitor.h"
 #include "utils/parameters.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/time_utils.h"
-#include "utils/torch_utils.h"
 #include "utils/uuid_utils.h"
 
 #if DORADO_METAL_BUILD
-#include "utils/metal_utils.h"
+#include "torch_utils/metal_utils.h"
 #elif DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 
 #if defined(_MSC_VER)
@@ -112,13 +112,13 @@ void reference_all_public_functions() {
     force_reference(&dorado::barcode_kits::parse_custom_arrangement);
 
 #if DORADO_CUDA_BUILD
-    // utils/cuda_utils.h
+    // torch_utils/cuda_utils.h
     force_reference(&dorado::utils::acquire_gpu_lock);
 #endif
-    // utils/gpu_monitor.h
+    // torch_utils/gpu_monitor.h
     force_reference(&dorado::utils::gpu_monitor::get_device_count);
 #if DORADO_METAL_BUILD
-    // utils/metal_utils.h
+    // torch_utils/metal_utils.h
     force_reference(&dorado::utils::create_buffer);
 #endif
     // utils/parameters.h
@@ -129,7 +129,7 @@ void reference_all_public_functions() {
     force_reference(&dorado::utils::split);
     // utils/time_utils.h
     force_reference(&dorado::utils::get_string_timestamp_from_unix_time);
-    // utils/torch_utils.h
+    // torch_utils/torch_utils.h
     force_reference(&dorado::utils::make_torch_deterministic);
     // utils/uuid_utils.h
     force_reference(&dorado::utils::derive_uuid);

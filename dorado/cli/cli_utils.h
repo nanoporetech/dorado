@@ -19,7 +19,7 @@
 #endif  // _WIN32
 
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 
 #include <htslib/sam.h>

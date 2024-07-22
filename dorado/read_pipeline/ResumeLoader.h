@@ -7,10 +7,10 @@
 
 namespace dorado {
 
-class ResumeLoaderNode {
+class ResumeLoader {
 public:
-    ResumeLoaderNode(MessageSink& sink, const std::string& resume_file);
-    ~ResumeLoaderNode() = default;
+    ResumeLoader(MessageSink& sink, const std::string& resume_file);
+
     void copy_completed_reads();
     std::unordered_set<std::string> get_processed_read_ids() const;
 

@@ -24,7 +24,7 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
-#include "read_pipeline/ResumeLoaderNode.h"
+#include "read_pipeline/ResumeLoader.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
@@ -36,15 +36,15 @@
 
 #include <string>
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
+#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/sys_stats.h"
-#include "utils/torch_utils.h"
 #include "utils/tty_utils.h"
 
 #include <htslib/sam.h>
@@ -547,7 +547,7 @@ void setup(const std::vector<std::string>& args,
         }
 
         // Resume functionality injects reads directly into the writer node.
-        ResumeLoaderNode resume_loader(hts_writer_ref, resume_from_file);
+        ResumeLoader resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
         reads_already_processed = resume_loader.get_processed_read_ids();
     }

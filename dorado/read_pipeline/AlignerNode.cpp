@@ -98,7 +98,6 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
             m_header_sequence_names.emplace_back(entry.first);
         }
     }
-    start_input_processing([this] { input_thread_fn(); }, "aligner_node");
 }
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
@@ -109,9 +108,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_thread_pool(std::move(thread_pool)),
           m_pipeline_priority(pipeline_priority),
           m_index_file_access(std::move(index_file_access)),
-          m_bed_file_access(std::move(bed_file_access)) {
-    start_input_processing([this] { input_thread_fn(); }, "aligner_node");
-}
+          m_bed_file_access(std::move(bed_file_access)) {}
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {

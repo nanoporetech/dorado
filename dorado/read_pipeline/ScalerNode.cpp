@@ -2,9 +2,9 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "models/kits.h"
-#include "utils/tensor_utils.h"
-#include "utils/trim.h"
-#include "utils/trim_rapid_adapter.h"
+#include "torch_utils/tensor_utils.h"
+#include "torch_utils/trim.h"
+#include "torch_utils/trim_rapid_adapter.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
@@ -272,8 +272,6 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
           m_scaling_params(config),
           m_model_type(model_type),
           m_trim_rna_adapter(trim_rna_adapter),
-          m_rapid_settings(rapid_settings) {
-    start_input_processing([this] { input_thread_fn(); }, "scaler_node");
-}
+          m_rapid_settings(rapid_settings) {}
 
 }  // namespace dorado

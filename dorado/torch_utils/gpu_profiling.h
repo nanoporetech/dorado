@@ -6,7 +6,7 @@
 
 #if DORADO_CUDA_BUILD
 #include "cuda_utils.h"
-#include "dev_utils.h"
+#include "utils/dev_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <cuda_runtime.h>

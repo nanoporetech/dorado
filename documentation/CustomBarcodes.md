@@ -56,7 +56,7 @@ flank_left_pad = 5
 flank_right_pad = 10
 front_barcode_window = 175
 rear_barcode_window = 175
-midstrand_flank_score = 0.8
+midstrand_flank_score = 0.95
 ```
 
 #### Arrangement Options
@@ -67,10 +67,10 @@ The table below describes the arrangement options in more detail.
 | -- | -- |
 | name | (Required) Name of the barcode arrangement. This name will be used to report the barcode classification. |
 | kit | (Optional) Which class of barcodes this arrangement belongs to (if any). |
-| mask_1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask_1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask_2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
-| mask_2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
+| mask1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
+| mask1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
+| mask2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
+| mask2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
 | barcode1_pattern | (Required) An expression capturing the sequences to use for the front barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | barcode2_pattern | (Optional) An expression capturing the sequences to use for the rear barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |

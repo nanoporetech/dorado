@@ -82,12 +82,12 @@ private:
     void start_threads();
     void modbase_task_thread_fn(size_t model_id);
 
-    size_t m_num_models = 0;
+    const size_t m_num_models;
 
     at::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
     std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
-    std::vector<std::unique_ptr<std::thread>> m_task_threads;
+    std::vector<std::thread> m_task_threads;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called = 0;

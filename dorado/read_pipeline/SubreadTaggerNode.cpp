@@ -1,5 +1,7 @@
 #include "SubreadTaggerNode.h"
 
+#include "utils/thread_naming.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -62,6 +64,7 @@ void SubreadTaggerNode::input_thread_fn() {
 }
 
 void SubreadTaggerNode::check_duplex_thread() {
+    utils::set_thread_name("subread_duplex");
     while (!m_terminate.load()) {
         std::unique_lock lock(m_duplex_reads_mutex);
         m_check_duplex_cv.wait(lock,
@@ -111,9 +114,7 @@ void SubreadTaggerNode::check_duplex_thread() {
 }
 
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
-        : MessageSink(max_reads, num_worker_threads) {
-    start_threads();
-}
+        : MessageSink(max_reads, num_worker_threads) {}
 
 ::dorado::stats::NamedStats SubreadTaggerNode::sample_stats() const {
     ::dorado::stats::NamedStats stats = ::dorado::stats::from_obj(m_work_queue);
@@ -123,7 +124,7 @@ SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
 
 void SubreadTaggerNode::start_threads() {
     m_terminate.store(false);
-    m_duplex_thread = std::make_unique<std::thread>(&SubreadTaggerNode::check_duplex_thread, this);
+    m_duplex_thread = std::thread([this] { check_duplex_thread(); });
     start_input_processing([this] { input_thread_fn(); }, "subread_tagger");
 }
 
@@ -133,10 +134,9 @@ void SubreadTaggerNode::terminate_impl() {
     m_terminate.store(true);
     m_check_duplex_cv.notify_one();
 
-    if (m_duplex_thread && m_duplex_thread->joinable()) {
-        m_duplex_thread->join();
+    if (m_duplex_thread.joinable()) {
+        m_duplex_thread.join();
     }
-    m_duplex_thread.reset();
 }
 
 }  // namespace dorado

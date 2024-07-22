@@ -1,12 +1,12 @@
 #include "CRFModel.h"
 
-#include "utils/gpu_profiling.h"
+#include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
 #include "utils/module_utils.h"
-#include "utils/tensor_utils.h"
 
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>

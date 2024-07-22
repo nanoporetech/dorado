@@ -1,4 +1,4 @@
-#include "ResumeLoaderNode.h"
+#include "ResumeLoader.h"
 
 #include "DefaultClientInfo.h"
 #include "HtsReader.h"
@@ -13,14 +13,14 @@
 
 namespace dorado {
 
-ResumeLoaderNode::ResumeLoaderNode(MessageSink& sink, const std::string& resume_file)
+ResumeLoader::ResumeLoader(MessageSink& sink, const std::string& resume_file)
         : m_sink(sink), m_resume_file(resume_file) {
     if (!std::filesystem::exists(resume_file)) {
         throw std::runtime_error("Resume file cannot be found: " + resume_file);
     }
 }
 
-void ResumeLoaderNode::copy_completed_reads() {
+void ResumeLoader::copy_completed_reads() {
     indicators::IndeterminateProgressBar bar{indicators::option::BarWidth{20},
                                              indicators::option::Start{"["},
                                              indicators::option::Fill{"·"},
@@ -72,7 +72,7 @@ void ResumeLoaderNode::copy_completed_reads() {
     hts_set_log_level(initial_hts_log_level);
 }
 
-std::unordered_set<std::string> ResumeLoaderNode::get_processed_read_ids() const {
+std::unordered_set<std::string> ResumeLoader::get_processed_read_ids() const {
     return m_processed_read_ids;
 }
 

@@ -2,10 +2,16 @@
 
 #include "compat/compat_utils.h"
 
-#if DORADO_CUDA_BUILD
-#include <c10/cuda/CUDACachingAllocator.h>
-#endif
 #include <torch/torch.h>
+#include <torch/version.h>
+
+#if DORADO_CUDA_BUILD
+#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 2
+#include <c10/cuda/CUDAAllocatorConfig.h>
+#else  // >=2.2
+#include <c10/cuda/CUDACachingAllocator.h>
+#endif  // >=2.2
+#endif  // DORADO_CUDA_BUILD
 
 namespace dorado::utils {
 

@@ -123,6 +123,7 @@ variables:
   artifacts:
     paths:
       - dist
+      # Uploading these allows us to avoid checking out the repo in tests.
       - tests/*.sh
       - tests/*.bat
       - tests/data
@@ -450,9 +451,10 @@ build_archive:linux:x86:focal:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
-  image: nvcr.io/nvidia/pytorch:23.01-py3
+  image: nvcr.io/nvidia/pytorch:24.06-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+    # Note: the linker flag is a workaround for the provided torch forgetting to link to cublas.
+    BUILD_OPTIONS: "-D DORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch -D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--copy-dt-needed-entries'"
   extends:
     - .linux_dependencies
     - .linux_runner
@@ -524,6 +526,10 @@ build_archive:macos:x64:
     MODEL_VERSION: v4.2.0
     TEST_DORADO_CORRECT: 1
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
@@ -533,6 +539,10 @@ build_archive:macos:x64:
   variables:
     GIT_STRATEGY: none
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive: &test_archive
@@ -686,6 +696,7 @@ test:model_download:macos:arm:
     - build:macos:arm
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+  timeout: 1h 30m
 
 # MLHub
 

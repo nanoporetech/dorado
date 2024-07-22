@@ -2,7 +2,7 @@
 
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
-#include "utils/gpu_profiling.h"
+#include "torch_utils/gpu_profiling.h"
 #include "utils/module_utils.h"
 
 #include <ATen/core/TensorBody.h>

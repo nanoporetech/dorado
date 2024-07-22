@@ -1,7 +1,7 @@
 #include "CudaCaller.h"
 
 #include "crf_utils.h"
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/thread_naming.h"
@@ -84,13 +84,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     start_threads();
 }
 
-CudaCaller::~CudaCaller() {
-    m_terminate.store(true);
-    m_input_cv.notify_one();
-    if (m_cuda_thread && m_cuda_thread->joinable()) {
-        m_cuda_thread->join();
-    }
-}
+CudaCaller::~CudaCaller() { terminate(); }
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
                                                           at::Tensor &output,
@@ -119,16 +113,14 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
 void CudaCaller::terminate() {
     m_terminate.store(true);
     m_input_cv.notify_one();
-    if (m_cuda_thread && m_cuda_thread->joinable()) {
-        m_cuda_thread->join();
+    if (m_cuda_thread.joinable()) {
+        m_cuda_thread.join();
     }
-    m_cuda_thread.reset();
 }
 
 void CudaCaller::restart() {
-    // This can be called more than one, via multiple runners.
-    if (m_terminate.load()) {
-        m_terminate.store(false);
+    // This can be called more than once, via multiple runners.
+    if (m_terminate.exchange(false)) {
         start_threads();
     }
 }
@@ -224,7 +216,12 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
     }
 #ifdef DORADO_TX2
-    m_batch_dims[0].N = 256;
+    if (requested_batch_size == 0) {
+        m_batch_dims[0].N = 256;
+    } else {
+        requested_batch_size = utils::pad_to(requested_batch_size, granularity);
+        m_batch_dims[0].N = std::clamp(requested_batch_size, granularity, 256);
+    }
     return;
 #endif
 
@@ -391,7 +388,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
 }
 
 void CudaCaller::start_threads() {
-    m_cuda_thread.reset(new std::thread(&CudaCaller::cuda_thread_fn, this));
+    m_cuda_thread = std::thread([this] { cuda_thread_fn(); });
 }
 
 void CudaCaller::cuda_thread_fn() {

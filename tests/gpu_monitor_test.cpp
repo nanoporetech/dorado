@@ -1,4 +1,4 @@
-#include "utils/gpu_monitor.h"
+#include "torch_utils/gpu_monitor.h"
 
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()

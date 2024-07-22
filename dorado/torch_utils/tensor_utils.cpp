@@ -1,6 +1,6 @@
 #include "tensor_utils.h"
 
-#include "simd.h"
+#include "utils/simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
 #include <torch/torch.h>

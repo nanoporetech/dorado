@@ -7,7 +7,7 @@
 #endif
 
 #if HAS_NVML
-#include "scoped_trace_log.h"
+#include "utils/scoped_trace_log.h"
 
 #include <nvml.h>
 #if defined(_WIN32)

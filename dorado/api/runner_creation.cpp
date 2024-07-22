@@ -9,7 +9,7 @@
 #elif DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
 #include "basecall/CudaModelRunner.h"
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 
 #include <cxxpool.h>

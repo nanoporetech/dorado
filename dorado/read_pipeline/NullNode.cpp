@@ -9,8 +9,6 @@ void NullNode::input_thread_fn() {
     }
 }
 
-NullNode::NullNode() : MessageSink(1000, 4) {
-    start_input_processing([this] { input_thread_fn(); }, "null_node");
-}
+NullNode::NullNode() : MessageSink(1000, 4) {}
 
 }  // namespace dorado
