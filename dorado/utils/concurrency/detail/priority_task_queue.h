@@ -23,11 +23,10 @@ struct WaitingTask {
     TaskPriority priority{TaskPriority::normal};
 };
 
-/* 
- * Queue allowing tasks to be pushed and popped, also allows pop to be called
- * with a priority which will remove and return the next task with that priority
- * from the queue.
- */
+// A queue of queues adapter class providing a single queue interface over multiple queues.
+// Popping from one queue will cause that queue to go to the back of the queue of queues to
+// be popped from.
+// The interface supports popping by priority.
 class PriorityTaskQueue {
 public:
     class TaskQueue {
@@ -36,8 +35,6 @@ public:
         virtual void push(TaskType task) = 0;
     };
     TaskQueue& create_task_queue(TaskPriority priority);
-
-    //void push(std::shared_ptr<WaitingTask> task);
 
     WaitingTask pop();
     WaitingTask pop(TaskPriority priority);
@@ -59,8 +56,8 @@ private:
 
         TaskPriority priority() const { return m_priority; };
 
-        void push(TaskType task) override;  // queue.push(task), if size==1 parent.push
-        TaskType pop();                     // pop, if not empty parent.push
+        void push(TaskType task) override;
+        TaskType pop();
     };
     std::vector<std::unique_ptr<ProducerQueue>>
             m_queue_repository{};  // ownership of producer queues

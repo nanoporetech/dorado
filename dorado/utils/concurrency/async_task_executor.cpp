@@ -15,7 +15,6 @@ AsyncTaskExecutor::AsyncTaskExecutor(MultiQueueThreadPool& thread_pool,
 AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 
 void AsyncTaskExecutor::send_impl(TaskType task) {
-    DORADO_SECTION_TIMING("AsyncTaskExecutor::send_impl");
     increment_tasks_in_flight();
 
     m_thread_pool_queue->push([task = std::move(task), this] {

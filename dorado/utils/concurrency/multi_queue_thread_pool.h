@@ -21,8 +21,9 @@ namespace dorado::utils::concurrency {
 
 using TaskType = detail::TaskType;
 
-// Thread pool which blocks new tasks being added while all
-// threads are busy.
+// Thread pool which pops tasks from multiple queues. Each queue is processed FIFO
+// however the queues are popped from in a cyclic fashion so that a new queue will not
+// be waiting behind an existing queue having all it's tasks popped.
 // Suitable for usecases where a producer thread should not be allowed to
 // enqueue a large amount of tasks ahead of a second producer thread
 // beginning to enqueue tasks.
