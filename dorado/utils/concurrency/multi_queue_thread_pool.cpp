@@ -58,8 +58,8 @@ void MultiQueueThreadPool::send(TaskType task, detail::PriorityTaskQueue::TaskQu
     {
         std::unique_lock lock(m_mutex);
         task_queue.push(std::move(task));
-        m_message_received.notify_one();
     }
+    m_message_received.notify_one();
 }
 
 std::size_t MultiQueueThreadPool::num_tasks_in_flight() {
