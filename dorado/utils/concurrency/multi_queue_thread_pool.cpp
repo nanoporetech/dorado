@@ -41,7 +41,7 @@ void MultiQueueThreadPool::join() {
     auto& terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
     for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
         {
-            std::unique_lock lock(m_mutex);
+            std::lock_guard lock(m_mutex);
             terminate_task_queue.push([this] { m_done.store(true, std::memory_order_relaxed); });
         }
         m_message_received.notify_one();
@@ -56,7 +56,7 @@ void MultiQueueThreadPool::join() {
 void MultiQueueThreadPool::send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue) {
     DORADO_SECTION_TIMING("MultiQueueThreadPool::send(task, task_queue)");
     {
-        std::unique_lock lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         task_queue.push(std::move(task));
     }
     m_message_received.notify_one();
@@ -130,7 +130,7 @@ void MultiQueueThreadPool::process_task_queue() {
         waiting_task.task();
     }
     if (last_task_priority) {
-        std::unique_lock lock(m_mutex);
+        std::lock_guard lock(m_mutex);
         decrement_in_flight_tasks(*last_task_priority);
         // Signal so that the condition variable will be checked by waiting threads
         // This is necessary since it is possible join() was called before all the threads
