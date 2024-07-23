@@ -88,6 +88,11 @@ inline void add_internal_arguments(utils::arg_parse::ArgParser& parser) {
     parser.hidden.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
+    parser.hidden.add_argument("--emit-chunk-benchmarks")
+            .help("Write out a CSV and CPP file to the working directory with the auto batchsize "
+                  "selection performance stats.")
+            .default_value(false)
+            .implicit_value(true);
 }
 
 inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {

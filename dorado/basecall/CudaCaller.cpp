@@ -1,5 +1,6 @@
 #include "CudaCaller.h"
 
+#include "CudaChunkBenchmarks.h"
 #include "crf_utils.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
@@ -15,6 +16,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <fstream>
 #include <limits>
 #include <map>
 
@@ -39,7 +41,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
                        const std::string &device,
                        float memory_limit_fraction,
                        PipelineType pipeline_type,
-                       float batch_size_time_penalty)
+                       float batch_size_time_penalty,
+                       bool emit_chunk_benchmarks)
         : m_config(model_config),
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
@@ -59,7 +62,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
 
     const auto chunk_size = model_config.basecaller.chunk_size();
     const auto batch_size = model_config.basecaller.batch_size();
-    determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty);
+    determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty,
+                         emit_chunk_benchmarks);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -202,7 +206,8 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
 void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                       int requested_batch_size,
                                       int requested_chunk_size,
-                                      float batch_size_time_penalty) {
+                                      float batch_size_time_penalty,
+                                      bool emit_chunk_benchmarks) {
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
@@ -264,6 +269,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                     (prop->major == 6 && prop->minor == 2) ||  // TX2
                                     (prop->major == 7 && prop->minor == 2) ||  // Xavier
                                     (prop->major == 8 && prop->minor == 7);    // Orin
+    // prop->integrated?
     memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
 
     // Apply limit fraction, and allow 1GB for model weights, etc.
@@ -324,40 +330,92 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
 
     // Times and corresponding batch sizes.
     std::vector<std::pair<float, int>> times_and_batch_sizes;
+    std::vector<std::pair<float, int>> all_times_and_batch_sizes;
     times_and_batch_sizes.reserve(max_batch_size / granularity);
 
-    for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
-        auto input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
+    // See if we can find cached values for the chunk timings for this run condition
+    const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
+            prop->name, m_config.model_path.string(), chunk_size);
+    if (!chunk_benchmarks) {
+        spdlog::warn(std::string("Unable to find chunk benchmarks for GPU ") + prop->name +
+                     ", model " + m_config.model_path.string() + " and chunk size " +
+                     std::to_string(chunk_size) +
+                     ". Full benchmarking will run for this device, which may take some time.");
+    }
 
+    for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
         float time = std::numeric_limits<float>::max();
-        for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
-            using utils::handle_cuda_result;
-            cudaEvent_t start, stop;
-            handle_cuda_result(cudaEventCreate(&start));
-            handle_cuda_result(cudaEventCreate(&stop));
-            handle_cuda_result(cudaEventRecord(start));
-            m_module->forward(input);
-            handle_cuda_result(cudaEventRecord(stop));
-            handle_cuda_result(cudaEventSynchronize(stop));
-            float ms = 0;
-            handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
-            auto time_this_iteration = ms / batch_size;
-            time = std::min(time, time_this_iteration);
-            handle_cuda_result(cudaEventDestroy(start));
-            handle_cuda_result(cudaEventDestroy(stop));
-            spdlog::trace("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
-                          time_this_iteration);
+
+        if (chunk_benchmarks && chunk_benchmarks->find(batch_size) != chunk_benchmarks->end() &&
+            !emit_chunk_benchmarks) {
+            time = chunk_benchmarks->at(batch_size);
+        } else {
+            auto input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
+
+            for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
+                using utils::handle_cuda_result;
+                cudaEvent_t start, stop;
+                handle_cuda_result(cudaEventCreate(&start));
+                handle_cuda_result(cudaEventCreate(&stop));
+                handle_cuda_result(cudaEventRecord(start));
+                m_module->forward(input);
+                handle_cuda_result(cudaEventRecord(stop));
+                handle_cuda_result(cudaEventSynchronize(stop));
+                float ms = 0;
+                handle_cuda_result(cudaEventElapsedTime(&ms, start, stop));
+                auto time_this_iteration = ms / batch_size;
+                time = std::min(time, time_this_iteration);
+                handle_cuda_result(cudaEventDestroy(start));
+                handle_cuda_result(cudaEventDestroy(stop));
+                spdlog::trace("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
+                              time_this_iteration);
+            }
+            // Clear the cache each time. Without this, intermittent cuda memory allocation errors
+            // are seen on windows laptop NVIDIA RTX A5500 Laptop GPU. See JIRA issue DOR-466
+            c10::cuda::CUDACachingAllocator::emptyCache();
+
+            spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size,
+                          time);
         }
 
-        spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size, time);
+        all_times_and_batch_sizes.emplace_back(time, batch_size);
         if (time < best_time) {
             best_time = time;
             times_and_batch_sizes.emplace_back(time, batch_size);
         }
+    }
 
-        // Clear the cache each time. Without this, intermittent cuda memory allocation errors
-        // are seen on windows laptop NVIDIA RTX A5500 Laptop GPU. See JIRA issue DOR-466
-        c10::cuda::CUDACachingAllocator::emptyCache();
+    if (emit_chunk_benchmarks) {
+        static std::mutex batch_output_mutex;
+        std::unique_lock<std::mutex> batch_output_lock(
+                batch_output_mutex);  // Prevent multiple devices outputting at once.
+
+        // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
+        std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
+                                           "\", \"" + m_config.model_path.string() + "\", " +
+                                           std::to_string(chunk_size) + "}] = {\n";
+        for (const auto &batch_time : all_times_and_batch_sizes) {
+            cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
+                                    std::to_string(batch_time.first) + "f },\n";
+        }
+        cpp_autobatch_output += "    };\n";
+        std::string cpp_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
+                                   m_config.model_path.string() + "__" +
+                                   std::to_string(chunk_size) + ".txt";
+        std::ofstream cpp_bench_file(cpp_filename);
+        cpp_bench_file << cpp_autobatch_output;
+
+        // Report out the batch sizes as a CSV file, for visualisation
+        std::string csv_autobatch_output = "batch_size,time_per_chunk\n";
+        for (const auto &batch_time : all_times_and_batch_sizes) {
+            csv_autobatch_output += std::to_string(batch_time.second) + "," +
+                                    std::to_string(batch_time.first) + "\n";
+        }
+        std::string csv_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
+                                   m_config.model_path.string() + "__" +
+                                   std::to_string(chunk_size) + ".csv";
+        std::ofstream csv_bench_file(csv_filename);
+        csv_bench_file << csv_autobatch_output;
     }
 
     // Find the first batch size that was under the threshold.

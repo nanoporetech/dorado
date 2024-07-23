@@ -16,9 +16,11 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const std::string& device,
         float memory_limit_fraction,
         PipelineType pipeline_type,
-        float batch_size_time_penalty) {
+        float batch_size_time_penalty,
+        bool emit_chunk_benchmarks) {
     return std::make_shared<basecall::CudaCaller>(model_config, device, memory_limit_fraction,
-                                                  pipeline_type, batch_size_time_penalty);
+                                                  pipeline_type, batch_size_time_penalty,
+                                                  emit_chunk_benchmarks);
 }
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(

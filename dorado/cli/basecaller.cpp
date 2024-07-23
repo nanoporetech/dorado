@@ -280,6 +280,7 @@ void setup(const std::vector<std::string>& args,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
+           bool emit_chunk_benchmarks,
            const std::string& resume_from_file,
            bool adapter_no_trim,
            bool primer_no_trim,
@@ -372,7 +373,8 @@ void setup(const std::vector<std::string>& args,
             BasecallerRunners basecaller_runners;
             std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                     api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
-                                                 api::PipelineType::simplex, 0.f);
+                                                 api::PipelineType::simplex, 0.f,
+                                                 emit_chunk_benchmarks);
             return basecaller_runners;
         };
 
@@ -395,7 +397,8 @@ void setup(const std::vector<std::string>& args,
 #endif
     {
         std::tie(runners, num_devices) = api::create_basecall_runners(
-                model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f);
+                model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f,
+                emit_chunk_benchmarks);
     }
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
@@ -778,6 +781,7 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"),
+              parser.hidden.get<bool>("--emit-chunk-benchmarks"),
               parser.visible.get<std::string>("--resume-from"), no_trim_adapters, no_trim_primers,
               custom_primer_file, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
               model_complex, std::move(barcoding_info), std::move(sample_sheet));

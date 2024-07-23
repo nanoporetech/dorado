@@ -19,7 +19,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t num_cpu_runners,
         float memory_fraction,
         PipelineType pipeline_type,
-        float batch_size_time_penalty);
+        float batch_size_time_penalty,
+        bool emit_chunk_benchmarks);
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,

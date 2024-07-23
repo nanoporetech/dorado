@@ -34,12 +34,16 @@ if (DORADO_GPU_BUILD)
     else()
         target_sources(dorado_basecall
             PRIVATE
+            CudaChunkBenchmarks.cpp
+            CudaChunkBenchmarks.h
             CudaModelRunner.cpp
             CudaModelRunner.h
             CudaCaller.cpp
             CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
+            Quadro_GV100.cpp
+            Quadro_GV100.h
         )
     endif()
 endif()
