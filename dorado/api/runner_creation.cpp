@@ -30,6 +30,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         bool emit_chunk_benchmarks) {
 #ifdef __APPLE__
     (void)pipeline_type;
+    (void)emit_chunk_benchmarks;
 #endif
 
     std::vector<basecall::RunnerPtr> runners;
