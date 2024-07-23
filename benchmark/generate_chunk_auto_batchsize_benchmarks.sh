@@ -3,16 +3,18 @@
 set -ex
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <dorado executable>"
+    echo "Usage: $0 <dorado executable> [device_string]"
     exit 1
 fi
 
+device_string=${2:-"auto"}
+echo "Using device string -x $device_string"
 data_dir=$(dirname $0)/../tests/data
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 pod5_dir=${data_dir}/pod5/dna_r10.4.1_e8.2_400bps_5khz/
 
 echo deleting any previous benchmark data
-rm chunk_benchmarks*
+rm chunk_benchmarks* || true
 
 echo Running benchmarks for models of interest
 for model_name in \
@@ -34,7 +36,7 @@ for model_name in \
                   ; do
     echo $model_name;
     $dorado_bin download --model $model_name
-    $dorado_bin basecaller --skip-model-compatibility-check --emit-chunk-benchmarks $model_name $pod5_dir > /dev/null
+    $dorado_bin basecaller -x $device_string --skip-model-compatibility-check --emit-chunk-benchmarks $model_name $pod5_dir > /dev/null
 done
 
 # Extract the GPU name from the benchmark filenames
