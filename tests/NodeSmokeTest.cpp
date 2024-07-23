@@ -177,10 +177,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
-    bool gpu{false};
-    if (torch::cuda::device_count() > 0) {
-        gpu = GENERATE(true, false);
-    }
+    auto gpu = GENERATE(true, false);
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -205,9 +202,11 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         device = "metal";
 #elif DORADO_CUDA_BUILD
         device = "cuda:all";
-        auto devices = dorado::utils::parse_cuda_device_string(device);
-        if (devices.empty()) {
-            SKIP("No CUDA devices found");
+        std::vector<std::string> devices;
+        std::string error_message;
+        if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
+            devices.empty()) {
+            SKIP("No CUDA devices found: " << error_message);
         }
 #else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
@@ -235,10 +234,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
-    bool gpu{false};
-    if (torch::cuda::device_count() > 0) {
-        gpu = GENERATE(true, false);
-    }
+    auto gpu = GENERATE(true, false);
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -272,9 +268,11 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         device = "metal";
 #elif DORADO_CUDA_BUILD
         device = "cuda:all";
-        auto modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
-        if (modbase_devices.empty()) {
-            SKIP("No CUDA devices found");
+        std::vector<std::string> devices;
+        std::string error_message;
+        if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
+            devices.empty()) {
+            SKIP("No CUDA devices found: " << error_message);
         }
 #else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
