@@ -698,11 +698,15 @@ test:model_download:macos:arm:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
   timeout: 1h 30m
 
+# Auto bachsize stats generation
 generate_auto_benchmarks:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_dependencies
-    - .linux_runner
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - ${GPU}
   when: manual
   stage: test
   needs:
@@ -716,6 +720,11 @@ generate_auto_benchmarks:linux:x86:focal:
       - "*.h"
       - "*.csv"
     expire_in: 1 day
+  parallel:
+    matrix:
+       - GPU: "gpu-a100"
+       - GPU: "gpu-v100"
+       - GPU: "gpu-a6000"
 
 # MLHub
 
