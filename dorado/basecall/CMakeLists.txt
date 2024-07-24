@@ -42,8 +42,14 @@ if (DORADO_GPU_BUILD)
             CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
-            Quadro_GV100.cpp
-            Quadro_GV100.h
+            benchmarks/NVIDIA_A100_80GB_PCIe.cpp
+            benchmarks/NVIDIA_A100_80GB_PCIe.h
+            benchmarks/NVIDIA_RTX_A6000.cpp
+            benchmarks/NVIDIA_RTX_A6000.h
+            benchmarks/Quadro_GV100.cpp
+            benchmarks/Quadro_GV100.h
+            benchmarks/Tesla_V100-PCIE-16GB.cpp
+            benchmarks/Tesla_V100-PCIE-16GB.h
         )
     endif()
 endif()
