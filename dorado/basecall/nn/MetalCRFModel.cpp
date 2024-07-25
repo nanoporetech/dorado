@@ -6,6 +6,9 @@
 
 #include <stdexcept>
 
+// Splitting up command buffers can be useful since it allows Xcode to make GPU captures.
+#define USE_SPLIT_LSTM_COMMAND_BUFFERS 0
+
 namespace {
 constexpr int kLstmGates = 4;
 // SIMD tile size dictated by the Metal spec.
@@ -457,7 +460,9 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
+#if !USE_SPLIT_LSTM_COMMAND_BUFFERS
         command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+#endif
 
         const int kResBufSize =
                 static_cast<int>(dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize);
@@ -468,14 +473,24 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
             const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
                                                      mtl_for_tensor(rnn->t_weights_bias),
                                                      mat_state.get()};
+#if USE_SPLIT_LSTM_COMMAND_BUFFERS
+            command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+#endif
             launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
                                   tg_buffer_lens, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
+#if USE_SPLIT_LSTM_COMMAND_BUFFERS
+            if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
+                return nullptr;
+            }
+#endif
         }
 
+#if !USE_SPLIT_LSTM_COMMAND_BUFFERS
         if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
             return nullptr;
         }
+#endif
     }
 
     command_buffer = next_command_buffer(m_command_queue.get(), try_count);
