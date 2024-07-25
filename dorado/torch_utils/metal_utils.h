@@ -18,6 +18,11 @@
 
 namespace dorado::utils {
 
+template <typename MetalObject>
+void name_mtl_object(MetalObject &&obj, const char *name) {
+    obj->setLabel(NS::String::string(name, NS::ASCIIStringEncoding));
+}
+
 // Returns an uninitialised MTL::Buffer of length bytes.
 NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length);
 
@@ -56,7 +61,7 @@ void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            long threads_per_threadgroup);
 
 // Returns true on success.
-bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count);
+bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count);
 
 NS::SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();

@@ -425,6 +425,7 @@ bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_cou
     // the effective batch size is m_out_batch_size.
     std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
     auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
+    name_mtl_object(scan_args, "scan_kernel_args");
 
     for (int i = 0; i < m_out_split; ++i) {
         // TODO: optimise grid size
@@ -546,6 +547,8 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
     // ScanArgs expects scores TNC tensor sizes
     std::vector<int32_t> scan_args_{m_out_chunk_size, m_batch_size, m_states};
     auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
+    name_mtl_object(scan_args, "scan_kernel_args");
+
     // TODO: optimise grid size
     launch_kernel_no_wait(
             m_bwd_scan_float_cps.get(), cb,

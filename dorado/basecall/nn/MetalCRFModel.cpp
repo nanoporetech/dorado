@@ -83,7 +83,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
         // The last 2 arguments are unused.
         const std::vector<int32_t> args{in_size,    win_size,   out_size, stride, win_size / 2,
                                         chunk_size, batch_size, 0,        0};
-        m_args.push_back(create_vec_buffer(device, args));
+        auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
+        name_mtl_object(buffer, "conv_args");
     } else {
         // We cut up the time span for individual kernel launches for conv3 since it is by far
         // the most time consuming, and sup times can be of the order of seconds, which
@@ -99,7 +100,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
             const std::vector<int32_t> args{in_size,    win_size,        out_size,
                                             stride,     win_size / 2,    chunk_size,
                                             batch_size, time_step_begin, time_step_end};
-            m_args.push_back(create_vec_buffer(device, args));
+            auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
+            name_mtl_object(buffer, "conv_args");
         }
         spdlog::debug("conv3 output_time_step_count {} => {} kernel launches",
                       output_time_step_count, num_pieces);
@@ -222,8 +224,8 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, lstm_chunk_size);
             std::vector<int32_t> args{batch_size / kTileSize, lstm_chunk_size, time_step_begin,
                                       time_step_end};
-            auto args_buffer = create_vec_buffer(m_device, args);
-            m_args_lstm.push_back(args_buffer);
+            auto &buffer = m_args_lstm.emplace_back(create_vec_buffer(m_device, args));
+            name_mtl_object(buffer, "lstm_args");
         }
         spdlog::debug("lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size, num_pieces);
     }
@@ -237,10 +239,13 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         const int32_t in_batch_tile_offset = out_batch_tiles * i;
         std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
                                              lstm_chunk_size};
-        args_linear.at(i) = create_vec_buffer(m_device, args_linear_);
+        auto &buffer = args_linear.at(i);
+        buffer = create_vec_buffer(m_device, args_linear_);
+        name_mtl_object(buffer, "linear_args");
     }
     args_linear2 = create_vec_buffer<int32_t>(
             device, {out_batch_tiles, 0, out_batch_tiles, lstm_chunk_size});
+    name_mtl_object(args_linear2, "linear2_args");
 
     switch (config.lstm_size) {
     case 128:
@@ -369,6 +374,9 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
             m_device, size_t(lstm_chunk_size + 3) * batch_size * config.lstm_size * dtype_bytes);
     mat_state = create_buffer(m_device, batch_size * config.lstm_size * dtype_bytes);
     mat_temp = create_buffer(m_device, mat_temp_elems * dtype_bytes);
+    name_mtl_object(mat_working_mem, "mat_working_mem");
+    name_mtl_object(mat_state, "mat_state");
+    name_mtl_object(mat_temp, "mat_temp");
 }
 
 void MetalBlockImpl::load_weights() {
@@ -400,6 +408,7 @@ void MetalBlockImpl::load_weights() {
         t_w = torch::stack({t_w[2], t_w[0], t_w[1], t_w[3]}, 2);
 
         rnn->t_weights_bias.view_as(t_w) = t_w;
+        name_mtl_object(mtl_for_tensor(rnn->t_weights_bias), "rnn_weights");
     }
 
     // Load and prepare linear layer weights.
@@ -464,7 +473,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                   kernel_simd_groups * kSIMDGroupWidth);
         }
 
-        if (!finishCommandBuffer(lstm_label, command_buffer, try_count)) {
+        if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
             return nullptr;
         }
     }

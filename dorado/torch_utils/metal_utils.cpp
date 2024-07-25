@@ -245,7 +245,8 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
-bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try_count) {
+bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+    name_mtl_object(cb, label);
     cb->commit();
     cb->waitUntilCompleted();
 
