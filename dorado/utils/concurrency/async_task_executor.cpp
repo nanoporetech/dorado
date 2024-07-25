@@ -64,8 +64,11 @@ void AsyncTaskExecutor::decrement_tasks_in_flight() {
         if (m_flushing_counter) {
             flush_in_progress = true;
         }
+
+        // We must notify with the lock still held to prevent the destructor being invoked
+        // and completing before this thread attempts to call notify_one on the destructed cvar.
+        m_tasks_in_flight_cv.notify_one();
     }
-    m_tasks_in_flight_cv.notify_one();
 
     if (flush_in_progress) {
         // The flush operation in the destructor is waiting on the m_flushing_counter.
