@@ -25,7 +25,8 @@ foreach(source ${METAL_SOURCES})
                 -Wall -Wextra -pedantic
                 -Wno-c++17-extensions # [[maybe_unused]] is C++17
                 -std=${METAL_STD_VERSION}
-                -ffast-math
+                -gline-tables-only -frecord-sources # embed source for trace analysis
+                -O2 -ffast-math
                 -c "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
                 -o "${air_path}"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${source}"
