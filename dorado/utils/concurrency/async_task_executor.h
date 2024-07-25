@@ -12,6 +12,11 @@
 namespace dorado::utils::concurrency {
 
 // Executor for posting tasks to an underlying thread pool
+//
+// N.B. The executor itself is not thread safe, it must be used
+// from a single thread such that calls to construction, send,
+// flush and destruction may not interleave.
+//
 // Many executors can be assigned to the same thread pool.
 // Allows tasks posted to a single instance of the executor
 // to be waited on instead of waiting on all tasks posted to
@@ -53,6 +58,7 @@ public:
                            task))]() -> decltype(auto) { return (*task_wrapper)(); });
     }
 
+    // Testability. Currently only needs to be made public for utests.
     // Blocks until all queued tasks are completed.
     // After invoking no further tasks may be enqueued by this executor.
     void flush();
