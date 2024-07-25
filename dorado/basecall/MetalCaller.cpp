@@ -380,7 +380,7 @@ int MetalLSTMCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
     const int kNumSmallerSizes = 16;
     const float test_size_increment = static_cast<float>(max_batch_size - min_batch_size) /
                                       static_cast<float>(kNumSmallerSizes);
-    for (int i = 0; i < kNumSmallerSizes; ++i) {
+    for (int i = 0; i <= kNumSmallerSizes; ++i) {
         const int test_batch_size =
                 utils::pad_to(min_batch_size + static_cast<int>(i * test_size_increment),
                               static_cast<int>(MTL_CORE_BATCH_SIZE));
