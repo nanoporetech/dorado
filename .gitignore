@@ -6,11 +6,13 @@
 *.qdrep
 dist
 build
-build-Release
-build-Debug
+build-*
 archive
 cmake-build*
 cmake.lock
 CMakeSettings.json
 _CPack_Packages
 tests/test_output
+.temp_dorado_model-*
+temp
+venv
