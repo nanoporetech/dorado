@@ -566,7 +566,7 @@ bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int 
                               .contiguous()
                               .to(m_scores_dtype);
 
-    MTL::CommandBuffer *const cb = m_command_queue->commandBuffer();
+    MTL::CommandBuffer *const cb = next_command_buffer(m_command_queue.get(), try_count);
     if (m_decode_complete_event) {
         // wait for the previous decode task to complete - this acts as a mutex
         // previous scores are processed in the decode threads

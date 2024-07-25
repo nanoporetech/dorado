@@ -210,6 +210,16 @@ void launch_kernel(ComputePipelineState *const pipeline,
     }
 }
 
+MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count) {
+    if (try_count == 0) {
+        return queue->commandBuffer();
+    }
+    // We're on a retry so there must have been an error, so enable additional logging this time around.
+    auto descriptor = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
+    descriptor->setErrorOptions(MTL::CommandBufferErrorOptionEncoderExecutionStatus);
+    return queue->commandBuffer(descriptor.get());
+}
+
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                            CommandBuffer *const command_buffer,
                            const std::vector<Buffer *> &buffers,
@@ -249,11 +259,7 @@ bool finishCommandBuffer(std::string_view label, MTL::CommandBuffer *cb, int try
         spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
                      fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
-            const auto *const error_ptr = cb->error();
-            if (error_ptr) {
-                spdlog::warn("Command buffer error code: {} ({})", error_ptr->code(),
-                             error_ptr->localizedDescription()->utf8String());
-            }
+            report_error(cb->error(), "finishCommandBuffer");
         }
     }
     return success;

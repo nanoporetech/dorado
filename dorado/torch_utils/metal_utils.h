@@ -46,6 +46,8 @@ void launch_kernel(MTL::ComputePipelineState *cps,
                    long threadgroups,
                    long threads_per_threadroup);
 
+MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count);
+
 void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            MTL::CommandBuffer *cb,
                            const std::vector<MTL::Buffer *> &buffers,

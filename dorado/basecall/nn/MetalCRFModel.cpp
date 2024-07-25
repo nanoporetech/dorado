@@ -433,7 +433,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   uint64_t linear_hold_off_id,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
-    auto command_buffer = m_command_queue->commandBuffer();
+    auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
     if (in.dtype() != torch::kF16) {
         throw std::runtime_error("Input tensor must be float16.");
@@ -448,7 +448,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
-        command_buffer = m_command_queue->commandBuffer();
+        command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
         const int kResBufSize =
                 static_cast<int>(dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize);
@@ -469,7 +469,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
         }
     }
 
-    command_buffer = m_command_queue->commandBuffer();
+    command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
     // The output buffers of conv/LSTM layers are not used by the decoding, so
     // can be overwritten by subsequent batches as soon as they have been consumed by
