@@ -461,7 +461,8 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
                     throw std::runtime_error("Insufficient memory to run inference on " + dev);
                 }
             }
-            spdlog::debug("Using batch size {} on device {}", device_batch_size, dev);
+            spdlog::info("> Using batch size {} on device {} in inference thread {}.",
+                         device_batch_size, dev, i);
             m_infer_threads.push_back(
                     std::thread(&CorrectionNode::infer_fn, this, dev, (int)d, device_batch_size));
         }
