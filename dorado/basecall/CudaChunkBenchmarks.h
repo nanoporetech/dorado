@@ -24,13 +24,7 @@ public:
 
     std::optional<const ChunkTimings> get_chunk_timings(GPUName gpu_name,
                                                         ModelName model_name,
-                                                        ChunkSize chunk_size) const {
-        if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) !=
-            m_chunk_benchmarks.end()) {
-            return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
-        }
-        return {};
-    }
+                                                        ChunkSize chunk_size) const;
 };
 
 }  // namespace dorado::basecall

@@ -44,6 +44,8 @@ if (DORADO_GPU_BUILD)
             decode/CUDADecoder.h
             benchmarks/NVIDIA_A100_80GB_PCIe.cpp
             benchmarks/NVIDIA_A100_80GB_PCIe.h
+            benchmarks/NVIDIA_H100_PCIe.cpp
+            benchmarks/NVIDIA_H100_PCIe.h
             benchmarks/NVIDIA_RTX_A6000.cpp
             benchmarks/NVIDIA_RTX_A6000.h
             benchmarks/Quadro_GV100.cpp
