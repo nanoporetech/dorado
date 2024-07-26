@@ -399,7 +399,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
                                            "\", \"" + m_config.model_path.string() + "\", " +
                                            std::to_string(chunk_size) + "}] = {\n";
-        for (const auto &batch_time : all_times_and_batch_sizes) {
+        for (const auto &batch_time : times_and_batch_sizes) {
             cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
                                     std::to_string(batch_time.first) + "f },\n";
         }
@@ -412,6 +412,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
 
         // Report out the batch sizes as a CSV file, for visualisation
         std::string csv_autobatch_output = "batch_size,time_per_chunk\n";
+        // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
         for (const auto &batch_time : all_times_and_batch_sizes) {
             csv_autobatch_output += std::to_string(batch_time.second) + "," +
                                     std::to_string(batch_time.first) + "\n";
