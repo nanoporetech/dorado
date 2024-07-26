@@ -271,7 +271,6 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                     (prop->major == 6 && prop->minor == 2) ||  // TX2
                                     (prop->major == 7 && prop->minor == 2) ||  // Xavier
                                     (prop->major == 8 && prop->minor == 7);    // Orin
-    // prop->integrated?
     memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
 
     // Apply limit fraction, and allow 1GB for model weights, etc.

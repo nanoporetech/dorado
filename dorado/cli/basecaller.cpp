@@ -773,9 +773,8 @@ int basecaller(int argc, char* argv[]) {
     }
 
     // Force on running of batchsize benchmarks if emission is on
-    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks")
-                                            ? true
-                                            : parser.hidden.get<bool>("--run-batchsize-benchmarks");
+    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
+                                    parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
     try {
         setup(args, model_config, data, mods_model_paths, device,
