@@ -133,11 +133,6 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    parser.visible.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\", \"cpu\" "
-                  "etc..")
-            .default_value(default_parameters.device);
-
     parser.visible.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
                   "reads will be basecalled")
@@ -254,7 +249,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     parser.visible.add_argument("--poly-a-config")
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
-
+    cli::add_device_arg(parser.visible);
     cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 }
@@ -656,20 +651,6 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto hts_file = cli::extract_hts_file(parser);
-    if (!hts_file) {
-        return EXIT_FAILURE;
-    }
-
-    if (hts_file->get_output_mode() == OutputMode::FASTQ) {
-        if (model_complex.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
-            spdlog::error(
-                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
-                    "results.");
-            return EXIT_FAILURE;
-        }
-    }
-
     bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;
     auto trim_options = parser.visible.get<std::string>("--trim");
     if (parser.visible.get<bool>("--no-trim")) {
@@ -755,6 +736,9 @@ int basecaller(int argc, char* argv[]) {
     }
 
     const auto device = parser.visible.get<std::string>("-x");
+    if (!cli::validate_device_string(device)) {
+        return EXIT_FAILURE;
+    }
     auto model_config = basecall::load_crf_model_config(model_path);
     set_basecaller_params(parser.visible, model_config, device);
 
@@ -765,6 +749,19 @@ int basecaller(int argc, char* argv[]) {
     if (!minimap_options) {
         spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
         return EXIT_FAILURE;
+    }
+
+    auto hts_file = cli::extract_hts_file(parser);
+    if (!hts_file) {
+        return EXIT_FAILURE;
+    }
+    if (hts_file->get_output_mode() == OutputMode::FASTQ) {
+        if (model_complex.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            return EXIT_FAILURE;
+        }
     }
 
     try {

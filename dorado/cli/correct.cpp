@@ -40,16 +40,6 @@ int correct(int argc, char* argv[]) {
                   "all available threads.")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-x", "--device")
-            .help("Device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
-                  "etc..")
-            .default_value(
-#if DORADO_CUDA_BUILD
-                    std::string{"cuda:all"}
-#else
-                    std::string{"cpu"}
-#endif
-            );
     parser.add_argument("--infer-threads")
             .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
@@ -74,6 +64,7 @@ int correct(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
+    cli::add_device_arg(parser);
 
     try {
         parser.parse_args(argc, argv);

@@ -5,6 +5,7 @@
 #include "dorado_version.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
+#include "utils/parameters.h"
 
 #ifdef _WIN32
 // Unreachable code warnings are emitted from argparse, even though they should be disabled by the
@@ -23,6 +24,7 @@
 #endif
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cctype>
@@ -111,6 +113,36 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
                                               const argparse::ArgumentParser& parser) {
     static_assert(std::is_default_constructible_v<T>, "T must be default constructible");
     return parser.is_used(arg_name) ? std::optional<T>(parser.get<T>(arg_name)) : std::nullopt;
+}
+
+inline void add_device_arg(argparse::ArgumentParser& parser) {
+    parser.add_argument("-x", "--device")
+            .help("Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), "
+                  "\"metal\", \"cpu\".")
+            .default_value(utils::default_parameters.device);
+}
+
+inline bool validate_device_string(const std::string& device) {
+    if (device == "cpu") {
+        return true;
+    }
+#if DORADO_METAL_BUILD
+    if (device == "metal") {
+        return true;
+    }
+#elif DORADO_CUDA_BUILD
+    if (!device.empty() && device.substr(0, 5) == "cuda:") {
+        std::string error_message{};
+        std::vector<std::string> devices{};
+        if (utils::try_parse_cuda_device_string(device, devices, error_message)) {
+            return true;
+        }
+        spdlog::error(error_message);
+        return false;
+    }
+#endif
+    spdlog::error("Invalid device string: {}", device);
+    return false;
 }
 
 }  // namespace cli
