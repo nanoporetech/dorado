@@ -42,7 +42,8 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
                        float memory_limit_fraction,
                        PipelineType pipeline_type,
                        float batch_size_time_penalty,
-                       bool emit_chunk_benchmarks)
+                       bool run_batchsize_benchmarks,
+                       bool emit_batchsize_benchmarks)
         : m_config(model_config),
           m_device(device),
           m_decoder(decode::create_decoder(device, m_config)),
@@ -63,7 +64,7 @@ CudaCaller::CudaCaller(const CRFModelConfig &model_config,
     const auto chunk_size = model_config.basecaller.chunk_size();
     const auto batch_size = model_config.basecaller.batch_size();
     determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty,
-                         emit_chunk_benchmarks);
+                         run_batchsize_benchmarks, emit_batchsize_benchmarks);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -207,7 +208,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                       int requested_batch_size,
                                       int requested_chunk_size,
                                       float batch_size_time_penalty,
-                                      bool emit_chunk_benchmarks) {
+                                      bool run_batchsize_benchmarks,
+                                      bool emit_batchsize_benchmarks) {
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
@@ -336,9 +338,9 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
             prop->name, m_config.model_path.string(), chunk_size);
-    if (!chunk_benchmarks) {
-        spdlog::warn(std::string("Unable to find chunk benchmarks for GPU ") + prop->name +
-                     ", model " + m_config.model_path.string() + " and chunk size " +
+    if (!chunk_benchmarks && !run_batchsize_benchmarks) {
+        spdlog::warn(std::string("Unable to find chunk benchmarks for GPU \"") + prop->name +
+                     "\", model " + m_config.model_path.string() + " and chunk size " +
                      std::to_string(chunk_size) +
                      ". Full benchmarking will run for this device, which may take some time.");
     }
@@ -346,9 +348,13 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
         float time = std::numeric_limits<float>::max();
 
-        if (chunk_benchmarks && chunk_benchmarks->find(batch_size) != chunk_benchmarks->end() &&
-            !emit_chunk_benchmarks) {
-            time = chunk_benchmarks->at(batch_size);
+        // Use the available cached chunk size if we haven't been explicitly told not to.
+        if (!run_batchsize_benchmarks && chunk_benchmarks) {
+            // Note that if a cache of batch size timings is available, we don't mix cached and live
+            //  benchmarks, to avoid discontinuities in the data.
+            if (chunk_benchmarks->find(batch_size) != chunk_benchmarks->end()) {
+                time = chunk_benchmarks->at(batch_size);
+            }
         } else {
             auto input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
 
@@ -385,7 +391,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         }
     }
 
-    if (emit_chunk_benchmarks) {
+    if (emit_batchsize_benchmarks) {
         static std::mutex batch_output_mutex;
         std::unique_lock<std::mutex> batch_output_lock(
                 batch_output_mutex);  // Prevent multiple devices outputting at once.

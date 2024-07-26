@@ -32,7 +32,8 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         float memory_limit_fraction,
         PipelineType pipeline_type,
         float batch_size_time_penalty,
-        bool emit_chunk_benchmarks);
+        bool run_batchsize_benchmarks,
+        bool emit_batchsize_benchmarks);
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
         const basecall::CRFModelConfig& model_config,

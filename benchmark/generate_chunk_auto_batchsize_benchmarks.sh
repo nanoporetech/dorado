@@ -36,7 +36,7 @@ for model_name in \
                   ; do
     echo $model_name;
     $dorado_bin download --model $model_name
-    $dorado_bin basecaller -x $device_string --skip-model-compatibility-check --emit-chunk-benchmarks $model_name $pod5_dir > /dev/null
+    $dorado_bin basecaller -x $device_string --skip-model-compatibility-check --emit-batchsize-benchmarks $model_name $pod5_dir > /dev/null
 done
 
 # Extract the GPU name from the benchmark filenames

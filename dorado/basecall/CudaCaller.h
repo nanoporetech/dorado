@@ -27,7 +27,8 @@ public:
                float memory_limit_fraction,
                PipelineType pipeline_type,
                float batch_size_time_penalty,
-               bool emit_chunk_benchmarks);
+               bool run_batchsize_benchmarks,
+               bool emit_batchsize_benchmarks);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -60,7 +61,8 @@ private:
                               int batch_size,
                               int chunk_size,
                               float batch_size_time_penalty,
-                              bool emit_chunk_benchmarks);
+                              bool run_batchsize_benchmarks,
+                              bool emit_batchsize_benchmarks);
 
     void start_threads();
     void cuda_thread_fn();

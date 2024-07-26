@@ -280,7 +280,8 @@ void setup(const std::vector<std::string>& args,
            bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
-           bool emit_chunk_benchmarks,
+           bool run_batchsize_benchmarks,
+           bool emit_batchsize_benchmarks,
            const std::string& resume_from_file,
            bool adapter_no_trim,
            bool primer_no_trim,
@@ -374,7 +375,8 @@ void setup(const std::vector<std::string>& args,
             std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                     api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
                                                  api::PipelineType::simplex, 0.f,
-                                                 emit_chunk_benchmarks);
+                                                 run_batchsize_benchmarks,
+                                                 emit_batchsize_benchmarks);
             return basecaller_runners;
         };
 
@@ -398,7 +400,7 @@ void setup(const std::vector<std::string>& args,
     {
         std::tie(runners, num_devices) = api::create_basecall_runners(
                 model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f,
-                emit_chunk_benchmarks);
+                run_batchsize_benchmarks, emit_batchsize_benchmarks);
     }
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
@@ -770,6 +772,11 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    // Force on running of batchsize benchmarks if emission is on
+    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks")
+                                            ? true
+                                            : parser.hidden.get<bool>("--run-batchsize-benchmarks");
+
     try {
         setup(args, model_config, data, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
@@ -780,8 +787,8 @@ int basecaller(int argc, char* argv[]) {
               parser.visible.get<std::string>("--read-ids"), recursive, *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),
-              parser.hidden.get<std::string>("--dump_stats_filter"),
-              parser.hidden.get<bool>("--emit-chunk-benchmarks"),
+              parser.hidden.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
+              parser.hidden.get<bool>("--emit-batchsize-benchmarks"),
               parser.visible.get<std::string>("--resume-from"), no_trim_adapters, no_trim_primers,
               custom_primer_file, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
               model_complex, std::move(barcoding_info), std::move(sample_sheet));

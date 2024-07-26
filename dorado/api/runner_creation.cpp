@@ -27,10 +27,12 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         float memory_fraction,
         PipelineType pipeline_type,
         float batch_size_time_penalty,
-        bool emit_chunk_benchmarks) {
+        bool run_batchsize_benchmarks,
+        bool emit_batchsize_benchmarks) {
 #ifdef __APPLE__
     (void)pipeline_type;
-    (void)emit_chunk_benchmarks;
+    (void)run_batchsize_benchmarks;
+    (void)emit_batchsize_benchmarks;
 #endif
 
     std::vector<basecall::RunnerPtr> runners;
@@ -83,7 +85,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         for (const auto& device_string : devices) {
             futures.push_back(pool.push(create_cuda_caller, std::cref(model_config),
                                         std::cref(device_string), memory_fraction, pipeline_type,
-                                        batch_size_time_penalty, emit_chunk_benchmarks));
+                                        batch_size_time_penalty, run_batchsize_benchmarks,
+                                        emit_batchsize_benchmarks));
         }
 
         callers.reserve(futures.size());

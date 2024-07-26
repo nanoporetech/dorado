@@ -88,9 +88,14 @@ inline void add_internal_arguments(utils::arg_parse::ArgParser& parser) {
     parser.hidden.add_argument("--dump_stats_filter")
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--emit-chunk-benchmarks")
+    parser.hidden.add_argument("--run-batchsize-benchmarks")
+            .help("run auto batchsize selection benchmarking instead of using cached benchmark "
+                  "figures.")
+            .default_value(false)
+            .implicit_value(true);
+    parser.hidden.add_argument("--emit-batchsize-benchmarks")
             .help("Write out a CSV and CPP file to the working directory with the auto batchsize "
-                  "selection performance stats.")
+                  "selection performance stats. Implies --run-batchsize-benchmarks")
             .default_value(false)
             .implicit_value(true);
 }
