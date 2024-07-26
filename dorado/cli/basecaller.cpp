@@ -249,7 +249,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     parser.visible.add_argument("--poly-a-config")
             .help("Configuration file for PolyA estimation to change default behaviours")
             .default_value(std::string(""));
-    cli::add_device_arg(parser.visible);
+    cli::add_device_arg(parser.visible, utils::default_parameters.device);
     cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 }

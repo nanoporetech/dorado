@@ -64,7 +64,13 @@ int correct(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-    cli::add_device_arg(parser);
+
+#if DORADO_CUDA_BUILD
+    const std::string default_device{"cuda:all"};
+#else
+    const std::string default_device{"cpu"};
+#endif
+    cli::add_device_arg(parser, default_device);
 
     try {
         parser.parse_args(argc, argv);

@@ -346,7 +346,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
-    cli::add_device_arg(parser.visible);
+    cli::add_device_arg(parser.visible, utils::default_parameters.device);
     cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 

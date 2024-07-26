@@ -5,7 +5,6 @@
 #include "dorado_version.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
-#include "utils/parameters.h"
 
 #ifdef _WIN32
 // Unreachable code warnings are emitted from argparse, even though they should be disabled by the
@@ -115,11 +114,11 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
     return parser.is_used(arg_name) ? std::optional<T>(parser.get<T>(arg_name)) : std::nullopt;
 }
 
-inline void add_device_arg(argparse::ArgumentParser& parser) {
+inline void add_device_arg(argparse::ArgumentParser& parser, const std::string& default_device) {
     parser.add_argument("-x", "--device")
             .help("Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), "
                   "\"metal\", \"cpu\".")
-            .default_value(utils::default_parameters.device);
+            .default_value(default_device);
 }
 
 inline bool validate_device_string(const std::string& device) {
