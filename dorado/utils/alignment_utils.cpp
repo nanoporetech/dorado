@@ -1,5 +1,8 @@
 #include "alignment_utils.h"
 
+#include <minimap.h>
+
+#include <ostream>
 #include <sstream>
 
 namespace dorado::utils {
@@ -50,6 +53,7 @@ std::string alignment_to_str(const char* query,
 
 std::vector<CigarOp> parse_cigar(std::string_view cigar) {
     std::vector<CigarOp> ops;
+    ops.reserve(std::size(cigar));
     std::string digits = "";
     for (char c : cigar) {
         if (std::isdigit(c)) {
@@ -58,8 +62,11 @@ std::vector<CigarOp> parse_cigar(std::string_view cigar) {
             uint32_t len = std::atoi(digits.c_str());
             CigarOpType type;
             switch (c) {
-            case 'M':
-                type = CigarOpType::MATCH;
+            case '=':
+                type = CigarOpType::EQ_MATCH;
+                break;
+            case 'X':
+                type = CigarOpType::X_MISMATCH;
                 break;
             case 'I':
                 type = CigarOpType::INS;
@@ -68,27 +75,54 @@ std::vector<CigarOp> parse_cigar(std::string_view cigar) {
                 type = CigarOpType::DEL;
                 break;
             default:
-                throw std::runtime_error("unknown type " + std::string(1, c));
+                throw std::runtime_error("Unsupported CIGAR operation type " + std::string(1, c));
             }
             digits = "";
             ops.push_back({type, len});
         }
     }
+    ops.shrink_to_fit();
     return ops;
 }
 
-std::string serialize_cigar(const std::vector<CigarOp>& cigar) {
-    std::stringstream ss;
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+    std::vector<dorado::CigarOp> cigar_ops;
+    cigar_ops.resize(n_cigar);
+    for (uint32_t i = 0; i < n_cigar; i++) {
+        const uint32_t op = cigar[i] & 0xf;
+        const uint32_t len = cigar[i] >> 4;
+
+        // minimap2 --eqx must be set
+        if (op == MM_CIGAR_EQ_MATCH) {
+            cigar_ops[i] = {CigarOpType::EQ_MATCH, len};
+        } else if (op == MM_CIGAR_X_MISMATCH) {
+            cigar_ops[i] = {CigarOpType::X_MISMATCH, len};
+        } else if (op == MM_CIGAR_INS) {
+            cigar_ops[i] = {CigarOpType::INS, len};
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops[i] = {CigarOpType::DEL, len};
+        } else if (op == MM_CIGAR_MATCH) {
+            throw std::runtime_error(
+                    "cigar op MATCH is not supported must set minimap2 --eqx flag" +
+                    std::to_string(op));
+        } else {
+            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
+        }
+    }
+    return cigar_ops;
+}
+
+void serialize_cigar(std::ostream& os, const std::vector<CigarOp>& cigar) {
     for (auto& op : cigar) {
-        ss << op.len;
+        os << op.len;
         char type = 'M';
         ;
         switch (op.op) {
-        case CigarOpType::MATCH:
-            type = 'M';
+        case CigarOpType::EQ_MATCH:
+            type = '=';
             break;
-        case CigarOpType::MISMATCH:
-            type = 'M';
+        case CigarOpType::X_MISMATCH:
+            type = 'X';
             break;
         case CigarOpType::INS:
             type = 'I';
@@ -97,9 +131,14 @@ std::string serialize_cigar(const std::vector<CigarOp>& cigar) {
             type = 'D';
             break;
         }
-        ss << type;
+        os << type;
     }
-    return ss.str();
+}
+
+std::string serialize_cigar(const std::vector<CigarOp>& cigar) {
+    std::ostringstream oss;
+    serialize_cigar(oss, cigar);
+    return oss.str();
 }
 
 }  // namespace dorado::utils

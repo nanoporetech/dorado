@@ -5,8 +5,8 @@
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/ErrorCorrectionPafReaderNode.h"
+#include "read_pipeline/ErrorCorrectionPafWriterNode.h"
 #include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/PafWriter.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
@@ -62,9 +62,10 @@ int correct(int argc, char* argv[]) {
                   "lower memory footprint.")
             .default_value(std::string{"8G"});
     parser.visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
-    parser.add_argument("-p", "--from-paf").help("path to PAF file with alignments.");
-    parser.add_argument("--to-paf")
-            .help("Generate PAF alignments.")
+    parser.visible.add_argument("-p", "--from-paf")
+            .help("Path to a PAF file with alignments. Skips alignment computation.");
+    parser.visible.add_argument("--to-paf")
+            .help("Generate PAF alignments and skip consensus.")
             .default_value(false)
             .implicit_value(true);
     int verbosity = 0;
@@ -107,7 +108,7 @@ int correct(int argc, char* argv[]) {
     auto batch_size(parser.visible.get<int>("batch-size"));
     auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(
             parser.visible.get<std::string>("index-size")));
-    auto to_paf(parser.get<bool>("to-paf"));
+    auto to_paf(parser.visible.get<bool>("to-paf"));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
@@ -121,8 +122,21 @@ int correct(int argc, char* argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
+    if (std::empty(reads)) {
+        spdlog::error("> At least one input reads file needs to be specified.");
+        std::exit(EXIT_FAILURE);
+    }
+
     if (!std::filesystem::exists(reads.front())) {
         spdlog::error("Input reads file {} does not exist!", reads.front());
+        std::exit(EXIT_FAILURE);
+    }
+
+    const std::string in_paf_file = (parser.visible.is_used("--from-paf"))
+                                            ? parser.visible.get<std::string>("from-paf")
+                                            : "";
+    if (!std::empty(in_paf_file) && !std::filesystem::exists(in_paf_file)) {
+        spdlog::error("Input PAF path {} does not exist!", in_paf_file);
         std::exit(EXIT_FAILURE);
     }
 
@@ -160,9 +174,9 @@ int correct(int argc, char* argv[]) {
 
         } else {
             // Download model
-            auto tmp_dir = utils::get_downloads_path(std::nullopt);
-            const std::string model_name = "herro-v1";
-            auto success = model_downloader::download_models(tmp_dir.string(), model_name);
+            const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
+            const std::string model_name{"herro-v1"};
+            const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
             if (!success) {
                 spdlog::error("Could not download model: {}", model_name);
                 std::exit(EXIT_FAILURE);
@@ -172,19 +186,19 @@ int correct(int argc, char* argv[]) {
         }
 
         // Setup outut file.
-        auto output_mode = OutputMode::FASTA;
+        const OutputMode output_mode{OutputMode::FASTA};
         hts_file =
                 std::make_unique<utils::HtsFile>("-", output_mode, correct_writer_threads, false);
 
         // 3. Corrected reads will be written out FASTA or BAM format.
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
+        const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
 
         // 2. Window generation, encoding + inference and decoding to generate
         // final reads.
         pipeline_desc.add_node<CorrectionNode>({hts_writer}, reads[0], correct_threads, device,
                                                infer_threads, batch_size, model_dir);
     } else {
-        pipeline_desc.add_node<PafWriter>({});
+        pipeline_desc.add_node<ErrorCorrectionPafWriterNode>({});
     }
 
     // Create the Pipeline from our description.
@@ -205,14 +219,13 @@ int correct(int argc, char* argv[]) {
     // Aligner stats need to be passed separately since the aligner node
     // is not part of the pipeline, so the stats are not automatically
     // gathered.
-    if (parser.is_used("--from-paf")) {
-        auto paf_file(parser.get<std::string>("from-paf"));
-        aligner = std::make_unique<ErrorCorrectionPafReaderNode>(paf_file);
+    if (!std::empty(in_paf_file)) {
+        aligner = std::make_unique<ErrorCorrectionPafReaderNode>(in_paf_file);
     } else {
         // 1. Alignment node that generates alignments per read to be
         // corrected.
-        aligner =
-                std::make_unique<ErrorCorrectionMapperNode>(reads[0], aligner_threads, index_size);
+        aligner = std::make_unique<ErrorCorrectionMapperNode>(reads.front(), aligner_threads,
+                                                              index_size);
     }
     stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
         tracker.update_progress_bar(stats, aligner->sample_stats());
@@ -225,7 +238,7 @@ int correct(int argc, char* argv[]) {
 
     spdlog::info("> starting correction");
     // Start the pipeline.
-    if (parser.is_used("--from-paf")) {
+    if (!std::empty(in_paf_file)) {
         dynamic_cast<ErrorCorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
     } else {
         dynamic_cast<ErrorCorrectionMapperNode*>(aligner.get())->process(*pipeline);

@@ -3,7 +3,11 @@
 
 #include <edlib.h>
 
+#include <cstdint>
+#include <iosfwd>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace dorado::utils {
 
@@ -29,6 +33,10 @@ namespace dorado::utils {
 std::string alignment_to_str(const char* query, const char* target, const EdlibAlignResult& result);
 
 std::vector<CigarOp> parse_cigar(std::string_view cigar);
+
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar);
+
+void serialize_cigar(std::ostream& os, const std::vector<CigarOp>& cigar);
 
 std::string serialize_cigar(const std::vector<CigarOp>& cigar);
 

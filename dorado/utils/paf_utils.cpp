@@ -1,8 +1,11 @@
 #include "paf_utils.h"
 
+#include "utils/alignment_utils.h"
+
 #include <spdlog/spdlog.h>
 
 #include <iostream>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -36,8 +39,28 @@ std::string serialize_paf(const PafEntry& entry) {
     oss << entry.qname << '\t' << entry.qlen << '\t' << entry.qstart << '\t' << entry.qend << '\t'
         << entry.strand << '\t' << entry.tname << '\t' << entry.tlen << '\t' << entry.tstart << '\t'
         << entry.tend << '\t' << entry.num_residue_matches << '\t' << entry.alignment_block_length
-        << '\t' << entry.mapq << '\t' << entry.aux;
+        << '\t' << entry.mapq;
+    if (!std::empty(entry.aux)) {
+        oss << '\t' << entry.aux;
+    }
     return oss.str();
+}
+
+void serialize_to_paf(std::ostream& os,
+                      const std::string_view qname,
+                      const std::string_view tname,
+                      const Overlap& ovl,
+                      const int num_residue_matches,
+                      const int alignment_block_length,
+                      const int mapq,
+                      const std::vector<CigarOp>& cigar) {
+    os << qname << '\t' << ovl.qlen << '\t' << ovl.qstart << '\t' << ovl.qend << '\t'
+       << (ovl.fwd ? '+' : '-') << '\t' << tname << '\t' << ovl.tlen << '\t' << ovl.tstart << '\t'
+       << ovl.tend << '\t' << num_residue_matches << '\t' << alignment_block_length << '\t' << mapq;
+    if (!std::empty(cigar)) {
+        os << "\tcg:Z:";
+        serialize_cigar(os, cigar);
+    }
 }
 
 std::string_view paf_aux_get(const PafEntry& paf_entry, const char tag[2], char type) {

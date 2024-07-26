@@ -111,7 +111,8 @@ void CorrectionProgressTracker::update_progress_bar(const stats::NamedStats& sta
         }
     } else if (num_reads_to_infer > 0) {
         set_description("Correcting");
-        float progress = 100.f * static_cast<float>(m_num_reads_corrected) / num_reads_to_infer;
+        const float progress =
+                100.f * static_cast<float>(m_num_reads_corrected) / num_reads_to_infer;
         m_last_progress_written = progress;
         internal_set_progress(progress);
     } else {

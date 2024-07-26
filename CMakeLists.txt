@@ -200,7 +200,7 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h    
+    dorado/read_pipeline/context_container.h
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
@@ -216,8 +216,8 @@ add_library(dorado_lib
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/PafWriter.cpp
-    dorado/read_pipeline/PafWriter.h
+    dorado/read_pipeline/ErrorCorrectionPafWriterNode.cpp
+    dorado/read_pipeline/ErrorCorrectionPafWriterNode.h
     dorado/read_pipeline/MessageSink.cpp
     dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
@@ -526,7 +526,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
-    
+
     enable_warnings_as_errors(dorado_io_lib)
 endif()
 
