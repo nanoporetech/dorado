@@ -18,7 +18,7 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         GPUName gpu_name,
-        ModelName model_name,
+        const ModelName & model_name,
         ChunkSize chunk_size) const {
     std::map<GPUName, GPUName> gpu_name_alias = {
             {"NVIDIA A100-PCIE-40GB", "NVIDIA A100 80GB PCIe"},

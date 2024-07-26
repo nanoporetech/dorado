@@ -23,7 +23,7 @@ public:
     }
 
     std::optional<const ChunkTimings> get_chunk_timings(GPUName gpu_name,
-                                                        ModelName model_name,
+                                                        const ModelName& model_name,
                                                         ChunkSize chunk_size) const;
 };
 
