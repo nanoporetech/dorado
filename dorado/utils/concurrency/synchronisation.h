@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ *   H E A D E R   O N L Y   I M P L E M E N T A T I O N
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * 
+ * Must remain a header only implementation as depended
+ * upon by ont_core basecall client code which cannot 
+ * have a dependency on the dorado lib.
+ */
+
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
