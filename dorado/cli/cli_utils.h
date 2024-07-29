@@ -154,8 +154,7 @@ inline std::string get_auto_detected_device() {
 #if DORADO_METAL_BUILD
     return "metal";
 #elif DORADO_CUDA_BUILD
-    const std::string ALL_CUDA_DEVICES{"cuda:all"};
-    return utils::get_cuda_device_info(ALL_CUDA_DEVICES, false).empty() ? "cpu" : ALL_CUDA_DEVICES;
+    return torch::cuda::is_available() ? "cuda:all" : "cpu";
 #else
     return "cpu";
 #endif
