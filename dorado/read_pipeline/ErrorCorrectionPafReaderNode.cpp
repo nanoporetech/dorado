@@ -3,6 +3,7 @@
 #include "ClientInfo.h"
 #include "utils/alignment_utils.h"
 #include "utils/paf_utils.h"
+#include "utils/timer_high_res.h"
 
 #include <spdlog/spdlog.h>
 
@@ -11,6 +12,8 @@
 namespace dorado {
 
 void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
+    timer::TimerHighRes timer;
+
     std::ifstream file(m_paf_file);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open PAF file " + m_paf_file);
@@ -26,7 +29,8 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
 
         if (alignments.read_name != entry.tname) {
             if (!start) {
-                spdlog::trace("Pushed alignment for {}", alignments.read_name);
+                spdlog::trace("[ErrorCorrectionPafReaderNode] Pushed alignment for {}",
+                              alignments.read_name);
                 pipeline.push_message(std::move(alignments));
             }
             alignments = CorrectionAlignments{};
@@ -52,11 +56,15 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
 
         ++count;
         if ((count % 1000000) == 0) {
-            spdlog::debug("Parsed {} PAF rows", count);
+            spdlog::debug("[ErrorCorrectionPafReaderNode] Parsed {} PAF rows. Time: {:.2f} s",
+                          count, timer.GetElapsedMilliseconds() / 1000.0f);
         }
     }
     spdlog::debug("Pushing {} records for correction", std::size(alignments.qnames));
     pipeline.push_message(std::move(alignments));
+
+    spdlog::debug("[ErrorCorrectionPafReaderNode] process total time: {:.2f} s",
+                  timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
 ErrorCorrectionPafReaderNode::ErrorCorrectionPafReaderNode(const std::string_view paf_file)
