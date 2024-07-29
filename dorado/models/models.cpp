@@ -1148,7 +1148,7 @@ std::string get_supported_model_info() {
                     for (const auto& mod_model : mod_matches) {
                         result += "        \"" + mod_model.name + "\":{\n";
                         result += "            \"canonical_base\": \"" +
-                                  canonical_base_map.at(mod_model.mods.variant) + "\"\n";
+                                  canonical_base_map.at(mod_model.mods.variant) + "\",\n";
                         result += "            \"variant\": \"" +
                                   to_string(mod_model.mods.variant) + "\"";
                         // If there is a newer model for this condition, add the outdated flag.
