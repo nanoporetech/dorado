@@ -9,6 +9,7 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
+#include "utils/parameters.h"
 
 #include <spdlog/spdlog.h>
 
@@ -67,12 +68,11 @@ int correct(int argc, char* argv[]) {
             .append();
 
 #if DORADO_CUDA_BUILD
-    const std::string default_device{"cuda:all"};
+    cli::add_device_arg(parser, utils::default_parameters.device);
 #else
-    // metal isn't supported by the CorrectionNode so use "cpu" as the default
-    const std::string default_device{"cpu"};
+    // only cuda devices are supported by the CorrectionNode so use "cpu" as the default
+    cli::add_device_arg(parser, "cpu");
 #endif
-    cli::add_device_arg(parser, default_device);
 
     try {
         utils::arg_parse::parse(parser, argc, argv);
@@ -96,7 +96,7 @@ int correct(int argc, char* argv[]) {
     }
     if (device == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
-        device == "cpu";
+        device = "cpu";
 #else
         device = cli::get_auto_detected_device();
 #endif
