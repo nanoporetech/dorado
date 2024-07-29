@@ -33,6 +33,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -114,10 +115,12 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
     return parser.is_used(arg_name) ? std::optional<T>(parser.get<T>(arg_name)) : std::nullopt;
 }
 
+constexpr inline std::string_view DEVICE_HELP{
+        "Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), \"metal\", "
+        "\"cpu\"."};
 inline void add_device_arg(argparse::ArgumentParser& parser, const std::string& default_device) {
     parser.add_argument("-x", "--device")
-            .help("Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), "
-                  "\"metal\", \"cpu\".")
+            .help(std::string{DEVICE_HELP})
             .default_value(default_device);
 }
 
@@ -140,7 +143,7 @@ inline bool validate_device_string(const std::string& device) {
         return false;
     }
 #endif
-    spdlog::error("Invalid device string: {}", device);
+    spdlog::error("Invalid device string: {}\n{}", device, DEVICE_HELP);
     return false;
 }
 
