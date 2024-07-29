@@ -121,10 +121,10 @@ constexpr inline std::string_view DEVICE_HELP{
         "or 'cuda:all' depending on the presence of a GPU device."};
 constexpr inline std::string_view AUTO_DETECT_DEVICE{"auto"};
 
-inline void add_device_arg(utils::arg_parse::ArgParser& parser, const std::string& default_device) {
+inline void add_device_arg(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument("-x", "--device")
             .help(std::string{DEVICE_HELP})
-            .default_value(default_device);
+            .default_value(std::string{AUTO_DETECT_DEVICE});
 }
 
 inline bool validate_device_string(const std::string& device) {

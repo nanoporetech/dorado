@@ -5,7 +5,6 @@
 namespace dorado::utils {
 
 struct DefaultParameters {
-    std::string device{"auto"};
     int batchsize{0};
     int chunksize{10000};
     int overlap{500};

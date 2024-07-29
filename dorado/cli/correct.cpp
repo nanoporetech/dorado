@@ -66,13 +66,7 @@ int correct(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-
-#if DORADO_CUDA_BUILD
-    cli::add_device_arg(parser, utils::default_parameters.device);
-#else
-    // only cuda devices are supported by the CorrectionNode so use "cpu" as the default
-    cli::add_device_arg(parser, "cpu");
-#endif
+    cli::add_device_arg(parser);
 
     try {
         utils::arg_parse::parse(parser, argc, argv);
