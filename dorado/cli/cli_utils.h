@@ -116,8 +116,9 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
 }
 
 constexpr inline std::string_view DEVICE_HELP{
-        "Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), \"metal\", "
-        "\"cpu\"."};
+        "Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
+        "'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will choose either 'cpu', 'metal' "
+        "or 'cuda:all' depending on the presence of a GPU device."};
 constexpr inline std::string_view AUTO_DETECT_DEVICE{"auto"};
 
 inline void add_device_arg(utils::arg_parse::ArgParser& parser, const std::string& default_device) {

@@ -363,7 +363,7 @@ bool try_parse_device_ids(const std::string &device_string,
         return true;
     }
 
-    if (device_string == "cuda:all" || device_string == "cuda:auto") {
+    if (device_string == "cuda:all") {
         return try_add_all_devices(device_string, num_devices, device_ids, error_message);
     }
 
