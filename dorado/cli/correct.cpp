@@ -91,6 +91,10 @@ int correct(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
     auto infer_threads(parser.visible.get<int>("infer-threads"));
     auto device(parser.visible.get<std::string>("device"));
+    if (!cli::validate_device_string(device)) {
+        return EXIT_FAILURE;
+    }
+
     auto batch_size(parser.visible.get<int>("batch-size"));
     auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(
             parser.visible.get<std::string>("index-size")));
