@@ -248,8 +248,10 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             qseq = utils::reverse_complement(qseq);
             std::reverse(qqual.begin(), qqual.end());
         }
-        int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
-        int cigar_end = std::min((int)cigar.size(), cigar_len);
+
+        const int cigar_len_total = static_cast<int>(std::size(cigar));
+        const int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
+        const int cigar_end = std::min(cigar_len_total - overlap.cigar_start_idx, cigar_len);
 
         uint8_t gap = fwd ? '*' : '#';
 

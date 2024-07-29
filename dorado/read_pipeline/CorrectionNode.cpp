@@ -461,7 +461,8 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
                     throw std::runtime_error("Insufficient memory to run inference on " + dev);
                 }
             }
-            spdlog::debug("Using batch size {} on device {}", device_batch_size, dev);
+            spdlog::info("> Using batch size {} on device {} in inference thread {}.",
+                         device_batch_size, dev, i);
             m_infer_threads.push_back(
                     std::thread(&CorrectionNode::infer_fn, this, dev, (int)d, device_batch_size));
         }
@@ -472,10 +473,10 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
     // Create index for fastq file.
     char* idx_name = fai_path(fastq.c_str());
     spdlog::debug("Looking for idx {}", idx_name);
-    if (!std::filesystem::exists(idx_name)) {
+    if (idx_name && !std::filesystem::exists(idx_name)) {
         if (fai_build(fastq.c_str()) != 0) {
             spdlog::error("Failed to build index for file {}", fastq);
-            throw std::runtime_error("");
+            throw std::runtime_error{"Failed to build index for file " + fastq + "."};
         }
         spdlog::debug("Created fastq index.");
     }
