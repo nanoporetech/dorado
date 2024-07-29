@@ -118,8 +118,8 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
 constexpr inline std::string_view DEVICE_HELP{
         "Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), \"metal\", "
         "\"cpu\"."};
-inline void add_device_arg(argparse::ArgumentParser& parser, const std::string& default_device) {
-    parser.add_argument("-x", "--device")
+inline void add_device_arg(utils::arg_parse::ArgParser& parser, const std::string& default_device) {
+    parser.visible.add_argument("-x", "--device")
             .help(std::string{DEVICE_HELP})
             .default_value(default_device);
 }
