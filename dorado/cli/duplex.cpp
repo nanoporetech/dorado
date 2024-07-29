@@ -360,9 +360,12 @@ int duplex(int argc, char* argv[]) {
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
-        const auto device{parser.visible.get<std::string>("-x")};
+        auto device{parser.visible.get<std::string>("-x")};
         if (!cli::validate_device_string(device)) {
             return EXIT_FAILURE;
+        }
+        if (device == cli::AUTO_DETECT_DEVICE) {
+            device = cli::get_auto_detected_device();
         }
 
         auto model(parser.visible.get<std::string>("model"));

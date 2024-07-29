@@ -118,6 +118,8 @@ inline std::optional<T> get_optional_argument(const std::string arg_name,
 constexpr inline std::string_view DEVICE_HELP{
         "Device string in format \"cuda:0,...,N\", \"cuda:all\" (or \"cuda:auto\"), \"metal\", "
         "\"cpu\"."};
+constexpr inline std::string_view AUTO_DETECT_DEVICE{"auto"};
+
 inline void add_device_arg(utils::arg_parse::ArgParser& parser, const std::string& default_device) {
     parser.visible.add_argument("-x", "--device")
             .help(std::string{DEVICE_HELP})
@@ -125,7 +127,7 @@ inline void add_device_arg(utils::arg_parse::ArgParser& parser, const std::strin
 }
 
 inline bool validate_device_string(const std::string& device) {
-    if (device == "cpu") {
+    if (device == "cpu" || device == AUTO_DETECT_DEVICE) {
         return true;
     }
 #if DORADO_METAL_BUILD
@@ -145,6 +147,17 @@ inline bool validate_device_string(const std::string& device) {
 #endif
     spdlog::error("Invalid device string: {}\n{}", device, DEVICE_HELP);
     return false;
+}
+
+inline std::string get_auto_detected_device() {
+#if DORADO_METAL_BUILD
+    return "metal";
+#elif DORADO_CUDA_BUILD
+    const std::string ALL_CUDA_DEVICES{"cuda:all"};
+    return utils::get_cuda_device_info(ALL_CUDA_DEVICES, false).empty() ? "cpu" : ALL_CUDA_DEVICES;
+#else
+    return "cpu";
+#endif
 }
 
 }  // namespace cli

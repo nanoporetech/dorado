@@ -94,6 +94,13 @@ int correct(int argc, char* argv[]) {
     if (!cli::validate_device_string(device)) {
         return EXIT_FAILURE;
     }
+    if (device == cli::AUTO_DETECT_DEVICE) {
+#if DORADO_METAL_BUILD
+        device == "cpu";
+#else
+        device = cli::get_auto_detected_device();
+#endif
+    }
 
     auto batch_size(parser.visible.get<int>("batch-size"));
     auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(

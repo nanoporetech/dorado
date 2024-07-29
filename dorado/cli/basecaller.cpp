@@ -651,9 +651,12 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    const auto device = parser.visible.get<std::string>("-x");
+    auto device{parser.visible.get<std::string>("-x")};
     if (!cli::validate_device_string(device)) {
         return EXIT_FAILURE;
+    }
+    if (device == cli::AUTO_DETECT_DEVICE) {
+        device = cli::get_auto_detected_device();
     }
 
     auto hts_file = cli::extract_hts_file(parser);
