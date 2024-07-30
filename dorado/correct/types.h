@@ -8,6 +8,7 @@
 namespace dorado::correction {
 
 struct OverlapWindow {
+    // CorrectionAlignments overlap vector index
     int overlap_idx = -1;
     int tstart = -1;
     int qstart = -1;

@@ -222,15 +222,17 @@ struct Overlap {
 
 // Overlaps for error correction
 struct CorrectionAlignments {
+    // Populated in ErrorCorrectionMapperNode::extract_alignments
     std::string read_name = "";
+    std::vector<std::string> qnames = {};
+    std::vector<std::vector<CigarOp>> cigars = {};
+    std::vector<Overlap> overlaps = {};
+
+    // Populated in CorrectionNode::populate_alignments if the alignment is useful
     std::string read_seq = "";
     std::vector<uint8_t> read_qual = {};
-    std::vector<Overlap> overlaps = {};
-    std::vector<std::vector<CigarOp>> cigars = {};
-    std::vector<std::vector<uint32_t>> mm2_cigars = {};
     std::vector<std::string> seqs = {};
     std::vector<std::vector<uint8_t>> quals = {};
-    std::vector<std::string> qnames = {};
 
     // This is mostly to workaround an issue where sometimes
     // the tend of an overlap is much bigger than the
@@ -256,9 +258,6 @@ struct CorrectionAlignments {
         }
         for (auto& v : cigars) {
             si += v.size() * sizeof(CigarOp);
-        }
-        for (auto& v : mm2_cigars) {
-            si += v.size() * sizeof(uint32_t);
         }
         for (auto& s : seqs) {
             si += s.length();
