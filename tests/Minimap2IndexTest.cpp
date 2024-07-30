@@ -23,6 +23,7 @@ class Minimap2IndexTestFixture {
 protected:
     dorado::alignment::Minimap2Index cut{};
     std::string reference_file;
+    std::string empty_file;
 
 public:
     Minimap2IndexTestFixture() {
@@ -30,6 +31,8 @@ public:
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
         reference_file = ref.string();
+        auto empty = aligner_test_dir / "empty.fa";
+        empty_file = empty.string();
 
         cut.initialise(dorado::alignment::create_dflt_options());
     }
@@ -82,6 +85,12 @@ TEST_CASE_METHOD(Minimap2IndexTestFixture,
                  TEST_GROUP " load() with invalid reference file returns reference_file_not_found",
                  TEST_GROUP) {
     REQUIRE(cut.load("some_reference_file", 1, false) == IndexLoadResult::reference_file_not_found);
+}
+
+TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                 TEST_GROUP " load() with empty reference file returns end_of_index",
+                 TEST_GROUP) {
+    REQUIRE(cut.load(empty_file, 1, false) == IndexLoadResult::end_of_index);
 }
 
 TEST_CASE_METHOD(Minimap2IndexTestFixture,
