@@ -4,6 +4,8 @@
 #include <torch/torch.h>
 #endif
 
+#include <string>
+
 namespace dorado::utils {
 
 inline std::string get_auto_detected_device() {
