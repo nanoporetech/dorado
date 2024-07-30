@@ -453,10 +453,11 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
 #endif
     for (size_t d = 0; d < devices.size(); d++) {
         const auto& dev = devices[d];
+        const float batch_factor = (utils::starts_with(device, "cuda")) ? 0.4f : 0.8f;
         for (int i = 0; i < infer_threads; i++) {
             int device_batch_size = batch_size;
             if (batch_size == 0) {
-                device_batch_size = calculate_batch_size(dev, 0.8f);
+                device_batch_size = calculate_batch_size(dev, batch_factor);
                 if (device_batch_size == 0) {
                     throw std::runtime_error("Insufficient memory to run inference on " + dev);
                 }
