@@ -11,6 +11,9 @@
 #include "utils/string_utils.h"
 #include "utils/thread_naming.h"
 #include "utils/types.h"
+
+#include <stdexcept>
+#include <unordered_set>
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif
@@ -46,44 +49,23 @@ dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& 
     return dorado::BamPtr(rec);
 }
 
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
-    std::vector<dorado::CigarOp> cigar_ops;
-    cigar_ops.resize(n_cigar);
-    for (uint32_t i = 0; i < n_cigar; i++) {
-        uint32_t op = cigar[i] & 0xf;
-        uint32_t len = cigar[i] >> 4;
-        if (op == MM_CIGAR_MATCH) {
-            cigar_ops[i] = {dorado::CigarOpType::MATCH, len};
-        } else if (op == MM_CIGAR_INS) {
-            cigar_ops[i] = {dorado::CigarOpType::INS, len};
-        } else if (op == MM_CIGAR_DEL) {
-            cigar_ops[i] = {dorado::CigarOpType::DEL, len};
-        } else {
-            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
-        }
-    }
-    return cigar_ops;
-}
-
 bool populate_alignments(dorado::CorrectionAlignments& alignments,
-                         dorado::hts_io::FastxRandomReader* reader) {
+                         dorado::hts_io::FastxRandomReader* reader,
+                         const std::unordered_set<int>& useful_overlap_idxs) {
     const auto& tname = alignments.read_name;
+
     alignments.read_seq = reader->fetch_seq(tname);
     alignments.read_qual = reader->fetch_qual(tname);
     int tlen = (int)alignments.read_seq.length();
+
+    // Might be worthwhile generating dense vectors with some index mapping to save memory
+    // as using filtering of useful overlaps makes these vectors sparse.
     auto num_qnames = alignments.qnames.size();
     alignments.seqs.resize(num_qnames);
     alignments.quals.resize(num_qnames);
     alignments.cigars.resize(num_qnames);
 
-    // In some cases the target read length reported by mm2 has differed from the
-    // read length when loaded from the fastq. So we check that here and skip
-    // any alignments where information is inconsisteny.
-    // TODO: This was mainly observed before a bug fix for proper loading
-    // of split mm2 indices was added. However the check is being kept around
-    // for now, and can be removed later.
-    std::vector<size_t> pos_to_remove;
-    for (size_t i = 0; i < num_qnames; i++) {
+    for (const size_t i : useful_overlap_idxs) {
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = reader->fetch_seq(qname);
         if ((int)alignments.seqs[i].length() != alignments.overlaps[i].qlen) {
@@ -97,9 +79,6 @@ bool populate_alignments(dorado::CorrectionAlignments& alignments,
                           alignments.overlaps[i].tlen, tlen, tname);
             return false;
         }
-        alignments.cigars[i] = parse_cigar(alignments.mm2_cigars[i].data(),
-                                           (uint32_t)alignments.mm2_cigars[i].size());
-        alignments.mm2_cigars[i] = {};
     }
 
     return alignments.check_consistent_overlaps();
@@ -354,19 +333,32 @@ void CorrectionNode::input_thread_fn() {
 
             auto alignments = std::get<CorrectionAlignments>(std::move(message));
             auto tname = alignments.read_name;
-            if (!populate_alignments(alignments, fastx_reader.get())) {
+
+            if (alignments.overlaps.empty()) {
                 continue;
             }
 
-            size_t n_windows = (alignments.read_seq.length() + m_window_size - 1) / m_window_size;
-            LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
             // Get the windows
+            size_t n_windows = (alignments.overlaps[0].tlen + m_window_size - 1) / m_window_size;
+            LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
             if (!extract_windows(windows, alignments, m_window_size)) {
                 continue;
             }
-            // Get the features
+
+            // Filter the window features and get the set of unique overlaps
+            const std::unordered_set<int> overlap_idxs = filter_features(windows, alignments);
+            if (overlap_idxs.empty()) {
+                continue;
+            }
+
+            // Populate the alignment data with only the records that are useful after TOP_K filter
+            if (!populate_alignments(alignments, fastx_reader.get(), overlap_idxs)) {
+                continue;
+            }
+
+            // Get the filtered features
             auto wfs = extract_features(windows, alignments, m_window_size);
 
             std::vector<std::string> corrected_seqs;
