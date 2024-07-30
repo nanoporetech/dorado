@@ -19,11 +19,11 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "torch_utils/auto_detect_device.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
-
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif
@@ -365,7 +365,7 @@ int duplex(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
         if (device == cli::AUTO_DETECT_DEVICE) {
-            device = cli::get_auto_detected_device();
+            device = utils::get_auto_detected_device();
         }
 
         auto model(parser.visible.get<std::string>("model"));

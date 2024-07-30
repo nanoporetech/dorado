@@ -25,6 +25,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoader.h"
+#include "torch_utils/auto_detect_device.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
@@ -656,7 +657,7 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (device == cli::AUTO_DETECT_DEVICE) {
-        device = cli::get_auto_detected_device();
+        device = utils::get_auto_detected_device();
     }
 
     auto hts_file = cli::extract_hts_file(parser);

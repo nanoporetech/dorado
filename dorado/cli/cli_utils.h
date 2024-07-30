@@ -150,16 +150,6 @@ inline bool validate_device_string(const std::string& device) {
     return false;
 }
 
-inline std::string get_auto_detected_device() {
-#if DORADO_METAL_BUILD
-    return "metal";
-#elif DORADO_CUDA_BUILD
-    return torch::cuda::is_available() ? "cuda:all" : "cpu";
-#else
-    return "cpu";
-#endif
-}
-
 }  // namespace cli
 
 }  // namespace dorado
