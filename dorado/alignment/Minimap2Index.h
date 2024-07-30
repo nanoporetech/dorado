@@ -24,10 +24,9 @@ class Minimap2Index {
 
     void set_index(std::shared_ptr<const mm_idx_t> m_index);
 
-    // returns false if a split index
-    std::shared_ptr<mm_idx_t> load_initial_index(const std::string& index_file,
-                                                 int num_threads,
-                                                 bool allow_split_index);
+    // Returns nullptr if loading failed, and the load-result, as a pair.
+    std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult>
+    load_initial_index(const std::string& index_file, int num_threads, bool allow_split_index);
 
 public:
     bool initialise(Minimap2Options options);

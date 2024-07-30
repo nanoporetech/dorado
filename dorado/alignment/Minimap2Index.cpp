@@ -34,12 +34,24 @@ void IndexReaderDeleter::operator()(mm_idx_reader_t* index_reader) {
     mm_idx_reader_close(index_reader);
 }
 
-std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& index_file,
-                                                            int num_threads,
-                                                            bool allow_split_index) {
+std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initial_index(
+        const std::string& index_file,
+        int num_threads,
+        bool allow_split_index) {
     m_index_reader = create_index_reader(index_file, m_options.index_options->get());
     std::shared_ptr<mm_idx_t> index(mm_idx_reader_read(m_index_reader.get(), num_threads),
                                     IndexDeleter());
+
+    if (!index) {
+        return {nullptr, IndexLoadResult::end_of_index};
+    }
+
+    if (index->n_seq == 0) {
+        // An empty or improperly formatted file can result in an mm_idx_t object with
+        // no indexes in it. Check for this, and treat it as a load failure.
+        return {nullptr, IndexLoadResult::end_of_index};
+    }
+
     if (!allow_split_index) {
         // If split index is not supported, then verify that the index doesn't
         // have multiple parts by loading the index again and making sure
@@ -47,7 +59,7 @@ std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& i
         IndexUniquePtr split_index{};
         split_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads));
         if (split_index != nullptr) {
-            return nullptr;
+            return {nullptr, IndexLoadResult::split_index_not_supported};
         }
     }
 
@@ -65,7 +77,7 @@ std::shared_ptr<mm_idx_t> Minimap2Index::load_initial_index(const std::string& i
 
     spdlog::debug("Loaded index with {} target seqs", index->n_seq);
 
-    return index;
+    return {index, IndexLoadResult::success};
 }
 
 IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
@@ -106,9 +118,9 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
         return IndexLoadResult::reference_file_not_found;
     }
 
-    auto index = load_initial_index(index_file, num_threads, allow_split_index);
-    if (!index) {
-        return IndexLoadResult::split_index_not_supported;
+    auto [index, result] = load_initial_index(index_file, num_threads, allow_split_index);
+    if (result != IndexLoadResult::success) {
+        return result;
     }
 
     if (!m_options.junc_bed.empty()) {
