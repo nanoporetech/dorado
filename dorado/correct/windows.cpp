@@ -6,6 +6,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <stdexcept>
+
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
@@ -30,10 +32,6 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
     for (int aln_idx = 0; aln_idx < num_alignments; aln_idx++) {
         const auto& overlap = alignments.overlaps[aln_idx];
         const auto& cigar = alignments.cigars[aln_idx];
-        //if (alignments.qnames[a] != "e3066d3e-2bdf-4803-89b9-0f077ac7ff7f") {
-        //    continue;
-        //}
-        LOG_TRACE("window for {}", alignments.qnames[aln_idx]);
 
         // Following the is_target == False logic form the rust code.
         if ((overlap.tend - overlap.tstart < window_size) ||
@@ -62,10 +60,10 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             spdlog::error(
                     "{} zeroth thres {} nth thres {} first win {} last win {} windows size {} "
                     "overlap "
-                    "tlen {} overlsp tstart {} overlap tend {} qname {} qlen {} qstart {} qend {}",
+                    "tlen {} overlsp tstart {} overlap tend {} qlen {} qstart {} qend {}",
                     alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,
                     last_window, windows.size(), overlap.tlen, overlap.tstart, overlap.tend,
-                    alignments.qnames[aln_idx], overlap.qlen, overlap.qstart, overlap.qend);
+                    overlap.qlen, overlap.qstart, overlap.qend);
             return false;
         }
 
@@ -102,8 +100,8 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             int tnew = tpos;
             int qnew = qpos;
             switch (op.op) {
-            case CigarOpType::MATCH:
-            case CigarOpType::MISMATCH:
+            case CigarOpType::EQ_MATCH:
+            case CigarOpType::X_MISMATCH:
                 tnew = tpos + op.len;
                 qnew = qpos + op.len;
                 LOG_TRACE("{} {}", op.len, "M");
@@ -117,7 +115,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                 LOG_TRACE("{} {}", op.len, "I");
                 continue;
             default:
-                continue;
+                throw std::runtime_error("unexpected CigarOpType");
             }
 
             LOG_TRACE("tpos {} qpos {} tnew {} qnew {}", tpos, qpos, tnew, qnew);
@@ -137,9 +135,10 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             for (int i = 1; i < diff_w; i++) {
                 int offset = (current_w + i) * window_size - tpos;
 
-                int q_start_new = (op.op == CigarOpType::MATCH || op.op == CigarOpType::MISMATCH)
-                                          ? qpos + offset
-                                          : qpos;
+                int q_start_new =
+                        (op.op == CigarOpType::EQ_MATCH || op.op == CigarOpType::X_MISMATCH)
+                                ? qpos + offset
+                                : qpos;
 
                 if (cigar_start_idx >= 0) {
                     windows[(current_w + i) - 1].push_back(
@@ -154,7 +153,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
 
                     t_window_start = tpos + offset;
 
-                    if (op.op == CigarOpType::MATCH || op.op == CigarOpType::MISMATCH) {
+                    if (op.op == CigarOpType::EQ_MATCH || op.op == CigarOpType::X_MISMATCH) {
                         q_window_start = qpos + offset;
                     } else {
                         q_window_start = qpos;
@@ -165,7 +164,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                 } else {
                     t_window_start = tpos + offset;
 
-                    if (op.op == CigarOpType::MATCH || op.op == CigarOpType::MISMATCH) {
+                    if (op.op == CigarOpType::EQ_MATCH || op.op == CigarOpType::X_MISMATCH) {
                         q_window_start = qpos + offset;
                     } else {
                         q_window_start = qpos;
@@ -179,7 +178,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             LOG_TRACE("new_w {} window size {} tpos {}", new_w, window_size, tpos);
             int offset = new_w * window_size - tpos;
 
-            int qend = (op.op == CigarOpType::MATCH || op.op == CigarOpType::MISMATCH)
+            int qend = (op.op == CigarOpType::EQ_MATCH || op.op == CigarOpType::X_MISMATCH)
                                ? qpos + offset
                                : qpos;
 

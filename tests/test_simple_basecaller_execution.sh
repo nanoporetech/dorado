@@ -74,7 +74,7 @@ if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --mod
     echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
-if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then 
+if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo  "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
     exit 1
 fi
@@ -359,12 +359,83 @@ done
 
 # Test dorado correct with auto detected platform. If that fails run on cpu.
 if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
-    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir/corrected_reads.fq
-    num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq | awk '{print $1}')
-    if [[ $num_corrected_reads -ne "12" ]]; then
-        echo "dorado correct command failed to generate expected reads"
+    # Create a folder for the new tests.
+    output_dir_correct_root=${output_dir}/correct
+    mkdir -p $output_dir_correct_root
+
+    ### TEST: Check if Dorado Correct generates expected consensus results on small data. This test
+    ###         compares: alignment accuracy vs small HG002 reference chunk, number of aligned reads and
+    ###         number of bases produced by consensus.
+    ###
+    ### Note: This test will likely fail once the model is retrained or if there are any algorithmic/bugfix changes.
+    ###         It is intentionally made strict to detect any changes (i.e. expecting identical accuracy), but the
+    ###         actual test is easy to update since it compares only the high level stats.
+    #
+    output_dir_correct=${output_dir_correct_root}/test-01
+    mkdir -p ${output_dir_correct}
+    #
+    # Run Dorado Correct.
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir_correct/corrected_reads.fasta
+    #
+    # Align the corrected reads to the reference portion.
+    $dorado_bin aligner --mm2-opts "-x map-ont" $data_dir/read_correction/ref.fasta $output_dir_correct/corrected_reads.fasta -o $output_dir_correct/ --emit-summary
+    #
+    # Sort the lines because the output of Correct is not stable.
+    sort $data_dir/read_correction/expected.alignment_summary.txt > $output_dir_correct/sorted.expected.alignment_summary.txt
+    sort $output_dir_correct/alignment_summary.txt > $output_dir_correct/sorted.alignment_summary.txt
+    #
+    # Test the accuracy and number of sequences in the output.
+    set +e
+    result=$(diff $output_dir_correct/sorted.expected.alignment_summary.txt $output_dir_correct/sorted.alignment_summary.txt | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $result -ne "0" ]]; then
+        echo "Dorado correct alignment accuracy does not match expected results."
+        diff $output_dir_correct/sorted.expected.alignment_summary.txt $output_dir_correct/sorted.alignment_summary.txt
         exit 1
     fi
+    #
+    # Test that the sequences have the same length.
+    samtools faidx $output_dir_correct/corrected_reads.fasta
+    cut -f 1,2 $output_dir_correct/corrected_reads.fasta.fai | sort > $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
+    set +e
+    result=$(diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $result -ne "0" ]]; then
+        echo "Dorado correct sequence length do not match expected sequence lengths."
+        diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
+        exit 1
+    fi
+
+    # Test if the malformed input will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
+    #
+    output_dir_correct=${output_dir_correct_root}/test-02
+    mkdir -p ${output_dir_correct}
+    #
+    set +e
+    $dorado_bin correct nonexistent.fastq -v > $output_dir_correct/corrected_reads.fasta 2> $output_dir_correct/corrected_reads.fasta.stderr
+    error_matched=$(grep "\[error\] Input reads file nonexistent.fastq does not exist!" $output_dir_correct/corrected_reads.fasta.stderr | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $error_matched -ne "1" ]]; then
+        echo "Dorado correct does not fail on non-existent reads input file!"
+        exit 1
+    fi
+
+    # Test if the malformed input will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
+    #
+    output_dir_correct=${output_dir_correct_root}/test-02
+    mkdir -p ${output_dir_correct}
+    #
+    set +e
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v --model-path nonexistent/dir > $output_dir_correct/corrected_reads.fasta 2> $output_dir_correct/corrected_reads.fasta.stderr
+    error_matched=$(grep "\[error\] Input model path nonexistent/dir does not exist!" $output_dir_correct/corrected_reads.fasta.stderr | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $error_matched -ne "1" ]]; then
+        echo "Dorado correct does not fail on non-existent input model path!"
+        exit 1
+    fi
+
+    echo "Dorado correct tests done!"
+
 fi
 
 rm -rf $output_dir

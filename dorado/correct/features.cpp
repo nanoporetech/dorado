@@ -1,12 +1,16 @@
 #include "features.h"
 
 #include "conversions.h"
+#include "correct/types.h"
 #include "read_pipeline/messages.h"
 #include "utils/sequence_utils.h"
+#include "utils/types.h"
 
 #include <ATen/Tensor.h>
 #include <spdlog/spdlog.h>
 #include <torch/types.h>
+
+#include <cstdint>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
@@ -19,61 +23,27 @@ const int TOP_K = 30;
 namespace dorado::correction {
 
 bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
-    bool long_indel = false;
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
     size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
     for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
-        if (cigar[i].op == CigarOpType::INS || cigar[i].op == CigarOpType::DEL) {
-            long_indel |= cigar[i].len >= 30;
+        if (cigar[i].len >= 30 &&
+            (cigar[i].op == CigarOpType::INS || cigar[i].op == CigarOpType::DEL)) {
+            LOG_TRACE("filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
+                      overlap.qstart, overlap.qend, cigar[i].len);
+            return true;
         }
     }
-    LOG_TRACE("filter ? tstart {} qstart {} qend {} res {}", overlap.tstart, overlap.qstart,
-              overlap.qend, long_indel);
-    return long_indel;
+    return false;
 }
 
 // Measure the accuracy of an alignment segment within a window
 // determined from the cigar string.
-void calculate_accuracy(OverlapWindow& overlap,
-                        const CorrectionAlignments& alignments,
-                        size_t win_idx,
-                        int win_len,
-                        int window_size) {
-    int tstart = overlap.tstart;
-    int tend = (int)win_idx * window_size + win_len;
-
-    // get query region
-    const auto overlap_idx = overlap.overlap_idx;
-    int oqstart = alignments.overlaps[overlap_idx].qstart;
-    int oqend = alignments.overlaps[overlap_idx].qend;
-    int qstart, qend;
-    if (alignments.overlaps[overlap_idx].fwd) {
-        qstart = oqstart + overlap.qstart;
-        qend = oqstart + overlap.qend;
-    } else {
-        qstart = oqend - overlap.qend;
-        qend = oqend - overlap.qstart;
-    }
-
-    int qlen = qend - qstart;
-
-    // Fetch subsequences
-    std::string tseq = alignments.read_seq.substr(tstart, tend - tstart);
-    std::string qseq;
-    if (alignments.overlaps[overlap_idx].fwd) {
-        qseq = alignments.seqs[overlap_idx].substr(qstart, qlen);
-    } else {
-        qseq = utils::reverse_complement(alignments.seqs[overlap_idx].substr(qstart, qlen));
-    }
-
-    LOG_TRACE("tstart {} tend {} qstart {} qend {} cig st {} cig end {}", tstart, tend, qstart,
-              qend, overlap.cigar_start_idx, overlap.cigar_end_idx);
-
+void calculate_accuracy(OverlapWindow& overlap, const CorrectionAlignments& alignments) {
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
+    bool has_warned_bad_cigar_op = false;
 
-    // Calculate accuracy
-    int tpos = 0, qpos = 0;
-    int m = 0, s = 0, i = 0, d = 0;
+    // counts of match, mismatch, insert, deletion
+    int n_match = 0, n_miss = 0, n_ins = 0, n_del = 0;
 
     for (int idx = overlap.cigar_start_idx; idx <= overlap.cigar_end_idx; idx++) {
         int len = -1;
@@ -91,40 +61,30 @@ void calculate_accuracy(OverlapWindow& overlap,
             break;
         }
 
-        LOG_TRACE("len {} tpos {} qpos {}", len, tpos, qpos);
-
         switch (cigar[idx].op) {
-        case CigarOpType::MATCH:
-            for (int j = 0; j < len; j++) {
-                auto tbase = tseq[tpos + j];
-                auto qbase = qseq[qpos + j];
-                LOG_TRACE("{} tbase {}, {} qbase {}", tpos + j, tbase, qpos + j, qbase);
-
-                if (tbase == qbase) {
-                    m += 1;
-                } else {
-                    s += 1;
-                }
-            }
-
-            tpos += len;
-            qpos += len;
+        case CigarOpType::EQ_MATCH:
+            n_match += len;
+            break;
+        case CigarOpType::X_MISMATCH:
+            n_miss += len;
             break;
         case CigarOpType::INS:
-            i += len;
-            qpos += len;
+            n_ins += len;
             break;
         case CigarOpType::DEL:
-            d += len;
-            tpos += len;
+            n_del += len;
             break;
         default:
+            if (!has_warned_bad_cigar_op) {
+                has_warned_bad_cigar_op = true;
+                LOG_TRACE("unexpected CigarOpType: {}", uint8_t(cigar[idx].op));
+            }
             break;
         }
     }
 
-    overlap.accuracy = (static_cast<float>(m) / (m + s + i + d));
-    LOG_TRACE("m {} s {} i {} d {}", m, s, i, d);
+    overlap.accuracy = (static_cast<float>(n_match) / (n_match + n_miss + n_ins + n_del));
+    LOG_TRACE("m {} s {} i {} d {}", n_match, n_miss, n_ins, n_del);
     LOG_TRACE("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
 }
 
@@ -148,7 +108,8 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
             int len = cigar[i].len;
 
             int l = -1;
-            if (op == CigarOpType::MATCH || op == CigarOpType::DEL) {
+            if (op == CigarOpType::EQ_MATCH || op == CigarOpType::X_MISMATCH ||
+                op == CigarOpType::DEL) {
                 l = len;
             } else if (op == CigarOpType::INS) {
                 max_ins[tpos - 1] = std::max(len, max_ins[tpos - 1]);
@@ -248,8 +209,10 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             qseq = utils::reverse_complement(qseq);
             std::reverse(qqual.begin(), qqual.end());
         }
-        int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
-        int cigar_end = std::min((int)cigar.size(), cigar_len);
+
+        const int cigar_len_total = static_cast<int>(std::size(cigar));
+        const int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
+        const int cigar_end = std::min(cigar_len_total - overlap.cigar_start_idx, cigar_len);
 
         uint8_t gap = fwd ? '*' : '#';
 
@@ -281,8 +244,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             LOG_TRACE("cigar_idx {} l {}", cigar_idx, l);
 
             switch (op) {
-            case CigarOpType::MATCH:
-            case CigarOpType::MISMATCH:
+            case CigarOpType::EQ_MATCH:
+            case CigarOpType::X_MISMATCH:
                 for (uint32_t i = 0; i < l; i++) {
                     auto base = base_encoding[uint8_t(qseq[query_iter]) + (fwd ? 0 : 32)];
                     auto qual = qqual[query_iter];
@@ -412,18 +375,10 @@ at::Tensor get_indices(const at::Tensor& bases, const std::vector<std::pair<int,
             .clone();
 }
 
-// Main interface function for generating features for each window
-// given the overlaps for a target read.
-std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                             const CorrectionAlignments& alignments,
-                                             int window_size) {
-    const std::string& tseq = alignments.read_seq;
-    int tlen = (int)tseq.length();
-
-    std::vector<WindowFeatures> wfs;
+std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>& windows,
+                                        const CorrectionAlignments& alignments) {
+    std::unordered_set<int> overlap_idxs;
     for (int w = 0; w < (int)windows.size(); w++) {
-        int win_len = (w == (int)windows.size() - 1) ? tlen - window_size * w : window_size;
-        LOG_TRACE("win idx {}: win len {}", w, win_len);
         auto& overlap_windows = windows[w];
 
         // Filter overlaps with very large indels
@@ -440,7 +395,7 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
         // Sort overlaps by score
         if (overlap_windows.size() > 1) {
             for (auto& ovlp : overlap_windows) {
-                calculate_accuracy(ovlp, alignments, w, win_len, window_size);
+                calculate_accuracy(ovlp, alignments);
             }
             // Sort the filtered overlaps by accuracy score
             std::sort(overlap_windows.begin(), overlap_windows.end(),
@@ -454,14 +409,39 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                           return a.accuracy > b.accuracy;
                       });
         }
+        // Take the TOP_K best overlaps
         overlap_windows.resize(std::min(TOP_K, (int)overlap_windows.size()));
 
+#ifndef NDEBUG
         if (overlap_windows.size() == 1) {
             LOG_TRACE("window {} 1st {}-{}", w, overlap_windows[0].qstart, overlap_windows[0].qend);
         } else if (overlap_windows.size() > 1) {
             LOG_TRACE("window {} 1st {}-{} 2nd {}-{}", w, overlap_windows[0].qstart,
                       overlap_windows[0].qend, overlap_windows[1].qstart, overlap_windows[1].qend);
         }
+#endif
+
+        for (const auto& ov : overlap_windows) {
+            assert(ov.overlap_idx >= 0);
+            overlap_idxs.insert(ov.overlap_idx);
+        }
+    }
+    return overlap_idxs;
+}
+
+// Main interface function for generating features for the top_k overlaps for each window
+// given the overlaps for a target read.
+std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
+                                             const CorrectionAlignments& alignments,
+                                             int window_size) {
+    const std::string& tseq = alignments.read_seq;
+    int tlen = (int)tseq.length();
+
+    std::vector<WindowFeatures> wfs;
+    for (int w = 0; w < (int)windows.size(); w++) {
+        int win_len = (w == (int)windows.size() - 1) ? tlen - window_size * w : window_size;
+        LOG_TRACE("win idx {}: win len {}", w, win_len);
+        auto& overlap_windows = windows[w];
 
         WindowFeatures wf;
         wf.window_idx = w;
