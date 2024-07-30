@@ -6,9 +6,11 @@
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
+#include "alignment/minimap2_args.h"
+#include "alignment/minimap2_wrappers.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
-#include "utils/thread_utils.h"
+#include "utils/thread_naming.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
@@ -20,12 +22,32 @@
 #include <string>
 #include <vector>
 
-const size_t MAX_OVERLAPS_PER_READ = 500;
-
 namespace {
 
-std::vector<uint32_t> copy_mm2_cigar(const uint32_t* cigar, uint32_t n_cigar) {
-    std::vector<uint32_t> cigar_ops(cigar, cigar + n_cigar);
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+    std::vector<dorado::CigarOp> cigar_ops;
+    cigar_ops.resize(n_cigar);
+    for (uint32_t i = 0; i < n_cigar; i++) {
+        const uint32_t op = cigar[i] & 0xf;
+        const uint32_t len = cigar[i] >> 4;
+
+        // minimap2 --eqx must be set
+        if (op == MM_CIGAR_EQ_MATCH) {
+            cigar_ops[i] = {dorado::CigarOpType::EQ_MATCH, len};
+        } else if (op == MM_CIGAR_X_MISMATCH) {
+            cigar_ops[i] = {dorado::CigarOpType::X_MISMATCH, len};
+        } else if (op == MM_CIGAR_INS) {
+            cigar_ops[i] = {dorado::CigarOpType::INS, len};
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops[i] = {dorado::CigarOpType::DEL, len};
+        } else if (op == MM_CIGAR_MATCH) {
+            throw std::runtime_error(
+                    "cigar op MATCH is not supported must set minimap2 --eqx flag" +
+                    std::to_string(op));
+        } else {
+            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
+        }
+    }
     return cigar_ops;
 }
 
@@ -104,22 +126,13 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             continue;
         }
 
-        uint32_t n_cigar = aln->p->n_cigar;
-        auto cigar = copy_mm2_cigar(aln->p->cigar, n_cigar);
-
+        auto cigar = parse_cigar(aln->p->cigar, aln->p->n_cigar);
         {
             std::lock_guard<std::mutex> aln_lock(mtx);
 
             auto& alignments = m_correction_records[tname];
-
-            // Cap total overlaps per read.
-            if (alignments.qnames.size() >= MAX_OVERLAPS_PER_READ) {
-                continue;
-            }
-
             alignments.qnames.push_back(qname);
-
-            alignments.mm2_cigars.push_back(std::move(cigar));
+            alignments.cigars.push_back(std::move(cigar));
             alignments.overlaps.push_back(std::move(ovlp));
         }
     }
@@ -245,20 +258,31 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
           m_index_file(index_file),
           m_num_threads(threads),
           m_reads_queue(5000) {
-    alignment::Minimap2Options options = alignment::dflt_options;
-    options.kmer_size = 25;
-    options.window_size = 17;
-    options.index_batch_size = index_size;
-    options.mm2_preset = "ava-ont";
-    options.bandwidth = 150;
-    options.bandwidth_long = 2000;
-    options.min_chain_score = 4000;
-    options.zdrop = options.zdrop_inv = 200;
-    options.occ_dist = 200;
-    options.cs = "short";
-    options.dual = "yes";
-    options.cap_kalloc = std::nullopt;
-    options.max_sw_mat = std::nullopt;
+    auto options = alignment::create_preset_options("ava-ont");
+    auto& index_options = options.index_options->get();
+    index_options.k = 25;
+    index_options.w = 17;
+    index_options.batch_size = index_size;
+    auto& mapping_options = options.mapping_options->get();
+    mapping_options.bw = 150;
+    mapping_options.bw_long = 2000;
+    mapping_options.min_chain_score = 4000;
+    mapping_options.zdrop = 200;
+    mapping_options.zdrop_inv = 200;
+    mapping_options.occ_dist = 200;
+    mapping_options.flag |= MM_F_EQX;
+
+    // --cs short
+    alignment::mm2::apply_cs_option(options, "short");
+
+    // --dual yes
+    alignment::mm2::apply_dual_option(options, "yes");
+
+    // reset to larger minimap2 defaults
+    mm_mapopt_t minimap_default_mapopt;
+    mm_mapopt_init(&minimap_default_mapopt);
+    mapping_options.cap_kalloc = minimap_default_mapopt.cap_kalloc;
+    mapping_options.max_sw_mat = minimap_default_mapopt.max_sw_mat;
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
