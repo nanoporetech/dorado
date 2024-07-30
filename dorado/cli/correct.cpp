@@ -5,6 +5,7 @@
 #include "read_pipeline/CorrectionNode.h"
 #include "read_pipeline/ErrorCorrectionMapperNode.h"
 #include "read_pipeline/HtsWriter.h"
+#include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
@@ -92,7 +93,7 @@ int correct(int argc, char* argv[]) {
 #if DORADO_METAL_BUILD
         device = "cpu";
 #else
-        device = cli::get_auto_detected_device();
+        device = utils::get_auto_detected_device();
 #endif
     }
 

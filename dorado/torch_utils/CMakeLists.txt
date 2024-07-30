@@ -1,4 +1,5 @@
 add_library(dorado_torch_utils
+    auto_detect_device.h    
     duplex_utils.cpp
     duplex_utils.h
     gpu_monitor.cpp
