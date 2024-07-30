@@ -1,7 +1,7 @@
 #pragma once
 
 #if DORADO_CUDA_BUILD
-#include <torch/torch.h>
+#include <torch/cuda.h>
 #endif
 
 #include <string>
