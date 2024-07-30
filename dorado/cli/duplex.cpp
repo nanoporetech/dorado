@@ -275,10 +275,6 @@ int duplex(int argc, char* argv[]) {
                   "performed automatically");
     parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
 
-    parser.visible.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-            .default_value(utils::default_parameters.device);
-
     parser.visible.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
@@ -350,6 +346,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
+    cli::add_device_arg(parser);
     cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 
@@ -363,7 +360,14 @@ int duplex(int argc, char* argv[]) {
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
-        auto device(parser.visible.get<std::string>("-x"));
+        auto device{parser.visible.get<std::string>("-x")};
+        if (!cli::validate_device_string(device)) {
+            return EXIT_FAILURE;
+        }
+        if (device == cli::AUTO_DETECT_DEVICE) {
+            device = cli::get_auto_detected_device();
+        }
+
         auto model(parser.visible.get<std::string>("model"));
 
         auto reads(parser.visible.get<std::string>("reads"));

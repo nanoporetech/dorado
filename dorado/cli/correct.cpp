@@ -9,6 +9,7 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
+#include "utils/parameters.h"
 
 #include <spdlog/spdlog.h>
 
@@ -31,26 +32,17 @@ using OutputMode = dorado::utils::HtsFile::OutputMode;
 
 int correct(int argc, char* argv[]) {
     utils::make_torch_deterministic();
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_description("Dorado read correction tool.");
-    parser.add_argument("reads").help("Path to a file with reads to correct in FASTQ format.");
-    parser.add_argument("-t", "--threads")
+    utils::arg_parse::ArgParser parser("dorado correct");
+    parser.visible.add_description("Dorado read correction tool.");
+    parser.visible.add_argument("reads").help(
+            "Path to a file with reads to correct in FASTQ format.");
+    parser.visible.add_argument("-t", "--threads")
             .help("Number of threads for processing. "
                   "Default uses "
                   "all available threads.")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-x", "--device")
-            .help("Device string in format \"cuda:0,...,N\", \"cuda:all\", \"cpu\" "
-                  "etc..")
-            .default_value(
-#if DORADO_CUDA_BUILD
-                    std::string{"cuda:all"}
-#else
-                    std::string{"cpu"}
-#endif
-            );
-    parser.add_argument("--infer-threads")
+    parser.visible.add_argument("--infer-threads")
             .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
             .default_value(2)
@@ -58,43 +50,55 @@ int correct(int argc, char* argv[]) {
             .default_value(1)
 #endif
             .scan<'i', int>();
-    parser.add_argument("-b", "--batch-size")
+    parser.visible.add_argument("-b", "--batch-size")
             .help("Batch size for inference. Default: 0 for auto batch size detection.")
             .default_value(0)
             .scan<'i', int>();
-    parser.add_argument("-i", "--index-size")
+    parser.visible.add_argument("-i", "--index-size")
             .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
                   "lower memory footprint.")
             .default_value(std::string{"8G"});
-    parser.add_argument("-m", "--model-path").help("Path to correction model folder.");
+    parser.visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
     int verbosity = 0;
-    parser.add_argument("-v", "--verbose")
+    parser.visible.add_argument("-v", "--verbose")
             .default_value(false)
             .implicit_value(true)
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
+    cli::add_device_arg(parser);
 
     try {
-        parser.parse_args(argc, argv);
+        utils::arg_parse::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser;
+        parser_stream << parser.visible;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
-    if (parser.get<bool>("--verbose")) {
+    if (parser.visible.get<bool>("--verbose")) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
-    auto reads(parser.get<std::vector<std::string>>("reads"));
-    auto threads(parser.get<int>("threads"));
-    auto infer_threads(parser.get<int>("infer-threads"));
-    auto device(parser.get<std::string>("device"));
-    auto batch_size(parser.get<int>("batch-size"));
+    auto reads(parser.visible.get<std::vector<std::string>>("reads"));
+    auto threads(parser.visible.get<int>("threads"));
+    auto infer_threads(parser.visible.get<int>("infer-threads"));
+    auto device(parser.visible.get<std::string>("device"));
+    if (!cli::validate_device_string(device)) {
+        return EXIT_FAILURE;
+    }
+    if (device == cli::AUTO_DETECT_DEVICE) {
+#if DORADO_METAL_BUILD
+        device = "cpu";
+#else
+        device = cli::get_auto_detected_device();
+#endif
+    }
+
+    auto batch_size(parser.visible.get<int>("batch-size"));
     auto index_size(utils::arg_parse::parse_string_to_size<uint64_t>(
-            parser.get<std::string>("index-size")));
+            parser.visible.get<std::string>("index-size")));
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     const int aligner_threads = threads;
@@ -115,14 +119,13 @@ int correct(int argc, char* argv[]) {
 
     std::filesystem::path model_dir;
     bool remove_tmp_dir = false;
-    if (parser.is_used("--model-path")) {
-        model_dir = std::filesystem::path(parser.get<std::string>("model-path"));
+    if (parser.visible.is_used("--model-path")) {
+        model_dir = std::filesystem::path(parser.visible.get<std::string>("model-path"));
 
         if (!std::filesystem::exists(model_dir)) {
             spdlog::error("Input model path {} does not exist!", model_dir.string());
             std::exit(EXIT_FAILURE);
         }
-
     } else {
         // Download model
         auto tmp_dir = utils::get_downloads_path(std::nullopt);
