@@ -224,6 +224,7 @@ add_library(dorado_lib
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
+    dorado/read_pipeline/Overlap.h
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
     dorado/read_pipeline/PolyACalculatorNode.cpp
@@ -548,7 +549,7 @@ if (GENERATE_TEST_COVERAGE)
             EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
             DEPENDENCIES dorado_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE 
+            EXCLUDE
                 "${DORADO_3RD_PARTY_SOURCE}/*"
                 "${DORADO_3RD_PARTY_DOWNLOAD}/*"
                 "${PROJECT_SOURCE_DIR}/tests/*"

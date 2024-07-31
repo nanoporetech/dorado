@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Overlap.h"
 #include "models/kits.h"
 #include "utils/types.h"
 
@@ -208,16 +209,6 @@ class BamMessage {
 public:
     BamPtr bam_ptr;
     std::shared_ptr<ClientInfo> client_info;
-};
-
-struct Overlap {
-    int qstart;
-    int qend;
-    int qlen;
-    int tstart;
-    int tend;
-    int tlen;
-    bool fwd;
 };
 
 // Overlaps for error correction
