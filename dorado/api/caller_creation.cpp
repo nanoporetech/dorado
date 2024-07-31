@@ -1,6 +1,7 @@
 #include "caller_creation.h"
 
 #if DORADO_CUDA_BUILD
+#include "basecall/BasecallerParams.h"
 #include "basecall/CudaCaller.h"
 #elif DORADO_METAL_BUILD
 #include "basecall/MetalCaller.h"
@@ -12,16 +13,8 @@ namespace dorado::api {
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
-        const basecall::CRFModelConfig& model_config,
-        const std::string& device,
-        float memory_limit_fraction,
-        PipelineType pipeline_type,
-        float batch_size_time_penalty,
-        bool run_batchsize_benchmarks,
-        bool emit_batchsize_benchmarks) {
-    return std::make_shared<basecall::CudaCaller>(
-            model_config, device, memory_limit_fraction, pipeline_type, batch_size_time_penalty,
-            run_batchsize_benchmarks, emit_batchsize_benchmarks);
+        const basecall::BasecallerCreationParams& params) {
+    return std::make_shared<basecall::CudaCaller>(params);
 }
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(

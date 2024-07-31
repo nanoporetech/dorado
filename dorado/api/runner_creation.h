@@ -1,5 +1,6 @@
 #pragma once
 
+#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunnerBase.h"
 #include "caller_creation.h"
 #include "modbase/ModBaseRunner.h"
@@ -13,15 +14,9 @@
 namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
-        const basecall::CRFModelConfig& model_config,
-        const std::string& device,
+        basecall::BasecallerCreationParams params,
         size_t num_gpu_runners,
-        size_t num_cpu_runners,
-        float memory_fraction,
-        PipelineType pipeline_type,
-        float batch_size_time_penalty,
-        bool run_batchsize_benchmarks,
-        bool emit_batchsize_benchmarks);
+        size_t num_cpu_runners);
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
         const std::vector<std::filesystem::path>& remora_models,

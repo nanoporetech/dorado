@@ -373,10 +373,10 @@ void setup(const std::vector<std::string>& args,
         auto create_runners = [&](const std::string& device_id, float fraction) {
             BasecallerRunners basecaller_runners;
             std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
-                    api::create_basecall_runners(model_config, device_id, num_runners, 0, fraction,
-                                                 api::PipelineType::simplex, 0.f,
-                                                 run_batchsize_benchmarks,
-                                                 emit_batchsize_benchmarks);
+                    api::create_basecall_runners(
+                            {model_config, device_id, fraction, api::PipelineType::simplex, 0.f,
+                             run_batchsize_benchmarks, emit_batchsize_benchmarks},
+                            num_runners, 0);
             return basecaller_runners;
         };
 
@@ -399,8 +399,9 @@ void setup(const std::vector<std::string>& args,
 #endif
     {
         std::tie(runners, num_devices) = api::create_basecall_runners(
-                model_config, device, num_runners, 0, 1.f, api::PipelineType::simplex, 0.f,
-                run_batchsize_benchmarks, emit_batchsize_benchmarks);
+                {model_config, device, 1.f, api::PipelineType::simplex, 0.f,
+                 run_batchsize_benchmarks, emit_batchsize_benchmarks},
+                num_runners, 0);
     }
 
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,

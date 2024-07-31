@@ -37,34 +37,27 @@ struct CudaCaller::NNTask {
     bool done{false};
 };
 
-CudaCaller::CudaCaller(const CRFModelConfig &model_config,
-                       const std::string &device,
-                       float memory_limit_fraction,
-                       PipelineType pipeline_type,
-                       float batch_size_time_penalty,
-                       bool run_batchsize_benchmarks,
-                       bool emit_batchsize_benchmarks)
-        : m_config(model_config),
-          m_device(device),
-          m_decoder(decode::create_decoder(device, m_config)),
-          m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(device)),
-          m_low_latency(pipeline_type == PipelineType::simplex_low_latency),
-          m_pipeline_type(pipeline_type),
+CudaCaller::CudaCaller(const BasecallerCreationParams &params)
+        : m_config(params.model_config),
+          m_device(params.device),
+          m_decoder(decode::create_decoder(params.device, m_config)),
+          m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
+          m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
+          m_pipeline_type(params.pipeline_type),
           m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
     assert(model_config.has_normalised_basecaller_params());
 
-    m_decoder_options.q_shift = model_config.qbias;
-    m_decoder_options.q_scale = model_config.qscale;
-    m_num_input_features = model_config.num_features;
+    m_decoder_options.q_shift = params.model_config.qbias;
+    m_decoder_options.q_scale = params.model_config.qscale;
+    m_num_input_features = params.model_config.num_features;
 
     at::InferenceMode guard;
-    m_module = load_crf_model(model_config, m_options);
+    m_module = load_crf_model(params.model_config, m_options);
 
-    const auto chunk_size = model_config.basecaller.chunk_size();
-    const auto batch_size = model_config.basecaller.batch_size();
-    determine_batch_dims(memory_limit_fraction, batch_size, chunk_size, batch_size_time_penalty,
-                         run_batchsize_benchmarks, emit_batchsize_benchmarks);
+    const auto chunk_size = params.model_config.basecaller.chunk_size();
+    const auto batch_size = params.model_config.basecaller.batch_size();
+    determine_batch_dims(params, batch_size, chunk_size);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -204,12 +197,9 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     return {crfmodel_bytes_per_chunk_timestep, decode_bytes_per_chunk_timestep};
 }
 
-void CudaCaller::determine_batch_dims(float memory_limit_fraction,
+void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                                       int requested_batch_size,
-                                      int requested_chunk_size,
-                                      float batch_size_time_penalty,
-                                      bool run_batchsize_benchmarks,
-                                      bool emit_batchsize_benchmarks) {
+                                      int requested_chunk_size) {
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
@@ -271,7 +261,8 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
                                     (prop->major == 6 && prop->minor == 2) ||  // TX2
                                     (prop->major == 7 && prop->minor == 2) ||  // Xavier
                                     (prop->major == 8 && prop->minor == 7);    // Orin
-    memory_limit_fraction *= is_unified_memory_device ? 0.5f : 1.f;
+    float memory_limit_fraction =
+            params.memory_limit_fraction * is_unified_memory_device ? 0.5f : 1.f;
 
     // Apply limit fraction, and allow 1GB for model weights, etc.
     int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
@@ -337,7 +328,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
             prop->name, m_config.model_path.string(), chunk_size);
-    if (!chunk_benchmarks && !run_batchsize_benchmarks) {
+    if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
         spdlog::warn(std::string("Unable to find chunk benchmarks for GPU \"") + prop->name +
                      "\", model " + m_config.model_path.string() + " and chunk size " +
                      std::to_string(chunk_size) +
@@ -348,7 +339,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         float time = std::numeric_limits<float>::max();
 
         // Use the available cached chunk size if we haven't been explicitly told not to.
-        if (!run_batchsize_benchmarks && chunk_benchmarks) {
+        if (!params.run_batchsize_benchmarks && chunk_benchmarks) {
             // Note that if a cache of batch size timings is available, we don't mix cached and live
             //  benchmarks, to avoid discontinuities in the data.
             if (chunk_benchmarks->find(batch_size) != chunk_benchmarks->end()) {
@@ -390,7 +381,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
         }
     }
 
-    if (emit_batchsize_benchmarks) {
+    if (params.emit_batchsize_benchmarks) {
         static std::mutex batch_output_mutex;
         std::unique_lock<std::mutex> batch_output_lock(
                 batch_output_mutex);  // Prevent multiple devices outputting at once.
@@ -438,7 +429,7 @@ void CudaCaller::determine_batch_dims(float memory_limit_fraction,
     }
 
     // Find the first batch size that was under the threshold.
-    const float threshold_time = best_time * (1 + batch_size_time_penalty);
+    const float threshold_time = best_time * (1 + params.batch_size_time_penalty);
     auto under_threshold = [threshold_time](auto pair) { return pair.first <= threshold_time; };
     auto largest_usable_batch = std::find_if(times_and_batch_sizes.begin(),
                                              times_and_batch_sizes.end(), under_threshold);
