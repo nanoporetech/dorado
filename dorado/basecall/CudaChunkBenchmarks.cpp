@@ -18,7 +18,7 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         GPUName gpu_name,
-        const ModelName & model_name,
+        const ModelName& model_name,
         ChunkSize chunk_size) const {
     std::map<GPUName, GPUName> gpu_name_alias = {
             {"NVIDIA A100-PCIE-40GB", "NVIDIA A100 80GB PCIe"},
@@ -33,6 +33,22 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
         return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
     }
     return {};
+}
+
+bool CudaChunkBenchmarks::add_chunk_timings(GPUName gpu_name,
+                                            const ModelName& model_name,
+                                            ChunkSize chunk_size,
+                                            std::vector<std::pair<float, int>> timings) {
+    if (get_chunk_timings(gpu_name, model_name, chunk_size)) {
+        return false;
+    }
+
+    auto& new_benchmarks = m_chunk_benchmarks[{gpu_name, model_name, chunk_size}];
+    for (auto& timing : timings) {
+        new_benchmarks[timing.second] = timing.first;
+    }
+
+    return true;
 }
 
 }  // namespace dorado::basecall

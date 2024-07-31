@@ -17,7 +17,7 @@ private:
     std::map<std::tuple<GPUName, ModelName, ChunkSize>, ChunkTimings> m_chunk_benchmarks;
 
 public:
-    static const CudaChunkBenchmarks& instance() {
+    static CudaChunkBenchmarks& instance() {
         static CudaChunkBenchmarks chunk_benchmarks;
         return chunk_benchmarks;
     }
@@ -25,6 +25,11 @@ public:
     std::optional<const ChunkTimings> get_chunk_timings(GPUName gpu_name,
                                                         const ModelName& model_name,
                                                         ChunkSize chunk_size) const;
+
+    bool add_chunk_timings(GPUName gpu_name,
+                           const ModelName& model_name,
+                           ChunkSize chunk_size,
+                           std::vector<std::pair<float, int>> timings);
 };
 
 }  // namespace dorado::basecall
