@@ -6,11 +6,9 @@
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
-#include "alignment/minimap2_args.h"
-#include "alignment/minimap2_wrappers.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
@@ -258,31 +256,20 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
           m_index_file(index_file),
           m_num_threads(threads),
           m_reads_queue(5000) {
-    auto options = alignment::create_preset_options("ava-ont");
-    auto& index_options = options.index_options->get();
-    index_options.k = 25;
-    index_options.w = 17;
-    index_options.batch_size = index_size;
-    auto& mapping_options = options.mapping_options->get();
-    mapping_options.bw = 150;
-    mapping_options.bw_long = 2000;
-    mapping_options.min_chain_score = 4000;
-    mapping_options.zdrop = 200;
-    mapping_options.zdrop_inv = 200;
-    mapping_options.occ_dist = 200;
-    mapping_options.flag |= MM_F_EQX;
-
-    // --cs short
-    alignment::mm2::apply_cs_option(options, "short");
-
-    // --dual yes
-    alignment::mm2::apply_dual_option(options, "yes");
-
-    // reset to larger minimap2 defaults
-    mm_mapopt_t minimap_default_mapopt;
-    mm_mapopt_init(&minimap_default_mapopt);
-    mapping_options.cap_kalloc = minimap_default_mapopt.cap_kalloc;
-    mapping_options.max_sw_mat = minimap_default_mapopt.max_sw_mat;
+    alignment::Minimap2Options options = alignment::dflt_options;
+    options.kmer_size = 25;
+    options.window_size = 17;
+    options.index_batch_size = index_size;
+    options.mm2_preset = "ava-ont";
+    options.bandwidth = 150;
+    options.bandwidth_long = 2000;
+    options.min_chain_score = 4000;
+    options.zdrop = options.zdrop_inv = 200;
+    options.occ_dist = 200;
+    options.cs = "short";
+    options.dual = "yes";
+    options.cap_kalloc = std::nullopt;
+    options.max_sw_mat = std::nullopt;
 
     m_index = std::make_shared<alignment::Minimap2Index>();
     if (!m_index->initialise(options)) {
@@ -290,6 +277,15 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     } else {
         spdlog::debug("Initialized index options.");
     }
+
+    // reset to larger minimap2 defaults
+    mm_mapopt_t& mapping_options = m_index->mapping_options();
+    mm_mapopt_t minimap_default_mapopt;
+    mm_mapopt_init(&minimap_default_mapopt);
+    mapping_options.cap_kalloc = minimap_default_mapopt.cap_kalloc;
+    mapping_options.max_sw_mat = minimap_default_mapopt.max_sw_mat;
+    mapping_options.flag |= MM_F_EQX;
+
     spdlog::debug("Loading index...");
     if (m_index->load(index_file, threads, true) != alignment::IndexLoadResult::success) {
         throw std::runtime_error("Failed to load index file " + index_file);
