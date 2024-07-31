@@ -20,12 +20,32 @@
 #include <string>
 #include <vector>
 
-const size_t MAX_OVERLAPS_PER_READ = 500;
-
 namespace {
 
-std::vector<uint32_t> copy_mm2_cigar(const uint32_t* cigar, uint32_t n_cigar) {
-    std::vector<uint32_t> cigar_ops(cigar, cigar + n_cigar);
+std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+    std::vector<dorado::CigarOp> cigar_ops;
+    cigar_ops.resize(n_cigar);
+    for (uint32_t i = 0; i < n_cigar; i++) {
+        const uint32_t op = cigar[i] & 0xf;
+        const uint32_t len = cigar[i] >> 4;
+
+        // minimap2 --eqx must be set
+        if (op == MM_CIGAR_EQ_MATCH) {
+            cigar_ops[i] = {dorado::CigarOpType::EQ_MATCH, len};
+        } else if (op == MM_CIGAR_X_MISMATCH) {
+            cigar_ops[i] = {dorado::CigarOpType::X_MISMATCH, len};
+        } else if (op == MM_CIGAR_INS) {
+            cigar_ops[i] = {dorado::CigarOpType::INS, len};
+        } else if (op == MM_CIGAR_DEL) {
+            cigar_ops[i] = {dorado::CigarOpType::DEL, len};
+        } else if (op == MM_CIGAR_MATCH) {
+            throw std::runtime_error(
+                    "cigar op MATCH is not supported must set minimap2 --eqx flag" +
+                    std::to_string(op));
+        } else {
+            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
+        }
+    }
     return cigar_ops;
 }
 
@@ -104,22 +124,13 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             continue;
         }
 
-        uint32_t n_cigar = aln->p->n_cigar;
-        auto cigar = copy_mm2_cigar(aln->p->cigar, n_cigar);
-
+        auto cigar = parse_cigar(aln->p->cigar, aln->p->n_cigar);
         {
             std::lock_guard<std::mutex> aln_lock(mtx);
 
             auto& alignments = m_correction_records[tname];
-
-            // Cap total overlaps per read.
-            if (alignments.qnames.size() >= MAX_OVERLAPS_PER_READ) {
-                continue;
-            }
-
             alignments.qnames.push_back(qname);
-
-            alignments.mm2_cigars.push_back(std::move(cigar));
+            alignments.cigars.push_back(std::move(cigar));
             alignments.overlaps.push_back(std::move(ovlp));
         }
     }
@@ -266,6 +277,15 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     } else {
         spdlog::debug("Initialized index options.");
     }
+
+    // reset to larger minimap2 defaults
+    mm_mapopt_t& mapping_options = m_index->mapping_options();
+    mm_mapopt_t minimap_default_mapopt;
+    mm_mapopt_init(&minimap_default_mapopt);
+    mapping_options.cap_kalloc = minimap_default_mapopt.cap_kalloc;
+    mapping_options.max_sw_mat = minimap_default_mapopt.max_sw_mat;
+    mapping_options.flag |= MM_F_EQX;
+
     spdlog::debug("Loading index...");
     if (m_index->load(index_file, threads, true) != alignment::IndexLoadResult::success) {
         throw std::runtime_error("Failed to load index file " + index_file);

@@ -253,6 +253,10 @@ const mm_mapopt_t& Minimap2Index::mapping_options() const {
     return *m_mapping_options;
 }
 
+mm_mapopt_t& Minimap2Index::mapping_options() {
+    return const_cast<mm_mapopt_t&>(const_cast<const Minimap2Index&>(*this).mapping_options());
+}
+
 const Minimap2Options& Minimap2Index::get_options() const { return m_options; }
 
 }  // namespace dorado::alignment

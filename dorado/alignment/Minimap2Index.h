@@ -46,6 +46,7 @@ public:
     const mm_idx_t* index() const { return m_index.get(); }
     const mm_idxopt_t& index_options() const;
     const mm_mapopt_t& mapping_options() const;
+    mm_mapopt_t& mapping_options();
 
     HeaderSequenceRecords get_sequence_records_for_header() const;
 
