@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <utility>
+#include <vector>
 
 namespace dorado::basecall {
 

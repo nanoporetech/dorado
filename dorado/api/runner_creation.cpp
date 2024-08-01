@@ -24,12 +24,6 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         basecall::BasecallerCreationParams params,
         size_t num_gpu_runners,
         size_t num_cpu_runners) {
-#ifdef __APPLE__
-    (void)pipeline_type;
-    (void)run_batchsize_benchmarks;
-    (void)emit_batchsize_benchmarks;
-#endif
-
     std::vector<basecall::RunnerPtr> runners;
 
     // Default is 1 device.  CUDA path may alter this.
@@ -54,12 +48,12 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
     }
 #if DORADO_METAL_BUILD
-    else if (device == "metal") {
+    else if (params.device == "metal") {
         auto caller = create_metal_caller(params.model_config, params.memory_limit_fraction);
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
-        if (model_config.basecaller.batch_size() == 0) {
+        if (params.model_config.basecaller.batch_size() == 0) {
             spdlog::info(" - set batch size to {}", runners.back()->batch_size());
         } else if (runners.back()->batch_size() !=
                    (size_t)params.model_config.basecaller.batch_size()) {
@@ -110,10 +104,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     }
 #else
     else {
-        throw std::runtime_error("Unsupported device: " + device);
+        throw std::runtime_error("Unsupported device: " + params.device);
     }
     (void)num_gpu_runners;
-    (void)batch_size_time_penalty;
 #endif
 
     return {std::move(runners), num_devices};

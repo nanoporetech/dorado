@@ -46,7 +46,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_pipeline_type(params.pipeline_type),
           m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
     assert(m_options.device().is_cuda());
-    assert(model_config.has_normalised_basecaller_params());
+    assert(params.model_config.has_normalised_basecaller_params());
 
     m_decoder_options.q_shift = params.model_config.qbias;
     m_decoder_options.q_scale = params.model_config.qscale;
