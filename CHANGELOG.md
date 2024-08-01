@@ -2,6 +2,19 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.7.3] (1 Aug 2024)
+
+This release of Dorado updates `dorado correct` to fix handling of high copy repeats and avoid shutdown hanging. It also includes `dorado demux` improvements to reduce false matches in midstrand barcode detection and ensure correct file naming, along with other fixes.
+
+* 5dc78ab677fbf4c67467ecfc4fb89438dc68c8d4 - Remove limit on number of overlaps considered during all-vs-all alignment in `dorado correct`
+* 2741de70278dd47850c548266d8b3bff5b387aaf - Prevent hang during shutdown of `dorado correct` and prevent out of memory errors
+* 37d316c4db26df6121f5c09410eb8bd966ab6b75 - Remove unused `--read-ids` and `--threads` parameters from `dorado correct`
+* ddb13dea5144769e0a5542321aa03867f06024c1 - Increase the threshold for midstrand barcode detection to reduce false matches
+* 845a3ad37f2a7d2b7e62fcd50ff1971f47c139c3 - Fix misnaming by `dorado demux` of barcode file for barcodes ending in a letter (e.g., `12a`)
+* 56d3e8e2ea55b4873e0ef4f35c144d210b20755e - Fix seq/qual orientation when demultiplexing aligned BAMs
+* 5ddfc2fa6d639fa52c735184a2c92e9ce4306a3c - Fix bug causing CUDA illegal memory access with v5 RNA SUP and mods
+
+
 # [0.7.2] (18 June 2024)
 
 This release of Dorado resolves basecalling failures when running v5 SUP models on CPU-only devices or v5 RNA HAC on Apple silicon. It also fixes bugs in `dorado demux` and `dorado correct`, and corrects `sm` and `sd` tags to match the Dorado SAM specification.
