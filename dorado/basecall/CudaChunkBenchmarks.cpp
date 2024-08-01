@@ -35,7 +35,7 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
     return {};
 }
 
-bool CudaChunkBenchmarks::add_chunk_timings(GPUName gpu_name,
+bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
                                             const ModelName& model_name,
                                             ChunkSize chunk_size,
                                             std::vector<std::pair<float, int>> timings) {

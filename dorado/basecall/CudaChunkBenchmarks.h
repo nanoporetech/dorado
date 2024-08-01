@@ -28,7 +28,7 @@ public:
                                                         const ModelName& model_name,
                                                         ChunkSize chunk_size) const;
 
-    bool add_chunk_timings(GPUName gpu_name,
+    bool add_chunk_timings(const GPUName& gpu_name,
                            const ModelName& model_name,
                            ChunkSize chunk_size,
                            std::vector<std::pair<float, int>> timings);
