@@ -735,6 +735,15 @@ int basecaller(int argc, char* argv[]) {
 
     if (model_complex.is_path()) {
         model_path = fs::path(model_arg);
+
+        if (!fs::exists(model_path)) {
+            spdlog::error(
+                    "Model path does not exist at: '{}' - Please download the model or use a model "
+                    "complex",
+                    model_arg);
+            return EXIT_FAILURE;
+        }
+
         mods_model_paths = model_resolution::get_non_complex_mods_models(
                 model_path, mod_bases, mod_bases_models, downloader);
     } else {

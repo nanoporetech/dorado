@@ -95,8 +95,17 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
                                     const bool recursive_file_loading) {
     const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
     if (model_complex.is_path()) {
+        if (!fs::exists(std::filesystem::path(model_arg))) {
+            spdlog::error(
+                    "Model path does not exist at: '{}' - Please download the model or use a model "
+                    "complex",
+                    model_arg);
+            std::exit(EXIT_FAILURE);
+        }
+
         // Get the model name
         const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
+
         const auto model_name = model_path.filename().string();
 
         // Find the simplex model - it must a known model otherwise we cannot match a stero model
