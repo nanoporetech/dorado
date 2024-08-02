@@ -36,52 +36,52 @@ variables:
 
 # Build stage components
 
-.macos_arm_runner: &macos_arm_runner
+.macos_arm_runner:
   tags:
     - osx_arm64
     - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "11.0"
 
-.macos_x64_runner: &macos_x64_runner
+.macos_x64_runner:
   tags:
     - osx_x86
     - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
 
-.linux_runner: &linux_runner
+.linux_runner:
   tags:
     - ubuntu-20.04
     - nvidia-docker
 
-.linux_arm64_runner: &linux_arm64_runner
+.linux_arm64_runner:
   tags:
     - linux_aarch64
     - docker-arm
 
-.linux_tegra_runner: &linux_tegra_runner
+.linux_tegra_runner:
   tags:
     - nvidia-docker-tegra-gpu
 
-.linux_orin_runner: &linux_orin_runner
+.linux_orin_runner:
   tags:
     - linux-arm64-gpu
     - nvidia-docker
 
-.windows_runner: &windows_runner
+.windows_runner:
   tags:
     - windows-10
     - VS2019
     - cuda-${CUDA}
 
-.linux_dependencies: &linux_dependencies
+.linux_dependencies:
   before_script:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
     - pip install gcovr
 
-.set_parallel_jobs: &set_parallel_jobs
+.set_parallel_jobs:
   - |
     if [[ $OSTYPE == 'darwin'* ]]; then
       PARALLEL_JOBS=$(( $(sysctl -n hw.physicalcpu) / 2 ))
@@ -253,7 +253,7 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - apt update && apt install -y clang clang-tidy
-    - *set_parallel_jobs
+    - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
 .build:linux:x86:focal:valgrind:
@@ -516,7 +516,7 @@ build_archive:macos:x64:
 
 # Test stage components
 
-.test_dorado: &test_dorado
+.test_dorado:
   stage: test
   variables:
     GIT_STRATEGY: none
@@ -534,7 +534,7 @@ build_archive:macos:x64:
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
 
-.test_dorado_windows: &test_dorado_windows
+.test_dorado_windows:
   stage: test
   variables:
     GIT_STRATEGY: none
@@ -545,7 +545,7 @@ build_archive:macos:x64:
     - mv ../tests ../dist .
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
-.test_archive: &test_archive
+.test_archive:
   stage: test
   variables:
     GIT_STRATEGY: none
@@ -700,7 +700,7 @@ test:model_download:macos:arm:
 
 # MLHub
 
-.mlhub: &mlhub
+.mlhub:
   stage: test
   when: manual
   image: ${TRIGGER_IMAGE}
