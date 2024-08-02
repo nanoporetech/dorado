@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "BasecallerParams.h"
 #include "CRFModelConfig.h"
 #include "api/caller_creation.h"
 #include "decode/Decoder.h"
@@ -22,11 +23,7 @@ namespace dorado::basecall {
 
 class CudaCaller {
 public:
-    CudaCaller(const CRFModelConfig &model_config,
-               const std::string &device,
-               float memory_limit_fraction,
-               PipelineType pipeline_type,
-               float batch_size_time_penalty);
+    CudaCaller(const BasecallerCreationParams &params);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -55,10 +52,9 @@ private:
     }
 
     std::pair<int64_t, int64_t> calculate_memory_requirements() const;
-    void determine_batch_dims(float memory_limit_fraction,
+    void determine_batch_dims(const BasecallerCreationParams &params,
                               int batch_size,
-                              int chunk_size,
-                              float batch_size_time_penalty);
+                              int chunk_size);
 
     void start_threads();
     void cuda_thread_fn();

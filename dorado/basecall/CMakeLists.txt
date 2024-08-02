@@ -34,12 +34,24 @@ if (DORADO_GPU_BUILD)
     else()
         target_sources(dorado_basecall
             PRIVATE
+            CudaChunkBenchmarks.cpp
+            CudaChunkBenchmarks.h
             CudaModelRunner.cpp
             CudaModelRunner.h
             CudaCaller.cpp
             CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
+            benchmarks/NVIDIA_A100_80GB_PCIe.cpp
+            benchmarks/NVIDIA_A100_80GB_PCIe.h
+            benchmarks/NVIDIA_H100_PCIe.cpp
+            benchmarks/NVIDIA_H100_PCIe.h
+            benchmarks/NVIDIA_RTX_A6000.cpp
+            benchmarks/NVIDIA_RTX_A6000.h
+            benchmarks/Quadro_GV100.cpp
+            benchmarks/Quadro_GV100.h
+            benchmarks/Tesla_V100-PCIE-16GB.cpp
+            benchmarks/Tesla_V100-PCIE-16GB.h
         )
     endif()
 endif()

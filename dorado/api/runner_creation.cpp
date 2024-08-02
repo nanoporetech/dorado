@@ -1,5 +1,6 @@
 #include "runner_creation.h"
 
+#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "modbase/ModBaseModelConfig.h"
@@ -20,54 +21,49 @@
 namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
-        const basecall::CRFModelConfig& model_config,
-        const std::string& device,
+        basecall::BasecallerCreationParams params,
         size_t num_gpu_runners,
-        size_t num_cpu_runners,
-        float memory_fraction,
-        PipelineType pipeline_type,
-        float batch_size_time_penalty) {
-#ifdef __APPLE__
-    (void)pipeline_type;
-#endif
-
+        size_t num_cpu_runners) {
     std::vector<basecall::RunnerPtr> runners;
 
     // Default is 1 device.  CUDA path may alter this.
     size_t num_devices = 1;
 
-    if (device == "cpu") {
+    if (params.device == "cpu") {
 #ifdef DORADO_TX2
         spdlog::warn("CPU basecalling is not supported on this platform. Results may be incorrect");
 #endif  // #ifdef DORADO_TX2
 
         if (num_cpu_runners == 0) {
-            num_cpu_runners = basecall::auto_calculate_num_runners(model_config, memory_fraction);
+            num_cpu_runners = basecall::auto_calculate_num_runners(params.model_config,
+                                                                   params.memory_limit_fraction);
         }
         spdlog::debug("- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::ModelRunner>(model_config, device));
+            runners.push_back(
+                    std::make_unique<basecall::ModelRunner>(params.model_config, params.device));
         }
-        if (runners.back()->batch_size() != (size_t)model_config.basecaller.batch_size()) {
+        if (runners.back()->batch_size() != (size_t)params.model_config.basecaller.batch_size()) {
             spdlog::debug("- CPU calling: set batch_size to {}", runners.back()->batch_size());
         }
     }
 #if DORADO_METAL_BUILD
-    else if (device == "metal") {
-        auto caller = create_metal_caller(model_config, memory_fraction);
+    else if (params.device == "metal") {
+        auto caller = create_metal_caller(params.model_config, params.memory_limit_fraction);
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
-        if (model_config.basecaller.batch_size() == 0) {
+        if (params.model_config.basecaller.batch_size() == 0) {
             spdlog::info(" - set batch size to {}", runners.back()->batch_size());
-        } else if (runners.back()->batch_size() != (size_t)model_config.basecaller.batch_size()) {
+        } else if (runners.back()->batch_size() !=
+                   (size_t)params.model_config.basecaller.batch_size()) {
             spdlog::warn("- set batch size to {}", runners.back()->batch_size());
         }
     }
 #endif  // DORADO_METAL_BUILD
 #if DORADO_CUDA_BUILD
     else {
-        auto devices = dorado::utils::parse_cuda_device_string(device);
+        auto devices = dorado::utils::parse_cuda_device_string(params.device);
         num_devices = devices.size();
         if (num_devices == 0) {
             throw std::runtime_error("CUDA device requested but no devices found.");
@@ -78,10 +74,17 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         std::vector<std::future<std::shared_ptr<basecall::CudaCaller>>> futures;
 
         futures.reserve(devices.size());
+
         for (const auto& device_string : devices) {
-            futures.push_back(pool.push(create_cuda_caller, std::cref(model_config),
-                                        std::cref(device_string), memory_fraction, pipeline_type,
-                                        batch_size_time_penalty));
+            basecall::BasecallerCreationParams per_device_params = {
+                    params.model_config,
+                    device_string,
+                    params.memory_limit_fraction,
+                    params.pipeline_type,
+                    params.batch_size_time_penalty,
+                    params.run_batchsize_benchmarks,
+                    params.emit_batchsize_benchmarks};
+            futures.push_back(pool.push(create_cuda_caller, per_device_params));
         }
 
         callers.reserve(futures.size());
@@ -101,10 +104,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     }
 #else
     else {
-        throw std::runtime_error("Unsupported device: " + device);
+        throw std::runtime_error("Unsupported device: " + params.device);
     }
     (void)num_gpu_runners;
-    (void)batch_size_time_penalty;
 #endif
 
     return {std::move(runners), num_devices};
