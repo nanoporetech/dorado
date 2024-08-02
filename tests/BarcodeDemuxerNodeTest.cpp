@@ -73,8 +73,9 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ });
 
         const std::unordered_set<std::string> expected_files = {
-                "unknown_run_id_bc01.bam", "unknown_run_id_bc01.bam.bai", "unknown_run_id_bc02.bam",
-                "unknown_run_id_bc02.bam.bai", "unknown_run_id_bc03.bam", "unknown_run_id_bc03.bam.bai",
+                "unknown_run_id_bc01.bam", "unknown_run_id_bc01.bam.bai",
+                "unknown_run_id_bc02.bam", "unknown_run_id_bc02.bam.bai",
+                "unknown_run_id_bc03.bam", "unknown_run_id_bc03.bam.bai",
         };
 
         std::unordered_set<std::string> actual_files;
