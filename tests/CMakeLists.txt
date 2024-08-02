@@ -232,6 +232,8 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
         set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
+    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/lib")
     endif()
 
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path
