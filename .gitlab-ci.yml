@@ -296,6 +296,8 @@ build:linux:arm64:bionic:
     - .build_and_test_dorado
     - .linux_arm64_runner
   script:
+    # Remove zstd since we'll build a newer version ourselves.
+    - apt remove -y libzstd-dev
     # Replace the script stage with just the build.
     - !reference [.run_dorado_cmake_build]
     # Modify the test paths so that we can run the tests on a different machine.
