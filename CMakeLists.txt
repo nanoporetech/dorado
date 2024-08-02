@@ -34,11 +34,14 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 if(WIN32)
-  # all third parties are release builds, so we must match the windows runtime
-  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
-  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
-  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
-  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+    # all third parties are release builds, so we must match the windows runtime
+    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
+    message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
+    message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+
+    # MSVC won't parallelise individual targets unless you tell it to.
+    add_compile_options("$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/MP${WIN_THREADS}>")
 endif()
 
 if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
