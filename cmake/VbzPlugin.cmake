@@ -25,7 +25,13 @@ function(add_hdf_vbz_plugin)
         set(CONAN_LIB_DIRS_DEBUG ${ZSTD_BUILD_DIR}/lib/Debug)
 
         install(FILES ${ZSTD_BUILD_DIR}/lib/Release/zstd.dll DESTINATION bin)
+    else()
+        # Some platforms need the Findzstd.cmake from hdf_plugins, but append it in case we already
+        # have one in the path.
+        list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty/hdf_plugins/cmake")
+        # hdf_plugins looks for 1.3.1 but the libarrow in POD5 requires 1.3.6 minimum.
+        find_package(zstd 1.3.6 REQUIRED)
     endif()
-   
+
     add_subdirectory(dorado/3rdparty/hdf_plugins EXCLUDE_FROM_ALL)
 endfunction()
