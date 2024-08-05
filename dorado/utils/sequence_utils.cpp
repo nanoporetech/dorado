@@ -321,6 +321,9 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
 std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
                                                          const std::string& target_sequence,
                                                          const std::vector<uint8_t>& moves) {
+    assert(static_cast<int>(query_sequence.length()) ==
+           std::accumulate(moves.begin(), moves.end(), 0));
+
     // We are going to compute the overlap between the two reads
     MmTbufPtr working_buffer;
     const auto overlap_result =
@@ -337,10 +340,8 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     const auto query_end = overlap_result->query_end;
     const auto target_end = overlap_result->target_end;
 
-    // Advance the query and target position.
-    ++query_start;
-    ++target_start;
-    while (query_sequence[query_start] != target_sequence[target_start]) {
+    // Advance the query and target position so that their first nucleotide is identical
+    while (query_sequence[target_start] != target_sequence[query_start]) {
         ++query_start;
         ++target_start;
     }
@@ -348,9 +349,8 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    auto target_sequence_component =
-            target_sequence.substr(target_start, target_end - target_start);
-    auto query_sequence_component = query_sequence.substr(query_start, query_end - query_start);
+    auto target_sequence_component = target_sequence.substr(query_start, query_end - query_start);
+    auto query_sequence_component = query_sequence.substr(target_start, target_end - target_start);
 
     EdlibAlignResult edlib_result = edlibAlign(
             target_sequence_component.data(), static_cast<int>(target_sequence_component.length()),
@@ -421,7 +421,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
 
     edlibFreeAlignResult(edlib_result);
 
-    return std::make_tuple(old_moves_offset, target_start - 1, std::move(new_moves));
+    return std::make_tuple(old_moves_offset, query_start, std::move(new_moves));
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {

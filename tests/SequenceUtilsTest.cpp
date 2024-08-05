@@ -11,6 +11,36 @@
 using std::make_tuple;
 using namespace dorado::utils;
 
+TEST_CASE(TEST_GROUP ": Test compute_overlap", TEST_GROUP) {
+    SECTION("Test overlaps of identical strings") {
+        auto query =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        dorado::MmTbufPtr working_buffer;
+        auto overlap = compute_overlap(query, "query", target, "target", working_buffer);
+
+        CHECK(overlap->query_start == 0);
+        CHECK(overlap->query_end == static_cast<int>(query.size()) - 1);
+        CHECK(overlap->target_start == 0);
+        CHECK(overlap->target_end == static_cast<int>(target.size()) - 1);
+    }
+
+    SECTION("Test overlaps of strings where one is a prefix of the other") {
+        auto query = std::string(
+                "TTTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        dorado::MmTbufPtr working_buffer;
+        auto overlap = compute_overlap(query, "query", target, "target", working_buffer);
+
+        CHECK(overlap->query_start == 0);
+        CHECK(overlap->query_end == static_cast<int>(target.size()) - 1);
+        CHECK(overlap->target_start == 5);
+        CHECK(overlap->target_end == static_cast<int>(query.size()) - 1);
+    }
+}
+
 TEST_CASE(TEST_GROUP ": Test base_to_int", TEST_GROUP) {
     CHECK(base_to_int('A') == 0);
     CHECK(base_to_int('C') == 1);
