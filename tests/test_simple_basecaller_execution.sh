@@ -350,9 +350,10 @@ test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/unclassified.bam ; do
+for bam in $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_unclassified.bam ; do
     if [ ! -f $bam ]; then
-        echo "Missing expected bam file $bam"
+        echo "Missing expected bam file $bam.  Generated files:"
+        ls -l $output_dir/demux_only_test/
         exit 1
     fi
 done
