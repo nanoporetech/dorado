@@ -22,22 +22,21 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
     CorrectionAlignments alignments;
 
     size_t count_records = 0;
-    size_t count_piles = 0;
     std::string line;
     while (std::getline(file, line)) {
         utils::PafEntry entry = utils::parse_paf(line);
 
         if (alignments.read_name != entry.tname) {
-            if (count_piles) {
+            if (m_reads_to_infer) {
                 spdlog::trace(
                         "Pushed {} alignments for correction for "
-                        "target {}. Number of piles pushed until now: {}.",
-                        std::size(alignments.qnames), alignments.read_name, count_piles);
+                        "target {}. Number of alignment piles pushed until now: {}.",
+                        std::size(alignments.qnames), alignments.read_name, m_reads_to_infer);
                 pipeline.push_message(std::move(alignments));
             }
             alignments = CorrectionAlignments{};
             alignments.read_name = std::move(entry.tname);
-            ++count_piles;
+            ++m_reads_to_infer;
         }
 
         Overlap ovlp;
@@ -61,14 +60,14 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
             spdlog::debug(
                     "Parsed {} PAF records in {} alignment piles. "
                     "Time: {:.2f} s",
-                    count_records, count_piles, timer.GetElapsedMilliseconds() / 1000.0f);
+                    count_records, m_reads_to_infer, timer.GetElapsedMilliseconds() / 1000.0f);
         }
     }
     if (!std::empty(alignments.qnames)) {
         spdlog::trace(
                 "Final pushed {} alignments for correction for "
                 "target {}. Number of piles pushed until now: {}.",
-                std::size(alignments.qnames), alignments.read_name, count_piles);
+                std::size(alignments.qnames), alignments.read_name, m_reads_to_infer);
         pipeline.push_message(std::move(alignments));
     }
 
@@ -76,11 +75,11 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
 }
 
 ErrorCorrectionPafReaderNode::ErrorCorrectionPafReaderNode(const std::string_view paf_file)
-        : MessageSink(1, 1), m_paf_file(paf_file) {}
+        : MessageSink(1, 1), m_paf_file(paf_file), m_reads_to_infer{0} {}
 
 stats::NamedStats ErrorCorrectionPafReaderNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
-    stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_correct);
+    stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer);
     return stats;
 }
 

@@ -24,8 +24,7 @@ public:
 
 private:
     std::string m_paf_file;
-
-    size_t m_reads_to_correct;
+    size_t m_reads_to_infer{0};
 };
 
 }  // namespace dorado
