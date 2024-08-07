@@ -12,7 +12,7 @@ using std::make_tuple;
 using namespace dorado::utils;
 
 TEST_CASE(TEST_GROUP ": Test compute_overlap", TEST_GROUP) {
-    SECTION("Test overlaps of identical strings") {
+    SECTION("Test overlaps of long identical strings") {
         auto query =
                 std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target =

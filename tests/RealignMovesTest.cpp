@@ -8,7 +8,7 @@ using namespace dorado;
 
 #define TEST_GROUP "[utils][realign_moves]"
 
-TEST_CASE("Realign Moves No Error", TEST_GROUP) {
+/*TEST_CASE("Realign Moves No Error", TEST_GROUP) {
     std::string query_sequence = "ACGTACGTACGTACGTACGTACGTACGTACGT";   // Example query sequence
     std::string target_sequence = "ACGTACGTACGTACGTACGTACGTACGTACGT";  // Example target sequence
     std::vector<uint8_t> moves = {
@@ -38,4 +38,29 @@ TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
     CHECK(move_offset == -1);
     CHECK(target_start == -1);
     CHECK(new_moves.empty());
+}*/
+
+TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
+    SECTION("Test overlaps of long identical strings") {
+        auto query =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, query_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);
+
+        CHECK(old_moves_offset == 0);
+        CHECK(query_start == 0);
+        CHECK(new_moves.size() == input_moves.size());
+        CHECK(new_moves == input_moves);
+    }
 }

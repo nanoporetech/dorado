@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <iterator>
 #include <numeric>
 #include <optional>
@@ -349,8 +350,20 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    auto target_sequence_component = target_sequence.substr(query_start, query_end - query_start);
-    auto query_sequence_component = query_sequence.substr(target_start, target_end - target_start);
+    //int qsa = query_sequence.size();
+    //int tsa = target_sequence.size();
+
+    //std::cout << qsa << " " << tsa <<std::endl;
+
+    auto target_sequence_component =
+            target_sequence.substr(query_start, query_end - query_start + 1);
+    auto query_sequence_component =
+            query_sequence.substr(target_start, target_end - target_start + 1);
+
+    //int qsc = target_sequence_component.size();
+    //int tsc = target_sequence_component.size();
+
+    //std::cout << qsc << " " << tsc <<std::endl;
 
     EdlibAlignResult edlib_result = edlibAlign(
             target_sequence_component.data(), static_cast<int>(target_sequence_component.length()),
@@ -366,21 +379,21 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         return failed_realignment;
     }
 
-    // Let's keep two cursor positions - one for the new move table and one for the old:
+    // Let's keep two cursor positions - one for the new move table which we are building, and one for the old where we track where we got to
     int new_move_cursor = 0;
     int old_move_cursor = 0;
 
+    // First step is to advance the moves table to the start of the aligment in the query.
     int moves_found = 0;
-
-    while (moves_found < int(moves.size()) && moves_found < int(query_start)) {
+    while (moves_found < int(moves.size()) && (moves_found < int(target_start))) {
         moves_found += moves[old_move_cursor];
         ++old_move_cursor;
     }
-    --old_move_cursor;  // We have gone one too far.
     int old_moves_offset = old_move_cursor;
 
     const auto alignment_size =
-            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
+            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) +
+            1;  // TODO - I *think* the alignemnt size should be +1 because end location is inclusive
     // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
     std::vector<uint8_t> new_moves;
     for (size_t i = 0; i < alignment_size; i++) {
@@ -392,8 +405,11 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
             new_move_cursor++;
             old_move_cursor++;
 
-            while (moves[old_move_cursor] == 0) {
-                if (old_move_cursor < (new_move_cursor + old_moves_offset)) {
+            while (moves[old_move_cursor] == 0 &&
+                   (old_move_cursor <
+                    int(moves.size()))) {  // If we have a zero in the old move table, we need to add zeros to the new move table to make it up
+                if (old_move_cursor <
+                    (new_move_cursor + old_moves_offset)) {  // TODO - not clear what this is doing
                     old_move_cursor++;
                 } else {
                     new_moves.push_back(0);
@@ -411,7 +427,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
             new_moves.push_back(0);
             new_move_cursor++;
             old_move_cursor++;
-            while (moves[old_move_cursor] == 0) {
+            while (moves[old_move_cursor] == 0 && (old_move_cursor < int(moves.size()))) {
                 new_moves.push_back(0);
                 old_move_cursor++;
                 new_move_cursor++;
