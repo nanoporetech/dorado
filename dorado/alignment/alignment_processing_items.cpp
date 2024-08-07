@@ -38,6 +38,11 @@ bool is_valid_input_file(const std::filesystem::path& input_path) {
         if (header) {
             return true;
         }
+        spdlog::error(
+                "Could not read hts header from file {} - possibly a fastq file containing U "
+                "bases?",
+                input_path.string());
+        return false;
     }
     return false;
 }
