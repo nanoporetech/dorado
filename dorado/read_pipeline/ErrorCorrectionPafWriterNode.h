@@ -1,8 +1,10 @@
 #pragma once
+
+#include "read_pipeline/MessageSink.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/flush_options.h"
 #include "utils/stats.h"
 
-#include <cstdint>
 #include <string>
 
 namespace dorado {

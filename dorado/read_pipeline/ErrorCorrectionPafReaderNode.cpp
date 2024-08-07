@@ -19,23 +19,25 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
         throw std::runtime_error("Could not open PAF file " + m_paf_file);
     }
 
-    bool start = true;
     CorrectionAlignments alignments;
 
-    size_t count = 0;
+    size_t count_records = 0;
+    size_t count_piles = 0;
     std::string line;
     while (std::getline(file, line)) {
         utils::PafEntry entry = utils::parse_paf(line);
 
         if (alignments.read_name != entry.tname) {
-            if (!start) {
-                spdlog::trace("[ErrorCorrectionPafReaderNode] Pushed alignment for {}",
-                              alignments.read_name);
+            if (count_piles) {
+                spdlog::trace(
+                        "Pushed {} alignments for correction for "
+                        "target {}. Number of piles pushed until now: {}.",
+                        std::size(alignments.qnames), alignments.read_name, count_piles);
                 pipeline.push_message(std::move(alignments));
             }
             alignments = CorrectionAlignments{};
-            alignments.read_name = entry.tname;
-            start = false;
+            alignments.read_name = std::move(entry.tname);
+            ++count_piles;
         }
 
         Overlap ovlp;
@@ -54,17 +56,23 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
         std::vector<CigarOp> cigar = utils::parse_cigar(cigar_str);
         alignments.cigars.push_back(std::move(cigar));
 
-        ++count;
-        if ((count % 1000000) == 0) {
-            spdlog::debug("[ErrorCorrectionPafReaderNode] Parsed {} PAF rows. Time: {:.2f} s",
-                          count, timer.GetElapsedMilliseconds() / 1000.0f);
+        ++count_records;
+        if ((count_records % 1000000) == 0) {
+            spdlog::debug(
+                    "Parsed {} PAF records in {} alignment piles. "
+                    "Time: {:.2f} s",
+                    count_records, count_piles, timer.GetElapsedMilliseconds() / 1000.0f);
         }
     }
-    spdlog::debug("Pushing {} records for correction", std::size(alignments.qnames));
-    pipeline.push_message(std::move(alignments));
+    if (!std::empty(alignments.qnames)) {
+        spdlog::trace(
+                "Final pushed {} alignments for correction for "
+                "target {}. Number of piles pushed until now: {}.",
+                std::size(alignments.qnames), alignments.read_name, count_piles);
+        pipeline.push_message(std::move(alignments));
+    }
 
-    spdlog::debug("[ErrorCorrectionPafReaderNode] process total time: {:.2f} s",
-                  timer.GetElapsedMilliseconds() / 1000.0f);
+    spdlog::debug("PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
 ErrorCorrectionPafReaderNode::ErrorCorrectionPafReaderNode(const std::string_view paf_file)

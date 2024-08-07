@@ -114,11 +114,11 @@ int correct(int argc, char* argv[]) {
     const int aligner_threads = threads;
     const int correct_threads = std::max(4, static_cast<int>(threads / 4));
     const int correct_writer_threads = 1;
-    spdlog::debug("> aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
+    spdlog::debug("> Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
                   correct_threads, correct_writer_threads);
 
     if (reads.size() > 1) {
-        spdlog::error("> multi file input not yet handled");
+        spdlog::error("> Multi file input not yet handled");
         std::exit(EXIT_FAILURE);
     }
 
@@ -236,7 +236,7 @@ int correct(int argc, char* argv[]) {
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
 
-    spdlog::info("> starting correction");
+    spdlog::info("> Starting");
     // Start the pipeline.
     if (!std::empty(in_paf_file)) {
         dynamic_cast<ErrorCorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
@@ -256,7 +256,7 @@ int correct(int argc, char* argv[]) {
     }
     tracker.summarize();
 
-    spdlog::info("> finished correction");
+    spdlog::info("> Finished");
 
     if (remove_tmp_dir) {
         std::filesystem::remove_all(model_dir.parent_path());

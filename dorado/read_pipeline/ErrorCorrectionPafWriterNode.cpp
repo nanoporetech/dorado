@@ -1,16 +1,8 @@
 #include "ErrorCorrectionPafWriterNode.h"
 
-#include "read_pipeline/ReadPipeline.h"
-#include "utils/alignment_utils.h"
 #include "utils/paf_utils.h"
-#include "utils/sequence_utils.h"
 
-#include <minimap.h>
-
-#include <cassert>
-#include <filesystem>
 #include <iostream>
-#include <stdexcept>
 
 namespace dorado {
 
@@ -25,9 +17,9 @@ void ErrorCorrectionPafWriterNode::input_thread_fn() {
             continue;
         }
 
-        const auto alignments = std::get<CorrectionAlignments>(std::move(message));
+        const CorrectionAlignments alignments = std::get<CorrectionAlignments>(std::move(message));
 
-        for (size_t i = 0; i < alignments.qnames.size(); i++) {
+        for (size_t i = 0; i < std::size(alignments.qnames); ++i) {
             utils::serialize_to_paf(std::cout, alignments.qnames[i], alignments.read_name,
                                     alignments.overlaps[i], 0, 0, 60, alignments.cigars[i]);
             std::cout << std::endl;
@@ -36,8 +28,7 @@ void ErrorCorrectionPafWriterNode::input_thread_fn() {
 }
 
 stats::NamedStats ErrorCorrectionPafWriterNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
-    return stats;
+    return stats::from_obj(m_work_queue);
 }
 
 void ErrorCorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }

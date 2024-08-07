@@ -1,5 +1,4 @@
-#ifndef DORADO_READ_PIPELINE_ERROR_CORRECTION_PAF_READER_NODE_H
-#define DORADO_READ_PIPELINE_ERROR_CORRECTION_PAF_READER_NODE_H
+#pragma once
 
 #include "ReadPipeline.h"
 #include "read_pipeline/MessageSink.h"
@@ -30,5 +29,3 @@ private:
 };
 
 }  // namespace dorado
-
-#endif  // DORADO_READ_PIPELINE_ERROR_CORRECTION_PAF_READER_NODE_H

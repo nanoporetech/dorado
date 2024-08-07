@@ -4,7 +4,6 @@
 #include "utils/types.h"
 
 #include <iosfwd>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,7 +36,7 @@ struct PafEntry {
 };
 
 PafEntry parse_paf(const std::string& paf_row);
-PafEntry parse_paf(std::stringstream& paf_row);
+PafEntry parse_paf(std::istringstream& paf_row);
 
 std::string serialize_paf(const PafEntry& paf_entry);
 

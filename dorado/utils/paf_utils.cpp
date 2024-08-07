@@ -7,11 +7,10 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
-#include <string>
 
 namespace dorado::utils {
 
-PafEntry parse_paf(std::stringstream& ss) {
+PafEntry parse_paf(std::istringstream& ss) {
     PafEntry entry;
     // Read the fields from the stringstream
     ss >> entry.qname >> entry.qlen >> entry.qstart >> entry.qend >> entry.strand >> entry.tname >>
@@ -30,7 +29,7 @@ PafEntry parse_paf(std::stringstream& ss) {
 }
 
 PafEntry parse_paf(const std::string& paf_row) {
-    std::stringstream ss(paf_row);
+    std::istringstream ss(paf_row);
     return parse_paf(ss);
 }
 
@@ -63,20 +62,20 @@ void serialize_to_paf(std::ostream& os,
     }
 }
 
-std::string_view paf_aux_get(const PafEntry& paf_entry, const char tag[2], char type) {
+std::string_view paf_aux_get(const PafEntry& paf_entry, const char tag[2], const char type) {
     const std::string t = std::string(tag) + ":" + std::string(1, type) + ":";
-    std::string_view aux(paf_entry.aux);
-    auto pos = aux.find(t.c_str());
+    const std::string_view aux(paf_entry.aux);
+    size_t pos = aux.find(t.c_str());
     if (pos == std::string::npos) {
-        return std::string_view();
+        return {};
     }
     pos += 5;
-    auto end = aux.find('\t', pos);
+    const size_t end = aux.find('\t', pos);
     if (end == std::string::npos) {
         return aux.substr(pos);
-    } else {
-        return aux.substr(pos, end - pos);
     }
+    assert(end > pos);
+    return aux.substr(pos, end - pos);
 }
 
 }  // namespace dorado::utils
