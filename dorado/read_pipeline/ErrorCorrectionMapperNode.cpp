@@ -97,7 +97,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         }
 
         // Non-const because it will be moved below.
-        std::vector<CigarOp> cigar = utils::parse_cigar(aln->p->cigar, aln->p->n_cigar);
+        std::vector<CigarOp> cigar = utils::convert_mm2_cigar(aln->p->cigar, aln->p->n_cigar);
 
         {
             std::lock_guard<std::mutex> aln_lock(mtx);

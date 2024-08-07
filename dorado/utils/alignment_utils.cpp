@@ -51,15 +51,14 @@ std::string alignment_to_str(const char* query,
     return ss.str();
 }
 
-std::vector<CigarOp> parse_cigar(std::string_view cigar) {
+std::vector<CigarOp> parse_cigar_from_string(const std::string_view cigar) {
     std::vector<CigarOp> ops;
     ops.reserve(std::size(cigar));
-    std::string digits = "";
+    uint32_t len = 0;
     for (char c : cigar) {
         if (std::isdigit(c)) {
-            digits += c;
+            len = len * 10 + (c - '0');
         } else {
-            uint32_t len = std::atoi(digits.c_str());
             CigarOpType type;
             switch (c) {
             case '=':
@@ -77,15 +76,15 @@ std::vector<CigarOp> parse_cigar(std::string_view cigar) {
             default:
                 throw std::runtime_error("Unsupported CIGAR operation type " + std::string(1, c));
             }
-            digits = "";
-            ops.push_back({type, len});
+            ops.emplace_back(CigarOp{type, len});
+            len = 0;
         }
     }
     ops.shrink_to_fit();
     return ops;
 }
 
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
+std::vector<CigarOp> convert_mm2_cigar(const uint32_t* cigar, uint32_t n_cigar) {
     std::vector<dorado::CigarOp> cigar_ops;
     cigar_ops.resize(n_cigar);
     for (uint32_t i = 0; i < n_cigar; i++) {
@@ -114,9 +113,7 @@ std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar
 
 void serialize_cigar(std::ostream& os, const std::vector<CigarOp>& cigar) {
     for (auto& op : cigar) {
-        os << op.len;
         char type = 'M';
-        ;
         switch (op.op) {
         case CigarOpType::EQ_MATCH:
             type = '=';
@@ -131,7 +128,7 @@ void serialize_cigar(std::ostream& os, const std::vector<CigarOp>& cigar) {
             type = 'D';
             break;
         }
-        os << type;
+        os << op.len << type;
     }
 }
 

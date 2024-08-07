@@ -52,7 +52,7 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
         alignments.overlaps.push_back(ovlp);
 
         const std::string_view cigar_str = utils::paf_aux_get(entry, "cg", 'Z');
-        std::vector<CigarOp> cigar = utils::parse_cigar(cigar_str);
+        std::vector<CigarOp> cigar = utils::parse_cigar_from_string(cigar_str);
         alignments.cigars.push_back(std::move(cigar));
 
         ++count_records;

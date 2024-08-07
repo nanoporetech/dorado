@@ -32,9 +32,9 @@ namespace dorado::utils {
 
 std::string alignment_to_str(const char* query, const char* target, const EdlibAlignResult& result);
 
-std::vector<CigarOp> parse_cigar(std::string_view cigar);
+std::vector<CigarOp> parse_cigar_from_string(std::string_view cigar);
 
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar);
+std::vector<dorado::CigarOp> convert_mm2_cigar(const uint32_t* cigar, uint32_t n_cigar);
 
 void serialize_cigar(std::ostream& os, const std::vector<CigarOp>& cigar);
 
