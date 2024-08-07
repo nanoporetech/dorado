@@ -470,6 +470,12 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
     switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
+        // N.B. with BY_CHANNEL ordering the ont_basecall_client application has a dependency
+        // on how the the cache is structured, i.e. that the number of channels in the cache
+        // is set to pairing_params.cache_depth. This is so that it can calculate the theoretical
+        // max cache size given it knows the max number of reads per channel that it will send.
+        // If the way the cache is structured is changed the ont_basecall_client code will also
+        // need to be updated otherwise there is a risk of deadlock.
         m_max_num_keys = pairing_params.cache_depth;
         spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
