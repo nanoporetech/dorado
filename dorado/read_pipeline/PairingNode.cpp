@@ -470,6 +470,12 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
     switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
+        // [JIRA issue: INSTX-5537]
+        // N.B. with BY_CHANNEL ordering the ont_core client code has a dependency on the cache being
+        // pairing_params.cache_depth number of channels such that it can calculate the theoretical
+        // max cache size given it knows the max number of reads per channel that it will send.
+        // If the way the cache is structured is changed the client code will also need to be updated
+        // otherwise there is a risk of deadlock.
         m_max_num_keys = pairing_params.cache_depth;
         spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
