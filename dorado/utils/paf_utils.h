@@ -1,7 +1,7 @@
 #pragma once
 
 #include "read_pipeline/Overlap.h"
-#include "utils/types.h"
+#include "utils/cigar.h"
 
 #include <iosfwd>
 #include <string>

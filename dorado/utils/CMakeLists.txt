@@ -9,6 +9,8 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
+    cigar.cpp
+    cigar.h
     concurrency/async_task_executor.cpp
     concurrency/async_task_executor.h
     concurrency/detail/priority_task_queue.cpp

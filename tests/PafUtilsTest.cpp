@@ -44,7 +44,7 @@ TEST_CASE("PafUtilsTest: Test aux loading", TEST_GROUP) {
         auto paf_entry = utils::parse_paf(line);
         auto cg_ptr = utils::paf_aux_get(paf_entry, "cg", 'Z');
         CHECK(!cg_ptr.empty());
-        auto ops = utils::parse_cigar_from_string(cg_ptr);
+        auto ops = parse_cigar_from_string(cg_ptr);
         CHECK(!ops.empty());
     }
 }

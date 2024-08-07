@@ -3,6 +3,7 @@
 #include "conversions.h"
 #include "correct/types.h"
 #include "read_pipeline/messages.h"
+#include "utils/cigar.cpp"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -27,7 +28,7 @@ bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignm
     size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
     for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
         if (cigar[i].len >= 30 &&
-            (cigar[i].op == CigarOpType::INS || cigar[i].op == CigarOpType::DEL)) {
+            (cigar[i].op == CigarOpType::I || cigar[i].op == CigarOpType::D)) {
             LOG_TRACE("filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
                       overlap.qstart, overlap.qend, cigar[i].len);
             return true;
@@ -62,22 +63,22 @@ void calculate_accuracy(OverlapWindow& overlap, const CorrectionAlignments& alig
         }
 
         switch (cigar[idx].op) {
-        case CigarOpType::EQ_MATCH:
+        case CigarOpType::EQ:
             n_match += len;
             break;
-        case CigarOpType::X_MISMATCH:
+        case CigarOpType::X:
             n_miss += len;
             break;
-        case CigarOpType::INS:
+        case CigarOpType::I:
             n_ins += len;
             break;
-        case CigarOpType::DEL:
+        case CigarOpType::D:
             n_del += len;
             break;
         default:
             if (!has_warned_bad_cigar_op) {
                 has_warned_bad_cigar_op = true;
-                LOG_TRACE("unexpected CigarOpType: {}", uint8_t(cigar[idx].op));
+                LOG_TRACE("unexpected CigarOpType: {}", static_cast<uint8_t>(cigar[idx].op));
             }
             break;
         }
@@ -108,10 +109,9 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
             int len = cigar[i].len;
 
             int l = -1;
-            if (op == CigarOpType::EQ_MATCH || op == CigarOpType::X_MISMATCH ||
-                op == CigarOpType::DEL) {
+            if (op == CigarOpType::EQ || op == CigarOpType::X || op == CigarOpType::D) {
                 l = len;
-            } else if (op == CigarOpType::INS) {
+            } else if (op == CigarOpType::I) {
                 max_ins[tpos - 1] = std::max(len, max_ins[tpos - 1]);
                 continue;
             }
@@ -244,8 +244,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             LOG_TRACE("cigar_idx {} l {}", cigar_idx, l);
 
             switch (op) {
-            case CigarOpType::EQ_MATCH:
-            case CigarOpType::X_MISMATCH:
+            case CigarOpType::EQ:
+            case CigarOpType::X:
                 for (uint32_t i = 0; i < l; i++) {
                     auto base = base_encoding[uint8_t(qseq[query_iter]) + (fwd ? 0 : 32)];
                     auto qual = qqual[query_iter];
@@ -262,14 +262,14 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
 
                 tpos += l;
                 break;
-            case CigarOpType::DEL:
+            case CigarOpType::D:
                 for (uint32_t i = 0; i < l; i++) {
                     LOG_TRACE("idx {}", idx);
                     idx += 1 + max_ins[tpos + i];
                 }
                 tpos += l;
                 break;
-            case CigarOpType::INS:
+            case CigarOpType::I:
                 idx -= max_ins[tpos - 1];
                 for (uint32_t i = 0; i < l; i++) {
                     auto base = base_encoding[uint8_t(qseq[query_iter]) + (fwd ? 0 : 32)];
@@ -286,6 +286,12 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                 }
 
                 idx += max_ins[tpos - 1];
+                break;
+            default:
+                throw std::runtime_error(
+                        "Unsupported CIGAR operation found in get_features_for_window! Op: " +
+                        std::string(1, convert_cigar_op_to_char(op)));
+                break;
             }
         }
 

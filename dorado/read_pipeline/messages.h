@@ -2,6 +2,7 @@
 
 #include "Overlap.h"
 #include "models/kits.h"
+#include "utils/cigar.h"
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>

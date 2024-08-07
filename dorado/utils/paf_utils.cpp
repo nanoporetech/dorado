@@ -57,8 +57,7 @@ void serialize_to_paf(std::ostream& os,
        << (ovl.fwd ? '+' : '-') << '\t' << tname << '\t' << ovl.tlen << '\t' << ovl.tstart << '\t'
        << ovl.tend << '\t' << num_residue_matches << '\t' << alignment_block_length << '\t' << mapq;
     if (!std::empty(cigar)) {
-        os << "\tcg:Z:";
-        serialize_cigar(os, cigar);
+        os << "\tcg:Z:" << cigar;
     }
 }
 
