@@ -110,7 +110,7 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 dorado_check_bam_not_empty
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
-num_nm_tags=$(samtools view $output_dir/realigned.bam | grep -o NM:i | wc -l | awk '{print $1}')
+num_nm_tags=$(samtools view $output_dir/realigned.bam | grep -o NM:i | wc -l)
 # This alignment creates a secondary output, so there should be exactly 2 NM:i tags
 if [[ $num_nm_tags -ne "2" ]]; then
     echo "dorado aligner has emitted incorrect number of NM tags."
