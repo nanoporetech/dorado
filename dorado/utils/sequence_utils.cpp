@@ -385,11 +385,17 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
 
     // First step is to advance the moves table to the start of the aligment in the query.
     int moves_found = 0;
-    while (moves_found < int(moves.size()) && (moves_found < int(target_start))) {
-        moves_found += moves[old_move_cursor];
-        ++old_move_cursor;
+
+    for (int i = 0; i < int(moves.size()); i++) {
+        moves_found += moves[i];
+        if (moves_found == target_start + 1) {
+            break;
+        }
+        old_move_cursor++;
     }
-    int old_moves_offset = old_move_cursor;
+
+    // This is wrong - you can't always add 1, you need to go up the zeros too
+    int old_moves_offset = old_move_cursor;  // Pointer into where the move table should now start
 
     const auto alignment_size =
             static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) +

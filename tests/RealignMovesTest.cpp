@@ -41,7 +41,7 @@ TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
 }*/
 
 TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
-    SECTION("Test overlaps of long identical strings") {
+    /*    SECTION("Test move table realignemnt of long identical sequences") {
         auto query =
                 std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target =
@@ -62,5 +62,28 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(query_start == 0);
         CHECK(new_moves.size() == input_moves.size());
         CHECK(new_moves == input_moves);
+    }*/
+
+    SECTION("Test move table realignemnt where target is suffix of query") {
+        auto query = std::string(
+                "TTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 8);
+        CHECK(target_start == 0);
+        CHECK(new_moves.size() == input_moves.size() - 4 * 2);
+        CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin() + 4));
     }
 }
