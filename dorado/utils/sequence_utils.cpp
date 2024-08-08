@@ -350,20 +350,10 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
     align_config.task = EDLIB_TASK_PATH;
 
-    //int qsa = query_sequence.size();
-    //int tsa = target_sequence.size();
-
-    //std::cout << qsa << " " << tsa <<std::endl;
-
     auto target_sequence_component =
             target_sequence.substr(query_start, query_end - query_start + 1);
     auto query_sequence_component =
             query_sequence.substr(target_start, target_end - target_start + 1);
-
-    //int qsc = target_sequence_component.size();
-    //int tsc = target_sequence_component.size();
-
-    //std::cout << qsc << " " << tsc <<std::endl;
 
     EdlibAlignResult edlib_result = edlibAlign(
             target_sequence_component.data(), static_cast<int>(target_sequence_component.length()),
@@ -394,12 +384,10 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         old_move_cursor++;
     }
 
-    // This is wrong - you can't always add 1, you need to go up the zeros too
     int old_moves_offset = old_move_cursor;  // Pointer into where the move table should now start
 
     const auto alignment_size =
-            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) +
-            1;  // TODO - I *think* the alignemnt size should be +1 because end location is inclusive
+            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) + 1;
     // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
     std::vector<uint8_t> new_moves;
     for (size_t i = 0; i < alignment_size; i++) {
@@ -414,8 +402,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
             while (moves[old_move_cursor] == 0 &&
                    (old_move_cursor <
                     int(moves.size()))) {  // If we have a zero in the old move table, we need to add zeros to the new move table to make it up
-                if (old_move_cursor <
-                    (new_move_cursor + old_moves_offset)) {  // TODO - not clear what this is doing
+                if (old_move_cursor < (new_move_cursor + old_moves_offset)) {
                     old_move_cursor++;
                 } else {
                     new_moves.push_back(0);
