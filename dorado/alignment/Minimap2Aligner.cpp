@@ -128,6 +128,9 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
     }
 
+    // strip any existing alignment metadata from the read
+    utils::remove_alignment_tags_from_record(irecord);
+
     // do the mapping
     int hits = 0;
     auto mm_index = m_minimap_index->index();

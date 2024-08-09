@@ -487,9 +487,9 @@ BamPtr new_unmapped_record(bam1_t* input_record, std::string seq, std::vector<ui
 void remove_alignment_tags_from_record(bam1_t* record) {
     // Iterate through all tags and check against known set
     // of tags to remove.
-    static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "ts",
-                                                         "de", "dv", "tp", "cm", "s1", "s2",
-                                                         "MD", "zd", "rl", "bh"};
+    static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "de",
+                                                         "dv", "tp", "cm", "s1", "s2", "MD",
+                                                         "zd", "rl", "bh", "cs"};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {
