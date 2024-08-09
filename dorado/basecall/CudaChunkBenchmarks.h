@@ -25,11 +25,11 @@ public:
     }
 
     std::optional<const ChunkTimings> get_chunk_timings(GPUName gpu_name,
-                                                        const ModelName& model_name,
+                                                        const std::string& model_path,
                                                         ChunkSize chunk_size) const;
 
     bool add_chunk_timings(const GPUName& gpu_name,
-                           const ModelName& model_name,
+                           const std::string& model_path,
                            ChunkSize chunk_size,
                            const std::vector<std::pair<float, int>>& timings);
 };

@@ -6,6 +6,8 @@
 #include "benchmarks/Quadro_GV100.h"
 #include "benchmarks/Tesla_V100-PCIE-16GB.h"
 
+#include <filesystem>
+
 namespace dorado::basecall {
 
 CudaChunkBenchmarks::CudaChunkBenchmarks() {
@@ -18,8 +20,17 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         GPUName gpu_name,
-        const ModelName& model_name,
+        const std::string& model_path,
         ChunkSize chunk_size) const {
+    // Strip any extra path elements from the model folder name
+    ModelName model_name = std::filesystem::path(model_path).filename().string();
+
+    // Try looking up the specified gpu name directly
+    if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) != m_chunk_benchmarks.end()) {
+        return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
+    }
+
+    // If the direct lookup fails, try looking up via an alias
     std::map<GPUName, GPUName> gpu_name_alias = {
             {"NVIDIA A100-PCIE-40GB", "NVIDIA A100 80GB PCIe"},
             {"NVIDIA A800 80GB PCIe", "NVIDIA A100 80GB PCIe"},
@@ -27,18 +38,22 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
 
     if (gpu_name_alias.find(gpu_name) != gpu_name_alias.end()) {
         gpu_name = gpu_name_alias[gpu_name];
+        if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) !=
+            m_chunk_benchmarks.end()) {
+            return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
+        }
     }
 
-    if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) != m_chunk_benchmarks.end()) {
-        return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
-    }
     return {};
 }
 
 bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
-                                            const ModelName& model_name,
+                                            const std::string& model_path,
                                             ChunkSize chunk_size,
                                             const std::vector<std::pair<float, int>>& timings) {
+    // Strip any extra path elements from the model folder name
+    ModelName model_name = std::filesystem::path(model_path).filename().string();
+
     if (get_chunk_timings(gpu_name, model_name, chunk_size)) {
         return false;
     }
