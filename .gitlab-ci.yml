@@ -469,6 +469,10 @@ build_archive:linux:arm64:bionic:
     - .linux_arm64_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
+  script:
+    # Remove zstd since we'll build a newer version ourselves.
+    - apt remove -y libzstd-dev
+    - !reference [.build_dorado_archive, script]
 
 build_archive:linux:arm64:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
