@@ -289,15 +289,13 @@ build:linux:x86:focal:clang_tidy:
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
 build:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .build_and_test_dorado
     - .linux_arm64_runner
   script:
-    # Remove zstd since we'll build a newer version ourselves.
-    - apt remove -y libzstd-dev
     # Replace the script stage with just the build.
     - !reference [.run_dorado_cmake_build]
     # Modify the test paths so that we can run the tests on a different machine.
@@ -315,7 +313,7 @@ build:linux:arm64:bionic:
       - ${BUILD_DIR}/tests
 
 build:linux:arm64:bionic:unittests:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   stage: build
   extends:
     - .linux_tegra_runner
@@ -464,15 +462,11 @@ build_archive:linux:x86:cuda12:
     - .on_nightly_or_manual
 
 build_archive:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
     - .linux_arm64_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
-  script:
-    # Remove zstd since we'll build a newer version ourselves.
-    - apt remove -y libzstd-dev
-    - !reference [.build_dorado_archive, script]
 
 build_archive:linux:arm64:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
@@ -590,7 +584,7 @@ test:linux:x86:focal:
     expire_in: 1 day
 
 test:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
     - .linux_dependencies
     - .linux_tegra_runner
