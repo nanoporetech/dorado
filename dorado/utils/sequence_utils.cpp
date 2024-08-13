@@ -13,7 +13,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <iterator>
 #include <numeric>
 #include <optional>
@@ -384,7 +383,8 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         old_move_cursor++;
     }
 
-    int old_moves_offset = old_move_cursor;  // Pointer into where the move table should now start
+    int old_moves_offset =
+            old_move_cursor;  // Cursor indicating where the move table should now start
 
     const auto alignment_size =
             static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) + 1;
