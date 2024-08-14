@@ -39,7 +39,7 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
             ++m_reads_to_infer;
         }
 
-        Overlap ovlp;
+        utils::Overlap ovlp;
         ovlp.qstart = entry.qstart;
         ovlp.qend = entry.qend;
         ovlp.qlen = entry.qlen;

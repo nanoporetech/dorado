@@ -37,6 +37,7 @@ add_library(dorado_utils
     MergeHeaders.cpp
     MergeHeaders.h
     module_utils.h
+    overlap.h
     parameters.cpp
     parameters.h
     parse_custom_kit.cpp

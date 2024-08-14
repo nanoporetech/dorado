@@ -69,7 +69,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             }
         }
 
-        Overlap ovlp;
+        utils::Overlap ovlp;
         ovlp.qstart = aln->qs;
         ovlp.qend = aln->qe;
         ovlp.qlen = (int)qread.length();

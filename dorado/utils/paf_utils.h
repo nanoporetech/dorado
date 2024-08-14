@@ -1,7 +1,6 @@
 #pragma once
 
-#include "read_pipeline/Overlap.h"
-#include "utils/cigar.h"
+#include "cigar.h"
 
 #include <iosfwd>
 #include <string>
@@ -9,6 +8,8 @@
 #include <vector>
 
 namespace dorado::utils {
+
+struct Overlap;
 
 struct PafEntry {
     std::string qname{"*"};

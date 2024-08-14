@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Overlap.h"
 #include "models/kits.h"
 #include "utils/cigar.h"
+#include "utils/overlap.h"
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
@@ -218,7 +218,7 @@ struct CorrectionAlignments {
     std::string read_name;
     std::vector<std::string> qnames = {};
     std::vector<std::vector<CigarOp>> cigars = {};
-    std::vector<Overlap> overlaps = {};
+    std::vector<utils::Overlap> overlaps = {};
 
     // Populated in CorrectionNode::populate_alignments if the alignment is useful
     std::string read_seq;

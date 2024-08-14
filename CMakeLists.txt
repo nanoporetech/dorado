@@ -224,7 +224,6 @@ add_library(dorado_lib
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
-    dorado/read_pipeline/Overlap.h
     dorado/read_pipeline/PairingNode.cpp
     dorado/read_pipeline/PairingNode.h
     dorado/read_pipeline/PolyACalculatorNode.cpp

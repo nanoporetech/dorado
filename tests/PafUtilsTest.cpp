@@ -1,5 +1,5 @@
 #include "TestUtils.h"
-#include "read_pipeline/Overlap.h"
+#include "utils/overlap.h"
 #include "utils/paf_utils.h"
 
 #include <catch2/catch.hpp>
@@ -47,7 +47,7 @@ TEST_CASE("PafUtilsTest: Test aux loading", TEST_GROUP) {
 
 TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
     SECTION("Record with forward strand mapping.") {
-        dorado::Overlap ovl;
+        dorado::utils::Overlap ovl;
         ovl.qstart = 0;
         ovl.qend = 100;
         ovl.qlen = 200;
@@ -72,7 +72,7 @@ TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
     }
 
     SECTION("Reverse complement record.") {
-        dorado::Overlap ovl;
+        dorado::utils::Overlap ovl;
         ovl.qstart = 0;
         ovl.qend = 100;
         ovl.qlen = 200;
