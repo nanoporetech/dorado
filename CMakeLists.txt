@@ -200,12 +200,14 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h    
+    dorado/read_pipeline/context_container.h
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
     dorado/read_pipeline/ErrorCorrectionMapperNode.h
+    dorado/read_pipeline/ErrorCorrectionPafReaderNode.cpp
+    dorado/read_pipeline/ErrorCorrectionPafReaderNode.h
     dorado/read_pipeline/CorrectionNode.cpp
     dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
@@ -214,6 +216,8 @@ add_library(dorado_lib
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
+    dorado/read_pipeline/ErrorCorrectionPafWriterNode.cpp
+    dorado/read_pipeline/ErrorCorrectionPafWriterNode.h
     dorado/read_pipeline/MessageSink.cpp
     dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
@@ -522,7 +526,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
-    
+
     enable_warnings_as_errors(dorado_io_lib)
 endif()
 
@@ -544,7 +548,7 @@ if (GENERATE_TEST_COVERAGE)
             EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
             DEPENDENCIES dorado_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE 
+            EXCLUDE
                 "${DORADO_3RD_PARTY_SOURCE}/*"
                 "${DORADO_3RD_PARTY_DOWNLOAD}/*"
                 "${PROJECT_SOURCE_DIR}/tests/*"

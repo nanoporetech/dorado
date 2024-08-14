@@ -415,7 +415,7 @@ if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
         exit 1
     fi
 
-    # Test if the malformed input will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
+    # Test if nonexistent input reads file will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
     #
     output_dir_correct=${output_dir_correct_root}/test-02
     mkdir -p ${output_dir_correct}
@@ -429,9 +429,9 @@ if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
         exit 1
     fi
 
-    # Test if the malformed input will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
+    # Test if nonexistent user-specified model path will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
     #
-    output_dir_correct=${output_dir_correct_root}/test-02
+    output_dir_correct=${output_dir_correct_root}/test-03
     mkdir -p ${output_dir_correct}
     #
     set +e
@@ -443,8 +443,47 @@ if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
         exit 1
     fi
 
-    echo "Dorado correct tests done!"
+    # Test decoupled mapping and inference stages.
+    #
+    output_dir_correct=${output_dir_correct_root}/test-04
+    mkdir -p ${output_dir_correct}
+    #
+    # Run the joined Dorado Correct pipeline (both mapping and inference stages) as a control.
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir_correct/joined.fasta
+    samtools faidx $output_dir_correct/joined.fasta
+    #
+    # Run separate stages.
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v --to-paf > $output_dir_correct/separate.paf
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v --from-paf $output_dir_correct/separate.paf > $output_dir_correct/separate.fasta
+    samtools faidx $output_dir_correct/separate.fasta
+    #
+    # Evaluate. Check that the number of generated sequences and their length is the same.
+    cut -f 1-2 $output_dir_correct/joined.fasta.fai | sort > $output_dir_correct/joined.fasta.seqs
+    cut -f 1-2 $output_dir_correct/separate.fasta.fai | sort > $output_dir_correct/separate.fasta.seqs
+    set +e
+    result=$(diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $result -ne "0" ]]; then
+        echo "Dorado Correct decoupled map/inference run does not generate the same output as the complete pipeline."
+        diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs
+        exit 1
+    fi
 
+    # Test if nonexistent user-specified input PAF file will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
+    #
+    output_dir_correct=${output_dir_correct_root}/test-05
+    mkdir -p ${output_dir_correct}
+    #
+    set +e
+    $dorado_bin correct $data_dir/read_correction/reads.fq -v --from-paf nonexistent.paf > $output_dir_correct/corrected_reads.fasta 2> $output_dir_correct/corrected_reads.fasta.stderr
+    error_matched=$(grep "\[error\] Input PAF path nonexistent.paf does not exist!" $output_dir_correct/corrected_reads.fasta.stderr | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $error_matched -ne "1" ]]; then
+        echo "Dorado correct does not fail gracefully on non-existent input PAF file!"
+        exit 1
+    fi
+
+    echo "Dorado correct tests done!"
 fi
 
 rm -rf $output_dir

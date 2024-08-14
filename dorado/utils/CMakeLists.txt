@@ -9,6 +9,8 @@ add_library(dorado_utils
     barcode_kits.h
     basecaller_utils.cpp
     basecaller_utils.h
+    cigar.cpp
+    cigar.h
     concurrency/async_task_executor.cpp
     concurrency/async_task_executor.h
     concurrency/detail/priority_task_queue.cpp
@@ -35,6 +37,7 @@ add_library(dorado_utils
     MergeHeaders.cpp
     MergeHeaders.h
     module_utils.h
+    overlap.h
     parameters.cpp
     parameters.h
     parse_custom_kit.cpp
@@ -55,12 +58,15 @@ add_library(dorado_utils
     thread_naming.h
     time_utils.cpp
     time_utils.h
+    timer_high_res.h
     tty_utils.h
     types.cpp
     types.h
     uuid_utils.cpp
     uuid_utils.h
-)
+    paf_utils.cpp
+    paf_utils.h
+ )
 
 target_compile_definitions(dorado_utils
     PUBLIC

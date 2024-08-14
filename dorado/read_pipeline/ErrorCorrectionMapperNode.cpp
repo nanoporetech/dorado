@@ -9,6 +9,7 @@
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
 #include "utils/PostCondition.h"
+#include "utils/alignment_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/thread_naming.h"
 
@@ -21,37 +22,6 @@
 #include <filesystem>
 #include <string>
 #include <vector>
-
-namespace {
-
-std::vector<dorado::CigarOp> parse_cigar(const uint32_t* cigar, uint32_t n_cigar) {
-    std::vector<dorado::CigarOp> cigar_ops;
-    cigar_ops.resize(n_cigar);
-    for (uint32_t i = 0; i < n_cigar; i++) {
-        const uint32_t op = cigar[i] & 0xf;
-        const uint32_t len = cigar[i] >> 4;
-
-        // minimap2 --eqx must be set
-        if (op == MM_CIGAR_EQ_MATCH) {
-            cigar_ops[i] = {dorado::CigarOpType::EQ_MATCH, len};
-        } else if (op == MM_CIGAR_X_MISMATCH) {
-            cigar_ops[i] = {dorado::CigarOpType::X_MISMATCH, len};
-        } else if (op == MM_CIGAR_INS) {
-            cigar_ops[i] = {dorado::CigarOpType::INS, len};
-        } else if (op == MM_CIGAR_DEL) {
-            cigar_ops[i] = {dorado::CigarOpType::DEL, len};
-        } else if (op == MM_CIGAR_MATCH) {
-            throw std::runtime_error(
-                    "cigar op MATCH is not supported must set minimap2 --eqx flag" +
-                    std::to_string(op));
-        } else {
-            throw std::runtime_error("Unknown cigar op: " + std::to_string(op));
-        }
-    }
-    return cigar_ops;
-}
-
-}  // namespace
 
 namespace dorado {
 
@@ -99,7 +69,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             }
         }
 
-        Overlap ovlp;
+        utils::Overlap ovlp;
         ovlp.qstart = aln->qs;
         ovlp.qend = aln->qe;
         ovlp.qlen = (int)qread.length();
@@ -126,7 +96,9 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             continue;
         }
 
-        auto cigar = parse_cigar(aln->p->cigar, aln->p->n_cigar);
+        // Non-const because it will be moved below.
+        std::vector<CigarOp> cigar = convert_mm2_cigar(aln->p->cigar, aln->p->n_cigar);
+
         {
             std::lock_guard<std::mutex> aln_lock(mtx);
 
