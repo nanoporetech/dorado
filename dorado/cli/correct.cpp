@@ -194,11 +194,11 @@ int correct(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (opt.in_reads_fns.size() > 1) {
-        spdlog::error("> Multi file input not yet handled");
+        spdlog::error("Multi file input not yet handled");
         std::exit(EXIT_FAILURE);
     }
     if (std::empty(opt.in_reads_fns)) {
-        spdlog::error("> At least one input reads file needs to be specified.");
+        spdlog::error("At least one input reads file needs to be specified.");
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_reads_fns.front())) {
@@ -218,7 +218,7 @@ int correct(int argc, char* argv[]) {
     const int aligner_threads = opt.threads;
     const int correct_threads = std::max(4, static_cast<int>(opt.threads / 4));
     const int correct_writer_threads = 1;
-    spdlog::debug("> Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
+    spdlog::debug("Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
                   correct_threads, correct_writer_threads);
 
     // If model dir is not specified, download the model.
@@ -298,7 +298,7 @@ int correct(int argc, char* argv[]) {
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
 
-    spdlog::info("> Starting");
+    spdlog::info("Starting");
 
     // Start the pipeline.
     if (!std::empty(opt.in_paf_fn)) {
@@ -316,7 +316,7 @@ int correct(int argc, char* argv[]) {
     // Report progress during output file finalisation.
     tracker.summarize();
 
-    spdlog::info("> Finished");
+    spdlog::info("Finished");
 
     if (remove_tmp_dir) {
         std::filesystem::remove_all(model_dir.parent_path());

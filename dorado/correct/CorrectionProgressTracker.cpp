@@ -39,7 +39,7 @@ void CorrectionProgressTracker::summarize() const {
     erase_progress_bar_line();
 
     if (m_num_reads_corrected > 0) {
-        spdlog::info("> Corrected reads written: {}", m_num_reads_corrected);
+        spdlog::info("Corrected reads written: {}", m_num_reads_corrected);
     }
 }
 
