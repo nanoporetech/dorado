@@ -9,8 +9,9 @@
 #include <unordered_map>
 
 namespace {
-const std::unordered_map<char, std::string> IUPAC_CODES = {
-        // clang-format off
+const std::unordered_map<char, std::string> IUPAC_CODES =
+        {
+                // clang-format off
         {'A', "A"},
         {'C', "C"},
         {'G', "G"},
@@ -27,7 +28,7 @@ const std::unordered_map<char, std::string> IUPAC_CODES = {
         {'H', "[ACT]"},
         {'V', "[ACG]"},
         {'N', "[ACGT]"},
-        // clang-format on
+                // clang-format on
 };
 
 std::string expand_motif_regex(const std::string& motif) {

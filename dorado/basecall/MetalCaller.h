@@ -23,7 +23,7 @@ using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
 class MetalCaller {
 protected:
-    MetalCaller(const CRFModelConfig &model_config) : m_config(model_config){};
+    MetalCaller(const CRFModelConfig &model_config) : m_config(model_config) {}
 
 public:
     virtual ~MetalCaller();

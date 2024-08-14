@@ -30,10 +30,10 @@ class ModelDownloader {
 public:
     // Model downloader with optional model search directory
     ModelDownloader(const std::optional<std::filesystem::path>& model_dir)
-            : m_models_dir(model_dir){};
+            : m_models_dir(model_dir) {}
 
     // Temporary model downloader
-    ModelDownloader() : m_models_dir(std::nullopt){};
+    ModelDownloader() : m_models_dir(std::nullopt) {}
 
     // Get the model search / downloads directory if any
     std::optional<std::filesystem::path> models_directory() const { return m_models_dir; }

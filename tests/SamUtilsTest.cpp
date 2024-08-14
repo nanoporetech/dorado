@@ -151,9 +151,9 @@ TEST_CASE(CUT_TAG " test parse with query_seq", CUT_TAG) {
 }
 
 TEST_CASE(CUT_TAG " test parse with no alignment section does not crash", CUT_TAG) {
-    std::string const sam = "@SQ\tSN:Lambda\tLN:48400\n@SQ\tSN:Ecoli\tLN:4594032\n";
-    std::string const long_seq = "ACGTACGTACGTACGTACGTACGTACGTACGT";
-    std::string const long_qstr = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%";
+    const std::string sam = "@SQ\tSN:Lambda\tLN:48400\n@SQ\tSN:Ecoli\tLN:4594032\n";
+    const std::string long_seq = "ACGTACGTACGTACGTACGTACGTACGTACGT";
+    const std::string long_qstr = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%";
     auto alignments = parse_sam_lines(sam, long_seq, long_qstr);
     CHECK(alignments.empty());
 }
@@ -161,8 +161,8 @@ TEST_CASE(CUT_TAG " test parse with no alignment section does not crash", CUT_TA
 TEST_CASE(CUT_TAG " test result sorting", CUT_TAG) {
     constexpr int secondary_flag = 256;
     constexpr int supplementary_flag = 2048;
-    std::string const long_seq = "ACGTACGTACGTACGTACGTACGTACGTACGT";
-    std::string const long_qstr = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%";
+    const std::string long_seq = "ACGTACGTACGTACGTACGTACGTACGTACGT";
+    const std::string long_qstr = "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%";
 
     // Create the lines in the mock SAM file.
     std::vector<std::string> alignment_sections;

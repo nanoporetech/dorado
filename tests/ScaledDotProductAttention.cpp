@@ -26,12 +26,12 @@ TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #else
     static constexpr c10::DeviceType valid_devices[] = {
 #if DORADO_CUDA_BUILD
-        c10::kCUDA,
+            c10::kCUDA,
 #endif  // DORADO_CUDA_BUILD
 #if DORADO_METAL_BUILD
-        c10::kMPS,
+            c10::kMPS,
 #endif  // DORADO_METAL_BUILD
-        c10::kCPU,
+            c10::kCPU,
     };
     const auto device_type = GENERATE(
             Catch::Generators::from_range(std::begin(valid_devices), std::end(valid_devices)));

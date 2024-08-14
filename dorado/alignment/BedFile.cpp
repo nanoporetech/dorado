@@ -10,7 +10,7 @@
 
 namespace dorado::alignment {
 
-BedFile::Entries const BedFile::NO_ENTRIES{};
+const BedFile::Entries BedFile::NO_ENTRIES{};
 
 const std::string & BedFile::filename() const { return m_file_name; }
 
