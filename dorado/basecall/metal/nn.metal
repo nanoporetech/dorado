@@ -1173,14 +1173,15 @@ kernel void lstm(const device LstmArgs* const args,
                 mm.mma(0, k_tiles, mat_a, mat_b);
                 mm.mma(2 * k_tiles, 3 * k_tiles, mat_a, mat_b);
 
-                for (int i = 0; i < SIMD_TILES_M; ++i) {
-                    const uint chunk_idx = (m_blk * SIMD_TILES_M + i) * TILE_SIZE + row;
-                    for (int j = 0; j < SIMD_TILES_N; j += 2) {
-                        simdgroup_store(mm.acc(i, j + 0), simd_res_buf[sid], 2 * TILE_SIZE);
-                        simdgroup_store(mm.acc(i, j + 1), simd_res_buf[sid] + TILE_SIZE,
+                for (int tile_i = 0; tile_i < SIMD_TILES_M; ++tile_i) {
+                    const uint chunk_idx = (m_blk * SIMD_TILES_M + tile_i) * TILE_SIZE + row;
+                    for (int tile_j = 0; tile_j < SIMD_TILES_N; tile_j += 2) {
+                        simdgroup_store(mm.acc(tile_i, tile_j + 0), simd_res_buf[sid],
+                                        2 * TILE_SIZE);
+                        simdgroup_store(mm.acc(tile_i, tile_j + 1), simd_res_buf[sid] + TILE_SIZE,
                                         2 * TILE_SIZE);
                         simdgroup_barrier(mem_flags::mem_threadgroup);
-                        const uint col = j * 2 + col_bits;
+                        const uint col = tile_j * 2 + col_bits;
                         const uint out_col = n_blk * SIMD_TILES_N * 2 + col;
                         const uint out_idx = out_col * batch_size + chunk_idx;
                         const float g = tanh_fast(simd_res_buf[sid][rb_idx + 0]);
@@ -1197,7 +1198,7 @@ kernel void lstm(const device LstmArgs* const args,
                     for (int j = 0; j < SIMD_TILES_N / 4; ++j) {
                         simdgroup_load(A, simd_out_buf[sid], SIMD_TILES_N * 2,
                                        ulong2(j * TILE_SIZE, 0));
-                        mat_c.store(A, i, n_blk * (SIMD_TILES_N / 4) + j);
+                        mat_c.store(A, tile_i, n_blk * (SIMD_TILES_N / 4) + j);
                     }
                 }
             }
