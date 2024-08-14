@@ -62,6 +62,6 @@ endif()
 
 download_and_extract(${POD5_URL} ${POD5_DIR})
 
-# pod5 makes use of threads, so make sure to link to them.
+# pod5 makes use of threads and jemalloc requires the dl* symbols, so make sure to link to them.
 find_package(Threads REQUIRED)
-list(APPEND POD5_LIBRARIES Threads::Threads)
+list(APPEND POD5_LIBRARIES Threads::Threads ${CMAKE_DL_LIBS})
