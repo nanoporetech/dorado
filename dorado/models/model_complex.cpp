@@ -135,7 +135,7 @@ ModelComplexSearch::ModelComplexSearch(const ModelComplex& complex,
         : m_complex(complex),
           m_chemistry(chemistry),
           m_suggestions(suggestions),
-          m_simplex_model_info(simplex()){};
+          m_simplex_model_info(simplex()) {}
 
 ModelInfo ModelComplexSearch::simplex() const {
     if (m_complex.is_path()) {

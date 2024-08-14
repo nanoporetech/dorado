@@ -713,7 +713,7 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
 #endif  // if DORADO_CUDA_BUILD
 
 ClampImpl::ClampImpl(float _min, float _max, bool _active)
-        : active(_active), min(_min), max(_max){};
+        : active(_active), min(_min), max(_max) {}
 
 at::Tensor ClampImpl::forward(at::Tensor x) {
     if (active) {

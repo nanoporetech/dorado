@@ -29,7 +29,7 @@ public:
     ~ErrorCorrectionMapperNode() = default;
     std::string get_name() const override { return "ErrorCorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override{};
+    void terminate(const FlushOptions&) override {};
     void restart() override {}
     // Main driver function.
     void process(Pipeline& pipeline);

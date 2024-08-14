@@ -22,9 +22,9 @@ public:
         FORCE = 3,
     };
 
-    BasecallerParams(){};
+    BasecallerParams() {}
     BasecallerParams(const std::filesystem::path& path) { update(path); };
-    ~BasecallerParams(){};
+    ~BasecallerParams() {}
 
     // Number of signal samples in a chunk
     int chunk_size() const { return m_chunk_size.val; }

@@ -230,7 +230,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
         }
 
         // Trim the sequence.
-        std::string_view const seq(read_seq.data() + min_start, max_end_pos - min_start);
+        const std::string_view seq(read_seq.data() + min_start, max_end_pos - min_start);
 
         // Search the sequence.
         if (best_only) {
