@@ -51,7 +51,7 @@ struct Options {
 };
 
 /// \brief Define the CLI options.
-ParserPtr create_cli(int& retVerbosity) {
+ParserPtr create_cli(int& verbosity) {
     ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado correct");
     parser->visible.add_description("Dorado read correction tool.");
     parser->visible.add_argument("reads").help(
@@ -89,7 +89,7 @@ ParserPtr create_cli(int& retVerbosity) {
             .default_value(false)
             .implicit_value(true)
             .nargs(0)
-            .action([&](const auto&) { ++retVerbosity; })
+            .action([&](const auto&) { ++verbosity; })
             .append();
     cli::add_device_arg(*parser);
 
@@ -185,7 +185,7 @@ int correct(int argc, char* argv[]) {
     const Options opt = set_options(*parser, verbosity);
 
     // Initialize the log level.
-    if (parser->visible.get<bool>("--verbose")) {
+    if (opt.verbosity) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
     }
 
