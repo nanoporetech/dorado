@@ -94,8 +94,8 @@ output_dir_correct=${output_dir_correct_root}/test-03
 mkdir -p ${output_dir_correct}
 #
 set +e
-$dorado_bin correct $data_dir/read_correction/reads.fq -v --model-path nonexistent/dir > $output_dir_correct/corrected_reads.fasta 2> $output_dir_correct/corrected_reads.fasta.stderr
-error_matched=$(grep "\[error\] Input model path nonexistent/dir does not exist!" $output_dir_correct/corrected_reads.fasta.stderr | wc -l | awk '{ print $1 }')
+$dorado_bin correct $data_dir/read_correction/reads.fq -v --model-path nonexistent/dir/ > $output_dir_correct/corrected_reads.fasta 2> $output_dir_correct/corrected_reads.fasta.stderr
+error_matched=$(grep "\[error\] Input model directory nonexistent/dir/ does not exist!" $output_dir_correct/corrected_reads.fasta.stderr | wc -l | awk '{ print $1 }')
 set -e
 if [[ $error_matched -ne "1" ]]; then
     echo "Dorado correct does not fail on non-existent input model path!"
