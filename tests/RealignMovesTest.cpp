@@ -41,7 +41,7 @@ TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
 }
 
 TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
-    SECTION("Test move table realignemnt of long identical sequences") {
+    SECTION("Test move table realignment of long identical sequences") {
         auto query =
                 std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target =
@@ -64,7 +64,7 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(new_moves == input_moves);
     }
 
-    SECTION("Test move table realignemnt where target is suffix of query") {
+    SECTION("Test move table realignment where target is suffix of query") {
         auto query = std::string(
                 "TTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target =
@@ -87,7 +87,7 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin() + 4 * 2));
     }
 
-    SECTION("Test 2  -  move table realignemnt where target is suffix of query") {
+    SECTION("Test 2  -  move table realignment where target is suffix of query") {
         auto query = std::string(
                 "TTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target =
@@ -111,7 +111,7 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin() + 4 * 3));
     }
 
-    SECTION("Test move table realignemnt where query is suffix of target") {
+    SECTION("Test move table realignment where query is suffix of target") {
         auto query =
                 std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target = std::string(
@@ -136,7 +136,7 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin()));
     }
 
-    SECTION("Test move table realignemnt where target is an infix of query") {
+    SECTION("Test move table realignment where target is an infix of query") {
         auto query = std::string(
                 "GGGGGACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTTGGGGG");
         auto target =
@@ -160,7 +160,7 @@ TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
         CHECK(new_moves.size() == input_moves.size() - (5 + 5) * 4);
     }
 
-    SECTION("Test move table realignemnt where query is an infix of target") {
+    SECTION("Test move table realignment where query is an infix of target") {
         auto query =
                 std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
         auto target = std::string(

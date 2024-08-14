@@ -344,6 +344,10 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     while (query_sequence[target_start] != target_sequence[query_start]) {
         ++query_start;
         ++target_start;
+        if (static_cast<size_t>(target_start) >= query_sequence.length() ||
+            static_cast<size_t>(query_start) >= target_sequence.length()) {
+            return failed_realignment;
+        }
     }
 
     EdlibAlignConfig align_config = edlibDefaultAlignConfig();
