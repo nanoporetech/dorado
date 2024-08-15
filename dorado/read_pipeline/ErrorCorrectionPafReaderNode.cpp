@@ -7,6 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <fstream>
 #include <vector>
 
 namespace dorado {
