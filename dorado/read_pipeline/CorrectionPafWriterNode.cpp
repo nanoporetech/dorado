@@ -1,4 +1,4 @@
-#include "ErrorCorrectionPafWriterNode.h"
+#include "CorrectionPafWriterNode.h"
 
 #include "utils/paf_utils.h"
 
@@ -6,11 +6,11 @@
 
 namespace dorado {
 
-ErrorCorrectionPafWriterNode::ErrorCorrectionPafWriterNode() : MessageSink(10000, 1) {}
+CorrectionPafWriterNode::CorrectionPafWriterNode() : MessageSink(10000, 1) {}
 
-ErrorCorrectionPafWriterNode::~ErrorCorrectionPafWriterNode() { stop_input_processing(); }
+CorrectionPafWriterNode::~CorrectionPafWriterNode() { stop_input_processing(); }
 
-void ErrorCorrectionPafWriterNode::input_thread_fn() {
+void CorrectionPafWriterNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (!std::holds_alternative<CorrectionAlignments>(message)) {
@@ -27,10 +27,10 @@ void ErrorCorrectionPafWriterNode::input_thread_fn() {
     }
 }
 
-stats::NamedStats ErrorCorrectionPafWriterNode::sample_stats() const {
+stats::NamedStats CorrectionPafWriterNode::sample_stats() const {
     return stats::from_obj(m_work_queue);
 }
 
-void ErrorCorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }
+void CorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }
 
 }  // namespace dorado

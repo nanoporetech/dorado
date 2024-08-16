@@ -11,11 +11,11 @@
 
 namespace dorado {
 
-class ErrorCorrectionPafReaderNode : public MessageSink {
+class CorrectionPafReaderNode : public MessageSink {
 public:
-    ErrorCorrectionPafReaderNode(std::string_view paf_file);
-    ~ErrorCorrectionPafReaderNode() = default;
-    std::string get_name() const override { return "ErrorCorrectionPafReaderNode"; }
+    CorrectionPafReaderNode(std::string_view paf_file);
+    ~CorrectionPafReaderNode() = default;
+    std::string get_name() const override { return "CorrectionPafReaderNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override {};
     void restart() override {}

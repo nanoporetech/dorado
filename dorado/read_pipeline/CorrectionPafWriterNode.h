@@ -9,11 +9,11 @@
 
 namespace dorado {
 
-class ErrorCorrectionPafWriterNode : public MessageSink {
+class CorrectionPafWriterNode : public MessageSink {
 public:
-    ErrorCorrectionPafWriterNode();
-    ~ErrorCorrectionPafWriterNode();
-    std::string get_name() const override { return "ErrorCorrectionPafWriterNode"; }
+    CorrectionPafWriterNode();
+    ~CorrectionPafWriterNode();
+    std::string get_name() const override { return "CorrectionPafWriterNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override;
     void restart() override {

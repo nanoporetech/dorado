@@ -22,16 +22,16 @@
 
 namespace dorado {
 
-class CorrectionNode : public MessageSink {
+class CorrectionInferenceNode : public MessageSink {
 public:
-    CorrectionNode(const std::string& fastq,
-                   int threads,
-                   const std::string& device,
-                   int infer_threads,
-                   int bach_size,
-                   const std::filesystem::path& model_dir);
-    ~CorrectionNode() { stop_input_processing(); }
-    std::string get_name() const override { return "CorrectionNode"; }
+    CorrectionInferenceNode(const std::string& fastq,
+                            int threads,
+                            const std::string& device,
+                            int infer_threads,
+                            int bach_size,
+                            const std::filesystem::path& model_dir);
+    ~CorrectionInferenceNode() { stop_input_processing(); }
+    std::string get_name() const override { return "CorrectionInferenceNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
     void restart() override {

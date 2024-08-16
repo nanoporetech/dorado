@@ -201,23 +201,23 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
     dorado/read_pipeline/context_container.h
+    dorado/read_pipeline/CorrectionInferenceNode.cpp
+    dorado/read_pipeline/CorrectionInferenceNode.h
+    dorado/read_pipeline/CorrectionMapperNode.cpp
+    dorado/read_pipeline/CorrectionMapperNode.h
+    dorado/read_pipeline/CorrectionPafReaderNode.cpp
+    dorado/read_pipeline/CorrectionPafReaderNode.h
+    dorado/read_pipeline/CorrectionPafWriterNode.cpp
+    dorado/read_pipeline/CorrectionPafWriterNode.h
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
-    dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
-    dorado/read_pipeline/ErrorCorrectionMapperNode.h
-    dorado/read_pipeline/ErrorCorrectionPafReaderNode.cpp
-    dorado/read_pipeline/ErrorCorrectionPafReaderNode.h
-    dorado/read_pipeline/CorrectionNode.cpp
-    dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/HtsReader.cpp
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/ErrorCorrectionPafWriterNode.cpp
-    dorado/read_pipeline/ErrorCorrectionPafWriterNode.h
     dorado/read_pipeline/MessageSink.cpp
     dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
