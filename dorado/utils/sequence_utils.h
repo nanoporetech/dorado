@@ -50,7 +50,14 @@ public:
 size_t count_trailing_chars(const std::string_view seq, char c);
 size_t count_leading_chars(const std::string_view seq, char c);
 
-// Result of overlapping two reads
+/**
+ * @brief Result of overlapping two reads.
+ *
+ * The `OverlapResult` struct holds the results of overlapping a query sequence with a target sequence.
+ * The coordinates provided for `target_start`, `target_end`, `query_start`, and `query_end` indicate positions in the respective sequences.
+ *
+ * For example, `query_start` represents the location of the start of the query sequence in the target sequence, and so on.
+ */
 struct OverlapResult {
     int32_t target_start;
     int32_t target_end;

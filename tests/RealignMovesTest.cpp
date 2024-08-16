@@ -39,3 +39,147 @@ TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
     CHECK(target_start == -1);
     CHECK(new_moves.empty());
 }
+
+TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
+    SECTION("Test move table realignment of long identical sequences") {
+        auto query =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, query_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);
+
+        CHECK(old_moves_offset == 0);
+        CHECK(query_start == 0);
+        CHECK(new_moves.size() == input_moves.size());
+        CHECK(new_moves == input_moves);
+    }
+
+    SECTION("Test move table realignment where target is suffix of query") {
+        auto query = std::string(
+                "TTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 8);
+        CHECK(target_start == 0);
+        CHECK(new_moves.size() == input_moves.size() - 4 * 2);
+        CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin() + 4 * 2));
+    }
+
+    SECTION("Test 2  -  move table realignment where target is suffix of query") {
+        auto query = std::string(
+                "TTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 4 * 3);
+        CHECK(target_start == 0);
+        CHECK(new_moves.size() == input_moves.size() - 4 * 3);
+        CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin() + 4 * 3));
+    }
+
+    SECTION("Test move table realignment where query is suffix of target") {
+        auto query =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target = std::string(
+                "TTTTTACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 0);
+        CHECK(target_start == 5);
+        CHECK(new_moves.size() == input_moves.size());
+        CHECK(std::equal(new_moves.begin(), new_moves.end(), input_moves.begin()));
+    }
+
+    SECTION("Test move table realignment where target is an infix of query") {
+        auto query = std::string(
+                "GGGGGACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTTGGGGG");
+        auto target =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 5 * 4);
+        CHECK(target_start == 0);
+        CHECK(new_moves.size() == input_moves.size() - (5 + 5) * 4);
+    }
+
+    SECTION("Test move table realignment where query is an infix of target") {
+        auto query =
+                std::string("ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        auto target = std::string(
+                "GGGGGACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTTGGGGG");
+
+        std::vector<uint8_t> input_moves;
+
+        for (char nucleotide : query) {
+            (void)nucleotide;
+            input_moves.push_back(1);
+            input_moves.push_back(0);
+            input_moves.push_back(0);
+        }
+
+        auto [old_moves_offset, target_start, new_moves] =
+                utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+
+        CHECK(old_moves_offset == 0);
+        CHECK(target_start == 5);
+        CHECK(new_moves.size() == input_moves.size());
+    }
+}
