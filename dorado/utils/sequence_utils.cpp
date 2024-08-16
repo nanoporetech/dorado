@@ -396,35 +396,33 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     std::vector<uint8_t> new_moves;
     for (size_t i = 0; i < alignment_size; i++) {
         auto alignment_entry = edlib_result.alignment[i];
-        if ((alignment_entry == 0) ||
-            (alignment_entry ==
-             3)) {  //Match or mismatch, need to update the new move table and move the cursor of the old move table.
+        if ((alignment_entry == 0) || (alignment_entry == 3)) {  // Match or mismatch
+            // Need to update the new move table and move the cursor of the old move table.
             new_moves.push_back(1);  // We have a match so we need a 1 (move)
             new_move_cursor++;
             old_move_cursor++;
 
-            while (moves[old_move_cursor] == 0 &&
-                   (old_move_cursor <
-                    int(moves.size()))) {  // If we have a zero in the old move table, we need to add zeros to the new move table to make it up
+            while ((old_move_cursor < int(moves.size())) && moves[old_move_cursor] == 0) {
                 if (old_move_cursor < (new_move_cursor + old_moves_offset)) {
                     old_move_cursor++;
                 } else {
+                    // If we have a zero in the old move table, we need to add zeros to the new move table to make it up
                     new_moves.push_back(0);
                     new_move_cursor++;
                     old_move_cursor++;
                 }
             }
             // Update the Query and target seq cursors
-        } else if (alignment_entry == 1) {  //Insertion to target
+        } else if (alignment_entry == 1) {  // Insertion to target
             // If we have an insertion in the target, we need to add a 1 to the new move table, and increment the new move table cursor. the old move table cursor and new are now out of sync and need fixing.
             new_moves.push_back(1);
             new_move_cursor++;
-        } else if (alignment_entry == 2) {  //Insertion to Query
+        } else if (alignment_entry == 2) {  // Insertion to Query
             // We have a query insertion, all we need to do is add zeros to the new move table to make it up, the signal can be assigned to the leftmost nucleotide in the sequence.
             new_moves.push_back(0);
             new_move_cursor++;
             old_move_cursor++;
-            while (moves[old_move_cursor] == 0 && (old_move_cursor < int(moves.size()))) {
+            while ((old_move_cursor < int(moves.size())) && moves[old_move_cursor] == 0) {
                 new_moves.push_back(0);
                 old_move_cursor++;
                 new_move_cursor++;
