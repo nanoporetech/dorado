@@ -31,6 +31,7 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#include "utils/string_utils.h"
 
 #include <argparse.hpp>
 #include <cxxpool.h>
@@ -122,136 +123,155 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
 
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
-            "model selection {fast,hac,sup}@v{version} for automatic model selection including "
-            "modbases, or path to existing model directory");
-
-    parser.visible.add_argument("data").help("the data directory or file (POD5/FAST5 format).");
-
-    parser.visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
-            .action([&](const auto&) { ++verbosity; })
-            .append();
-
-    parser.visible.add_argument("-l", "--read-ids")
-            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
-                  "reads will be basecalled")
-            .default_value(std::string(""));
-
-    parser.visible.add_argument("--resume-from")
-            .help("Resume basecalling from the given HTS file. Fully written read records are not "
-                  "processed again.")
-            .default_value(std::string(""));
-
-    parser.visible.add_argument("-n", "--max-reads").default_value(0).scan<'i', int>();
-
-    parser.visible.add_argument("--min-qscore")
-            .help("Discard reads with mean Q-score below this threshold.")
-            .default_value(0)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("-b", "--batchsize")
-            .default_value(default_parameters.batchsize)
-            .scan<'i', int>()
-            .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
-                  "closest multiple of 64.");
-
-    parser.visible.add_argument("-c", "--chunksize")
-            .default_value(default_parameters.chunksize)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("-o", "--overlap")
-            .default_value(default_parameters.overlap)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("-r", "--recursive")
-            .default_value(false)
-            .implicit_value(true)
-            .help("Recursively scan through directories to load FAST5 and POD5 files");
-
-    parser.visible.add_argument("--models-directory")
-            .default_value(std::string("."))
-            .help("optional directory to search for existing models or download new models into");
-
-    parser.visible.add_argument("--modified-bases")
-            .nargs(argparse::nargs_pattern::at_least_one)
-            .action([](const std::string& value) {
-                const auto& mods = models::modified_model_variants();
-                if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                    spdlog::error("'{}' is not a supported modification please select from {}",
-                                  value,
-                                  std::accumulate(std::next(mods.begin()), mods.end(), mods[0],
-                                                  [](const std::string& a, const std::string& b) {
-                                                      return a + ", " + b;
-                                                  }));
-                    std::exit(EXIT_FAILURE);
-                }
-                return value;
-            });
-
-    parser.visible.add_argument("--modified-bases-models")
-            .default_value(std::string())
-            .help("a comma separated list of modified base models");
-
-    parser.visible.add_argument("--modified-bases-threshold")
-            .default_value(default_parameters.methylation_threshold)
-            .scan<'f', float>()
-            .help("the minimum predicted methylation probability for a modified base to be emitted "
-                  "in an all-context model, [0, 1]");
-
-    parser.visible.add_argument("--emit-moves").default_value(false).implicit_value(true);
-
-    parser.visible.add_argument("--reference")
-            .help("Path to reference for alignment.")
-            .default_value(std::string(""));
-    parser.visible.add_argument("--bed-file")
-            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
-                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
-            .default_value(std::string(""));
-
-    parser.visible.add_argument("--kit-name")
-            .help("Enable barcoding with the provided kit name. Choose from: " +
-                  dorado::barcode_kits::barcode_kits_list_str() + ".")
-            .default_value(std::string{});
-    parser.visible.add_argument("--barcode-both-ends")
-            .help("Require both ends of a read to be barcoded for a double ended barcode.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--no-trim")
-            .help("Skip trimming of barcodes, adapters, and primers. If option is not chosen, "
-                  "trimming of all three is enabled.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--trim")
-            .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
-                  "Default behaviour is to trim all detected adapters, primers, or barcodes. "
-                  "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
-                  "adapters and "
-                  "primers, but not barcodes. The 'none' choice is equivelent to using --no-trim. "
-                  "Note that "
-                  "this only applies to DNA. RNA adapters are always trimmed.")
-            .default_value(std::string(""));
-    parser.visible.add_argument("--sample-sheet")
-            .help("Path to the sample sheet to use.")
-            .default_value(std::string(""));
-    parser.visible.add_argument("--barcode-arrangement")
-            .help("Path to file with custom barcode arrangement.");
-    parser.visible.add_argument("--barcode-sequences")
-            .help("Path to file with custom barcode sequences.");
-    parser.visible.add_argument("--primer-sequences")
-            .help("Path to file with custom primer sequences.")
-            .default_value(std::nullopt);
-    parser.visible.add_argument("--estimate-poly-a")
-            .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
-                  "dRNA use cases.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--poly-a-config")
-            .help("Configuration file for PolyA estimation to change default behaviours")
-            .default_value(std::string(""));
-    cli::add_device_arg(parser);
-    cli::add_basecaller_output_arguments(parser);
+            "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
+            "modbases, or path to existing model directory.");
+    parser.visible.add_argument("data").help("The data directory or file (POD5/FAST5 format).");
+    {
+        // Default "Optional arguments" group
+        parser.visible.add_argument("-v", "--verbose")
+                .default_value(false)
+                .implicit_value(true)
+                .nargs(0)
+                .action([&](const auto&) { ++verbosity; })
+                .append();
+        cli::add_device_arg(parser);
+        parser.visible.add_argument("--models-directory")
+                .default_value(std::string("."))
+                .help("Optional directory to search for existing models or download new models "
+                      "into.");
+        parser.visible.add_argument("--bed-file")
+                .help("Optional bed-file. If specified, overlaps between the alignments and "
+                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
+                      "read tag.")
+                .default_value(std::string(""));
+    }
+    {
+        parser.visible.add_group("Input data arguments");
+        parser.visible.add_argument("-r", "--recursive")
+                .default_value(false)
+                .implicit_value(true)
+                .help("Recursively scan through directories to load FAST5 and POD5 files.");
+        parser.visible.add_argument("-l", "--read-ids")
+                .help("A file with a newline-delimited list of reads to basecall. If not provided, "
+                      "all reads will be basecalled.")
+                .default_value(std::string(""));
+        parser.visible.add_argument("-n", "--max-reads")
+                .help("Limit the number of reads to be basecalled.")
+                .default_value(0)
+                .scan<'i', int>();
+        parser.visible.add_argument("--resume-from")
+                .help("Resume basecalling from the given HTS file. Fully written read records are "
+                      "not processed again.")
+                .default_value(std::string(""));
+    }
+    {
+        parser.visible.add_group("Output arguments");
+        parser.visible.add_argument("--min-qscore")
+                .help("Discard reads with mean Q-score below this threshold.")
+                .default_value(0)
+                .scan<'i', int>();
+        parser.visible.add_argument("--emit-moves")
+                .help("Write the move table to the 'mv' tag.")
+                .default_value(false)
+                .implicit_value(true);
+        cli::add_basecaller_output_arguments(parser);
+    }
+    {
+        parser.visible.add_group("Alignment arguments");
+        parser.visible.add_argument("--reference")
+                .help("Path to reference for alignment.")
+                .default_value(std::string(""));
+        alignment::mm2::add_options_string_arg(parser);
+    }
+    {
+        const std::string mods_codes = utils::join(models::modified_model_variants(), ", ");
+        parser.visible.add_group("Modified model arguments");
+        parser.visible.add_argument("--modified-bases")
+                .help("A space separated list of modified base codes. Choose from: " + mods_codes +
+                      ".")
+                .nargs(argparse::nargs_pattern::at_least_one)
+                .action([&mods_codes](const std::string& value) {
+                    const auto& mods = models::modified_model_variants();
+                    if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
+                        spdlog::error("'{}' is not a supported modification please select from {}",
+                                      value, mods_codes);
+                        std::exit(EXIT_FAILURE);
+                    }
+                    return value;
+                });
+        parser.visible.add_argument("--modified-bases-models")
+                .default_value(std::string())
+                .help("A comma separated list of modified base model paths.");
+        parser.visible.add_argument("--modified-bases-threshold")
+                .default_value(default_parameters.methylation_threshold)
+                .scan<'f', float>()
+                .help("The minimum predicted methylation probability for a modified base to be "
+                      "emitted in an all-context model, [0, 1].");
+    }
+    {
+        parser.visible.add_group("Barcoding arguments");
+        parser.visible.add_argument("--kit-name")
+                .help("Enable barcoding with the provided kit name. Choose from: " +
+                      dorado::barcode_kits::barcode_kits_list_str() + ".")
+                .default_value(std::string{});
+        parser.visible.add_argument("--sample-sheet")
+                .help("Path to the sample sheet to use.")
+                .default_value(std::string(""));
+        parser.visible.add_argument("--barcode-both-ends")
+                .help("Require both ends of a read to be barcoded for a double ended barcode.")
+                .default_value(false)
+                .implicit_value(true);
+        parser.visible.add_argument("--barcode-arrangement")
+                .help("Path to file with custom barcode arrangement.");
+        parser.visible.add_argument("--barcode-sequences")
+                .help("Path to file with custom barcode sequences.");
+        parser.visible.add_argument("--primer-sequences")
+                .help("Path to file with custom primer sequences.")
+                .default_value(std::nullopt);
+    }
+    {
+        parser.visible.add_group("Trimming arguments");
+        parser.visible.add_argument("--no-trim")
+                .help("Skip trimming of barcodes, adapters, and primers. If option is not chosen, "
+                      "trimming of all three is enabled.")
+                .default_value(false)
+                .implicit_value(true);
+        parser.visible.add_argument("--trim")
+                .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
+                      "Default behaviour is to trim all detected adapters, primers, or barcodes. "
+                      "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
+                      "adapters and primers, but not barcodes. The 'none' choice is equivelent to "
+                      "using --no-trim. Note that this only applies to DNA. "
+                      "RNA adapters are always trimmed.")
+                .default_value(std::string(""));
+    }
+    {
+        parser.visible.add_group("Poly-a arguments");
+        parser.visible.add_argument("--estimate-poly-a")
+                .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
+                      "dRNA use cases.")
+                .default_value(false)
+                .implicit_value(true);
+        parser.visible.add_argument("--poly-a-config")
+                .help("Configuration file for PolyA estimation to change default behaviours")
+                .default_value(std::string(""));
+    }
+    {
+        parser.visible.add_group("Advanced arguments");
+        parser.visible.add_argument("-b", "--batchsize")
+                .help("The number of chunks in a batch. If 0 an optimal batchsize will be "
+                      "selected.")
+                .default_value(default_parameters.batchsize)
+                .scan<'i', int>();
+        parser.visible.add_argument("-c", "--chunksize")
+                .help("The number of samples in a chunk.")
+                .default_value(default_parameters.chunksize)
+                .scan<'i', int>();
+        parser.visible.add_argument("-o", "--overlap")
+                .help("The number of samples overlapping neighbouring chunks.")
+                .default_value(default_parameters.overlap)
+                .scan<'i', int>();
+    }
     cli::add_internal_arguments(parser);
 }
 
@@ -612,8 +632,6 @@ int basecaller(int argc, char* argv[]) {
     utils::arg_parse::ArgParser parser("dorado");
     int verbosity = 0;
     set_dorado_basecaller_args(parser, verbosity);
-
-    alignment::mm2::add_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
