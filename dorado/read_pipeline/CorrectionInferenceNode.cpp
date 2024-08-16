@@ -109,8 +109,8 @@ std::vector<std::string> concatenate_corrected_windows(const std::vector<std::st
 
 namespace dorado {
 
-void CorrectionNode::concat_features_and_send(const std::vector<std::string>& to_decode,
-                                              const std::string& read_name) {
+void CorrectionInferenceNode::concat_features_and_send(const std::vector<std::string>& to_decode,
+                                                       const std::string& read_name) {
     LOG_TRACE("decoding window for {}", read_name);
     auto corrected_seqs = concatenate_corrected_windows(to_decode);
     if (corrected_seqs.size() == 1) {
@@ -125,7 +125,7 @@ void CorrectionNode::concat_features_and_send(const std::vector<std::string>& to
     }
 }
 
-void CorrectionNode::decode_fn() {
+void CorrectionInferenceNode::decode_fn() {
     utils::set_thread_name("corr_decode");
     spdlog::debug("Starting decode thread!");
 
@@ -161,7 +161,7 @@ void CorrectionNode::decode_fn() {
     }
 }
 
-void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
+void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
     utils::set_thread_name("corr_infer");
     spdlog::debug("Starting process thread for {}!", device_str);
     m_num_active_infer_threads++;
@@ -317,7 +317,7 @@ void CorrectionNode::infer_fn(const std::string& device_str, int mtx_idx, int ba
     }
 }
 
-void CorrectionNode::input_thread_fn() {
+void CorrectionInferenceNode::input_thread_fn() {
     auto thread_id = m_num_active_feature_threads++;
 
     auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
@@ -411,12 +411,12 @@ void CorrectionNode::input_thread_fn() {
     }
 }
 
-CorrectionNode::CorrectionNode(const std::string& fastq,
-                               int threads,
-                               const std::string& device,
-                               int infer_threads,
-                               const int batch_size,
-                               const std::filesystem::path& model_dir)
+CorrectionInferenceNode::CorrectionInferenceNode(const std::string& fastq,
+                                                 int threads,
+                                                 const std::string& device,
+                                                 int infer_threads,
+                                                 const int batch_size,
+                                                 const std::filesystem::path& model_dir)
         : MessageSink(1000, threads),
           m_fastq(fastq),
           m_model_config(parse_model_config(model_dir / "config.toml")),
@@ -456,12 +456,12 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
             }
             spdlog::info("Using batch size {} on device {} in inference thread {}.",
                          device_batch_size, dev, i);
-            m_infer_threads.push_back(
-                    std::thread(&CorrectionNode::infer_fn, this, dev, (int)d, device_batch_size));
+            m_infer_threads.push_back(std::thread(&CorrectionInferenceNode::infer_fn, this, dev,
+                                                  (int)d, device_batch_size));
         }
     }
     for (int i = 0; i < 4; i++) {
-        m_decode_threads.push_back(std::thread(&CorrectionNode::decode_fn, this));
+        m_decode_threads.push_back(std::thread(&CorrectionInferenceNode::decode_fn, this));
     }
     // Create index for fastq file.
     char* idx_name = fai_path(fastq.c_str());
@@ -476,7 +476,7 @@ CorrectionNode::CorrectionNode(const std::string& fastq,
     hts_free(idx_name);
 }
 
-void CorrectionNode::terminate(const FlushOptions&) {
+void CorrectionInferenceNode::terminate(const FlushOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
         infer_thread.join();
@@ -488,7 +488,7 @@ void CorrectionNode::terminate(const FlushOptions&) {
     m_decode_threads.clear();
 }
 
-stats::NamedStats CorrectionNode::sample_stats() const {
+stats::NamedStats CorrectionInferenceNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["num_reads_corrected"] = double(num_reads.load());
     stats["total_reads_in_input"] = total_reads_in_input;

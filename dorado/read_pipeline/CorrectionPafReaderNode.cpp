@@ -12,7 +12,7 @@
 
 namespace dorado {
 
-void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
+void CorrectionPafReaderNode::process(Pipeline& pipeline) {
     timer::TimerHighRes timer;
 
     std::ifstream file(m_paf_file);
@@ -75,10 +75,10 @@ void ErrorCorrectionPafReaderNode::process(Pipeline& pipeline) {
     spdlog::debug("PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
-ErrorCorrectionPafReaderNode::ErrorCorrectionPafReaderNode(const std::string_view paf_file)
+CorrectionPafReaderNode::CorrectionPafReaderNode(const std::string_view paf_file)
         : MessageSink(1, 1), m_paf_file(paf_file), m_reads_to_infer{0} {}
 
-stats::NamedStats ErrorCorrectionPafReaderNode::sample_stats() const {
+stats::NamedStats CorrectionPafReaderNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer);
     return stats;

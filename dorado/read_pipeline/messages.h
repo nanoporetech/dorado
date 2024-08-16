@@ -214,13 +214,13 @@ public:
 
 // Overlaps for error correction
 struct CorrectionAlignments {
-    // Populated in ErrorCorrectionMapperNode::extract_alignments
+    // Populated in CorrectionMapperNode::extract_alignments
     std::string read_name;
     std::vector<std::string> qnames;
     std::vector<std::vector<CigarOp>> cigars;
     std::vector<utils::Overlap> overlaps;
 
-    // Populated in CorrectionNode::populate_alignments if the alignment is useful
+    // Populated in CorrectionInferenceNode::populate_alignments if the alignment is useful
     std::string read_seq;
     std::vector<uint8_t> read_qual;
     std::vector<std::string> seqs;

@@ -25,10 +25,10 @@
 
 namespace dorado {
 
-void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
-                                                   int hits,
-                                                   const std::string& qread,
-                                                   const std::string& qname) {
+void CorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
+                                              int hits,
+                                              const std::string& qread,
+                                              const std::string& qname) {
     for (int j = 0; j < hits; j++) {
         // mapping region
         auto aln = &reg[j];
@@ -110,7 +110,7 @@ void ErrorCorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
     }
 }
 
-void ErrorCorrectionMapperNode::input_thread_fn() {
+void CorrectionMapperNode::input_thread_fn() {
     utils::set_thread_name("errcorr_node");
     BamPtr read;
     MmTbufPtr tbuf(mm_tbuf_init());
@@ -140,7 +140,7 @@ void ErrorCorrectionMapperNode::input_thread_fn() {
     }
 }
 
-void ErrorCorrectionMapperNode::load_read_fn() {
+void CorrectionMapperNode::load_read_fn() {
     utils::set_thread_name("errcorr_load");
     m_reads_queue.restart();
     HtsReader reader(m_index_file, {});
@@ -155,7 +155,7 @@ void ErrorCorrectionMapperNode::load_read_fn() {
     m_reads_queue.terminate();
 }
 
-void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
+void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
     utils::set_thread_name("errcorr_copy");
     while (!m_copy_terminate.load()) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
@@ -172,11 +172,11 @@ void ErrorCorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
     }
 }
 
-void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
+void CorrectionMapperNode::process(Pipeline& pipeline) {
     std::thread reader_thread;
     std::vector<std::thread> aligner_threads;
     std::thread copy_thread =
-            std::thread(&ErrorCorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
+            std::thread(&CorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
     do {
         spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
@@ -185,11 +185,10 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
         // 1. Start thread for generating reads.
-        reader_thread = std::thread(&ErrorCorrectionMapperNode::load_read_fn, this);
+        reader_thread = std::thread(&CorrectionMapperNode::load_read_fn, this);
         // 2. Start threads for aligning reads.
         for (int i = 0; i < m_num_threads; i++) {
-            aligner_threads.push_back(
-                    std::thread(&ErrorCorrectionMapperNode::input_thread_fn, this));
+            aligner_threads.push_back(std::thread(&CorrectionMapperNode::input_thread_fn, this));
         }
         // 3. Wait for alignments to finish and all reads to be read
         if (reader_thread.joinable()) {
@@ -223,9 +222,9 @@ void ErrorCorrectionMapperNode::process(Pipeline& pipeline) {
     }
 }
 
-ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_file,
-                                                     int threads,
-                                                     uint64_t index_size)
+CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
+                                           int threads,
+                                           uint64_t index_size)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
@@ -271,7 +270,7 @@ ErrorCorrectionMapperNode::ErrorCorrectionMapperNode(const std::string& index_fi
     m_index_seqs = m_index->index()->n_seq;
 }
 
-stats::NamedStats ErrorCorrectionMapperNode::sample_stats() const {
+stats::NamedStats CorrectionMapperNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["num_reads_aligned"] = m_alignments_processed.load();
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());

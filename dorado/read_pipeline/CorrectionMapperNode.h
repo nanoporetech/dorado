@@ -23,11 +23,11 @@
 
 namespace dorado {
 
-class ErrorCorrectionMapperNode : public MessageSink {
+class CorrectionMapperNode : public MessageSink {
 public:
-    ErrorCorrectionMapperNode(const std::string& index_file, int threads, uint64_t index_size);
-    ~ErrorCorrectionMapperNode() = default;
-    std::string get_name() const override { return "ErrorCorrectionMapperNode"; }
+    CorrectionMapperNode(const std::string& index_file, int threads, uint64_t index_size);
+    ~CorrectionMapperNode() = default;
+    std::string get_name() const override { return "CorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override {};
     void restart() override {}

@@ -259,11 +259,11 @@ int correct(int argc, char* argv[]) {
         const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
 
         // 2. Window generation, encoding + inference and decoding to generate final reads.
-        pipeline_desc.add_node<CorrectionNode>({hts_writer}, opt.in_reads_fns[0], correct_threads,
-                                               opt.device, opt.infer_threads, opt.batch_size,
-                                               model_dir);
+        pipeline_desc.add_node<CorrectionInferenceNode>(
+                {hts_writer}, opt.in_reads_fns[0], correct_threads, opt.device, opt.infer_threads,
+                opt.batch_size, model_dir);
     } else {
-        pipeline_desc.add_node<ErrorCorrectionPafWriterNode>({});
+        pipeline_desc.add_node<CorrectionPafWriterNode>({});
     }
 
     // Create the Pipeline from our description.
@@ -279,11 +279,11 @@ int correct(int argc, char* argv[]) {
     // is not part of the pipeline, so the stats are not automatically gathered.
     std::unique_ptr<MessageSink> aligner;
     if (!std::empty(opt.in_paf_fn)) {
-        aligner = std::make_unique<ErrorCorrectionPafReaderNode>(opt.in_paf_fn);
+        aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn);
     } else {
         // 1. Alignment node that generates alignments per read to be corrected.
-        aligner = std::make_unique<ErrorCorrectionMapperNode>(opt.in_reads_fns.front(),
-                                                              aligner_threads, opt.index_size);
+        aligner = std::make_unique<CorrectionMapperNode>(opt.in_reads_fns.front(), aligner_threads,
+                                                         opt.index_size);
     }
 
     // Set up stats counting.
@@ -302,9 +302,9 @@ int correct(int argc, char* argv[]) {
 
     // Start the pipeline.
     if (!std::empty(opt.in_paf_fn)) {
-        dynamic_cast<ErrorCorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
+        dynamic_cast<CorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
     } else {
-        dynamic_cast<ErrorCorrectionMapperNode*>(aligner.get())->process(*pipeline);
+        dynamic_cast<CorrectionMapperNode*>(aligner.get())->process(*pipeline);
     }
 
     // Wait for the pipeline to complete.  When it does, we collect

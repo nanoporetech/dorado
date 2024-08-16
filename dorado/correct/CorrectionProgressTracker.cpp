@@ -57,8 +57,8 @@ void CorrectionProgressTracker::update_progress_bar(const stats::NamedStats& sta
         return 0.;
     };
 
-    auto total_reads_in_input = int64_t(fetch_stat("CorrectionNode.total_reads_in_input"));
-    m_num_reads_corrected = int64_t(fetch_stat("CorrectionNode.num_reads_corrected"));
+    auto total_reads_in_input = int64_t(fetch_stat("CorrectionInferenceNode.total_reads_in_input"));
+    m_num_reads_corrected = int64_t(fetch_stat("CorrectionInferenceNode.num_reads_corrected"));
 
     auto index_seqs = int64_t(fetch_stat("index_seqs"));
     auto num_reads_aligned = int64_t(fetch_stat("num_reads_aligned"));
