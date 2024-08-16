@@ -53,45 +53,61 @@ struct Options {
 /// \brief Define the CLI options.
 ParserPtr create_cli(int& verbosity) {
     ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado correct");
-    parser->visible.add_description("Dorado read correction tool.");
-    parser->visible.add_argument("reads").help(
-            "Path to a file with reads to correct in FASTQ format.");
-    parser->visible.add_argument("-t", "--threads")
-            .help("Number of threads for processing. "
-                  "Default uses "
-                  "all available threads.")
-            .default_value(0)
-            .scan<'i', int>();
-    parser->visible.add_argument("--infer-threads")
-            .help("Number of threads per device.")
+
+    parser->visible.add_description("Dorado read correction tool");
+
+    {
+        // Positional arguments group
+        parser->visible.add_argument("reads").help(
+                "Path to a file with reads to correct in FASTQ format.");
+    }
+    {
+        // Default "Optional arguments" group
+        parser->visible.add_argument("-t", "--threads")
+                .help("Number of threads for processing. "
+                      "Default uses all available threads.")
+                .default_value(0)
+                .scan<'i', int>();
+        parser->visible.add_argument("--infer-threads")
+                .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
-            .default_value(2)
+                .default_value(2)
 #else
-            .default_value(1)
+                .default_value(1)
 #endif
-            .scan<'i', int>();
-    parser->visible.add_argument("-b", "--batch-size")
-            .help("Batch size for inference. Default: 0 for auto batch size detection.")
-            .default_value(0)
-            .scan<'i', int>();
-    parser->visible.add_argument("-i", "--index-size")
-            .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
-                  "lower memory footprint.")
-            .default_value(std::string{"8G"});
-    parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
-    parser->visible.add_argument("-p", "--from-paf")
-            .help("Path to a PAF file with alignments. Skips alignment computation.");
-    parser->visible.add_argument("--to-paf")
-            .help("Generate PAF alignments and skip consensus.")
-            .default_value(false)
-            .implicit_value(true);
-    parser->visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
-            .action([&](const auto&) { ++verbosity; })
-            .append();
-    cli::add_device_arg(*parser);
+                .scan<'i', int>();
+
+        cli::add_device_arg(*parser);
+
+        // Default "Optional arguments" group
+        parser->visible.add_argument("-v", "--verbose")
+                .default_value(false)
+                .implicit_value(true)
+                .nargs(0)
+                .action([&](const auto&) { ++verbosity; })
+                .append();
+    }
+    {
+        parser->visible.add_group("Input/output arguments");
+        parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
+        parser->visible.add_argument("-p", "--from-paf")
+                .help("Path to a PAF file with alignments. Skips alignment computation.");
+        parser->visible.add_argument("--to-paf")
+                .help("Generate PAF alignments and skip consensus.")
+                .default_value(false)
+                .implicit_value(true);
+    }
+    {
+        parser->visible.add_group("Advanced arguments");
+        parser->visible.add_argument("-b", "--batch-size")
+                .help("Batch size for inference. Default: 0 for auto batch size detection.")
+                .default_value(0)
+                .scan<'i', int>();
+        parser->visible.add_argument("-i", "--index-size")
+                .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
+                      "lower memory footprint.")
+                .default_value(std::string{"8G"});
+    }
 
     return parser;
 }
