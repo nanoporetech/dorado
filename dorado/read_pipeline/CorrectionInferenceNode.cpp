@@ -1,4 +1,4 @@
-#include "CorrectionNode.h"
+#include "CorrectionInferenceNode.h"
 
 #include "correct/conversions.h"
 #include "correct/decode.h"

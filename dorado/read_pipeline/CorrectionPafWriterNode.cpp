@@ -1,4 +1,4 @@
-#include "ErrorCorrectionPafWriterNode.h"
+#include "CorrectionPafWriterNode.h"
 
 #include "utils/paf_utils.h"
 

@@ -1,4 +1,4 @@
-#include "ErrorCorrectionPafReaderNode.h"
+#include "CorrectionPafReaderNode.h"
 
 #include "ClientInfo.h"
 #include "utils/alignment_utils.h"

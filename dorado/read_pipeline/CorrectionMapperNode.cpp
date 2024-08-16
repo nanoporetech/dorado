@@ -1,4 +1,4 @@
-#include "ErrorCorrectionMapperNode.h"
+#include "CorrectionMapperNode.h"
 
 #include "ClientInfo.h"
 #include "HtsReader.h"
