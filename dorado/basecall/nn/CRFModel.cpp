@@ -1,12 +1,12 @@
 #include "CRFModel.h"
 
-#include "utils/gpu_profiling.h"
+#include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
 #include "utils/module_utils.h"
-#include "utils/tensor_utils.h"
 
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -713,7 +713,7 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
 #endif  // if DORADO_CUDA_BUILD
 
 ClampImpl::ClampImpl(float _min, float _max, bool _active)
-        : active(_active), min(_min), max(_max){};
+        : active(_active), min(_min), max(_max) {}
 
 at::Tensor ClampImpl::forward(at::Tensor x) {
     if (active) {

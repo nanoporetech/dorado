@@ -43,18 +43,17 @@ public:
     void finalise_hts_files(const utils::HtsFile::ProgressCallback& progress_callback);
 
 private:
-    std::filesystem::path m_output_dir;
-    int m_htslib_threads;
+    const std::filesystem::path m_output_dir;
+    const int m_htslib_threads;
     SamHdrPtr m_header;
     std::atomic<int> m_processed_reads{0};
 
     HtsFiles m_files;
-    std::unique_ptr<std::thread> m_worker;
     void input_thread_fn();
     int write(bam1_t* record);
     const bool m_write_fastq;
     const bool m_sort_bam;
-    std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
+    const std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 
 }  // namespace dorado

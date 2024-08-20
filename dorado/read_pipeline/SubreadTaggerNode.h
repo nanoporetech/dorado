@@ -35,7 +35,7 @@ private:
     void input_thread_fn();
     void check_duplex_thread();
 
-    std::unique_ptr<std::thread> m_duplex_thread;
+    std::thread m_duplex_thread;
 
     std::mutex m_subread_groups_mutex;
     std::unordered_map<uint64_t, std::vector<SimplexReadPtr>> m_subread_groups;

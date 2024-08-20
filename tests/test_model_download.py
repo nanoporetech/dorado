@@ -11,7 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fnmatch import fnmatch
-import yaml
+import json
 
 Job = Tuple[str, str, Optional[str]]
 
@@ -22,6 +22,7 @@ def smoke_test_model(
     models_dir: Path,
     simplex_model: str,
     mods_model: Optional[str],
+    batch_size: Optional[int] = None,
 ):
     # Run a single read through the model.
     single_read = test_dir / "pod5" / "single_na24385.pod5"
@@ -39,29 +40,21 @@ def smoke_test_model(
         single_read,
     ]
 
+    if batch_size is not None:
+        args.extend(["--batchsize", str(int(batch_size))])
+
     if mods_model:
         mods_path = models_dir / mods_model
         assert mods_path.exists(), f"mods model does not exist at {mods_path}"
-        args.extend(["--modified-bases-models", mods_path])
+        args.extend(["--modified-bases-models", str(mods_path)])
+
+    cmd = " ".join([str(v) for v in args])
+    print(f"Running: '{cmd}'")
 
     subprocess.check_call(
         args,
         stdout=subprocess.DEVNULL,
     )
-
-
-def unpack(listy_dict: Dict, key: str) -> Dict:
-    """
-    The downloader --list-structured uses lists of dicts which are uniquely
-    keyed. Flatten this list into a dict for ease of use.
-    """
-    if not listy_dict:
-        return {}
-
-    out = {}
-    for dct in listy_dict.get(key, []):
-        out.update(dct)
-    return out
 
 
 def get_jobs(dorado_bin: Path) -> List[Job]:
@@ -70,18 +63,15 @@ def get_jobs(dorado_bin: Path) -> List[Job]:
     test jobs as [condition, simplex_model, mods_model]
     """
     jobs: List[Job] = []
-    # Grab the list of models
     structured_models_result = subprocess.check_output(
         [dorado_bin, "download", "--list-structured"]
     )
-    structured_models_dict = yaml.load(structured_models_result, Loader=yaml.Loader)
-
-    for condition, cond_i in structured_models_dict.items():
-        for sm, si in unpack(cond_i, "simplex_models").items():
-            jobs.append((condition, sm, None))
-            for mm, _ in unpack(si, "modified_models").items():
-                jobs.append((condition, sm, mm))
-
+    structured_models = json.loads(structured_models_result)
+    for condition, condition_info in structured_models.items():
+        for sx_model, sx_info in condition_info.get("simplex_models", {}).items():
+            jobs.append((condition, sx_model, None))
+            for mod_model, _ in sx_info.get("modified_models", {}).items():
+                jobs.append((condition, sx_model, mod_model))
     return jobs
 
 
@@ -91,6 +81,7 @@ def run_tests(
     models_dir: Optional[Path],
     simplex_glob: str,
     mods_glob: str,
+    batch_size: Optional[int] = None,
 ) -> int:
     """Test all models and mods models - returns number of cases tested"""
     count_tested = 0
@@ -109,7 +100,7 @@ def run_tests(
                 )
                 continue
 
-            if mods_glob and not fnmatch(mods, mods_glob):
+            if mods and mods_glob and not fnmatch(mods, mods_glob):
                 print(
                     f"Skipped {condition=}, {simplex=}, {mods=} matching {mods_glob=}"
                 )
@@ -122,6 +113,7 @@ def run_tests(
                 models_dir=Path(models_dir),
                 simplex_model=simplex,
                 mods_model=mods,
+                batch_size=batch_size,
             )
             count_tested += 1
     return count_tested
@@ -144,6 +136,12 @@ def main() -> int:
         type=Path,
         default=None,
         help="optional path to ALL models skipping download",
+    )
+    parser.add_argument(
+        "--batchsize",
+        required=False,
+        type=int,
+        help="optional batchsize passed to dorado",
     )
 
     parser.add_argument(
@@ -171,6 +169,7 @@ def main() -> int:
         models_dir=models_dir,
         simplex_glob=args.simplex_glob,
         mods_glob=args.mods_glob,
+        batch_size=args.batchsize,
     )
 
     return 0 if count_tested > 0 else 1

@@ -120,6 +120,7 @@ const BarcodeKitScoringParams RBK114_PARAMS{
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
         /*min_flank_score*/ 0.0f,
+        /*midstrand_flank_score*/ 0.95f,
 };
 
 const BarcodeKitScoringParams TWIST_PARAMS{
@@ -132,55 +133,56 @@ const BarcodeKitScoringParams TWIST_PARAMS{
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
         /*min_flank_score*/ 0.5f,
+        /*midstrand_flank_score*/ 0.95f,
 };
 
 // Some arrangement names are just aliases of each other. This is because they were released
 // as part of different kits, but they map to the same underlying arrangement.
 const KitInfo kit_16S = {
-        "16S",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
-        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24, BC_1_24,       DEFAULT_PARAMS,
+        "16S",         true,         true,    false,   RAB_1st_FRONT,  RAB_1st_REAR,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_24, BC_1_24, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_lwb = {
-        "LWB",         true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
-        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12, BC_1_12,       DEFAULT_PARAMS,
+        "LWB",         true,         true,    false,   LWB_1st_FRONT,  LWB_1st_REAR,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_12, BC_1_12, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_lwb24 = {
-        "LWB24",       true,         true,    LWB_1st_FRONT, LWB_1st_REAR,
-        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24, BC_1_24,       DEFAULT_PARAMS,
+        "LWB24",       true,         true,    false,   LWB_1st_FRONT,  LWB_1st_REAR,
+        LWB_2nd_FRONT, LWB_2nd_REAR, BC_1_24, BC_1_24, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb12 = {
-        "NB12",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
-        NB_2nd_FRONT, NB_2nd_REAR, NB_1_12, NB_1_12,      DEFAULT_PARAMS,
+        "NB12",       true,        true,    false,   NB_1st_FRONT,   NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_12, NB_1_12, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb24 = {
-        "NB24",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
-        NB_2nd_FRONT, NB_2nd_REAR, NB_1_24, NB_1_24,      DEFAULT_PARAMS,
+        "NB24",       true,        true,    false,   NB_1st_FRONT,   NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_24, NB_1_24, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_nb96 = {
-        "NB96",       true,        true,    NB_1st_FRONT, NB_1st_REAR,
-        NB_2nd_FRONT, NB_2nd_REAR, NB_1_96, NB_1_96,      DEFAULT_PARAMS,
+        "NB96",       true,        true,    false,   NB_1st_FRONT,   NB_1st_REAR,
+        NB_2nd_FRONT, NB_2nd_REAR, NB_1_96, NB_1_96, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rab = {
-        "RAB",         true,         true,    RAB_1st_FRONT, RAB_1st_REAR,
-        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12, BC_1_12,       DEFAULT_PARAMS,
+        "RAB",         true,         true,    false,   RAB_1st_FRONT,  RAB_1st_REAR,
+        RAB_2nd_FRONT, RAB_2nd_REAR, BC_1_12, BC_1_12, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rbk96 = {
-        "RBK96", false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96, {}, DEFAULT_PARAMS,
+        "RBK96", false, false, false, RBK4_FRONT, RBK4_REAR, "", "", RBK_1_96, {}, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rbk4 = {
-        "RBK4", false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12, {}, DEFAULT_PARAMS,
+        "RBK4", false, false, false, RBK4_FRONT, RBK4_REAR, "", "", BC_1_12, {}, DEFAULT_PARAMS,
 };
 
 const KitInfo kit_rlb = {
-        "RLB", true, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A, {}, DEFAULT_PARAMS,
+        "RLB", true, false, false, RLB_FRONT, RLB_REAR, "", "", BC_1_12A, {}, DEFAULT_PARAMS,
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
@@ -205,6 +207,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "NB13-24",
                  true,
                  true,
+                 false,
                  NB_1st_FRONT,
                  NB_1st_REAR,
                  NB_2nd_FRONT,
@@ -228,6 +231,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "PCR12",
                  true,
                  true,
+                 false,
                  BC_1st_FRONT,
                  BC_1st_REAR,
                  BC_2nd_FRONT,
@@ -242,6 +246,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "PCR96",
                  true,
                  true,
+                 false,
                  BC_1st_FRONT,
                  BC_1st_REAR,
                  BC_2nd_FRONT,
@@ -257,6 +262,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RBK001",
          {
                  "RBK",
+                 false,
                  false,
                  false,
                  RBK_FRONT,
@@ -276,6 +282,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "RBK096_kit14",
                  false,
                  false,
+                 false,
                  RBK4_kit14_FRONT,
                  RBK4_kit14_REAR,
                  "",
@@ -290,6 +297,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "RBK24",
                  false,
                  false,
+                 false,
                  RBK4_FRONT,
                  RBK4_REAR,
                  "",
@@ -302,6 +310,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-RBK114-24",
          {
                  "RBK24_kit14",
+                 false,
                  false,
                  false,
                  RBK4_kit14_FRONT,
@@ -325,6 +334,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "RPB24-Kit14",
                  true,
                  false,
+                 false,
                  RLB_FRONT,
                  RLB_REAR,
                  "",
@@ -337,6 +347,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"VSK-VMK001",
          {
                  "VMK",
+                 false,
                  false,
                  false,
                  RBK_FRONT,
@@ -353,6 +364,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "VMK4",
                  false,
                  false,
+                 false,
                  RBK4_FRONT,
                  RBK4_REAR,
                  "",
@@ -366,6 +378,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "PGx",
                  true,
                  true,
+                 false,
                  "CATACGAGAT",
                  "GTGACTGGAG",
                  "AGATCTACAC",
@@ -409,6 +422,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
                  "PGx",
                  true,
                  true,
+                 false,
                  "CATACGAGAT",
                  "GTGACTGGAG",
                  "AGATCTACAC",
@@ -922,10 +936,12 @@ std::string barcode_kits_list_str() {
 std::string normalize_barcode_name(const std::string& barcode_name) {
     std::string digits = "";
     // Normalize using only the digits at the end of the barcode name.
+    bool found_digits = false;
     for (auto rit = barcode_name.rbegin(); rit != barcode_name.rend(); ++rit) {
         if (std::isdigit(static_cast<unsigned char>(*rit))) {
             digits += *rit;
-        } else {
+            found_digits = true;
+        } else if (found_digits) {
             break;
         }
     }

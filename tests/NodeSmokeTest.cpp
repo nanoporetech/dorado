@@ -18,16 +18,16 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
+#include "torch_utils/trim_rapid_adapter.h"
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
-#include "utils/trim_rapid_adapter.h"
 
 #include <torch/cuda.h>
 
 #include <optional>
 
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
 
 #include <ATen/Functions.h>
@@ -177,10 +177,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
-    bool gpu{false};
-    if (torch::cuda::device_count() > 0) {
-        gpu = GENERATE(true, false);
-    }
+    auto gpu = GENERATE(true, false);
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -205,9 +202,11 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         device = "metal";
 #elif DORADO_CUDA_BUILD
         device = "cuda:all";
-        auto devices = dorado::utils::parse_cuda_device_string(device);
-        if (devices.empty()) {
-            SKIP("No CUDA devices found");
+        std::vector<std::string> devices;
+        std::string error_message;
+        if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
+            devices.empty()) {
+            SKIP("No CUDA devices found: " << error_message);
         }
 #else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
@@ -225,9 +224,9 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     model_config.normalise_basecaller_params();
 
     // Create runners
-    auto [runners, num_devices] =
-            dorado::api::create_basecall_runners(model_config, device, default_params.num_runners,
-                                                 1, 1.f, dorado::api::PipelineType::simplex, 0.f);
+    auto [runners, num_devices] = dorado::api::create_basecall_runners(
+            {model_config, device, 1.f, dorado::api::PipelineType::simplex, 0.f, false, false},
+            default_params.num_runners, 1);
     CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners),
                                            dorado::utils::default_parameters.overlap, model_name,
@@ -235,10 +234,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
-    bool gpu{false};
-    if (torch::cuda::device_count() > 0) {
-        gpu = GENERATE(true, false);
-    }
+    auto gpu = GENERATE(true, false);
     CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
     CAPTURE(pipeline_restart);
@@ -272,9 +268,11 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         device = "metal";
 #elif DORADO_CUDA_BUILD
         device = "cuda:all";
-        auto modbase_devices = dorado::utils::parse_cuda_device_string("cuda:all");
-        if (modbase_devices.empty()) {
-            SKIP("No CUDA devices found");
+        std::vector<std::string> devices;
+        std::string error_message;
+        if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
+            devices.empty()) {
+            SKIP("No CUDA devices found: " << error_message);
         }
 #else
         SKIP("Can't test GPU without DORADO_GPU_BUILD");
@@ -293,7 +291,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
         read->read_common.model_stride = int(model_stride);
         // The move table size needs rounding up.
-        size_t const move_table_size =
+        const size_t move_table_size =
                 (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
         read->read_common.moves.resize(move_table_size);
         std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(), 1);

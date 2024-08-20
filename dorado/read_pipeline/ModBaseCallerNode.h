@@ -63,8 +63,8 @@ private:
     size_t m_block_stride;
     size_t m_batch_size;
 
-    std::unique_ptr<std::thread> m_output_worker;
-    std::vector<std::unique_ptr<std::thread>> m_runner_workers;
+    std::thread m_output_worker;
+    std::vector<std::thread> m_runner_workers;
 
     utils::AsyncQueue<std::unique_ptr<RemoraChunk>> m_processed_chunks;
     std::vector<std::unique_ptr<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>> m_chunk_queues;

@@ -1,4 +1,4 @@
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 
 #include <catch2/catch.hpp>
 #include <spdlog/spdlog.h>

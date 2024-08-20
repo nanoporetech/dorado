@@ -26,7 +26,7 @@ private:
     void input_thread_fn();
 
     // The stride which was used to simplex call the data
-    int m_input_signal_stride;
+    const int m_input_signal_stride;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_encoded_pairs{0};

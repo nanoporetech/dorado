@@ -28,8 +28,8 @@ private:
     void worker_thread();
     void basespace(const std::string& template_read_id, const std::string& complement_read_id);
 
-    size_t m_num_worker_threads{1};
-    std::unique_ptr<std::thread> m_worker_thread;
+    const size_t m_num_worker_threads;
+    std::thread m_worker_thread;
     std::map<std::string, std::string> m_template_complement_map;
     const ReadMap m_reads;
 };

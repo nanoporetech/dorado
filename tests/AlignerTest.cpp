@@ -9,6 +9,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
+#include "utils/concurrency/multi_queue_thread_pool.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/types.h"
@@ -105,7 +106,9 @@ protected:
         CHECK(index_file_access->load_index(loaded_align_info->reference_file,
                                             loaded_align_info->minimap_options,
                                             2) == dorado::alignment::IndexLoadResult::success);
-        create_pipeline(index_file_access, bed_file_access, 2);
+        auto thread_pool = std::make_shared<dorado::utils::concurrency::MultiQueueThreadPool>(2);
+        create_pipeline(index_file_access, bed_file_access, thread_pool,
+                        dorado::utils::concurrency::TaskPriority::normal);
 
         dorado::ReadCommon read_common{};
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "models/kits.h"
+#include "utils/cigar.h"
+#include "utils/overlap.h"
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
@@ -210,27 +212,19 @@ public:
     std::shared_ptr<ClientInfo> client_info;
 };
 
-struct Overlap {
-    int qstart;
-    int qend;
-    int qlen;
-    int tstart;
-    int tend;
-    int tlen;
-    bool fwd;
-};
-
 // Overlaps for error correction
 struct CorrectionAlignments {
-    std::string read_name = "";
-    std::string read_seq = "";
-    std::vector<uint8_t> read_qual = {};
-    std::vector<Overlap> overlaps = {};
-    std::vector<std::vector<CigarOp>> cigars = {};
-    std::vector<std::vector<uint32_t>> mm2_cigars = {};
-    std::vector<std::string> seqs = {};
-    std::vector<std::vector<uint8_t>> quals = {};
-    std::vector<std::string> qnames = {};
+    // Populated in CorrectionMapperNode::extract_alignments
+    std::string read_name;
+    std::vector<std::string> qnames;
+    std::vector<std::vector<CigarOp>> cigars;
+    std::vector<utils::Overlap> overlaps;
+
+    // Populated in CorrectionInferenceNode::populate_alignments if the alignment is useful
+    std::string read_seq;
+    std::vector<uint8_t> read_qual;
+    std::vector<std::string> seqs;
+    std::vector<std::vector<uint8_t>> quals;
 
     // This is mostly to workaround an issue where sometimes
     // the tend of an overlap is much bigger than the
@@ -256,9 +250,6 @@ struct CorrectionAlignments {
         }
         for (auto& v : cigars) {
             si += v.size() * sizeof(CigarOp);
-        }
-        for (auto& v : mm2_cigars) {
-            si += v.size() * sizeof(uint32_t);
         }
         for (auto& s : seqs) {
             si += s.length();

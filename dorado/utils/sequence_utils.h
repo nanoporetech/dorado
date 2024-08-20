@@ -41,7 +41,23 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 
-// Result of overlapping two reads
+class BaseInfo {
+public:
+    static constexpr int NUM_BASES = 4;
+    static const std::vector<int> BASE_IDS;
+};
+
+size_t count_trailing_chars(const std::string_view seq, char c);
+size_t count_leading_chars(const std::string_view seq, char c);
+
+/**
+ * @brief Result of overlapping two reads.
+ *
+ * The `OverlapResult` struct holds the results of overlapping a query sequence with a target sequence.
+ * The coordinates provided for `target_start`, `target_end`, `query_start`, and `query_end` indicate positions in the respective sequences.
+ *
+ * For example, `query_start` represents the location of the start of the query sequence in the target sequence, and so on.
+ */
 struct OverlapResult {
     int32_t target_start;
     int32_t target_end;
@@ -62,15 +78,6 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
 // Bases are specified as capital letters.
 // Undefined output if characters other than A, C, G, T appear.
 std::string reverse_complement(const std::string& sequence);
-
-class BaseInfo {
-public:
-    static constexpr int NUM_BASES = 4;
-    static const std::vector<int> BASE_IDS;
-};
-
-size_t count_trailing_chars(const std::string_view seq, char c);
-size_t count_leading_chars(const std::string_view seq, char c);
 
 /**
  * @brief Realigns a move table based on a given query sequence and a target sequence.

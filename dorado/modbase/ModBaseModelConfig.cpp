@@ -1,8 +1,8 @@
 #include "ModBaseModelConfig.h"
 
+#include "torch_utils/tensor_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/tensor_utils.h"
 
 #include <toml.hpp>
 
@@ -96,7 +96,7 @@ ModBaseInfo get_modbase_info(
         size_t base_counts = 1;
     };
 
-    std::string const allowed_bases = "ACGT";
+    const std::string allowed_bases = "ACGT";
     std::array<ModelInfo, 4> model_info;
     for (int b = 0; b < 4; ++b) {
         model_info[b].alphabet.emplace_back(1, allowed_bases[b]);

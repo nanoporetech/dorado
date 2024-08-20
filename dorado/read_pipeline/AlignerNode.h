@@ -5,6 +5,7 @@
 #include "alignment/Minimap2Options.h"
 #include "read_pipeline/ClientInfo.h"
 #include "read_pipeline/MessageSink.h"
+#include "utils/concurrency/task_priority.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -16,6 +17,11 @@ struct bam1_t;
 typedef struct mm_tbuf_s mm_tbuf_t;
 
 namespace dorado {
+
+namespace utils::concurrency {
+class AsyncTaskExecutor;
+class MultiQueueThreadPool;
+}  // namespace utils::concurrency
 
 namespace alignment {
 class Minimap2Index;
@@ -31,7 +37,8 @@ public:
                 int threads);
     AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                 std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                int threads);
+                std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
+                utils::concurrency::TaskPriority pipeline_priority);
     ~AlignerNode() { stop_input_processing(); }
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
@@ -47,9 +54,17 @@ private:
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ClientInfo& client_info);
     std::shared_ptr<dorado::alignment::BedFile> get_bedfile(const ClientInfo& client_info,
                                                             const std::string& bedfile);
+    template <typename READ>
+    void align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read);
+
+    void align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
+                           BamMessage&& bam_message);
+
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
 
+    std::shared_ptr<utils::concurrency::MultiQueueThreadPool> m_thread_pool{};
+    utils::concurrency::TaskPriority m_pipeline_priority{utils::concurrency::TaskPriority::normal};
     std::shared_ptr<const alignment::Minimap2Index> m_index_for_bam_messages{};
     std::shared_ptr<const alignment::BedFile> m_bedfile_for_bam_messages{};
     std::vector<std::string> m_header_sequence_names{};

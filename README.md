@@ -22,10 +22,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.7.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.2-linux-x64.tar.gz)
- - [dorado-0.7.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.2-linux-arm64.tar.gz)
- - [dorado-0.7.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.2-osx-arm64.zip)
- - [dorado-0.7.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.2-win64.zip)
+ - [dorado-0.7.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-linux-x64.tar.gz)
+ - [dorado-0.7.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-linux-arm64.tar.gz)
+ - [dorado-0.7.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-osx-arm64.zip)
+ - [dorado-0.7.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -151,8 +151,10 @@ Beyond the traditional A, T, C, and G basecalling, Dorado can also detect modifi
 To call modifications, extend the models argument with a comma-separated list of modifications:
 
 ```
-$ dorado basecaller hac,5mCG_5hmCG pod5s/ > calls.bam
+$ dorado basecaller hac,5mCG_5hmCG,6mA pod5s/ > calls.bam
 ```
+
+In the example above, basecalling is performed with the detection of both 5mC/5hmC in CG contexts and 6mA in all contexts.
 
 Refer to the [DNA models](#dna-models) table's _Compatible Modifications_ column to see available modifications that can be called with the `--modified-bases` option.
 

@@ -6,6 +6,8 @@
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "messages.h"
+#include "utils/concurrency/async_task_executor.h"
+#include "utils/concurrency/multi_queue_thread_pool.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
@@ -17,6 +19,9 @@
 #include <vector>
 
 namespace {
+
+constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
+constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};
 
 std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         dorado::alignment::IndexFileAccess& index_file_access,
@@ -70,7 +75,10 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const std::string& bed_file,
                          const alignment::Minimap2Options& options,
                          int threads)
-        : MessageSink(10000, threads),
+        : MessageSink(10000, 1),
+          m_thread_pool(
+                  std::make_shared<utils::concurrency::MultiQueueThreadPool>(threads,
+                                                                             "align_node_pool")),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
@@ -90,17 +98,17 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
             m_header_sequence_names.emplace_back(entry.first);
         }
     }
-    start_input_processing([this] { input_thread_fn(); }, "aligner_node");
 }
 
 AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_access,
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
-                         int threads)
-        : MessageSink(10000, threads),
+                         std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
+                         utils::concurrency::TaskPriority pipeline_priority)
+        : MessageSink(10000, 1),
+          m_thread_pool(std::move(thread_pool)),
+          m_pipeline_priority(pipeline_priority),
           m_index_file_access(std::move(index_file_access)),
-          m_bed_file_access(std::move(bed_file_access)) {
-    start_input_processing([this] { input_thread_fn(); }, "aligner_node");
-}
+          m_bed_file_access(std::move(bed_file_access)) {}
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {
@@ -167,35 +175,48 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
+template <typename READ>
+void AlignerNode::align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read) {
+    executor.send([this, read = std::move(read)]() mutable {
+        thread_local MmTbufPtr tbuf{mm_tbuf_init()};
+        align_read_common(read->read_common, tbuf.get());
+        send_message_to_sink(std::move(read));
+    });
+}
+
+void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
+                                    BamMessage&& bam_message) {
+    executor.send([this, bam_message = std::move(bam_message)] {
+        thread_local MmTbufPtr tbuf{mm_tbuf_init()};
+        auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
+                               .align(bam_message.bam_ptr.get(), tbuf.get());
+        for (auto& record : records) {
+            if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
+                auto ref_id = record->core.tid;
+                add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
+            }
+            send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
+        }
+    });
+}
+
 void AlignerNode::input_thread_fn() {
     Message message;
-    mm_tbuf_t* tbuf = mm_tbuf_init();
-    auto align_read = [this, tbuf](auto&& read) {
-        align_read_common(read->read_common, tbuf);
-        send_message_to_sink(std::move(read));
-    };
+    // create an executor for the pool whose destructor will block till all tasks completed.
+    utils::concurrency::AsyncTaskExecutor task_executor{*m_thread_pool, m_pipeline_priority,
+                                                        MAX_PROCESSING_QUEUE_SIZE};
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            auto bam_message = std::get<BamMessage>(std::move(message));
-            auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                                   .align(bam_message.bam_ptr.get(), tbuf);
-            for (auto& record : records) {
-                if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
-                    auto ref_id = record->core.tid;
-                    add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
-                }
-                send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
-            }
+            align_bam_message(task_executor, std::get<BamMessage>(std::move(message)));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
-            align_read(std::get<SimplexReadPtr>(std::move(message)));
+            align_read(task_executor, std::get<SimplexReadPtr>(std::move(message)));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
-            align_read(std::get<DuplexReadPtr>(std::move(message)));
+            align_read(task_executor, std::get<DuplexReadPtr>(std::move(message)));
         } else {
             send_message_to_sink(std::move(message));
             continue;
         }
     }
-    mm_tbuf_destroy(tbuf);
 }
 
 stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }

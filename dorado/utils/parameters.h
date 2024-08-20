@@ -5,13 +5,6 @@
 namespace dorado::utils {
 
 struct DefaultParameters {
-#if DORADO_CUDA_BUILD
-    std::string device{"cuda:all"};
-#elif DORADO_METAL_BUILD
-    std::string device{"metal"};
-#else
-    std::string device{"cpu"};
-#endif
     int batchsize{0};
     int chunksize{10000};
     int overlap{500};

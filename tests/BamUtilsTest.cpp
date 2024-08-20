@@ -78,8 +78,8 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
         auto kit_info = dorado::barcode_kits::get_kit_info(KIT_NAME);
         dorado::SamHdrPtr sam_header(sam_hdr_init());
 
-        std::string const CUSTOM_BARCODE_NAME{"BC01"};
-        std::string const CUSTOM_BARCODE_SEQUENCE{"AAA"};
+        const std::string CUSTOM_BARCODE_NAME{"BC01"};
+        const std::string CUSTOM_BARCODE_SEQUENCE{"AAA"};
         std::unordered_map<std::string, std::string> custom_barcodes{
                 {CUSTOM_BARCODE_NAME, CUSTOM_BARCODE_SEQUENCE}};
 

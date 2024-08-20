@@ -232,7 +232,7 @@ public:
               m_kit(std::get<1>(key)),
               m_kit_info(get_kit_info()),
               m_chemistry(get_chemistry(key)),
-              m_sampling_rate(std::get<2>(key)){};
+              m_sampling_rate(std::get<2>(key)) {}
 
     inline Flowcell flowcell() const { return m_flowcell; }
     inline KitCode kit() const { return m_kit; }

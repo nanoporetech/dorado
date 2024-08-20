@@ -4,11 +4,11 @@
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
+#include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -22,9 +22,7 @@
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
-AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {
-    start_input_processing([this] { input_thread_fn(); }, "adapter_detect");
-}
+AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {}
 
 void AdapterDetectorNode::input_thread_fn() {
     Message message;

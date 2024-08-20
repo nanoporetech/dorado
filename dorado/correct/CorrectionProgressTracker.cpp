@@ -39,7 +39,7 @@ void CorrectionProgressTracker::summarize() const {
     erase_progress_bar_line();
 
     if (m_num_reads_corrected > 0) {
-        spdlog::info("> Corrected reads written: {}", m_num_reads_corrected);
+        spdlog::info("Corrected reads written: {}", m_num_reads_corrected);
     }
 }
 
@@ -57,8 +57,8 @@ void CorrectionProgressTracker::update_progress_bar(const stats::NamedStats& sta
         return 0.;
     };
 
-    auto total_reads_in_input = int64_t(fetch_stat("CorrectionNode.total_reads_in_input"));
-    m_num_reads_corrected = int64_t(fetch_stat("CorrectionNode.num_reads_corrected"));
+    auto total_reads_in_input = int64_t(fetch_stat("CorrectionInferenceNode.total_reads_in_input"));
+    m_num_reads_corrected = int64_t(fetch_stat("CorrectionInferenceNode.num_reads_corrected"));
 
     auto index_seqs = int64_t(fetch_stat("index_seqs"));
     auto num_reads_aligned = int64_t(fetch_stat("num_reads_aligned"));
@@ -109,7 +109,14 @@ void CorrectionProgressTracker::update_progress_bar(const stats::NamedStats& sta
         } else {
             internal_set_progress(m_last_progress_written);
         }
+    } else if (num_reads_to_infer > 0) {
+        set_description("Correcting");
+        const float progress =
+                100.f * static_cast<float>(m_num_reads_corrected) / num_reads_to_infer;
+        m_last_progress_written = progress;
+        internal_set_progress(progress);
     } else {
+        set_description("Loading alignments");
         internal_set_progress(0.f);
     }
 }

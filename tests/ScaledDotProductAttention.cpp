@@ -1,6 +1,9 @@
 #include <basecall/nn/TxModel.h>
+#include <c10/core/DeviceType.h>
 #include <c10/core/TensorOptions.h>
+#include <spdlog/spdlog.h>
 #include <torch/nn.h>
+#include <torch/version.h>
 
 // clang-format off
 #include <catch2/catch.hpp>
@@ -18,18 +21,33 @@ using namespace dorado::basecall::nn;
 
 TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2
-    spdlog::warn("TORCH_VERSION_MAJOR < 2 - Tests skipped - Scaled Dot Product Attention");
+    spdlog::warn("Test skipped - Scaled Dot Product Attention");
+
 #else
-    auto options = at::TensorOptions().dtype(torch::kFloat64).device(c10::kCUDA);
+    static constexpr c10::DeviceType valid_devices[] = {
+#if DORADO_CUDA_BUILD
+            c10::kCUDA,
+#endif  // DORADO_CUDA_BUILD
+#if DORADO_METAL_BUILD
+            c10::kMPS,
+#endif  // DORADO_METAL_BUILD
+            c10::kCPU,
+    };
+    const auto device_type = GENERATE(
+            Catch::Generators::from_range(std::begin(valid_devices), std::end(valid_devices)));
+    CAPTURE(device_type);
+
+    if ((device_type == c10::kCUDA && !torch::hasCUDA()) ||
+        (device_type == c10::kMPS && !torch::hasMPS())) {
+        spdlog::warn("Test skipped - Scaled Dot Product Attention: no support for {}",
+                     c10::DeviceTypeName(device_type));
+        return;
+    }
+
+    auto options = at::TensorOptions().dtype(torch::kFloat32).device(device_type);
 
     SECTION("No Mask") {
         torch::manual_seed(0);
-        if (!torch::hasCUDA()) {
-            spdlog::warn(
-                    "No Nvidia driver present - Test skipped - Scaled Dot Product Attention "
-                    "[no mask]");
-            return;
-        }
 
         torch::Tensor no_mask;
         std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);
@@ -39,13 +57,7 @@ TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
     }
 
     SECTION("Masked") {
-        torch::manual_seed(1);
-        if (!torch::hasCUDA()) {
-            spdlog::warn(
-                    "No Nvidia driver present -  Test skipped - Scaled Dot Product Attention "
-                    "[mask]");
-            return;
-        }
+        torch::manual_seed(123);
 
         torch::Tensor mask = torch::rand({8, 8}, options).gt(0.5);
         std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);

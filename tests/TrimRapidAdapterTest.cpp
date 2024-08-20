@@ -1,4 +1,4 @@
-#include "utils/trim_rapid_adapter.h"
+#include "torch_utils/trim_rapid_adapter.h"
 
 #include <ATen/Functions.h>
 #include <c10/core/ScalarType.h>

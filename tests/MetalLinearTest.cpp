@@ -1,4 +1,4 @@
-#include "utils/metal_utils.h"
+#include "torch_utils/metal_utils.h"
 
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()

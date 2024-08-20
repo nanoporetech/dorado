@@ -30,7 +30,6 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
           m_sort_bam(sort_bam && !write_fastq),
           m_sample_sheet(std::move(sample_sheet)) {
     std::filesystem::create_directories(m_output_dir);
-    start_input_processing([this] { input_thread_fn(); }, "brcd_demux");
 }
 
 BarcodeDemuxerNode::~BarcodeDemuxerNode() { stop_input_processing(); }
@@ -55,6 +54,16 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
         bc = std::string(bam_aux2Z(bam_tag));
     }
 
+    std::string run_id = "unknown_run_id";
+    auto read_group_tag = bam_aux_get(record, "RG");
+    if (read_group_tag) {
+        std::string read_group_string = std::string(bam_aux2Z(read_group_tag));
+        auto pos = read_group_string.find('_');
+        if (pos != std::string::npos) {
+            run_id = read_group_string.substr(0, pos);
+        }
+    }
+
     if (m_sample_sheet) {
         // experiment id and position id are not stored in the bam record, so we can't recover them to use here
         auto alias = m_sample_sheet->get_alias("", "", "", bc);
@@ -63,11 +72,11 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
             bam_aux_update_str(record, "BC", int(bc.size() + 1), bc.c_str());
         }
     }
-    // Check of existence of file for that barcode.
-    auto& file = m_files[bc];
+    // Check of existence of file for that barcode and run id.
+    auto& file = m_files[run_id + bc];
     if (!file) {
         // For new barcodes, create a new HTS file (either fastq or BAM).
-        std::string filename = bc + (m_write_fastq ? ".fastq" : ".bam");
+        std::string filename = run_id + "_" + bc + (m_write_fastq ? ".fastq" : ".bam");
         auto filepath = m_output_dir / filename;
         auto filepath_str = filepath.string();
 

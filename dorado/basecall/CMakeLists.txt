@@ -25,7 +25,7 @@ if (DORADO_GPU_BUILD)
         target_sources(dorado_basecall
             PRIVATE
             MetalCaller.cpp
-            MetalCaller.h            
+            MetalCaller.h
             MetalModelRunner.cpp
             MetalModelRunner.h
             nn/MetalCRFModel.cpp
@@ -34,12 +34,24 @@ if (DORADO_GPU_BUILD)
     else()
         target_sources(dorado_basecall
             PRIVATE
+            CudaChunkBenchmarks.cpp
+            CudaChunkBenchmarks.h
             CudaModelRunner.cpp
             CudaModelRunner.h
             CudaCaller.cpp
             CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
+            benchmarks/NVIDIA_A100_80GB_PCIe.cpp
+            benchmarks/NVIDIA_A100_80GB_PCIe.h
+            benchmarks/NVIDIA_H100_PCIe.cpp
+            benchmarks/NVIDIA_H100_PCIe.h
+            benchmarks/NVIDIA_RTX_A6000.cpp
+            benchmarks/NVIDIA_RTX_A6000.h
+            benchmarks/Quadro_GV100.cpp
+            benchmarks/Quadro_GV100.h
+            benchmarks/Tesla_V100-PCIE-16GB.cpp
+            benchmarks/Tesla_V100-PCIE-16GB.h
         )
     endif()
 endif()
@@ -54,20 +66,28 @@ target_include_directories(dorado_basecall
 
 target_link_libraries(dorado_basecall
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
+        dorado_torch_utils
         dorado_utils
     PRIVATE
-        ${KOI_LIBRARIES}
         spdlog::spdlog
 )
 
-target_include_directories(dorado_basecall
-    PRIVATE
-        ${KOI_INCLUDE}
-)
+if (TARGET koi)
+    target_link_libraries(dorado_basecall PRIVATE koi)
+
+    # Current koi can't be linked to directly since it doesn't provide an include path.
+    # TODO: once koi is updated we can remove this.
+    if (BUILD_KOI_FROM_SOURCE)
+        if (KOI_VERSION VERSION_GREATER "0.4.8")
+            message(FATAL_ERROR "This should no longer be necessary")
+        endif()
+        target_include_directories(dorado_basecall PRIVATE ${KOI_DIR}/koi/lib)
+    endif()
+endif()
 
 enable_warnings_as_errors(dorado_basecall)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_basecall REUSE_FROM dorado_utils)
+    target_precompile_headers(dorado_basecall REUSE_FROM dorado_torch_utils)
 endif()

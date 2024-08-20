@@ -17,13 +17,14 @@ struct BarcodeKitScoringParams {
     int front_barcode_window = 175;
     int rear_barcode_window = 175;
     float min_flank_score = 0.5f;
-    float midstrand_flank_score = 0.8f;
+    float midstrand_flank_score = 0.95f;
 };
 
 struct KitInfo {
     std::string name;
     bool double_ends;
     bool ends_different;
+    bool rear_only_barcodes;
     std::string top_front_flank;
     std::string top_rear_flank;
     std::string bottom_front_flank;

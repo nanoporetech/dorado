@@ -12,14 +12,16 @@ add_executable(dorado_tests
     alignment_processing_items_test.cpp
     arg_parse_ext_test.cpp
     AsyncQueueTest.cpp
+    async_task_executor_test.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp
     BamWriterTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
-    BarcodeDemuxerNodeTest.cpp    
+    BarcodeDemuxerNodeTest.cpp
     BasecallerParamsTest.cpp
     BedFileTest.cpp
+    CigarTest.cpp
     CliUtilsTest.cpp
     context_container_test.cpp
     CRFModelConfigTest.cpp
@@ -39,10 +41,12 @@ add_executable(dorado_tests
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     myers_test.cpp
+    multi_queue_thread_pool_test.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     PolyACalculatorTest.cpp
     PostConditionTest.cpp
+    priority_task_queue_test.cpp
     ReadFilterNodeTest.cpp
     ReadForwarderNodeTest.cpp
     ReadTest.cpp
@@ -51,14 +55,17 @@ add_executable(dorado_tests
     RNASplitTest.cpp
     SampleSheetTests.cpp
     SamUtilsTest.cpp
+    ScaledDotProductAttention.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp
     StringUtilsTest.cpp
+    synchronisation_test.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimRapidAdapterTest.cpp
     TrimTest.cpp
+    PafUtilsTest.cpp
 )
 if (NOT IOS)
     target_sources(dorado_tests
@@ -79,11 +86,7 @@ if (DORADO_GPU_BUILD)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
     else()
         target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
-        if (NOT DORADO_TX2)
-            target_sources(dorado_tests PRIVATE ScaledDotProductAttention.cpp)
-        endif()
     endif()
-
 endif()
 
 
@@ -100,6 +103,7 @@ add_library(dorado_tests_common STATIC
 )
 target_link_libraries(dorado_tests_common
     PUBLIC
+        dorado_torch_utils
         dorado_utils
         dorado_compat
 )
@@ -230,6 +234,8 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     # We also want these libs to take priority over any installed on the system, so prepend them.
     if (MSVC)
         set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/bin")
+    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        set_property(TEST ${TEST_BIN} APPEND PROPERTY ENVIRONMENT_MODIFICATION "LD_LIBRARY_PATH=path_list_prepend:${CMAKE_INSTALL_PREFIX}/lib")
     endif()
 
     # For some reason when TSan is enabled on x64/Linux we get a failure to load dependencies of torch, so add it explicitly to the path

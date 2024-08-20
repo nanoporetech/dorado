@@ -25,6 +25,8 @@ mkdir -p $output_dir
 test_output_file=$test_dir/${output_dir_name}_output.log
 
 echo dorado download models
+$dorado_bin download --list
+$dorado_bin download --list-structured
 $dorado_bin download --model ${model_name} --directory ${output_dir}
 model=${output_dir}/${model_name}
 $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
@@ -72,7 +74,7 @@ if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --mod
     echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
-if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then 
+if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo  "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
     exit 1
 fi
@@ -106,6 +108,14 @@ $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
+# Check that the aligner strips old alignment tags
+$dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
+num_nm_tags=$(samtools view $output_dir/realigned.bam | grep -o NM:i | wc -l)
+# This alignment creates a secondary output, so there should be exactly 2 NM:i tags
+if [[ $num_nm_tags -ne "2" ]]; then
+    echo "dorado aligner has emitted incorrect number of NM tags."
+    exit 1
+fi
 
 echo dorado aligner options test stage
 dorado_aligner_options_test() (
@@ -243,14 +253,14 @@ fi
 
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
-samtools quickcheck -u $output_dir/demux/EXP-PBC096_barcode04.bam
-num_demuxed_reads=$(samtools view -c $output_dir/demux/EXP-PBC096_barcode04.bam)
+samtools quickcheck -u $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam
+num_demuxed_reads=$(samtools view -c $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam)
 if [[ $num_demuxed_reads -ne "3" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
 fi
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/ --kit-name EXP-PBC096 --output-dir $output_dir/demux_from_folder
-samtools quickcheck -u $output_dir/demux_from_folder/EXP-PBC096_barcode04.bam
+samtools quickcheck -u $output_dir/demux_from_folder/unknown_run_id_EXP-PBC096_barcode04.bam
 num_summary_lines=$(wc -l < $output_dir/demux/barcoding_summary.txt)
 if [[ $num_summary_lines -ne "4" ]]; then
     echo "4 lines in summary expected. Found ${num_summary_lines}"
@@ -259,8 +269,8 @@ fi
 
 echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
-samtools quickcheck -u $output_dir/custom_demux/SQK-RPB004_barcode01.bam
-num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/SQK-RPB004_barcode01.bam)
+samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_SQK-RPB004_barcode01.bam
+num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_SQK-RPB004_barcode01.bam)
 if [[ $num_demuxed_reads -ne "2" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
     exit 1
@@ -348,21 +358,12 @@ test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/unclassified.bam ; do
+for bam in $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_unclassified.bam ; do
     if [ ! -f $bam ]; then
-        echo "Missing expected bam file $bam"
+        echo "Missing expected bam file $bam.  Generated files:"
+        ls -l $output_dir/demux_only_test/
         exit 1
     fi
 done
-
-# Test dorado correct with auto detected platform. If that fails run on cpu.
-if [[ "${TEST_DORADO_CORRECT}" == "1" ]]; then
-    $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir/corrected_reads.fq
-    num_corrected_reads=$(wc -l $output_dir/corrected_reads.fq | awk '{print $1}')
-    if [[ $num_corrected_reads -ne "12" ]]; then
-        echo "dorado correct command failed to generate expected reads"
-        exit 1
-    fi
-fi
 
 rm -rf $output_dir

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "basecall/ModelRunnerBase.h"
 #include "utils/parameters.h"
 
 #include <cmath>
@@ -21,9 +22,9 @@ public:
         FORCE = 3,
     };
 
-    BasecallerParams(){};
+    BasecallerParams() {}
     BasecallerParams(const std::filesystem::path& path) { update(path); };
-    ~BasecallerParams(){};
+    ~BasecallerParams() {}
 
     // Number of signal samples in a chunk
     int chunk_size() const { return m_chunk_size.val; }
@@ -81,4 +82,17 @@ protected:
     // Returns false - no change, true - updated
     bool set_value(Value& self, const Value& other);
 };
+
+struct CRFModelConfig;
+
+struct BasecallerCreationParams {
+    const basecall::CRFModelConfig& model_config;
+    const std::string& device;
+    float memory_limit_fraction;
+    PipelineType pipeline_type;
+    float batch_size_time_penalty;
+    bool run_batchsize_benchmarks;
+    bool emit_batchsize_benchmarks;
+};
+
 }  // namespace dorado::basecall

@@ -2,6 +2,7 @@
 
 #include "ClientInfo.h"
 #include "utils/sequence_utils.h"
+#include "utils/thread_naming.h"
 
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
@@ -162,6 +163,7 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
 }
 
 void PairingNode::pair_list_worker_thread(int tid) {
+    utils::set_thread_name("pair_list_thrd");
     Message message;
     while (get_input_message(message)) {
         // If this message isn't a read, just forward it to the sink.
@@ -247,6 +249,7 @@ void PairingNode::pair_list_worker_thread(int tid) {
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
+    utils::set_thread_name("pair_gen_thrd");
     at::InferenceMode inference_mode_guard;
 
     auto compare_reads_by_time = [](const SimplexReadPtr& read1, const SimplexReadPtr& read2) {
@@ -456,7 +459,6 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
     }
 
     m_pairing_func = &PairingNode::pair_list_worker_thread;
-    start_threads();
 }
 
 PairingNode::PairingNode(DuplexPairingParameters pairing_params,
@@ -468,6 +470,12 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
           m_max_num_reads(std::numeric_limits<size_t>::max()) {
     switch (pairing_params.read_order) {
     case ReadOrder::BY_CHANNEL:
+        // N.B. with BY_CHANNEL ordering the ont_basecall_client application has a dependency
+        // on how the the cache is structured, i.e. that the number of channels in the cache
+        // is set to pairing_params.cache_depth. This is so that it can calculate the theoretical
+        // max cache size given it knows the max number of reads per channel that it will send.
+        // If the way the cache is structured is changed the ont_basecall_client code will also
+        // need to be updated otherwise there is a risk of deadlock.
         m_max_num_keys = pairing_params.cache_depth;
         spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
         break;
@@ -480,14 +488,13 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
                                  dorado::to_string(pairing_params.read_order));
     }
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
-    start_threads();
 }
 
 void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.push_back(std::make_unique<std::thread>(std::thread(m_pairing_func, this, i)));
+        m_workers.emplace_back([=] { (this->*m_pairing_func)(i); });
         ++m_num_active_worker_threads;
     }
 }
@@ -501,9 +508,7 @@ void PairingNode::terminate(const FlushOptions& flush_options) {
 void PairingNode::terminate_impl() {
     terminate_input_queue();
     for (auto& m : m_workers) {
-        if (m->joinable()) {
-            m->join();
-        }
+        m.join();
     }
     m_workers.clear();
 

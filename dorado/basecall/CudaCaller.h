@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "BasecallerParams.h"
 #include "CRFModelConfig.h"
 #include "api/caller_creation.h"
 #include "decode/Decoder.h"
@@ -22,11 +23,7 @@ namespace dorado::basecall {
 
 class CudaCaller {
 public:
-    CudaCaller(const CRFModelConfig &model_config,
-               const std::string &device,
-               float memory_limit_fraction,
-               PipelineType pipeline_type,
-               float batch_size_time_penalty);
+    CudaCaller(const BasecallerCreationParams &params);
 
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
@@ -55,28 +52,27 @@ private:
     }
 
     std::pair<int64_t, int64_t> calculate_memory_requirements() const;
-    void determine_batch_dims(float memory_limit_fraction,
+    void determine_batch_dims(const BasecallerCreationParams &params,
                               int batch_size,
-                              int chunk_size,
-                              float batch_size_time_penalty);
+                              int chunk_size);
 
     void start_threads();
     void cuda_thread_fn();
 
     const CRFModelConfig m_config;
-    std::string m_device;
+    const std::string m_device;
     std::unique_ptr<decode::Decoder> m_decoder;
     decode::DecoderOptions m_decoder_options;
-    at::TensorOptions m_options;
+    const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::atomic<bool> m_terminate{false};
     std::deque<std::shared_ptr<NNTask>> m_input_queue;
     std::mutex m_input_lock;
     std::condition_variable m_input_cv;
-    std::unique_ptr<std::thread> m_cuda_thread;
+    std::thread m_cuda_thread;
     int m_num_input_features;
-    bool m_low_latency;
-    PipelineType m_pipeline_type;
+    const bool m_low_latency;
+    const PipelineType m_pipeline_type;
     c10::cuda::CUDAStream m_stream;
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to

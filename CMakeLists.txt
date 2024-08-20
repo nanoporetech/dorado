@@ -34,11 +34,14 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 if(WIN32)
-  # all third parties are release builds, so we must match the windows runtime
-  set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
-  message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
-  message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
-  message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+    # all third parties are release builds, so we must match the windows runtime
+    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    message(STATUS "toolset: ${CMAKE_GENERATOR_TOOLSET}")
+    message(STATUS "platform: ${CMAKE_GENERATOR_PLATFORM}")
+    message(STATUS "vs platform: ${CMAKE_VS_PLATFORM_NAME}")
+
+    # MSVC won't parallelise individual targets unless you tell it to.
+    add_compile_options("$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/MP${WIN_THREADS}>")
 endif()
 
 if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
@@ -130,6 +133,7 @@ enable_testing()
 
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/utils)
+add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/basecall)
@@ -196,14 +200,18 @@ add_library(dorado_lib
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
     dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h    
+    dorado/read_pipeline/context_container.h
+    dorado/read_pipeline/CorrectionInferenceNode.cpp
+    dorado/read_pipeline/CorrectionInferenceNode.h
+    dorado/read_pipeline/CorrectionMapperNode.cpp
+    dorado/read_pipeline/CorrectionMapperNode.h
+    dorado/read_pipeline/CorrectionPafReaderNode.cpp
+    dorado/read_pipeline/CorrectionPafReaderNode.h
+    dorado/read_pipeline/CorrectionPafWriterNode.cpp
+    dorado/read_pipeline/CorrectionPafWriterNode.h
     dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
-    dorado/read_pipeline/ErrorCorrectionMapperNode.cpp
-    dorado/read_pipeline/ErrorCorrectionMapperNode.h
-    dorado/read_pipeline/CorrectionNode.cpp
-    dorado/read_pipeline/CorrectionNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
     dorado/read_pipeline/FakeDataLoader.h
     dorado/read_pipeline/HtsReader.cpp
@@ -232,8 +240,8 @@ add_library(dorado_lib
     dorado/read_pipeline/ReadSplitNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
     dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/ResumeLoaderNode.cpp
-    dorado/read_pipeline/ResumeLoaderNode.h
+    dorado/read_pipeline/ResumeLoader.cpp
+    dorado/read_pipeline/ResumeLoader.h
     dorado/read_pipeline/ScalerNode.cpp
     dorado/read_pipeline/ScalerNode.h
     dorado/read_pipeline/StereoDuplexEncoderNode.cpp
@@ -305,7 +313,6 @@ target_include_directories(dorado_lib
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${TORCH_INCLUDE_DIRS}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
@@ -323,15 +330,14 @@ if(NOT SKIP_HDF_PLUGINS)
 endif()
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_lib REUSE_FROM dorado_utils)
+    target_precompile_headers(dorado_lib REUSE_FROM dorado_torch_utils)
 endif()
 
 target_link_libraries(dorado_lib
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
         htslib
         edlib
-        dorado_utils
         dorado_basecall
         dorado_modbase
     PRIVATE
@@ -423,6 +429,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         # torch may bundle it's own specific copy of the cuda libs. if it does, we want everything to point at them
         file(GLOB TORCH_CUDA_LIBS "${TORCH_LIB}/lib/${LIB}")
         if(TORCH_CUDA_LIBS)
+            # Sort the list so that we process in order: libX.so -> libX.so.1 -> libX.so.1.1.1
+            list(SORT TORCH_CUDA_LIBS)
             foreach(TORCH_CUDA_LIB IN LISTS TORCH_CUDA_LIBS)
                 # create links to the torch bundled libs with hashes in the name
                 # e.g. libcublas.so.11 => libcublas-3b81d170.so.11
@@ -430,14 +438,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 string(REGEX REPLACE "-[0-9a-f]+[.]" "." link ${target})
                 get_filename_component(target_name ${target} NAME)
                 get_filename_component(link_name ${link} NAME)
-                execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
+                if (NOT target_name STREQUAL link_name)
+                    execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
 
-                # create links to the versioned links above
-                # e.g. libcublas.so => libcublas.so.11
-                string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
-                execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-                install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
+                    # create links to the versioned links above
+                    # e.g. libcublas.so => libcublas.so.11
+                    string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
+                    if (NOT base_link STREQUAL link_name)
+                        execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
+                    endif()
+                endif()
             endforeach()
         else()
             # bundle the libraries from the cuda toolkit
@@ -514,7 +526,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
         ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     )
-    
+
     enable_warnings_as_errors(dorado_io_lib)
 endif()
 
@@ -528,7 +540,7 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
         include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_utils)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
         endforeach()
         setup_target_for_coverage_gcovr_html(
@@ -536,7 +548,11 @@ if (GENERATE_TEST_COVERAGE)
             EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
             DEPENDENCIES dorado_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE "${PROJECT_SOURCE_DIR}/dorado/3rdparty/*" "${PROJECT_SOURCE_DIR}/tests/*"
+            EXCLUDE
+                "${DORADO_3RD_PARTY_SOURCE}/*"
+                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
+                "${PROJECT_SOURCE_DIR}/tests/*"
+                "${CMAKE_BINARY_DIR}/3rdparty/*"
             )
     endif()
 endif()

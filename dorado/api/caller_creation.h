@@ -1,5 +1,6 @@
 #pragma once
 
+#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunnerBase.h"
 
 #include <filesystem>
@@ -27,11 +28,7 @@ using dorado::basecall::PipelineType;
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
-        const basecall::CRFModelConfig& model_config,
-        const std::string& device,
-        float memory_limit_fraction,
-        PipelineType pipeline_type,
-        float batch_size_time_penalty);
+        const basecall::BasecallerCreationParams& params);
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
         const basecall::CRFModelConfig& model_config,

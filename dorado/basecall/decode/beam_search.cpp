@@ -98,7 +98,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
         qstring[i] = static_cast<char>(33.5f + qscore);
     }
 
-    return make_tuple(sequence, qstring);
+    return make_tuple(std::move(sequence), std::move(qstring));
 }
 
 // Incorporates NUM_NEW_BITS into a Castagnoli CRC32, aka CRC32C

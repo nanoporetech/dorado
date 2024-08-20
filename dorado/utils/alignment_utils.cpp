@@ -1,5 +1,8 @@
 #include "alignment_utils.h"
 
+#include <minimap.h>
+
+#include <ostream>
 #include <sstream>
 
 namespace dorado::utils {

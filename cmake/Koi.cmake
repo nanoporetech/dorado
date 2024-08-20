@@ -41,8 +41,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         endif()
         add_subdirectory(${KOI_DIR}/koi/lib)
 
-        set(KOI_INCLUDE ${KOI_DIR}/koi/lib)
-        set(KOI_LIBRARIES koi)
     else()
         find_package(CUDAToolkit REQUIRED)
         get_best_compatible_koi_version(KOI_CUDA)
@@ -51,12 +49,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             download_and_extract(${KOI_CDN_URL}/${KOI_DIR}.tar.gz ${KOI_DIR})
-            set(KOI_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${KOI_DIR}/${KOI_DIR}/lib/libkoi.a)
+            set(KOI_LIBRARY ${DORADO_3RD_PARTY_DOWNLOAD}/${KOI_DIR}/${KOI_DIR}/lib/libkoi.a)
         elseif(WIN32)
             download_and_extract(${KOI_CDN_URL}/${KOI_DIR}.zip ${KOI_DIR})
-            set(KOI_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${KOI_DIR}/${KOI_DIR}/lib/koi.lib)
+            set(KOI_LIBRARY ${DORADO_3RD_PARTY_DOWNLOAD}/${KOI_DIR}/${KOI_DIR}/lib/koi.lib)
         endif()
         set(KOI_INCLUDE ${DORADO_3RD_PARTY_DOWNLOAD}/${KOI_DIR}/${KOI_DIR}/include)
+
+        add_library(koi STATIC IMPORTED)
+        set_target_properties(koi
+            PROPERTIES
+                IMPORTED_LOCATION ${KOI_LIBRARY}
+                INTERFACE_INCLUDE_DIRECTORIES ${KOI_INCLUDE}
+        )
 
     endif()
 endif()

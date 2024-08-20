@@ -4,10 +4,10 @@
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
 #include "demux/barcoding_info.h"
+#include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/trim.h"
 #include "utils/types.h"
 
 #include <htslib/sam.h>
@@ -46,9 +46,7 @@ const dorado::demux::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo&
 
 namespace dorado {
 
-BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {
-    start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
-}
+BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {}
 
 void BarcodeClassifierNode::input_thread_fn() {
     Message message;

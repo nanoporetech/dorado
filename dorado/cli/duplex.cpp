@@ -19,22 +19,22 @@
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
+#include "torch_utils/auto_detect_device.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
-
 #if DORADO_CUDA_BUILD
-#include "utils/cuda_utils.h"
+#include "torch_utils/cuda_utils.h"
 #endif
-#include "utils/duplex_utils.h"
+#include "torch_utils/duplex_utils.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
-#include "utils/torch_utils.h"
 #include "utils/tty_utils.h"
 #include "utils/types.h"
 
@@ -46,6 +46,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -94,8 +95,17 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
                                     const bool recursive_file_loading) {
     const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
     if (model_complex.is_path()) {
+        if (!fs::exists(std::filesystem::path(model_arg))) {
+            spdlog::error(
+                    "Model path does not exist at: '{}' - Please download the model or use a model "
+                    "complex",
+                    model_arg);
+            std::exit(EXIT_FAILURE);
+        }
+
         // Get the model name
         const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
+
         const auto model_name = model_path.filename().string();
 
         // Find the simplex model - it must a known model otherwise we cannot match a stero model
@@ -274,10 +284,6 @@ int duplex(int argc, char* argv[]) {
                   "performed automatically");
     parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
 
-    parser.visible.add_argument("-x", "--device")
-            .help("device string in format \"cuda:0,...,N\", \"cuda:all\", \"metal\" etc..")
-            .default_value(utils::default_parameters.device);
-
     parser.visible.add_argument("-b", "--batchsize")
             .default_value(default_parameters.batchsize)
             .scan<'i', int>()
@@ -349,6 +355,7 @@ int duplex(int argc, char* argv[]) {
             .help("the minimum predicted methylation probability for a modified base to be emitted "
                   "in an all-context model, [0, 1]");
 
+    cli::add_device_arg(parser);
     cli::add_basecaller_output_arguments(parser);
     cli::add_internal_arguments(parser);
 
@@ -362,7 +369,14 @@ int duplex(int argc, char* argv[]) {
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
-        auto device(parser.visible.get<std::string>("-x"));
+        auto device{parser.visible.get<std::string>("-x")};
+        if (!cli::validate_device_string(device)) {
+            return EXIT_FAILURE;
+        }
+        if (device == cli::AUTO_DETECT_DEVICE) {
+            device = utils::get_auto_detected_device();
+        }
+
         auto model(parser.visible.get<std::string>("model"));
 
         auto reads(parser.visible.get<std::string>("reads"));
@@ -600,9 +614,10 @@ int duplex(int argc, char* argv[]) {
                     // calling.
                     DuplexBasecallerRunners basecaller_runners;
                     std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
-                            api::create_basecall_runners(models.model_config, device_id,
-                                                         num_runners, 0, 0.9f * fraction,
-                                                         api::PipelineType::duplex, 0.f);
+                            api::create_basecall_runners(
+                                    {models.model_config, device_id, 0.9f * fraction,
+                                     api::PipelineType::duplex, 0.f, false, false},
+                                    num_runners, 0);
 
                     // The fraction argument for GPU memory allocates the fraction of the
                     // _remaining_ memory to the caller. So, we allocate all of the available
@@ -614,9 +629,10 @@ int duplex(int argc, char* argv[]) {
                     // chances for the stereo model to use the cached allocations from the simplex
                     // model.
                     std::tie(basecaller_runners.stereo_runners, std::ignore) =
-                            api::create_basecall_runners(models.stereo_model_config, device_id,
-                                                         num_runners, 0, 0.5f * fraction,
-                                                         api::PipelineType::duplex, 0.f);
+                            api::create_basecall_runners(
+                                    {models.stereo_model_config, device_id, 0.5f * fraction,
+                                     api::PipelineType::duplex, 0.f, false, false},
+                                    num_runners, 0);
 
                     return basecaller_runners;
                 };
@@ -643,11 +659,13 @@ int duplex(int argc, char* argv[]) {
 #endif
             {
                 std::tie(runners, num_devices) =
-                        api::create_basecall_runners(models.model_config, device, num_runners, 0,
-                                                     0.9f, api::PipelineType::duplex, 0.f);
-                std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
-                        models.stereo_model_config, device, num_runners, 0, 0.5f,
-                        api::PipelineType::duplex, 0.f);
+                        api::create_basecall_runners({models.model_config, device, 0.9f,
+                                                      api::PipelineType::duplex, 0.f, false, false},
+                                                     num_runners, 0);
+                std::tie(stereo_runners, std::ignore) =
+                        api::create_basecall_runners({models.stereo_model_config, device, 0.5f,
+                                                      api::PipelineType::duplex, 0.f, false, false},
+                                                     num_runners, 0);
             }
 
             spdlog::info("> Starting Stereo Duplex pipeline");

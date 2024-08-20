@@ -69,10 +69,6 @@ private:
     // Model runners which have not terminated.
     std::atomic<int> m_num_active_model_runners{0};
 
-    // Time when Basecaller Node is initialised. Used for benchmarking and debugging
-    std::chrono::time_point<std::chrono::system_clock> initialization_time;
-    // Time when Basecaller Node terminates. Used for benchmarking and debugging
-    std::chrono::time_point<std::chrono::system_clock> termination_time;
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`
     std::vector<size_t> m_chunk_sizes;

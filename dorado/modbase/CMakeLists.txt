@@ -27,14 +27,15 @@ target_include_directories(dorado_modbase
 
 target_link_libraries(dorado_modbase
     PUBLIC
-        ${TORCH_LIBRARIES}
+        torch_lib
     PRIVATE
         dorado_utils
+        dorado_torch_utils
         spdlog::spdlog
 )
 
 enable_warnings_as_errors(dorado_modbase)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_modbase REUSE_FROM dorado_utils)
+    target_precompile_headers(dorado_modbase REUSE_FROM dorado_torch_utils)
 endif()

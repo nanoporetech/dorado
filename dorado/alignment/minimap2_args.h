@@ -36,7 +36,7 @@ std::optional<Minimap2Options> try_parse_options_no_help(const std::string& mini
 // Returns the help text associated with the supported minimap options
 std::string get_help_message();
 
-// Helper functions for ErrorCorrectionMapperNode which uses options we don't yet support in the command line
+// Helper functions for CorrectionMapperNode which uses options we don't yet support in the command line
 void apply_cs_option(Minimap2Options& options, const std::string& cs_opt);
 void apply_dual_option(Minimap2Options& options, const std::string& dual_yes_or_no);
 

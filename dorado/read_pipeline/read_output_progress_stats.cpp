@@ -12,8 +12,8 @@ namespace dorado {
 
 namespace {
 
-std::string const PREFIX_PROGRESS_LINE_HDR{"[PROG_STAT_HDR] "};
-std::string const PREFIX_PROGRESS_LINE{"[PROG_STAT] "};
+const std::string PREFIX_PROGRESS_LINE_HDR{"[PROG_STAT_HDR] "};
+const std::string PREFIX_PROGRESS_LINE{"[PROG_STAT] "};
 
 // Assuming we are 3/4 of the way through the current give a smoother change
 // to estimated total number of reads than assuming half.

@@ -158,7 +158,7 @@ public:
      *  Useful for later assigning to a kstring_t returned by an htslib
      *  API function. If you need to pass object to an API function which
      *  will put data in it, then use the pre-allocate constructor instead,
-     *  to avoid library conflicts on windows.   
+     *  to avoid library conflicts on windows.
      */
     KString();
 
@@ -234,14 +234,6 @@ struct ModBaseInfo {
     std::string long_names;
     std::string context;
     std::array<size_t, 4> base_counts{};
-};
-
-// Enum for handling CIGAR ops
-enum class CigarOpType : uint8_t { INS = 0, DEL, MATCH, MISMATCH };
-
-struct CigarOp {
-    CigarOpType op;
-    uint32_t len;
 };
 
 }  // namespace dorado

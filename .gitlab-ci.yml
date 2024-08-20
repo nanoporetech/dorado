@@ -36,52 +36,52 @@ variables:
 
 # Build stage components
 
-.macos_arm_runner: &macos_arm_runner
+.macos_arm_runner:
   tags:
     - osx_arm64
     - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "11.0"
 
-.macos_x64_runner: &macos_x64_runner
+.macos_x64_runner:
   tags:
     - osx_x86
     - xcode-14.2
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
 
-.linux_runner: &linux_runner
+.linux_runner:
   tags:
     - ubuntu-20.04
     - nvidia-docker
 
-.linux_arm64_runner: &linux_arm64_runner
+.linux_arm64_runner:
   tags:
     - linux_aarch64
     - docker-arm
 
-.linux_tegra_runner: &linux_tegra_runner
+.linux_tegra_runner:
   tags:
     - nvidia-docker-tegra-gpu
 
-.linux_orin_runner: &linux_orin_runner
+.linux_orin_runner:
   tags:
     - linux-arm64-gpu
     - nvidia-docker
 
-.windows_runner: &windows_runner
+.windows_runner:
   tags:
     - windows-10
     - VS2019
     - cuda-${CUDA}
 
-.linux_dependencies: &linux_dependencies
+.linux_dependencies:
   before_script:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
     - pip install gcovr
 
-.set_parallel_jobs: &set_parallel_jobs
+.set_parallel_jobs:
   - |
     if [[ $OSTYPE == 'darwin'* ]]; then
       PARALLEL_JOBS=$(( $(sysctl -n hw.physicalcpu) / 2 ))
@@ -95,7 +95,7 @@ variables:
 
 .setup_ccache:
   - if [[ -d '/data/gitlab-ci-cache' ]] && [[ $OSTYPE != 'darwin'* ]] && [[ $OSTYPE != 'msys' ]]; then
-  -   export CCACHE_DIR=/data/gitlab-ci-cache
+  - export CCACHE_DIR=/data/gitlab-ci-cache
   - fi
   - ccache -s || true
 
@@ -123,6 +123,7 @@ variables:
   artifacts:
     paths:
       - dist
+      # Uploading these allows us to avoid checking out the repo in tests.
       - tests/*.sh
       - tests/*.bat
       - tests/data
@@ -153,10 +154,10 @@ variables:
     # produces should be ready to be notarized. That can be done asynchronously, but
     # doing everything in one pass (--wait flag) saves complicating the jobs.
     - ${NOTARYTOOL[@]} submit archive/dorado-*.zip
-        --apple-id ${APPLE_NOTARIZATION_ID}
-        --password ${APPLE_NOTARIZATION_PASSWORD}
-        --team-id ${APPLE_NOTARIZATION_TEAM}
-        --progress --verbose --wait
+      --apple-id ${APPLE_NOTARIZATION_ID}
+      --password ${APPLE_NOTARIZATION_PASSWORD}
+      --team-id ${APPLE_NOTARIZATION_TEAM}
+      --progress --verbose --wait
     # If notarization fails you need to run `xcrun notarytool log <request id>` to get
     # information about what failed.
     #
@@ -170,21 +171,14 @@ variables:
     # we'd need to switch to a dmg instead and do something like:
     #- xcrun stapler staple dorado-*.dmg
 
-# Run this job manually for push pipelines, but always run on nightly.
+# Run this job manually, but always run on nightly.
 .on_nightly_or_manual:
   rules:
-      - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-        when: manual
-        # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
-        allow_failure: true
-
-# Always run this job in a nightly or if its dependency exists.
-# This is required for dependents of on_nightly_or_manual jobs since that job won't otherwise exist.
-.on_nightly_or_if_dependency_exists:
-  rules:
-      - if: $CI_PIPELINE_SOURCE == "schedule"
-      - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE != "schedule"
+      when: manual
+      # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+      allow_failure: true
 
 # Pre-flight stages
 
@@ -194,6 +188,7 @@ pre-commit:
     GIT_SUBMODULE_STRATEGY: none
   stage: pre-flight
   script:
+    - echo "Pipeline source is ${CI_PIPELINE_SOURCE}"
     - pip install pre-commit
     - pre-commit run --all-files
   tags:
@@ -258,7 +253,7 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - apt update && apt install -y clang clang-tidy
-    - *set_parallel_jobs
+    - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
 
 .build:linux:x86:focal:valgrind:
@@ -277,10 +272,10 @@ build:linux:x86:focal:clang_tidy:
     - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
     - tar -xvf valgrind-${VALGRIND_VERSION}.tar.bz2
     - pushd valgrind-${VALGRIND_VERSION}
-    -   ./autogen.sh
-    -   ./configure
-    -   make -j ${PARALLEL_JOBS}
-    -   valgrind=$(pwd)/vg-in-place
+    - ./autogen.sh
+    - ./configure
+    - make -j ${PARALLEL_JOBS}
+    - valgrind=$(pwd)/vg-in-place
     - popd
     # We need symbols otherwise the generated reports are useless.
     - export CFLAGS="${CFLAGS} -g"
@@ -294,7 +289,7 @@ build:linux:x86:focal:clang_tidy:
 # We have to split the tegra builds into separate build+test jobs since we can't
 # test on the machines we build on.
 build:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -318,7 +313,7 @@ build:linux:arm64:bionic:
       - ${BUILD_DIR}/tests
 
 build:linux:arm64:bionic:unittests:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   stage: build
   extends:
     - .linux_tegra_runner
@@ -364,7 +359,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
 
 build:windows:debug:
   variables:
@@ -380,7 +375,7 @@ build:windows_koi_download:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
 
 build:macos:arm:
   variables:
@@ -456,9 +451,10 @@ build_archive:linux:x86:focal:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
-  image: nvcr.io/nvidia/pytorch:23.01-py3
+  image: nvcr.io/nvidia/pytorch:24.06-py3
   variables:
-    BUILD_OPTIONS: "-DDORADO_LIBTORCH_DIR=/usr/local/lib/python3.8/dist-packages/torch"
+    # Note: the linker flag is a workaround for the provided torch forgetting to link to cublas.
+    BUILD_OPTIONS: "-D DORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch -D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--copy-dt-needed-entries'"
   extends:
     - .linux_dependencies
     - .linux_runner
@@ -466,7 +462,7 @@ build_archive:linux:x86:cuda12:
     - .on_nightly_or_manual
 
 build_archive:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
     - .linux_arm64_runner
     - .build_dorado_archive
@@ -520,7 +516,7 @@ build_archive:macos:x64:
 
 # Test stage components
 
-.test_dorado: &test_dorado
+.test_dorado:
   stage: test
   variables:
     GIT_STRATEGY: none
@@ -528,20 +524,29 @@ build_archive:macos:x64:
     BATCH: 384
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
-    TEST_DORADO_CORRECT: 1
+    NO_TEST_DORADO_CORRECT: 0
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
+    - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
 
-.test_dorado_windows: &test_dorado_windows
+.test_dorado_windows:
   stage: test
   variables:
     GIT_STRATEGY: none
   script:
+    # Do everything inside a newly created folder, since some runners only run
+    # tests and hence never perform a git clean.
+    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - mv ../tests ../dist .
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
-.test_archive: &test_archive
+.test_archive:
   stage: test
   variables:
     GIT_STRATEGY: none
@@ -580,7 +585,7 @@ test:linux:x86:focal:
     expire_in: 1 day
 
 test:linux:arm64:bionic:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.2
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
     - .linux_dependencies
     - .linux_tegra_runner
@@ -591,7 +596,7 @@ test:linux:arm64:bionic:
     BATCH: 0
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
-    TEST_DORADO_CORRECT: 0
+    NO_TEST_DORADO_CORRECT: 1
   needs:
     - build:linux:arm64:bionic
 
@@ -600,7 +605,7 @@ test:linux:arm64:focal:
   extends:
     - .linux_dependencies
     - .linux_orin_runner
-    - .test_dorado  
+    - .test_dorado
   needs:
     - build:linux:arm64:focal
 
@@ -631,7 +636,6 @@ test_archive:linux:x86:20.04_nvidia:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -641,7 +645,6 @@ test_archive:linux:x86:18.04:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -651,7 +654,6 @@ test_archive:linux:x86:20.04:
   extends:
     - .linux_runner
     - .test_archive
-    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:x86:centos7
 
@@ -661,7 +663,6 @@ test_archive:linux:arm64:18.04:
   extends:
     - .linux_tegra_runner
     - .test_archive
-    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:arm64:bionic
 
@@ -671,7 +672,6 @@ test_archive:linux:arm64:20.04:
     - .linux_dependencies
     - .linux_orin_runner
     - .test_archive
-    - .on_nightly_or_if_dependency_exists
   needs:
     - build_archive:linux:arm64:focal
 
@@ -686,21 +686,50 @@ test:model_download:linux:x86:focal:
   needs:
     - build:linux:x86:focal
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 64
 
 test:model_download:macos:arm:
   extends:
-    - .macos_arm_runner 
+    - .macos_arm_runner
     - .on_nightly_or_manual
   stage: test
   needs:
     - build:macos:arm
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+  timeout: 1h 30m
+
+# Auto bachsize stats generation
+generate_auto_benchmarks:linux:x86:focal:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  extends:
+    - .linux_dependencies
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - ${GPU}
+  when: manual
+  stage: test
+  needs:
+    - build:linux:x86:focal
+  script:
+    - nvidia-smi
+    - ./benchmark/generate_chunk_auto_batchsize_benchmarks.sh ./dist/bin/dorado cuda:0
+  artifacts:
+    paths:
+      - "*.cpp"
+      - "*.h"
+      - "*.csv"
+    expire_in: 1 day
+  parallel:
+    matrix:
+       - GPU: "gpu-a100"
+       - GPU: "gpu-v100"
+       - GPU: "gpu-a6000"
 
 # MLHub
 
-.mlhub: &mlhub
+.mlhub:
   stage: test
   when: manual
   image: ${TRIGGER_IMAGE}
@@ -735,47 +764,41 @@ test:model_download:macos:arm:
       ${MLHUB_TRIGGER_URL}
 
 mlhub:sre_4k_260bps:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '4k_260bps'
+    CONDITION: "4k_260bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-260bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_260bps_fast@v4.1.0","dna_r10.4.1_e8.2_260bps_hac@v4.1.0","dna_r10.4.1_e8.2_260bps_sup@v4.1.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_4k_400bps_v4_1:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '4k_400bps'
+    CONDITION: "4k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-4khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.1.0","dna_r10.4.1_e8.2_400bps_hac@v4.1.0","dna_r10.4.1_e8.2_400bps_sup@v4.1.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_v4_3:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps'
+    CONDITION: "5k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v4.3.0","dna_r10.4.1_e8.2_400bps_hac@v4.3.0","dna_r10.4.1_e8.2_400bps_sup@v4.3.0"]'
-    DUPLEX_MODELS: '[]'
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_v5:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps'
+    CONDITION: "5k_400bps"
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v5.0.0","dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
-    DUPLEX_MODELS: '[]'
-
+    DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_duplex:
-  extends:
-    .mlhub_sre
+  extends: .mlhub_sre
   variables:
-    CONDITION: '5k_400bps_duplex'
+    CONDITION: "5k_400bps_duplex"
     SRE_CONFIG: "dna_r10.4.2-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
     DUPLEX_MODELS: '["dna_r10.4.1_e8.2_5khz_stereo@v1.3"]'
@@ -804,9 +827,9 @@ mlhub:remora-validate:
       ${MLHUB_TRIGGER_URL}
   parallel:
     matrix:
-      - DEVICE: 
-        - "cuda:all"
-        - "cpu"
+      - DEVICE:
+          - "cuda:all"
+          - "cpu"
 
 # MLHub - Dorado integration test
 mlhub:sweeper:
@@ -855,7 +878,7 @@ deploy:all:
   variables:
     GIT_STRATEGY: none
   script:
-   - ls -lh archive
+    - ls -lh archive
   extends:
     - .on_nightly_or_manual
   artifacts:

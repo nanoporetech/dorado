@@ -21,6 +21,7 @@
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -199,6 +200,7 @@ int demuxer(int argc, char* argv[]) {
 
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
+        spdlog::error("Could not initialise for input {}", reads);
         return EXIT_FAILURE;
     }
     const auto& all_files = processing_items.get();
