@@ -273,57 +273,12 @@ int duplex(int argc, char* argv[]) {
     torch::set_num_threads(1);
 
     utils::arg_parse::ArgParser parser("dorado");
+
     parser.visible.add_argument("model").help(
-            "model selection {fast,hac,sup}@v{version} for automatic model selection including "
-            "modbases, or path to existing model directory");
+            "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
+            "modbases, or path to existing model directory.");
     parser.visible.add_argument("reads").help(
             "Reads in POD5 format or BAM/SAM format for basespace.");
-    parser.visible.add_argument("--pairs")
-            .default_value(std::string(""))
-            .help("Space-delimited csv containing read ID pairs. If not provided, pairing will be "
-                  "performed automatically");
-    parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
-
-    parser.visible.add_argument("-b", "--batchsize")
-            .default_value(default_parameters.batchsize)
-            .scan<'i', int>()
-            .help("if 0 an optimal batchsize will be selected. batchsizes are rounded to the "
-                  "closest multiple of 64.");
-
-    parser.visible.add_argument("-c", "--chunksize")
-            .default_value(default_parameters.chunksize)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("-o", "--overlap")
-            .default_value(default_parameters.overlap)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("-r", "--recursive")
-            .default_value(false)
-            .implicit_value(true)
-            .help("Recursively scan through directories to load FAST5 and POD5 files");
-
-    parser.visible.add_argument("--models-directory")
-            .default_value(std::string("."))
-            .help("directory to search for existing models or download new models into");
-
-    parser.visible.add_argument("-l", "--read-ids")
-            .help("A file with a newline-delimited list of reads to basecall. If not provided, all "
-                  "reads will be basecalled")
-            .default_value(std::string(""));
-
-    parser.visible.add_argument("--min-qscore")
-            .help("Discard reads with mean Q-score below this threshold.")
-            .default_value(0)
-            .scan<'i', int>();
-
-    parser.visible.add_argument("--reference")
-            .help("Path to reference for alignment.")
-            .default_value(std::string(""));
-    parser.visible.add_argument("--bed-file")
-            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
-                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
-            .default_value(std::string(""));
 
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
@@ -333,33 +288,90 @@ int duplex(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    parser.visible.add_argument("--modified-bases")
-            .nargs(argparse::nargs_pattern::at_least_one)
-            .action([](const std::string& value) {
-                const auto& mods = models::modified_model_variants();
-                if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                    spdlog::error("'{}' is not a supported modification please select from {}",
-                                  value, utils::join(mods, ", "));
-                    std::exit(EXIT_FAILURE);
-                }
-                return value;
-            });
-
-    parser.visible.add_argument("--modified-bases-models")
-            .default_value(std::string())
-            .help("a comma separated list of modified base models");
-
-    parser.visible.add_argument("--modified-bases-threshold")
-            .default_value(default_parameters.methylation_threshold)
-            .scan<'f', float>()
-            .help("the minimum predicted methylation probability for a modified base to be emitted "
-                  "in an all-context model, [0, 1]");
-
     cli::add_device_arg(parser);
-    cli::add_basecaller_output_arguments(parser);
-    cli::add_internal_arguments(parser);
 
-    alignment::mm2::add_options_string_arg(parser);
+    parser.visible.add_argument("--models-directory")
+            .default_value(std::string("."))
+            .help("Optional directory to search for existing models or download new models into.");
+    {
+        parser.visible.add_group("Input data arguments");
+        parser.visible.add_argument("-r", "--recursive")
+                .help("Recursively scan through directories to load FAST5 and POD5 files.")
+                .default_value(false)
+                .implicit_value(true);
+        parser.visible.add_argument("-l", "--read-ids")
+                .help("A file with a newline-delimited list of reads to basecall. If not provided, "
+                      "all reads will be basecalled.")
+                .default_value(std::string(""));
+        parser.visible.add_argument("--pairs")
+                .default_value(std::string(""))
+                .help("Space-delimited csv containing read ID pairs. If not provided, pairing will "
+                      "be performed automatically.");
+    }
+    {
+        parser.visible.add_group("Output arguments");
+        parser.visible.add_argument("--min-qscore")
+                .help("Discard reads with mean Q-score below this threshold.")
+                .default_value(0)
+                .scan<'i', int>();
+        cli::add_basecaller_output_arguments(parser);
+    }
+    {
+        parser.visible.add_group("Alignment arguments");
+        parser.visible.add_argument("--reference")
+                .help("Path to reference for alignment.")
+                .default_value(std::string(""));
+        alignment::mm2::add_options_string_arg(parser);
+        parser.visible.add_argument("--bed-file")
+                .help("Optional bed-file. If specified, overlaps between the alignments and "
+                      "bed-file "
+                      "entries will be counted, and recorded in BAM output using the 'bh' read "
+                      "tag.")
+                .default_value(std::string(""));
+    }
+    {
+        const std::string options = utils::join(models::modified_model_variants(), ", ");
+        parser.visible.add_group("Modified model arguments");
+        parser.visible.add_argument("--modified-bases")
+                .help("A space separated list of modified base codes. Choose from: " + options +
+                      ".")
+                .nargs(argparse::nargs_pattern::at_least_one)
+                .action([&options](const std::string& value) {
+                    const auto& mods = models::modified_model_variants();
+                    if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
+                        spdlog::error("'{}' is not a supported modification please select from {}.",
+                                      value, options);
+                        std::exit(EXIT_FAILURE);
+                    }
+                    return value;
+                });
+        parser.visible.add_argument("--modified-bases-models")
+                .help("A comma separated list of modified base models")
+                .default_value(std::string());
+        parser.visible.add_argument("--modified-bases-threshold")
+                .help("The minimum predicted methylation probability for a modified base to be "
+                      "emitted in an all-context model, [0, 1].")
+                .default_value(default_parameters.methylation_threshold)
+                .scan<'f', float>();
+    }
+    {
+        parser.visible.add_group("Advanced arguments");
+        parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
+        parser.visible.add_argument("-b", "--batchsize")
+                .help("The number of chunks in a batch. If 0 an optimal batchsize will be "
+                      "selected.")
+                .default_value(default_parameters.batchsize)
+                .scan<'i', int>();
+        parser.visible.add_argument("-c", "--chunksize")
+                .help("The number of samples in a chunk.")
+                .default_value(default_parameters.chunksize)
+                .scan<'i', int>();
+        parser.visible.add_argument("-o", "--overlap")
+                .help("The number of samples overlapping neighbouring chunks.")
+                .default_value(default_parameters.overlap)
+                .scan<'i', int>();
+    }
+    cli::add_internal_arguments(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
