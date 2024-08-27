@@ -250,3 +250,43 @@ TEST_CASE("Test find_mux_change_trim_seq_index", TEST_GROUP) {
         CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == 119);
     }
 }
+
+TEST_CASE("Test determine_trim_interval (BC)", TEST_GROUP) {
+    using std::make_tuple;
+    auto [kit, top_pen, bottom_pen, top_score, bottom_score, use_top, top_pos, bottom_pos,
+          expected] = GENERATE(table<std::string, int, int, float, float, bool, std::pair<int, int>,
+                                     std::pair<int, int>, std::pair<int, int>>({
+            make_tuple("unclassified", -1, -1, -1.f, -1.f, false, std::make_pair(-1, -1),
+                       std::make_pair(-1, -1), std::make_pair(0, 100)),
+            make_tuple("good_both", 0, 0, 1.f, 1.f, false, std::make_pair(1, 10),
+                       std::make_pair(85, 95), std::make_pair(11, 85)),
+            make_tuple("bad_both", 0, 0, 0.5f, 0.5f, false, std::make_pair(1, 10),
+                       std::make_pair(85, 95), std::make_pair(0, 100)),
+            make_tuple("good_top", 0, 1, 1.f, 0.5f, true, std::make_pair(1, 10),
+                       std::make_pair(85, 95), std::make_pair(11, 100)),
+            make_tuple("good_bottom", 1, 0, 0.5f, 1.f, false, std::make_pair(1, 10),
+                       std::make_pair(85, 95), std::make_pair(0, 85)),
+            make_tuple("overlapped_top", 0, 0, 1.f, 0.7f, true, std::make_pair(1, 60),
+                       std::make_pair(50, 95), std::make_pair(61, 100)),
+            make_tuple("overlapped_bottom", 0, 0, 0.7f, 1.f, false, std::make_pair(1, 60),
+                       std::make_pair(50, 95), std::make_pair(0, 50)),
+            make_tuple("full_read_top", 0, 0, 0.7f, 1.f, true, std::make_pair(0, 100),
+                       std::make_pair(60, 90), std::make_pair(0, 100)),
+            make_tuple("full_read_bottom", 0, 0, 0.7f, 1.f, false, std::make_pair(1, 60),
+                       std::make_pair(0, 100), std::make_pair(0, 100)),
+
+    }));
+    CAPTURE(kit);
+    dorado::BarcodeScoreResult bc_res;
+    bc_res.kit = kit;
+    bc_res.top_penalty = top_pen;
+    bc_res.bottom_penalty = bottom_pen;
+    bc_res.top_flank_score = top_score;
+    bc_res.bottom_flank_score = bottom_score;
+    bc_res.top_barcode_pos = top_pos;
+    bc_res.bottom_barcode_pos = bottom_pos;
+    bc_res.use_top = use_top;
+
+    auto interval = dorado::Trimmer::determine_trim_interval(bc_res, 100);
+    CHECK(interval == expected);
+}
