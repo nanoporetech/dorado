@@ -38,6 +38,7 @@ EdlibAlignConfig init_edlib_config_for_adapters() {
 // For adapters, we there are specific sequences we look for at the front of the read. We don't look for exactly
 // the reverse complement at the rear of the read, though, because it will generally be truncated. So we list here
 // the specific sequences to look for at the front and rear of the reads.
+// RNA adapters are only looked for at the rear of the read, so don't have a front sequence.
 struct Adapter {
     std::string name;
     std::string front_sequence;
@@ -46,7 +47,8 @@ struct Adapter {
 
 const std::vector<Adapter> adapters = {
         {"LSK109", "AATGTACTTCGTTCAGTTACGTATTGCT", "AGCAATACGTAACTGAACGAAGT"},
-        {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"}};
+        {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"},
+        {"RNA004", "", "GGTTGTTTCTGTTGGTGCTGATATTGC"}};
 
 // For primers, we look for each primer sequence, and its reverse complement, at both the front and rear of the read.
 struct Primer {
@@ -152,35 +154,46 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         const auto& query_seq_rev = queries[i].sequence_rev;
         spdlog::trace("Checking adapter/primer {}", name);
 
-        auto front_result = edlibAlign(query_seq.data(), int(query_seq.length()), read_front.data(),
-                                       int(read_front.length()), placement_config);
-        front_results.emplace_back(copy_results(front_result, name + "_FWD", query_seq.length()));
-        edlibFreeAlignResult(front_result);
-        if (query_type == PRIMER) {
-            // For primers we look for both the forward and reverse sequence at both ends.
-            auto front_result_rev =
-                    edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()), read_front.data(),
+        if (!query_seq.empty()) {
+            auto front_result =
+                    edlibAlign(query_seq.data(), int(query_seq.length()), read_front.data(),
                                int(read_front.length()), placement_config);
             front_results.emplace_back(
-                    copy_results(front_result_rev, name + "_REV", query_seq_rev.length()));
-            edlibFreeAlignResult(front_result_rev);
+                    copy_results(front_result, name + "_FWD", query_seq.length()));
+            edlibFreeAlignResult(front_result);
         }
-
-        auto rear_result = edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()),
-                                      read_rear.data(), int(read_rear.length()), placement_config);
-        rear_results.emplace_back(copy_results(rear_result, name + "_REV", query_seq_rev.length()));
-        rear_results.back().position.first += rear_start;
-        rear_results.back().position.second += rear_start;
-        edlibFreeAlignResult(rear_result);
-        if (query_type == PRIMER) {
-            auto rear_result_fwd =
-                    edlibAlign(query_seq.data(), int(query_seq.length()), read_rear.data(),
+        if (!query_seq_rev.empty()) {
+            auto rear_result =
+                    edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()), read_rear.data(),
                                int(read_rear.length()), placement_config);
             rear_results.emplace_back(
-                    copy_results(rear_result_fwd, name + "_FWD", query_seq.length()));
+                    copy_results(rear_result, name + "_REV", query_seq_rev.length()));
             rear_results.back().position.first += rear_start;
             rear_results.back().position.second += rear_start;
-            edlibFreeAlignResult(rear_result_fwd);
+            edlibFreeAlignResult(rear_result);
+        }
+
+        if (query_type == PRIMER) {
+            // For primers we look for both the forward and reverse sequence at both ends.
+            if (!query_seq_rev.empty()) {
+                auto front_result_rev =
+                        edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()),
+                                   read_front.data(), int(read_front.length()), placement_config);
+                front_results.emplace_back(
+                        copy_results(front_result_rev, name + "_REV", query_seq_rev.length()));
+                edlibFreeAlignResult(front_result_rev);
+            }
+
+            if (!query_seq.empty()) {
+                auto rear_result_fwd =
+                        edlibAlign(query_seq.data(), int(query_seq.length()), read_rear.data(),
+                                   int(read_rear.length()), placement_config);
+                rear_results.emplace_back(
+                        copy_results(rear_result_fwd, name + "_FWD", query_seq.length()));
+                rear_results.back().position.first += rear_start;
+                rear_results.back().position.second += rear_start;
+                edlibFreeAlignResult(rear_result_fwd);
+            }
         }
     }
     int best_front = -1, best_rear = -1;
