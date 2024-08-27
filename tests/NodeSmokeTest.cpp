@@ -153,10 +153,21 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     using SampleType = dorado::models::SampleType;
     auto pipeline_restart = GENERATE(false, true);
     auto model_type = GENERATE(SampleType::DNA, SampleType::RNA002, SampleType::RNA004);
-    auto trim_rna_adapter = GENERATE(true, false);
     dorado::utils::rapid::Settings trim_rapid_adapter;
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
+
+    if (model_type == SampleType::RNA002) {
+        auto trim_adapter = GENERATE(true, false);
+        auto rna_adapter = GENERATE(true, false);
+        CAPTURE(trim_adapter);
+        CAPTURE(rna_adapter);
+        auto adapter_info = std::make_shared<dorado::demux::AdapterInfo>();
+        adapter_info->trim_adapters = trim_adapter;
+        adapter_info->trim_adapters = rna_adapter;
+        client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
+                std::move(adapter_info));
+    }
 
     set_pipeline_restart(pipeline_restart);
 
@@ -172,8 +183,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_rna_adapter, trim_rapid_adapter, 2,
-                                       1000);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_rapid_adapter, 2, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {

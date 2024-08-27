@@ -370,7 +370,7 @@ TEST_CASE(
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
             std::make_shared<const dorado::demux::AdapterInfo>(
-                    dorado::demux::AdapterInfo{true, true, std::nullopt}));
+                    dorado::demux::AdapterInfo{true, true, false, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
     // Push a Read type.

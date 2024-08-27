@@ -1,7 +1,7 @@
 #include "ScalerNode.h"
 
 #include "basecall/CRFModelConfig.h"
-#include "demux/barcoding_info.h"
+#include "demux/adapter_info.h"
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
 #include "torch_utils/trim.h"
@@ -138,22 +138,19 @@ void ScalerNode::input_thread_fn() {
         bool is_rna_model =
                 (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
 
-        bool is_barcoding = [&] {
-            if (!read->read_common.client_info) {
-                return false;
-            }
-            auto barcoding_info =
-                    read->read_common.client_info->contexts().get_ptr<const demux::BarcodingInfo>();
-            return (barcoding_info &&
-                    (!barcoding_info->kit_name.empty() || barcoding_info->custom_kit.has_value()));
-        }();
-
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (is_rna_model && !is_barcoding) {
+        if (is_rna_model) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            if (m_trim_rna_adapter &&
-                size_t(trim_start) < read->read_common.get_raw_data_samples()) {
+            bool trim_adapter = [&] {
+                if (!read->read_common.client_info) {
+                    return false;
+                }
+                auto adapter_info = read->read_common.client_info->contexts()
+                                            .get_ptr<const demux::AdapterInfo>();
+                return adapter_info && adapter_info->trim_adapters && !adapter_info->rna_adapters;
+            }();
+            if (trim_adapter && size_t(trim_start) < read->read_common.get_raw_data_samples()) {
                 read->read_common.raw_data =
                         read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
                 read->read_common.rna_adapter_end_signal_pos = 0;
@@ -275,14 +272,12 @@ void ScalerNode::input_thread_fn() {
 
 ScalerNode::ScalerNode(const SignalNormalisationParams& config,
                        SampleType model_type,
-                       bool trim_rna_adapter,
                        const utils::rapid::Settings& rapid_settings,
                        int num_worker_threads,
                        size_t max_reads)
         : MessageSink(max_reads, num_worker_threads),
           m_scaling_params(config),
           m_model_type(model_type),
-          m_trim_rna_adapter(trim_rna_adapter),
           m_rapid_settings(rapid_settings) {}
 
 }  // namespace dorado
