@@ -1,6 +1,7 @@
 #include "ScalerNode.h"
 
 #include "basecall/CRFModelConfig.h"
+#include "demux/barcoding_info.h"
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
 #include "torch_utils/trim.h"
@@ -137,9 +138,19 @@ void ScalerNode::input_thread_fn() {
         bool is_rna_model =
                 (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
 
+        bool is_barcoding = [&] {
+            if (!read->read_common.client_info) {
+                return false;
+            }
+            auto barcoding_info =
+                    read->read_common.client_info->contexts().get_ptr<const demux::BarcodingInfo>();
+            return (barcoding_info &&
+                    (!barcoding_info->kit_name.empty() || barcoding_info->custom_kit.has_value()));
+        }();
+
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
-        if (is_rna_model) {
+        if (is_rna_model && !is_barcoding) {
             trim_start = determine_rna_adapter_pos(*read, m_model_type);
             if (m_trim_rna_adapter &&
                 size_t(trim_start) < read->read_common.get_raw_data_samples()) {
