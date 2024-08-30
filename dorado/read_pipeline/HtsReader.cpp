@@ -16,33 +16,78 @@
 
 namespace dorado {
 
+namespace {
+
+class HtsLibBamRecordGenerator : public details::BamRecordGenerator {
+    HtsFilePtr m_file{};
+    SamHdrPtr m_header{};
+    std::string m_format{};
+
+public:
+    HtsLibBamRecordGenerator(const std::string& filename) {
+        m_file.reset(hts_open(filename.c_str(), "r"));
+        if (!m_file) {
+            return;
+        }
+        // If input format is FASTX, read tags from the query name line.
+        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "1");
+        auto format = hts_format_description(hts_get_format(m_file.get()));
+        if (format) {
+            m_format = format;
+            hts_free(format);
+        }
+        m_header.reset(sam_hdr_read(m_file.get()));
+        if (!m_header) {
+            return;
+        }
+    }
+
+    bool is_valid() { return m_file != nullptr && m_header != nullptr; }
+
+    sam_hdr_t* header() const { return m_header.get(); }
+    const std::string& format() const { return m_format; }
+
+    bool try_get_next_record(bam1_t* record) override {
+        return sam_read1(m_file.get(), m_header.get(), record) >= 0;
+    }
+};
+
+class BamRecordGeneratorImpl : public details::BamRecordGenerator {
+public:
+    BamRecordGeneratorImpl(const std::string& filename) : m_hts_reader(filename) {}
+
+    sam_hdr_t* header() const { return m_hts_reader.header(); }
+
+    const std::string& format() const { return m_hts_reader.format(); }
+
+    bool try_get_next_record(bam1_t* record) override {
+        return m_hts_reader.try_get_next_record(record);
+    }
+
+    bool is_valid() { return m_hts_reader.is_valid(); }
+
+private:
+    HtsLibBamRecordGenerator m_hts_reader;
+};
+
+}  // namespace
+
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
         : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    m_file = hts_open(filename.c_str(), "r");
-    if (!m_file) {
+    auto bam_record_generator = std::make_unique<BamRecordGeneratorImpl>(filename);
+    if (!bam_record_generator->is_valid()) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    // If input format is FASTX, read tags from the query name line.
-    hts_set_opt(m_file, FASTQ_OPT_AUX, "1");
-    auto format = hts_format_description(hts_get_format(m_file));
-    if (format) {
-        m_format = format;
-        hts_free(format);
-    }
-    m_header = sam_hdr_read(m_file);
-    if (!m_header) {
-        throw std::runtime_error("Could not read header from file: " + filename);
-    }
+    m_header = bam_record_generator->header();
+    m_format = bam_record_generator->format();
     is_aligned = m_header->n_targets > 0;
+    m_bam_record_generator = std::move(bam_record_generator);
+
     record.reset(bam_init1());
 }
 
-HtsReader::~HtsReader() {
-    sam_hdr_destroy(m_header);
-    record.reset();
-    hts_close(m_file);
-}
+HtsReader::~HtsReader() { record.reset(); }
 
 void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
     m_client_info = std::move(client_info);
@@ -52,7 +97,7 @@ void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
     m_record_mutator = std::move(mutator);
 }
 
-bool HtsReader::read() { return sam_read1(m_file, m_header, record.get()) >= 0; }
+bool HtsReader::read() { return m_bam_record_generator->try_get_next_record(record.get()); }
 
 bool HtsReader::has_tag(const char* tagname) {
     uint8_t* tag = bam_aux_get(record.get(), tagname);

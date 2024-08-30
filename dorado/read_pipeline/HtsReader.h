@@ -20,6 +20,13 @@ using ReadMap = std::unordered_map<std::string, SimplexReadPtr>;
 
 class Pipeline;
 
+namespace details {
+class BamRecordGenerator {
+public:
+    virtual bool try_get_next_record(bam1_t* record) = 0;
+};
+}  // namespace details
+
 class HtsReader {
 public:
     HtsReader(const std::string& filename,
@@ -42,13 +49,14 @@ public:
     const std::string& format() const;
 
 private:
-    htsFile* m_file{nullptr};
-    sam_hdr_t* m_header{nullptr};
+    sam_hdr_t* m_header{nullptr};  // non-owning
     std::string m_format{};
     std::shared_ptr<ClientInfo> m_client_info;
 
     std::function<void(BamPtr&)> m_record_mutator{};
     std::optional<std::unordered_set<std::string>> m_read_list;
+
+    std::unique_ptr<details::BamRecordGenerator> m_bam_record_generator;
 };
 
 template <typename T>
