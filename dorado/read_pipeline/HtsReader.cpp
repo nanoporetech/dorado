@@ -25,7 +25,11 @@ HtsReader::HtsReader(const std::string& filename,
     }
     // If input format is FASTX, read tags from the query name line.
     hts_set_opt(m_file, FASTQ_OPT_AUX, "1");
-    format = hts_format_description(hts_get_format(m_file));
+    auto format = hts_format_description(hts_get_format(m_file));
+    if (format) {
+        m_format = format;
+        hts_free(format);
+    }
     m_header = sam_hdr_read(m_file);
     if (!m_header) {
         throw std::runtime_error("Could not read header from file: " + filename);
@@ -35,7 +39,6 @@ HtsReader::HtsReader(const std::string& filename,
 }
 
 HtsReader::~HtsReader() {
-    hts_free(format);
     sam_hdr_destroy(m_header);
     record.reset();
     hts_close(m_file);
@@ -82,6 +85,10 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
     spdlog::debug("Total reads processed: {}", num_reads);
     return num_reads;
 }
+
+sam_hdr_t* HtsReader::header() const { return m_header; }
+
+const std::string& HtsReader::format() const { return m_format; }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
     HtsReader reader(filename, std::nullopt);

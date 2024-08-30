@@ -35,15 +35,16 @@ public:
     bool has_tag(const char* tagname);
     void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
-    char* format{nullptr};
     bool is_aligned{false};
     BamPtr record{nullptr};
 
-    sam_hdr_t* header() const { return m_header; }
+    sam_hdr_t* header() const;
+    const std::string& format() const;
 
 private:
     htsFile* m_file{nullptr};
     sam_hdr_t* m_header{nullptr};
+    std::string m_format{};
     std::shared_ptr<ClientInfo> m_client_info;
 
     std::function<void(BamPtr&)> m_record_mutator{};

@@ -262,7 +262,7 @@ int aligner(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        spdlog::debug("> input fmt: {} aligned: {}", reader->format, reader->is_aligned);
+        spdlog::debug("> input fmt: {} aligned: {}", reader->format(), reader->is_aligned);
         auto header = SamHdrPtr(sam_hdr_dup(reader->header()));
         utils::add_hd_header_line(header.get());
         add_pg_hdr(header.get());
