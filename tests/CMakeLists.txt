@@ -28,6 +28,7 @@ add_executable(dorado_tests
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
+    fastq_reader_test.cpp
     FastxRandomReaderTest.cpp
     gpu_monitor_test.cpp
     HtsFileTest.cpp
