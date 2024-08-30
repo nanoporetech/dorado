@@ -38,10 +38,12 @@ public:
     char* format{nullptr};
     bool is_aligned{false};
     BamPtr record{nullptr};
-    sam_hdr_t* header{nullptr};
+
+    sam_hdr_t* header() const { return m_header; }
 
 private:
     htsFile* m_file{nullptr};
+    sam_hdr_t* m_header{nullptr};
     std::shared_ptr<ClientInfo> m_client_info;
 
     std::function<void(BamPtr&)> m_record_mutator{};

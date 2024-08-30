@@ -26,17 +26,17 @@ HtsReader::HtsReader(const std::string& filename,
     // If input format is FASTX, read tags from the query name line.
     hts_set_opt(m_file, FASTQ_OPT_AUX, "1");
     format = hts_format_description(hts_get_format(m_file));
-    header = sam_hdr_read(m_file);
-    if (!header) {
+    m_header = sam_hdr_read(m_file);
+    if (!m_header) {
         throw std::runtime_error("Could not read header from file: " + filename);
     }
-    is_aligned = header->n_targets > 0;
+    is_aligned = m_header->n_targets > 0;
     record.reset(bam_init1());
 }
 
 HtsReader::~HtsReader() {
     hts_free(format);
-    sam_hdr_destroy(header);
+    sam_hdr_destroy(m_header);
     record.reset();
     hts_close(m_file);
 }
@@ -49,7 +49,7 @@ void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
     m_record_mutator = std::move(mutator);
 }
 
-bool HtsReader::read() { return sam_read1(m_file, header, record.get()) >= 0; }
+bool HtsReader::read() { return sam_read1(m_file, m_header, record.get()) >= 0; }
 
 bool HtsReader::has_tag(const char* tagname) {
     uint8_t* tag = bam_aux_get(record.get(), tagname);

@@ -31,7 +31,7 @@ protected:
         HtsReader reader(m_in_sam.string(), std::nullopt);
 
         utils::HtsFile hts_file(m_out_bam.string(), mode, num_threads, false);
-        hts_file.set_header(reader.header);
+        hts_file.set_header(reader.header());
 
         PipelineDescriptor pipeline_desc;
         auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
