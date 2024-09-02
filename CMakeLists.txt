@@ -53,7 +53,9 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Set warnings and RPATH before we create any targets.
 include(cmake/Warnings.cmake)
+include(cmake/SetRPATH.cmake)
 
 set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
@@ -349,18 +351,6 @@ if(NOT WIN32)
 endif()
 
 if(NOT DORADO_DISABLE_DORADO)
-    if(NOT WIN32)
-        # Set up RPATHs so we can find dependencies
-        set(CMAKE_SKIP_RPATH FALSE)
-        # Note: we don't need the relative lib dir if everything is in
-        if(APPLE)
-            set(CMAKE_INSTALL_RPATH "@executable_path/;@executable_path/../lib")
-        else()
-            set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib/;$ORIGIN")
-        endif()
-        set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-    endif()
-
     add_executable(dorado
         dorado/main.cpp
         dorado/cli/aligner.cpp
