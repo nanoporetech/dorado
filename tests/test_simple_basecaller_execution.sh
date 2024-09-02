@@ -188,7 +188,7 @@ dorado_aligner_options_test() (
 )
 dorado_aligner_options_test
 
-if ! uname -r | grep -q tegra; then
+if ! uname -r | grep -q -E 'tegra|minit'; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
