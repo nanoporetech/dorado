@@ -12,9 +12,11 @@ struct ModBaseModelConfig {
     std::vector<std::string> mod_long_names;  ///< The long names of the modified bases.
     std::string motif;                        ///< The motif to look for modified bases within.
     size_t base_mod_count{};                  ///< The number of modifications for the base.
-    size_t motif_offset{};  ///< The position of the canonical base within the motif.
+    size_t motif_offset{};     ///< The position of the canonical base within the motif.
+    size_t context_samples{};  ///< The context samples given by `context_before + context_after`
     size_t context_before{};  ///< The number of context samples in the signal the network looks at around a candidate base.
     size_t context_after{};  ///< The number of context samples in the signal the network looks at around a candidate base.
+    int kmer_length{};   ///< The kmer length given by `bases_before + bases_after + 1`
     int bases_before{};  ///< The number of bases before the primary base of a kmer.
     int bases_after{};   ///< The number of bases after the primary base of a kmer.
     int offset{};

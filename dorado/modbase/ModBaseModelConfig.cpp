@@ -6,6 +6,18 @@
 
 #include <toml.hpp>
 
+namespace {
+
+int get_positive_int(const toml::value& p, const std::string& key) {
+    const int v = toml::find<int>(p, key);
+    if (v < 0) {
+        throw std::runtime_error("Invalid modbase model value for '" + key + "' found: '" +
+                                 std::to_string(v) + "'.");
+    }
+    return v;
+};
+}  // namespace
+
 namespace dorado::modbase {
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
@@ -13,7 +25,7 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
     auto config_toml = toml::parse(model_path / "config.toml");
     const auto& params = toml::find(config_toml, "modbases");
     config.motif = toml::find<std::string>(params, "motif");
-    config.motif_offset = toml::find<int>(params, "motif_offset");
+    config.motif_offset = get_positive_int(params, "motif_offset");
 
     const std::string canonical_bases = "ACGT";
     std::string motif_base = config.motif.substr(config.motif_offset, 1);
@@ -48,11 +60,15 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
 
     config.base_mod_count = config.mod_bases.size();
 
-    config.context_before = toml::find<int>(params, "chunk_context_0");
-    config.context_after = toml::find<int>(params, "chunk_context_1");
-    config.bases_before = toml::find<int>(params, "kmer_context_bases_0");
-    config.bases_after = toml::find<int>(params, "kmer_context_bases_1");
-    config.offset = toml::find<int>(params, "offset");
+    config.context_before = get_positive_int(params, "chunk_context_0");
+    config.context_after = get_positive_int(params, "chunk_context_1");
+    config.context_samples = config.context_before + config.context_after;
+
+    config.bases_before = get_positive_int(params, "kmer_context_bases_0");
+    config.bases_after = get_positive_int(params, "kmer_context_bases_1");
+    config.kmer_length = config.bases_before + config.bases_after + 1;
+
+    config.offset = get_positive_int(params, "offset");
 
     if (params.contains("reverse_signal")) {
         config.reverse_signal = toml::find<bool>(params, "reverse_signal");
@@ -64,10 +80,10 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
         // these may not exist if we convert older models
         const auto& refinement_params = toml::find(config_toml, "refinement");
         config.refine_do_rough_rescale =
-                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
+                (get_positive_int(refinement_params, "refine_do_rough_rescale") == 1);
         if (config.refine_do_rough_rescale) {
             config.refine_kmer_center_idx =
-                    toml::find<int>(refinement_params, "refine_kmer_center_idx");
+                    get_positive_int(refinement_params, "refine_kmer_center_idx");
 
             auto kmer_levels_tensor =
                     utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
