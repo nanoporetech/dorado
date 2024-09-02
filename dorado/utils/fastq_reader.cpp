@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-#include <optional>
 #include <sstream>
 
 namespace dorado::utils {
@@ -27,10 +26,10 @@ bool is_valid_id_field(const std::string& field) {
     return true;
 }
 
-bool is_valid_sequence_field(const std::string& field) {
+bool is_valid_sequence_field(std::string& field) {
     bool contains_t{};
     bool contains_u{};
-    for (const auto& element : field) {
+    for (auto& element : field) {
         switch (element) {
         case 'A':
         case 'C':
@@ -47,6 +46,7 @@ bool is_valid_sequence_field(const std::string& field) {
                 return false;
             }
             contains_u = true;
+            element = 'T';
             break;
         default:
             return false;
@@ -63,44 +63,37 @@ bool is_valid_quality_field(const std::string& field) {
     return std::none_of(field.begin(), field.end(), [](char c) { return c < 0x21 || c > 0x7e; });
 }
 
-struct FastqRecord {
-    std::string id;
-    std::string sequence;
-    std::string separator;
-    std::string quality;
-
-    bool set_id(std::string line) {
-        if (!is_valid_id_field(line)) {
-            return false;
-        }
-        id = std::move(line);
-        return true;
+bool set_id(FastqRecord& record, std::string line) {
+    if (!is_valid_id_field(line)) {
+        return false;
     }
+    record.id = std::move(line);
+    return true;
+}
 
-    bool set_sequence(std::string line) {
-        if (!is_valid_sequence_field(line)) {
-            return false;
-        }
-        sequence = std::move(line);
-        return true;
+bool set_sequence(FastqRecord& record, std::string line) {
+    if (!is_valid_sequence_field(line)) {
+        return false;
     }
+    record.sequence = std::move(line);
+    return true;
+}
 
-    bool set_separator(std::string line) {
-        if (!is_valid_separator_field(line)) {
-            return false;
-        }
-        separator = std::move(line);
-        return true;
+bool set_separator(FastqRecord& record, std::string line) {
+    if (!is_valid_separator_field(line)) {
+        return false;
     }
+    record.separator = std::move(line);
+    return true;
+}
 
-    bool set_quality(std::string line) {
-        if (!is_valid_quality_field(line)) {
-            return false;
-        }
-        quality = std::move(line);
-        return true;
+bool set_quality(FastqRecord& record, std::string line) {
+    if (!is_valid_quality_field(line)) {
+        return false;
     }
-};
+    record.quality = std::move(line);
+    return true;
+}
 
 bool get_non_empty_line(std::istream& input_stream, std::string& line) {
     if (!std::getline(input_stream, line)) {
@@ -115,16 +108,16 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
     }
     FastqRecord result;
     std::string line;
-    if (!get_non_empty_line(input_stream, line) || !result.set_id(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line) || !set_id(result, std::move(line))) {
         return std::nullopt;
     }
-    if (!get_non_empty_line(input_stream, line) || !result.set_sequence(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line) || !set_sequence(result, std::move(line))) {
         return std::nullopt;
     }
-    if (!get_non_empty_line(input_stream, line) || !result.set_separator(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line) || !set_separator(result, std::move(line))) {
         return std::nullopt;
     }
-    if (!get_non_empty_line(input_stream, line) || !result.set_quality(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line) || !set_quality(result, std::move(line))) {
         return std::nullopt;
     }
 
@@ -136,6 +129,32 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
 }
 
 }  // namespace
+
+FastqReader::FastqReader(const std::string& input_file) {
+    if (!is_fastq(input_file)) {
+        return;
+    }
+    m_input_stream = std::make_unique<std::ifstream>(input_file);
+}
+
+FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream) {
+    if (!is_fastq(*input_stream)) {
+        return;
+    }
+    // return to start of stream after validating the first record.
+    input_stream->clear();
+    input_stream->seekg(0);
+    m_input_stream = std::move(input_stream);
+}
+
+bool FastqReader::is_valid() const { return m_input_stream && m_input_stream->good(); }
+
+std::optional<FastqRecord> FastqReader::try_get_next_record() {
+    if (!m_input_stream) {
+        return std::nullopt;
+    }
+    return get_next_record(*m_input_stream);
+}
 
 bool is_fastq(const std::string& input_file) {
     std::ifstream input_stream{input_file};

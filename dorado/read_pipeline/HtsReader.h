@@ -23,6 +23,7 @@ class Pipeline;
 namespace details {
 class BamRecordGenerator {
 public:
+    virtual ~BamRecordGenerator() = default;
     virtual bool try_get_next_record(bam1_t* record) = 0;
 };
 }  // namespace details
