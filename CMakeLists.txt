@@ -422,6 +422,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "*curand.so*"
             "*cusolver.so*"
             "*cufft.so*"
+            "*cupti.so*"
         )
     endif()
 
