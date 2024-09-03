@@ -142,7 +142,7 @@ DEFINE_TEST("FastqReader::is_valid constructed with invalid fastq returns false"
     REQUIRE_FALSE(cut.is_valid());
 }
 
-DEFINE_TEST("FastqReader::is_valid constructed with valid fastq returns false") {
+DEFINE_TEST("FastqReader::is_valid constructed with valid fastq returns true") {
     auto fastq_stream = std::make_unique<std::istringstream>(VALID_FASTQ_RECORD);
     dorado::utils::FastqReader cut(std::move(fastq_stream));
     REQUIRE(cut.is_valid());
