@@ -124,7 +124,7 @@ bool HtsReader::try_initialise_generator(const std::string& filename) {
     }
     m_header = generator->header();
     m_format = generator->format();
-    m_bam_record_generator = [generator = std::move(generator)](bam1_t* record) mutable -> bool {
+    m_bam_record_generator = [generator](bam1_t* record) mutable -> bool {
         return generator->try_get_next_record(record);
     };
     return true;
