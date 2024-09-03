@@ -18,7 +18,7 @@ bool is_valid_id_field(const std::string& field) {
     return true;
 }
 
-bool is_valid_sequence_field(std::string& field) {
+bool validate_sequence_field_as_ts(std::string& field) {
     bool contains_t{};
     bool contains_u{};
     for (auto& element : field) {
@@ -106,7 +106,7 @@ bool FastqRecord::set_id(std::string line) {
 }
 
 bool FastqRecord::set_sequence(std::string line) {
-    if (!is_valid_sequence_field(line)) {
+    if (!validate_sequence_field_as_ts(line)) {
         return false;
     }
     m_sequence = std::move(line);
