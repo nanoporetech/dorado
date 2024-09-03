@@ -33,11 +33,10 @@ bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_r
     int leftmost_pos = -1;  // UNMAPPED - will be written as 0
     uint8_t map_q = 0;      // UNMAPPED
     int next_pos = -1;      // UNMAPPED - will be written as 0
-    auto read_id = fastq_record.read_id();
-    auto result =
-            bam_set1(record, read_id.size(), fastq_record.read_id().data(), flags, -1, leftmost_pos,
-                     map_q, 0, nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
-                     fastq_record.sequence().c_str(), (char*)qscore.data(), 0);
+    auto result = bam_set1(record, fastq_record.read_id().size(), fastq_record.read_id().data(),
+                           flags, -1, leftmost_pos, map_q, 0, nullptr, -1, next_pos, 0,
+                           fastq_record.sequence().size(), fastq_record.sequence().c_str(),
+                           (char*)qscore.data(), 0);
     return result >= 0;
 }
 
