@@ -6,6 +6,7 @@
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
+#include "read_pipeline/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
@@ -240,7 +241,8 @@ TEST_CASE(
     const bool barcode_both_ends = GENERATE(true, false);
     CAPTURE(barcode_both_ends);
     constexpr bool no_trim = false;
-    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
@@ -397,7 +399,8 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     std::vector<std::string> kits = {"SQK-16S024"};
     bool barcode_both_ends = false;
     bool no_trim = false;
-    pipeline_desc.add_node<BarcodeClassifierNode>({sink}, 8);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     fs::path data_dir = fs::path(get_data_dir("barcode_demux"));
@@ -456,6 +459,32 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     CHECK(bam_aux_get(read1.get(), "bh") == nullptr);
     CHECK(read2->core.tid == -1);
     CHECK(bam_aux_get(read2.get(), "bh") == nullptr);
+}
+
+TEST_CASE("BarcodeClassifierNode: test primer/barcode overlap correction", TEST_GROUP) {
+    BarcodeScoreResult bc_res;
+    bc_res.top_barcode_pos = {10, 30};
+    bc_res.bottom_barcode_pos = {70, 90};
+    auto primer_trim_interval = std::make_pair(20, 90);
+    int seqlen = 100;
+    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, true);
+    CHECK(primer_trim_interval.first == 10);
+    CHECK(primer_trim_interval.second == 90);
+
+    primer_trim_interval = std::make_pair(20, 90);
+    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, false);
+    CHECK(primer_trim_interval.first == 0);
+    CHECK(primer_trim_interval.second == 90);
+
+    primer_trim_interval = std::make_pair(10, 80);
+    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, true);
+    CHECK(primer_trim_interval.first == 10);
+    CHECK(primer_trim_interval.second == 90);
+
+    primer_trim_interval = std::make_pair(10, 80);
+    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, false);
+    CHECK(primer_trim_interval.first == 10);
+    CHECK(primer_trim_interval.second == 100);
 }
 
 struct CustomDoubleEndedKitInput {

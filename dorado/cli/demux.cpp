@@ -7,6 +7,7 @@
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/TrimmerNode.h"
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/MergeHeaders.h"
@@ -262,7 +263,8 @@ int demuxer(int argc, char* argv[]) {
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
     if (barcoding_info) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
-        pipeline_desc.add_node<BarcodeClassifierNode>({demux_writer}, demux_threads);
+        auto trimmer = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
+        pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, demux_threads);
     }
 
     // Create the Pipeline from our description.

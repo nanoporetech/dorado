@@ -30,8 +30,6 @@ public:
     const std::vector<Query>& get_adapter_sequences() const;
     const std::vector<Query>& get_primer_sequences() const;
 
-    static void check_and_update_barcoding(SimplexRead& read, std::pair<int, int>& trim_interval);
-
 private:
     enum QueryType { ADAPTER, PRIMER };
 
@@ -44,5 +42,4 @@ private:
 };
 
 }  // namespace demux
-
 }  // namespace dorado
