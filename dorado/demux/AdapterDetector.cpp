@@ -35,9 +35,71 @@ EdlibAlignConfig init_edlib_config_for_adapters() {
     return placement_config;
 }
 
+dorado::SingleEndResult copy_results(const EdlibAlignResult& source,
+                                     const std::string& name,
+                                     size_t length) {
+    dorado::SingleEndResult dest{};
+    dest.name = name;
+
+    if (source.status != EDLIB_STATUS_OK || !source.startLocations || !source.endLocations) {
+        return dest;
+    }
+
+    dest.score = 1.0f - float(source.editDistance) / length;
+    dest.position = {source.startLocations[0], source.endLocations[0]};
+    return dest;
+}
+
+void align(std::string_view q,
+           std::string_view t,
+           const std::string& name,
+           std::vector<dorado::SingleEndResult>& results,
+           const int rear_start,
+           const EdlibAlignConfig& config) {
+    auto result = edlibAlign(q.data(), int(q.length()), t.data(), int(t.length()), config);
+    results.emplace_back(copy_results(result, name, q.length()));
+
+    if (rear_start >= 0) {
+        results.back().position.first += rear_start;
+        results.back().position.second += rear_start;
+    }
+
+    edlibFreeAlignResult(result);
+}
+
+dorado::SingleEndResult get_best_result(const std::vector<dorado::SingleEndResult>& results) {
+    int best = -1;
+    float best_score = -1.0f;
+    constexpr float EPSILON = 0.1f;
+    for (size_t i = 0; i < results.size(); ++i) {
+        int old_span =
+                (best == -1) ? 0 : results[best].position.second - results[best].position.first;
+        int new_span = results[i].position.second - results[i].position.first;
+        if (results[i].score > best_score + EPSILON) {
+            // The current match is clearly better than the previously seen best match.
+            best_score = results[i].score;
+            best = int(i);
+        }
+        if (std::abs(results[i].score - best_score) <= EPSILON) {
+            // The current match and previously seen best match have nearly equal scores. Pick the longer one.
+            if (new_span > old_span) {
+                best_score = results[i].score;
+                best = int(i);
+            }
+        }
+    }
+
+    if (best != -1) {
+        return results[best];
+    }
+
+    return {};
+}
+
 // For adapters, we there are specific sequences we look for at the front of the read. We don't look for exactly
 // the reverse complement at the rear of the read, though, because it will generally be truncated. So we list here
 // the specific sequences to look for at the front and rear of the reads.
+// RNA adapters are only looked for at the rear of the read, so don't have a front sequence.
 struct Adapter {
     std::string name;
     std::string front_sequence;
@@ -46,7 +108,8 @@ struct Adapter {
 
 const std::vector<Adapter> adapters = {
         {"LSK109", "AATGTACTTCGTTCAGTTACGTATTGCT", "AGCAATACGTAACTGAACGAAGT"},
-        {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"}};
+        {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"},
+        {"RNA004", "", "GGTTGTTTCTGTTGGTGCTGATATTGC"}};
 
 // For primers, we look for each primer sequence, and its reverse complement, at both the front and rear of the read.
 struct Primer {
@@ -118,21 +181,6 @@ const std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences
     return m_primer_sequences;
 }
 
-static SingleEndResult copy_results(const EdlibAlignResult& source,
-                                    const std::string& name,
-                                    size_t length) {
-    SingleEndResult dest{};
-    dest.name = name;
-
-    if (source.status != EDLIB_STATUS_OK || !source.startLocations || !source.endLocations) {
-        return dest;
-    }
-
-    dest.score = 1.0f - float(source.editDistance) / length;
-    dest.position = {source.startLocations[0], source.endLocations[0]};
-    return dest;
-}
-
 AdapterScoreResult AdapterDetector::detect(const std::string& seq,
                                            const std::vector<Query>& queries,
                                            AdapterDetector::QueryType query_type) const {
@@ -146,91 +194,35 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     EdlibAlignConfig placement_config = init_edlib_config_for_adapters();
 
     std::vector<SingleEndResult> front_results, rear_results;
+    constexpr int IS_FRONT = -1;
     for (size_t i = 0; i < queries.size(); i++) {
         const auto& name = queries[i].name;
-        const auto& query_seq = queries[i].sequence;
-        const auto& query_seq_rev = queries[i].sequence_rev;
+        std::string_view query_seq = queries[i].sequence;
+        std::string_view query_seq_rev = queries[i].sequence_rev;
         spdlog::trace("Checking adapter/primer {}", name);
 
-        auto front_result = edlibAlign(query_seq.data(), int(query_seq.length()), read_front.data(),
-                                       int(read_front.length()), placement_config);
-        front_results.emplace_back(copy_results(front_result, name + "_FWD", query_seq.length()));
-        edlibFreeAlignResult(front_result);
+        if (!query_seq.empty()) {
+            align(query_seq, read_front, name + "_FWD", front_results, IS_FRONT, placement_config);
+        }
+        if (!query_seq_rev.empty()) {
+            align(query_seq_rev, read_rear, name + "_REV", rear_results, rear_start,
+                  placement_config);
+        }
+
         if (query_type == PRIMER) {
             // For primers we look for both the forward and reverse sequence at both ends.
-            auto front_result_rev =
-                    edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()), read_front.data(),
-                               int(read_front.length()), placement_config);
-            front_results.emplace_back(
-                    copy_results(front_result_rev, name + "_REV", query_seq_rev.length()));
-            edlibFreeAlignResult(front_result_rev);
-        }
-
-        auto rear_result = edlibAlign(query_seq_rev.data(), int(query_seq_rev.length()),
-                                      read_rear.data(), int(read_rear.length()), placement_config);
-        rear_results.emplace_back(copy_results(rear_result, name + "_REV", query_seq_rev.length()));
-        rear_results.back().position.first += rear_start;
-        rear_results.back().position.second += rear_start;
-        edlibFreeAlignResult(rear_result);
-        if (query_type == PRIMER) {
-            auto rear_result_fwd =
-                    edlibAlign(query_seq.data(), int(query_seq.length()), read_rear.data(),
-                               int(read_rear.length()), placement_config);
-            rear_results.emplace_back(
-                    copy_results(rear_result_fwd, name + "_FWD", query_seq.length()));
-            rear_results.back().position.first += rear_start;
-            rear_results.back().position.second += rear_start;
-            edlibFreeAlignResult(rear_result_fwd);
-        }
-    }
-    int best_front = -1, best_rear = -1;
-    float best_front_score = -1.0f, best_rear_score = -1.0f;
-    const float EPSILON = 0.1f;
-    AdapterScoreResult result;
-    for (size_t i = 0; i < front_results.size(); ++i) {
-        int old_span = (best_front == -1) ? 0
-                                          : front_results[best_front].position.second -
-                                                    front_results[best_front].position.first;
-        int new_span = front_results[i].position.second - front_results[i].position.first;
-        if (front_results[i].score > best_front_score + EPSILON) {
-            // The current match is clearly better than the previously seen best match.
-            best_front_score = front_results[i].score;
-            best_front = int(i);
-        }
-        if (std::abs(front_results[i].score - best_front_score) <= EPSILON) {
-            // The current match and previously seen best match have nearly equal scores. Pick the longer one.
-            if (new_span > old_span) {
-                best_front_score = front_results[i].score;
-                best_front = int(i);
+            if (!query_seq_rev.empty()) {
+                align(query_seq_rev, read_front, name + "_REV", front_results, IS_FRONT,
+                      placement_config);
             }
-        }
-    }
-    for (size_t i = 0; i < rear_results.size(); ++i) {
-        int old_span = (best_rear == -1) ? 0
-                                         : rear_results[best_rear].position.second -
-                                                   rear_results[best_rear].position.first;
-        int new_span = rear_results[i].position.second - rear_results[i].position.first;
-        if (rear_results[i].score > best_rear_score + EPSILON) {
-            // The current match is clearly better than the previously seen best match.
-            best_rear_score = rear_results[i].score;
-            best_rear = int(i);
-        }
-        if (std::abs(rear_results[i].score - best_rear_score) <= EPSILON) {
-            // The current match and previously seen best match have nearly equal scores. Pick the longer one.
-            if (new_span > old_span) {
-                best_rear_score = rear_results[i].score;
-                best_rear = int(i);
+            if (!query_seq.empty()) {
+                align(query_seq, read_rear, name + "_FWD", rear_results, rear_start,
+                      placement_config);
             }
         }
     }
 
-    if (best_front != -1) {
-        result.front = front_results[best_front];
-    }
-    if (best_rear != -1) {
-        result.rear = rear_results[best_rear];
-    }
-    return result;
+    return {get_best_result(front_results), get_best_result(rear_results)};
 }
 
 void AdapterDetector::check_and_update_barcoding(SimplexRead& read,
