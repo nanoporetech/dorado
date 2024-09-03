@@ -47,11 +47,11 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
     const int window = m_config.primer_window;
     int trailing_Ts = 0;
 
-    std::string_view seq_view = std::string_view(read.read_common.seq);
+    const std::string_view seq_view = std::string_view(read.read_common.seq);
     auto bottom_start = std::max(0, (int)seq_view.length() - window);
     std::string_view read_bottom = seq_view.substr(bottom_start, window);
 
-    EdlibAlignConfig align_config = init_edlib_config_for_adapter();
+    const EdlibAlignConfig align_config = init_edlib_config_for_adapter();
     EdlibAlignResult align_result =
             edlibAlign(rna_adapter.data(), int(rna_adapter.length()), read_bottom.data(),
                        int(read_bottom.length()), align_config);
@@ -69,9 +69,9 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
                 read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
                 read.read_common.seq.size() + 1);
 
-        int base_anchor = bottom_start + align_result.startLocations[0] - m_config.rna_offset;
+        const int base_anchor = bottom_start + align_result.startLocations[0] - m_config.rna_offset;
         // RNA sequence is reversed wrt the signal and move table
-        int signal_anchor = int(seq_to_sig_map[seq_view.length() - base_anchor]);
+        const int signal_anchor = int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
         result = {false, signal_anchor, trailing_Ts, false};
     } else {
         spdlog::trace("{} adapter score too low {}", read.read_common.read_id, adapter_score);

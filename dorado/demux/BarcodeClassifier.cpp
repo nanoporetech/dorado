@@ -205,7 +205,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
     std::vector<BarcodeCandidateKit> candidates_list;
 
     for (auto& kit_name : m_kit_info_provider.kit_names()) {
-        const auto& kit_info = m_kit_info_provider.get_kit_info(kit_name);
+        const barcode_kits::KitInfo& kit_info = m_kit_info_provider.get_kit_info(kit_name);
 
         if (!kit_info.barcodes2.empty() && kit_info.barcodes.size() != kit_info.barcodes2.size()) {
             throw std::runtime_error(
@@ -224,7 +224,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
         candidate.kit = kit_name;
         candidate.barcode_kit = kit_info.name;
         const auto& ref_bc_name = kit_info.barcodes[0];
-        const auto& ref_bc = m_kit_info_provider.get_barcode_sequence(ref_bc_name);
+        const std::string& ref_bc = m_kit_info_provider.get_barcode_sequence(ref_bc_name);
 
         std::string bc_mask(ref_bc.length(), 'N');
 
@@ -256,7 +256,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         if (!kit_info.barcodes2.empty()) {
             const auto& ref_bc2_name = kit_info.barcodes2[0];
-            const auto& ref_bc2 = m_kit_info_provider.get_barcode_sequence(ref_bc2_name);
+            const std::string& ref_bc2 = m_kit_info_provider.get_barcode_sequence(ref_bc2_name);
 
             std::string bc2_mask(ref_bc2.length(), 'N');
             candidate.bottom_context = (use_leading_flank ? kit_info.bottom_front_flank : "") +
@@ -278,7 +278,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         for (size_t idx = 0; idx < kit_info.barcodes.size(); idx++) {
             const auto& bc_name = kit_info.barcodes[idx];
-            const auto& barcode1 = m_kit_info_provider.get_barcode_sequence(bc_name);
+            const std::string& barcode1 = m_kit_info_provider.get_barcode_sequence(bc_name);
             auto barcode1_rev = utils::reverse_complement(barcode1);
 
             if (!candidate.barcodes1.empty() &&
@@ -293,7 +293,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
             if (!kit_info.barcodes2.empty()) {
                 const auto& bc2_name = kit_info.barcodes2[idx];
-                const auto& barcode2 = m_kit_info_provider.get_barcode_sequence(bc2_name);
+                const std::string& barcode2 = m_kit_info_provider.get_barcode_sequence(bc2_name);
                 auto barcode2_rev = utils::reverse_complement(barcode2);
 
                 if (!candidate.barcodes2.empty() &&
@@ -837,7 +837,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
-    const auto& kit = m_kit_info_provider.get_kit_info(candidate->kit);
+    const barcode_kits::KitInfo& kit = m_kit_info_provider.get_kit_info(candidate->kit);
 
     // Detect presence of mid-strand barcode. If one is confident found, then
     // treat that read as unclassified since it's most likely an unsplit read.

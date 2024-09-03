@@ -34,8 +34,8 @@ dorado::barcode_kits::BarcodeKitScoringParams set_scoring_params(
         // params with whatever is set for that specific kit.
         const auto& kit_name = kit_names[0];
         const auto& kit_info = barcode_kits::get_kit_infos();
-        auto prebuilt_kit_iter = kit_info.find(kit_name);
-        if (prebuilt_kit_iter != kit_info.end()) {
+        const auto prebuilt_kit_iter = kit_info.find(kit_name);
+        if (prebuilt_kit_iter != kit_info.cend()) {
             params = prebuilt_kit_iter->second.scoring_params;
         }
     }
@@ -70,26 +70,26 @@ KitInfoProvider::KitInfoProvider(const std::vector<std::string>& kit_names,
 }
 
 const barcode_kits::KitInfo& KitInfoProvider::get_kit_info(const std::string& kit_name) const {
-    auto custom_kit_iter = m_custom_kit.find(kit_name);
-    if (custom_kit_iter != m_custom_kit.end()) {
+    const auto custom_kit_iter = m_custom_kit.find(kit_name);
+    if (custom_kit_iter != m_custom_kit.cend()) {
         return custom_kit_iter->second;
     }
     const auto& barcode_kit_infos = barcode_kits::get_kit_infos();
-    auto prebuilt_kit_iter = barcode_kit_infos.find(kit_name);
-    if (prebuilt_kit_iter != barcode_kit_infos.end()) {
+    const auto prebuilt_kit_iter = barcode_kit_infos.find(kit_name);
+    if (prebuilt_kit_iter != barcode_kit_infos.cend()) {
         return prebuilt_kit_iter->second;
     }
     throw std::runtime_error("Could not find " + kit_name + " in pre-built or custom kits");
 }
 
 const std::string& KitInfoProvider::get_barcode_sequence(const std::string& barcode_name) const {
-    auto custom_seqs_iter = m_custom_seqs.find(barcode_name);
-    if (custom_seqs_iter != m_custom_seqs.end()) {
+    const auto custom_seqs_iter = m_custom_seqs.find(barcode_name);
+    if (custom_seqs_iter != m_custom_seqs.cend()) {
         return custom_seqs_iter->second;
     }
     const auto& barcodes_map = barcode_kits::get_barcodes();
-    auto prebuilt_seqs_iter = barcodes_map.find(barcode_name);
-    if (prebuilt_seqs_iter != barcodes_map.end()) {
+    const auto prebuilt_seqs_iter = barcodes_map.find(barcode_name);
+    if (prebuilt_seqs_iter != barcodes_map.cend()) {
         return prebuilt_seqs_iter->second;
     }
     throw std::runtime_error("Could not find " + barcode_name +
