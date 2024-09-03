@@ -2,6 +2,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <sstream>
+
 #define CUT_TAG "[dorado::utils::fastq_reader]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
