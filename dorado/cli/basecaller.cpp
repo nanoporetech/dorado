@@ -479,6 +479,11 @@ void setup(const std::vector<std::string>& args,
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
 
+    bool is_rna_adapter = is_rna_model(model_config) &&
+                          (adapter_info->rna_adapters ||
+                           (barcoding_info && (!barcoding_info->kit_name.empty() ||
+                                               barcoding_info->custom_kit.has_value())));
+
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
 
@@ -495,7 +500,7 @@ void setup(const std::vector<std::string>& args,
     }
     if (estimate_poly_a) {
         auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), polya_config);
+                is_rna_model(model_config), is_rna_adapter, polya_config);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
                 std::move(poly_tail_calculator));
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
