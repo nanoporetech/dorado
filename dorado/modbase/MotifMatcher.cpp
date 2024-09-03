@@ -45,7 +45,7 @@ std::string expand_motif_regex(const std::string& motif) {
 namespace dorado::modbase {
 
 MotifMatcher::MotifMatcher(const ModBaseModelConfig& model_config)
-        : MotifMatcher(model_config.motif, model_config.motif_offset) {}
+        : MotifMatcher(model_config.mods.motif, model_config.mods.motif_offset) {}
 
 MotifMatcher::MotifMatcher(const std::string& motif, size_t offset)
         : m_motif(expand_motif_regex(motif)), m_motif_offset(offset) {}

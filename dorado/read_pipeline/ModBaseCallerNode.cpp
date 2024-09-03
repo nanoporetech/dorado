@@ -118,12 +118,12 @@ void ModBaseCallerNode::init_modbase_info() {
     auto& runner = m_runners[0];
     modbase::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-        const auto& params = runner->caller_params(caller_id);
+        const auto& params = runner->caller_params(caller_id).mods;
         if (!params.motif.empty()) {
             context_handler.set_context(params.motif, size_t(params.motif_offset));
         }
         base_mod_params.emplace_back(runner->caller_params(caller_id));
-        m_num_states += params.base_mod_count;
+        m_num_states += params.count;
     }
 
     auto result = modbase::get_modbase_info(base_mod_params);
@@ -220,11 +220,10 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                 auto scaled_signal =
                         runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
-                auto context_samples = (params.context_before + params.context_after);
-
                 // One-hot encodes the kmer at each signal step for input into the network
-                modbase::ModBaseEncoder encoder(m_block_stride, context_samples,
-                                                params.bases_before, params.bases_after);
+                modbase::ModBaseEncoder encoder(m_block_stride, params.context.samples,
+                                                params.context.bases_before,
+                                                params.context.bases_after);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, new_seq);
@@ -335,7 +334,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
         auto& params = runner->caller_params(caller_id);
         auto signal = read->read_common.raw_data;
-        if (params.reverse_signal) {
+        if (params.context.reverse) {
             signal = at::flip(signal, 0);
             std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
             std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
@@ -347,8 +346,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto scaled_signal = runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
         // One-hot encodes the kmer at each signal step for input into the network
-        modbase::ModBaseEncoder encoder(m_block_stride, params.context_samples, params.bases_before,
-                                        params.bases_after);
+        modbase::ModBaseEncoder encoder(m_block_stride, params.context.samples,
+                                        params.context.bases_before, params.context.bases_after);
         encoder.init(sequence_ints, seq_to_sig_map);
 
         auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
