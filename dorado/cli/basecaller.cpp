@@ -245,6 +245,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                       "using --no-trim. Note that this only applies to DNA. "
                       "RNA adapters are always trimmed.")
                 .default_value(std::string(""));
+        parser.hidden.add_argument("--rna-adapters")
+                .help("Force use of RNA adapters.")
+                .implicit_value(true)
+                .default_value(false);
     }
     {
         parser.visible.add_group("Poly-a arguments");
@@ -300,13 +304,11 @@ void setup(const std::vector<std::string>& args,
            bool run_batchsize_benchmarks,
            bool emit_batchsize_benchmarks,
            const std::string& resume_from_file,
-           bool adapter_no_trim,
-           bool primer_no_trim,
-           const std::optional<std::string>& custom_primer_file,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelComplex& model_complex,
            std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
+           std::shared_ptr<const dorado::demux::AdapterInfo> adapter_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::debug(model_config.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
@@ -424,7 +426,8 @@ void setup(const std::vector<std::string>& args,
     auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
                                                     recursive_file_loading);
 
-    const bool adapter_trimming_enabled = (!adapter_no_trim || !primer_no_trim);
+    const bool adapter_trimming_enabled =
+            (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
     const auto thread_allocations = utils::default_thread_allocations(
             int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
             barcoding_info != nullptr, adapter_trimming_enabled);
@@ -480,6 +483,7 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
     auto client_info = std::make_shared<DefaultClientInfo>();
+    client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
     if (barcoding_info) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(
                 std::move(barcoding_info));
@@ -487,11 +491,6 @@ void setup(const std::vector<std::string>& args,
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }
     if (adapter_trimming_enabled) {
-        auto adapter_info = std::make_shared<demux::AdapterInfo>();
-        adapter_info->trim_adapters = !adapter_no_trim;
-        adapter_info->trim_primers = !primer_no_trim;
-        adapter_info->custom_seqs = custom_primer_file;
-        client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
@@ -511,10 +510,9 @@ void setup(const std::vector<std::string>& args,
 
     api::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(remora_runners), mean_qscore_start_pos,
-            !adapter_no_trim, thread_allocations.scaler_node_threads,
-            true /* Enable read splitting */, thread_allocations.splitter_node_threads,
-            thread_allocations.remora_threads, current_sink_node,
-            PipelineDescriptor::InvalidNodeHandle);
+            thread_allocations.scaler_node_threads, true /* Enable read splitting */,
+            thread_allocations.splitter_node_threads, thread_allocations.remora_threads,
+            current_sink_node, PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -755,6 +753,12 @@ int basecaller(int argc, char* argv[]) {
         custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
     }
 
+    auto adapter_info = std::make_shared<demux::AdapterInfo>();
+    adapter_info->trim_adapters = !no_trim_adapters;
+    adapter_info->trim_primers = !no_trim_primers;
+    adapter_info->custom_seqs = custom_primer_file;
+    adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
+
     fs::path model_path;
     std::vector<fs::path> mods_model_paths;
 
@@ -822,9 +826,9 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<std::string>("--dump_stats_file"),
               parser.hidden.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
               parser.hidden.get<bool>("--emit-batchsize-benchmarks"),
-              parser.visible.get<std::string>("--resume-from"), no_trim_adapters, no_trim_primers,
-              custom_primer_file, parser.visible.get<bool>("--estimate-poly-a"), polya_config,
-              model_complex, std::move(barcoding_info), std::move(sample_sheet));
+              parser.visible.get<std::string>("--resume-from"),
+              parser.visible.get<bool>("--estimate-poly-a"), polya_config, model_complex,
+              std::move(barcoding_info), std::move(adapter_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(downloader.temporary_models());

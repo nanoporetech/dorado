@@ -38,36 +38,43 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < adapters.size(); ++i) {
         // First put the front adapter only at the beginning, with 6 bases in front of it.
-        auto new_sequence1 = "ACGTAC" + adapters[i].sequence + seq;
-        auto res1 = detector.find_adapters(new_sequence1);
-        CHECK(res1.front.name == adapters[i].name + "_FWD");
-        CHECK(res1.front.position == std::make_pair(6, int(adapters[i].sequence.length()) + 5));
-        CHECK(res1.front.score == 1.0f);
-        CHECK(res1.rear.score < 0.7f);
+        if (!adapters[i].sequence.empty()) {
+            auto new_sequence1 = "ACGTAC" + adapters[i].sequence + seq;
+            auto res1 = detector.find_adapters(new_sequence1);
+            CHECK(res1.front.name == adapters[i].name + "_FWD");
+            CHECK(res1.front.position == std::make_pair(6, int(adapters[i].sequence.length()) + 5));
+            CHECK(res1.front.score == 1.0f);
+            CHECK(res1.rear.score < 0.7f);
+        }
 
         // Now put the rear adapter at the end, with 3 bases after it.
-        auto new_sequence2 = seq + adapters[i].sequence_rev + "TTT";
-        auto res2 = detector.find_adapters(new_sequence2);
-        CHECK(res2.front.score < 0.7f);
-        CHECK(res2.rear.name == adapters[i].name + "_REV");
-        CHECK(res2.rear.position ==
-              std::make_pair(int(seq.size()),
-                             int(seq.size() + adapters[i].sequence_rev.length()) - 1));
-        CHECK(res2.rear.score == 1.0f);
+        if (!adapters[i].sequence_rev.empty()) {
+            auto new_sequence2 = seq + adapters[i].sequence_rev + "TTT";
+            auto res2 = detector.find_adapters(new_sequence2);
+            CHECK(res2.front.score < 0.7f);
+            CHECK(res2.rear.name == adapters[i].name + "_REV");
+            CHECK(res2.rear.position ==
+                  std::make_pair(int(seq.size()),
+                                 int(seq.size() + adapters[i].sequence_rev.length()) - 1));
+            CHECK(res2.rear.score == 1.0f);
+        }
 
         // Now put them both in.
-        auto new_sequence3 = "TGCA" + adapters[i].sequence + seq + adapters[i].sequence_rev + "GTA";
-        auto res3 = detector.find_adapters(new_sequence3);
-        CHECK(res3.front.name == adapters[i].name + "_FWD");
-        CHECK(res3.front.position == std::make_pair(4, int(adapters[i].sequence.length()) + 3));
-        CHECK(res3.front.score == 1.0f);
-        CHECK(res3.rear.name == adapters[i].name + "_REV");
-        CHECK(res3.rear.position ==
-              std::make_pair(int(adapters[i].sequence.size() + seq.size()) + 4,
-                             int(adapters[i].sequence.size() + seq.size() +
-                                 adapters[i].sequence_rev.length()) +
-                                     3));
-        CHECK(res2.rear.score == 1.0f);
+        if (!adapters[i].sequence.empty() && !adapters[i].sequence_rev.empty()) {
+            auto new_sequence3 =
+                    "TGCA" + adapters[i].sequence + seq + adapters[i].sequence_rev + "GTA";
+            auto res3 = detector.find_adapters(new_sequence3);
+            CHECK(res3.front.name == adapters[i].name + "_FWD");
+            CHECK(res3.front.position == std::make_pair(4, int(adapters[i].sequence.length()) + 3));
+            CHECK(res3.front.score == 1.0f);
+            CHECK(res3.rear.name == adapters[i].name + "_REV");
+            CHECK(res3.rear.position ==
+                  std::make_pair(int(adapters[i].sequence.size() + seq.size()) + 4,
+                                 int(adapters[i].sequence.size() + seq.size() +
+                                     adapters[i].sequence_rev.length()) +
+                                         3));
+            CHECK(res3.rear.score == 1.0f);
+        }
     }
 }
 
@@ -254,7 +261,7 @@ TEST_CASE(
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
             std::make_shared<const dorado::demux::AdapterInfo>(
-                    dorado::demux::AdapterInfo{true, true, std::nullopt}));
+                    dorado::demux::AdapterInfo{true, true, false, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
     // Push a Read type.
