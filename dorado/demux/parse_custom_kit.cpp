@@ -1,16 +1,13 @@
 #include "parse_custom_kit.h"
 
-#include "utils/barcode_kits.h"
-
 #include <htslib/sam.h>
 #include <toml.hpp>
-#include <toml/value.hpp>
 
 #include <algorithm>
 #include <string>
 #include <vector>
 
-namespace dorado::barcode_kits {
+namespace dorado::demux {
 
 bool check_normalized_id_pattern(const std::string& pattern) {
     auto modulo_pos = pattern.find_first_of('%');
@@ -167,4 +164,4 @@ dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
     return params;
 }
 
-}  // namespace dorado::barcode_kits
+}  // namespace dorado::demux

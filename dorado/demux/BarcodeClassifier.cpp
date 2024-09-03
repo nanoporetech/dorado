@@ -1,10 +1,8 @@
 #include "BarcodeClassifier.h"
 
 #include "barcoding_info.h"
-#include "parse_custom_sequences.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
-#include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -119,45 +117,6 @@ bool barcode_is_permitted(const demux::BarcodingInfo::FilterSet& allowed_barcode
     return allowed_barcodes->count(normalized_barcode_name) != 0;
 }
 
-// Helper function to convert the parsed custom kit tuple
-// into an unordered_map to simplify searching for kit info during
-// barcoding.
-std::unordered_map<std::string, dorado::barcode_kits::KitInfo> process_custom_kit(
-        const std::optional<std::string>& custom_kit) {
-    std::unordered_map<std::string, dorado::barcode_kits::KitInfo> kit_map;
-    if (custom_kit) {
-        auto custom_arrangement = dorado::barcode_kits::parse_custom_arrangement(*custom_kit);
-        if (custom_arrangement) {
-            const auto& [kit_name, kit_info] = *custom_arrangement;
-            kit_map[kit_name] = kit_info;
-        }
-    }
-    return kit_map;
-}
-
-dorado::barcode_kits::BarcodeKitScoringParams set_scoring_params(
-        const std::vector<std::string>& kit_names,
-        const std::optional<std::string>& custom_kit) {
-    dorado::barcode_kits::BarcodeKitScoringParams params{};
-
-    if (!kit_names.empty()) {
-        // If it is one of the pre-defined kits, override the default scoring
-        // params with whatever is set for that specific kit.
-        const auto& kit_name = kit_names[0];
-        const auto& kit_info_map = barcode_kits::get_kit_infos();
-        auto prebuilt_kit_iter = kit_info_map.find(kit_name);
-        if (prebuilt_kit_iter != kit_info_map.end()) {
-            params = prebuilt_kit_iter->second.scoring_params;
-        }
-    }
-    if (custom_kit) {
-        // If a custom kit is passed, parse it for any scoring
-        // params that need to override the default params.
-        return barcode_kits::parse_scoring_params(*custom_kit, params);
-    } else {
-        return params;
-    }
-}
 // Helper to extract left buffer from a flank.
 std::string extract_left_buffer(const std::string& flank, int buffer) {
     return flank.substr(std::max(0, static_cast<int>(flank.length()) - buffer));
@@ -219,14 +178,10 @@ struct BarcodeClassifier::BarcodeCandidateKit {
     std::string barcode_kit;
 };
 
-BarcodeClassifier::BarcodeClassifier(const std::vector<std::string>& kit_names,
-                                     const std::optional<std::string>& custom_kit,
-                                     const std::optional<std::string>& custom_barcodes)
-        : m_custom_kit(process_custom_kit(custom_kit)),
-          m_custom_seqs(custom_barcodes ? parse_custom_sequences(*custom_barcodes)
-                                        : std::unordered_map<std::string, std::string>{}),
-          m_scoring_params(set_scoring_params(kit_names, custom_kit)),
-          m_barcode_candidates(generate_candidates(kit_names)) {}
+BarcodeClassifier::BarcodeClassifier(KitInfoProvider kit_info_provider)
+        : m_kit_info_provider(std::move(kit_info_provider)),
+          m_scoring_params(m_kit_info_provider.scoring_params()),
+          m_barcode_candidates(generate_candidates()) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
@@ -239,34 +194,6 @@ BarcodeScoreResult BarcodeClassifier::barcode(
     return best_barcode;
 }
 
-const dorado::barcode_kits::KitInfo& BarcodeClassifier::get_kit_info(
-        const std::string& kit_name) const {
-    auto custom_kit_iter = m_custom_kit.find(kit_name);
-    if (custom_kit_iter != m_custom_kit.end()) {
-        return custom_kit_iter->second;
-    }
-    const auto& kit_info_map = barcode_kits::get_kit_infos();
-    auto prebuilt_kit_iter = kit_info_map.find(kit_name);
-    if (prebuilt_kit_iter != kit_info_map.end()) {
-        return prebuilt_kit_iter->second;
-    }
-    throw std::runtime_error("Could not find " + kit_name + " in pre-built or custom kits");
-}
-
-const std::string& BarcodeClassifier::get_barcode_sequence(const std::string& barcode_name) const {
-    auto custom_seqs_iter = m_custom_seqs.find(barcode_name);
-    if (custom_seqs_iter != m_custom_seqs.end()) {
-        return custom_seqs_iter->second;
-    }
-    const auto& barcodes = barcode_kits::get_barcodes();
-    auto prebuilt_seqs_iter = barcodes.find(barcode_name);
-    if (prebuilt_seqs_iter != barcodes.end()) {
-        return prebuilt_seqs_iter->second;
-    }
-    throw std::runtime_error("Could not find " + barcode_name +
-                             " in pre-built or custom barcode sequences");
-}
-
 // Generate all possible barcode candidates. If kit name is passed
 // limit the candidates generated to only the specified kits. This is done
 // to frontload some of the computation, such as calculating flanks
@@ -274,25 +201,11 @@ const std::string& BarcodeClassifier::get_barcode_sequence(const std::string& ba
 // etc.
 // Returns a vector all barcode candidates to test the
 // input read sequence against.
-std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_candidates(
-        const std::vector<std::string>& kit_names) {
+std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_candidates() {
     std::vector<BarcodeCandidateKit> candidates_list;
 
-    std::vector<std::string> final_kit_names;
-    if (!m_custom_kit.empty()) {
-        for (auto& [kit_name, _] : m_custom_kit) {
-            final_kit_names.push_back(kit_name);
-        }
-    } else if (kit_names.empty()) {
-        throw std::runtime_error(
-                "Either custom kit must include kit arrangement or a kit name needs to be passed "
-                "in.");
-    } else {
-        final_kit_names = kit_names;
-    }
-
-    for (auto& kit_name : final_kit_names) {
-        const auto& kit_info = get_kit_info(kit_name);
+    for (auto& kit_name : m_kit_info_provider.kit_names()) {
+        const auto& kit_info = m_kit_info_provider.get_kit_info(kit_name);
 
         if (!kit_info.barcodes2.empty() && kit_info.barcodes.size() != kit_info.barcodes2.size()) {
             throw std::runtime_error(
@@ -311,7 +224,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
         candidate.kit = kit_name;
         candidate.barcode_kit = kit_info.name;
         const auto& ref_bc_name = kit_info.barcodes[0];
-        const auto& ref_bc = get_barcode_sequence(ref_bc_name);
+        const auto& ref_bc = m_kit_info_provider.get_barcode_sequence(ref_bc_name);
 
         std::string bc_mask(ref_bc.length(), 'N');
 
@@ -343,7 +256,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         if (!kit_info.barcodes2.empty()) {
             const auto& ref_bc2_name = kit_info.barcodes2[0];
-            const auto& ref_bc2 = get_barcode_sequence(ref_bc2_name);
+            const auto& ref_bc2 = m_kit_info_provider.get_barcode_sequence(ref_bc2_name);
 
             std::string bc2_mask(ref_bc2.length(), 'N');
             candidate.bottom_context = (use_leading_flank ? kit_info.bottom_front_flank : "") +
@@ -365,7 +278,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         for (size_t idx = 0; idx < kit_info.barcodes.size(); idx++) {
             const auto& bc_name = kit_info.barcodes[idx];
-            const auto& barcode1 = get_barcode_sequence(bc_name);
+            const auto& barcode1 = m_kit_info_provider.get_barcode_sequence(bc_name);
             auto barcode1_rev = utils::reverse_complement(barcode1);
 
             if (!candidate.barcodes1.empty() &&
@@ -380,7 +293,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
             if (!kit_info.barcodes2.empty()) {
                 const auto& bc2_name = kit_info.barcodes2[idx];
-                const auto& barcode2 = get_barcode_sequence(bc2_name);
+                const auto& barcode2 = m_kit_info_provider.get_barcode_sequence(bc2_name);
                 auto barcode2_rev = utils::reverse_complement(barcode2);
 
                 if (!candidate.barcodes2.empty() &&
@@ -924,7 +837,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         throw std::runtime_error("Unimplemented: multiple barcoding kits");
     }
 
-    const auto& kit = get_kit_info(candidate->kit);
+    const auto& kit = m_kit_info_provider.get_kit_info(candidate->kit);
 
     // Detect presence of mid-strand barcode. If one is confident found, then
     // treat that read as unclassified since it's most likely an unsplit read.

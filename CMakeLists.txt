@@ -183,6 +183,10 @@ add_library(dorado_lib
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
     dorado/demux/barcoding_info.h
+    dorado/demux/KitInfoProvider.cpp
+    dorado/demux/KitInfoProvider.h
+    dorado/demux/parse_custom_kit.cpp
+    dorado/demux/parse_custom_kit.h
     dorado/demux/parse_custom_sequences.cpp
     dorado/demux/parse_custom_sequences.h
     dorado/demux/Trimmer.cpp
