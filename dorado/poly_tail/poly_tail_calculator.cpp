@@ -75,8 +75,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
     std::vector<std::pair<int, int>> intervals;
     const int kStride = 3;
-    for (int s = left_end; s < right_end; s += kStride) {
-        int e = std::min(s + kMaxSampleGap, right_end);
+    for (int s = left_end; s < right_end - kMaxSampleGap; s += kStride) {
+        int e = s + kMaxSampleGap;
         auto [avg, stdev] = calc_stats(s, e);
         if (stdev < kVar) {
             // If a new interval overlaps with the previous interval, just extend
