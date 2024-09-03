@@ -8,6 +8,7 @@
 #include <htslib/sam.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,14 +20,6 @@ namespace dorado {
 using ReadMap = std::unordered_map<std::string, SimplexReadPtr>;
 
 class Pipeline;
-
-namespace details {
-class BamRecordGenerator {
-public:
-    virtual ~BamRecordGenerator() = default;
-    virtual bool try_get_next_record(bam1_t* record) = 0;
-};
-}  // namespace details
 
 class HtsReader {
 public:
@@ -57,7 +50,10 @@ private:
     std::function<void(BamPtr&)> m_record_mutator{};
     std::optional<std::unordered_set<std::string>> m_read_list;
 
-    std::unique_ptr<details::BamRecordGenerator> m_bam_record_generator;
+    std::function<bool(bam1_t*)> m_bam_record_generator{};
+
+    template <typename T>
+    bool try_initialise_generator(const std::string& filename);
 };
 
 template <typename T>

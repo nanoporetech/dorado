@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -21,9 +22,9 @@ namespace dorado {
 
 namespace {
 
-const std::string BAM_FORMAT_TEEXT_FASTQ{"FASTQ sequence text"};
+const std::string HTS_FORMAT_TEXT_FASTQ{"FASTQ sequence text"};
 
-class FastqBamRecordGenerator : public details::BamRecordGenerator {
+class FastqBamRecordGenerator {
     utils::FastqReader m_fastq_reader;
     SamHdrPtr m_header;
 
@@ -39,36 +40,37 @@ public:
     bool is_valid() const { return m_fastq_reader.is_valid(); }
 
     sam_hdr_t* header() const { return m_header.get(); }
-    const std::string& format() const { return BAM_FORMAT_TEEXT_FASTQ; }
+    const std::string& format() const { return HTS_FORMAT_TEXT_FASTQ; }
 
-    bool try_get_next_record(bam1_t* record) override {
+    bool try_get_next_record(bam1_t* record) {
         auto fastq_record = m_fastq_reader.try_get_next_record();
         if (!fastq_record) {
             return false;
         }
-        std::string read_id = fastq_record->id.substr(1, fastq_record->id.find(' ') - 1);
+        auto id_len = fastq_record->id().find(' ');
+        id_len = id_len == std::string::npos ? fastq_record->id().size() - 1 : id_len - 1;
+        std::string_view read_id = fastq_record->read_id();
         std::vector<uint8_t> qscore{};
-        qscore.reserve(fastq_record->quality.size());
-        std::transform(fastq_record->quality.begin(), fastq_record->quality.end(),
+        qscore.reserve(fastq_record->quality().size());
+        std::transform(fastq_record->quality().begin(), fastq_record->quality().end(),
                        std::back_inserter(qscore), [](char c) { return (uint8_t)(c)-33; });
         uint16_t flags = 4;     // 4 = UNMAPPED
         int leftmost_pos = -1;  // UNMAPPED - will be written as 0
         uint8_t map_q = 0;      // UNMAPPED
         int next_pos = -1;      // UNMAPPED - will be written as 0
-        auto result = bam_set1(record, read_id.size(), read_id.c_str(), flags, -1, leftmost_pos,
-                               map_q, 0, nullptr, -1, next_pos, 0, fastq_record->sequence.size(),
-                               fastq_record->sequence.c_str(), (char*)qscore.data(), 0);
+        auto result = bam_set1(record, read_id.size(), read_id.data(), flags, -1, leftmost_pos,
+                               map_q, 0, nullptr, -1, next_pos, 0, fastq_record->sequence().size(),
+                               fastq_record->sequence().c_str(), (char*)qscore.data(), 0);
         return result >= 0;
     }
 };
 
-class HtsLibBamRecordGenerator : public details::BamRecordGenerator {
+class HtsLibBamRecordGenerator {
     HtsFilePtr m_file{};
     SamHdrPtr m_header{};
     std::string m_format{};
 
 public:
-    HtsLibBamRecordGenerator() {}
     HtsLibBamRecordGenerator(const std::string& filename) {
         m_file.reset(hts_open(filename.c_str(), "r"));
         if (!m_file) {
@@ -92,54 +94,9 @@ public:
     sam_hdr_t* header() const { return m_header.get(); }
     const std::string& format() const { return m_format; }
 
-    bool try_get_next_record(bam1_t* record) override {
+    bool try_get_next_record(bam1_t* record) {
         return sam_read1(m_file.get(), m_header.get(), record) >= 0;
     }
-};
-
-class BamRecordGeneratorImpl : public details::BamRecordGenerator {
-    HtsLibBamRecordGenerator m_htslib_generator;
-    std::unique_ptr<FastqBamRecordGenerator> m_fastq_generator;
-
-    std::function<bool(bam1_t*)> m_next_record_op;
-
-public:
-    BamRecordGeneratorImpl(const std::string& filename) : m_htslib_generator(filename) {
-        if (m_htslib_generator.is_valid()) {
-            m_next_record_op = [this](bam1_t* record) {
-                return m_htslib_generator.try_get_next_record(record);
-            };
-            return;
-        }
-        m_fastq_generator = std::make_unique<FastqBamRecordGenerator>(filename);
-        if (!m_fastq_generator->is_valid()) {
-            return;
-        }
-        m_next_record_op = [this](bam1_t* record) {
-            return m_fastq_generator->try_get_next_record(record);
-        };
-    }
-
-    sam_hdr_t* header() const {
-        if (m_htslib_generator.is_valid()) {
-            return m_htslib_generator.header();
-        }
-        return m_fastq_generator->header();
-    }
-
-    const std::string& format() const {
-        if (m_htslib_generator.is_valid()) {
-            return m_htslib_generator.format();
-        }
-        return m_fastq_generator->format();
-    }
-
-    bool try_get_next_record(bam1_t* record) override { return m_next_record_op(record); }
-
-    bool is_valid() { return static_cast<bool>(m_next_record_op); }
-
-private:
-    HtsLibBamRecordGenerator m_hts_reader;
 };
 
 }  // namespace
@@ -147,16 +104,28 @@ private:
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
         : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    auto bam_record_generator = std::make_unique<BamRecordGeneratorImpl>(filename);
-    if (!bam_record_generator->is_valid()) {
+    if (!try_initialise_generator<HtsLibBamRecordGenerator>(filename) &&
+        !try_initialise_generator<FastqBamRecordGenerator>(filename)) {
         throw std::runtime_error("Could not open file: " + filename);
     }
-    m_header = bam_record_generator->header();
-    m_format = bam_record_generator->format();
     is_aligned = m_header->n_targets > 0;
-    m_bam_record_generator = std::move(bam_record_generator);
 
     record.reset(bam_init1());
+}
+
+template <typename T>
+bool HtsReader::try_initialise_generator(const std::string& filename) {
+    auto generator =
+            std::make_shared<T>(filename);  // shared to allow the generator to be copy assigned
+    if (!generator->is_valid()) {
+        return false;
+    }
+    m_header = generator->header();
+    m_format = generator->format();
+    m_bam_record_generator = [generator = std::move(generator)](bam1_t* record) mutable -> bool {
+        return generator->try_get_next_record(record);
+    };
+    return true;
 }
 
 HtsReader::~HtsReader() { record.reset(); }
@@ -169,7 +138,7 @@ void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
     m_record_mutator = std::move(mutator);
 }
 
-bool HtsReader::read() { return m_bam_record_generator->try_get_next_record(record.get()); }
+bool HtsReader::read() { return m_bam_record_generator(record.get()); }
 
 bool HtsReader::has_tag(const char* tagname) {
     uint8_t* tag = bam_aux_get(record.get(), tagname);

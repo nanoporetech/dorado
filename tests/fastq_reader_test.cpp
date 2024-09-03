@@ -140,10 +140,10 @@ DEFINE_TEST("FastqReader::try_get_next_record when valid returns expected record
     CHECK(cut.is_valid());
     auto record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id == VALID_ID);
-    CHECK(record->sequence == VALID_SEQ);
-    CHECK(record->separator == VALID_SEPARATOR);
-    CHECK(record->quality == VALID_QUAL);
+    CHECK(record->id() == VALID_ID);
+    CHECK(record->sequence() == VALID_SEQ);
+    CHECK(record->separator() == VALID_SEPARATOR);
+    CHECK(record->quality() == VALID_QUAL);
 }
 
 DEFINE_TEST("FastqReader::try_get_next_record after returning the only record returns null") {
@@ -176,10 +176,10 @@ DEFINE_TEST(
     CHECK(record.has_value());
     record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id == VALID_ID_2);
-    CHECK(record->sequence == VALID_SEQ_2);
-    CHECK(record->separator == VALID_SEPARATOR);
-    CHECK(record->quality == VALID_QUAL_2);
+    CHECK(record->id() == VALID_ID_2);
+    CHECK(record->sequence() == VALID_SEQ_2);
+    CHECK(record->separator() == VALID_SEPARATOR);
+    CHECK(record->quality() == VALID_QUAL_2);
 }
 
 DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with Us replaced") {
@@ -188,10 +188,10 @@ DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with
     CHECK(cut.is_valid());
     auto record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id == VALID_ID);
-    CHECK(record->sequence == VALID_SEQ);  // Check Ts not Us
-    CHECK(record->separator == VALID_SEPARATOR);
-    CHECK(record->quality == VALID_QUAL);
+    CHECK(record->id() == VALID_ID);
+    CHECK(record->sequence() == VALID_SEQ);  // Check Ts not Us
+    CHECK(record->separator() == VALID_SEPARATOR);
+    CHECK(record->quality() == VALID_QUAL);
 }
 
 }  // namespace dorado::utils::fastq_reader::test
