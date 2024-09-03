@@ -35,17 +35,32 @@ bool koi_can_use_cutlass() {
 }
 
 struct KoiTensorExt : public KoiTensor {
-    KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) {
+    KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) { init(t, dim_tags); }
+    KoiTensorExt(const at::Tensor &t,
+                 const std::vector<int> &dim_tags,
+                 const at::Tensor &scale_t,
+                 int scale_tag_) {
+        init(t, dim_tags);
+        scale_tag = scale_tag_;
+        scale_data = scale_t.data_ptr();
+        scale_type_id = type_id_from_tensor(scale_t);
+    }
+
+    KoiTypeId type_id_from_tensor(const at::Tensor &t) {
+        if (t.dtype() == torch::kF16) {
+            return KOI_F16;
+        } else if (t.dtype() == torch::kF32) {
+            return KOI_F32;
+        } else if (t.dtype() == torch::kI8) {
+            return KOI_I8;
+        }
+        throw std::runtime_error("KoiTensor unsupported dtype");
+    }
+
+    void init(const at::Tensor &t, const std::vector<int> &dim_tags) {
         data_ptr = t.data_ptr();
         ndims = static_cast<int>(t.dim());
-        if (t.dtype() == torch::kF16) {
-            type_id = KOI_F16;
-        } else if (t.dtype() == torch::kI8) {
-            type_id = KOI_I8;
-        } else {
-            spdlog::error("KoiTensor unsupported dtype");
-            exit(EXIT_FAILURE);
-        }
+        type_id = type_id_from_tensor(t);
         if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
             spdlog::error("KoiTensor dimension mismatch");
             exit(EXIT_FAILURE);
@@ -55,6 +70,9 @@ struct KoiTensorExt : public KoiTensor {
             dims[i].size = t.size(i);
             dims[i].stride = t.stride(i);
         }
+        scale_data = nullptr;
+        scale_tag = 0;
+        scale_type_id = KOI_NONE;
     }
 };
 }  // anonymous namespace
@@ -73,6 +91,13 @@ namespace nn {
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
+
+void apply_rounding(at::Tensor &t, int remove_bits) {
+    // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
+    // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
+    t.view(torch::kI16).add_(1 << (remove_bits - 1));
+    t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
+}
 
 torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
@@ -468,6 +493,16 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
                                 .contiguous()
                                 .view({E / 16, C / 8, 16, 8});
             t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
+
+            // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
+            // power efficient and results in higher performance for a small accuracy drop)
+            int remove_bits = 4;
+            apply_rounding(wqkv_weights, remove_bits);
+            apply_rounding(proj_weight, remove_bits);
+            apply_rounding(t_res_weights, remove_bits);
+            apply_rounding(t_res2_weights, remove_bits);
+            apply_rounding(t_fc1_wts, remove_bits);
+            apply_rounding(t_fc2_wts, remove_bits);
         }
 
         // Output buffers
@@ -499,47 +534,50 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
         KoiTensorExt res2_weights(t_res2_weights, {'C'});
 
         int res = KOI_SUCCESS;
-        if (res == KOI_SUCCESS) {
+        int calls = 0;
+        if (res == KOI_SUCCESS && ++calls) {
             // Fused QKV Matmul Plus Rotary embedding
             utils::ScopedProfileRange spr("QKV+ROTE", 3);
             res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv, &sincos,
                                  &out_qkv, ctr[0].data_ptr<int>());
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // Apply masket attention
             utils::ScopedProfileRange spr("MEA", 3);
             res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // Koi linear matmul
             utils::ScopedProfileRange spr("OUTP", 3);
             res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
                              ctr[1].data_ptr<int>());
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // RMS residual
             utils::ScopedProfileRange spr("LNORM1", 3);
             res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in, alpha, &res_weights, &in);
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // Matmul + SWIGLU
             utils::ScopedProfileRange spr("FC1+SILU", 3);
-            res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>());
+            int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
+            res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
+                                use_f32_accum);
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // Fully connected
             utils::ScopedProfileRange spr("FC2", 3);
             res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
                              ctr[3].data_ptr<int>());
         }
-        if (res == KOI_SUCCESS) {
+        if (res == KOI_SUCCESS && ++calls) {
             // RMS Norm Residual again
             utils::ScopedProfileRange spr("LNORM2", 3);
             res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in, alpha, &res2_weights, &in);
         }
         // TODO: handle result
         if (res != KOI_SUCCESS) {
-            spdlog::error("Koi tiled path failed");
+            spdlog::error("Koi tiled path failed {}", calls);
         }
         return x;
     }
