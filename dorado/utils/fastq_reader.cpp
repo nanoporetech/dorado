@@ -18,17 +18,6 @@ bool is_valid_id_field(const std::string& field) {
         return false;
     }
     return true;
-
-    //std::stringstream field_stream{field};
-    //std::string id_section{};
-    //if (!std::getline(field_stream, id_section, ' ')) {
-    //    return false;
-    //}
-    //if (id_section.size() < 2) {
-    //    return false;
-    //}
-
-    //return true;
 }
 
 bool is_valid_sequence_field(std::string& field) {
@@ -87,7 +76,7 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
     if (!get_non_empty_line(input_stream, line) || !result.set_sequence(std::move(line))) {
         return std::nullopt;
     }
-    if (!get_non_empty_line(input_stream, line) || !result.set_separator(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line) || !is_valid_separator_field(line)) {
         return std::nullopt;
     }
     if (!get_non_empty_line(input_stream, line) || !result.set_quality(std::move(line))) {
@@ -105,14 +94,16 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
 
 const std::string& FastqRecord::id() const { return m_id; }
 const std::string& FastqRecord::sequence() const { return m_sequence; }
-const std::string& FastqRecord::separator() const { return m_separator; }
 const std::string& FastqRecord::quality() const { return m_quality; }
+
+const std::string_view& FastqRecord::read_id() { return m_read_id; }
 
 bool FastqRecord::set_id(std::string line) {
     if (!is_valid_id_field(line)) {
         return false;
     }
     m_id = std::move(line);
+    parse_id_line();
     return true;
 }
 
@@ -124,20 +115,19 @@ bool FastqRecord::set_sequence(std::string line) {
     return true;
 }
 
-bool FastqRecord::set_separator(std::string line) {
-    if (!is_valid_separator_field(line)) {
-        return false;
-    }
-    m_separator = std::move(line);
-    return true;
-}
-
 bool FastqRecord::set_quality(std::string line) {
     if (!is_valid_quality_field(line)) {
         return false;
     }
     m_quality = std::move(line);
     return true;
+}
+
+void FastqRecord::parse_id_line() {
+    assert(m_id.size() > 1);
+    auto id_len = m_id.find(' ');
+    id_len = id_len == std::string::npos ? m_id.size() - 1 : id_len - 1;
+    m_read_id = {m_id.data() + 1, id_len};
 }
 
 FastqReader::FastqReader(const std::string& input_file) {
@@ -177,13 +167,6 @@ bool is_fastq(std::istream& input_stream) {
     }
 
     return get_next_record(input_stream).has_value();
-}
-
-std::string_view FastqRecord::read_id() {
-    assert(m_id.size() > 1);
-    auto id_len = m_id.find(' ');
-    id_len = id_len == std::string::npos ? m_id.size() - 1 : id_len - 1;
-    return std::string_view{m_id.data() + 1, id_len};
 }
 
 }  // namespace dorado::utils

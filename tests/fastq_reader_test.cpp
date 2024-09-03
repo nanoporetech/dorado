@@ -109,6 +109,24 @@ DEFINE_TEST("is_fastq parameterized testing") {
     REQUIRE(is_fastq(input_stream) == is_valid);
 }
 
+DEFINE_TEST("read_id() with valid simple id line returns the read id") {
+    FastqRecord cut{};
+    CHECK(cut.set_id("@expected_simple_read_id"));
+
+    REQUIRE(cut.read_id() == "expected_simple_read_id");
+}
+
+DEFINE_TEST("read_id() with valid complex id line returns the read id") {
+    FastqRecord cut{};
+    CHECK(cut.set_id(
+            "@fdbbea47-8893-4055-942b-8c2efe226c17 runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
+            "sample_id=AMW_RNA_model_training_QC_3 flow_cell_id=FAH44643 ch=258 "
+            "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
+            "basecall_gpu=NVIDIA RTX A5500 Laptop GPU"));
+
+    REQUIRE(cut.read_id() == "fdbbea47-8893-4055-942b-8c2efe226c17");
+}
+
 DEFINE_TEST("FastqReader constructor with invalid file does not throw") {
     REQUIRE_NOTHROW(dorado::utils::FastqReader("invalid_file"));
 }
@@ -144,7 +162,6 @@ DEFINE_TEST("FastqReader::try_get_next_record when valid returns expected record
     REQUIRE(record.has_value());
     CHECK(record->id() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);
-    CHECK(record->separator() == VALID_SEPARATOR);
     CHECK(record->quality() == VALID_QUAL);
 }
 
@@ -180,7 +197,6 @@ DEFINE_TEST(
     REQUIRE(record.has_value());
     CHECK(record->id() == VALID_ID_2);
     CHECK(record->sequence() == VALID_SEQ_2);
-    CHECK(record->separator() == VALID_SEPARATOR);
     CHECK(record->quality() == VALID_QUAL_2);
 }
 
@@ -192,7 +208,6 @@ DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with
     REQUIRE(record.has_value());
     CHECK(record->id() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);  // Check Ts not Us
-    CHECK(record->separator() == VALID_SEPARATOR);
     CHECK(record->quality() == VALID_QUAL);
 }
 
