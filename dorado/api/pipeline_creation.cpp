@@ -20,7 +20,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              std::vector<basecall::RunnerPtr>&& runners,
                              std::vector<modbase::RunnerPtr>&& modbase_runners,
                              uint32_t mean_qscore_start_pos,
-                             bool trim_adapter,
                              int scaler_node_threads,
                              bool enable_read_splitter,
                              int splitter_node_threads,
@@ -52,7 +51,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     auto trim_rapid_adapter_settings = utils::rapid::get_settings();
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {}, model_config.signal_norm_params, model_config.sample_type, trim_adapter,
+            {}, model_config.signal_norm_params, model_config.sample_type,
             trim_rapid_adapter_settings, scaler_node_threads, 1000);
     if (current_node_handle != PipelineDescriptor::InvalidNodeHandle) {
         pipeline_desc.add_node_sink(current_node_handle, scaler_node);
@@ -168,7 +167,7 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
     utils::rapid::Settings trim_rapid_adapter_settings;
     trim_rapid_adapter_settings.active = false;
     auto scaler_node = pipeline_desc.add_node<ScalerNode>(
-            {basecaller_node}, model_config.signal_norm_params, models::SampleType::DNA, false,
+            {basecaller_node}, model_config.signal_norm_params, models::SampleType::DNA,
             trim_rapid_adapter_settings, scaler_node_threads, 1000);
 
     // if we've been provided a source node, connect it to the start of our pipeline

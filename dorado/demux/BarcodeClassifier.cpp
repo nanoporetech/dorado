@@ -787,6 +787,8 @@ float BarcodeClassifier::find_midstrand_barcode_double_ends(
 // In this scenario, the barcode (and its flanks) only ligate to the 5' end
 // of the read. So we only look for barcode sequence in the top "window" (first
 // 150bp) of the read.
+// If rear_barcodes is true, the barcode ligates only at the 3' end, so we shift the
+// window to the end of the read.
 std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
@@ -837,24 +839,29 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         res.barcode_name = barcode_name;
         res.kit = candidate.kit;
         res.barcode_kit = candidate.barcode_kit;
-        res.top_flank_score = top_flank_score;
-        res.bottom_flank_score = -1.f;
-        res.flank_score = std::max(res.top_flank_score, res.bottom_flank_score);
-        res.top_penalty = top_mask_penalty;
-        res.bottom_penalty = -1;
-        res.penalty = res.top_penalty;
-        res.use_top = true;
-        res.top_barcode_score = 1.f - static_cast<float>(res.top_penalty) / barcode.length();
-        res.barcode_score = res.top_barcode_score;
         if (rear_barcodes) {
+            res.bottom_flank_score = top_flank_score;
+            res.flank_score = res.bottom_flank_score;
+            res.bottom_penalty = top_mask_penalty;
+            res.penalty = res.bottom_penalty;
+            res.use_top = false;
+            res.bottom_barcode_score =
+                    1.f - static_cast<float>(res.bottom_penalty) / barcode.length();
+            res.barcode_score = res.bottom_barcode_score;
             int rear_start =
                     std::max(0, (int)read_seq.length() - m_scoring_params.rear_barcode_window);
-            res.top_barcode_pos = {rear_start + top_result.startLocations[0],
-                                   rear_start + top_result.endLocations[0]};
+            res.bottom_barcode_pos = {rear_start + top_result.startLocations[0],
+                                      rear_start + top_result.endLocations[0]};
         } else {
+            res.top_flank_score = top_flank_score;
+            res.flank_score = res.top_flank_score;
+            res.top_penalty = top_mask_penalty;
+            res.penalty = res.top_penalty;
+            res.use_top = true;
+            res.top_barcode_score = 1.f - static_cast<float>(res.top_penalty) / barcode.length();
+            res.barcode_score = res.top_barcode_score;
             res.top_barcode_pos = {top_result.startLocations[0], top_result.endLocations[0]};
         }
-
         results.push_back(res);
     }
     edlibFreeAlignResult(top_result);
@@ -1011,17 +1018,13 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const auto& second_best_result = std::next(best_result);
         const int penalty_dist = second_best_result->penalty - best_result->penalty;
 
-        bool barcode_proximity_ok = false;
-        if (kit.rear_only_barcodes) {
-            barcode_proximity_ok = best_result->top_barcode_pos.second >=
-                                   int(read_seq.length() - m_scoring_params.barcode_end_proximity);
-        } else {
-            // NB: this test will pass if _either_ barcode is close enough to the end of the read for a both ends kit.
-            barcode_proximity_ok =
-                    best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity ||
-                    best_result->bottom_barcode_pos.second >=
-                            int(read_seq.length() - m_scoring_params.barcode_end_proximity);
-        }
+        // NB: this test will pass if _either_ barcode is close enough to the end of the read for a both ends kit.
+        bool barcode_proximity_ok =
+                (best_result->top_barcode_pos.first >= 0 &&
+                 best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity) ||
+                (best_result->bottom_barcode_pos.second >= 0 &&
+                 best_result->bottom_barcode_pos.second >=
+                         int(read_seq.length() - m_scoring_params.barcode_end_proximity));
 
         if (((penalty_dist >= m_scoring_params.min_barcode_penalty_dist &&
               are_penalties_acceptable(*best_result)) ||

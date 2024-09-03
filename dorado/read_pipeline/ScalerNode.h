@@ -14,7 +14,6 @@ class ScalerNode : public MessageSink {
 public:
     ScalerNode(const basecall::SignalNormalisationParams& config,
                models::SampleType model_type,
-               bool trim_rna_adapter,
                const utils::rapid::Settings& m_rapid_settings,
                int num_worker_threads,
                size_t max_reads);
@@ -31,7 +30,6 @@ private:
 
     const basecall::SignalNormalisationParams m_scaling_params;
     const models::SampleType m_model_type;
-    const bool m_trim_rna_adapter;
     const utils::rapid::Settings m_rapid_settings;
 
     // A flag to warn only once if the basecall model and read SampleType differ

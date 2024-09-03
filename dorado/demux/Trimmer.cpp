@@ -58,32 +58,29 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
     // the end of top barcode end value because that's the position
     // in the sequence where the barcode ends. So the actual sequence
     // because from one after that.
-    if (res.top_penalty >= 0 && res.bottom_penalty >= 0) {
+    if (res.top_penalty >= 0) {
         float top_flank_score = res.top_flank_score;
         if (top_flank_score > kFlankScoreThres) {
             trim_interval.first = res.top_barcode_pos.second + 1;
         }
+    }
 
+    if (res.bottom_penalty >= 0) {
         float bottom_flank_score = res.bottom_flank_score;
         if (bottom_flank_score > kFlankScoreThres) {
             trim_interval.second = res.bottom_barcode_pos.first;
         }
+    }
 
-        // In some cases where the read length is very small, the front
-        // and rear windows could actually overlap. In that case find
-        // which window was used and just grab the interval for that
-        // window.
-        if (trim_interval.second <= trim_interval.first) {
-            if (res.use_top) {
-                trim_interval = {res.top_barcode_pos.second, seqlen};
-            } else {
-                trim_interval = {0, res.bottom_barcode_pos.first};
-            }
-        }
-    } else {
-        float top_flank_score = res.top_flank_score;
-        if (top_flank_score > kFlankScoreThres) {
-            trim_interval.first = res.top_barcode_pos.second + 1;
+    // In some cases where the read length is very small, the front
+    // and rear windows could actually overlap. In that case find
+    // which window was used and just grab the interval for that
+    // window.
+    if (trim_interval.second <= trim_interval.first) {
+        if (res.use_top) {
+            trim_interval = {res.top_barcode_pos.second + 1, seqlen};
+        } else {
+            trim_interval = {0, res.bottom_barcode_pos.first};
         }
     }
 

@@ -346,10 +346,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         // scale signal based on model parameters
         auto scaled_signal = runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
-        auto context_samples = (params.context_before + params.context_after);
-
         // One-hot encodes the kmer at each signal step for input into the network
-        modbase::ModBaseEncoder encoder(m_block_stride, context_samples, params.bases_before,
+        modbase::ModBaseEncoder encoder(m_block_stride, params.context_samples, params.bases_before,
                                         params.bases_after);
         encoder.init(sequence_ints, seq_to_sig_map);
 
