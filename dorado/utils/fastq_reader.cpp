@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
-#include <iostream>
-#include <sstream>
 
 namespace dorado::utils {
 
@@ -96,7 +94,7 @@ const std::string& FastqRecord::id() const { return m_id; }
 const std::string& FastqRecord::sequence() const { return m_sequence; }
 const std::string& FastqRecord::quality() const { return m_quality; }
 
-const std::string_view& FastqRecord::read_id() { return m_read_id; }
+const std::string& FastqRecord::read_id() const { return m_read_id; }
 
 bool FastqRecord::set_id(std::string line) {
     if (!is_valid_id_field(line)) {
@@ -125,9 +123,7 @@ bool FastqRecord::set_quality(std::string line) {
 
 void FastqRecord::parse_id_line() {
     assert(m_id.size() > 1);
-    auto id_len = m_id.find(' ');
-    id_len = id_len == std::string::npos ? m_id.size() - 1 : id_len - 1;
-    m_read_id = {m_id.data() + 1, id_len};
+    m_read_id = m_id.substr(1, m_id.find(' ') - 1);
 }
 
 FastqReader::FastqReader(const std::string& input_file) {

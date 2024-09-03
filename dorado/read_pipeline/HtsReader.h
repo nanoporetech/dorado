@@ -25,7 +25,6 @@ class HtsReader {
 public:
     HtsReader(const std::string& filename,
               std::optional<std::unordered_set<std::string>> read_list);
-    ~HtsReader();
     bool read();
 
     // If reading directly into a pipeline need to set the client info on the messages
