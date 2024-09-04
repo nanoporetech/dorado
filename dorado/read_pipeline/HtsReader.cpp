@@ -3,6 +3,7 @@
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/messages.h"
+#include "utils/bam_utils.h"
 #include "utils/fastq_reader.h"
 #include "utils/types.h"
 
@@ -26,17 +27,19 @@ const std::string HTS_FORMAT_TEXT_FASTQ{"FASTQ sequence text"};
 
 bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_record) {
     std::vector<uint8_t> qscore{};
-    qscore.reserve(fastq_record.quality().size());
-    std::transform(fastq_record.quality().begin(), fastq_record.quality().end(),
+    qscore.reserve(fastq_record.qstring().size());
+    std::transform(fastq_record.qstring().begin(), fastq_record.qstring().end(),
                    std::back_inserter(qscore), [](char c) { return (uint8_t)(c)-33; });
     uint16_t flags = 4;     // 4 = UNMAPPED
     int leftmost_pos = -1;  // UNMAPPED - will be written as 0
     uint8_t map_q = 0;      // UNMAPPED
     int next_pos = -1;      // UNMAPPED - will be written as 0
-    auto result = bam_set1(record, fastq_record.read_id().size(), fastq_record.read_id().data(),
-                           flags, -1, leftmost_pos, map_q, 0, nullptr, -1, next_pos, 0,
-                           fastq_record.sequence().size(), fastq_record.sequence().c_str(),
-                           (char*)qscore.data(), 0);
+    auto read_id = utils::read_id_view(fastq_record.header());
+    auto result = bam_set1(record, read_id.size(), read_id.data(), flags, -1, leftmost_pos, map_q,
+                           0, nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
+                           fastq_record.sequence().c_str(), (char*)qscore.data(), 0);
+    utils::add_fastq_header_tag(record, fastq_record.header());
+
     return result >= 0;
 }
 
@@ -106,8 +109,8 @@ public:
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
         : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    if (!try_initialise_generator<HtsLibBamRecordGenerator>(filename) &&
-        !try_initialise_generator<FastqBamRecordGenerator>(filename)) {
+    if (!try_initialise_generator<FastqBamRecordGenerator>(filename) &&
+        !try_initialise_generator<HtsLibBamRecordGenerator>(filename)) {
         throw std::runtime_error("Could not open file: " + filename);
     }
     is_aligned = m_header->n_targets > 0;

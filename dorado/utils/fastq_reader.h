@@ -4,29 +4,27 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace dorado::utils {
 
 class FastqRecord {
-    std::string m_id;
+    std::string m_header;
     std::string m_sequence;
-    std::string m_quality;
-
-    std::string m_read_id;
-
-    void parse_id_line();
+    std::string m_qstring;
 
 public:
-    const std::string& id() const;
+    const std::string& header() const;
     const std::string& sequence() const;
-    const std::string& quality() const;
-
-    const std::string& read_id() const;
+    const std::string& qstring() const;
 
     bool set_id(std::string value);
     bool set_sequence(std::string value);
     bool set_quality(std::string value);
 };
+
+std::string_view read_id_view(const std::string& header_line);
+std::string_view run_id_view(const std::string& header_line);
 
 class FastqReader {
 public:

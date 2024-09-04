@@ -81,27 +81,50 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
         return std::nullopt;
     }
 
-    if (result.sequence().size() != result.quality().size()) {
+    if (result.sequence().size() != result.qstring().size()) {
         return std::nullopt;
     }
 
     return result;
 }
 
+std::size_t token_len(const std::string& header_line, std::size_t token_start_pos) {
+    auto token_end_pos = header_line.find(' ', token_start_pos);
+    if (token_end_pos == std::string::npos) {
+        token_end_pos = header_line.size();
+    }
+    return token_end_pos - token_start_pos;
+}
+
 }  // namespace
 
-const std::string& FastqRecord::id() const { return m_id; }
+const std::string& FastqRecord::header() const { return m_header; }
 const std::string& FastqRecord::sequence() const { return m_sequence; }
-const std::string& FastqRecord::quality() const { return m_quality; }
+const std::string& FastqRecord::qstring() const { return m_qstring; }
 
-const std::string& FastqRecord::read_id() const { return m_read_id; }
+std::string_view read_id_view(const std::string& header_line) {
+    assert(header_line.size() > 1);
+    return {header_line.data() + 1, token_len(header_line, 1)};
+}
+
+std::string_view run_id_view(const std::string& header_line) {
+    // Fastq header line format:
+    // @{read_id} runid={run_id} sampleid={sample_id} read={read_number} ch={channel_id} start_time={start_time_utc}
+    const std::string RUN_ID_KEY_SEARCH{" runid="};
+    auto runid_start = header_line.find(RUN_ID_KEY_SEARCH);
+    if (runid_start == std::string::npos) {
+        return {};
+    }
+    runid_start = runid_start + RUN_ID_KEY_SEARCH.size();
+
+    return {header_line.data() + runid_start, token_len(header_line, runid_start)};
+}
 
 bool FastqRecord::set_id(std::string line) {
     if (!is_valid_id_field(line)) {
         return false;
     }
-    m_id = std::move(line);
-    parse_id_line();
+    m_header = std::move(line);
     return true;
 }
 
@@ -117,13 +140,8 @@ bool FastqRecord::set_quality(std::string line) {
     if (!is_valid_quality_field(line)) {
         return false;
     }
-    m_quality = std::move(line);
+    m_qstring = std::move(line);
     return true;
-}
-
-void FastqRecord::parse_id_line() {
-    assert(m_id.size() > 1);
-    m_read_id = m_id.substr(1, m_id.find(' ') - 1);
 }
 
 FastqReader::FastqReader(const std::string& input_file) {

@@ -148,7 +148,7 @@ bool AlignmentProcessingItems::initialise_for_file() {
     }
 
     auto output = replace_extension(fs::path(m_output_folder) / input_file_path.filename());
-    m_processing_list.emplace_back(m_input_path, output.string(), OutputMode::BAM);
+    m_processing_list.emplace_back(m_input_path, output.string(), OutputMode::SAM);
 
     return true;
 }
@@ -176,13 +176,13 @@ void AlignmentProcessingItems::add_all_valid_files() {
             // single unique output file name
             const auto input = (input_root / input_files[0]).string();
             const auto& output = output_to_inputs_pair.first;
-            m_processing_list.emplace_back(input, output, OutputMode::BAM);
+            m_processing_list.emplace_back(input, output, OutputMode::SAM);
         } else {
             // duplicate output names, disambiguate by preserving input file extension and extending with '.bam'
             for (const auto& input_relative_path : input_files) {
                 const auto input = (input_root / input_relative_path).string();
                 const auto output = (output_root / input_relative_path).string() + ".bam";
-                m_processing_list.emplace_back(input, output, OutputMode::BAM);
+                m_processing_list.emplace_back(input, output, OutputMode::SAM);
             }
         }
     }

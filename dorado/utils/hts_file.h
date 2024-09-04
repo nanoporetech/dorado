@@ -31,7 +31,7 @@ public:
 
     void set_buffer_size(size_t buff_size);
     int set_header(const sam_hdr_t* header);
-    int write(const bam1_t* record);
+    int write(bam1_t* record);
 
     bool finalise_is_noop() const { return m_finalise_is_noop; }
     void finalise(const ProgressCallback& progress_callback);

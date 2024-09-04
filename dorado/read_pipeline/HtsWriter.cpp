@@ -91,7 +91,7 @@ void HtsWriter::input_thread_fn() {
     }
 }
 
-int HtsWriter::write(const bam1_t* const record) {
+int HtsWriter::write(bam1_t* const record) {
     // track stats
     m_total++;
     if (record->core.flag & BAM_FUNMAP) {

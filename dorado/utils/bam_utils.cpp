@@ -112,6 +112,19 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 
 }  // namespace
 
+int add_fastq_header_tag(bam1_t* record, const std::string& fastq_header) {
+    return bam_aux_append(record, "fq", 'Z', static_cast<int>(fastq_header.size() + 1),
+                          (uint8_t*)fastq_header.c_str());
+}
+
+int remove_fastq_header_tag(bam1_t* record) {
+    auto tag_ptr = bam_aux_get(record, "fq");
+    if (!tag_ptr) {
+        return 0;  // return success result for bam_aux_del, as we assume it wasn't present.
+    }
+    return bam_aux_del(record, tag_ptr);
+}
+
 void add_hd_header_line(sam_hdr_t* hdr) {
     sam_hdr_add_line(hdr, "HD", "VN", SAM_FORMAT_VERSION, "SO", "unknown", nullptr);
 }

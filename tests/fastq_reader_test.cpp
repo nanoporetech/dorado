@@ -109,22 +109,20 @@ DEFINE_TEST("is_fastq parameterized testing") {
     REQUIRE(is_fastq(input_stream) == is_valid);
 }
 
-DEFINE_TEST("read_id() with valid simple id line returns the read id") {
+DEFINE_TEST("read_id_view() with valid simple id line returns the read id") {
     FastqRecord cut{};
-    CHECK(cut.set_id("@expected_simple_read_id"));
 
-    REQUIRE(cut.read_id() == "expected_simple_read_id");
+    REQUIRE(read_id_view("@expected_simple_read_id") == "expected_simple_read_id");
 }
 
-DEFINE_TEST("read_id() with valid complex id line returns the read id") {
-    FastqRecord cut{};
-    CHECK(cut.set_id(
-            "@fdbbea47-8893-4055-942b-8c2efe226c17 runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
-            "sample_id=AMW_RNA_model_training_QC_3 flow_cell_id=FAH44643 ch=258 "
-            "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
-            "basecall_gpu=NVIDIA RTX A5500 Laptop GPU"));
-
-    REQUIRE(cut.read_id() == "fdbbea47-8893-4055-942b-8c2efe226c17");
+DEFINE_TEST("read_id_view() with valid complex id line returns the read id") {
+    REQUIRE(read_id_view(
+                    "@fdbbea47-8893-4055-942b-8c2efe226c17 "
+                    "runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
+                    "sample_id=AMW_RNA_model_training_QC_3 flow_cell_id=FAH44643 ch=258 "
+                    "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
+                    "basecall_gpu=NVIDIA RTX A5500 Laptop GPU") ==
+            "fdbbea47-8893-4055-942b-8c2efe226c17");
 }
 
 DEFINE_TEST("FastqReader constructor with invalid file does not throw") {
@@ -160,9 +158,9 @@ DEFINE_TEST("FastqReader::try_get_next_record when valid returns expected record
     CHECK(cut.is_valid());
     auto record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id() == VALID_ID);
+    CHECK(record->header() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);
-    CHECK(record->quality() == VALID_QUAL);
+    CHECK(record->qstring() == VALID_QUAL);
 }
 
 DEFINE_TEST("FastqReader::try_get_next_record after returning the only record returns null") {
@@ -195,9 +193,9 @@ DEFINE_TEST(
     CHECK(record.has_value());
     record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id() == VALID_ID_2);
+    CHECK(record->header() == VALID_ID_2);
     CHECK(record->sequence() == VALID_SEQ_2);
-    CHECK(record->quality() == VALID_QUAL_2);
+    CHECK(record->qstring() == VALID_QUAL_2);
 }
 
 DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with Us replaced") {
@@ -206,9 +204,24 @@ DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with
     CHECK(cut.is_valid());
     auto record = cut.try_get_next_record();
     REQUIRE(record.has_value());
-    CHECK(record->id() == VALID_ID);
+    CHECK(record->header() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);  // Check Ts not Us
-    CHECK(record->quality() == VALID_QUAL);
+    CHECK(record->qstring() == VALID_QUAL);
+}
+
+DEFINE_TEST("run_id_view() parameterized") {
+    auto [header_line, expected_run_id] = GENERATE(table<std::string, std::string>({
+            {"@read_0 runid=12", "12"},
+            {"@read_0 runid=a125g desc", "a125g"},
+            {"@read_0 runid=", ""},
+            {"@fdbbea47-8893-4055-942b-8c2efe226c17 sample_id=AMW_RNA_model_training_QC_3 "
+             "flow_cell_id=FAH44643 ch=258 runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
+             "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
+             "basecall_gpu=NVIDIA RTX A5500 Laptop GPU",
+             "e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501"},
+    }));
+    CAPTURE(header_line);
+    REQUIRE(run_id_view(header_line) == expected_run_id);
 }
 
 }  // namespace dorado::utils::fastq_reader::test

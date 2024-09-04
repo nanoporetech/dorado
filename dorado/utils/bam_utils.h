@@ -9,6 +9,7 @@
 
 struct sam_hdr_t;
 struct kstring_t;
+struct bam1_t;
 
 namespace dorado::utils {
 
@@ -24,6 +25,10 @@ struct AlignmentOps {
     size_t deletions;
     size_t substitutions;
 };
+
+int add_fastq_header_tag(bam1_t* record, const std::string& fastq_header);
+
+int remove_fastq_header_tag(bam1_t* record);
 
 void add_hd_header_line(sam_hdr_t* hdr);
 

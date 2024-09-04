@@ -1,6 +1,7 @@
 #include "hts_file.h"
 
 #include "utils/PostCondition.h"
+#include "utils/bam_utils.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/hts.h>
@@ -273,7 +274,8 @@ int HtsFile::set_header(const sam_hdr_t* const header) {
     return 0;
 }
 
-int HtsFile::write(const bam1_t* record) {
+int HtsFile::write(bam1_t* record) {
+    remove_fastq_header_tag(record);
     ++m_num_records;
     if (m_file) {
         return write_to_file(record);
