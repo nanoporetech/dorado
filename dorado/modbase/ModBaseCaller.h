@@ -2,6 +2,7 @@
 
 #include "ModBaseModelConfig.h"
 #include "MotifMatcher.h"
+#include "utils/module_utils.h"
 #include "utils/stats.h"
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
@@ -30,9 +31,9 @@ public:
         friend class ModBaseCaller;
 
     public:
-        ModBaseData(const std::filesystem::path& model_path,
-                    at::TensorOptions opts,
-                    int batch_size_);
+        ModBaseData(const ModBaseModelConfig& config,
+                    const at::TensorOptions& opts,
+                    const int batch_size_);
         std::vector<size_t> get_motif_hits(const std::string& seq) const;
 
         const ModBaseModelConfig params;

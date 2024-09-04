@@ -250,3 +250,34 @@ TEST_CASE("Test find_mux_change_trim_seq_index", TEST_GROUP) {
         CHECK(utils::find_mux_change_trim_seq_index(to_qstr(vec)) == 119);
     }
 }
+
+TEST_CASE("Test determine_trim_interval (BC)", TEST_GROUP) {
+    using std::make_tuple;
+    auto [kit, top_pen, bottom_pen, top_score, bottom_score, use_top, top_pos, bottom_pos,
+          expected] = GENERATE(table<std::string, int, int, float, float, bool, std::pair<int, int>,
+                                     std::pair<int, int>, std::pair<int, int>>({
+            {"unclassified", -1, -1, -1.f, -1.f, false, {-1, -1}, {-1, -1}, {0, 100}},
+            {"good_both", 0, 0, 1.f, 1.f, false, {1, 10}, {85, 95}, {11, 85}},
+            {"bad_both", 0, 0, 0.5f, 0.5f, false, {1, 10}, {85, 95}, {0, 100}},
+            {"good_top", 0, 1, 1.f, 0.5f, true, {1, 10}, {85, 95}, {11, 100}},
+            {"good_bottom", 1, 0, 0.5f, 1.f, false, {1, 10}, {85, 95}, {0, 85}},
+            {"overlapped_top", 0, 0, 1.f, 0.7f, true, {1, 60}, {50, 95}, {61, 100}},
+            {"overlapped_bottom", 0, 0, 0.7f, 1.f, false, {1, 60}, {50, 95}, {0, 50}},
+            {"full_read_top", 0, 0, 0.7f, 1.f, true, {0, 100}, {60, 90}, {0, 100}},
+            {"full_read_bottom", 0, 0, 0.7f, 1.f, false, {1, 60}, {0, 100}, {0, 100}},
+
+    }));
+    CAPTURE(kit);
+    dorado::BarcodeScoreResult bc_res;
+    bc_res.kit = kit;
+    bc_res.top_penalty = top_pen;
+    bc_res.bottom_penalty = bottom_pen;
+    bc_res.top_flank_score = top_score;
+    bc_res.bottom_flank_score = bottom_score;
+    bc_res.top_barcode_pos = top_pos;
+    bc_res.bottom_barcode_pos = bottom_pos;
+    bc_res.use_top = use_top;
+
+    auto interval = dorado::Trimmer::determine_trim_interval(bc_res, 100);
+    CHECK(interval == expected);
+}

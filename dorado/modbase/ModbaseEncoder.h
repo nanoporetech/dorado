@@ -17,7 +17,7 @@ private:
     int m_seq_len;
     int m_signal_len;
     std::vector<int> m_sequence_ints;
-    std::vector<int> m_sample_offsets;
+    std::vector<uint64_t> m_sample_offsets;
 
     int compute_sample_pos(int base_pos) const;
 

@@ -6,85 +6,249 @@
 
 #include <toml.hpp>
 
+#include <cmath>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+
+// Indicates that a value has no default and is therefore required
+constexpr std::optional<int> REQUIRED = std::nullopt;
+
+// Get an integer value from a toml::value asserting that it is within a closed interval.
+// If no default is given then the key must exist in the toml::value.
+int get_int_in_range(const toml::value& p,
+                     const std::string& key,
+                     int min_val,
+                     int max_val,
+                     std::optional<int> default_val) {
+    const int val = default_val.has_value()
+                            ? toml::find_or<int>(p, key, std::forward<int>(default_val.value()))
+                            : toml::find<int>(p, key);
+    if (val < min_val || val > max_val) {
+        auto v = std::to_string(val);
+        auto r = std::to_string(min_val) + " <= x <= " + std::to_string(max_val);
+        throw std::runtime_error("Invalid modbase model value for '" + key + "' found: '" + v +
+                                 "' which is not in range [" + r + "]");
+    }
+    return val;
+}
+}  // namespace
+
 namespace dorado::modbase {
 
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
-    ModBaseModelConfig config;
-    auto config_toml = toml::parse(model_path / "config.toml");
-    const auto& params = toml::find(config_toml, "modbases");
-    config.motif = toml::find<std::string>(params, "motif");
-    config.motif_offset = toml::find<int>(params, "motif_offset");
-
-    const std::string canonical_bases = "ACGT";
-    std::string motif_base = config.motif.substr(config.motif_offset, 1);
-    if (canonical_bases.find(motif_base) == std::string::npos) {
-        throw std::runtime_error("Invalid base for modification: " + motif_base);
+std::string to_string(const ModelType& model_type) {
+    switch (model_type) {
+    case CONV_LSTM:
+        return std::string("conv_lstm");
+    case CONV_V1:
+        return std::string("conv_v1");
+    case CONV_V2:
+        return std::string("conv_v2");
+    default:
+        throw std::runtime_error("Unknown modbase ModelType");
     }
+};
 
+ModelType model_type_from_string(const std::string& model_type) {
+    if (model_type == "conv_lstm") {
+        return ModelType::CONV_LSTM;
+    }
+    if (model_type == "conv_only" || model_type == "conv_v1") {
+        return ModelType::CONV_V1;
+    }
+    if (model_type == "conv_v2") {
+        return ModelType::CONV_V2;
+    }
+    throw std::runtime_error("Unknown modbase model type: `" + model_type + "`");
+}
+
+ModelType parse_model_type(const toml::value& config_toml) {
+    return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+}
+
+ModelGeneralParams parse_general_params(const toml::value& config_toml) {
+    const auto segment = toml::find(config_toml, "model_params");
+
+    constexpr int MAX_SIZE = 4096;
+    constexpr int MAX_KMER = 19;
+    constexpr int MAX_FEATURES = 10;
+    ModelGeneralParams params{parse_model_type(config_toml),
+                              get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
+                              get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
+                              get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED)};
+    return params;
+}
+
+LinearParams parse_linear_params(const toml::value& segment) {
+    constexpr int MAX_SIZE = 4096;
+    LinearParams params{get_int_in_range(segment, "in", 1, MAX_SIZE, REQUIRED),
+                        get_int_in_range(segment, "out", 1, MAX_SIZE, REQUIRED)};
+    return params;
+}
+
+ConvParams parse_conv_params(const toml::value& segment) {
+    constexpr int MAX_SIZE = 4096;
+    constexpr int MAX_WINLEN = 1024;
+    constexpr int MAX_STRIDE = 128;
+    constexpr int MAX_DEPTH = 64;
+    constexpr int MAX_PADDING = 4096;
+
+    constexpr int DEFAULT_STRIDE = 1;
+    constexpr int DEFAULT_DEPTH = 1;
+    constexpr int DEFAULT_PADDING = 0;
+
+    ConvParams params{get_int_in_range(segment, "insize", 1, MAX_SIZE, REQUIRED),
+                      get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
+                      get_int_in_range(segment, "winlen", 1, MAX_WINLEN, REQUIRED),
+                      get_int_in_range(segment, "stride", 1, MAX_STRIDE, DEFAULT_STRIDE),
+                      get_int_in_range(segment, "depth", 1, MAX_DEPTH, DEFAULT_DEPTH),
+                      get_int_in_range(segment, "padding", 0, MAX_PADDING, DEFAULT_PADDING)};
+    return params;
+}
+
+std::vector<ConvParams> parse_convs(const toml::value& segment) {
+    const auto& sublayers = toml::find(segment, "sublayers").as_array();
+
+    std::vector<ConvParams> convs;
+    convs.reserve(sublayers.size());
+
+    for (const auto& sublayer : sublayers) {
+        const auto type = toml::find<std::string>(sublayer, "type");
+        if (type != "convolution") {
+            throw std::runtime_error(
+                    "Unexpected sublayer type in modbase model config expected "
+                    "'convolution' but found :'" +
+                    type + "'.");
+        }
+        convs.push_back(parse_conv_params(sublayer));
+    }
+    return convs;
+}
+
+std::optional<ConvEncoder> parse_conv_encoder(const toml::value& config_toml) {
+    const auto model_type = parse_model_type(config_toml);
+    if (model_type != ModelType::CONV_V2) {
+        return std::nullopt;
+    }
+    const auto segment = toml::find(config_toml, "encoder");
+    ConvEncoder encoder{parse_convs(toml::find(segment, "stem")),
+                        parse_convs(toml::find(segment, "downsample")),
+                        parse_convs(toml::find(segment, "stages")),
+                        parse_linear_params(toml::find(segment, "head"))};
+    return encoder;
+}
+
+ModificationParams parse_modification_params(const toml::value& config_toml) {
+    const auto& params = toml::find(config_toml, "modbases");
+
+    std::vector<std::string> codes;
     const auto& mod_bases = toml::find(params, "mod_bases");
     if (mod_bases.is_string()) {
+        // style: mod_bases = "hm" - does not accept chebi codes
         auto mod_base_string = mod_bases.as_string().str;
         for (const auto& mod_base : mod_base_string) {
-            config.mod_bases.push_back(std::string(1, mod_base));
+            codes.push_back(std::string(1, mod_base));
         }
     } else {
+        // style: mod_bases = [ "h", "m",]
         auto mod_base_array = mod_bases.as_array();
         for (const auto& mod_base : mod_base_array) {
             assert(mod_base.is_string());
-            config.mod_bases.push_back(mod_base.as_string().str);
+            codes.push_back(mod_base.as_string().str);
         }
     }
 
-    for (const auto& mod_base : config.mod_bases) {
-        if (!utils::validate_bam_tag_code(mod_base)) {
-            throw std::runtime_error("Invalid modified base code: " + mod_base);
-        }
-    }
-
-    for (size_t i = 0; i < config.mod_bases.size(); ++i) {
-        config.mod_long_names.push_back(
+    std::vector<std::string> long_names;
+    for (size_t i = 0; i < codes.size(); ++i) {
+        long_names.push_back(
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
     }
 
-    config.base_mod_count = config.mod_bases.size();
+    const auto motif = toml::find<std::string>(params, "motif");
+    const auto motif_offset = static_cast<size_t>(
+            get_int_in_range(params, "motif_offset", 0, int(motif.size()), REQUIRED));
 
-    config.context_before = toml::find<int>(params, "chunk_context_0");
-    config.context_after = toml::find<int>(params, "chunk_context_1");
-    config.bases_before = toml::find<int>(params, "kmer_context_bases_0");
-    config.bases_after = toml::find<int>(params, "kmer_context_bases_1");
-    config.offset = toml::find<int>(params, "offset");
+    return ModificationParams{codes, long_names, motif, motif_offset};
+}
 
-    if (params.contains("reverse_signal")) {
-        config.reverse_signal = toml::find<bool>(params, "reverse_signal");
-    } else {
-        config.reverse_signal = false;
+ContextParams parse_context_params(const toml::value& config_toml) {
+    const auto& params = toml::find(config_toml, "modbases");
+
+    const auto context_before =
+            static_cast<size_t>(get_int_in_range(params, "chunk_context_0", 1, 4096, REQUIRED));
+    const auto context_after =
+            static_cast<size_t>(get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED));
+
+    const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
+    const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
+
+    const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
+
+    return ContextParams(context_before, context_after, bases_before, bases_after, reverse);
+}
+
+RefinementParams parse_refinement_params(const toml::value& config_toml,
+                                         const std::filesystem::path& model_path,
+                                         const std::vector<float>& _test_levels) {
+    if (!config_toml.contains("refinement")) {
+        return RefinementParams{};
     }
 
-    if (config_toml.contains("refinement")) {
-        // these may not exist if we convert older models
-        const auto& refinement_params = toml::find(config_toml, "refinement");
-        config.refine_do_rough_rescale =
-                (toml::find<int>(refinement_params, "refine_do_rough_rescale") == 1);
-        if (config.refine_do_rough_rescale) {
-            config.refine_kmer_center_idx =
-                    toml::find<int>(refinement_params, "refine_kmer_center_idx");
+    const auto segment = toml::find(config_toml, "refinement");
 
-            auto kmer_levels_tensor =
-                    utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
-            std::copy(kmer_levels_tensor.data_ptr<float>(),
-                      kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
-                      std::back_inserter(config.refine_kmer_levels));
-            config.refine_kmer_len = static_cast<size_t>(
-                    std::round(std::log(config.refine_kmer_levels.size()) / std::log(4)));
-        }
-
-    } else {
-        // if the toml file doesn't contain any of the above parameters then
-        // the model doesn't support rescaling so turn it off
-        config.refine_do_rough_rescale = false;
+    bool do_rough_rescale = toml::find<int>(segment, "refine_do_rough_rescale") == 1;
+    if (!do_rough_rescale) {
+        return RefinementParams{};
     }
+
+    std::vector<float> kmer_levels;
+    // allow us to avoid adding tensors to the repo just for testing
+    if (_test_levels.empty()) {
+        auto kmer_levels_tensor =
+                utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
+        std::copy(kmer_levels_tensor.data_ptr<float>(),
+                  kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
+                  std::back_inserter(kmer_levels));
+    } else {
+        kmer_levels = _test_levels;
+    }
+
+    const int kmer_len = static_cast<int>(std::round(std::log(kmer_levels.size()) / std::log(4)));
+    const int center_index =
+            get_int_in_range(segment, "refine_kmer_center_idx", 0, kmer_len - 1, REQUIRED);
+
+    return RefinementParams(kmer_len, center_index, kmer_levels);
+}
+
+ModBaseModelConfig load_modbase_model_config_impl(const std::filesystem::path& model_path,
+                                                  const std::vector<float>& test_kmer_levels) {
+    const auto config_toml = toml::parse(model_path / "config.toml");
+
+    ModBaseModelConfig config{
+            model_path,
+            parse_general_params(config_toml),
+            parse_modification_params(config_toml),
+            parse_context_params(config_toml),
+            parse_refinement_params(config_toml, model_path, test_kmer_levels),
+            parse_conv_encoder(config_toml),
+    };
+
     return config;
 }
+
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
+    return load_modbase_model_config_impl(model_path, {});
+}
+
+namespace test {
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path,
+                                             const std::vector<float>& test_kmer_levels) {
+    return load_modbase_model_config_impl(model_path, test_kmer_levels);
+}
+}  // namespace test
 
 ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params) {
@@ -97,22 +261,22 @@ ModBaseInfo get_modbase_info(
     };
 
     const std::string allowed_bases = "ACGT";
-    std::array<ModelInfo, 4> model_info;
-    for (int b = 0; b < 4; ++b) {
+    std::array<ModelInfo, utils::BaseInfo::NUM_BASES> model_info;
+    for (int b = 0; b < utils::BaseInfo::NUM_BASES; ++b) {
         model_info[b].alphabet.emplace_back(1, allowed_bases[b]);
     }
 
     for (const auto& params_ref : base_mod_params) {
-        const auto& params = params_ref.get();
+        const auto& params = params_ref.get().mods;
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in remora model metadata.");
         }
         auto& map_entry = model_info[utils::BaseInfo::BASE_IDS[base]];
-        map_entry.long_names = params.mod_long_names;
-        map_entry.alphabet.insert(map_entry.alphabet.end(), params.mod_bases.begin(),
-                                  params.mod_bases.end());
-        map_entry.base_counts = params.base_mod_count + 1;
+        map_entry.long_names = params.long_names;
+        map_entry.alphabet.insert(map_entry.alphabet.end(), params.codes.begin(),
+                                  params.codes.end());
+        map_entry.base_counts = params.count + 1;
     }
 
     ModBaseInfo result;
@@ -133,13 +297,20 @@ ModBaseInfo get_modbase_info(
 
 void check_modbase_multi_model_compatibility(
         const std::vector<std::filesystem::path>& modbase_models) {
+    if (modbase_models.size() < 2) {
+        return;
+    }
+
     std::string err_msg = "";
     for (size_t i = 0; i < modbase_models.size(); i++) {
-        auto ref_model = load_modbase_model_config(modbase_models[i]);
-        const auto& ref_motif = ref_model.motif[ref_model.motif_offset];
+        const auto ref_model = load_modbase_model_config(modbase_models[i]);
+        const auto& ref_params = ref_model.mods;
+        const auto& ref_motif = ref_params.motif[ref_params.motif_offset];
+
         for (size_t j = i + 1; j < modbase_models.size(); j++) {
-            auto query_model = load_modbase_model_config(modbase_models[j]);
-            const auto& query_motif = query_model.motif[query_model.motif_offset];
+            const auto query_model = load_modbase_model_config(modbase_models[j]);
+            const auto& query_params = query_model.mods;
+            const auto& query_motif = query_params.motif[query_params.motif_offset];
 
             if (ref_motif == query_motif) {
                 err_msg += modbase_models[i].string() + " and " + modbase_models[j].string() +

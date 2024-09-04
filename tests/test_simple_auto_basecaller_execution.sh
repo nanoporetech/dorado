@@ -76,7 +76,7 @@ $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} | $dorado
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_dir -b ${batch} --reference $output_dir/ref.fq > $output_dir/calls.bam
 samtools quickcheck -u $output_dir/calls.bam
 
-if ! uname -r | grep -q tegra; then
+if ! uname -r | grep -q -E 'tegra|minit'; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
