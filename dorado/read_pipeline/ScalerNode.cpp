@@ -141,25 +141,25 @@ void ScalerNode::input_thread_fn() {
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
         if (is_rna_model) {
-            trim_start = determine_rna_adapter_pos(*read, m_model_type);
-            bool trim_adapter = [&] {
-                if (!read->read_common.client_info) {
-                    return false;
+            std::shared_ptr<const demux::AdapterInfo> adapter_info =
+                    read->read_common.client_info ? read->read_common.client_info->contexts()
+                                                            .get_ptr<const demux::AdapterInfo>()
+                                                  : nullptr;
+
+            const bool has_rna_based_adapters = adapter_info && adapter_info->rna_adapters;
+            if (!has_rna_based_adapters) {
+                trim_start = determine_rna_adapter_pos(*read, m_model_type);
+                if (size_t(trim_start) < read->read_common.get_raw_data_samples()) {
+                    read->read_common.raw_data = read->read_common.raw_data.index(
+                            {Slice(trim_start, at::indexing::None)});
+                    read->read_common.rna_adapter_end_signal_pos = 0;
+                } else {
+                    // If RNA adapter isn't trimmed, track where the adapter signal is ending
+                    // so it can be used during polyA estimation.
+                    read->read_common.rna_adapter_end_signal_pos = trim_start;
+                    // Since we're not actualy trimming the signal, reset the trim value to 0.
+                    trim_start = 0;
                 }
-                auto adapter_info = read->read_common.client_info->contexts()
-                                            .get_ptr<const demux::AdapterInfo>();
-                return adapter_info && adapter_info->trim_adapters && !adapter_info->rna_adapters;
-            }();
-            if (trim_adapter && size_t(trim_start) < read->read_common.get_raw_data_samples()) {
-                read->read_common.raw_data =
-                        read->read_common.raw_data.index({Slice(trim_start, at::indexing::None)});
-                read->read_common.rna_adapter_end_signal_pos = 0;
-            } else {
-                // If RNA adapter isn't trimmed, track where the adapter signal is ending
-                // so it can be used during polyA estimation.
-                read->read_common.rna_adapter_end_signal_pos = trim_start;
-                // Since we're not actualy trimming the signal, reset the trim value to 0.
-                trim_start = 0;
             }
         }
 
