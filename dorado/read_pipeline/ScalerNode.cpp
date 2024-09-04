@@ -141,13 +141,13 @@ void ScalerNode::input_thread_fn() {
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
         if (is_rna_model) {
-            std::shared_ptr<const dorado::demux::AdapterInfo> adapter_info =
+            std::shared_ptr<const demux::AdapterInfo> adapter_info =
                     read->read_common.client_info ? read->read_common.client_info->contexts()
                                                             .get_ptr<const demux::AdapterInfo>()
                                                   : nullptr;
 
-            const bool rna_adapters = adapter_info && adapter_info->rna_adapters;
-            if (!rna_adapters) {
+            const bool has_rna_based_adapters = adapter_info && adapter_info->rna_adapters;
+            if (!has_rna_based_adapters) {
                 trim_start = determine_rna_adapter_pos(*read, m_model_type);
                 if (size_t(trim_start) < read->read_common.get_raw_data_samples()) {
                     read->read_common.raw_data = read->read_common.raw_data.index(
