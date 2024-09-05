@@ -16,3 +16,6 @@ tests/test_output
 .temp_dorado_model-*
 temp
 venv
+tests/test_output*
+log*
+*.t.err
