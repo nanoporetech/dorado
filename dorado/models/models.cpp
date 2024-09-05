@@ -1031,6 +1031,7 @@ ModelInfo get_model_info(const std::string& model_name) {
     const auto& simplex_model_infos = simplex_models();
     const auto& mods_model_infos = modified_models();
     const auto& stereo_model_infos = stereo_models();
+    const auto& correction_model_infos = correction_models();
 
     auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
     std::vector<ModelInfo> matches;
@@ -1040,6 +1041,8 @@ ModelInfo get_model_info(const std::string& model_name) {
                  is_name_match);
     std::copy_if(stereo_model_infos.begin(), stereo_model_infos.end(), std::back_inserter(matches),
                  is_name_match);
+    std::copy_if(correction_model_infos.begin(), correction_model_infos.end(),
+                 std::back_inserter(matches), is_name_match);
 
     if (matches.empty()) {
         throw std::runtime_error("Could not find information on model: " + model_name);
