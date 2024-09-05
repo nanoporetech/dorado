@@ -14,14 +14,22 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
+#include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 using namespace std::chrono_literals;
 
@@ -48,6 +56,7 @@ struct Options {
     bool to_paf = false;
     std::string in_paf_fn;
     std::string model_path;
+    std::string resume_path_fn;
 };
 
 /// \brief Define the CLI options.
@@ -96,6 +105,13 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Generate PAF alignments and skip consensus.")
                 .default_value(false)
                 .implicit_value(true);
+        parser->visible.add_argument("--resume-from")
+                .help("Resume a previously interrupted run. Requires a path to a file where "
+                      "sequence headers are stored in the first column (whitespace delimited), one "
+                      "per row. The header can also occupy a full row with no other columns. For "
+                      "example, a .fai index generated from the previously corrected output FASTA "
+                      "file is a valid input here.")
+                .default_value("");
     }
     {
         parser->visible.add_group("Advanced arguments");
@@ -139,6 +155,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.in_paf_fn = (parser.visible.is_used("--from-paf"))
                             ? parser.visible.get<std::string>("from-paf")
                             : "";
+    opt.resume_path_fn = parser.visible.get<std::string>("resume-from");
     opt.model_path = (parser.visible.is_used("--model-path"))
                              ? parser.visible.get<std::string>("model-path")
                              : "";
@@ -180,6 +197,154 @@ struct HtsFileDeleter {
     }
 };
 
+std::unordered_set<std::string> load_processed_reads(const std::filesystem::path& in_path) {
+    std::unordered_set<std::string> ret;
+    std::string line;
+    std::string token;
+    std::ifstream ifs(in_path);
+    while (std::getline(ifs, line)) {
+        if (std::empty(line)) {
+            continue;
+        }
+
+        // Split on whitespace and ':'. The ':' is important because Dorado Correct
+        // can generate multiple output reads from the same input read, and it adds
+        // a ":<num>" suffix to the header in these cases.
+        const std::size_t found = line.find_first_of(": \t");
+        std::string header = line.substr(0, found);
+
+        // Check for malformed inputs.
+        if (std::empty(header)) {
+            throw std::runtime_error{"Found empty string in the first column of input file: " +
+                                     in_path.string() + ", line: '" + line + "'."};
+        }
+
+        ret.emplace(std::move(header));
+    }
+    return ret;
+}
+
+std::filesystem::path get_fai_path(const std::filesystem::path& in_fastx_fn) {
+    char* idx_name = fai_path(in_fastx_fn.string().c_str());
+    std::filesystem::path ret;
+    if (idx_name) {
+        ret = std::filesystem::path(idx_name);
+    }
+    hts_free(idx_name);
+    return ret;
+}
+
+bool check_fai_exists(const std::filesystem::path& in_fastx_fn) {
+    const std::filesystem::path idx_name = get_fai_path(in_fastx_fn);
+    if (std::empty(idx_name)) {
+        return false;
+    }
+    return std::filesystem::exists(idx_name);
+}
+
+void create_fai_index(const std::filesystem::path& in_fastx_fn) {
+    if (std::empty(in_fastx_fn)) {
+        throw std::runtime_error{"Cannot load/create a FAI index from an empty path!"};
+    }
+
+    const std::filesystem::path idx_name = get_fai_path(in_fastx_fn);
+    spdlog::debug("Looking for idx {}", idx_name.string());
+
+    if (std::empty(idx_name)) {
+        throw std::runtime_error{"Empty index path generated for input file: '" +
+                                 in_fastx_fn.string() + "'."};
+    }
+
+    if (!std::filesystem::exists(idx_name)) {
+        if (fai_build(in_fastx_fn.string().c_str())) {
+            spdlog::error("Failed to build index for file {}", in_fastx_fn.string());
+            throw std::runtime_error{"Failed to build index for file " + in_fastx_fn.string() +
+                                     "."};
+        }
+        spdlog::debug("Created the FAI index for file: {}", in_fastx_fn.string());
+    }
+}
+
+std::tuple<std::string, int64_t> find_furthest_skipped_read(
+        const std::filesystem::path& in_fastx_fn,
+        const std::unordered_set<std::string>& skip_set) {
+    if (std::empty(skip_set)) {
+        return std::tuple(std::string(), -1);
+    }
+
+    if (!check_fai_exists(in_fastx_fn)) {
+        create_fai_index(in_fastx_fn);
+    }
+
+    const std::filesystem::path in_reads_fai_fn = get_fai_path(in_fastx_fn);
+
+    std::string furthest_reach;
+    int64_t furthest_reach_id{-1};
+    int64_t num_loaded{0};
+
+    std::ifstream ifs(in_reads_fai_fn);
+    std::string line;
+    std::string token;
+    while (std::getline(ifs, line)) {
+        if (std::empty(line)) {
+            throw std::runtime_error{"Empty lines found in the input index file: " +
+                                     in_reads_fai_fn.string()};
+        }
+
+        // Split on whitespace and ':'. The ':' is important because Dorado Correct
+        // can generate multiple output reads from the same input read, and it adds
+        // a ":<num>" suffix to the header in these cases.
+        const std::size_t found = line.find_first_of(": \t");
+        std::string header = line.substr(0, found);
+
+        // Check for malformed inputs.
+        if (std::empty(header)) {
+            throw std::runtime_error{
+                    "Found empty string in the first column of input index file: " +
+                    in_reads_fai_fn.string() + ", line: '" + line + "'."};
+        }
+
+        if (skip_set.find(header) != skip_set.end()) {
+            std::swap(furthest_reach, header);
+            furthest_reach_id = num_loaded;
+        }
+        ++num_loaded;
+    }
+
+    return std::tuple(furthest_reach, furthest_reach_id);
+}
+
+void validate_options(const Options& opt) {
+    // Parameter validation.
+    if (!cli::validate_device_string(opt.device)) {
+        std::exit(EXIT_FAILURE);
+    }
+    if (opt.in_reads_fns.size() > 1) {
+        spdlog::error("Multi file input not yet handled");
+        std::exit(EXIT_FAILURE);
+    }
+    if (std::empty(opt.in_reads_fns)) {
+        spdlog::error("At least one input reads file needs to be specified.");
+        std::exit(EXIT_FAILURE);
+    }
+    if (!std::filesystem::exists(opt.in_reads_fns.front())) {
+        spdlog::error("Input reads file {} does not exist!", opt.in_reads_fns.front());
+        std::exit(EXIT_FAILURE);
+    }
+    if (!std::empty(opt.in_paf_fn) && !std::filesystem::exists(opt.in_paf_fn)) {
+        spdlog::error("Input PAF path {} does not exist!", opt.in_paf_fn);
+        std::exit(EXIT_FAILURE);
+    }
+    if (!std::empty(opt.model_path) && !std::filesystem::exists(opt.model_path)) {
+        spdlog::error("Input model directory {} does not exist!", opt.model_path);
+        std::exit(EXIT_FAILURE);
+    }
+    if (!std::empty(opt.resume_path_fn) && !std::filesystem::exists(opt.resume_path_fn)) {
+        spdlog::error("Input resume index file {} does not exist!", opt.resume_path_fn);
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 }  // namespace
 
 int correct(int argc, char* argv[]) {
@@ -205,30 +370,11 @@ int correct(int argc, char* argv[]) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
     }
 
-    // Parameter validation.
-    if (!cli::validate_device_string(opt.device)) {
-        return EXIT_FAILURE;
-    }
-    if (opt.in_reads_fns.size() > 1) {
-        spdlog::error("Multi file input not yet handled");
-        std::exit(EXIT_FAILURE);
-    }
-    if (std::empty(opt.in_reads_fns)) {
-        spdlog::error("At least one input reads file needs to be specified.");
-        std::exit(EXIT_FAILURE);
-    }
-    if (!std::filesystem::exists(opt.in_reads_fns.front())) {
-        spdlog::error("Input reads file {} does not exist!", opt.in_reads_fns.front());
-        std::exit(EXIT_FAILURE);
-    }
-    if (!std::empty(opt.in_paf_fn) && !std::filesystem::exists(opt.in_paf_fn)) {
-        spdlog::error("Input PAF path {} does not exist!", opt.in_paf_fn);
-        std::exit(EXIT_FAILURE);
-    }
-    if (!std::empty(opt.model_path) && !std::filesystem::exists(opt.model_path)) {
-        spdlog::error("Input model directory {} does not exist!", opt.model_path);
-        std::exit(EXIT_FAILURE);
-    }
+    // Check if input options are good.
+    validate_options(opt);
+
+    // After validation, there is exactly one reads file allowed:
+    const std::string in_reads_fn = opt.in_reads_fns.front();
 
     // Compute the number of threads for each stage.
     const int aligner_threads = opt.threads;
@@ -247,6 +393,17 @@ int correct(int argc, char* argv[]) {
         }
         return std::tuple(ret_model_dir, ret_remove_tmp_dir);
     }();
+
+    // Load the resume list if it exists.
+    const std::unordered_set<std::string> skip_set =
+            (!std::empty(opt.resume_path_fn)) ? load_processed_reads(opt.resume_path_fn)
+                                              : std::unordered_set<std::string>{};
+
+    // Find the furthest processed input read in the skip set. If skip_set is empty,
+    const auto [furthest_skip_header, furthest_skip_id] =
+            find_furthest_skipped_read(in_reads_fn, skip_set);
+    spdlog::debug("furthest_skip_header = '{}', furthest_skip_id = {}", furthest_skip_header,
+                  furthest_skip_id);
 
     // Workflow construction.
     // The overall pipeline will be as follows:
@@ -275,9 +432,9 @@ int correct(int argc, char* argv[]) {
         const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
 
         // 2. Window generation, encoding + inference and decoding to generate final reads.
-        pipeline_desc.add_node<CorrectionInferenceNode>(
-                {hts_writer}, opt.in_reads_fns[0], correct_threads, opt.device, opt.infer_threads,
-                opt.batch_size, model_dir);
+        pipeline_desc.add_node<CorrectionInferenceNode>({hts_writer}, in_reads_fn, correct_threads,
+                                                        opt.device, opt.infer_threads,
+                                                        opt.batch_size, model_dir, skip_set);
     } else {
         pipeline_desc.add_node<CorrectionPafWriterNode>({});
     }
@@ -298,8 +455,8 @@ int correct(int argc, char* argv[]) {
         aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn);
     } else {
         // 1. Alignment node that generates alignments per read to be corrected.
-        aligner = std::make_unique<CorrectionMapperNode>(opt.in_reads_fns.front(), aligner_threads,
-                                                         opt.index_size);
+        aligner = std::make_unique<CorrectionMapperNode>(in_reads_fn, aligner_threads,
+                                                         opt.index_size, furthest_skip_header);
     }
 
     // Set up stats counting.
