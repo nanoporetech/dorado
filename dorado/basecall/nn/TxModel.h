@@ -104,14 +104,16 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const tx::TxEncoderParams &params,
-                  const at::TensorOptions &options,
-                  bool use_koi_tiled);
+    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
 
+    struct ScaledTensor {
+        at::Tensor t, scale;
+    };
+    ScaledTensor koi_forward(ScaledTensor scaled_tensor);
+
     tx::TxEncoderParams params;
-    bool use_koi_tiled;
 
     // Rearranged weights for Koi tiled codepath
     at::Tensor wqkv_weights, sincos_bfr, proj_weight, proj_bias;
@@ -131,6 +133,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
 
     bool use_koi_tiled{false};
     torch::nn::Sequential stack{nullptr};
+    std::vector<TxEncoder> layer_vec;
 };
 
 TORCH_MODULE(TxEncoderStack);
