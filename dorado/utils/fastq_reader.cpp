@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <sstream>
 
 namespace dorado::utils {
 
@@ -12,7 +13,7 @@ bool is_valid_id_field(const std::string& field) {
     if (field.at(0) != '@') {
         return false;
     }
-    if (field.size() < 2 || field.at(1) == ' ') {
+    if (field.size() < 2 || field.at(1) == ' ' || field.at(1) == '\t') {
         return false;
     }
     return true;
@@ -81,27 +82,84 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
         return std::nullopt;
     }
 
-    if (result.sequence().size() != result.quality().size()) {
+    if (result.sequence().size() != result.qstring().size()) {
         return std::nullopt;
     }
 
     return result;
 }
 
+char header_separator(bool has_bam_tags) { return has_bam_tags ? '\t' : ' '; }
+
+void ignore_read_id_before_bam_tags(std::istringstream& header_stream) {
+    header_stream.ignore(std::numeric_limits<std::streamsize>::max(), '\t');
+}
+
 }  // namespace
 
-const std::string& FastqRecord::id() const { return m_id; }
+const std::string& FastqRecord::header() const { return m_header; }
 const std::string& FastqRecord::sequence() const { return m_sequence; }
-const std::string& FastqRecord::quality() const { return m_quality; }
+const std::string& FastqRecord::qstring() const { return m_qstring; }
 
-const std::string& FastqRecord::read_id() const { return m_read_id; }
+std::size_t FastqRecord::token_len(std::size_t token_start_pos) const {
+    auto separator = header_separator(m_header_has_bam_tags);
+    auto token_end_pos = m_header.find(separator, token_start_pos);
+    if (token_end_pos == std::string::npos) {
+        token_end_pos = m_header.size();
+    }
+    return token_end_pos - token_start_pos;
+}
+
+std::string_view FastqRecord::read_id_view() const {
+    assert(m_header.size() > 1);
+    return {m_header.data() + 1, token_len(1)};
+}
+
+std::string_view FastqRecord::run_id_view() const {
+    if (m_header_has_bam_tags) {
+        return {};  // HtsLib style
+    }
+    // Assume minKNOW format and check for the runid key
+    const std::string RUN_ID_KEY_SEARCH{" runid="};
+    auto runid_start = m_header.find(RUN_ID_KEY_SEARCH);
+    if (runid_start == std::string::npos) {
+        return {};
+    }
+    runid_start = runid_start + RUN_ID_KEY_SEARCH.size();
+
+    return {m_header.data() + runid_start, token_len(runid_start)};
+}
+
+std::vector<std::string> FastqRecord::get_bam_tags() const {
+    if (!m_header_has_bam_tags) {
+        return {};
+    }
+    std::vector<std::string> result{};
+    std::istringstream header_stream{m_header};
+    std::string tag;
+    ignore_read_id_before_bam_tags(header_stream);
+    while (std::getline(header_stream, tag, '\t')) {
+        result.push_back(std::move(tag));
+    }
+    return result;
+}
 
 bool FastqRecord::set_id(std::string line) {
+    // Fastq header line format we currently recognise beyond the ID field are
+    // a) minKNOW style:
+    // @{read_id} runid={run_id} sampleid={sample_id} read={read_number} ch={channel_id} start_time={start_time_utc}
+    // or,
+    // b) HtsLib, which embeds tab separated bam tags:
+    // @{read_id}['\t'{tag_data}...]
+    //
+    // Other formats should be of the form @{read_id}[ {description}]
     if (!is_valid_id_field(line)) {
         return false;
     }
-    m_id = std::move(line);
-    parse_id_line();
+    m_header = std::move(line);
+    if (m_header.find('\t') != std::string::npos) {
+        m_header_has_bam_tags = true;
+    }
     return true;
 }
 
@@ -117,13 +175,8 @@ bool FastqRecord::set_quality(std::string line) {
     if (!is_valid_quality_field(line)) {
         return false;
     }
-    m_quality = std::move(line);
+    m_qstring = std::move(line);
     return true;
-}
-
-void FastqRecord::parse_id_line() {
-    assert(m_id.size() > 1);
-    m_read_id = m_id.substr(1, m_id.find(' ') - 1);
 }
 
 FastqReader::FastqReader(const std::string& input_file) {

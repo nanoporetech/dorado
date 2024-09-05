@@ -4,24 +4,27 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace dorado::utils {
 
 class FastqRecord {
-    std::string m_id;
+    std::string m_header;
     std::string m_sequence;
-    std::string m_quality;
+    std::string m_qstring;
 
-    std::string m_read_id;
-
-    void parse_id_line();
+    bool m_header_has_bam_tags{};
+    std::size_t token_len(std::size_t token_start_pos) const;
 
 public:
-    const std::string& id() const;
+    const std::string& header() const;
     const std::string& sequence() const;
-    const std::string& quality() const;
+    const std::string& qstring() const;
 
-    const std::string& read_id() const;
+    std::string_view read_id_view() const;
+    std::string_view run_id_view() const;
+    std::vector<std::string> get_bam_tags() const;
 
     bool set_id(std::string value);
     bool set_sequence(std::string value);
