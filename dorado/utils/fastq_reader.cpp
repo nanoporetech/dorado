@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <limits>
 #include <sstream>
 
 namespace dorado::utils {
