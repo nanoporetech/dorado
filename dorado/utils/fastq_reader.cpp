@@ -92,7 +92,7 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
 
 char header_separator(bool has_bam_tags) { return has_bam_tags ? '\t' : ' '; }
 
-void ignore_read_id_before_bam_tags(std::istringstream& header_stream) {
+void ignore_next_tab_separated_field(std::istringstream& header_stream) {
     header_stream.ignore(std::numeric_limits<std::streamsize>::max(), '\t');
 }
 
@@ -137,8 +137,11 @@ std::vector<std::string> FastqRecord::get_bam_tags() const {
     }
     std::vector<std::string> result{};
     std::istringstream header_stream{m_header};
+
+    // First field is the read ID not a bam tag
+    ignore_next_tab_separated_field(header_stream);
+
     std::string tag;
-    ignore_read_id_before_bam_tags(header_stream);
     while (std::getline(header_stream, tag, '\t')) {
         result.push_back(std::move(tag));
     }
@@ -146,7 +149,7 @@ std::vector<std::string> FastqRecord::get_bam_tags() const {
 }
 
 bool FastqRecord::set_id(std::string line) {
-    // Fastq header line format we currently recognise beyond the ID field are
+    // Fastq header line format we currently recognise beyond the initial @{read_id} field are
     // a) minKNOW style:
     // @{read_id} runid={run_id} sampleid={sample_id} read={read_number} ch={channel_id} start_time={start_time_utc}
     // or,

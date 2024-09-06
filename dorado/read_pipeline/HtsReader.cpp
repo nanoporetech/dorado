@@ -34,17 +34,13 @@ void write_bam_aux_tag_from_string(bam1_t* record, const std::string& bam_tag_st
         return;
     }
 
-    std::string tag_type;
-    if (!std::getline(tag_stream, tag_type, ':') || tag_type.size() != 1) {
-        return;
-    }
-
     // Currently we only write to the fastq header the tags RG:Z, st:Z and DS:Z.
     // These these are simple to read as a std::string as they are just a string
     // of printable characters including SPACE, regex: [ !-~]*
     // So filter out anything apart from string fields so we don't need to worry
     // about the encoding of other tags when written to a fastq text file.
-    if (tag_type != "Z") {
+    std::string tag_type;
+    if (!std::getline(tag_stream, tag_type, ':') || tag_type != "Z") {
         return;
     }
 
