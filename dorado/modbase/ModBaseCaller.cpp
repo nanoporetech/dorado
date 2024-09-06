@@ -1,5 +1,6 @@
 #include "ModBaseCaller.h"
 
+#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
 #include "MotifMatcher.h"
 #include "nn/ModBaseModel.h"
@@ -29,8 +30,8 @@ struct ModBaseCaller::ModBaseTask {
             : input_sigs(std::move(input_sigs_)),
               input_seqs(std::move(input_seqs_)),
               num_chunks(num_chunks_) {}
-    at::Tensor input_sigs;
-    at::Tensor input_seqs;
+    at::Tensor input_sigs;  // Shape: NCT
+    at::Tensor input_seqs;  // Shape: NTC (permuted to NCT in model)
     std::mutex mut;
     std::condition_variable cv;
     at::Tensor out;
@@ -38,30 +39,30 @@ struct ModBaseCaller::ModBaseTask {
     int num_chunks;
 };
 
-ModBaseCaller::ModBaseData::ModBaseData(const std::filesystem::path& model_path,
-                                        at::TensorOptions opts,
-                                        int batch_size_)
-        : params(load_modbase_model_config(model_path)),
-          module_holder(load_modbase_model(model_path, opts)),
+ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
+                                        const at::TensorOptions& opts,
+                                        const int batch_size_)
+        : params(config),
+          module_holder(load_modbase_model(params, opts)),
           matcher(params),
           batch_size(batch_size_) {
-    if (params.refine_do_rough_rescale) {
-        scaler = std::make_unique<ModBaseScaler>(params.refine_kmer_levels, params.refine_kmer_len,
-                                                 params.refine_kmer_center_idx);
+    if (params.refine.do_rough_rescale) {
+        scaler = std::make_unique<ModBaseScaler>(params.refine.levels, params.refine.kmer_len,
+                                                 params.refine.center_idx);
     }
 
 #if DORADO_CUDA_BUILD
     if (opts.device().is_cuda()) {
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
-        auto sig_len = static_cast<int64_t>(params.context_before + params.context_after);
-        auto kmer_len = params.bases_after + params.bases_before + 1;
+        const auto& context = params.context;
+        const auto sig_len = static_cast<int64_t>(context.samples);
 
         // Warmup
         c10::cuda::OptionalCUDAStreamGuard guard(stream);
         auto input_sigs = torch::empty({batch_size, 1, sig_len}, opts);
-        auto input_seqs =
-                torch::empty({batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts);
+        auto input_seqs = torch::empty(
+                {batch_size, sig_len, utils::BaseInfo::NUM_BASES * context.kmer_len}, opts);
         module_holder->forward(input_sigs, input_seqs);
         stream->synchronize();
     }
@@ -101,10 +102,10 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     m_task_threads.reserve(m_num_models);
 
     for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
-        const auto& model_path = model_paths[model_id];
+        const auto& config = load_modbase_model_config(model_paths[model_id]);
 
         at::InferenceMode guard;
-        auto caller_data = std::make_unique<ModBaseData>(model_path, m_options, batch_size);
+        auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
         m_caller_data.push_back(std::move(caller_data));
     }
 
@@ -120,9 +121,9 @@ std::vector<at::Tensor> ModBaseCaller::create_input_sig_tensors() const {
                         .dtype(m_options.dtype());
 
     std::vector<at::Tensor> input_sigs;
+    input_sigs.reserve(m_caller_data.size());
     for (auto& caller_data : m_caller_data) {
-        auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
-                                            caller_data->params.context_after);
+        auto sig_len = static_cast<int64_t>(caller_data->params.context.samples);
         input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
     }
     return input_sigs;
@@ -135,12 +136,13 @@ std::vector<at::Tensor> ModBaseCaller::create_input_seq_tensors() const {
                         .dtype(torch::kInt8);
 
     std::vector<at::Tensor> input_seqs;
+    input_seqs.reserve(m_caller_data.size());
     for (auto& caller_data : m_caller_data) {
-        auto sig_len = static_cast<int64_t>(caller_data->params.context_before +
-                                            caller_data->params.context_after);
-        auto kmer_len = caller_data->params.bases_after + caller_data->params.bases_before + 1;
+        const auto& context = caller_data->params.context;
+        auto sig_len = static_cast<int64_t>(context.samples);
         input_seqs.push_back(torch::empty(
-                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * kmer_len}, opts));
+                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * context.kmer_len},
+                opts));
     }
     return input_seqs;
 }
