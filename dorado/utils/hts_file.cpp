@@ -329,9 +329,7 @@ bool HtsFile::merge_temp_files_iteratively(const ProgressCallback& progress_call
     progress_callback(percent_start_merging);
     ProgressUpdater update_progress(progress_callback, percent_start_merging, 100,
                                     m_num_records * progress_multiplier);
-    spdlog::info("Merging {} bam files in {} iterations.", m_temp_files.size(), num_batches);
     for (size_t iter = 0; iter < num_batches; ++iter) {
-        spdlog::info("Merge iteration {}.", iter);
         if (!merge_temp_files(update_progress, batcher.get_batch(iter),
                               batcher.get_merge_filename(iter))) {
             return false;
@@ -394,9 +392,9 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     }
 
     // If this is the final iteration, initialise for indexing.
-    bool final_iteration = (std::filesystem::path(merged_filename).extension() != ".tmp");
+    bool final_iteration = (std::filesystem::path(merged_filename).extension().string() != ".tmp");
+    std::string idx_fname = merged_filename + ".bai";
     if (final_iteration) {
-        std::string idx_fname = merged_filename + ".bai";
         auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
         if (res < 0) {
             spdlog::error("Could not initialize output file for indexing, error code {}", res);
