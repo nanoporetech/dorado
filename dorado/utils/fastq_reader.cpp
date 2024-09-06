@@ -1,5 +1,7 @@
 #include "fastq_reader.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cassert>
 #include <fstream>
@@ -64,26 +66,34 @@ bool get_non_empty_line(std::istream& input_stream, std::string& line) {
     return !line.empty();
 }
 
-std::optional<FastqRecord> get_next_record(std::istream& input_stream) {
+std::optional<FastqRecord> get_next_record(std::istream& input_stream, std::string& error_message) {
     if (!input_stream.good()) {
         return std::nullopt;
     }
     FastqRecord result;
     std::string line;
-    if (!get_non_empty_line(input_stream, line) || !result.set_id(std::move(line))) {
+    if (!get_non_empty_line(input_stream, line)) {
+        return std::nullopt;
+    }
+    if (!result.set_id(std::move(line))) {
+        error_message = "Invalid header line.";
         return std::nullopt;
     }
     if (!get_non_empty_line(input_stream, line) || !result.set_sequence(std::move(line))) {
+        error_message = "Invalid sequence.";
         return std::nullopt;
     }
     if (!get_non_empty_line(input_stream, line) || !is_valid_separator_field(line)) {
+        error_message = "Invalid separator.";
         return std::nullopt;
     }
     if (!get_non_empty_line(input_stream, line) || !result.set_quality(std::move(line))) {
+        error_message = "Invalid qstring.";
         return std::nullopt;
     }
 
     if (result.sequence().size() != result.qstring().size()) {
+        error_message = "Qstring length does not match sequence length.";
         return std::nullopt;
     }
 
@@ -183,14 +193,15 @@ bool FastqRecord::set_quality(std::string line) {
     return true;
 }
 
-FastqReader::FastqReader(const std::string& input_file) {
-    if (!is_fastq(input_file)) {
+FastqReader::FastqReader(std::string input_file) : m_input_file(std::move(input_file)) {
+    if (!is_fastq(m_input_file)) {
         return;
     }
-    m_input_stream = std::make_unique<std::ifstream>(input_file);
+    m_input_stream = std::make_unique<std::ifstream>(m_input_file);
 }
 
-FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream) {
+FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream)
+        : m_input_file("<input_stream>") {
     if (!is_fastq(*input_stream)) {
         return;
     }
@@ -206,7 +217,15 @@ std::optional<FastqRecord> FastqReader::try_get_next_record() {
     if (!m_input_stream) {
         return std::nullopt;
     }
-    return get_next_record(*m_input_stream);
+    ++m_record_count;
+    std::string error_message{};
+    auto next_fastq_record = get_next_record(*m_input_stream, error_message);
+    if (!error_message.empty()) {
+        spdlog::warn("Failed to read record #{} from {}. {}", m_record_count, m_input_file,
+                     error_message);
+    }
+
+    return next_fastq_record;
 }
 
 bool is_fastq(const std::string& input_file) {
@@ -219,7 +238,8 @@ bool is_fastq(std::istream& input_stream) {
         return false;
     }
 
-    return get_next_record(input_stream).has_value();
+    std::string ignore_error_when_checking;
+    return get_next_record(input_stream, ignore_error_when_checking).has_value();
 }
 
 }  // namespace dorado::utils
