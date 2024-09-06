@@ -1,5 +1,6 @@
 #include "modbase/ModbaseEncoder.h"
 
+#include "modbase/ModBaseContext.h"
 #include "modbase/encode_kmer.h"
 #include "utils/sequence_utils.h"
 
@@ -137,8 +138,15 @@ TEST_CASE("Test kmer decoder helper", TEST_GROUP) {
 }
 
 TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
-    const size_t BLOCK_STRIDE = 2;
-    const size_t SLICE_BLOCKS = 6;
+    constexpr size_t BLOCK_STRIDE = 2;
+    constexpr size_t SLICE_BLOCKS = 6;
+    constexpr size_t CONTEXT_SAMPLES = BLOCK_STRIDE * SLICE_BLOCKS;
+    constexpr size_t BASES_BEFORE = 1;
+    constexpr size_t BASES_AFTER = 1;
+
+    constexpr bool kIsCentroid = false;
+    constexpr bool kIsJustified = true;
+
     std::string sequence{"TATTCAGTAC"};
     auto seq_ints = dorado::utils::sequence_to_ints(sequence);
     //                         T  A     T        T  C     A     G        T     A  C
@@ -146,14 +154,13 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     auto seq_to_sig_map = dorado::utils::moves_to_map(moves, BLOCK_STRIDE,
                                                       moves.size() * BLOCK_STRIDE, std::nullopt);
 
-    dorado::modbase::ModBaseEncoder encoder(BLOCK_STRIDE, SLICE_BLOCKS * BLOCK_STRIDE, 1, 1);
+    dorado::modbase::ModBaseEncoder encoder(BLOCK_STRIDE, CONTEXT_SAMPLES, BASES_BEFORE,
+                                            BASES_AFTER, false);
     encoder.init(seq_ints, seq_to_sig_map);
 
-    auto slice0 = encoder.get_context(0);  // The T in the NTA 3mer.
-    CHECK(slice0.first_sample == 0);
-    CHECK(slice0.num_samples == 7);
-    CHECK(slice0.lead_samples_needed == 5);
-    CHECK(slice0.tail_samples_needed == 0);
+    dorado::modbase::ModBaseEncoder justified_encoder(BLOCK_STRIDE, CONTEXT_SAMPLES, BASES_BEFORE,
+                                                      BASES_AFTER, true);
+    justified_encoder.init(seq_ints, seq_to_sig_map);
 
     // clang-format off
     std::vector<int8_t> expected_slice0 = {
@@ -170,68 +177,43 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
         0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, // TAT
         1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, // ATT
     };
-
     // clang-format on
-    CHECK(expected_slice0 == slice0.data);
 
-    std::string bases0 = "NTA NTA NTA NTA NTA NTA NTA TAT TAT TAT TAT ATT";
-    CHECK(expected_slice0 == encode_bases(bases0));
+    // Seq: 0 Centroid is offset by 1 sample (A: TAT) (2/2)
+    std::string exp_cent_seq_0 = "NTA NTA NTA NTA NTA NTA NTA TAT TAT TAT TAT ATT";
+    std::string exp_just_seq_0 = "NTA NTA NTA NTA NTA NTA NTA NTA TAT TAT TAT TAT";
+    // Seq: 4 Centroid is offset by 2 samples (C: TC-A) because of the stay (4/2)
+    std::string exp_cent_seq_4 = "ATT ATT TTC TTC TCA TCA TCA TCA CAG CAG CAG CAG";
+    std::string exp_just_seq_4 = "ATT ATT ATT ATT TTC TTC TCA TCA TCA TCA CAG CAG";
+    // Seq: 9 Centroid is offset by 3 samples (C: AC--) because of the double stay (6/2)
+    std::string exp_cent_seq_9 = "GTA TAC TAC ACN ACN ACN ACN ACN ACN ACN ACN ACN";
+    std::string exp_just_seq_9 = "GTA GTA GTA GTA TAC TAC ACN ACN ACN ACN ACN ACN";
 
-    auto slice1 = encoder.get_context(4);  // The C in the TCA 3mer.
-    CHECK(slice1.first_sample == 10);
-    CHECK(slice1.num_samples == 12);
-    CHECK(slice1.lead_samples_needed == 0);
-    CHECK(slice1.tail_samples_needed == 0);
+    CHECK(expected_slice0 == encode_bases(exp_cent_seq_0));
 
-    // clang-format off
-    std::vector<int8_t> expected_slice1 = {
-        1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, // ATT
-        1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, // ATT
-        0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, // TTC
-        0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, // TTC
-        0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, // TCA
-        0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, // TCA
-        0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, // TCA
-        0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, // TCA
-        0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, // CAG
-        0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, // CAG
-        0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, // CAG
-        0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, // CAG
-    };
+    using EncCtx = ModBaseEncoder::Context;
+    auto [justified, seq_pos, ctx] = GENERATE_COPY(table<bool, size_t, EncCtx>({
+            // Seq: 0 The T in the NTA 3mer.
+            std::make_tuple(kIsCentroid, 0, EncCtx{encode_bases(exp_cent_seq_0), 0, 7, 5, 0}),
+            std::make_tuple(kIsJustified, 0, EncCtx{encode_bases(exp_just_seq_0), 0, 6, 6, 0}),
+            // Seq: 4 The C in the TCA 3mer.
+            std::make_tuple(kIsCentroid, 4, EncCtx{encode_bases(exp_cent_seq_4), 10, 12, 0, 0}),
+            std::make_tuple(kIsJustified, 4, EncCtx{encode_bases(exp_just_seq_4), 8, 12, 0, 0}),
+            // Seq: 9 The C in the ACN 3mer.
+            std::make_tuple(kIsCentroid, 9, EncCtx{encode_bases(exp_cent_seq_9), 31, 9, 0, 3}),
+            std::make_tuple(kIsJustified, 9, EncCtx{encode_bases(exp_just_seq_9), 28, 12, 0, 0}),
+    }));
 
-    // clang-format on
-    CHECK(expected_slice1 == slice1.data);
-    std::string bases1 = "ATT ATT TTC TTC TCA TCA TCA TCA CAG CAG CAG CAG";
-    CHECK(expected_slice1 == encode_bases(bases1));
+    CAPTURE(seq_pos, justified, decode_bases(ctx.data, 3), ctx.first_sample,
+            ctx.num_existing_samples, ctx.lead_samples_needed, ctx.tail_samples_needed);
 
-    auto slice2 = encoder.get_context(9);  // The C in the ACN 3mer.
-    CHECK(slice2.first_sample == 31);
-    CHECK(slice2.num_samples == 9);
-    CHECK(slice2.lead_samples_needed == 0);
-    CHECK(slice2.tail_samples_needed == 3);
-
-    // clang-format off
-    std::vector<int8_t> expected_slice2 = {
-        0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, // GTA
-        0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, // TAC
-        0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, // TAC
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, // ACN
-    };
-    // clang-format on
-    CHECK(expected_slice2 == slice2.data);
-
-    std::string bases2 = "GTA TAC TAC ACN ACN ACN ACN ACN ACN ACN ACN ACN";
-    CHECK(expected_slice2 == encode_bases(bases2));
-    CHECK(bases2.size() == decode_bases(expected_slice2, 3).size());
-    CHECK(bases2 == decode_bases(expected_slice2, 3));
+    auto res = justified ? justified_encoder.get_context(seq_pos) : encoder.get_context(seq_pos);
+    CHECK(res.data == ctx.data);
+    CHECK(decode_bases(res.data, 3) == decode_bases(ctx.data, 3));
+    CHECK(res.first_sample == ctx.first_sample);
+    CHECK(res.num_existing_samples == ctx.num_existing_samples);
+    CHECK(res.lead_samples_needed == ctx.lead_samples_needed);
+    CHECK(res.tail_samples_needed == ctx.tail_samples_needed);
 }
 
 TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
