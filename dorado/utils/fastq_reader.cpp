@@ -66,6 +66,27 @@ bool get_non_empty_line(std::istream& input_stream, std::string& line) {
     return !line.empty();
 }
 
+bool get_wrapped_line(std::istream& input_stream,
+                      std::string& wrapped_line,
+                      char next_field_token) {
+    std::string line;
+    std::ostringstream line_builder{};
+    while (input_stream.peek() != next_field_token && get_non_empty_line(input_stream, line)) {
+        line_builder << line;
+    }
+    wrapped_line = line_builder.str();
+    return !wrapped_line.empty();
+}
+
+//bool try_get_seq_line(std::istream& input_stream, std::string& seq_line) {
+//    std::string line;
+//    std::ostringstream sequence_builder{};
+//    if (!get_wrapped_line(input_stream, line, '+')) {
+//        error_message = "Invalid sequence.";
+//        return std::nullopt;
+//    }
+//}
+
 std::optional<FastqRecord> get_next_record(std::istream& input_stream, std::string& error_message) {
     if (!input_stream.good()) {
         return std::nullopt;
@@ -79,7 +100,7 @@ std::optional<FastqRecord> get_next_record(std::istream& input_stream, std::stri
         error_message = "Invalid header line.";
         return std::nullopt;
     }
-    if (!get_non_empty_line(input_stream, line) || !result.set_sequence(std::move(line))) {
+    if (!get_wrapped_line(input_stream, line, '+') || !result.set_sequence(std::move(line))) {
         error_message = "Invalid sequence.";
         return std::nullopt;
     }
