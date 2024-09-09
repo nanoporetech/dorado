@@ -304,7 +304,7 @@ std::tuple<std::string, int64_t> find_furthest_skipped_read(
                     in_reads_fai_fn.string() + ", line: '" + line + "'."};
         }
 
-        if (skip_set.find(header) != skip_set.end()) {
+        if (skip_set.count(header) > 0) {
             std::swap(furthest_reach, header);
             furthest_reach_id = num_loaded;
         }
@@ -396,7 +396,7 @@ int correct(int argc, char* argv[]) {
 
     // Load the resume list if it exists.
     try {
-        const std::unordered_set<std::string> skip_set =
+        std::unordered_set<std::string> skip_set =
                 (!std::empty(opt.resume_path_fn)) ? load_processed_reads(opt.resume_path_fn)
                                                   : std::unordered_set<std::string>{};
 
@@ -435,7 +435,7 @@ int correct(int argc, char* argv[]) {
             // 2. Window generation, encoding + inference and decoding to generate final reads.
             pipeline_desc.add_node<CorrectionInferenceNode>(
                     {hts_writer}, in_reads_fn, correct_threads, opt.device, opt.infer_threads,
-                    opt.batch_size, model_dir, skip_set);
+                    opt.batch_size, model_dir);
         } else {
             pipeline_desc.add_node<CorrectionPafWriterNode>({});
         }
@@ -453,11 +453,12 @@ int correct(int argc, char* argv[]) {
         // is not part of the pipeline, so the stats are not automatically gathered.
         std::unique_ptr<MessageSink> aligner;
         if (!std::empty(opt.in_paf_fn)) {
-            aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn);
+            aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn, std::move(skip_set));
         } else {
             // 1. Alignment node that generates alignments per read to be corrected.
             aligner = std::make_unique<CorrectionMapperNode>(in_reads_fn, aligner_threads,
-                                                             opt.index_size, furthest_skip_header);
+                                                             opt.index_size, furthest_skip_header,
+                                                             std::move(skip_set));
         }
 
         // Set up stats counting.

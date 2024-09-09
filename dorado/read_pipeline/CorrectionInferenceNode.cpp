@@ -338,15 +338,6 @@ void CorrectionInferenceNode::input_thread_fn() {
                 continue;
             }
 
-            // Skip reads which were already processed.
-            if (!std::empty(m_skip_set)) {
-                const auto it = m_skip_set.find(tname);
-                if (it != m_skip_set.cend()) {
-                    spdlog::debug("Resuming in inference: skipping read {}", tname);
-                    continue;
-                }
-            }
-
             // Get the windows
             size_t n_windows = (alignments.overlaps[0].tlen + m_window_size - 1) / m_window_size;
             LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
@@ -425,16 +416,14 @@ CorrectionInferenceNode::CorrectionInferenceNode(const std::string& fastq,
                                                  const std::string& device,
                                                  int infer_threads,
                                                  const int batch_size,
-                                                 const std::filesystem::path& model_dir,
-                                                 const std::unordered_set<std::string>& skip_set)
+                                                 const std::filesystem::path& model_dir)
         : MessageSink(1000, threads),
           m_fastq(fastq),
           m_model_config(parse_model_config(model_dir / "config.toml")),
           m_features_queue(1000),
           m_inferred_features_queue(500),
           m_bases_manager(batch_size),
-          m_quals_manager(batch_size),
-          m_skip_set{skip_set} {
+          m_quals_manager(batch_size) {
     m_window_size = m_model_config.window_size;
 
     std::vector<std::string> devices;

@@ -30,7 +30,8 @@ public:
     CorrectionMapperNode(const std::string& index_file,
                          int threads,
                          uint64_t index_size,
-                         const std::string& furthest_skip_header);
+                         std::string furthest_skip_header,
+                         std::unordered_set<std::string> skip_set);
     ~CorrectionMapperNode() = default;
     std::string get_name() const override { return "CorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
@@ -79,6 +80,7 @@ private:
     std::atomic<bool> m_copy_terminate{false};
 
     std::string m_furthest_skip_header;
+    std::unordered_set<std::string> m_skip_set;
 };
 
 }  // namespace dorado
