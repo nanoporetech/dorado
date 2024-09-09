@@ -379,7 +379,7 @@ if(NOT DORADO_DISABLE_DORADO)
     )
 
     if(MSVC)
-        set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
+        set_property(TARGET dorado APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
     endif()
 
     enable_warnings_as_errors(dorado)
