@@ -395,104 +395,113 @@ int correct(int argc, char* argv[]) {
     }();
 
     // Load the resume list if it exists.
-    const std::unordered_set<std::string> skip_set =
-            (!std::empty(opt.resume_path_fn)) ? load_processed_reads(opt.resume_path_fn)
-                                              : std::unordered_set<std::string>{};
+    try {
+        const std::unordered_set<std::string> skip_set =
+                (!std::empty(opt.resume_path_fn)) ? load_processed_reads(opt.resume_path_fn)
+                                                  : std::unordered_set<std::string>{};
 
-    // Find the furthest processed input read in the skip set. If skip_set is empty,
-    const auto [furthest_skip_header, furthest_skip_id] =
-            find_furthest_skipped_read(in_reads_fn, skip_set);
-    spdlog::debug("furthest_skip_header = '{}', furthest_skip_id = {}", furthest_skip_header,
-                  furthest_skip_id);
+        // Find the furthest processed input read in the skip set. If skip_set is empty,
+        const auto [furthest_skip_header, furthest_skip_id] =
+                find_furthest_skipped_read(in_reads_fn, skip_set);
+        spdlog::debug("furthest_skip_header = '{}', furthest_skip_id = {}", furthest_skip_header,
+                      furthest_skip_id);
 
-    // Workflow construction.
-    // The overall pipeline will be as follows:
-    //  1. The Alignment node will be responsible for running all-vs-all alignment.
-    //      Since the MM2 index for a full genome could be larger than what can
-    //      fit in memory, the alignment node needs to support split mm2 indices.
-    //      This requires the input reads to be iterated over multiple times, once
-    //      for each index chunk. In order to manage this properly, the input file
-    //      reading is handled within the alignment node.
-    //      Each alignment out of that node is expected to generate multiple aligned
-    //      records, which will all be packaged and sent into a window generation node.
-    //  2. Correction node will chunk up the alignments into multiple windows, create
-    //      tensors, run inference and decode the windows into a final corrected sequence.
-    //  3. Corrected reads will be written out FASTA or BAM format.
+        // Workflow construction.
+        // The overall pipeline will be as follows:
+        //  1. The Alignment node will be responsible for running all-vs-all alignment.
+        //      Since the MM2 index for a full genome could be larger than what can
+        //      fit in memory, the alignment node needs to support split mm2 indices.
+        //      This requires the input reads to be iterated over multiple times, once
+        //      for each index chunk. In order to manage this properly, the input file
+        //      reading is handled within the alignment node.
+        //      Each alignment out of that node is expected to generate multiple aligned
+        //      records, which will all be packaged and sent into a window generation node.
+        //  2. Correction node will chunk up the alignments into multiple windows, create
+        //      tensors, run inference and decode the windows into a final corrected sequence.
+        //  3. Corrected reads will be written out FASTA or BAM format.
 
-    std::unique_ptr<utils::HtsFile, HtsFileDeleter> hts_file;
-    PipelineDescriptor pipeline_desc;
+        std::unique_ptr<utils::HtsFile, HtsFileDeleter> hts_file;
+        PipelineDescriptor pipeline_desc;
 
-    // Add the writer node and (optionally) the correction node.
-    if (!opt.to_paf) {
-        // Setup output file.
-        hts_file = std::unique_ptr<utils::HtsFile, HtsFileDeleter>(
-                new utils::HtsFile("-", OutputMode::FASTA, correct_writer_threads, false));
+        // Add the writer node and (optionally) the correction node.
+        if (!opt.to_paf) {
+            // Setup output file.
+            hts_file = std::unique_ptr<utils::HtsFile, HtsFileDeleter>(
+                    new utils::HtsFile("-", OutputMode::FASTA, correct_writer_threads, false));
 
-        // 3. Corrected reads will be written out in FASTA format.
-        const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
+            // 3. Corrected reads will be written out in FASTA format.
+            const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
 
-        // 2. Window generation, encoding + inference and decoding to generate final reads.
-        pipeline_desc.add_node<CorrectionInferenceNode>({hts_writer}, in_reads_fn, correct_threads,
-                                                        opt.device, opt.infer_threads,
-                                                        opt.batch_size, model_dir, skip_set);
-    } else {
-        pipeline_desc.add_node<CorrectionPafWriterNode>({});
-    }
+            // 2. Window generation, encoding + inference and decoding to generate final reads.
+            pipeline_desc.add_node<CorrectionInferenceNode>(
+                    {hts_writer}, in_reads_fn, correct_threads, opt.device, opt.infer_threads,
+                    opt.batch_size, model_dir, skip_set);
+        } else {
+            pipeline_desc.add_node<CorrectionPafWriterNode>({});
+        }
 
-    // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
-    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
-    if (!pipeline) {
-        spdlog::error("Failed to create pipeline");
+        // Create the Pipeline from our description.
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+        if (!pipeline) {
+            spdlog::error("Failed to create pipeline");
+            return EXIT_FAILURE;
+        }
+
+        // Create the entry (input) node (either the mapper or the reader).
+        // Aligner stats need to be passed separately since the aligner node
+        // is not part of the pipeline, so the stats are not automatically gathered.
+        std::unique_ptr<MessageSink> aligner;
+        if (!std::empty(opt.in_paf_fn)) {
+            aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn);
+        } else {
+            // 1. Alignment node that generates alignments per read to be corrected.
+            aligner = std::make_unique<CorrectionMapperNode>(in_reads_fn, aligner_threads,
+                                                             opt.index_size, furthest_skip_header);
+        }
+
+        // Set up stats counting.
+        CorrectionProgressTracker tracker;
+        tracker.set_description("Correcting");
+        std::vector<dorado::stats::StatsCallable> stats_callables;
+        stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
+            tracker.update_progress_bar(stats, aligner->sample_stats());
+        });
+        constexpr auto kStatsPeriod = 1000ms;
+        auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+                kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
+        // End stats counting setup.
+
+        spdlog::info("Starting");
+
+        // Start the pipeline.
+        if (!std::empty(opt.in_paf_fn)) {
+            dynamic_cast<CorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
+        } else {
+            dynamic_cast<CorrectionMapperNode*>(aligner.get())->process(*pipeline);
+        }
+
+        // Wait for the pipeline to complete.  When it does, we collect
+        // final stats to allow accurate summarisation.
+        auto final_stats = pipeline->terminate(DefaultFlushOptions());
+        stats_sampler->terminate();
+        tracker.update_progress_bar(final_stats, aligner->sample_stats());
+
+        // Report progress during output file finalisation.
+        tracker.summarize();
+
+        spdlog::info("Finished");
+
+        if (remove_tmp_dir) {
+            std::filesystem::remove_all(model_dir.parent_path());
+        }
+
+    } catch (const std::exception& e) {
+        spdlog::error("Caught exception: {}.", e.what());
         return EXIT_FAILURE;
-    }
-
-    // Create the entry (input) node (either the mapper or the reader).
-    // Aligner stats need to be passed separately since the aligner node
-    // is not part of the pipeline, so the stats are not automatically gathered.
-    std::unique_ptr<MessageSink> aligner;
-    if (!std::empty(opt.in_paf_fn)) {
-        aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn);
-    } else {
-        // 1. Alignment node that generates alignments per read to be corrected.
-        aligner = std::make_unique<CorrectionMapperNode>(in_reads_fn, aligner_threads,
-                                                         opt.index_size, furthest_skip_header);
-    }
-
-    // Set up stats counting.
-    CorrectionProgressTracker tracker;
-    tracker.set_description("Correcting");
-    std::vector<dorado::stats::StatsCallable> stats_callables;
-    stats_callables.push_back([&tracker, &aligner](const stats::NamedStats& stats) {
-        tracker.update_progress_bar(stats, aligner->sample_stats());
-    });
-    constexpr auto kStatsPeriod = 1000ms;
-    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
-    // End stats counting setup.
-
-    spdlog::info("Starting");
-
-    // Start the pipeline.
-    if (!std::empty(opt.in_paf_fn)) {
-        dynamic_cast<CorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
-    } else {
-        dynamic_cast<CorrectionMapperNode*>(aligner.get())->process(*pipeline);
-    }
-
-    // Wait for the pipeline to complete.  When it does, we collect
-    // final stats to allow accurate summarisation.
-    auto final_stats = pipeline->terminate(DefaultFlushOptions());
-    stats_sampler->terminate();
-    tracker.update_progress_bar(final_stats, aligner->sample_stats());
-
-    // Report progress during output file finalisation.
-    tracker.summarize();
-
-    spdlog::info("Finished");
-
-    if (remove_tmp_dir) {
-        std::filesystem::remove_all(model_dir.parent_path());
+    } catch (...) {
+        spdlog::error("Caught an unknown exception!");
+        return EXIT_FAILURE;
     }
 
     return 0;
