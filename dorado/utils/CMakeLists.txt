@@ -40,8 +40,6 @@ add_library(dorado_utils
     overlap.h
     parameters.cpp
     parameters.h
-    parse_custom_kit.cpp
-    parse_custom_kit.h
     PostCondition.h
     SampleSheet.cpp
     SampleSheet.h
