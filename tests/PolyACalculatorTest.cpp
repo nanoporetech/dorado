@@ -1,6 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 #include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -36,6 +36,7 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
             TestCase{143, "poly_a/r9_rev_cdna", false}, TestCase{35, "poly_a/r10_fwd_cdna", false},
             TestCase{37, "poly_a/rna002", true}, TestCase{73, "poly_a/rna004", true});
 
+    CAPTURE(data);
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
@@ -56,9 +57,9 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
     read->read_common.client_info->contexts()
-            .register_context<const dorado::poly_tail::PolyTailCalculator>(
-                    dorado::poly_tail::PolyTailCalculatorFactory::create(
-                            dorado::poly_tail::PolyTailConfig{}, is_rna, false));
+            .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
+                    std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>("", is_rna,
+                                                                                    false));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -93,11 +94,10 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto poly_tail_configs = dorado::poly_tail::prepare_configs(config);
     read->read_common.client_info->contexts()
-            .register_context<const dorado::poly_tail::PolyTailCalculator>(
-                    dorado::poly_tail::PolyTailCalculatorFactory::create(poly_tail_configs.back(),
-                                                                         false, false));
+            .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
+                    std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(config, false,
+                                                                                    false));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));

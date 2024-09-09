@@ -7,7 +7,7 @@
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/models.h"
-#include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BasecallerNode.h"
@@ -429,9 +429,9 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculator>(
-            dorado::poly_tail::PolyTailCalculatorFactory::create(
-                    dorado::poly_tail::PolyTailConfig{}, is_rna, is_rna_adapter));
+    client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
+            std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>("", is_rna,
+                                                                            is_rna_adapter));
 
     set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;
