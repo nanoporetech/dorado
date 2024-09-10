@@ -46,72 +46,85 @@ DEFINE_TEST("is_fastq with non existent file return false") {
 
 DEFINE_TEST("is_fastq parameterized testing") {
     auto [input_text, is_valid, description] = GENERATE(table<std::string, bool, std::string>({
-            //{VALID_FASTQ_RECORD + VALID_FASTQ_RECORD_2, true, "valid fastq"},
-            //{std::string{"\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE +
-            //         VALID_FASTQ_RECORD_2,
-            // false, "empty id line returns false"},
+            {VALID_FASTQ_RECORD + VALID_FASTQ_RECORD_2, true, "valid fastq"},
+            {std::string{"\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE +
+                     VALID_FASTQ_RECORD_2,
+             false, "empty id line returns false"},
 
-            //{VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE + VALID_ID_LINE +
-            //         VALID_FASTQ_RECORD_2,
-            // false, "missing id line returns false"},
+            {VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE + VALID_ID_LINE +
+                     VALID_FASTQ_RECORD_2,
+             false, "missing id line returns false"},
 
-            //{std::string{"fdbbea47-8893-4055-942b-8c2efe226c17\n"} + VALID_SEQ_LINE +
-            //         VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
-            // false, "id line missing '@' prefix returns false"},
+            {std::string{"fdbbea47-8893-4055-942b-8c2efe226c17\n"} + VALID_SEQ_LINE +
+                     VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
+             false, "id line missing '@' prefix returns false"},
 
-            //{std::string{"@\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
-            // "id line with only '@' returns false"},
+            {std::string{"@\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
+             "id line with only '@' returns false"},
 
-            //{std::string{"@ blah\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
-            // false, "id line '@ description only' returns false"},
+            {std::string{"@ blah\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
+             false, "id line '@ description only' returns false"},
 
-            //{VALID_ID_LINE + "\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
-            // "empty sequence line returns false"},
+            {VALID_ID_LINE + "\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
+             "empty sequence line returns false"},
 
-            //{VALID_ID_LINE + "ACGTPCAGTT\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
-            // "sequence line containing invalid characters returns false"},
+            {VALID_ID_LINE + "ACGTPCAGTT\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
+             "sequence line containing invalid characters returns false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE_WITH_U + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, true,
-            // "sequence line containing Us instead of Ts returns true"},
+            {VALID_ID_LINE + VALID_SEQ_LINE_WITH_U + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, true,
+             "sequence line containing Us instead of Ts returns true"},
 
-            //{VALID_ID_LINE + "ACGTACGUAC\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
-            // "sequence line containing Us and Ts returns false"},
+            {VALID_ID_LINE + "ACGTACGUAC\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, false,
+             "sequence line containing Us and Ts returns false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE, false,
-            // "separator line empty - false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE, false,
+             "separator line empty - false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE + VALID_FASTQ_RECORD_2, false,
-            // "missing separator line - false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE + VALID_FASTQ_RECORD_2, false,
+             "missing separator line - false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + "+A\n" + VALID_QUAL_LINE, false,
-            // "separator line with characters after + returns false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+A\n" + VALID_QUAL_LINE, false,
+             "separator line with characters after + returns false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + "-\n" + VALID_QUAL_LINE, false,
-            // "separator line with invalid character returns false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + "-\n" + VALID_QUAL_LINE, false,
+             "separator line with invalid character returns false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2,
-            // false, "empty quality line - false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2,
+             false, "empty quality line - false"},
 
-            //{VALID_ID_LINE + "\n" + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2, false,
-            // "empty quality and sequence lines - false"},
+            {VALID_ID_LINE + "\n" + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2, false,
+             "empty quality and sequence lines - false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_FASTQ_RECORD_2, false,
-            // "missing quality line - false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_FASTQ_RECORD_2, false,
+             "missing quality line - false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "$$# %(()NS\n", false,
-            // "quality line with invalid character 0x20 returns false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "$$# %(()NS\n", false,
+             "quality line with invalid character 0x20 returns false"},
 
-            //{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "!$#(%((~~\x7f\n", false,
-            // "quality line with invalid character 0x7f returns false"},
+            {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "!$#(%((~~\x7f\n", false,
+             "quality line with invalid character 0x7f returns false"},
 
-            //{VALID_ID_LINE + "ACGT\n" + VALID_SEPARATOR_LINE + "!$#(%\n", false,
-            // "quality line different length to sequence returns false"},
+            {VALID_ID_LINE + "ACGT\n" + VALID_SEPARATOR_LINE + "!$#(%\n", false,
+             "quality line different length to sequence returns false"},
 
             {VALID_ID_LINE + VALID_LINE_WRAPPED_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
              true, "valid record with line wrapped sequence returns true"},
 
-            {VALID_ID_LINE + "TCA\n\n" + VALID_SEPARATOR_LINE + VALID_QUAL_LINE, true,
+            {VALID_ID_LINE + "TCA\n\n" + VALID_SEPARATOR_LINE + "ABC\n", false,
              "record with line wrapped sequence containing trailing empty line returns false"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "AB\nC\n", true,
+             "record with line wrapped qstring returns true"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "AB\n\nC\n", false,
+             "record with line wrapped qstring containing empty line returns false"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "A\n@\nC\n", true,
+             "record with valid qstring containing '@' returns true"},
+
+            {VALID_ID_LINE + "ACGTACG\nTAC\nG\nTAC\n" + VALID_SEPARATOR_LINE +
+                     "@read_0\nACT\n+\n!$#\n",
+             true, "record with qstring equivalent to a valid fastq record returns true"},
     }));
     CAPTURE(description);
     CAPTURE(input_text);
@@ -127,7 +140,7 @@ DEFINE_TEST("FastqRecord::read_id_view() parameterized") {
     }));
     CAPTURE(header_line);
     FastqRecord cut{};
-    cut.set_id(std::move(header_line));
+    cut.set_header(std::move(header_line));
 
     REQUIRE(cut.read_id_view() == expected_read_id);
 }
@@ -146,14 +159,14 @@ DEFINE_TEST("FastqRecord::run_id_view() parameterized") {
     }));
     CAPTURE(header_line);
     FastqRecord cut{};
-    cut.set_id(std::move(header_line));
+    cut.set_header(std::move(header_line));
 
     REQUIRE(cut.run_id_view() == expected_run_id);
 }
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with no descroption returns empty") {
     FastqRecord cut{};
-    cut.set_id("@read_0");
+    cut.set_header("@read_0");
 
     auto bam_tags = cut.get_bam_tags();
 
@@ -162,7 +175,7 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with no descroption returns empty") {
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with minKNOW style header returns empty") {
     FastqRecord cut{};
-    cut.set_id(
+    cut.set_header(
             "@c2707254-5445-4cfb-a414-fce1f12b56c0 runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
             "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");
 
@@ -173,7 +186,7 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with minKNOW style header returns empty
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with single tag returns that tag") {
     FastqRecord cut{};
-    cut.set_id("@read_0\tRG:Z:6a94c5e3");
+    cut.set_header("@read_0\tRG:Z:6a94c5e3");
 
     auto bam_tags = cut.get_bam_tags();
 
@@ -183,7 +196,7 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with single tag returns that tag") {
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with two tags containing spaces returns both tags") {
     FastqRecord cut{};
-    cut.set_id("@read_0\tfq:Z:some text field\tRG:Z:6a94c5e3");
+    cut.set_header("@read_0\tfq:Z:some text field\tRG:Z:6a94c5e3");
 
     auto bam_tags = cut.get_bam_tags();
 

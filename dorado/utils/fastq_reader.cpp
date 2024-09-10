@@ -66,59 +66,37 @@ bool get_non_empty_line(std::istream& input_stream, std::string& line) {
     return !line.empty();
 }
 
-bool get_wrapped_line(std::istream& input_stream,
-                      std::string& wrapped_line,
-                      char next_field_token) {
+bool get_wrapped_qstring_line(std::istream& input_stream,
+                              std::size_t sequence_size,
+                              std::string& wrapped_line) {
     std::string line;
     std::ostringstream line_builder{};
-    while (input_stream.peek() != next_field_token && get_non_empty_line(input_stream, line)) {
+    std::size_t qstring_size{};
+    while (qstring_size < sequence_size && get_non_empty_line(input_stream, line)) {
+        if (!is_valid_quality_field(line)) {
+            return false;
+        }
+        qstring_size += line.size();
+        if (qstring_size > sequence_size) {
+            return false;
+        }
+        line_builder << line;
+    }
+    wrapped_line = line_builder.str();
+    return wrapped_line.size() == sequence_size;
+}
+
+bool get_wrapped_sequence_line(std::istream& input_stream, std::string& wrapped_line) {
+    std::string line;
+    std::ostringstream line_builder{};
+    while (input_stream.peek() != '+') {
+        if (!get_non_empty_line(input_stream, line) || !validate_sequence_and_replace_us(line)) {
+            return false;
+        }
         line_builder << line;
     }
     wrapped_line = line_builder.str();
     return !wrapped_line.empty();
-}
-
-//bool try_get_seq_line(std::istream& input_stream, std::string& seq_line) {
-//    std::string line;
-//    std::ostringstream sequence_builder{};
-//    if (!get_wrapped_line(input_stream, line, '+')) {
-//        error_message = "Invalid sequence.";
-//        return std::nullopt;
-//    }
-//}
-
-std::optional<FastqRecord> get_next_record(std::istream& input_stream, std::string& error_message) {
-    if (!input_stream.good()) {
-        return std::nullopt;
-    }
-    FastqRecord result;
-    std::string line;
-    if (!get_non_empty_line(input_stream, line)) {
-        return std::nullopt;
-    }
-    if (!result.set_id(std::move(line))) {
-        error_message = "Invalid header line.";
-        return std::nullopt;
-    }
-    if (!get_wrapped_line(input_stream, line, '+') || !result.set_sequence(std::move(line))) {
-        error_message = "Invalid sequence.";
-        return std::nullopt;
-    }
-    if (!get_non_empty_line(input_stream, line) || !is_valid_separator_field(line)) {
-        error_message = "Invalid separator.";
-        return std::nullopt;
-    }
-    if (!get_non_empty_line(input_stream, line) || !result.set_quality(std::move(line))) {
-        error_message = "Invalid qstring.";
-        return std::nullopt;
-    }
-
-    if (result.sequence().size() != result.qstring().size()) {
-        error_message = "Qstring length does not match sequence length.";
-        return std::nullopt;
-    }
-
-    return result;
 }
 
 char header_separator(bool has_bam_tags) { return has_bam_tags ? '\t' : ' '; }
@@ -179,8 +157,8 @@ std::vector<std::string> FastqRecord::get_bam_tags() const {
     return result;
 }
 
-bool FastqRecord::set_id(std::string line) {
-    // Fastq header line format we currently recognise beyond the initial @{read_id} field are
+bool FastqRecord::set_header(std::string line) {
+    // Fastq header line formats that we currently recognise beyond the initial @{read_id} are
     // a) minKNOW style:
     // @{read_id} runid={run_id} sampleid={sample_id} read={read_number} ch={channel_id} start_time={start_time_utc}
     // or,
@@ -198,20 +176,36 @@ bool FastqRecord::set_id(std::string line) {
     return true;
 }
 
-bool FastqRecord::set_sequence(std::string line) {
-    if (!validate_sequence_and_replace_us(line)) {
-        return false;
+std::optional<FastqRecord> FastqRecord::try_create(std::istream& input_stream,
+                                                   std::string& error_message) {
+    if (!input_stream.good()) {
+        return std::nullopt;
     }
-    m_sequence = std::move(line);
-    return true;
-}
+    FastqRecord result;
+    std::string line;
+    if (!get_non_empty_line(input_stream, line)) {
+        return std::nullopt;
+    }
+    if (!result.set_header(std::move(line))) {
+        error_message = "Invalid header line.";
+        return std::nullopt;
+    }
+    if (!get_wrapped_sequence_line(input_stream, line)) {
+        error_message = "Invalid sequence.";
+        return std::nullopt;
+    }
+    result.m_sequence = std::move(line);
+    if (!get_non_empty_line(input_stream, line) || !is_valid_separator_field(line)) {
+        error_message = "Invalid separator.";
+        return std::nullopt;
+    }
+    if (!get_wrapped_qstring_line(input_stream, result.sequence().size(), line)) {
+        error_message = "Invalid qstring.";
+        return std::nullopt;
+    }
+    result.m_qstring = std::move(line);
 
-bool FastqRecord::set_quality(std::string line) {
-    if (!is_valid_quality_field(line)) {
-        return false;
-    }
-    m_qstring = std::move(line);
-    return true;
+    return result;
 }
 
 FastqReader::FastqReader(std::string input_file) : m_input_file(std::move(input_file)) {
@@ -240,7 +234,7 @@ std::optional<FastqRecord> FastqReader::try_get_next_record() {
     }
     ++m_record_count;
     std::string error_message{};
-    auto next_fastq_record = get_next_record(*m_input_stream, error_message);
+    auto next_fastq_record = FastqRecord::try_create(*m_input_stream, error_message);
     if (!error_message.empty()) {
         spdlog::warn("Failed to read record #{} from {}. {}", m_record_count, m_input_file,
                      error_message);
@@ -260,7 +254,7 @@ bool is_fastq(std::istream& input_stream) {
     }
 
     std::string ignore_error_when_checking;
-    return get_next_record(input_stream, ignore_error_when_checking).has_value();
+    return FastqRecord::try_create(input_stream, ignore_error_when_checking).has_value();
 }
 
 }  // namespace dorado::utils

@@ -26,9 +26,11 @@ public:
     std::string_view run_id_view() const;
     std::vector<std::string> get_bam_tags() const;
 
-    bool set_id(std::string value);
-    bool set_sequence(std::string value);
-    bool set_quality(std::string value);
+    //  Testablity. Public to allow utests to check processing of tags embedded in the header record
+    bool set_header(std::string value);
+
+    static std::optional<FastqRecord> try_create(std::istream& input_stream,
+                                                 std::string& error_message);
 };
 
 class FastqReader {
