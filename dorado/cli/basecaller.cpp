@@ -8,6 +8,7 @@
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
@@ -45,7 +46,6 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
-#include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/sys_stats.h"
 #include "utils/tty_utils.h"
@@ -89,7 +89,7 @@ const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
 
 std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
         const std::string& custom_kit_file) {
-    auto custom_kit_info = barcode_kits::parse_custom_arrangement(custom_kit_file);
+    auto custom_kit_info = demux::parse_custom_arrangement(custom_kit_file);
     if (!custom_kit_info) {
         spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
         std::exit(EXIT_FAILURE);
@@ -482,6 +482,12 @@ void setup(const std::vector<std::string>& args,
     if (barcoding_info || adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
+
+    const bool is_rna_adapter = is_rna_model(model_config) &&
+                                (adapter_info->rna_adapters ||
+                                 (barcoding_info && (!barcoding_info->kit_name.empty() ||
+                                                     barcoding_info->custom_kit.has_value())));
+
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
     if (barcoding_info) {
@@ -496,7 +502,7 @@ void setup(const std::vector<std::string>& args,
     }
     if (estimate_poly_a) {
         auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), polya_config);
+                is_rna_model(model_config), is_rna_adapter, polya_config);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
                 std::move(poly_tail_calculator));
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(

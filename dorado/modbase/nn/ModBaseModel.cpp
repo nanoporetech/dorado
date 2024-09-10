@@ -1,5 +1,6 @@
 #include "ModBaseModel.h"
 
+#include "modbase/ModBaseModelConfig.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/module_utils.h"
 
@@ -15,7 +16,7 @@ namespace {
 template <class Model>
 ModuleHolder<AnyModule> populate_model(Model&& model,
                                        const std::filesystem::path& path,
-                                       at::TensorOptions options) {
+                                       const at::TensorOptions& options) {
     auto state_dict = model->load_weights(path);
     model->load_state_dict(state_dict);
     model->to(options.dtype_opt().value().toScalarType());
@@ -232,29 +233,27 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 
 }  // namespace nn
 
-ModuleHolder<AnyModule> load_modbase_model(const std::filesystem::path& model_path,
-                                           at::TensorOptions options) {
-    auto config = toml::parse(model_path / "config.toml");
+ModuleHolder<AnyModule> load_modbase_model(const ModBaseModelConfig& config,
+                                           const at::TensorOptions& options) {
+    c10::InferenceMode guard;
 
-    const auto& general_params = toml::find(config, "general");
-    const auto model_type = toml::find<std::string>(general_params, "model");
-
-    const auto& model_params = toml::find(config, "model_params");
-    const auto size = toml::find<int>(model_params, "size");
-    const auto kmer_len = toml::find<int>(model_params, "kmer_len");
-    const auto num_out = toml::find<int>(model_params, "num_out");
-
-    if (model_type == "conv_lstm") {
-        auto model = nn::ModBaseConvLSTMModel(size, kmer_len, num_out);
-        return populate_model(model, model_path, options);
+    switch (config.general.model_type) {
+    case ModelType::CONV_LSTM: {
+        auto model = nn::ModBaseConvLSTMModel(config.general.size, config.general.kmer_len,
+                                              config.general.num_out);
+        return populate_model(model, config.model_path, options);
     }
-
-    if (model_type == "conv_only") {
-        auto model = nn::ModBaseConvModel(size, kmer_len, num_out);
-        return populate_model(model, model_path, options);
+    case ModelType::CONV_V1: {
+        auto model = nn::ModBaseConvModel(config.general.size, config.general.kmer_len,
+                                          config.general.num_out);
+        return populate_model(model, config.model_path, options);
     }
-
-    throw std::runtime_error("Unknown model type in config file.");
+    case ModelType::CONV_V2: {
+        throw std::runtime_error("'conv_v2' modbase models have not been implemented yet");
+    }
+    default:
+        throw std::runtime_error("Unknown model type in config file.");
+    }
 }
 
 }  // namespace dorado::modbase

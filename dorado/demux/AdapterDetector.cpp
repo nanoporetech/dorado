@@ -1,7 +1,7 @@
 #include "AdapterDetector.h"
 
+#include "parse_custom_kit.h"
 #include "parse_custom_sequences.h"
-#include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 

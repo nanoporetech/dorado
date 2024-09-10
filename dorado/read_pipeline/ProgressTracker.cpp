@@ -106,6 +106,7 @@ void ProgressTracker::summarize() const {
 
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0) {
         // Visualize a distribution of the tail lengths called.
+        int modal_poly_a_tail_length = 0;
         if (!m_poly_a_tail_length_count.empty()) {
             spdlog::debug("PolyA tail length distribution :");
             auto max_val = std::max_element(
@@ -115,10 +116,14 @@ void ProgressTracker::summarize() const {
             for (const auto& [len, count] : m_poly_a_tail_length_count) {
                 spdlog::debug("{:03d} : {}", len, std::string(count / factor, '*'));
             }
+            modal_poly_a_tail_length = max_val->first;
         }
 
         spdlog::info("> PolyA tails called {}, not called {}, avg tail length {}",
                      m_num_poly_a_called, m_num_poly_a_not_called, m_avg_poly_a_tail_lengths);
+        if (!m_poly_a_tail_length_count.empty()) {
+            spdlog::info("Modal tail length {}", modal_poly_a_tail_length);
+        }
     }
 }
 

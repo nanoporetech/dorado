@@ -35,6 +35,7 @@ add_executable(dorado_tests
     MathUtilsTest.cpp
     MergeHeadersTest.cpp
     Minimap2IndexTest.cpp
+    ModBaseConfigTest.cpp
     ModBaseEncoderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
@@ -168,7 +169,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
 
     enable_warnings_as_errors(${TEST_BIN})
     if (MSVC)
-        set_target_properties(${TEST_BIN} PROPERTIES LINK_OPTIONS "/ignore:4099")
+        set_property(TARGET ${TEST_BIN} APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
     else()
         # Add -Wno-trigraphs because one of the tests uses a qstring that has a trigraph sequence.
         target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")

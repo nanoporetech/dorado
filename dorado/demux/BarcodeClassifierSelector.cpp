@@ -17,15 +17,16 @@ std::shared_ptr<const BarcodeClassifier> BarcodeClassifierSelector::get_barcoder
     const auto kit_id = barcode_kit_info.kit_name.empty() ? *barcode_kit_info.custom_kit
                                                           : barcode_kit_info.kit_name;
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_barcoder_lut.count(kit_id)) {
-        m_barcoder_lut.emplace(
-                kit_id, std::make_shared<const BarcodeClassifier>(
-                                barcode_kit_info.kit_name.empty()
-                                        ? std::vector<std::string>{}
-                                        : std::vector<std::string>{barcode_kit_info.kit_name},
-                                barcode_kit_info.custom_kit, barcode_kit_info.custom_seqs));
+    auto& barcoder = m_barcoder_lut[kit_id];
+    if (!barcoder) {
+        KitInfoProvider kit_info_provider(
+                barcode_kit_info.kit_name.empty()
+                        ? std::vector<std::string>{}
+                        : std::vector<std::string>{barcode_kit_info.kit_name},
+                barcode_kit_info.custom_kit, barcode_kit_info.custom_seqs);
+        barcoder = std::make_shared<const BarcodeClassifier>(std::move(kit_info_provider));
     }
-    return m_barcoder_lut.at(kit_id);
+    return barcoder;
 }
 
 }  // namespace dorado::demux

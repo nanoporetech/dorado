@@ -1,0 +1,24 @@
+[general]
+creation_date = "12/12/2022, 17:10:42"
+model = "conv_lstm"
+
+[model_params]
+size = 256
+kmer_len = 9
+num_out = 3
+
+[modbases]
+mod_bases = "hm"
+offset = 0
+mod_long_names_0 = "5hmC"
+mod_long_names_1 = "5mC"
+chunk_context_0 = 50
+chunk_context_1 = 50
+kmer_context_bases_0 = 4
+kmer_context_bases_1 = 4
+motif = "CG"
+motif_offset = 0
+
+[refinement]
+refine_do_rough_rescale = 1
+refine_kmer_center_idx = 6
