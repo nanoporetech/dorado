@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -25,6 +26,41 @@ namespace {
 
 const std::string HTS_FORMAT_TEXT_FASTQ{"FASTQ sequence text"};
 
+void write_bam_aux_tag_from_string(bam1_t* record, const std::string& bam_tag_string) {
+    // Format TAG:TYPE:VALUE where TAG is a 2 char string, TYPE is a single char, and value
+    std::istringstream tag_stream{bam_tag_string};
+
+    std::string tag_id;
+    if (!std::getline(tag_stream, tag_id, ':') || tag_id.size() != 2) {
+        return;
+    }
+
+    // Currently we only write to the fastq header the tags RG:Z, st:Z and DS:Z.
+    // These these are simple to read as a std::string as they are just a string
+    // of printable characters including SPACE, regex: [ !-~]*
+    // So filter out anything apart from string fields so we don't need to worry
+    // about the encoding of other tags when written to a fastq text file.
+    std::string tag_type;
+    if (!std::getline(tag_stream, tag_type, ':') || tag_type != "Z") {
+        return;
+    }
+
+    std::string tag_data;
+    if (!std::getline(tag_stream, tag_data) || tag_data.size() == 0) {
+        return;
+    }
+
+    //int bam_aux_append(bam1_t * b, const char tag[2], char type, int len, const uint8_t* data);
+    bam_aux_append(record, tag_id.data(), tag_type.at(0), static_cast<int>(tag_data.size() + 1),
+                   (uint8_t*)tag_data.c_str());
+}
+
+void write_bam_aux_tags_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_record) {
+    for (const auto& bam_tag_string : fastq_record.get_bam_tags()) {
+        write_bam_aux_tag_from_string(record, bam_tag_string);
+    }
+}
+
 bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_record) {
     std::vector<uint8_t> qscore{};
     qscore.reserve(fastq_record.qstring().size());
@@ -34,12 +70,12 @@ bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_r
     int leftmost_pos = -1;  // UNMAPPED - will be written as 0
     uint8_t map_q = 0;      // UNMAPPED
     int next_pos = -1;      // UNMAPPED - will be written as 0
-    auto read_id = utils::read_id_view(fastq_record.header());
+    auto read_id = fastq_record.read_id_view();
     auto result = bam_set1(record, read_id.size(), read_id.data(), flags, -1, leftmost_pos, map_q,
                            0, nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
                            fastq_record.sequence().c_str(), (char*)qscore.data(), 0);
+    write_bam_aux_tags_from_fastq(record, fastq_record);
     utils::add_fastq_header_tag(record, fastq_record.header());
-
     return result >= 0;
 }
 

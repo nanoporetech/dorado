@@ -1,0 +1,22 @@
+[general]
+creation_date = "11/18/2021, 15:59:17"
+model = "conv_only"
+
+[model_params]
+size = 64
+kmer_len = 9
+num_out = 2
+
+[modbases]
+mod_bases = "m"
+offset = 0
+mod_long_names_0 = "5mC"
+chunk_context_0 = 50
+chunk_context_1 = 50
+kmer_context_bases_0 = 4
+kmer_context_bases_1 = 4
+motif = "CG"
+motif_offset = 0
+
+[refinement]
+refine_do_rough_rescale = 0

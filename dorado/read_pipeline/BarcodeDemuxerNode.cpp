@@ -24,8 +24,11 @@ std::string get_run_id_from_fq_tag(bam1_t* const record) {
         return {};
     }
     std::string header{bam_aux2Z(fastq_id_tag)};
-
-    return std::string{utils::run_id_view(header)};
+    utils::FastqRecord fastq_record{};
+    if (!fastq_record.set_header(header)) {
+        return {};
+    }
+    return std::string{fastq_record.run_id_view()};
 }
 
 std::string get_run_id_from_rg_tag(bam1_t* const record) {

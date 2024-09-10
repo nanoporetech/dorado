@@ -50,12 +50,12 @@ echo dorado basecaller test stage
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
 $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
-if ! uname -r | grep -q tegra; then
+if ! uname -r | grep -q -E 'tegra|minit'; then
     $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
     dorado_check_bam_not_empty
 fi
 
-# Check that the read group has the required model info in it's header
+# Check that the read group has the required model info in its header
 if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
     echo "Output SAM file does not contain basecall model name in header!"
     exit 1
@@ -188,7 +188,7 @@ dorado_aligner_options_test() (
 )
 dorado_aligner_options_test
 
-if ! uname -r | grep -q tegra; then
+if ! uname -r | grep -q -E 'tegra|minit'; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 

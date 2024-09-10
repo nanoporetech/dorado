@@ -43,10 +43,7 @@ bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
 }
 
 bool is_valid_input_file(const std::filesystem::path& input_path) {
-    if (is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string())) {
-        return true;
-    }
-    return false;
+    return is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string());
 }
 
 fs::path replace_extension(fs::path output_path) {

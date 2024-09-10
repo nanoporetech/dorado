@@ -17,6 +17,8 @@ const std::string VALID_ID_2{"@fdbbea47-8893-4055-942b-8c2efe22ffff some other d
 const std::string VALID_ID_LINE_2{VALID_ID_2 + "\n"};
 const std::string VALID_SEQ{"CCCGTTGAAG"};
 const std::string VALID_SEQ_LINE{VALID_SEQ + "\n"};
+const std::string VALID_LINE_WRAPPED_SEQ{"CCCGT\nTGAAG"};
+const std::string VALID_LINE_WRAPPED_SEQ_LINE{VALID_LINE_WRAPPED_SEQ + "\n"};
 const std::string VALID_SEQ_LINE_WITH_U{"CCCGUUGAAG\n"};
 const std::string VALID_SEQ_2{"ACCGTTGCAT"};
 const std::string VALID_SEQ_LINE_2{VALID_SEQ_2 + "\n"};
@@ -24,6 +26,8 @@ const std::string VALID_SEPARATOR{"+"};
 const std::string VALID_SEPARATOR_LINE{VALID_SEPARATOR + "\n"};
 const std::string VALID_QUAL{"!$#(%(()N~"};
 const std::string VALID_QUAL_LINE{VALID_QUAL + "\n"};
+const std::string VALID_LINE_WRAPPED_QUAL{"!$#(\n%(()N~"};
+const std::string VALID_LINE_WRAPPED_QUAL_LINE{VALID_LINE_WRAPPED_QUAL + "\n"};
 const std::string VALID_QUAL_2{"$(#%(()N~!"};
 const std::string VALID_QUAL_LINE_2{VALID_QUAL_2 + "\n"};
 const std::string VALID_FASTQ_RECORD{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE +
@@ -102,6 +106,25 @@ DEFINE_TEST("is_fastq parameterized testing") {
 
             {VALID_ID_LINE + "ACGT\n" + VALID_SEPARATOR_LINE + "!$#(%\n", false,
              "quality line different length to sequence returns false"},
+
+            {VALID_ID_LINE + VALID_LINE_WRAPPED_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
+             true, "valid record with line wrapped sequence returns true"},
+
+            {VALID_ID_LINE + "TCA\n\n" + VALID_SEPARATOR_LINE + "ABC\n", false,
+             "record with line wrapped sequence containing trailing empty line returns false"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "AB\nC\n", true,
+             "record with line wrapped qstring returns true"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "AB\n\nC\n", false,
+             "record with line wrapped qstring containing empty line returns false"},
+
+            {VALID_ID_LINE + "TCA\n" + VALID_SEPARATOR_LINE + "A\n@\nC\n", true,
+             "record with valid qstring containing '@' returns true"},
+
+            {VALID_ID_LINE + "ACGTACG\nTAC\nG\nTAC\n" + VALID_SEPARATOR_LINE +
+                     "@read_0\nACT\n+\n!$#\n",
+             true, "record with qstring equivalent to a valid fastq record returns true"},
     }));
     CAPTURE(description);
     CAPTURE(input_text);
@@ -109,20 +132,77 @@ DEFINE_TEST("is_fastq parameterized testing") {
     REQUIRE(is_fastq(input_stream) == is_valid);
 }
 
-DEFINE_TEST("read_id_view() with valid simple id line returns the read id") {
+DEFINE_TEST("FastqRecord::read_id_view() parameterized") {
+    auto [header_line, expected_read_id] = GENERATE(table<std::string, std::string>({
+            {"@expected_simple_read_id", "expected_simple_read_id"},
+            {"@8623ac42-0956\tst:Z:2023-06-22T07\tRG:Z:6a94c5e3.0", "8623ac42-0956"},
+            {"@read_0 runid=1", "read_0"},
+    }));
+    CAPTURE(header_line);
     FastqRecord cut{};
+    cut.set_header(std::move(header_line));
 
-    REQUIRE(read_id_view("@expected_simple_read_id") == "expected_simple_read_id");
+    REQUIRE(cut.read_id_view() == expected_read_id);
 }
 
-DEFINE_TEST("read_id_view() with valid complex id line returns the read id") {
-    REQUIRE(read_id_view(
-                    "@fdbbea47-8893-4055-942b-8c2efe226c17 "
-                    "runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
-                    "sample_id=AMW_RNA_model_training_QC_3 flow_cell_id=FAH44643 ch=258 "
-                    "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
-                    "basecall_gpu=NVIDIA RTX A5500 Laptop GPU") ==
-            "fdbbea47-8893-4055-942b-8c2efe226c17");
+DEFINE_TEST("FastqRecord::run_id_view() parameterized") {
+    auto [header_line, expected_run_id] = GENERATE(table<std::string, std::string>({
+            {"@read_0 runid=12", "12"},
+            {"@read_0 runid=a125g desc", "a125g"},
+            {"@read_0 runid=", ""},
+            {"@r0\tfq:Z:bam tag contains token runid=a125g\tRG:Z:6a94c5e3", ""},
+            {"@fdbbea47-8893-4055-942b-8c2efe226c17 sample_id=AMW_RNA_model_training_QC_3 "
+             "flow_cell_id=FAH44643 ch=258 runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
+             "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
+             "basecall_gpu=NVIDIA RTX A5500 Laptop GPU",
+             "e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501"},
+    }));
+    CAPTURE(header_line);
+    FastqRecord cut{};
+    cut.set_header(std::move(header_line));
+
+    REQUIRE(cut.run_id_view() == expected_run_id);
+}
+
+DEFINE_TEST("FastqRecord::get_bam_tags() with no descroption returns empty") {
+    FastqRecord cut{};
+    cut.set_header("@read_0");
+
+    auto bam_tags = cut.get_bam_tags();
+
+    REQUIRE(bam_tags.empty());
+}
+
+DEFINE_TEST("FastqRecord::get_bam_tags() with minKNOW style header returns empty") {
+    FastqRecord cut{};
+    cut.set_header(
+            "@c2707254-5445-4cfb-a414-fce1f12b56c0 runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
+            "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");
+
+    auto bam_tags = cut.get_bam_tags();
+
+    REQUIRE(bam_tags.empty());
+}
+
+DEFINE_TEST("FastqRecord::get_bam_tags() with single tag returns that tag") {
+    FastqRecord cut{};
+    cut.set_header("@read_0\tRG:Z:6a94c5e3");
+
+    auto bam_tags = cut.get_bam_tags();
+
+    REQUIRE(bam_tags.size() == 1);
+    REQUIRE(bam_tags[0] == "RG:Z:6a94c5e3");
+}
+
+DEFINE_TEST("FastqRecord::get_bam_tags() with two tags containing spaces returns both tags") {
+    FastqRecord cut{};
+    cut.set_header("@read_0\tfq:Z:some text field\tRG:Z:6a94c5e3");
+
+    auto bam_tags = cut.get_bam_tags();
+
+    REQUIRE(bam_tags.size() == 2);
+    REQUIRE(bam_tags[0] == "fq:Z:some text field");
+    REQUIRE(bam_tags[1] == "RG:Z:6a94c5e3");
 }
 
 DEFINE_TEST("FastqReader constructor with invalid file does not throw") {
@@ -207,21 +287,6 @@ DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with
     CHECK(record->header() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);  // Check Ts not Us
     CHECK(record->qstring() == VALID_QUAL);
-}
-
-DEFINE_TEST("run_id_view() parameterized") {
-    auto [header_line, expected_run_id] = GENERATE(table<std::string, std::string>({
-            {"@read_0 runid=12", "12"},
-            {"@read_0 runid=a125g desc", "a125g"},
-            {"@read_0 runid=", ""},
-            {"@fdbbea47-8893-4055-942b-8c2efe226c17 sample_id=AMW_RNA_model_training_QC_3 "
-             "flow_cell_id=FAH44643 ch=258 runid=e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501 "
-             "start_time=2017-12-19T08:38:08Z basecall_model_version_id=rna002_70bps_hac@v3 "
-             "basecall_gpu=NVIDIA RTX A5500 Laptop GPU",
-             "e2b939f9f7f6b5b78f0b24d0da9da9f6a48d5501"},
-    }));
-    CAPTURE(header_line);
-    REQUIRE(run_id_view(header_line) == expected_run_id);
 }
 
 }  // namespace dorado::utils::fastq_reader::test

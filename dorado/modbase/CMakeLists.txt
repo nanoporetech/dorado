@@ -1,4 +1,6 @@
 add_library(dorado_modbase STATIC
+    encode_kmer.cpp
+    encode_kmer.h
     ModBaseCaller.cpp
     ModBaseCaller.h
     ModBaseContext.cpp
