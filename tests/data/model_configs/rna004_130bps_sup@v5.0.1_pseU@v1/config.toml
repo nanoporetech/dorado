@@ -1,0 +1,25 @@
+[general]
+creation_date = "05/13/2024, 19:35:51"
+model = "conv_lstm"
+
+[model_params]
+size = 128
+kmer_len = 9
+num_out = 2
+
+[modbases]
+mod_bases = [ "17802",]
+offset = 0
+reverse_signal = true
+base_start_justify = true
+mod_long_names_0 = "pseU"
+chunk_context_0 = 150
+chunk_context_1 = 150
+kmer_context_bases_0 = 4
+kmer_context_bases_1 = 4
+motif = "T"
+motif_offset = 0
+
+[refinement]
+refine_do_rough_rescale = 1
+refine_kmer_center_idx = 3
