@@ -13,6 +13,10 @@ namespace {
 
 const std::string VALID_ID{"@fdbbea47-8893-4055-942b-8c2efe226c17 some description"};
 const std::string VALID_ID_LINE{VALID_ID + "\n"};
+const std::string VALID_ID_WITH_TABS{
+        "@8623ac42-0956-4692-9a93-bdd99bf1a94e\tst:Z:2023-06-22T07:17:48.308+00:00\tRG:Z:"
+        "6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4.3.0"};
+const std::string VALID_ID_LINE_WITH_TABS{VALID_ID_WITH_TABS + "\n"};
 const std::string VALID_ID_2{"@fdbbea47-8893-4055-942b-8c2efe22ffff some other description"};
 const std::string VALID_ID_LINE_2{VALID_ID_2 + "\n"};
 const std::string VALID_SEQ{"CCCGTTGAAG"};
@@ -57,6 +61,9 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE + VALID_ID_LINE +
                      VALID_FASTQ_RECORD_2,
              false, "missing id line returns false"},
+
+            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
+             true, "valid header with tabbed aux fields returns true"},
 
             {std::string{"fdbbea47-8893-4055-942b-8c2efe226c17\n"} + VALID_SEQ_LINE +
                      VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
@@ -128,6 +135,16 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_ID_LINE + "ACGTACG\nTAC\nG\nTAC\n" + VALID_SEPARATOR_LINE +
                      "@read_0\nACT\n+\n!$#\n",
              true, "record with qstring equivalent to a valid fastq record returns true"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+" + VALID_ID_LINE.substr(1) + VALID_QUAL_LINE, true,
+             "record with extended separator line like header returns true"},
+
+            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + "+" + VALID_ID_LINE_WITH_TABS.substr(1) +
+                     VALID_QUAL_LINE,
+             true, "record with extended separator line like tabbed header returns true"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+ blah\n" + VALID_QUAL_LINE, true,
+             "record with extended separator line containing leading SPACE returns true"},
     }));
     CAPTURE(description);
     CAPTURE(input_text);
