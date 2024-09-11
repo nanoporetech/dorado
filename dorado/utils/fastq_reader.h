@@ -19,7 +19,12 @@ class FastqRecord {
 
 public:
     const std::string& header() const;
+
+    // All characters will be in the set {A,C,G,T}
     const std::string& sequence() const;
+
+    // All characters will be in the range of printable characters ['!' .. '~'],
+    // i.e. [33 .. 126]
     const std::string& qstring() const;
 
     std::string_view read_id_view() const;

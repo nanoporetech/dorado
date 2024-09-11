@@ -49,7 +49,7 @@ private:
     std::function<void(BamPtr&)> m_record_mutator{};
     std::optional<std::unordered_set<std::string>> m_read_list;
 
-    std::function<bool(bam1_t*)> m_bam_record_generator{};
+    std::function<bool(bam1_t&)> m_bam_record_generator{};
 
     template <typename T>
     bool try_initialise_generator(const std::string& filename);

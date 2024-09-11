@@ -25,7 +25,7 @@ namespace {
 
 const std::string HTS_FORMAT_TEXT_FASTQ{"FASTQ sequence text"};
 
-void write_bam_aux_tag_from_string(bam1_t* record, const std::string& bam_tag_string) {
+void write_bam_aux_tag_from_string(bam1_t& record, const std::string& bam_tag_string) {
     // Format TAG:TYPE:VALUE where TAG is a 2 char string, TYPE is a single char, and value
     std::istringstream tag_stream{bam_tag_string};
 
@@ -50,31 +50,34 @@ void write_bam_aux_tag_from_string(bam1_t* record, const std::string& bam_tag_st
     }
 
     //int bam_aux_append(bam1_t * b, const char tag[2], char type, int len, const uint8_t* data);
-    bam_aux_append(record, tag_id.data(), tag_type.at(0), static_cast<int>(tag_data.size() + 1),
+    bam_aux_append(&record, tag_id.data(), tag_type.at(0), static_cast<int>(tag_data.size() + 1),
                    (uint8_t*)tag_data.c_str());
 }
 
-void write_bam_aux_tags_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_record) {
+void write_bam_aux_tags_from_fastq(bam1_t& record, const utils::FastqRecord& fastq_record) {
     for (const auto& bam_tag_string : fastq_record.get_bam_tags()) {
         write_bam_aux_tag_from_string(record, bam_tag_string);
     }
 }
 
-bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_record) {
+bool try_assign_bam_from_fastq(bam1_t& record, const utils::FastqRecord& fastq_record) {
     std::vector<uint8_t> qscore{};
     qscore.reserve(fastq_record.qstring().size());
     std::transform(fastq_record.qstring().begin(), fastq_record.qstring().end(),
-                   std::back_inserter(qscore), [](char c) { return (uint8_t)(c)-33; });
-    uint16_t flags = 4;     // 4 = UNMAPPED
-    int leftmost_pos = -1;  // UNMAPPED - will be written as 0
-    uint8_t map_q = 0;      // UNMAPPED
-    int next_pos = -1;      // UNMAPPED - will be written as 0
-    auto read_id = fastq_record.read_id_view();
-    auto result = bam_set1(record, read_id.size(), read_id.data(), flags, -1, leftmost_pos, map_q,
-                           0, nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
-                           fastq_record.sequence().c_str(), (char*)qscore.data(), 0);
+                   std::back_inserter(qscore), [](char c) { return static_cast<uint8_t>(c - 33); });
+    constexpr uint16_t flags = 4;     // 4 = UNMAPPED
+    constexpr int leftmost_pos = -1;  // UNMAPPED - will be written as 0
+    constexpr uint8_t map_q = 0;      // UNMAPPED
+    constexpr int next_pos = -1;      // UNMAPPED - will be written as 0
+    const auto read_id = fastq_record.read_id_view();
+    if (bam_set1(&record, read_id.size(), read_id.data(), flags, -1, leftmost_pos, map_q, 0,
+                 nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
+                 fastq_record.sequence().c_str(), (char*)qscore.data(), 0) < 0) {
+        return false;
+    }
+
     write_bam_aux_tags_from_fastq(record, fastq_record);
-    return result >= 0;
+    return true;
 }
 
 class FastqBamRecordGenerator {
@@ -95,7 +98,7 @@ public:
     sam_hdr_t* header() const { return m_header.get(); }
     const std::string& format() const { return HTS_FORMAT_TEXT_FASTQ; }
 
-    bool try_get_next_record(bam1_t* record) {
+    bool try_get_next_record(bam1_t& record) {
         auto fastq_record = m_fastq_reader.try_get_next_record();
         if (!fastq_record) {
             return false;
@@ -133,8 +136,8 @@ public:
     sam_hdr_t* header() const { return m_header.get(); }
     const std::string& format() const { return m_format; }
 
-    bool try_get_next_record(bam1_t* record) {
-        return sam_read1(m_file.get(), m_header.get(), record) >= 0;
+    bool try_get_next_record(bam1_t& record) {
+        return sam_read1(m_file.get(), m_header.get(), &record) >= 0;
     }
 };
 
@@ -160,7 +163,7 @@ bool HtsReader::try_initialise_generator(const std::string& filename) {
     }
     m_header = generator->header();
     m_format = generator->format();
-    m_bam_record_generator = [generator = std::move(generator)](bam1_t* bam_record) {
+    m_bam_record_generator = [generator = std::move(generator)](bam1_t& bam_record) {
         return generator->try_get_next_record(bam_record);
     };
     return true;
@@ -174,7 +177,7 @@ void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
     m_record_mutator = std::move(mutator);
 }
 
-bool HtsReader::read() { return m_bam_record_generator(record.get()); }
+bool HtsReader::read() { return m_bam_record_generator(*record); }
 
 bool HtsReader::has_tag(const char* tagname) {
     uint8_t* tag = bam_aux_get(record.get(), tagname);
