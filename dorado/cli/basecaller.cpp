@@ -479,7 +479,7 @@ void setup(const std::vector<std::string>& args,
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
-    if (barcoding_info || adapter_trimming_enabled) {
+    if ((barcoding_info && barcoding_info->trim) || adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
 
