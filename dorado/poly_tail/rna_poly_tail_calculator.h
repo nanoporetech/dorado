@@ -6,16 +6,19 @@ namespace dorado::poly_tail {
 
 class RNAPolyTailCalculator : public PolyTailCalculator {
 public:
-    RNAPolyTailCalculator(PolyTailConfig config) : PolyTailCalculator(std::move(config)) {}
+    RNAPolyTailCalculator(PolyTailConfig config, bool is_rna_adapter);
     SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const override;
 
 protected:
     float average_samples_per_base(const std::vector<float>& sizes) const override;
     int signal_length_adjustment(int signal_len) const override;
-    float min_avg_val() const override { return 0.0f; }
+    float min_avg_val() const override { return -0.5f; }
     std::pair<int, int> signal_range(int signal_anchor,
                                      int signal_len,
                                      float samples_per_base) const override;
+
+private:
+    bool m_rna_adapter;
 };
 
 }  // namespace dorado::poly_tail

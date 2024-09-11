@@ -185,6 +185,10 @@ add_library(dorado_lib
     dorado/demux/BarcodeClassifierSelector.cpp
     dorado/demux/BarcodeClassifierSelector.h
     dorado/demux/barcoding_info.h
+    dorado/demux/KitInfoProvider.cpp
+    dorado/demux/KitInfoProvider.h
+    dorado/demux/parse_custom_kit.cpp
+    dorado/demux/parse_custom_kit.h
     dorado/demux/parse_custom_sequences.cpp
     dorado/demux/parse_custom_sequences.h
     dorado/demux/Trimmer.cpp
@@ -375,7 +379,7 @@ if(NOT DORADO_DISABLE_DORADO)
     )
 
     if(MSVC)
-        set_target_properties(dorado PROPERTIES LINK_OPTIONS "/ignore:4099")
+        set_property(TARGET dorado APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
     endif()
 
     enable_warnings_as_errors(dorado)

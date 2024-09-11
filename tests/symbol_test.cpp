@@ -7,6 +7,7 @@
 #include "api/runner_creation.h"
 #include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunner.h"
+#include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
 #include "modbase/ModBaseModelConfig.h"
 #include "modbase/ModBaseRunner.h"
@@ -23,7 +24,6 @@
 #include "torch_utils/torch_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/parameters.h"
-#include "utils/parse_custom_kit.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/time_utils.h"
@@ -108,8 +108,8 @@ void reference_all_public_functions() {
     force_reference(&dorado::utils::shallow_copy_read);
     // utils/barcode_kits.h
     force_reference(&dorado::barcode_kits::get_kit_infos);
-    // utils/parse_custom_kit.h
-    force_reference(&dorado::barcode_kits::parse_custom_arrangement);
+    // demux/parse_custom_kit.h
+    force_reference(&dorado::demux::parse_custom_arrangement);
 
 #if DORADO_CUDA_BUILD
     // torch_utils/cuda_utils.h

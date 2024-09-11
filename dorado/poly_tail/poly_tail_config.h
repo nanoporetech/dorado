@@ -6,6 +6,7 @@
 namespace dorado::poly_tail {
 
 struct PolyTailConfig {
+    std::string rna_adapter = "GGTTGTTTCTGTTGGTGCTGATATTGC";                         // RNA
     std::string front_primer = "TTTCTGTTGGTGCTGATATTGCTTT";                          // SSP
     std::string rear_primer = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";  // VNP
     std::string rc_front_primer;
@@ -14,6 +15,7 @@ struct PolyTailConfig {
     std::string plasmid_rear_flank;
     std::string rc_plasmid_front_flank;
     std::string rc_plasmid_rear_flank;
+    int rna_offset = 61;
     int primer_window = 150;
     float flank_threshold = 0.6f;
     bool is_plasmid = false;

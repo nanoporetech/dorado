@@ -1,7 +1,7 @@
 #pragma once
+#include "KitInfoProvider.h"
 #include "barcoding_info.h"
 #include "utils/barcode_kits.h"
-#include "utils/parse_custom_kit.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -20,9 +20,13 @@ class BarcodeClassifier {
     struct BarcodeCandidateKit;
 
 public:
+    BarcodeClassifier(KitInfoProvider kit_info_provider);
+
     BarcodeClassifier(const std::vector<std::string>& kit_names,
                       const std::optional<std::string>& custom_kit,
-                      const std::optional<std::string>& custom_sequences);
+                      const std::optional<std::string>& custom_sequences)
+            : BarcodeClassifier(KitInfoProvider(kit_names, custom_kit, custom_sequences)) {};
+
     ~BarcodeClassifier();
 
     BarcodeScoreResult barcode(const std::string& seq,
@@ -30,12 +34,11 @@ public:
                                const BarcodingInfo::FilterSet& allowed_barcodes) const;
 
 private:
-    const std::unordered_map<std::string, dorado::barcode_kits::KitInfo> m_custom_kit;
-    const std::unordered_map<std::string, std::string> m_custom_seqs;
+    const KitInfoProvider m_kit_info_provider;
     const barcode_kits::BarcodeKitScoringParams m_scoring_params;
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;
 
-    std::vector<BarcodeCandidateKit> generate_candidates(const std::vector<std::string>& kit_names);
+    std::vector<BarcodeCandidateKit> generate_candidates();
     float find_midstrand_barcode_different_double_ends(std::string_view read_seq,
                                                        const BarcodeCandidateKit& candidate) const;
     float find_midstrand_barcode_double_ends(std::string_view read_seq,
@@ -60,9 +63,6 @@ private:
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
                                          const BarcodingInfo::FilterSet& allowed_barcodes) const;
-
-    const dorado::barcode_kits::KitInfo& get_kit_info(const std::string& kit_name) const;
-    const std::string& get_barcode_sequence(const std::string& barcode_name) const;
 };
 
 }  // namespace demux
