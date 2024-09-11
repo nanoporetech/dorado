@@ -186,8 +186,10 @@ ContextParams parse_context_params(const toml::value& config_toml) {
     const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
 
     const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
+    const bool base_start_justify = toml::find_or<bool>(params, "base_start_justify", false);
 
-    return ContextParams(context_before, context_after, bases_before, bases_after, reverse);
+    return ContextParams(context_before, context_after, bases_before, bases_after, reverse,
+                         base_start_justify);
 }
 
 RefinementParams parse_refinement_params(const toml::value& config_toml,
@@ -227,14 +229,10 @@ ModBaseModelConfig load_modbase_model_config_impl(const std::filesystem::path& m
                                                   const std::vector<float>& test_kmer_levels) {
     const auto config_toml = toml::parse(model_path / "config.toml");
 
-    ModBaseModelConfig config{
-            model_path,
-            parse_general_params(config_toml),
-            parse_modification_params(config_toml),
-            parse_context_params(config_toml),
-            parse_refinement_params(config_toml, model_path, test_kmer_levels),
-            parse_conv_encoder(config_toml),
-    };
+    ModBaseModelConfig config{model_path, parse_general_params(config_toml),
+                              parse_modification_params(config_toml),
+                              parse_context_params(config_toml),
+                              parse_refinement_params(config_toml, model_path, test_kmer_levels)};
 
     return config;
 }

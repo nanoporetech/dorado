@@ -187,20 +187,23 @@ struct ContextParams {
     const int bases_after;   ///< The number of bases after the primary base of a kmer.
     const int kmer_len;      ///< The kmer length given by `bases_before + bases_after + 1`
 
-    const bool reverse;  ///< Reverse model data before processing (rna model)
+    const bool reverse;             ///< Reverse model data before processing (rna model)
+    const bool base_start_justify;  ///< To justify the kmer encoding to start the context hit
 
     ContextParams(size_t samples_before_,
                   size_t samples_after_,
                   int bases_before_,
                   int bases_after_,
-                  bool reverse_)
+                  bool reverse_,
+                  bool base_start_justify_)
             : samples_before(samples_before_),
               samples_after(samples_after_),
               samples(samples_before + samples_after),
               bases_before(bases_before_),
               bases_after(bases_after_),
               kmer_len(bases_before_ + bases_after_ + 1),
-              reverse(reverse_) {
+              reverse(reverse_),
+              base_start_justify(base_start_justify_) {
         if (samples_before < 1 || samples_after < 1) {
             throw std::runtime_error(err + "context params: 'negative or zero context samples'.");
         }
@@ -216,23 +219,17 @@ struct ModBaseModelConfig {
     ModificationParams mods;           ///< Params for the modifications being detected
     ContextParams context;             ///< Params for the context over which mods are inferred
     RefinementParams refine;           ///< Params for kmer refinement
-    std::optional<ConvEncoder> conv_encoder{std::nullopt};  ///< conv_v2 model parameters
-
-    // Returns true if this modbase model processes chunks instead of context hits
-    bool is_chunked_input_model() const { return conv_encoder.has_value(); };
 
     ModBaseModelConfig(const std::filesystem::path& model_path_,
                        const ModelGeneralParams& general_,
                        const ModificationParams& mods_,
                        const ContextParams& context_,
-                       const RefinementParams& refine_,
-                       const std::optional<ConvEncoder>& conv_encoder_)
+                       const RefinementParams& refine_)
             : model_path(model_path_),
               general(general_),
               mods(mods_),
               context(context_),
-              refine(refine_),
-              conv_encoder(conv_encoder_) {
+              refine(refine_) {
         // Kmer length is duplicated in modbase model configs - check they match
         if (general.kmer_len != context.kmer_len) {
             auto kl_a = std::to_string(general.kmer_len);

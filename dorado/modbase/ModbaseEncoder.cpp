@@ -16,14 +16,17 @@ namespace dorado::modbase {
 ModBaseEncoder::ModBaseEncoder(size_t block_stride,
                                size_t context_samples,
                                int bases_before,
-                               int bases_after)
+                               int bases_after,
+                               bool base_start_justified)
         : m_bases_before(bases_before),
           m_bases_after(bases_after),
           m_kmer_len(bases_before + bases_after + 1),
           m_block_stride(int(block_stride)),
           m_context_samples(int(context_samples)),
+          m_context_samples_before(m_context_samples / 2),
           m_seq_len(0),
-          m_signal_len(0) {}
+          m_signal_len(0),
+          m_base_start_justified(base_start_justified) {}
 
 void ModBaseEncoder::init(const std::vector<int>& sequence_ints,
                           const std::vector<uint64_t>& seq_to_sig_map) {
@@ -47,10 +50,8 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     }
 
     Context context{};
-    int base_sample_pos =
-            (compute_sample_pos(int(seq_pos)) + compute_sample_pos(int(seq_pos) + 1)) / 2;
-    int samples_before = (m_context_samples / 2);
-    int first_sample = base_sample_pos - samples_before;
+    int first_sample = sample_pos(int(seq_pos)) - m_context_samples_before;
+
     if (first_sample >= 0) {
         context.first_sample = size_t(first_sample);
         context.lead_samples_needed = 0;
@@ -60,10 +61,10 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     }
     int last_sample = first_sample + m_context_samples;
     if (last_sample > m_signal_len) {
-        context.num_samples = size_t(m_signal_len) - context.first_sample;
+        context.num_existing_samples = size_t(m_signal_len) - context.first_sample;
         context.tail_samples_needed = last_sample - m_signal_len;
     } else {
-        context.num_samples = size_t(last_sample) - context.first_sample;
+        context.num_existing_samples = size_t(last_sample) - context.first_sample;
         context.tail_samples_needed = 0;
     }
 
@@ -71,7 +72,7 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     auto start_it = std::upper_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
                                      context.first_sample);
     auto end_it = std::lower_bound(m_sample_offsets.begin(), m_sample_offsets.end(),
-                                   context.first_sample + context.num_samples);
+                                   context.first_sample + context.num_existing_samples);
 
     auto seq_start = std::distance(m_sample_offsets.begin(), start_it) - 1;
     auto seq_end = std::distance(m_sample_offsets.begin(), end_it);
@@ -110,6 +111,15 @@ ModBaseEncoder::Context ModBaseEncoder::get_context(size_t seq_pos) const {
     context.data = encode_kmer_context(seq_ints, chunk_seq_to_sig, m_bases_before, m_bases_after,
                                        m_context_samples);
     return context;
+}
+
+int ModBaseEncoder::sample_pos(int base_pos) const {
+    if (m_base_start_justified) {
+        // The sample position of the context base.
+        return compute_sample_pos(base_pos);
+    }
+    // The centroid sample beween the context base and the next base.
+    return (compute_sample_pos(base_pos) + compute_sample_pos(base_pos + 1)) / 2;
 }
 
 int ModBaseEncoder::compute_sample_pos(int base_pos) const {
