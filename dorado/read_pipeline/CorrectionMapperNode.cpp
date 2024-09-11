@@ -20,8 +20,6 @@
 
 #include <cassert>
 #include <filesystem>
-#include <string>
-#include <vector>
 
 namespace dorado {
 
@@ -163,11 +161,20 @@ void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
-        spdlog::debug("Pushing {} records for correction", m_shadow_correction_records.size());
-        m_reads_to_infer.store(m_reads_to_infer.load() + m_shadow_correction_records.size());
-        for (auto& [_, r] : m_shadow_correction_records) {
+        spdlog::debug("Pushing {} records downstream of mapping.",
+                      m_shadow_correction_records.size());
+        int64_t num_pushed{0};
+        for (auto& [tname, r] : m_shadow_correction_records) {
+            // Skip reads which were already processed.
+            if (m_skip_set.count(tname) > 0) {
+                spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
+                continue;
+            }
             pipeline.push_message(std::move(r));
+            ++num_pushed;
         }
+        m_reads_to_infer.store(m_reads_to_infer.load() + num_pushed);
+        spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
         m_shadow_correction_records.clear();
     }
 }
@@ -177,6 +184,41 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
     std::vector<std::thread> aligner_threads;
     std::thread copy_thread =
             std::thread(&CorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
+
+    // If needed, skip all index chunks until we find the one containing this read.
+    if (!std::empty(m_furthest_skip_header)) {
+        spdlog::debug("Resuming overlaps from target read: {}", m_furthest_skip_header);
+
+        size_t total_skipped = 0;
+
+        do {
+            const alignment::HeaderSequenceRecords headers =
+                    m_index->get_sequence_records_for_header();
+
+            bool found = false;
+            for (size_t i = 0; i < std::size(headers); ++i) {
+                const auto& [header, _] = headers[i];
+                if (header == m_furthest_skip_header) {
+                    found = true;
+                    spdlog::debug("Resume: found header {} in index chunk ID {}.",
+                                  m_furthest_skip_header, m_current_index);
+                    break;
+                }
+            }
+            if (found) {
+                spdlog::debug("Resume: stoping the initial iteration.");
+                break;
+            }
+
+            ++m_current_index;
+            total_skipped += std::size(headers);
+            spdlog::debug("Resume: skipping index batch of {} reads. Total skipped: {}",
+                          std::size(headers), total_skipped);
+
+        } while (m_index->load_next_chunk(m_num_threads) !=
+                 alignment::IndexLoadResult::end_of_index);
+    }
+
     do {
         spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
@@ -224,11 +266,15 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
 
 CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
                                            int threads,
-                                           uint64_t index_size)
+                                           uint64_t index_size,
+                                           std::string furthest_skip_header,
+                                           std::unordered_set<std::string> skip_set)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
-          m_reads_queue(5000) {
+          m_reads_queue(5000),
+          m_furthest_skip_header{std::move(furthest_skip_header)},
+          m_skip_set{std::move(skip_set)} {
     auto options = alignment::create_preset_options("ava-ont");
     auto& index_options = options.index_options->get();
     index_options.k = 25;

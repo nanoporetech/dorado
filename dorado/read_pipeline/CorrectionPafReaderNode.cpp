@@ -27,6 +27,11 @@ void CorrectionPafReaderNode::process(Pipeline& pipeline) {
     while (std::getline(file, line)) {
         utils::PafEntry entry = utils::parse_paf(line);
 
+        // Skip all blacklisted targets.
+        if (m_skip_set.count(entry.tname) > 0) {
+            continue;
+        }
+
         if (alignments.read_name != entry.tname) {
             if (m_reads_to_infer) {
                 spdlog::trace(
@@ -75,8 +80,12 @@ void CorrectionPafReaderNode::process(Pipeline& pipeline) {
     spdlog::debug("PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
-CorrectionPafReaderNode::CorrectionPafReaderNode(const std::string_view paf_file)
-        : MessageSink(1, 1), m_paf_file(paf_file), m_reads_to_infer{0} {}
+CorrectionPafReaderNode::CorrectionPafReaderNode(const std::string_view paf_file,
+                                                 std::unordered_set<std::string> skip_set)
+        : MessageSink(1, 1),
+          m_paf_file(paf_file),
+          m_reads_to_infer{0},
+          m_skip_set{std::move(skip_set)} {}
 
 stats::NamedStats CorrectionPafReaderNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);

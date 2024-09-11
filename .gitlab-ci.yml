@@ -127,6 +127,7 @@ variables:
       - tests/*.sh
       - tests/*.bat
       - tests/data
+      - tests/cram
     expire_in: 1 day
 
 .build_dorado_archive:
@@ -308,6 +309,7 @@ build:linux:arm64:bionic:
       - tests/*.sh
       - tests/*.bat
       - tests/data
+      - tests/cram
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
@@ -534,6 +536,7 @@ build_archive:macos:x64:
     - bash ./tests/test_simple_auto_basecaller_execution.sh ./dist/bin/dorado ${MODEL_SPEED} ${MODEL_VERSION} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
+    - bash ./tests/test_dorado_correct_cram.sh ./dist/bin/dorado
 
 .test_dorado_windows:
   stage: test

@@ -13,6 +13,8 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,7 +27,11 @@ namespace dorado {
 
 class CorrectionMapperNode : public MessageSink {
 public:
-    CorrectionMapperNode(const std::string& index_file, int threads, uint64_t index_size);
+    CorrectionMapperNode(const std::string& index_file,
+                         int threads,
+                         uint64_t index_size,
+                         std::string furthest_skip_header,
+                         std::unordered_set<std::string> skip_set);
     ~CorrectionMapperNode() = default;
     std::string get_name() const override { return "CorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
@@ -72,6 +78,9 @@ private:
     std::atomic<size_t> m_reads_to_infer{0};
 
     std::atomic<bool> m_copy_terminate{false};
+
+    std::string m_furthest_skip_header;
+    std::unordered_set<std::string> m_skip_set;
 };
 
 }  // namespace dorado
