@@ -3,6 +3,7 @@
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/module_utils.h"
 
 #include <ATen/core/TensorBody.h>
@@ -108,16 +109,13 @@ struct TxEncoderImpl : torch::nn::Module {
 
     at::Tensor forward(at::Tensor x);
 
-    struct ScaledTensor {
-        at::Tensor t, scale;
-    };
-    ScaledTensor koi_forward(ScaledTensor scaled_tensor);
+    void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
 
     tx::TxEncoderParams params;
 
     // Rearranged weights for Koi tiled codepath
-    at::Tensor wqkv_weights, sincos_bfr, proj_weight, proj_bias;
-    at::Tensor t_res_weights, t_res2_weights, t_fc1_wts, t_fc2_wts;
+    utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
+    at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
@@ -132,6 +130,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
     at::Tensor forward(const at::Tensor &x);
 
     bool use_koi_tiled{false};
+    bool use_i8{false};
     torch::nn::Sequential stack{nullptr};
     std::vector<TxEncoder> layer_vec;
 };
