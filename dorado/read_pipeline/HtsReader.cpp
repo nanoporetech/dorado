@@ -75,7 +75,7 @@ bool try_assign_bam_from_fastq(bam1_t* record, const utils::FastqRecord& fastq_r
                            0, nullptr, -1, next_pos, 0, fastq_record.sequence().size(),
                            fastq_record.sequence().c_str(), (char*)qscore.data(), 0);
     write_bam_aux_tags_from_fastq(record, fastq_record);
-    utils::add_fastq_header_tag(record, fastq_record.header());
+    utils::try_add_fastq_header_tag(record, fastq_record.header());
     return result >= 0;
 }
 
