@@ -19,6 +19,46 @@
 #include <utility>
 #include <vector>
 
+namespace {
+using Interval = std::pair<int, int>;
+std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_info,
+                                                   int seqlen,
+                                                   Interval adapter_interval,
+                                                   Interval barcoding_interval) {
+    const auto& adapter_info = client_info.contexts().get_ptr<const dorado::demux::AdapterInfo>();
+    const auto& barcode_info = client_info.contexts().get_ptr<const dorado::demux::BarcodingInfo>();
+
+    if ((!adapter_info || (!adapter_info->trim_adapters && !adapter_info->trim_primers)) &&
+        (!barcode_info || !barcode_info->trim)) {
+        // No trimming to be done, and no need to strip alignment information from read.
+        return {false, false, {0, 0}};
+    }
+
+    // If there is no trimming to be done for this read, then the left trim-point will be zero, and the right trim-point will either be zero or seqlen.
+    bool trim_adapter = false, trim_barcodes = false;
+    if (adapter_interval.second > 0 &&
+        (adapter_interval.second < seqlen || adapter_interval.first > 0)) {
+        trim_adapter = true;
+    }
+    if (barcoding_interval.second > 0 &&
+        (barcoding_interval.second < seqlen || barcoding_interval.first > 0)) {
+        trim_barcodes = true;
+    }
+
+    // Find the inner-most trim locations.
+    Interval trim_interval = {0, seqlen};
+    if (trim_adapter) {
+        trim_interval = adapter_interval;
+    }
+    if (trim_barcodes) {
+        trim_interval.first = std::max(trim_interval.first, barcoding_interval.first);
+        trim_interval.second = std::min(trim_interval.second, barcoding_interval.second);
+    }
+
+    return {trim_barcodes, trim_adapter, trim_interval};
+}
+}  // namespace
+
 namespace dorado {
 
 // This Node is responsible for trimming adapters, primers, and barcodes.
@@ -51,41 +91,10 @@ void TrimmerNode::process_read(BamMessage& bam_message) {
 
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
 
-    const auto& adapter_info =
-            bam_message.client_info->contexts().get_ptr<const demux::AdapterInfo>();
-    const auto& barcode_info =
-            bam_message.client_info->contexts().get_ptr<const dorado::demux::BarcodingInfo>();
+    auto [trim_adapter, trim_barcodes, trim_interval] =
+            get_trim_interval(*bam_message.client_info, seqlen, bam_message.adapter_trim_interval,
+                              bam_message.barcode_trim_interval);
 
-    if ((!adapter_info || (!adapter_info->trim_adapters && !adapter_info->trim_primers)) &&
-        (!barcode_info || !barcode_info->trim)) {
-        // No trimming to be done, and no need to strip alignment information from read.
-        return;
-    }
-
-    // If there is no trimming to be done for this read, then the left trim-point will be zero, and the right trim-point will either be zero or seqlen.
-    bool trim_adapter = false, trim_barcodes = false;
-    if (bam_message.adapter_trim_interval.second > 0 &&
-        (bam_message.adapter_trim_interval.second < seqlen ||
-         bam_message.adapter_trim_interval.first > 0)) {
-        trim_adapter = true;
-    }
-    if (bam_message.barcode_trim_interval.second > 0 &&
-        (bam_message.barcode_trim_interval.second < seqlen ||
-         bam_message.barcode_trim_interval.first > 0)) {
-        trim_barcodes = true;
-    }
-
-    // Find the inner-most trim locations.
-    std::pair<int, int> trim_interval = {0, seqlen};
-    if (trim_adapter) {
-        trim_interval = bam_message.adapter_trim_interval;
-    }
-    if (trim_barcodes) {
-        trim_interval.first =
-                std::max(trim_interval.first, bam_message.barcode_trim_interval.first);
-        trim_interval.second =
-                std::min(trim_interval.second, bam_message.barcode_trim_interval.second);
-    }
     if (trim_adapter || trim_barcodes) {
         bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
     } else {
@@ -102,47 +111,14 @@ void TrimmerNode::process_read(SimplexRead& read) {
 
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
 
-    const auto& adapter_info =
-            read.read_common.client_info->contexts().get_ptr<const demux::AdapterInfo>();
-    const auto& barcode_info =
-            read.read_common.client_info->contexts().get_ptr<const dorado::demux::BarcodingInfo>();
+    auto [trim_adapter, trim_barcodes, trim_interval] = get_trim_interval(
+            *read.read_common.client_info, seqlen, read.read_common.adapter_trim_interval,
+            read.read_common.barcode_trim_interval);
 
-    if ((!adapter_info || (!adapter_info->trim_adapters && !adapter_info->trim_primers)) &&
-        (!barcode_info || !barcode_info->trim)) {
-        // No trimming to be done, and no need to strip alignment information from read.
-        return;
-    }
-
-    // If there is no trimming to be done for this read, then the left trim-point will be zero, and the right trim-point will either be zero or seqlen.
-    bool trim_adapter = false, trim_barcodes = false;
-    if (read.read_common.adapter_trim_interval.second > 0 &&
-        (read.read_common.adapter_trim_interval.second < seqlen ||
-         read.read_common.adapter_trim_interval.first > 0)) {
-        trim_adapter = true;
-    }
-    if (read.read_common.barcode_trim_interval.second > 0 &&
-        (read.read_common.barcode_trim_interval.second < seqlen ||
-         read.read_common.barcode_trim_interval.first > 0)) {
-        trim_barcodes = true;
-    }
-
-    // Find the inner-most trim locations.
-    std::pair<int, int> trim_interval = {0, seqlen};
-    if (trim_adapter) {
-        trim_interval = read.read_common.adapter_trim_interval;
-    }
-    if (trim_barcodes) {
-        trim_interval.first =
-                std::max(trim_interval.first, read.read_common.barcode_trim_interval.first);
-        trim_interval.second =
-                std::min(trim_interval.second, read.read_common.barcode_trim_interval.second);
-    }
-    read.read_common.adapter_trim_interval = trim_interval;
     if (trim_adapter || trim_barcodes) {
         Trimmer::trim_sequence(read, trim_interval);
+        Trimmer::check_and_update_barcoding(read);
     }
-
-    Trimmer::check_and_update_barcoding(read);
 }
 
 stats::NamedStats TrimmerNode::sample_stats() const {
