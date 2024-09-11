@@ -10,14 +10,8 @@
 namespace dorado::utils {
 
 class FastqRecord {
-    std::string m_header;
-    std::string m_sequence;
-    std::string m_qstring;
-
-    bool m_header_has_bam_tags{};
-    std::size_t token_len(std::size_t token_start_pos) const;
-
 public:
+    // The header will be at least 2 characters and begin with '@'
     const std::string& header() const;
 
     // All characters will be in the set {A,C,G,T}
@@ -31,11 +25,19 @@ public:
     std::string_view run_id_view() const;
     std::vector<std::string> get_bam_tags() const;
 
-    //  Testablity. Public to allow utests to check processing of tags embedded in the header record
+    //  Testability. Public to allow utests to check processing of tags embedded in the header record
     bool set_header(std::string value);
 
     static std::optional<FastqRecord> try_create(std::istream& input_stream,
                                                  std::string& error_message);
+
+private:
+    std::string m_header;
+    std::string m_sequence;
+    std::string m_qstring;
+
+    bool m_header_has_bam_tags{};
+    std::size_t token_len(std::size_t token_start_pos) const;
 };
 
 class FastqReader {
