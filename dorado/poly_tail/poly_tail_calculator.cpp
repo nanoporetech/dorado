@@ -236,7 +236,8 @@ std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
         bool is_rna,
         bool is_rna_adapter,
         const std::string& config_file) {
-    auto config = prepare_config(config_file);
+    auto configs = prepare_configs(config_file);
+    auto& config = configs.front();
     if (is_rna) {
         return std::make_unique<RNAPolyTailCalculator>(std::move(config), is_rna_adapter);
     }
