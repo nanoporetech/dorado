@@ -671,7 +671,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
     use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
                     (params.nhead == 8) && (params.attn_window.first == 127) &&
                     (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
-    spdlog::info("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
+    spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 #endif
 
     stack = Sequential();
