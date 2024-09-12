@@ -21,12 +21,11 @@ PolyTailCalculatorSelector::PolyTailCalculatorSelector(const std::filesystem::pa
         throw std::runtime_error("PolyA config file doesn't exist at " + config.string());
     }
 
-    std::ifstream file(config);  // Open the file for reading
+    std::ifstream file(config);
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file " + config.string());
     }
 
-    // Read the file contents into a string
     std::stringstream buffer;
     buffer << file.rdbuf();
     init(buffer, is_rna, is_rna_adapter);
@@ -52,6 +51,9 @@ void PolyTailCalculatorSelector::init(std::istream& config_stream,
     }
 }
 
+// Return the barcode-specific configuration if one has been provided, otherwise the default.
+// If any barcode-specific configurations are present, do not attempt to estimate
+// for unclassified reads - better to give no result than a wrong result in this case.
 std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorSelector::get_calculator(
         const std::string& name) const {
     std::lock_guard<std::mutex> lock(m_lut_mutex);

@@ -25,9 +25,9 @@ struct PolyTailConfig {
     std::string barcode_id;
 };
 
-// Prepare the PolyA configuration struct. If a configuration
-// file is available, parse it to extract parameters. Otherwise
-// prepare the default configuration.
+// Prepare the PolyA configurations. If a configuration file is available, parse it to extract parameters.
+// If barcode-specific overrides are present, the non-specific configuration will be at the back.
+// Otherwise prepares a single default configuration.
 std::vector<PolyTailConfig> prepare_configs(const std::string& config_file);
 
 // Overloaded function that parses the configuration passed
