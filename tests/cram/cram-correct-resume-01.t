@@ -2,8 +2,10 @@ Test empty skip_set. No input is skipped, and everything is generated.
   $ rm -rf out; mkdir -p out
   > in_reads=${TEST_DATA_DIR}/read_correction/reads.fq
   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
-  > touch skip_set.txt
-  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from skip_set.txt -v > out/out.fasta 2> out/out.fasta.stderr
+  > touch out/skip_set.txt
+  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from out/skip_set.txt -v > out/out.fasta 2> out/out.fasta.stderr
+  > grep -i "\[error\]" out/out.fasta.stderr
+  > grep -i "\[warning\]" out/out.fasta.stderr
   > samtools faidx out/out.fasta
   > cat out/out.fasta.fai | cut -f1,1 | sort
   3855985e-bb9b-4df4-9825-cc08f373342b
