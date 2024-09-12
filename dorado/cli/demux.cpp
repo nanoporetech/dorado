@@ -229,12 +229,12 @@ int demuxer(int argc, char* argv[]) {
 
     HtsReader reader(all_files[0].input, read_list);
     utils::MergeHeaders hdr_merger(strip_alignment);
-    hdr_merger.add_header(reader.header, all_files[0].input);
+    hdr_merger.add_header(reader.header(), all_files[0].input);
 
     // Fold in the headers from all the other files in the input list.
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
         HtsReader header_reader(all_files[input_idx].input, read_list);
-        auto error_msg = hdr_merger.add_header(header_reader.header, all_files[input_idx].input);
+        auto error_msg = hdr_merger.add_header(header_reader.header(), all_files[input_idx].input);
         if (!error_msg.empty()) {
             spdlog::error("Unable to combine headers from all input files: " + error_msg);
             return EXIT_FAILURE;

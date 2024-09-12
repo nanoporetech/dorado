@@ -8,6 +8,7 @@
 #include <htslib/sam.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -24,7 +25,6 @@ class HtsReader {
 public:
     HtsReader(const std::string& filename,
               std::optional<std::unordered_set<std::string>> read_list);
-    ~HtsReader();
     bool read();
 
     // If reading directly into a pipeline need to set the client info on the messages
@@ -35,17 +35,25 @@ public:
     bool has_tag(const char* tagname);
     void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
-    char* format{nullptr};
     bool is_aligned{false};
     BamPtr record{nullptr};
-    sam_hdr_t* header{nullptr};
+
+    sam_hdr_t* header();
+    const sam_hdr_t* header() const;
+    const std::string& format() const;
 
 private:
-    htsFile* m_file{nullptr};
+    sam_hdr_t* m_header{nullptr};  // non-owning
+    std::string m_format{};
     std::shared_ptr<ClientInfo> m_client_info;
 
     std::function<void(BamPtr&)> m_record_mutator{};
     std::optional<std::unordered_set<std::string>> m_read_list;
+
+    std::function<bool(bam1_t&)> m_bam_record_generator{};
+
+    template <typename T>
+    bool try_initialise_generator(const std::string& filename);
 };
 
 template <typename T>

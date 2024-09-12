@@ -31,7 +31,7 @@ protected:
         HtsReader reader(m_in_sam.string(), std::nullopt);
 
         utils::HtsFile hts_file(m_out_bam.string(), mode, num_threads, false);
-        hts_file.set_header(reader.header);
+        hts_file.set_header(reader.header());
 
         PipelineDescriptor pipeline_desc;
         auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
@@ -79,7 +79,8 @@ TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_G
 
 TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
-    auto input_fastq = bam_test_dir / "fastq_with_tags.fq";
+    std::string input_fastq_name = GENERATE("fastq_with_tags.fq", "fastq_with_us_and_tags.fq");
+    auto input_fastq = bam_test_dir / input_fastq_name;
     auto tmp_dir = make_temp_dir("writer_test");
     auto out_fastq = tmp_dir.m_path / "output.fq";
 

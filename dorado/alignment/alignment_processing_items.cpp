@@ -1,6 +1,7 @@
 #include "alignment_processing_items.h"
 
 #include "utils/PostCondition.h"
+#include "utils/fastq_reader.h"
 #include "utils/scoped_trace_log.h"
 #include "utils/stream_utils.h"
 #include "utils/tty_utils.h"
@@ -31,22 +32,18 @@ std::set<std::string>& get_supported_compression_extensions() {
     return supported_compression_extensions;
 };
 
-bool is_valid_input_file(const std::filesystem::path& input_path) {
+bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
     dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
     if (!hts_file) {
         return false;
     }
 
     dorado::SamHdrPtr header(sam_hdr_read(hts_file.get()));
-    if (!header) {
-        spdlog::error(
-                "Could not read hts header from file {} - possibly a fastq file containing U "
-                "bases?",
-                input_path.string());
-        return false;
-    }
+    return header != nullptr;
+}
 
-    return true;
+bool is_valid_input_file(const std::filesystem::path& input_path) {
+    return is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string());
 }
 
 fs::path replace_extension(fs::path output_path) {
