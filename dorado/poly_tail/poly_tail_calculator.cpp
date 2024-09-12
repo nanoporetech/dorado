@@ -232,19 +232,15 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     return num_bases;
 }
 
-std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
-        bool is_rna,
-        bool is_rna_adapter,
-        const std::string& config_file) {
-    auto configs = prepare_configs(config_file);
-    auto& config = configs.front();
+std::shared_ptr<const PolyTailCalculator>
+PolyTailCalculatorFactory::create(const PolyTailConfig& config, bool is_rna, bool is_rna_adapter) {
     if (is_rna) {
-        return std::make_unique<RNAPolyTailCalculator>(std::move(config), is_rna_adapter);
+        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter);
     }
     if (config.is_plasmid) {
-        return std::make_unique<PlasmidPolyTailCalculator>(std::move(config));
+        return std::make_unique<PlasmidPolyTailCalculator>(config);
     }
-    return std::make_unique<DNAPolyTailCalculator>(std::move(config));
+    return std::make_unique<DNAPolyTailCalculator>(config);
 }
 
 }  // namespace dorado::poly_tail

@@ -501,8 +501,9 @@ void setup(const std::vector<std::string>& args,
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (estimate_poly_a) {
+        auto poly_tail_configs = poly_tail::prepare_configs(polya_config);
         auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), is_rna_adapter, polya_config);
+                poly_tail_configs.back(), is_rna_model(model_config), is_rna_adapter);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
                 std::move(poly_tail_calculator));
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(

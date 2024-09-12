@@ -281,6 +281,8 @@ add_library(dorado_lib
     dorado/poly_tail/plasmid_poly_tail_calculator.h
     dorado/poly_tail/poly_tail_calculator.cpp
     dorado/poly_tail/poly_tail_calculator.h
+    dorado/poly_tail/poly_tail_calculator_selector.cpp
+    dorado/poly_tail/poly_tail_calculator_selector.h
     dorado/poly_tail/poly_tail_config.cpp
     dorado/poly_tail/poly_tail_config.h
     dorado/poly_tail/rna_poly_tail_calculator.cpp
