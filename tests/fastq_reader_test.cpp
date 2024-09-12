@@ -13,6 +13,10 @@ namespace {
 
 const std::string VALID_ID{"@fdbbea47-8893-4055-942b-8c2efe226c17 some description"};
 const std::string VALID_ID_LINE{VALID_ID + "\n"};
+const std::string VALID_ID_WITH_TABS{
+        "@8623ac42-0956-4692-9a93-bdd99bf1a94e\tst:Z:2023-06-22T07:17:48.308+00:00\tRG:Z:"
+        "6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4.3.0"};
+const std::string VALID_ID_LINE_WITH_TABS{VALID_ID_WITH_TABS + "\n"};
 const std::string VALID_ID_2{"@fdbbea47-8893-4055-942b-8c2efe22ffff some other description"};
 const std::string VALID_ID_LINE_2{VALID_ID_2 + "\n"};
 const std::string VALID_SEQ{"CCCGTTGAAG"};
@@ -47,6 +51,9 @@ DEFINE_TEST("is_fastq with non existent file return false") {
 DEFINE_TEST("is_fastq parameterized testing") {
     auto [input_text, is_valid, description] = GENERATE(table<std::string, bool, std::string>({
             {VALID_FASTQ_RECORD + VALID_FASTQ_RECORD_2, true, "valid fastq"},
+
+            {"", false, "empty input returns false"},
+
             {std::string{"\n"} + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE +
                      VALID_FASTQ_RECORD_2,
              false, "empty id line returns false"},
@@ -54,6 +61,9 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE + VALID_ID_LINE +
                      VALID_FASTQ_RECORD_2,
              false, "missing id line returns false"},
+
+            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
+             true, "valid header with tabbed aux fields returns true"},
 
             {std::string{"fdbbea47-8893-4055-942b-8c2efe226c17\n"} + VALID_SEQ_LINE +
                      VALID_SEPARATOR_LINE + VALID_QUAL_LINE,
@@ -83,11 +93,18 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE + VALID_FASTQ_RECORD_2, false,
              "missing separator line - false"},
 
-            {VALID_ID_LINE + VALID_SEQ_LINE + "+A\n" + VALID_QUAL_LINE, false,
-             "separator line with characters after + returns false"},
-
             {VALID_ID_LINE + VALID_SEQ_LINE + "-\n" + VALID_QUAL_LINE, false,
              "separator line with invalid character returns false"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+" + VALID_ID_LINE.substr(1) + VALID_QUAL_LINE, true,
+             "extended separator line with description like header returns true"},
+
+            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + "+" + VALID_ID_LINE_WITH_TABS.substr(1) +
+                     VALID_QUAL_LINE,
+             true, "extended separator line with tabbed description like header returns true"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+ blah\n" + VALID_QUAL_LINE, true,
+             "extended separator line with description containing leading SPACE returns true"},
 
             {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2,
              false, "empty quality line - false"},
@@ -168,9 +185,7 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with no descroption returns empty") {
     FastqRecord cut{};
     cut.set_header("@read_0");
 
-    auto bam_tags = cut.get_bam_tags();
-
-    REQUIRE(bam_tags.empty());
+    REQUIRE(cut.get_bam_tags().empty());
 }
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with minKNOW style header returns empty") {
@@ -179,16 +194,14 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with minKNOW style header returns empty
             "@c2707254-5445-4cfb-a414-fce1f12b56c0 runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
             "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");
 
-    auto bam_tags = cut.get_bam_tags();
-
-    REQUIRE(bam_tags.empty());
+    REQUIRE(cut.get_bam_tags().empty());
 }
 
 DEFINE_TEST("FastqRecord::get_bam_tags() with single tag returns that tag") {
     FastqRecord cut{};
     cut.set_header("@read_0\tRG:Z:6a94c5e3");
 
-    auto bam_tags = cut.get_bam_tags();
+    const auto bam_tags = cut.get_bam_tags();
 
     REQUIRE(bam_tags.size() == 1);
     REQUIRE(bam_tags[0] == "RG:Z:6a94c5e3");
@@ -198,7 +211,7 @@ DEFINE_TEST("FastqRecord::get_bam_tags() with two tags containing spaces returns
     FastqRecord cut{};
     cut.set_header("@read_0\tfq:Z:some text field\tRG:Z:6a94c5e3");
 
-    auto bam_tags = cut.get_bam_tags();
+    const auto bam_tags = cut.get_bam_tags();
 
     REQUIRE(bam_tags.size() == 2);
     REQUIRE(bam_tags[0] == "fq:Z:some text field");

@@ -3,6 +3,7 @@
 #include "types.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <string>
@@ -60,8 +61,37 @@ private:
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);
     void cache_record(const bam1_t* record);
-    bool merge_temp_files(ProgressUpdater& update_progress) const;
+    bool merge_temp_files_iteratively(const ProgressCallback& progress_callback) const;
+    bool merge_temp_files(ProgressUpdater& update_progress,
+                          const std::vector<std::string>& temp_files,
+                          const std::string& merged_filename) const;
     void initialise_threads();
+};
+
+class FileMergeBatcher {
+public:
+    FileMergeBatcher(const std::vector<std::string>& files,
+                     const std::string& final_file,
+                     size_t batch_size);
+    size_t num_batches() const;
+    size_t get_recursion_level() const;
+    const std::vector<std::string>& get_batch(size_t n) const;
+    const std::string& get_merge_filename(size_t n) const;
+
+private:
+    struct MergeJob {
+        std::vector<std::string> files;
+        std::string merged_file;
+    };
+
+    int m_current_batch;
+    size_t m_batch_size;
+    size_t m_recursion_level;
+    std::vector<MergeJob> m_merge_jobs;
+    std::filesystem::path m_file_path;
+
+    std::string make_merged_filename();
+    std::vector<MergeJob> recursive_batching(const std::vector<std::string>& files);
 };
 
 }  // namespace dorado::utils

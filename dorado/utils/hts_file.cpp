@@ -18,12 +18,13 @@ namespace {
 constexpr size_t MINIMUM_BUFFER_SIZE{100000};  // The smallest allowed buffer size is 100 KB.
 constexpr size_t DEFAULT_BUFFER_SIZE{
         20000000};  // Arbitrary 20 MB. Can be overridden by application code.
-
-}  // namespace
+constexpr size_t MAX_FILES_FOR_MERGE{512};  // Maximum number of files to merge at once.
 
 bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& header2) {
     return (strcmp(sam_hdr_str(header1.get()), sam_hdr_str(header2.get())) == 0);
 }
+
+}  // namespace
 
 namespace dorado::utils {
 
@@ -250,11 +251,8 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         }
     } else {
         // Otherwise merge the temp files.
-        constexpr size_t percent_start_merging = 5;
-        progress_callback(percent_start_merging);
-        ProgressUpdater update_progress(progress_callback, percent_start_merging, 100,
-                                        m_num_records);
-        if (!merge_temp_files(update_progress)) {
+        bool merge_complete = merge_temp_files_iteratively(progress_callback);
+        if (!merge_complete) {
             spdlog::error("Merging of temporary files failed.");
             return;
         }
@@ -324,17 +322,37 @@ void HtsFile::cache_record(const bam1_t* record) {
     m_current_buffer_offset = ((m_current_buffer_offset + alignment - 1) / alignment) * alignment;
 }
 
-bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
+bool HtsFile::merge_temp_files_iteratively(const ProgressCallback& progress_callback) const {
+    // For large numbers of files, we need to merge iteratively.
+    FileMergeBatcher batcher(m_temp_files, m_filename, MAX_FILES_FOR_MERGE);
+    auto num_batches = batcher.num_batches();
+    auto progress_multiplier = batcher.get_recursion_level();
+    constexpr size_t percent_start_merging = 5;
+    progress_callback(percent_start_merging);
+    ProgressUpdater update_progress(progress_callback, percent_start_merging, 100,
+                                    m_num_records * progress_multiplier);
+    for (size_t iter = 0; iter < num_batches; ++iter) {
+        if (!merge_temp_files(update_progress, batcher.get_batch(iter),
+                              batcher.get_merge_filename(iter))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
+                               const std::vector<std::string>& temp_files,
+                               const std::string& merged_filename) const {
     // This code assumes the headers for the files are all the same. This will be
     // true if the temp-files were created by this class, but it means that this
     // function is not suitable for generic merging of BAM files.
-    const size_t num_temp_files = m_temp_files.size();
+    const size_t num_temp_files = temp_files.size();
     std::vector<HtsFilePtr> in_files(num_temp_files);
     std::vector<BamPtr> top_records(num_temp_files);
     std::vector<uint64_t> top_record_scores(num_temp_files);
     SamHdrPtr header{};
     for (size_t i = 0; i < num_temp_files; ++i) {
-        in_files[i].reset(hts_open(m_temp_files[i].c_str(), "rb"));
+        in_files[i].reset(hts_open(temp_files[i].c_str(), "rb"));
         if (bgzf_mt(in_files[i]->fp.bgzf, m_threads, 128) < 0) {
             spdlog::error("Could not enable multi threading for BAM reading.");
             return false;
@@ -346,7 +364,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
             // Sanity check. Make sure headers match.
             if (!compare_headers(header, current_header)) {
                 spdlog::error("Header for temporary file {} does not match other headers.",
-                              m_temp_files[i]);
+                              temp_files[i]);
                 return false;
             }
             current_header.reset();
@@ -354,15 +372,15 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         top_records[i].reset(bam_init1());
         auto res = sam_read1(in_files[i].get(), header.get(), top_records[i].get());
         if (res < 0) {
-            spdlog::error("Could not read first record from file {}, error code {}",
-                          m_temp_files[i], res);
+            spdlog::error("Could not read first record from file {}, error code {}", temp_files[i],
+                          res);
             return false;
         }
         top_record_scores[i] = calculate_sorting_key(top_records[i].get());
     }
 
     // Open the output file, and write the header.
-    HtsFilePtr out_file(hts_open(m_filename.c_str(), "wb"));
+    HtsFilePtr out_file(hts_open(merged_filename.c_str(), "wb"));
     if (bgzf_mt(out_file->fp.bgzf, m_threads, 128) < 0) {
         spdlog::error("Could not enable multi threading for BAM generation.");
         return false;
@@ -375,12 +393,15 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         return false;
     }
 
-    // Initialise for indexing.
-    std::string idx_fname = m_filename + ".bai";
-    auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
-    if (res < 0) {
-        spdlog::error("Could not initialize output file for indexing, error code {}", res);
-        return false;
+    // If this is the final iteration, initialise for indexing.
+    bool final_iteration = (std::filesystem::path(merged_filename).extension().string() != ".tmp");
+    std::string idx_fname = merged_filename + ".bai";
+    if (final_iteration) {
+        auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
+        if (res < 0) {
+            spdlog::error("Could not initialize output file for indexing, error code {}", res);
+            return false;
+        }
     }
 
     size_t processed_records = 0;
@@ -404,7 +425,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         }
 
         // Write the record.
-        res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
+        auto res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
         if (res < 0) {
             spdlog::error("Failed to write to sorted file {}, error code {}", out_file->fn, res);
             return false;
@@ -429,20 +450,117 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress) const {
         }
     }
 
-    // Write the index file.
-    res = sam_idx_save(out_file.get());
-    if (res < 0) {
-        spdlog::error("Could not write index file, error code {}", res);
-        return false;
+    if (final_iteration) {
+        // Write the index file.
+        auto res = sam_idx_save(out_file.get());
+        if (res < 0) {
+            spdlog::error("Could not write index file, error code {}", res);
+            return false;
+        }
     }
+
     out_file.reset();
 
     // If we got this far, merging was successful, so remove the temporary files.
     // If we returned early due to a merging failure, the temporary files will remain.
-    for (const auto& temp_file : m_temp_files) {
+    for (const auto& temp_file : temp_files) {
         std::filesystem::remove(temp_file);
     }
     return true;
+}
+
+FileMergeBatcher::FileMergeBatcher(const std::vector<std::string>& files,
+                                   const std::string& final_file,
+                                   size_t batch_size)
+        : m_current_batch(0),
+          m_batch_size(batch_size),
+          m_recursion_level(0),
+          m_file_path(std::filesystem::path(final_file).parent_path()) {
+    if (m_batch_size < 3) {
+        throw std::runtime_error("FileMergeBatcher requires a batchsize of at least 3.");
+    }
+    m_merge_jobs = recursive_batching(files);
+    m_merge_jobs.back().merged_file = final_file;
+}
+
+size_t FileMergeBatcher::num_batches() const { return m_merge_jobs.size(); }
+
+size_t FileMergeBatcher::get_recursion_level() const { return m_recursion_level; }
+
+const std::vector<std::string>& FileMergeBatcher::get_batch(size_t n) const {
+    if (n >= m_merge_jobs.size()) {
+        throw std::range_error("Merge job index out of bounds.");
+    }
+    return m_merge_jobs[n].files;
+}
+
+const std::string& FileMergeBatcher::get_merge_filename(size_t n) const {
+    if (n >= m_merge_jobs.size()) {
+        throw std::range_error("Merge job index out of bounds.");
+    }
+    return m_merge_jobs[n].merged_file;
+}
+
+std::string FileMergeBatcher::make_merged_filename() {
+    auto filename_root = (m_file_path / "batch_").string();
+    return filename_root + std::to_string(m_current_batch) + ".tmp";
+}
+
+std::vector<FileMergeBatcher::MergeJob> FileMergeBatcher::recursive_batching(
+        const std::vector<std::string>& files) {
+    std::vector<MergeJob> jobs;
+    if (files.size() <= m_batch_size) {
+        auto final_file = make_merged_filename();
+        jobs.push_back({files, final_file});
+        ++m_recursion_level;
+        ++m_current_batch;
+        return jobs;
+    }
+
+    size_t count = files.size();
+    size_t num_batches = count / m_batch_size;
+    if (count % m_batch_size) {
+        ++num_batches;
+    }
+    size_t batch_size = count / num_batches;
+    if (count % num_batches) {
+        ++batch_size;
+    }
+    for (size_t k = 0, batch = 0; batch < num_batches; ++batch) {
+        auto this_batch_size = batch_size;
+        auto batch_out_file = make_merged_filename();
+        if (k + batch_size > count) {
+            this_batch_size = count - k;
+        }
+        jobs.push_back({{}, batch_out_file});
+        for (size_t i = 0; i < this_batch_size; ++i) {
+            jobs.back().files.push_back(files[k + i]);
+        }
+        k += this_batch_size;
+        ++m_current_batch;
+    }
+    ++m_recursion_level;
+
+    // Edge case: The last batch could have 1 file in it, which is no good.
+    if (jobs.back().files.size() == 1) {
+        // Shift the last file from the second-to-last batch to the beginning of the last batch.
+        std::vector<std::string> new_job_files = {jobs[num_batches - 2].files.back(),
+                                                  jobs.back().files.front()};
+        jobs[num_batches - 2].files.pop_back();
+        jobs.back().files.swap(new_job_files);
+        // Note that for a batch-size of 3 or more, each batch will now have 2 or more files in it.
+    }
+
+    // And now the recursion.
+    std::vector<std::string> merged_files(num_batches);
+    for (size_t k = 0; k < num_batches; ++k) {
+        merged_files[k] = jobs[k].merged_file;
+    }
+    auto more_jobs = recursive_batching(merged_files);
+    for (size_t k = 0; k < more_jobs.size(); ++k) {
+        jobs.push_back({std::move(more_jobs[k].files), std::move(more_jobs[k].merged_file)});
+    }
+    return jobs;
 }
 
 }  // namespace dorado::utils

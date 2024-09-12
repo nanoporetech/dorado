@@ -419,13 +419,18 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
 DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     auto pipeline_restart = GENERATE(false, true);
     auto is_rna = GENERATE(false, true);
+    auto is_rna_adapter = false;
+    if (is_rna) {
+        is_rna_adapter = GENERATE(false, true);
+    }
     CAPTURE(pipeline_restart);
     CAPTURE(is_rna);
+    CAPTURE(is_rna_adapter);
 
     set_pipeline_restart(pipeline_restart);
 
     client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculator>(
-            dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, ""));
+            dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, is_rna_adapter, ""));
 
     set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;

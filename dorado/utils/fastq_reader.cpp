@@ -13,12 +13,15 @@ namespace dorado::utils {
 namespace {
 
 bool is_valid_id_field(const std::string& field) {
-    if (field.at(0) != '@') {
+    if (field.size() < 2 || field.at(0) != '@') {
         return false;
     }
-    if (field.size() < 2 || field.at(1) == ' ' || field.at(1) == '\t') {
+
+    const auto id_start_char = field.at(1);
+    if (id_start_char == ' ' || id_start_char == '\t') {
         return false;
     }
+
     return true;
 }
 
@@ -52,7 +55,10 @@ bool validate_sequence_and_replace_us(std::string& field) {
     return true;
 }
 
-bool is_valid_separator_field(const std::string& field) { return field == "+"; }
+bool is_valid_separator_field(const std::string& field) {
+    assert(!field.empty());
+    return field.at(0) == '+';
+}
 
 bool is_valid_quality_field(const std::string& field) {
     //0x21 (lowest quality; '!' in ASCII) to 0x7e (highest quality; '~' in ASCII)
@@ -112,7 +118,7 @@ const std::string& FastqRecord::sequence() const { return m_sequence; }
 const std::string& FastqRecord::qstring() const { return m_qstring; }
 
 std::size_t FastqRecord::token_len(std::size_t token_start_pos) const {
-    auto separator = header_separator(m_header_has_bam_tags);
+    const auto separator = header_separator(m_header_has_bam_tags);
     auto token_end_pos = m_header.find(separator, token_start_pos);
     if (token_end_pos == std::string::npos) {
         token_end_pos = m_header.size();

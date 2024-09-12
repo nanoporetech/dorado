@@ -27,7 +27,7 @@ struct AlignmentOps {
 };
 
 // Attempts to write the fastq header record line to the custom tag "fq"
-// This means data written by minKNOW intot the fastq header record, such as
+// This means data written by minKNOW into the fastq header record, such as
 // run_id is not lost when converting to bam and can be retrieved from the
 // "fq" tag.
 // Note, this will fail if the header contains illegal characters such as TAB.
