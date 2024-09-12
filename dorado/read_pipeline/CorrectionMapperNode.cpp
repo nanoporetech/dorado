@@ -52,11 +52,12 @@ void CorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
             m_processed_queries_per_target.emplace(tname, std::unordered_set<std::string>());
         }
         auto& mtx = *m_read_mutex[tname];
+        auto& processed_queries = m_processed_queries_per_target[tname];
+        auto& alignments = m_correction_records[tname];
         lock.unlock();
 
         {
             std::lock_guard<std::mutex> aln_lock(mtx);
-            auto& processed_queries = m_processed_queries_per_target[tname];
             if (processed_queries.find(qname) != processed_queries.end()) {
                 // Query/target pair has been processed before. Assume that
                 // the first one processed is the best one, and ignore
@@ -100,7 +101,6 @@ void CorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
         {
             std::lock_guard<std::mutex> aln_lock(mtx);
 
-            auto& alignments = m_correction_records[tname];
             alignments.qnames.push_back(qname);
             alignments.cigars.push_back(std::move(cigar));
             alignments.overlaps.push_back(std::move(ovlp));
