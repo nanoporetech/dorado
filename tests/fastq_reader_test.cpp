@@ -93,11 +93,18 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_ID_LINE + VALID_SEQ_LINE + "\n" + VALID_QUAL_LINE + VALID_FASTQ_RECORD_2, false,
              "missing separator line - false"},
 
-            {VALID_ID_LINE + VALID_SEQ_LINE + "+A\n" + VALID_QUAL_LINE, false,
-             "separator line with characters after + returns false"},
-
             {VALID_ID_LINE + VALID_SEQ_LINE + "-\n" + VALID_QUAL_LINE, false,
              "separator line with invalid character returns false"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+" + VALID_ID_LINE.substr(1) + VALID_QUAL_LINE, true,
+             "extended separator line with description like header returns true"},
+
+            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + "+" + VALID_ID_LINE_WITH_TABS.substr(1) +
+                     VALID_QUAL_LINE,
+             true, "extended separator line with tabbed description like header returns true"},
+
+            {VALID_ID_LINE + VALID_SEQ_LINE + "+ blah\n" + VALID_QUAL_LINE, true,
+             "extended separator line with description containing leading SPACE returns true"},
 
             {VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE + "\n" + VALID_FASTQ_RECORD_2,
              false, "empty quality line - false"},
@@ -135,16 +142,6 @@ DEFINE_TEST("is_fastq parameterized testing") {
             {VALID_ID_LINE + "ACGTACG\nTAC\nG\nTAC\n" + VALID_SEPARATOR_LINE +
                      "@read_0\nACT\n+\n!$#\n",
              true, "record with qstring equivalent to a valid fastq record returns true"},
-
-            {VALID_ID_LINE + VALID_SEQ_LINE + "+" + VALID_ID_LINE.substr(1) + VALID_QUAL_LINE, true,
-             "record with extended separator line like header returns true"},
-
-            {VALID_ID_LINE_WITH_TABS + VALID_SEQ_LINE + "+" + VALID_ID_LINE_WITH_TABS.substr(1) +
-                     VALID_QUAL_LINE,
-             true, "record with extended separator line like tabbed header returns true"},
-
-            {VALID_ID_LINE + VALID_SEQ_LINE + "+ blah\n" + VALID_QUAL_LINE, true,
-             "record with extended separator line containing leading SPACE returns true"},
     }));
     CAPTURE(description);
     CAPTURE(input_text);

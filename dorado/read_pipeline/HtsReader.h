@@ -38,7 +38,8 @@ public:
     bool is_aligned{false};
     BamPtr record{nullptr};
 
-    sam_hdr_t* header() const;
+    sam_hdr_t* header();
+    const sam_hdr_t* header() const;
     const std::string& format() const;
 
 private:

@@ -51,7 +51,7 @@ void write_bam_aux_tag_from_string(bam1_t& record, const std::string& bam_tag_st
 
     //int bam_aux_append(bam1_t * b, const char tag[2], char type, int len, const uint8_t* data);
     bam_aux_append(&record, tag_id.data(), tag_type.at(0), static_cast<int>(tag_data.size() + 1),
-                   (uint8_t*)tag_data.c_str());
+                   reinterpret_cast<const uint8_t*>(tag_data.c_str()));
 }
 
 void write_bam_aux_tags_from_fastq(bam1_t& record, const utils::FastqRecord& fastq_record) {
@@ -95,7 +95,10 @@ public:
 
     bool is_valid() const { return m_fastq_reader.is_valid(); }
 
-    sam_hdr_t* header() const { return m_header.get(); }
+    sam_hdr_t* header() { return m_header.get(); }
+
+    const sam_hdr_t* header() const { return m_header.get(); }
+
     const std::string& format() const { return HTS_FORMAT_TEXT_FASTQ; }
 
     bool try_get_next_record(bam1_t& record) {
@@ -211,7 +214,7 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
     return num_reads;
 }
 
-sam_hdr_t* HtsReader::header() const { return m_header; }
+sam_hdr_t* HtsReader::header() { return m_header; }
 
 const std::string& HtsReader::format() const { return m_format; }
 

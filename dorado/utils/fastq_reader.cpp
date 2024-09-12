@@ -55,7 +55,10 @@ bool validate_sequence_and_replace_us(std::string& field) {
     return true;
 }
 
-bool is_valid_separator_field(const std::string& field) { return field == "+"; }
+bool is_valid_separator_field(const std::string& field) {
+    assert(!field.empty());
+    return field.at(0) == '+';
+}
 
 bool is_valid_quality_field(const std::string& field) {
     //0x21 (lowest quality; '!' in ASCII) to 0x7e (highest quality; '~' in ASCII)
