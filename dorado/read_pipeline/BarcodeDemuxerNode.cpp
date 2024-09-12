@@ -116,7 +116,7 @@ int BarcodeDemuxerNode::write(bam1_t* const record) {
 
         file = std::make_unique<utils::HtsFile>(
                 filepath_str,
-                m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::SAM,
+                m_write_fastq ? utils::HtsFile::OutputMode::FASTQ : utils::HtsFile::OutputMode::BAM,
                 m_htslib_threads, m_sort_bam);
         if (m_sort_bam) {
             file->set_buffer_size(BAM_BUFFER_SIZE);
