@@ -203,7 +203,7 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
-                          "Default poly tail config cannot specify barcode_id.");
+                          "Default poly tail config must not specify barcode_id.");
     }
 
     SECTION("Parse override configs") {

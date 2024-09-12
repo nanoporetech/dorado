@@ -82,7 +82,7 @@ void add_configs(const toml::value& config_toml, std::vector<PolyTailConfig>& co
     // add the default config
     auto default_config = update_config(config_toml, PolyTailConfig{});
     if (!default_config.barcode_id.empty()) {
-        throw std::runtime_error("Default poly tail config cannot specify barcode_id.");
+        throw std::runtime_error("Default poly tail config must not specify barcode_id.");
     }
 
     // get override configs
