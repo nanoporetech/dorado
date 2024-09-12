@@ -13,12 +13,16 @@ private:
     int m_kmer_len;
     int m_block_stride;
     int m_context_samples;
+    int m_context_samples_before;
 
     int m_seq_len;
     int m_signal_len;
     std::vector<int> m_sequence_ints;
     std::vector<uint64_t> m_sample_offsets;
 
+    bool m_base_start_justified;
+
+    int sample_pos(int base_pos) const;
     int compute_sample_pos(int base_pos) const;
 
     std::vector<int8_t> encode_kmer(const std::vector<int>& seq,
@@ -30,8 +34,13 @@ public:
      *  @param context_samples The number of samples corresponding to a slice of encoded data.
      *  @param bases_before The number of bases before the primary base of each kmer.
      *  @param bases_after The number of bases after the primary base of each kmer.
+     *  @param base_start_justified To justifiy the kmer encoding the the start of the base
      */
-    ModBaseEncoder(size_t block_stride, size_t context_samples, int bases_before, int bases_after);
+    ModBaseEncoder(size_t block_stride,
+                   size_t context_samples,
+                   int bases_before,
+                   int bases_after,
+                   bool base_start_justified);
 
     /** Initialize the sequence and movement map from which to generate encodings
      *  @param sequence_ints The basecall sequence encoded as integers (A=0, C=1, G=2, T=3)
@@ -44,7 +53,7 @@ public:
     struct Context {
         std::vector<int8_t> data;  ///< Encoded data slice
         size_t first_sample;       ///< Index of first raw data sample for the slice.
-        size_t num_samples;        ///< Number of samples of raw data in the slice.
+        size_t num_existing_samples;  ///< Number of samples of raw data in the slice that already exist.
         size_t lead_samples_needed;  ///< Number of samples, if any, to pad the beginning of the raw data slice with.
         size_t tail_samples_needed;  ///< Number of samples, if any, to pad the end of the raw data slice with.
     };

@@ -48,7 +48,7 @@ std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrang
     const auto& config = toml::find(config_toml, "arrangement");
     std::string kit_name = toml::find<std::string>(config, "name");
 
-    new_kit.name = toml::find<std::string>(config, "kit");
+    new_kit.name = toml::find_or<std::string>(config, "kit", "");
 
     // Determine barcode sequences.
     int bc_start_idx = toml::find<int>(config, "first_index");

@@ -10,6 +10,7 @@ public:
     static void trim_sequence(SimplexRead& read, std::pair<int, int> interval);
     static std::pair<int, int> determine_trim_interval(const BarcodeScoreResult& res, int seqlen);
     static std::pair<int, int> determine_trim_interval(const AdapterScoreResult& res, int seqlen);
+    static void check_and_update_barcoding(SimplexRead& read);
 };
 
 }  // namespace dorado

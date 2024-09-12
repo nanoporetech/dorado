@@ -26,6 +26,7 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ResumeLoader.h"
+#include "read_pipeline/TrimmerNode.h"
 #include "torch_utils/auto_detect_device.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
@@ -478,6 +479,9 @@ void setup(const std::vector<std::string>& args,
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             methylation_threshold_pct, std::move(sample_sheet), 1000);
+    if ((barcoding_info && barcoding_info->trim) || adapter_trimming_enabled) {
+        current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
+    }
 
     const bool is_rna_adapter = is_rna_model(model_config) &&
                                 (adapter_info->rna_adapters ||
@@ -486,17 +490,15 @@ void setup(const std::vector<std::string>& args,
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
-
-    if (adapter_trimming_enabled) {
-        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
-                {current_sink_node}, thread_allocations.adapter_threads);
-    }
-
     if (barcoding_info) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(
                 std::move(barcoding_info));
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
+    }
+    if (adapter_trimming_enabled) {
+        current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
+                {current_sink_node}, thread_allocations.adapter_threads);
     }
     if (estimate_poly_a) {
         auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(

@@ -18,7 +18,7 @@ const auto _5mCG = get_data_dir("model_configs/dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1"
 const auto _5mCG_5hmCG =
         get_data_dir("model_configs/dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2");
 const auto _pseU = get_data_dir("model_configs/rna004_130bps_sup@v5.0.0_pseU@v1");
-
+const auto _pseU_j = get_data_dir("model_configs/rna004_130bps_sup@v5.0.1_pseU@v1");
 TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     using Gen = ModelGeneralParams;
     using Mod = ModificationParams;
@@ -35,21 +35,28 @@ TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
                 _5mCG, 
                 Gen{ModelType::CONV_V1, 64, 9, 2}, 
                 Mod{{"m"}, {"5mC"}, "CG", 0},
-                Ctx{50, 50, 4, 4, false}, 
+                Ctx{50, 50, 4, 4, false, false}, 
                 Rmt{}
             ),
             std::make_tuple(
                 _5mCG_5hmCG, 
                 Gen{ModelType::CONV_LSTM, 256, 9, 3}, 
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0,},                
-                Ctx{50, 50, 4, 4, false}, 
+                Ctx{50, 50, 4, 4, false, false}, 
                 Rmt{7, 6, refined_kmer_levels}
             ),
             std::make_tuple(
                 _pseU,
                 Gen{ModelType::CONV_LSTM, 128, 9, 2},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
-                Ctx{150, 150, 4, 4, true},
+                Ctx{150, 150, 4, 4, true, false},
+                Rmt{7, 3, refined_kmer_levels}
+            ),
+            std::make_tuple(
+                _pseU_j,
+                Gen{ModelType::CONV_LSTM, 128, 9, 2},
+                Mod{{"17802"}, {"pseU"}, "T", 0},            
+                Ctx{150, 150, 4, 4, true, true},
                 Rmt{7, 3, refined_kmer_levels}
             ),
             }));
@@ -77,6 +84,8 @@ TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
 
     SECTION("context parameters") {
         const auto& c = model.context;
+        CAPTURE(path, c.samples_before, c.samples_after, c.samples, c.bases_before, c.bases_after,
+                c.kmer_len, c.reverse, c.base_start_justify);
         CHECK(c.samples_before == context.samples_before);
         CHECK(c.samples_after == context.samples_after);
         CHECK(c.samples == context.samples);
@@ -84,6 +93,7 @@ TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
         CHECK(c.bases_after == context.bases_after);
         CHECK(c.kmer_len == context.kmer_len);
         CHECK(c.reverse == context.reverse);
+        CHECK(c.base_start_justify == context.base_start_justify);
     }
 
     SECTION("refinement parameters") {

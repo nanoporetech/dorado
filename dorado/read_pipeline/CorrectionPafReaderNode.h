@@ -8,12 +8,13 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_set>
 
 namespace dorado {
 
 class CorrectionPafReaderNode : public MessageSink {
 public:
-    CorrectionPafReaderNode(std::string_view paf_file);
+    CorrectionPafReaderNode(std::string_view paf_file, std::unordered_set<std::string> skip_set);
     ~CorrectionPafReaderNode() = default;
     std::string get_name() const override { return "CorrectionPafReaderNode"; }
     stats::NamedStats sample_stats() const override;
@@ -25,6 +26,7 @@ public:
 private:
     std::string m_paf_file;
     size_t m_reads_to_infer{0};
+    std::unordered_set<std::string> m_skip_set;
 };
 
 }  // namespace dorado

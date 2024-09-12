@@ -93,10 +93,9 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     qname);
-            bam_message.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
             return;
         }
-        bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
+        bam_message.adapter_trim_interval = trim_interval;
     }
 }
 
@@ -134,15 +133,13 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
                     read.read_common.read_id);
             return;
         }
-        demux::AdapterDetector::check_and_update_barcoding(read, trim_interval);
-        Trimmer::trim_sequence(read, trim_interval);
         read.read_common.adapter_trim_interval = trim_interval;
     }
 }
 
 stats::NamedStats AdapterDetectorNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
-    stats["num_reads_trimmed"] = m_num_records.load();
+    stats["num_reads_processed"] = m_num_records.load();
     return stats;
 }
 

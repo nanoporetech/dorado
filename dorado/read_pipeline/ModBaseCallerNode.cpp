@@ -221,9 +221,9 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                         runner->scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
 
                 // One-hot encodes the kmer at each signal step for input into the network
-                modbase::ModBaseEncoder encoder(m_block_stride, params.context.samples,
-                                                params.context.bases_before,
-                                                params.context.bases_after);
+                modbase::ModBaseEncoder encoder(
+                        m_block_stride, params.context.samples, params.context.bases_before,
+                        params.context.bases_after, params.context.base_start_justify);
                 encoder.init(sequence_ints, seq_to_sig_map);
 
                 auto context_hits = runner->get_motif_hits(caller_id, new_seq);
@@ -235,7 +235,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                     auto slice = encoder.get_context(context_hit);
                     // signal
                     auto input_signal = scaled_signal.index({at::indexing::Slice(
-                            slice.first_sample, slice.first_sample + slice.num_samples)});
+                            slice.first_sample, slice.first_sample + slice.num_existing_samples)});
                     if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
                         input_signal = at::constant_pad_nd(input_signal,
                                                            {(int64_t)slice.lead_samples_needed,
@@ -347,7 +347,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
 
         // One-hot encodes the kmer at each signal step for input into the network
         modbase::ModBaseEncoder encoder(m_block_stride, params.context.samples,
-                                        params.context.bases_before, params.context.bases_after);
+                                        params.context.bases_before, params.context.bases_after,
+                                        params.context.base_start_justify);
         encoder.init(sequence_ints, seq_to_sig_map);
 
         auto context_hits = runner->get_motif_hits(caller_id, read->read_common.seq);
@@ -358,7 +359,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
             auto slice = encoder.get_context(context_hit);
             // signal
             auto input_signal = scaled_signal.index({at::indexing::Slice(
-                    slice.first_sample, slice.first_sample + slice.num_samples)});
+                    slice.first_sample, slice.first_sample + slice.num_existing_samples)});
             if (slice.lead_samples_needed != 0 || slice.tail_samples_needed != 0) {
                 input_signal = at::constant_pad_nd(
                         input_signal,
