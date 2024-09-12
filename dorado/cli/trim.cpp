@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
@@ -141,6 +142,8 @@ int trim(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
 
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({hts_writer}, 1);
+
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = true;
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
@@ -150,7 +153,7 @@ int trim(int argc, char* argv[]) {
     client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
     reader.set_client_info(client_info);
 
-    pipeline_desc.add_node<AdapterDetectorNode>({hts_writer}, trim_threads);
+    pipeline_desc.add_node<AdapterDetectorNode>({trimmer}, trim_threads);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters;

@@ -210,6 +210,9 @@ class BamMessage {
 public:
     BamPtr bam_ptr;
     std::shared_ptr<ClientInfo> client_info;
+    std::shared_ptr<BarcodeScoreResult> barcoding_result{};
+    std::pair<int, int> adapter_trim_interval{};
+    std::pair<int, int> barcode_trim_interval{};
 };
 
 // Overlaps for error correction

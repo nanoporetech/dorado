@@ -7,6 +7,7 @@
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
+#include "read_pipeline/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -185,119 +186,8 @@ void detect_and_trim(SimplexRead& read) {
     trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
     trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
     CHECK(trim_interval.first < trim_interval.second);
-    demux::AdapterDetector::check_and_update_barcoding(read, trim_interval);
     Trimmer::trim_sequence(read, trim_interval);
     read.read_common.adapter_trim_interval = trim_interval;
-}
-
-TEST_CASE(
-        "AdapterDetector: check trimming when adapter/primer trimming is combined with barcode "
-        "detection.",
-        TEST_GROUP) {
-    using Catch::Matchers::Equals;
-
-    const std::string seq = std::string(200, 'A');
-    demux::AdapterDetector detector(std::nullopt);
-    const auto& adapters = detector.get_adapter_sequences();
-    const auto& primers = detector.get_primer_sequences();
-    const auto& front_adapter = adapters[1].sequence;
-    const auto& front_primer = primers[2].sequence;
-    const auto& rear_adapter = adapters[1].sequence_rev;
-    const auto& rear_primer = primers[2].sequence_rev;
-    std::string front_barcode = "CCCCCCCCCC";
-    std::string rear_barcode = "GGGGGGGGGG";
-    const int stride = 6;
-
-    {
-        // Test case where barcode detection has been done, but barcodes were not trimmed.
-        // Make sure that barcode results are updated to reflect their position in the sequence
-        // after the front adapter and primer have been trimmed.
-        SimplexRead read;
-        read.read_common.seq = front_adapter + front_primer + front_barcode + seq + rear_barcode +
-                               rear_primer + rear_adapter;
-        read.read_common.qstring = std::string(read.read_common.seq.length(), '!');
-        read.read_common.read_id = "read_id";
-        read.read_common.model_stride = stride;
-        read.read_common.num_trimmed_samples = 0;
-        read.read_common.pre_trim_seq_length = read.read_common.seq.length();
-
-        std::vector<uint8_t> moves;
-        for (size_t i = 0; i < read.read_common.seq.length(); i++) {
-            moves.push_back(1);
-            moves.push_back(0);
-        }
-        read.read_common.moves = moves;
-        read.read_common.raw_data = at::zeros(moves.size() * stride);
-
-        const auto flank_size = front_adapter.length() + front_primer.length();
-        const int additional_trimmed_samples =
-                int(stride * 2 * flank_size);  // * 2 is because we have 2 moves per base
-
-        // Add in barcoding information.
-        read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>();
-        auto& barcode_results = *read.read_common.barcoding_result;
-        barcode_results.barcode_name = "fake_barcode";
-        int front_barcode_start = int(front_adapter.length() + front_primer.length());
-        int front_barcode_end = front_barcode_start + int(front_barcode.length());
-        int rear_barcode_start = front_barcode_end + int(seq.length());
-        int rear_barcode_end = rear_barcode_start + int(rear_barcode.length());
-        barcode_results.top_barcode_pos = {front_barcode_start, front_barcode_end};
-        barcode_results.bottom_barcode_pos = {rear_barcode_start, rear_barcode_end};
-
-        detect_and_trim(read);
-        std::string expected_trimmed_seq = front_barcode + seq + rear_barcode;
-        CHECK(read.read_common.seq == expected_trimmed_seq);
-        CHECK(read.read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
-        int expected_front_barcode_start = 0;
-        int expected_front_barcode_end = int(front_barcode.length());
-        int expected_rear_barcode_start = expected_front_barcode_end + int(seq.length());
-        int expected_rear_barcode_end = expected_rear_barcode_start + int(rear_barcode.length());
-        CHECK(barcode_results.top_barcode_pos ==
-              std::pair<int, int>(expected_front_barcode_start, expected_front_barcode_end));
-        CHECK(barcode_results.bottom_barcode_pos ==
-              std::pair<int, int>(expected_rear_barcode_start, expected_rear_barcode_end));
-    }
-    {
-        // Test case where barcode detection has been done, but barcodes were not trimmed.
-        // In this case the detected adapter/primer overlaps what was detected as the barcode.
-        // The code should therefore not trim anything.
-        SimplexRead read;
-        read.read_common.seq = front_adapter + front_primer + seq + rear_primer + rear_adapter;
-        read.read_common.qstring = std::string(read.read_common.seq.length(), '!');
-        read.read_common.read_id = "read_id";
-        read.read_common.model_stride = stride;
-        read.read_common.num_trimmed_samples = 0;
-        read.read_common.pre_trim_seq_length = read.read_common.seq.length();
-
-        std::vector<uint8_t> moves;
-        for (size_t i = 0; i < read.read_common.seq.length(); i++) {
-            moves.push_back(1);
-            moves.push_back(0);
-        }
-        read.read_common.moves = moves;
-        read.read_common.raw_data = at::zeros(moves.size() * stride);
-
-        // Add in barcoding information.
-        read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>();
-        auto& barcode_results = *read.read_common.barcoding_result;
-        barcode_results.barcode_name = "fake_barcode";
-        int front_barcode_start = 5;
-        int front_barcode_end = 15;
-        int rear_barcode_start =
-                int(front_adapter.length() + front_primer.length() + seq.length()) + 5;
-        int rear_barcode_end = rear_barcode_start + 10;
-        barcode_results.top_barcode_pos = {front_barcode_start, front_barcode_end};
-        barcode_results.bottom_barcode_pos = {rear_barcode_start, rear_barcode_end};
-
-        std::string expected_trimmed_seq = read.read_common.seq;  // Nothing should get trimmed.
-        detect_and_trim(read);
-        CHECK(read.read_common.seq == expected_trimmed_seq);
-        CHECK(read.read_common.num_trimmed_samples == uint64_t(0));
-        CHECK(barcode_results.top_barcode_pos ==
-              std::pair<int, int>(front_barcode_start, front_barcode_end));
-        CHECK(barcode_results.bottom_barcode_pos ==
-              std::pair<int, int>(rear_barcode_start, rear_barcode_end));
-    }
 }
 
 TEST_CASE(
@@ -309,7 +199,8 @@ TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    pipeline_desc.add_node<AdapterDetectorNode>({sink}, 8);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    pipeline_desc.add_node<AdapterDetectorNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 

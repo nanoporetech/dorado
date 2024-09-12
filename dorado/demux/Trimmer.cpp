@@ -243,4 +243,50 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
     }
 }
 
+void Trimmer::check_and_update_barcoding(SimplexRead& read) {
+    // If barcoding has been done, we may need to make some adjustments.
+    if (!read.read_common.barcoding_result) {
+        return;
+    }
+    auto& barcode_result = *read.read_common.barcoding_result;
+    if (barcode_result.barcode_name == "unclassified") {
+        return;
+    }
+
+    bool front_barcode_trimmed = (read.read_common.barcode_trim_interval.first > 0);
+    bool rear_barcode_trimmed = (read.read_common.barcode_trim_interval.second > 0 &&
+                                 read.read_common.barcode_trim_interval.second <
+                                         int(read.read_common.pre_trim_seq_length));
+
+    if (front_barcode_trimmed || rear_barcode_trimmed) {
+        // If barcodes are being trimmed, then the barcode positions are relative to the original
+        // untrimmed sequence. So we don't need to make any updates.
+        return;
+    }
+
+    bool front_adapter_trimmed = (read.read_common.adapter_trim_interval.first > 0);
+
+    if (!front_adapter_trimmed) {
+        // If we haven't trimmed any adapter or primer from the front of the read, then we don't need
+        // to update any barcode positions.
+        return;
+    }
+
+    // An adapter or primer was found trimmed from the beginning of the read, and barcodes were found,
+    // but are not being trimmed. This means that their position details will need to be updated so that
+    // they refer to the position in the trimmed read.
+    if (barcode_result.top_barcode_pos != std::pair<int, int>(-1, -1)) {
+        // We have detected, but not trimmed, a front barcode.
+        // Update the position to correspond to the trimmed sequence.
+        barcode_result.top_barcode_pos.first -= read.read_common.adapter_trim_interval.first;
+        barcode_result.top_barcode_pos.second -= read.read_common.adapter_trim_interval.first;
+    }
+    if (barcode_result.bottom_barcode_pos != std::pair<int, int>(-1, -1)) {
+        // We have detected, but not trimmed, a rear barcode.
+        // Update position to correspond to the trimmed sequence.
+        barcode_result.bottom_barcode_pos.first -= read.read_common.adapter_trim_interval.first;
+        barcode_result.bottom_barcode_pos.second -= read.read_common.adapter_trim_interval.first;
+    }
+}
+
 }  // namespace dorado

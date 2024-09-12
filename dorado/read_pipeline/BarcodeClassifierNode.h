@@ -30,12 +30,17 @@ public:
         start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
     }
 
+    static void fix_misidentified_primers(const BarcodeScoreResult& bc_res,
+                                          std::pair<int, int>& primer_trim_interval,
+                                          int seqlen,
+                                          bool trim_primers);
+
 private:
     std::atomic<int> m_num_records{0};
     demux::BarcodeClassifierSelector m_barcoder_selector{};
 
     void input_thread_fn();
-    void barcode(BamPtr& read, const demux::BarcodingInfo* barcoding_info);
+    void barcode(BamMessage& read, const demux::BarcodingInfo* barcoding_info);
     void barcode(SimplexRead& read);
 
     // Track how many reads were classified as each barcode for debugging
