@@ -75,7 +75,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
                 read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
                 read.read_common.seq.size() + 1);
 
-        const int base_anchor = bottom_start + align_result.startLocations[0] - m_config.rna_offset;
+        const int base_anchor = bottom_start + align_result.startLocations[0];
         // RNA sequence is reversed wrt the signal and move table
         const int signal_anchor =
                 int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
@@ -103,6 +103,17 @@ std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
                                                         float samples_per_base) const {
     const int kSpread = int(std::round(samples_per_base * max_tail_length()));
     return {std::max(0, signal_anchor - 50), std::min(signal_len, signal_anchor + kSpread)};
+}
+
+std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int>& interval,
+                                                        float samples_per_base) const {
+    if (m_rna_adapter) {
+        // Extend the buffer towards the front of the read as there may be something between the adapter and the polytail
+        return {interval.second - interval.first +
+                        static_cast<int>(std::round(m_config.rna_offset * samples_per_base)),
+                interval.second - interval.first};
+    }
+    return {interval.second - interval.first, interval.second - interval.first};
 }
 
 }  // namespace dorado::poly_tail

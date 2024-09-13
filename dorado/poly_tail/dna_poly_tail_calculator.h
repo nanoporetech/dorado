@@ -13,6 +13,16 @@ protected:
     float average_samples_per_base(const std::vector<float>& sizes) const override;
     int signal_length_adjustment(int) const override { return 0; };
     float min_avg_val() const override { return -3.0f; }
+    std::pair<int, int> buffer_range(const std::pair<int, int>& interval,
+                                     float samples_per_base) const override {
+        (void)samples_per_base;
+        // The buffer is currently the length of the interval
+        // itself. This heuristic generally works because a longer interval
+        // detected is likely to be the correct one so we relax the
+        // how close it needs to be to the anchor to account for errors
+        // in anchor determination.
+        return {interval.second - interval.first, interval.second - interval.first};
+    }
     std::pair<int, int> signal_range(int signal_anchor,
                                      int signal_len,
                                      float samples_per_base) const override;

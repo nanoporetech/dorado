@@ -75,7 +75,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::pair<float, float> last_interval_stats;
     const int kStride = 3;
 
-    auto try_merge_latest_intervals = [&, right=right_end]() {  // keep clang-tidy happy
+    auto try_merge_latest_intervals = [&, right = right_end]() {  // keep clang-tidy happy
         if (intervals.size() > 1) {
             auto last_interval = intervals.rbegin();
             auto prev_last_interval = std::next(last_interval);
@@ -198,17 +198,14 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::vector<std::pair<int, int>> filtered_intervals;
     std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
                  std::back_inserter(filtered_intervals), [&](auto& i) {
-                     int buffer = i.second - i.first;
+                     auto buffer = buffer_range(i, num_samples_per_base);
                      // Only keep intervals that are close-ish to the signal anchor.
                      // i.e. the anchor needs to be within the buffer region of
-                     // the interval. The buffer is currently the length of the interval
-                     // itself. This heuristic generally works because a longer interval
-                     // detected is likely to be the correct one so we relax the
-                     // how close it needs to be to the anchor to account for errors
-                     // in anchor determination.
-                     // <----buffer---|--- interval ---|---- buffer---->
-                     bool within_anchor_dist = (signal_anchor >= std::max(0, i.first - buffer)) &&
-                                               (signal_anchor <= (i.second + buffer));
+                     // the interval
+                     // <----buffer.first---|--- interval ---|---- buffer.second---->
+                     bool within_anchor_dist =
+                             (signal_anchor >= std::max(0, i.first - buffer.first)) &&
+                             (signal_anchor <= (i.second + buffer.second));
                      bool meets_min_base_count =
                              (i.second - i.first) >=
                              std::round(num_samples_per_base * m_config.min_base_count);
