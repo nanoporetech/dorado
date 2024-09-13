@@ -7,29 +7,42 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <tuple>
 
 namespace dorado::alignment {
 
+bool operator==(const BedFile::Entry& l, const BedFile::Entry& r) {
+    return std::tie(l.bed_line, l.start, l.end, l.strand) ==
+           std::tie(r.bed_line, r.start, r.end, r.strand);
+}
+
+bool operator!=(const BedFile::Entry& l, const BedFile::Entry& r) { return !(l == r); }
+
 const BedFile::Entries BedFile::NO_ENTRIES{};
 
-const std::string & BedFile::filename() const { return m_file_name; }
+const std::string& BedFile::filename() const { return m_file_name; }
 
-bool BedFile::load(const std::string & bed_filename) {
+bool BedFile::load(const std::string& bed_filename) {
     m_file_name = bed_filename;
 
     // Read in each line and parse it into the BedFile structure
-    std::ifstream file_stream(m_file_name, std::ios::ate);
+    std::ifstream file_stream(m_file_name);
     if (file_stream.fail()) {
         spdlog::error("Failed to open Bed file for reading: '{}'", m_file_name);
         return false;
     }
-    auto file_size = file_stream.tellg();
-    file_stream.seekg(0);
+    return load(file_stream);
+};
+
+bool BedFile::load(std::istream& input_stream) {
+    input_stream.seekg(0, std::ios::end);
+    auto file_size = input_stream.tellg();
+    input_stream.seekg(0);
     bool reading_header = true;
     bool allow_column_headers = true;
-    while (!(file_stream.tellg() == (int32_t)file_size || file_stream.tellg() == -1)) {
+    while (!(input_stream.tellg() == (int32_t)file_size || input_stream.tellg() == -1)) {
         std::string bed_line;
-        std::getline(file_stream, bed_line);
+        std::getline(input_stream, bed_line);
 
         if (utils::starts_with(bed_line, "#")) {
             continue;
@@ -92,9 +105,9 @@ bool BedFile::load(const std::string & bed_filename) {
     }
 
     return true;
-};
+}
 
-const BedFile::Entries & BedFile::entries(const std::string & genome) const {
+const BedFile::Entries& BedFile::entries(const std::string& genome) const {
     auto it = m_genomes.find(genome);
     return it != m_genomes.end() ? it->second : NO_ENTRIES;
 }

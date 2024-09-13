@@ -1,5 +1,6 @@
 #pragma once
 
+#include <istream>
 #include <map>
 #include <string>
 #include <vector>
@@ -30,10 +31,15 @@ public:
     ~BedFile() = default;
 
     bool load(const std::string& filename);
+    bool load(std::istream& input);
 
     const Entries& entries(const std::string& genome) const;
 
     const std::string& filename() const;
 };
+
+bool operator==(const BedFile::Entry& l, const BedFile::Entry& r);
+
+bool operator!=(const BedFile::Entry& l, const BedFile::Entry& r);
 
 }  // namespace dorado::alignment
