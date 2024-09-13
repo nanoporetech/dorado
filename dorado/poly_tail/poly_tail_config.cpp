@@ -10,13 +10,15 @@
 #include <istream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 namespace dorado::poly_tail {
+namespace {
 
-PolyTailConfig prepare_config(std::istream& is) {
-    PolyTailConfig config;
-
-    const toml::value config_toml = toml::parse(is);
+PolyTailConfig update_config(const toml::value& config_toml, PolyTailConfig config) {
+    if (config_toml.contains("barcode_id")) {
+        config.barcode_id = toml::find<std::string>(config_toml, "barcode_id");
+    }
 
     if (config_toml.contains("anchors")) {
         const auto& anchors = toml::find(config_toml, "anchors");
@@ -76,7 +78,43 @@ PolyTailConfig prepare_config(std::istream& is) {
     return config;
 }
 
-PolyTailConfig prepare_config(const std::string& config_file) {
+void add_configs(const toml::value& config_toml, std::vector<PolyTailConfig>& configs) {
+    // add the default config
+    auto default_config = update_config(config_toml, PolyTailConfig{});
+    if (!default_config.barcode_id.empty()) {
+        throw std::runtime_error("Default poly tail config must not specify barcode_id.");
+    }
+
+    // get override configs
+    if (config_toml.contains("overrides")) {
+        const std::vector<toml::value> overrides = toml::find(config_toml, "overrides").as_array();
+        std::unordered_set<std::string> ids;
+        for (auto& override_toml : overrides) {
+            auto override = update_config(override_toml, default_config);
+            ids.insert(override.barcode_id);
+            configs.push_back(std::move(override));
+        }
+        if (ids.count("") != 0) {
+            throw std::runtime_error("Missing barcode_id in override poly tail configuration.");
+        }
+        if (ids.size() != overrides.size()) {
+            throw std::runtime_error("Duplicate barcode_id found in poly tail config file.");
+        }
+    }
+
+    configs.push_back(std::move(default_config));
+}
+
+}  // namespace
+
+std::vector<PolyTailConfig> prepare_configs(std::istream& is) {
+    const toml::value config_toml = toml::parse(is);
+    std::vector<PolyTailConfig> configs;
+    add_configs(config_toml, configs);
+    return configs;
+}
+
+std::vector<PolyTailConfig> prepare_configs(const std::string& config_file) {
     if (!config_file.empty()) {
         if (!std::filesystem::exists(config_file) ||
             !std::filesystem::is_regular_file(config_file)) {
@@ -90,10 +128,10 @@ PolyTailConfig prepare_config(const std::string& config_file) {
         // Read the file contents into a string
         std::stringstream buffer;
         buffer << file.rdbuf();
-        return prepare_config(buffer);
+        return prepare_configs(buffer);
     } else {
         std::stringstream buffer("");
-        return prepare_config(buffer);
+        return prepare_configs(buffer);
     }
 }
 

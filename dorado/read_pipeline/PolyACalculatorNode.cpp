@@ -2,6 +2,7 @@
 
 #include "ClientInfo.h"
 #include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -25,9 +26,16 @@ void PolyACalculatorNode::input_thread_fn() {
         // If this message isn't a read, we'll get a bad_variant_access exception.
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        auto calculator = read->read_common.client_info->contexts()
-                                  .get_ptr<const poly_tail::PolyTailCalculator>();
+        auto selector = read->read_common.client_info->contexts()
+                                .get_ptr<const poly_tail::PolyTailCalculatorSelector>();
 
+        if (!selector) {
+            send_message_to_sink(std::move(read));
+            num_not_called++;
+            continue;
+        }
+
+        auto calculator = selector->get_calculator(read->read_common.barcode);
         if (!calculator) {
             send_message_to_sink(std::move(read));
             num_not_called++;

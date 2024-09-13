@@ -15,7 +15,7 @@
 #include "models/kits.h"
 #include "models/model_complex.h"
 #include "models/models.h"
-#include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/AlignerNode.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
@@ -490,6 +490,16 @@ void setup(const std::vector<std::string>& args,
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
+
+    if (estimate_poly_a) {
+        auto poly_tail_calc_selector =
+                std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
+                        polya_config, is_rna_model(model_config), is_rna_adapter);
+        client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
+                std::move(poly_tail_calc_selector));
+        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
+                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
+    }
     if (barcoding_info) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(
                 std::move(barcoding_info));
@@ -500,14 +510,7 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
-    if (estimate_poly_a) {
-        auto poly_tail_calculator = poly_tail::PolyTailCalculatorFactory::create(
-                is_rna_model(model_config), is_rna_adapter, polya_config);
-        client_info->contexts().register_context<const poly_tail::PolyTailCalculator>(
-                std::move(poly_tail_calculator));
-        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
-    }
+
     current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
             {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
             std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);

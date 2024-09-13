@@ -71,9 +71,9 @@ protected:
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(bool is_rna,
-                                                            bool is_rna_adapter,
-                                                            const std::string& config_file);
+    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
+                                                            bool is_rna,
+                                                            bool is_rna_adapter);
 };
 
 }  // namespace dorado::poly_tail
