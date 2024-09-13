@@ -80,7 +80,7 @@ bool SummaryData::process_file(const std::string& filename, std::ostream& writer
     if (reader.is_aligned) {
         m_field_flags |= ALIGNMENT_FIELDS;
     }
-    auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
+    auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
     write_header(writer);
     return write_rows_from_reader(reader, writer, read_group_exp_start_time);
 }
@@ -103,7 +103,7 @@ bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) 
     write_header(writer);
     for (const auto& read_file : files) {
         HtsReader reader(read_file, std::nullopt);
-        auto read_group_exp_start_time = utils::get_read_group_info(reader.header, "DT");
+        auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
         bool ok = write_rows_from_reader(reader, writer, read_group_exp_start_time);
         if (!ok) {
             spdlog::error("File {} could not be processed. Skipping file.", read_file);
@@ -227,7 +227,7 @@ bool SummaryData::write_rows_from_reader(
 
             if (reader.is_aligned && !(reader.record->core.flag & BAM_FUNMAP)) {
                 alignment_mapq = static_cast<int>(reader.record->core.qual);
-                alignment_genome = reader.header->target_name[reader.record->core.tid];
+                alignment_genome = reader.header()->target_name[reader.record->core.tid];
 
                 alignment_genome_start = int32_t(reader.record->core.pos);
                 alignment_genome_end = int32_t(bam_endpos(reader.record.get()));

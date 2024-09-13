@@ -23,6 +23,8 @@ add_library(dorado_utils
     crypto_utils.cpp
     dev_utils.cpp
     dev_utils.h
+    fastq_reader.cpp
+    fastq_reader.h
     fs_utils.cpp
     fs_utils.h
     hts_file.cpp
