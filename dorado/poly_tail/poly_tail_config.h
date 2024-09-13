@@ -7,7 +7,7 @@
 namespace dorado::poly_tail {
 
 struct PolyTailConfig {
-    std::string rna_adapter = "GGTTGTTTCTGTTGGTGCTGATATTGC";                         // RNA
+    std::string rna_adapter = "GGTTGTTTCTGTTGGTGCTG";                                // RNA
     std::string front_primer = "TTTCTGTTGGTGCTGATATTGCTTT";                          // SSP
     std::string rear_primer = "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT";  // VNP
     std::string rc_front_primer;
