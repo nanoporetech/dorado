@@ -140,7 +140,6 @@ void CorrectionMapperNode::input_thread_fn() {
 
 void CorrectionMapperNode::load_read_fn() {
     utils::set_thread_name("errcorr_load");
-    m_reads_queue.restart();
     HtsReader reader(m_index_file, {});
     while (reader.read()) {
         m_reads_queue.try_push(BamPtr(bam_dup1(reader.record.get())));
@@ -150,7 +149,6 @@ void CorrectionMapperNode::load_read_fn() {
             spdlog::debug("Read {} reads", m_reads_read.load());
         }
     }
-    m_reads_queue.terminate();
 }
 
 void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
@@ -161,20 +159,21 @@ void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
-        spdlog::debug("Pushing {} records downstream of mapping.",
-                      m_shadow_correction_records.size());
-        int64_t num_pushed{0};
-        for (auto& [tname, r] : m_shadow_correction_records) {
-            // Skip reads which were already processed.
-            if (m_skip_set.count(tname) > 0) {
-                spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
-                continue;
+        for (auto& shadow_data : m_shadow_correction_records) {
+            spdlog::debug("Pushing {} records downstream of mapping.", shadow_data.size());
+            int64_t num_pushed{0};
+            for (auto& [tname, r] : shadow_data) {
+                // Skip reads which were already processed.
+                if (m_skip_set.count(tname) > 0) {
+                    spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
+                    continue;
+                }
+                pipeline.push_message(std::move(r));
+                ++num_pushed;
             }
-            pipeline.push_message(std::move(r));
-            ++num_pushed;
+            m_reads_to_infer.fetch_add(num_pushed);
+            spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
         }
-        m_reads_to_infer.store(m_reads_to_infer.load() + num_pushed);
-        spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
         m_shadow_correction_records.clear();
     }
 }
@@ -223,6 +222,7 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
         spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
+        m_reads_queue.restart();
 
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
@@ -236,6 +236,7 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
         if (reader_thread.joinable()) {
             reader_thread.join();
         }
+        m_reads_queue.terminate();
         for (auto& t : aligner_threads) {
             if (t.joinable()) {
                 t.join();
@@ -246,11 +247,11 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
             // Only copy when the thread sending alignments to downstream pipeline
             // is done.
             std::unique_lock<std::mutex> lock(m_copy_mtx);
-            m_shadow_correction_records = std::move(m_correction_records);
+            m_shadow_correction_records.emplace_back(std::move(m_correction_records));
         }
         m_copy_cv.notify_one();
 
-        m_correction_records.clear();
+        m_correction_records = {};
         m_read_mutex.clear();
         m_processed_queries_per_target.clear();
         // 4. Load next index and loop
