@@ -57,7 +57,7 @@ PolyTailConfig update_config(const toml::value& config_toml, PolyTailConfig conf
 
     if (config_toml.contains("threshold")) {
         const auto& threshold = toml::find(config_toml, "threshold");
-        if (threshold.contains("flank_threshold ")) {
+        if (threshold.contains("flank_threshold")) {
             config.flank_threshold = toml::find<float>(threshold, "flank_threshold");
         }
     }
