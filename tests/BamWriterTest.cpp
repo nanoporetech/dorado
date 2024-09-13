@@ -95,12 +95,12 @@ TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
         utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2, false);
         HtsWriter writer(hts_file, "");
         reader.read();
-        auto rg_tag = bam_aux_get(reader.record.get(), "RG");
+        const auto rg_tag = bam_aux_get(reader.record.get(), "RG");
         REQUIRE(rg_tag != nullptr);
         CHECK_THAT(bam_aux2Z(rg_tag),
                    Equals("6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4."
                           "3.0"));
-        auto st_tag = bam_aux_get(reader.record.get(), "st");
+        const auto st_tag = bam_aux_get(reader.record.get(), "st");
         REQUIRE(st_tag != nullptr);
         CHECK_THAT(bam_aux2Z(st_tag), Equals("2023-06-22T07:17:48.308+00:00"));
         writer.write(reader.record.get());
@@ -121,19 +121,19 @@ TEST_CASE(
         "HtsWriterTest: Read fastq with minKNOW header does not write out the bam tag containing "
         "the input fastq header",
         TEST_GROUP) {
-    fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
-    auto minknow_fastq_file = bam_test_dir / "fastq_with_minknow_header.fq";
+    const fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
+    const auto minknow_fastq_file = bam_test_dir / "fastq_with_minknow_header.fq";
     dorado::HtsReader fastq_reader(minknow_fastq_file.string(), std::nullopt);
-    auto tmp_dir = make_temp_dir("writer_test");
-    auto out_sam = tmp_dir.m_path / "output.sam";
+    const auto tmp_dir = make_temp_dir("writer_test");
+    const auto out_sam = tmp_dir.m_path / "output.sam";
 
     // Read the minkow style fastq and confirm the header line is written to the bam aux tag 'fq'
     CHECK(fastq_reader.read());
     auto fq_tag = bam_aux_get(fastq_reader.record.get(), "fq");
     REQUIRE(fq_tag != nullptr);
-    auto fq_tag_value = bam_aux2Z(fq_tag);
+    const auto fq_tag_value = bam_aux2Z(fq_tag);
     REQUIRE(fq_tag_value != nullptr);
-    std::string fq_header{fq_tag_value};
+    const std::string fq_header{fq_tag_value};
     CHECK(fq_header ==
           "@c2707254-5445-4cfb-a414-fce1f12b56c0 "
           "runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
@@ -152,7 +152,7 @@ TEST_CASE(
     HtsReader new_fastq_reader(out_sam.string(), std::nullopt);
     new_fastq_reader.read();
 
-    fq_tag = bam_aux_get(fastq_reader.record.get(), "fq");
+    fq_tag = bam_aux_get(new_fastq_reader.record.get(), "fq");
     REQUIRE(fq_tag == nullptr);
 }
 

@@ -115,15 +115,15 @@ TEST_CASE("HtsReaderTest: fetch_read_ids API w/ SAM", TEST_GROUP) {
 TEST_CASE(
         "HtsReaderTest: read fastq with minKNOW header expect header embedded in bam aux tag 'fq'",
         TEST_GROUP) {
-    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
-    auto minknow_fastq_file = aligner_test_dir / "fastq_with_minknow_header.fq";
+    const fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    const auto minknow_fastq_file = aligner_test_dir / "fastq_with_minknow_header.fq";
     dorado::HtsReader cut(minknow_fastq_file.string(), std::nullopt);
     CHECK(cut.read());
-    auto fq_tag = bam_aux_get(cut.record.get(), "fq");
+    const auto fq_tag = bam_aux_get(cut.record.get(), "fq");
     REQUIRE(fq_tag != nullptr);
-    auto fq_tag_value = bam_aux2Z(fq_tag);
+    const auto fq_tag_value = bam_aux2Z(fq_tag);
     REQUIRE(fq_tag_value != nullptr);
-    std::string fq_header{fq_tag_value};
+    const std::string fq_header{fq_tag_value};
     REQUIRE(fq_header ==
             "@c2707254-5445-4cfb-a414-fce1f12b56c0 runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
             "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");

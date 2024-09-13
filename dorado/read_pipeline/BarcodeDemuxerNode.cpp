@@ -23,7 +23,7 @@ std::string get_run_id_from_fq_tag(bam1_t* const record) {
     if (!fastq_id_tag) {
         return {};
     }
-    std::string header{bam_aux2Z(fastq_id_tag)};
+    const std::string header{bam_aux2Z(fastq_id_tag)};
     utils::FastqRecord fastq_record{};
     if (!fastq_record.set_header(header)) {
         return {};
@@ -32,9 +32,9 @@ std::string get_run_id_from_fq_tag(bam1_t* const record) {
 }
 
 std::string get_run_id_from_rg_tag(bam1_t* const record) {
-    auto read_group_tag = bam_aux_get(record, "RG");
+    const auto read_group_tag = bam_aux_get(record, "RG");
     if (read_group_tag) {
-        std::string read_group_string = std::string(bam_aux2Z(read_group_tag));
+        const std::string read_group_string = std::string(bam_aux2Z(read_group_tag));
         auto pos = read_group_string.find('_');
         if (pos != std::string::npos) {
             return read_group_string.substr(0, pos);
@@ -56,7 +56,7 @@ void apply_sample_sheet_alias(const utils::SampleSheet& sample_sheet,
                               std::string& barcode,
                               bam1_t* const record) {
     // experiment id and position id are not stored in the bam record, so we can't recover them to use here
-    auto alias = sample_sheet.get_alias("", "", "", barcode);
+    const auto alias = sample_sheet.get_alias("", "", "", barcode);
     if (!alias.empty()) {
         barcode = alias;
         bam_aux_update_str(record, "BC", int(barcode.size() + 1), barcode.c_str());
