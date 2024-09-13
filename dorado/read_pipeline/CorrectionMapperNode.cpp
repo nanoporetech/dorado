@@ -161,20 +161,21 @@ void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
 
-        spdlog::debug("Pushing {} records downstream of mapping.",
-                      m_shadow_correction_records.size());
-        int64_t num_pushed{0};
-        for (auto& [tname, r] : m_shadow_correction_records) {
-            // Skip reads which were already processed.
-            if (m_skip_set.count(tname) > 0) {
-                spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
-                continue;
+        for (auto& shadow_data : m_shadow_correction_records) {
+            spdlog::debug("Pushing {} records downstream of mapping.", shadow_data.size());
+            int64_t num_pushed{0};
+            for (auto& [tname, r] : shadow_data) {
+                // Skip reads which were already processed.
+                if (m_skip_set.count(tname) > 0) {
+                    spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
+                    continue;
+                }
+                pipeline.push_message(std::move(r));
+                ++num_pushed;
             }
-            pipeline.push_message(std::move(r));
-            ++num_pushed;
+            m_reads_to_infer.fetch_add(num_pushed);
+            spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
         }
-        m_reads_to_infer.store(m_reads_to_infer.load() + num_pushed);
-        spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
         m_shadow_correction_records.clear();
     }
 }
@@ -246,11 +247,11 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
             // Only copy when the thread sending alignments to downstream pipeline
             // is done.
             std::unique_lock<std::mutex> lock(m_copy_mtx);
-            m_shadow_correction_records = std::move(m_correction_records);
+            m_shadow_correction_records.emplace_back(std::move(m_correction_records));
         }
         m_copy_cv.notify_one();
 
-        m_correction_records.clear();
+        m_correction_records = {};
         m_read_mutex.clear();
         m_processed_queries_per_target.clear();
         // 4. Load next index and loop

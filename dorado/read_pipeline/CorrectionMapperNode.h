@@ -66,7 +66,7 @@ private:
 
     std::mutex m_copy_mtx;
     std::condition_variable m_copy_cv;
-    std::unordered_map<std::string, CorrectionAlignments> m_shadow_correction_records;
+    std::vector<std::unordered_map<std::string, CorrectionAlignments>> m_shadow_correction_records;
 
     // Mutex per target id to prevent a global lock across all targets.
     std::unordered_map<std::string, std::unique_ptr<std::mutex>> m_read_mutex;
