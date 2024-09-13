@@ -72,6 +72,7 @@ std::string extract_model_name_from_path(const std::filesystem::path& model_path
 std::string extract_model_names_from_paths(const std::vector<std::filesystem::path>& model_paths);
 
 // Extract the set of supported models as a yaml formatted string.
-std::string get_supported_model_info();
+// If a path is provided, the supported model info will be filtered to the models available in that folder.
+std::string get_supported_model_info(const std::filesystem::path& model_download_folder);
 
 }  // namespace dorado::models
