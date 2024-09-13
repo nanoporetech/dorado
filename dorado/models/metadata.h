@@ -25,9 +25,11 @@ enum class ModsVariant : uint8_t {
     M_5mCG,
     M_5mCG_5hmCG,
     M_5mC,
+    M_m5C,
     M_6mA,
     M_m6A,
     M_m6A_DRACH,
+    M_inosine_m6A,
     M_pseU,
     NONE  // NONE must be last
 };
@@ -53,6 +55,7 @@ enum class ModelVersion : uint8_t {
     v4_2_0,
     v4_3_0,
     v5_0_0,
+    v5_1_0,
     NONE  // NONE must be last
 };
 

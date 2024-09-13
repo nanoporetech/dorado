@@ -57,9 +57,11 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
         CHECK(mods.at("5mCG") == ModsVariant::M_5mCG);
         CHECK(mods.at("5mCG_5hmCG") == ModsVariant::M_5mCG_5hmCG);
         CHECK(mods.at("5mC") == ModsVariant::M_5mC);
+        CHECK(mods.at("m5C") == ModsVariant::M_m5C);
         CHECK(mods.at("6mA") == ModsVariant::M_6mA);
         CHECK(mods.at("m6A") == ModsVariant::M_m6A);
         CHECK(mods.at("m6A_DRACH") == ModsVariant::M_m6A_DRACH);
+        CHECK(mods.at("inosine_m6A") == ModsVariant::M_inosine_m6A);
         CHECK(mods.at("pseU") == ModsVariant::M_pseU);
         CHECK(mods.size() == static_cast<size_t>(ModsVariant::NONE));
     }
@@ -70,9 +72,11 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
         CHECK(get_mods_variant("5mCG") == ModsVariant::M_5mCG);
         CHECK(get_mods_variant("5mCG_5hmCG") == ModsVariant::M_5mCG_5hmCG);
         CHECK(get_mods_variant("5mC") == ModsVariant::M_5mC);
+        CHECK(get_mods_variant("m5C") == ModsVariant::M_m5C);
         CHECK(get_mods_variant("6mA") == ModsVariant::M_6mA);
         CHECK(get_mods_variant("m6A") == ModsVariant::M_m6A);
         CHECK(get_mods_variant("m6A_DRACH") == ModsVariant::M_m6A_DRACH);
+        CHECK(get_mods_variant("inosine_m6A") == ModsVariant::M_inosine_m6A);
         CHECK(get_mods_variant("pseU") == ModsVariant::M_pseU);
         for (const auto& it : {"", "foo", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2"}) {
             CHECK(get_mods_variant(it) == ModsVariant::NONE);
@@ -85,9 +89,11 @@ TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
         CHECK(to_string(ModsVariant::M_5mCG) == "5mCG");
         CHECK(to_string(ModsVariant::M_5mCG_5hmCG) == "5mCG_5hmCG");
         CHECK(to_string(ModsVariant::M_5mC) == "5mC");
+        CHECK(to_string(ModsVariant::M_m5C) == "m5C");
         CHECK(to_string(ModsVariant::M_6mA) == "6mA");
-        CHECK(to_string(ModsVariant::M_m6A_DRACH) == "m6A_DRACH");
         CHECK(to_string(ModsVariant::M_m6A) == "m6A");
+        CHECK(to_string(ModsVariant::M_m6A_DRACH) == "m6A_DRACH");
+        CHECK(to_string(ModsVariant::M_inosine_m6A) == "inosine_m6A");
         CHECK(to_string(ModsVariant::M_pseU) == "pseU");
         CHECK_THROWS_AS(to_string(ModsVariant::NONE), std::logic_error);
     }
@@ -116,7 +122,9 @@ TEST_CASE(TEST_TAG "  mods_canonical_base_map", TEST_TAG) {
         CHECK(mods.at(ModsVariant::M_5mCG) == "C");
         CHECK(mods.at(ModsVariant::M_5mCG_5hmCG) == "C");
         CHECK(mods.at(ModsVariant::M_5mC) == "C");
+        CHECK(mods.at(ModsVariant::M_m5C) == "C");
         CHECK(mods.at(ModsVariant::M_6mA) == "A");
+        CHECK(mods.at(ModsVariant::M_inosine_m6A) == "A");
         CHECK(mods.at(ModsVariant::M_m6A) == "A");
         CHECK(mods.at(ModsVariant::M_m6A_DRACH) == "A");
         CHECK(mods.at(ModsVariant::M_pseU) == "T");
@@ -146,6 +154,8 @@ TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CHECK(to_string(ModelVersion::v4_1_0) == "v4.1.0");
         CHECK(to_string(ModelVersion::v4_2_0) == "v4.2.0");
         CHECK(to_string(ModelVersion::v4_3_0) == "v4.3.0");
+        CHECK(to_string(ModelVersion::v5_0_0) == "v5.0.0");
+        CHECK(to_string(ModelVersion::v5_1_0) == "v5.1.0");
         CHECK(to_string(ModelVersion::NONE) == "latest");
         CHECK(vers.size() ==
               static_cast<size_t>(ModelVersion::NONE) + 1);  // +1 as "NONE" is included in the map
