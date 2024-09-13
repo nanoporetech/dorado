@@ -140,7 +140,6 @@ void CorrectionMapperNode::input_thread_fn() {
 
 void CorrectionMapperNode::load_read_fn() {
     utils::set_thread_name("errcorr_load");
-    m_reads_queue.restart();
     HtsReader reader(m_index_file, {});
     while (reader.read()) {
         m_reads_queue.try_push(BamPtr(bam_dup1(reader.record.get())));
@@ -150,7 +149,6 @@ void CorrectionMapperNode::load_read_fn() {
             spdlog::debug("Read {} reads", m_reads_read.load());
         }
     }
-    m_reads_queue.terminate();
 }
 
 void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
@@ -224,6 +222,7 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
         spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
+        m_reads_queue.restart();
 
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
@@ -237,6 +236,7 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
         if (reader_thread.joinable()) {
             reader_thread.join();
         }
+        m_reads_queue.terminate();
         for (auto& t : aligner_threads) {
             if (t.joinable()) {
                 t.join();
