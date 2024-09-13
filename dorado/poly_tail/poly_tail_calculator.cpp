@@ -54,14 +54,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
         return {avg, std::sqrt(var)};
     };
 
-    std::pair<float, float> last_interval_stats;
-
     // Maximum variance between consecutive values to be
     // considered part of the same interval.
     const float kVar = 0.35f;
     // How close the mean values should be for consecutive intervals
     // to be merged.
-    const float kMeanValueProximity = 0.2f;
+    const float kMeanValueProximity = 0.25f;
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = int(std::round(num_samples_per_base * 5));
     // Minimum size of intervals considered for merge.
@@ -74,46 +72,78 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
     std::vector<std::pair<int, int>> intervals;
+    std::pair<float, float> last_interval_stats;
     const int kStride = 3;
+
+    auto try_merge_latest_intervals = [&, right=right_end]() {  // keep clang-tidy happy
+        if (intervals.size() > 1) {
+            auto last_interval = intervals.rbegin();
+            auto prev_last_interval = std::next(last_interval);
+
+            // Attempt to merge the last interval and the previous one if
+            // 1. the gap between the intervals is small and
+            // 2. the first interval is longer than some threshold and
+            // 3. the second interval is longer than some threshold or reaches the end of the range
+            spdlog::trace("Evaluate for merge {}-{} with {}-{}", prev_last_interval->first,
+                          prev_last_interval->second, last_interval->first, last_interval->second);
+            if ((last_interval->first - prev_last_interval->second < kMaxSampleGap) &&
+                (prev_last_interval->second - prev_last_interval->first >
+                         kMinIntervalSizeForMerge &&
+                 (last_interval->second - last_interval->first > kMinIntervalSizeForMerge ||
+                  last_interval->second >= (right - kStride)))) {
+                spdlog::trace("Merge interval {}-{} with {}-{}", prev_last_interval->first,
+                              prev_last_interval->second, last_interval->first,
+                              last_interval->second);
+                prev_last_interval->second = last_interval->second;
+
+                intervals.pop_back();
+                return true;
+            }
+        }
+        return false;
+    };
+
+    bool in_range = false;
     for (int s = left_end; s < (right_end - kMaxSampleGap); s += kStride) {
         const int e = s + kMaxSampleGap;
         auto [avg, stdev] = calc_stats(s, e);
-        if (stdev < kVar) {
-            // If a new interval overlaps with the previous interval, just extend
-            // the previous interval.
-            if (intervals.size() > 1 && intervals.back().second >= s &&
-                std::abs(avg - last_interval_stats.first) < kMeanValueProximity &&
-                (avg > kMinAvgVal)) {
-                auto& last = intervals.back();
-                spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}", last.first,
-                              last.second, s, e, avg, stdev);
-                last.second = e;
-            } else {
-                // Attempt to merge the most recent interval and the one before
-                // that if the gap between the intervals is small and both of the
-                // intervals are longer than some threshold.
-                if (intervals.size() >= 2) {
-                    auto& last = intervals.back();
-                    auto& second_last = intervals[intervals.size() - 2];
-                    spdlog::trace("Evaluate for merge {}-{} with {}-{}", second_last.first,
-                                  second_last.second, last.first, last.second);
-                    if ((last.first - second_last.second < kMaxSampleGap) &&
-                        (last.second - last.first > kMinIntervalSizeForMerge) &&
-                        (second_last.second - second_last.first > kMinIntervalSizeForMerge)) {
-                        spdlog::trace("Merge interval {}-{} with {}-{}", second_last.first,
-                                      second_last.second, second_last.first, last.second);
-                        second_last.second = last.second;
-                        intervals.pop_back();
-                    } else if (second_last.second - second_last.first <
-                               std::round(num_samples_per_base * m_config.min_base_count)) {
-                        intervals.erase(intervals.end() - 2);
-                    }
-                }
+        if (avg > kMinAvgVal && stdev < kVar) {
+            if (intervals.empty()) {
                 spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                 intervals.push_back({s, e});
+            } else {
+                // If new interval overlaps with the previous interval and
+                // intervals have a similar mean, just extend the previous interval.
+                auto last_interval = intervals.rbegin();
+                if (last_interval->second >= s &&
+                    std::abs(avg - last_interval_stats.first) < kMeanValueProximity) {
+                    // recalc stats for new interval
+                    std::tie(avg, stdev) = calc_stats(last_interval->first, e);
+                    spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}",
+                                  last_interval->first, last_interval->second, last_interval->first,
+                                  e, avg, stdev);
+                    last_interval->second = e;
+                } else {
+                    try_merge_latest_intervals();
+                    spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
+                    intervals.push_back({s, e});
+                }
             }
             last_interval_stats = {avg, stdev};
+            in_range = true;
+        } else if (in_range) {
+            if (try_merge_latest_intervals()) {
+                // recalc stats for new interval
+                auto last_interval = intervals.rbegin();
+                last_interval_stats = calc_stats(last_interval->first, last_interval->second);
+            }
+            in_range = false;
         }
+    }
+
+    if (in_range) {
+        // We won't have attempted to merge the final two ranges if we were still in a range at the end
+        try_merge_latest_intervals();
     }
 
     std::string int_str = "";
@@ -173,7 +203,11 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                      // <----buffer---|--- interval ---|---- buffer---->
                      bool within_anchor_dist = (signal_anchor >= std::max(0, i.first - buffer)) &&
                                                (signal_anchor <= (i.second + buffer));
-                     return within_anchor_dist;
+                     bool meets_min_base_count =
+                             (i.second - i.first) >=
+                             std::round(num_samples_per_base * m_config.min_base_count);
+
+                     return within_anchor_dist && meets_min_base_count;
                  });
 
     int_str = "";
