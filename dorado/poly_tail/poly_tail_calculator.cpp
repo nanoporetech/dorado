@@ -124,18 +124,26 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
     // Cluster intervals if there are interrupted poly tails that should
     // be combined. Interruption length is specified through a config file.
-    // In the example below, tail estimation show include both stretches
+    // In the example below, tail estimation should include both stretches
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
-    const int kMaxInterruption =
-            static_cast<int>(std::round(num_samples_per_base * m_config.tail_interrupt_length));
+    const size_t num_bases = read.read_common.seq.length();
+    const auto num_samples = read.read_common.get_raw_data_samples();
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map =
+            dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
+
     std::vector<std::pair<int, int>> clustered_intervals;
     for (const auto& i : intervals) {
         if (clustered_intervals.empty()) {
             clustered_intervals.push_back(i);
         } else {
             auto& last = clustered_intervals.back();
-            if (std::abs(i.first - last.second) < kMaxInterruption) {
+            auto start = std::lower_bound(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
+                                          last.second);
+            auto end = std::upper_bound(start, std::end(seq_to_sig_map), i.first);
+            auto bases = static_cast<int>(std::distance(start, end));
+            if (bases <= m_config.tail_interrupt_length) {
                 last.second = i.second;
             } else {
                 clustered_intervals.push_back(i);
