@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 EdlibAlignConfig init_edlib_config_for_adapter() {
@@ -24,6 +25,10 @@ RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config, bool is_rna_
         : PolyTailCalculator(std::move(config)), m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
+    auto log_sum = std::accumulate(std::begin(sizes), std::end(sizes), 0.f,
+                                   [](float total, float size) { return total + std::log(size); });
+    auto samples_per_base1 = sizes.empty() ? 0 : std::exp(log_sum / sizes.size());
+
     auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
     float sum = 0.f;
     int count = 0;
@@ -33,7 +38,8 @@ float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
             count++;
         }
     }
-    return (count > 0 ? (sum / count) : 0.f);
+    auto samples_per_base2 = (count > 0 ? (sum / count) : 0.f);
+    return (samples_per_base1 + samples_per_base2) / 2;
 }
 
 SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
