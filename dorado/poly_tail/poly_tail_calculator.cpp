@@ -82,11 +82,17 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
             // Attempt to merge the last interval and the previous one if
             // 1. the gap between the intervals is small and
-            // 2. the first interval is longer than some threshold and
-            // 3. the second interval is longer than some threshold or reaches the end of the range
+            // 2. the averages of the two intervals are close and
+            // 3. the first interval is longer than some threshold and
+            // 4. the second interval is longer than some threshold or reaches the end of the range
             spdlog::trace("Evaluate for merge {}-{} with {}-{}", prev_last_interval->first,
                           prev_last_interval->second, last_interval->first, last_interval->second);
+
+            auto [avg_1, stdev_1] =
+                    calc_stats(prev_last_interval->first, prev_last_interval->second);
+            auto [avg_2, stdev_2] = calc_stats(last_interval->first, last_interval->second);
             if ((last_interval->first - prev_last_interval->second < kMaxSampleGap) &&
+                (std::abs(avg_2 - avg_1) < kMeanValueProximity) &&
                 (prev_last_interval->second - prev_last_interval->first >
                          kMinIntervalSizeForMerge &&
                  (last_interval->second - last_interval->first > kMinIntervalSizeForMerge ||
