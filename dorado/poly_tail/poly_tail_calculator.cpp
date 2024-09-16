@@ -88,9 +88,9 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             spdlog::trace("Evaluate for merge {}-{} with {}-{}", prev_last_interval->first,
                           prev_last_interval->second, last_interval->first, last_interval->second);
 
-            auto [avg_1, stdev_1] =
+            const auto [avg_1, stdev_1] =
                     calc_stats(prev_last_interval->first, prev_last_interval->second);
-            auto [avg_2, stdev_2] = calc_stats(last_interval->first, last_interval->second);
+            const auto [avg_2, stdev_2] = calc_stats(last_interval->first, last_interval->second);
             if ((last_interval->first - prev_last_interval->second < kMaxSampleGap) &&
                 (std::abs(avg_2 - avg_1) < kMeanValueProximity) &&
                 (prev_last_interval->second - prev_last_interval->first >
