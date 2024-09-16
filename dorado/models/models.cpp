@@ -923,6 +923,7 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
         },
         // RNA004 v3.0.1
+        // m6A - DRACH
         ModelInfo{
                 "rna004_130bps_sup@v3.0.1_m6A_DRACH@v1",
                 "356b3eed19916d83d59cbfd24bb9f33823d6f738891f3ac8fe77319ae5cbde7f",
@@ -945,6 +946,21 @@ const std::vector<ModelInfo> models = {
                 CC::RNA004_130BPS,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_m6A, VV::v1_0_0},
+        },
+        // m6A - DRACH
+        ModelInfo{
+                "rna004_130bps_hac@v5.0.0_m6A_DRACH@v1",
+                "b140acbfc04bb24080b39cc81d71016895dc74454c7cb630629b93ec60e315c9",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.0.0_m6A_DRACH@v1",
+                "62dd2d9e225fa9638258bd33063fa930c4179b13878064547d5be7b33d478b23",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
         },
         // pseU - all context
         ModelInfo{
@@ -992,6 +1008,21 @@ const std::vector<ModelInfo> models = {
                 CC::RNA004_130BPS,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_1_0},
                 ModsVariantPair{ModsVariant::M_inosine_m6A, VV::v1_0_0},
+        },
+        // m6A - DRACH
+        ModelInfo{
+                "rna004_130bps_hac@v5.1.0_m6A_DRACH@v1",
+                "911ba609b657f8e24fe44519a965d0d9bac91f35e7026c8ee1614492bf7ce3f9",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_1_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.1.0_m6A_DRACH@v1",
+                "ec616e5d725860e1686c17d70c8f135c6e0e66f6c3e7e28a6cdefe19cae2e91f",
+                CC::RNA004_130BPS,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_1_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
         },
         // pseU - all context
         ModelInfo{
