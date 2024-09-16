@@ -121,7 +121,7 @@ bool try_add_fastq_header_tag(bam1_t* record, const std::string& header) {
     }
 
     return bam_aux_append(record, "fq", 'Z', static_cast<int>(header.size() + 1),
-                          (uint8_t*)header.c_str()) == 0;
+                          reinterpret_cast<const uint8_t*>(header.c_str())) == 0;
 }
 
 int remove_fastq_header_tag(bam1_t* record) {
