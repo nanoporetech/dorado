@@ -14,8 +14,7 @@ protected:
     int signal_length_adjustment(int) const override { return 0; };
     float min_avg_val() const override { return -3.0f; }
     std::pair<int, int> buffer_range(const std::pair<int, int>& interval,
-                                     float samples_per_base) const override {
-        (void)samples_per_base;
+                                     [[maybe_unused]] float samples_per_base) const override {
         // The buffer is currently the length of the interval
         // itself. This heuristic generally works because a longer interval
         // detected is likely to be the correct one so we relax the
