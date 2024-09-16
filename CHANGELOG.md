@@ -2,6 +2,40 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.8.0] (16 Sept 2024)
+
+This release of Dorado adds v5.1 RNA models with new `inosine_m6A` and `m5C` RNA modified base models, updates existing modified base models, improves the speed of v5 SUP basecalling models on A100/H100 GPUs, and enhances the flexibility and stability of `dorado correct`. It also introduces per-barcode configuration for poly(A) estimation with interrupted tails, adds new `--output-dir` and `--bed-file` arguments to Dorado basecalling commands, and includes a variety of other improvements for stability and usability.
+
+* a69c0a2987e60f3889cc56cd820e8a7713887f33 - Add v5.1.0 RNA basecalling models, including new `inosine_m6A` and `m5C` modified base models, and updated existing DNA and RNA modified base models
+* 8e3a8707be5248d7bcc47d3e89b80c0bdc9c2f36 - Improve speed of v5 SUP basecalling models on A100 and H100 GPUs
+* 6ee90189197d11bfe50e919067582da6eccf513e - Reduce false positive calls from v5 DNA modifed base models
+* 69cb26032d8393a781a9a3d32aa2ceb13ec65491 - Fix bug causing intermittent crashing with v5 SUP models
+* e9dec497a38fa2a1935f64d30e35db246da58a08 - Add `--resume-from` functionality to `dorado correct`
+* cb6eee1c3d63da2f1f11fb8fcc63418908154f81 - Decouple alignment and inference stages in `dorado correct`
+* df861db10d77b4056702857ca11d2e50b63946af - Prevent segfaults in `dorado correct`
+* f35c8cc3ebf900cfd6e19cf6ebaebc94fbb8619b - Fix bug when downloading models for `dorado correct`
+* 66467011c1f22f7037e1055bb435bef090790dd1 - Add per-barcode poly(A) configuration for interrupted tails
+* 0b79407afdfc8f4fa66d5393a722e29358a6302d - Improve poly(A) length estimation for RNA and DNA
+* df614abee24523abc2858b02d18205b9ebca53fe - Add `--output-dir` argument to `dorado basecaller` and `dorado duplex`
+* f9beb393cd8237a142dba43f3b04a77cb688d1c0 - Add `--bed-file` argument to `dorado basecaller` and `dorado duplex`
+* 1fc6f1eb5a535262ef601a8fe4674edc87a137c9 - Add `--models-directory` option to `basecaller`, `duplex`, and `download` to download and reuse models
+* 966c2ca38369a21855cdd491b025979a9628b5b5 - Update POD5 version to v0.3.15
+* 6ec77c8b6cfc3a53433ae27f7a5383f77097eefa - Fix errors when performing duplex calling with modified bases
+* 4a28d589d5e244f62543ebb4d744e8c2843bde93 - Always trim DNA adapter signal before processing RNA reads
+* a90fbf9729a1791be5e7da0f3aacc9d5c20135a8 - Fix loading of FASTQ files containing RNA with U bases
+* 9e5db84725635ceaa282691e8e430dd56851ffa2 - Fix duplicated alignment tags in re-aligned files
+* 3cc4de3c941601fad906c80b6c770fef2814ad9c - Prevent "Too many open files" error when using `--sort-bam` with `dorado demux`
+* b53191858fd33e7a0b4832df6e9e38cf5af22add - Prevent `dorado basecaller` crash when signal-space trimming removes all raw data
+* adc60bae22648fef6521608a625c0e5bc842ac2f - Package `libcupti.so` into ARM Linux builds
+* 667d16001845c8f173ae44ecdef0befaabf2af10 - Remove kit name requirement in custom barcode configuration
+* e9281fa6d9ff36a7fb51efed0caf2c776b7d0c33 - Emit an error message if header from input HTS file cannot be read
+* 7f42b8fd869da5210f9a60a83a6656173023dcb0 - Warn and exit instead of crashing if a model path does not exist
+* 7d7424615830f46f7246a20125b73573c78ef7c9 - Improve index file error handling
+* c77733a9d5ec054a426147cdcd9f6e8a03399aff - Add a mechanism to cache auto batch size calculations
+* a674dadec1b3feb1ed8e8a6421d5d3fc17b0b5bd - Update `--help` documentation for `basecaller`, `duplex`, and `correct`
+* 022901e29864fdeb9a99c4961c679882fe4a6b34 - Fix JSON output when using `--list-structured` with `dorado download`
+
+
 # [0.7.3] (1 Aug 2024)
 
 This release of Dorado updates `dorado correct` to fix handling of high copy repeats and avoid shutdown hanging. It also includes `dorado demux` improvements to reduce false matches in midstrand barcode detection and ensure correct file naming, along with other fixes.
