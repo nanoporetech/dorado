@@ -177,13 +177,13 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
     }
 }
 
-std::pair<at::Tensor, at::Tensor> quantize_tensor(const at::Tensor& tensor) {
-    auto fp_range = tensor.abs().amax(0);
+ScaledTensor quantize_tensor(const at::Tensor& t, int dim) {
+    auto fp_range = t.abs().amax(dim);
     constexpr int levels = 256;
-    auto quant_scale = (levels / 2) / fp_range;
+    auto quant_scale = ((levels / 2) / fp_range);
     auto quant_max = (levels / 2) - 1;
-    auto tensor_quantized = (tensor * quant_scale).round().clip(-quant_max, quant_max);
-    return {quant_scale.to(at::ScalarType::Float), tensor_quantized.to(at::ScalarType::Char)};
+    auto t_quant = (t * quant_scale.unsqueeze(dim)).round().clip(-quant_max, quant_max);
+    return ScaledTensor{t_quant.to(at::ScalarType::Char), quant_scale.to(at::ScalarType::Float)};
 }
 
 std::string print_size(const at::Tensor& t, const std::string& name) {

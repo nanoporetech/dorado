@@ -28,10 +28,63 @@ extern "C" {
 #include "koi.h"
 }
 
-static bool koi_can_use_cutlass() {
+namespace {
+bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
 }
+
+struct KoiTensorExt : public KoiTensor {
+    KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) { init(t, dim_tags); }
+    KoiTensorExt(const at::Tensor &t,
+                 const std::vector<int> &dim_tags,
+                 const at::Tensor &scale_t,
+                 int scale_tag_) {
+        init(t, dim_tags);
+        if (scale_t.numel()) {
+            if (type_id != KOI_I8) {
+                throw std::runtime_error("KoiTensor scale tensor only compatible with I8 tensor");
+            }
+            scale_tag = scale_tag_;
+            scale_data = scale_t.data_ptr();
+            scale_type_id = type_id_from_tensor(scale_t);
+            if (scale_type_id != KOI_F32) {
+                throw std::runtime_error("KoiTensor scale tensor must be F32");
+            }
+        }
+    }
+
+    KoiTypeId type_id_from_tensor(const at::Tensor &t) {
+        if (t.dtype() == torch::kF16) {
+            return KOI_F16;
+        } else if (t.dtype() == torch::kF32) {
+            return KOI_F32;
+        } else if (t.dtype() == torch::kI8) {
+            return KOI_I8;
+        }
+        throw std::runtime_error("KoiTensor unsupported dtype");
+    }
+
+    void init(const at::Tensor &t, const std::vector<int> &dim_tags) {
+        data_ptr = t.data_ptr();
+        ndims = static_cast<int>(t.dim());
+        type_id = type_id_from_tensor(t);
+        if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
+            spdlog::error("KoiTensor dimension mismatch");
+            exit(EXIT_FAILURE);
+        }
+        for (int i = 0; i < ndims; ++i) {
+            dims[i].tag = dim_tags[i];
+            dims[i].size = t.size(i);
+            dims[i].stride = t.stride(i);
+        }
+        scale_data = nullptr;
+        scale_tag = 0;
+        scale_type_id = KOI_NONE;
+    }
+};
+}  // anonymous namespace
+
 #endif
 
 #include <filesystem>
@@ -46,6 +99,13 @@ namespace nn {
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
+
+void apply_rounding(at::Tensor &t, int remove_bits) {
+    // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
+    // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
+    t.view(torch::kI16).add_(1 << (remove_bits - 1));
+    t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
+}
 
 torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
@@ -372,7 +432,8 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options) {
+TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_, const at::TensorOptions &options)
+        : params(params_) {
     self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
                                                                 true, params.attn_window, options));
     ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
@@ -382,6 +443,177 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params, const at::Tensor
     const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha);
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
+
+void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
+    (void)scaled_tensor;
+    (void)x_f16;
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    const int N = static_cast<int>(x_f16.size(0));
+    const int T = static_cast<int>(x_f16.size(1)) * 16;
+    const int C = params.d_model;
+    const int D = params.d_model / params.nhead;
+    const int H = params.nhead;
+    const int E = params.dim_feedforward * 2;
+    const auto [win_upper, win_lower] = params.attn_window;
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+    // Atomic counter, need 4 buffers of 4B each of working memory
+    auto ctr = torch::zeros({4}, x_f16.options().dtype(torch::kI32));
+
+    utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
+    const float alpha = params.deepnorm_alpha;
+
+    auto f16_opts = x_f16.options().dtype(torch::kF16);
+
+    if (!t_res_weights.numel()) {
+        // Weights for the Q,K and V tensors which will be multiplied with the inputs
+        wqkv_weights_f16.t = torch::empty_like(self_attn->wqkv->weight);
+        // For Q and K weights, we need to take the lower and upper halves of the D dimension
+        // and interleave them
+        auto wqk = self_attn->wqkv->weight.view({3, H, 2, D / 2, C}).slice(0, 0, 2);
+        wqkv_weights_f16.t.view({3, H, D / 2, 2, C}).slice(0, 0, 2) = wqk.transpose(2, 3);
+        wqkv_weights_f16.t = wqkv_weights_f16.t.view({3, H, D, C});
+        // Straight copy of V weights
+        wqkv_weights_f16.t[2] = self_attn->wqkv->weight.view({3, H, D, C})[2];
+
+        // Quantize, take rcp of scale
+        wqkv_weights_i8 = utils::quantize_tensor(wqkv_weights_f16.t, -1);
+        wqkv_weights_i8.scale.reciprocal_();
+
+        // Rearrange qkv weights to tiled format
+        wqkv_weights_i8.t = wqkv_weights_i8.t.view({3, H, D / 16, 16, C / 16, 16})
+                                    .transpose(-3, -2)
+                                    .contiguous();
+        wqkv_weights_f16.t = wqkv_weights_f16.t.view({3, H, D / 16, 16, C / 8, 8})
+                                     .transpose(-3, -2)
+                                     .contiguous();
+
+        //Rotary embedding as a torch tensor
+        auto rot_bfrs = self_attn->rotary_emb->named_buffers();
+        auto max_T = 16 * (rot_bfrs["sin_freqs"].size(0) / 16);
+        sincos_bfr = torch::empty({max_T, D / 2, 2}, f16_opts);
+        sincos_bfr.select(2, 0) = rot_bfrs["sin_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+        sincos_bfr.select(2, 1) = rot_bfrs["cos_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+        sincos_bfr = sincos_bfr.view({max_T / 16, 16, D / 8, 8}).transpose(1, 2).contiguous();
+
+        // Need rearranging to correct tiled format
+        proj_weight = self_attn->out_proj->weight.view({C / 16, 16, C / 8, 8})
+                              .transpose(1, 2)
+                              .contiguous();
+        proj_bias = self_attn->out_proj->bias.view({C});
+
+        t_res_weights = norm1->weight.view({C});
+        t_res2_weights = norm2->weight.view({C});
+
+        // Quantize SwiGLU weights, interleave, and rearrange as tiled
+        auto fc1_weight_interleaved =
+                ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
+        t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
+        t_fc1_wts_i8.scale.reciprocal_();
+        t_fc1_wts_i8.t = t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+
+        t_fc1_wts_f16.t =
+                fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
+
+        t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
+
+        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
+        // power efficient and results in higher performance for a small accuracy drop)
+        int remove_bits = 4;
+        apply_rounding(proj_weight, remove_bits);
+        apply_rounding(t_res_weights, remove_bits);
+        apply_rounding(t_res2_weights, remove_bits);
+        apply_rounding(t_fc2_wts, remove_bits);
+        apply_rounding(wqkv_weights_f16.t, remove_bits);
+        apply_rounding(t_fc1_wts_f16.t, remove_bits);
+    }
+
+    // Output buffers
+    auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, f16_opts);
+    auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, f16_opts);
+    auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
+    auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, f16_opts);
+    auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
+
+    //Define Koi Tensors for the above buffers.
+    auto &x = scaled_tensor.t;
+    bool use_i8 = x.dtype() == torch::kI8;
+    auto &wqkv_weights = use_i8 ? wqkv_weights_i8 : wqkv_weights_f16;
+    auto &t_fc1_wts = use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16;
+    KoiTensorExt in_f16(x_f16, {'N', 'T', 'C', 't', 'c'});
+    KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'}, scaled_tensor.scale, 'C');
+    KoiTensorExt *in_i8_ptr = use_i8 ? &in : nullptr;
+    KoiTensorExt in_mk(x.flatten(0, 1), {'M', 'K', 'm', 'k'}, scaled_tensor.scale, 'K');
+    KoiTensorExt weights_qkv(wqkv_weights.t, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'},
+                             wqkv_weights.scale, 'C');
+    KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
+    KoiTensorExt out_attn(t_out_attn, {'N', 'T', 'H', 'D', 't', 'd'});
+    KoiTensorExt out_attn_mk(t_out_attn.flatten(2, 3).flatten(0, 1), {'M', 'K', 'm', 'k'});
+    KoiTensorExt out_proj_mn(t_out_proj.flatten(0, 1), {'M', 'N', 'm', 'n'});
+    KoiTensorExt out_proj_ntc(t_out_proj, {'N', 'T', 'C', 't', 'c'});
+    KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
+    KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
+    KoiTensorExt fc1_out_mk(t_fc1_out, {'M', 'K', 'm', 'k'});
+    KoiTensorExt fc2_out_mn(t_fc2_out.flatten(0, 1), {'M', 'N', 'm', 'n'});
+    KoiTensorExt fc2_out_ntc(t_fc2_out, {'N', 'T', 'C', 't', 'c'});
+
+    KoiTensorExt sincos(sincos_bfr.slice(0, 0, T / 16), {'T', 'D', 't', 'd'});
+    KoiTensorExt proj_w(proj_weight, {'N', 'K', 'n', 'k'});
+    KoiTensorExt proj_b(proj_bias, {'N'});
+    KoiTensorExt res_weights(t_res_weights, {'C'});
+    KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
+    KoiTensorExt res2_weights(t_res2_weights, {'C'});
+
+    int res = KOI_SUCCESS;
+    int calls = 0;
+    if (res == KOI_SUCCESS && ++calls) {
+        // Fused QKV Matmul Plus Rotary embedding
+        utils::ScopedProfileRange spr("QKV+ROTE", 3);
+        res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv, &sincos,
+                             &out_qkv, ctr[0].data_ptr<int>());
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Apply masket attention
+        utils::ScopedProfileRange spr("MEA", 3);
+        res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Koi linear matmul
+        utils::ScopedProfileRange spr("OUTP", 3);
+        res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
+                         ctr[1].data_ptr<int>());
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // RMS residual
+        utils::ScopedProfileRange spr("LNORM1", 3);
+        res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
+                                   in_i8_ptr);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Matmul + SWIGLU
+        utils::ScopedProfileRange spr("FC1+SILU", 3);
+        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
+        res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
+                            use_f32_accum);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Fully connected
+        utils::ScopedProfileRange spr("FC2", 3);
+        res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
+                         ctr[3].data_ptr<int>());
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // RMS Norm Residual again
+        utils::ScopedProfileRange spr("LNORM2", 3);
+        res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
+                                   in_i8_ptr);
+    }
+    // TODO: handle result
+    if (res != KOI_SUCCESS) {
+        spdlog::error("Koi tiled path failed {}", calls);
+    }
+#endif
+}
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     at::Tensor attn, f;
@@ -432,15 +664,65 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const basecall::CRFModelConfig &config,
+TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
                                        const at::TensorOptions &options) {
-    const auto &tx_enc_params = config.tx->tx;
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    // TODO: make sure these are all the requirements
+    use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
+                    (params.nhead == 8) && (params.attn_window.first == 127) &&
+                    (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
+#endif
+
     stack = Sequential();
-    for (int i = 0; i < tx_enc_params.depth; ++i) {
-        stack->push_back(register_module("transformer_encoder" + std::to_string(i),
-                                         TxEncoder(tx_enc_params, options)));
+    for (int i = 0; i < params.depth; ++i) {
+        TxEncoder encoder(params, options);
+        stack->push_back(register_module("transformer_encoder" + std::to_string(i), encoder));
+        layer_vec.push_back(encoder);
     }
+    use_i8 = utils::get_dev_opt<bool>("koi_use_i8", true);
 };
+
+at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
+#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+    if (use_koi_tiled) {
+        const int N = static_cast<int>(x.size(0));
+        const int T = static_cast<int>(x.size(1));
+        const int C = static_cast<int>(x.size(2));
+
+        at::Tensor tiled_f16;
+        {
+            utils::ScopedProfileRange spr("Tile F16", 2);
+            tiled_f16 = x.view({N, T / 16, 16, C / 8, 8}).transpose(2, 3).contiguous();
+        }
+
+        utils::ScaledTensor scaled_tensor;
+        if (use_i8) {
+            utils::ScopedProfileRange spr("Quantise/tile I8", 2);
+            // Quanitze tensor to i8 and take the reciprocal of the scale.
+            scaled_tensor = utils::quantize_tensor(x, 2);
+            scaled_tensor.scale.reciprocal_();
+            // Transform the tensor into the tiled format.
+            scaled_tensor.t =
+                    scaled_tensor.t.view({N, T / 16, 16, C / 16, 16}).transpose(2, 3).contiguous();
+        } else {
+            scaled_tensor.t = tiled_f16;
+        }
+
+        for (auto &layer : layer_vec) {
+            layer->koi_forward(scaled_tensor, tiled_f16);
+        }
+
+        at::Tensor untiled_f16;
+        {
+            utils::ScopedProfileRange spr("Untile F16", 2);
+            untiled_f16 = tiled_f16.transpose(2, 3).contiguous().view({N, T, C});
+        }
+        return untiled_f16;
+    }
+#endif
+    return stack->forward(x);
+}
 
 LinearUpsampleImpl::LinearUpsampleImpl(const tx::EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
@@ -474,7 +756,7 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
 TxModelImpl::TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
-    tx_encoder = register_module("transformer_encoder", TxEncoderStack(config, m_options));
+    tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));
     tx_decoder = register_module("transformer_decoder", LinearUpsample(config.tx->upsample));
     crf = register_module("crf", LinearScaledCRF(config.tx->crf));
 }
