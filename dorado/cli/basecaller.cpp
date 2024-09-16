@@ -251,14 +251,14 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false);
     }
     {
-        parser.visible.add_group("Poly-a arguments");
+        parser.visible.add_group("Poly(A) arguments");
         parser.visible.add_argument("--estimate-poly-a")
-                .help("Estimate poly-A/T tail lengths (beta feature). Primarily meant for cDNA and "
-                      "dRNA use cases.")
+                .help("Estimate poly(A)/poly(T) tail lengths (beta feature). Primarily meant for "
+                      "cDNA and dRNA use cases.")
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("--poly-a-config")
-                .help("Configuration file for PolyA estimation to change default behaviours")
+                .help("Configuration file for poly(A) estimation to change default behaviours")
                 .default_value(std::string(""));
     }
     {
