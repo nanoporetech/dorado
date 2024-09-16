@@ -109,7 +109,7 @@ struct Adapter {
 const std::vector<Adapter> adapters = {
         {"LSK109", "AATGTACTTCGTTCAGTTACGTATTGCT", "AGCAATACGTAACTGAACGAAGT"},
         {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"},
-        {"RNA004", "", "GGTTGTTTCTGTTGGTGCTGATATTGC"}};
+        {"RNA004", "", "GGTTGTTTCTGTTGGTGCTG"}};
 
 // For primers, we look for each primer sequence, and its reverse complement, at both the front and rear of the read.
 struct Primer {

@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 EdlibAlignConfig init_edlib_config_for_adapter() {
@@ -24,6 +25,11 @@ RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config, bool is_rna_
         : PolyTailCalculator(std::move(config)), m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
+    const auto log_sum =
+            std::accumulate(std::cbegin(sizes), std::cend(sizes), 0.f,
+                            [](float total, float size) { return total + std::log(size); });
+    const auto samples_per_base1 = sizes.empty() ? 0 : std::exp(log_sum / sizes.size());
+
     auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
     float sum = 0.f;
     int count = 0;
@@ -33,7 +39,8 @@ float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
             count++;
         }
     }
-    return (count > 0 ? (sum / count) : 0.f);
+    const auto samples_per_base2 = (count > 0 ? (sum / count) : 0.f);
+    return (samples_per_base1 + samples_per_base2) / 2;
 }
 
 SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
@@ -69,7 +76,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
                 read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
                 read.read_common.seq.size() + 1);
 
-        const int base_anchor = bottom_start + align_result.startLocations[0] - m_config.rna_offset;
+        const int base_anchor = bottom_start + align_result.startLocations[0];
         // RNA sequence is reversed wrt the signal and move table
         const int signal_anchor =
                 int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
@@ -97,6 +104,17 @@ std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
                                                         float samples_per_base) const {
     const int kSpread = int(std::round(samples_per_base * max_tail_length()));
     return {std::max(0, signal_anchor - 50), std::min(signal_len, signal_anchor + kSpread)};
+}
+
+std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int>& interval,
+                                                        float samples_per_base) const {
+    if (m_rna_adapter) {
+        // Extend the buffer towards the front of the read as there may be something between the adapter and the polytail
+        return {interval.second - interval.first +
+                        static_cast<int>(std::round(m_config.rna_offset * samples_per_base)),
+                interval.second - interval.first};
+    }
+    return {interval.second - interval.first, interval.second - interval.first};
 }
 
 }  // namespace dorado::poly_tail
