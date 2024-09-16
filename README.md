@@ -311,18 +311,45 @@ Dorado supports single-read error correction with the integration of the [HERRO]
 
 To correct reads, run:
 ```
-$ dorado correct reads.fastq(.gz) > corrected_reads.fasta
+$ dorado correct reads.fastq > corrected_reads.fasta
 ```
 
-Dorado correct only supports FASTX(.gz) as the input and generates a FASTA file as output. The input can be uncompressed or compressed with `bgz`. An index file is generated for the input FASTX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
+Dorado correct only supports FASTQ(.gz) as the input and generates a FASTA file as output. The input can be uncompressed or compressed with `bgz`. An index file is generated for the input FASTQ file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space.
 
-The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( > 64 cores), large system memory ( > 256GB) and a modern GPU with a large VRAM ( > 32GB).
+The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( >= 64 cores), large system memory ( >= 256GB) and a modern GPU with a large VRAM ( >= 32GB).
 
 All required model weights are downloaded automatically by Dorado. However, the weights can also be pre-downloaded and passed via command line in case of offline execution. To do so, run:
 ```
 $ dorado download --model herro-v1
-$ dorado correct -m herro-v1 reads.fastq(.gz) > corrected_reads.fasta
+$ dorado correct -m herro-v1 reads.fastq > corrected_reads.fasta
 ```
+Dorado Correct now also provides a feature to run mapping (CPU-only stage) and inference (GPU-intensive stage) individually. This enables separation of the CPU and GPU heavy stages into individual steps which can even be run on different nodes with appropriate compute characteristics. Example:
+```
+$ dorado correct reads.fastq --to-paf > overlaps.paf
+$ dorado correct reads.fastq --from-paf overlaps.paf > corrected_reads.fasta
+```
+Gzipped PAF is currently not supported for the `--from-paf` option.
+
+Additionally, if a run was stopped or has failed, Dorado Correct provides a "resume" functionality. The resume feature takes a list of previously corrected reads (e.g. a `.fai` index from the previous run) and skips the previously processed reads:
+```
+$ samtools faidx corrected_reads.1.fasta    # Output from the previously interrupted run.
+$ dorado correct reads.fastq --resume-from corrected_reads.1.fasta.fai > corrected_reads.2.fasta
+```
+The input file format for the `--resume-from` feature can be any plain text file where the first whitespace-delimited column (or a full row) consists of sequence names to skip, one per row.
+
+#### Troubleshooting
+1. In case the process is consuming too much memory for your system, try running it with a smaller index size. For example:
+    ```
+    $ dorado correct reads.fastq --index-size 4G > corrected_reads.fasta
+    ```
+2. The auto-computed inference batch size may still be too high for your system. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size / selecting it manually. For example:
+    ```
+    $ dorado correct reads.fastq --batch-size <number> > corrected_reads.fasta
+    ```
+3. In case your output FASTA file contains a very low amount of corrected reads compared to the input, please check the following:
+    - The input dataset has average read length `>=10kbp`. Dorado Correct is designed for long reads, and it will not work on short libraries.
+    - Input coverage is reasonable, preferrably `>=30x`.
+    - Check the average base qualities of the input dataset. Dorado Correct expects accurate inputs for both mapping and inference.
 
 ## Available basecalling models
 
