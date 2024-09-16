@@ -67,7 +67,7 @@ TEST_CASE(CUT_TAG " load from stream with two records same genome creates two en
 }
 
 TEST_CASE(CUT_TAG
-          " load from stream with 4 records, 2 entries in 2 genomes each, retrusn the correct "
+          " load from stream with 4 records, 2 genomes with 2 entries each, returns the correct "
           "entries for genomes.",
           CUT_TAG) {
     dorado::alignment::BedFile cut{};
@@ -93,29 +93,26 @@ TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
                     {"Lambda\t1234\t2345", "Lambda", 1234, 2345, '.', true},
                     {"Lambda 1234 2345", "Lambda", 0, 0, 0, false},
             }));
-
+    const BedFile::Entry EXPECTED{line, start, end, strand};
     CAPTURE(line);
 
     dorado::alignment::BedFile cut{};
-    std::istringstream input_stream{line + "\n" + RANDOM_2.bed_line};
+    std::istringstream input_stream{RANDOM_1.bed_line + "\n" + line + "\n" + RANDOM_2.bed_line};
 
     CHECK(cut.load(input_stream));
     const auto entries = cut.entries(genome);
 
     if (valid) {
         REQUIRE(entries.size() == 1);
-        const auto& actual = entries[0];
-        REQUIRE(line == actual.bed_line);
-        REQUIRE(start == actual.start);
-        REQUIRE(end == actual.end);
-        REQUIRE(strand == actual.strand);
+        CHECK(entries[0] == EXPECTED);
     } else {
         CHECK(entries.empty());
     }
 
     auto second_genome_entries = cut.entries("Random");
-    REQUIRE(second_genome_entries.size() == 1);
-    CHECK(second_genome_entries[0] == RANDOM_2);
+    REQUIRE(second_genome_entries.size() == 2);
+    CHECK(second_genome_entries[0] == RANDOM_1);
+    CHECK(second_genome_entries[1] == RANDOM_2);
 }
 
 }  // namespace dorado::alignment::bed_file::test
