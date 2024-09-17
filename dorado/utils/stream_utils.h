@@ -78,7 +78,7 @@ public:
 };
 
 /// <summary>
-/// RAII helper to provide scoped stderr suppression
+/// RAII helper to provide scoped stdout suppression
 /// </summary>
 class [[nodiscard]] SuppressStdout final {
     const int m_fd;

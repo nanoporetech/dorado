@@ -102,7 +102,6 @@ TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
             {"abc  \t\n  z  ", "abc  \t\n  z"},
     }));
     // clang-format on
-
     CAPTURE(input);
 
     auto actual = rtrim_view(input);

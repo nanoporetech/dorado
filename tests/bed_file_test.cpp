@@ -43,7 +43,7 @@ TEST_CASE(CUT_TAG " load from stream with valid input does not throw.", CUT_TAG)
     REQUIRE_NOTHROW(cut.load(input_stream));
 }
 
-TEST_CASE(CUT_TAG " load from stream with valid single record creates single entry.", CUT_TAG) {
+TEST_CASE(CUT_TAG " load with valid single record creates single entry.", CUT_TAG) {
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{LAMBDA_1.bed_line};
     CHECK(cut.load(input_stream));
@@ -54,10 +54,8 @@ TEST_CASE(CUT_TAG " load from stream with valid single record creates single ent
     CHECK(entries[0] == LAMBDA_1);
 }
 
-TEST_CASE(
-        CUT_TAG
-        " load from stream with 'track' header line plus valid single record creates single entry.",
-        CUT_TAG) {
+TEST_CASE(CUT_TAG " load with 'track' header line plus valid single record creates single entry.",
+          CUT_TAG) {
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{"track blah\tblah2\n" + LAMBDA_1.bed_line};
     CHECK(cut.load(input_stream));
@@ -69,7 +67,7 @@ TEST_CASE(
 }
 
 TEST_CASE(CUT_TAG
-          " load from stream with 'browser' header line plus valid single record creates single "
+          " load with 'browser' header line plus valid single record creates single "
           "entry.",
           CUT_TAG) {
     dorado::alignment::BedFile cut{};
@@ -83,7 +81,7 @@ TEST_CASE(CUT_TAG
 }
 
 TEST_CASE(CUT_TAG
-          " load from stream with '#' comment header line plus valid single record creates single "
+          " load with '#' comment header line plus valid single record creates single "
           "entry.",
           CUT_TAG) {
     dorado::alignment::BedFile cut{};
@@ -97,7 +95,7 @@ TEST_CASE(CUT_TAG
 }
 
 TEST_CASE(CUT_TAG
-          " load from stream with multiple header lines plus valid single record creates single "
+          " load with multiple header lines plus valid single record creates single "
           "entry.",
           CUT_TAG) {
     dorado::alignment::BedFile cut{};
@@ -111,8 +109,15 @@ TEST_CASE(CUT_TAG
     CHECK(entries[0] == LAMBDA_1);
 }
 
-TEST_CASE(CUT_TAG " load from stream with two records same genome creates two entries for genome.",
-          CUT_TAG) {
+TEST_CASE(CUT_TAG " load with header line after bed data line returns false.", CUT_TAG) {
+    dorado::alignment::BedFile cut{};
+    std::istringstream input_stream{LAMBDA_1.bed_line + "\nbrowser blah"};
+
+    utils::SuppressStdout suppress_error_message{};
+    REQUIRE_FALSE(cut.load(input_stream));
+}
+
+TEST_CASE(CUT_TAG " load with two records same genome creates two entries for genome.", CUT_TAG) {
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{LAMBDA_1.bed_line + "\n" + LAMBDA_2.bed_line};
     CHECK(cut.load(input_stream));
@@ -125,7 +130,7 @@ TEST_CASE(CUT_TAG " load from stream with two records same genome creates two en
 }
 
 TEST_CASE(CUT_TAG
-          " load from stream with 4 records, 2 genomes with 2 entries each, returns the correct "
+          " load with 4 records, 2 genomes with 2 entries each, returns the correct "
           "entries for genomes.",
           CUT_TAG) {
     dorado::alignment::BedFile cut{};
