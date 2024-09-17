@@ -4,9 +4,11 @@ Using the `--index-size 1` (1bp in size) will make each read to be in its own ch
   $ rm -rf out; mkdir -p out
   > in_reads=${TEST_DATA_DIR}/read_correction/reads.fq
   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
-  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > skip_set.txt
-  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from skip_set.txt -v --index-size 1 --to-paf > out/out.paf 2> out/out.paf.stderr
-  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from skip_set.txt -v --index-size 1 --from-paf out/out.paf > out/out.fasta 2> out/out.fasta.stderr
+  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > out/skip_set.txt
+  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from out/skip_set.txt -v --index-size 1 --to-paf > out/out.paf 2> out/out.paf.stderr
+  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from out/skip_set.txt -v --index-size 1 --from-paf out/out.paf > out/out.fasta 2> out/out.fasta.stderr
+  > grep -i "\[error\]" out/out.paf.stderr out/out.fasta.stderr
+  > grep -i "\[warning\]" out/out.paf.stderr out/out.fasta.stderr
   > samtools faidx out/out.fasta
   > cut -f6,6 out/out.paf | sort | uniq
   > echo "-"
@@ -25,8 +27,10 @@ containing in total 3 target reads. Read "df814002-1961-4262-aaf5-e8f2760aa77a" 
   $ rm -rf out; mkdir -p out
   > in_reads=${TEST_DATA_DIR}/read_correction/reads.fq
   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
-  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > skip_set.txt
-  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from skip_set.txt -v --index-size 100000 --to-paf > out/out.paf 2> out/out.paf.stderr
+  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > out/skip_set.txt
+  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from out/skip_set.txt -v --index-size 100000 --to-paf > out/out.paf 2> out/out.paf.stderr
+  > grep -i "\[error\]" out/out.paf.stderr
+  > grep -i "\[warning\]" out/out.paf.stderr
   > cut -f6,6 out/out.paf | sort | uniq
   3855985e-bb9b-4df4-9825-cc08f373342b
   b93514e5-c61b-48d8-b730-f6c97d169ff7
@@ -37,9 +41,11 @@ Only the single read in the skip-set should not be present in the output, becaus
   $ rm -rf out; mkdir -p out
   > in_reads=${TEST_DATA_DIR}/read_correction/reads.fq
   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
-  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > skip_set.txt
+  > echo "df814002-1961-4262-aaf5-e8f2760aa77a" > out/skip_set.txt
   > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} -v --index-size 100000 --to-paf > out/out.paf 2> out/out.paf.stderr
-  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from skip_set.txt -v --index-size 100000 --from-paf out/out.paf > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} correct ${in_reads} -t 4 ${model_var} --resume-from out/skip_set.txt -v --index-size 100000 --from-paf out/out.paf > out/out.fasta 2> out/out.fasta.stderr
+  > grep -i "\[error\]" out/out.paf.stderr out/out.fasta.stderr
+  > grep -i "\[warning\]" out/out.paf.stderr out/out.fasta.stderr
   > samtools faidx out/out.fasta
   > cat out/out.fasta.fai | cut -f1,1 | sort
   3855985e-bb9b-4df4-9825-cc08f373342b

@@ -32,12 +32,11 @@ if [[ "${OUT_DIR}" == "" ]]; then
 fi
 
 mkdir -p ${output_dir}
-pwd
 
 # Download the Cram package.
 pushd ${output_dir}
 curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
-tar -xzvf cram-0.6.tar.gz
+tar -xzf cram-0.6.tar.gz
 CRAM=$(pwd)/cram-0.6/cram.py
 popd
 
@@ -48,16 +47,6 @@ MODEL_DIR=${output_dir}/herro-v1
 if [[ ! -d "${MODEL_DIR}" ]]; then
     ${DORADO_BIN} download --model "herro-v1" --models-directory ${output_dir}
 fi
-
-pwd
-echo "Current dir:"
-ls -la
-echo "TEST_DIR:"
-ls -la ${TEST_DIR}
-echo "TEST_DATA_DIR:"
-ls -la ${TEST_DATA_DIR}
-echo "MODEL_DIR:"
-ls -la ${MODEL_DIR}
 
 export DORADO_BIN
 export TEST_DATA_DIR

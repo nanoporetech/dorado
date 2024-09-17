@@ -53,6 +53,35 @@ flank_threshold = 0.6
 tail_interrupt_length = 10
 ```
 
+### Overrides
+Configuration options can be overridden for individual barcodes. We generate a default configuration as normal, and then
+add overrides of specific values for each barcode by adding an `[[overrides]]` section labelled by the barcode name.
+```
+[anchors]
+front_primer = "ATCG"
+rear_primer = "CGTA"
+[tail]
+tail_interrupt_length = 5
+
+[[overrides]]
+barcode_id = "Custom-Kit_barcode01"
+[overrides.threshold]
+flank_threshold = 0.5
+
+[[overrides]]
+barcode_id = "Custom-Kit_barcode02"
+[overrides.anchors]
+front_primer = "AACC"
+rear_primer = "GGTT"
+[overrides.tail]
+tail_interrupt_length = 10
+```
+
+This creates three configurations:
+* a default configuration with custom front and rear primers and an interrupt length of 5
+* a configuration to use for `barcode01` from kit `Custom-Kit`  identical to the main custom settings (i.e. with the custom front and rear primers and the interrupt length), with an additional change to the `flank_threshold`.
+* a configuration to use for `barcode02` from kit `Custom-Kit` with different primers and an interrupt length of 10, but with no change to the flank threshold.
+
 ### Configuration Options
 
 | Option | Description |

@@ -3,6 +3,7 @@
 #include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/module_utils.h"
 
 #include <ATen/core/TensorBody.h>
@@ -104,9 +105,17 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const basecall::tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
+
+    void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
+
+    tx::TxEncoderParams params;
+
+    // Rearranged weights for Koi tiled codepath
+    utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
+    at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
@@ -116,18 +125,23 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
+    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
 
-    at::Tensor forward(const at::Tensor &x) { return stack->forward(x); };
+    at::Tensor forward(const at::Tensor &x);
+
+    bool use_koi_tiled{false};
+    bool use_i8{false};
     torch::nn::Sequential stack{nullptr};
+    std::vector<TxEncoder> layer_vec;
 };
 
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const basecall::tx::EncoderUpsampleParams &params);
+    LinearUpsampleImpl(const tx::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
+
     const int scale_factor;
     torch::nn::Linear linear{nullptr};
 };

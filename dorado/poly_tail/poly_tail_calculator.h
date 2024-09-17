@@ -53,6 +53,10 @@ protected:
     // Floor for average signal value of poly tail.
     virtual float min_avg_val() const = 0;
 
+    // Returns the acceptable distance between the supplied interval and the anchor
+    virtual std::pair<int, int> buffer_range(const std::pair<int, int>& interval,
+                                             float samples_per_base) const = 0;
+
     // Determine the outer boundary of the signal space to consider based on the anchor.
     virtual std::pair<int, int> signal_range(int signal_anchor,
                                              int signal_len,
@@ -71,9 +75,9 @@ protected:
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(bool is_rna,
-                                                            bool is_rna_adapter,
-                                                            const std::string& config_file);
+    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
+                                                            bool is_rna,
+                                                            bool is_rna_adapter);
 };
 
 }  // namespace dorado::poly_tail

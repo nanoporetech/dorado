@@ -149,8 +149,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.in_reads_fns = parser.visible.get<std::vector<std::string>>("reads");
     opt.infer_threads = parser.visible.get<int>("infer-threads");
     opt.batch_size = parser.visible.get<int>("batch-size");
-    opt.index_size = utils::arg_parse::parse_string_to_size<uint64_t>(
-            parser.visible.get<std::string>("index-size"));
+    opt.index_size = std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
+                                                  parser.visible.get<std::string>("index-size")));
     opt.to_paf = parser.visible.get<bool>("to-paf");
     opt.in_paf_fn = (parser.visible.is_used("--from-paf"))
                             ? parser.visible.get<std::string>("from-paf")

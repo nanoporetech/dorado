@@ -495,9 +495,9 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
             if (type_id == KOI_F16) {
                 w_device = linear->weight.contiguous().to(in_ntc.options());
             } else {
-                auto [quant_scale, quant] = dorado::utils::quantize_tensor(linear->weight.t());
-                weight_scale = quant_scale.to(torch::kF16).to(in_ntc.device());
-                w_device = quant.t().contiguous().to(in_ntc.device());
+                auto scaled_tensor = dorado::utils::quantize_tensor(linear->weight, 1);
+                weight_scale = scaled_tensor.scale.to(torch::kF16).to(in_ntc.device());
+                w_device = scaled_tensor.t.contiguous().to(in_ntc.device());
             }
         }
         auto res = host_linear(
@@ -646,9 +646,9 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
             auto layer_device_bias = params["bias_ih_l0"].to(opts_f16).view({4, layer_size}).t();
 
             if (type_id == KOI_I8) {
-                auto [scale, quantized] = dorado::utils::quantize_tensor(weights_cpu.t());
-                weights_cpu = quantized.t();
-                scale = scale.view({4, layer_size}).t();
+                auto scaled_tensor = dorado::utils::quantize_tensor(weights_cpu, 1);
+                weights_cpu = scaled_tensor.t;
+                auto scale = scaled_tensor.scale.view({4, layer_size}).t();
                 device_scale.push_back(scale.to(opts_f16).contiguous());
             } else {
                 device_scale.push_back(torch::ones_like(layer_device_bias));
@@ -692,11 +692,11 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
     if (device_w_hh.empty()) {
         for (auto &rnn : rnns) {
             const auto &params = rnn->named_parameters();
-            auto [scale, quant] = dorado::utils::quantize_tensor(params["weight_hh_l0"].t());
+            auto scaled_tensor = dorado::utils::quantize_tensor(params["weight_hh_l0"], 1);
             device_w_ih.push_back(params["weight_ih_l0"].transpose(0, 1).contiguous());
-            device_w_hh.push_back(quant.contiguous());
+            device_w_hh.push_back(scaled_tensor.t.t().contiguous());
             device_bias.push_back(params["bias_ih_l0"]);
-            device_scale.push_back(scale.contiguous());
+            device_scale.push_back(scaled_tensor.scale.contiguous());
         }
     }
 

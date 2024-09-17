@@ -129,6 +129,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
 DuplexModels load_models(const std::string& model_arg,
                          const std::vector<std::string>& mod_bases,
                          const std::string& mod_bases_models,
+                         const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const std::string& reads,
                          const basecall::BasecallerParams& basecaller_params,
@@ -146,8 +147,17 @@ DuplexModels load_models(const std::string& model_arg,
         spdlog::warn("Duplex is not supported for fast models.");
     }
 
-    std::filesystem::path model_path;
     std::filesystem::path stereo_model_path;
+    if (!stereo_model_arg.empty()) {
+        stereo_model_path = std::filesystem::path(stereo_model_arg);
+        if (!std::filesystem::exists(stereo_model_path)) {
+            spdlog::error("--stereo-model does not exist at: '{}'.",
+                          stereo_model_path.string().c_str());
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
+    std::filesystem::path model_path;
     std::vector<std::filesystem::path> mods_model_paths;
 
     model_downloader::ModelDownloader downloader(model_directory);
@@ -155,9 +165,12 @@ DuplexModels load_models(const std::string& model_arg,
     // Cannot use inferred_selection as it has the ModelVariant set differently.
     if (ModelComplexParser::parse(model_arg).is_path()) {
         model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
-        stereo_model_path = model_path.parent_path() / model_search.stereo().name;
-        if (!std::filesystem::exists(stereo_model_path)) {
-            stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
+
+        if (stereo_model_path.empty()) {
+            stereo_model_path = model_path.parent_path() / model_search.stereo().name;
+            if (!std::filesystem::exists(stereo_model_path)) {
+                stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
+            }
         }
 
         if (!skip_model_compatibility_check) {
@@ -187,7 +200,9 @@ DuplexModels load_models(const std::string& model_arg,
     } else {
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");
-            stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
+            if (stereo_model_path.empty()) {
+                stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
+            }
             // Either get the mods from the model complex or resolve from --modified-bases args
             mods_model_paths = inferred_model_complex.has_mods_variant()
                                        ? downloader.get(model_search.mods(), "mods")
@@ -372,6 +387,10 @@ int duplex(int argc, char* argv[]) {
                 .scan<'i', int>();
     }
     cli::add_internal_arguments(parser);
+
+    parser.hidden.add_argument("--stereo-model")
+            .help("Path to stereo model")
+            .default_value(std::string(""));
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
@@ -561,14 +580,16 @@ int duplex(int argc, char* argv[]) {
                 throw std::runtime_error(err);
             }
 
+            const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
             const auto basecaller_params = get_basecaller_params(parser.visible);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
-            const DuplexModels models = load_models(
-                    model, mod_bases, mod_bases_models, models_directory, reads, basecaller_params,
-                    recursive_file_loading, skip_model_compatibility_check, device);
+            const DuplexModels models =
+                    load_models(model, mod_bases, mod_bases_models, stereo_model_arg,
+                                models_directory, reads, basecaller_params, recursive_file_loading,
+                                skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 

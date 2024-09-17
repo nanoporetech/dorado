@@ -1,6 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 #include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PolyACalculatorNode.h"
@@ -33,9 +33,10 @@ struct TestCase {
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto [gt, data, is_rna] = GENERATE(
-            TestCase{143, "poly_a/r9_rev_cdna", false}, TestCase{35, "poly_a/r10_fwd_cdna", false},
-            TestCase{37, "poly_a/rna002", true}, TestCase{73, "poly_a/rna004", true});
+            TestCase{149, "poly_a/r9_rev_cdna", false}, TestCase{35, "poly_a/r10_fwd_cdna", false},
+            TestCase{39, "poly_a/rna002", true}, TestCase{76, "poly_a/rna004", true});
 
+    CAPTURE(data);
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
@@ -56,8 +57,9 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
     read->read_common.client_info->contexts()
-            .register_context<const dorado::poly_tail::PolyTailCalculator>(
-                    dorado::poly_tail::PolyTailCalculatorFactory::create(is_rna, false, ""));
+            .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
+                    std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>("", is_rna,
+                                                                                    false));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -93,8 +95,9 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
     read->read_common.client_info->contexts()
-            .register_context<const dorado::poly_tail::PolyTailCalculator>(
-                    dorado::poly_tail::PolyTailCalculatorFactory::create(false, false, config));
+            .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
+                    std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(config, false,
+                                                                                    false));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -108,38 +111,33 @@ TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config", TEST
 }
 
 TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
-    auto tmp_dir = make_temp_dir("polya_test");
-
     SECTION("Check failure with non-existent file.") {
         const std::string missing_file = "foo_bar_baz";
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(missing_file),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(missing_file),
                           "PolyA config file doesn't exist at foo_bar_baz");
     }
 
     SECTION("Only one primer is provided") {
-        auto path = (tmp_dir.m_path / "only_one_primer.toml").string();
         const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
 
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(buffer),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
                           "Both front_primer and rear_primer must be provided in the PolyA "
                           "configuration file.");
     }
 
     SECTION("Only one plasmid flank is provided") {
-        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
         const toml::value data{{"anchors", toml::table{{"plasmid_rear_flank", "ACTG"}}}};
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
 
-        CHECK_THROWS_WITH(dorado::poly_tail::prepare_config(buffer),
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
                           "Both plasmid_front_flank and plasmid_rear_flank must be provided in the "
                           "PolyA configuration file.");
     }
 
     SECTION("Parse all supported configs") {
-        auto path = (tmp_dir.m_path / "only_one_flank.toml").string();
         const toml::value data{{"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
                                                        {"plasmid_rear_flank", "ACTG"},
                                                        {"front_primer", "AAAAAA"},
@@ -148,7 +146,9 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         const std::string fmt = toml::format(data);
         std::stringstream buffer(fmt);
 
-        auto config = dorado::poly_tail::prepare_config(buffer);
+        auto configs = dorado::poly_tail::prepare_configs(buffer);
+        REQUIRE(configs.size() == 1);
+        const auto& config = configs.front();
         CHECK(config.front_primer == "AAAAAA");
         CHECK(config.rc_front_primer == "TTTTTT");
         CHECK(config.rear_primer == "GGGGGG");
@@ -159,5 +159,73 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
         CHECK(config.rc_plasmid_rear_flank == "CAGT");
         CHECK(config.is_plasmid);  // Since the plasmid flanks were specified
         CHECK(config.tail_interrupt_length == 10);
+    }
+
+    SECTION("Override config missing id") {
+        const int NUM_CONFIGS = 3;
+        toml::array config_toml;
+        for (int i = 0; i < NUM_CONFIGS; ++i) {
+            toml::table data{};
+            config_toml.push_back(data);
+        }
+        const toml::value data{{"overrides", config_toml}};
+        const std::string fmt = toml::format(data);
+        std::stringstream buffer(fmt);
+
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
+                          "Missing barcode_id in override poly tail configuration.");
+    }
+
+    SECTION("Override config duplicate id") {
+        const int NUM_CONFIGS = 3;
+        toml::array config_toml;
+        for (int i = 0; i < NUM_CONFIGS; ++i) {
+            toml::table data{{"barcode_id", "duplicate"}};
+            config_toml.push_back(data);
+        }
+        const toml::value data{{"overrides", config_toml}};
+        const std::string fmt = toml::format(data);
+        std::stringstream buffer(fmt);
+
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
+                          "Duplicate barcode_id found in poly tail config file.");
+    }
+
+    SECTION("Default config contains barcode id") {
+        const int NUM_CONFIGS = 3;
+        toml::array config_toml;
+        for (int i = 0; i < NUM_CONFIGS; ++i) {
+            toml::table data{{"barcode_id", "barcode" + std::to_string(i)}};
+            config_toml.push_back(data);
+        }
+        const toml::value data{{"barcode_id", "error"}, {"overrides", config_toml}};
+        const std::string fmt = toml::format(data);
+        std::stringstream buffer(fmt);
+
+        CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
+                          "Default poly tail config must not specify barcode_id.");
+    }
+
+    SECTION("Parse override configs") {
+        const int NUM_CONFIGS = 3;
+        toml::array config_toml;
+        for (int i = 0; i < NUM_CONFIGS; ++i) {
+            toml::table data{{"barcode_id", "barcode" + std::to_string(i)}};
+            config_toml.push_back(data);
+        }
+
+        const toml::value data{{"tail", toml::table{{"tail_interrupt_length", 10}}},
+                               {"overrides", config_toml}};
+        const std::string fmt = toml::format(data);
+        std::stringstream buffer(fmt);
+
+        auto configs = dorado::poly_tail::prepare_configs(buffer);
+        REQUIRE(configs.size() == NUM_CONFIGS + 1);  // specified configs + default
+        for (int i = 0; i < NUM_CONFIGS; ++i) {
+            CHECK(configs[i].barcode_id ==
+                  "barcode" + std::to_string(i));           // overridden value per config
+            CHECK(configs[i].tail_interrupt_length == 10);  // default inherited from main config
+        }
+        CHECK(configs.back().barcode_id.empty());
     }
 }

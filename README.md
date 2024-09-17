@@ -22,10 +22,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.7.3-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-linux-x64.tar.gz)
- - [dorado-0.7.3-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-linux-arm64.tar.gz)
- - [dorado-0.7.3-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-osx-arm64.zip)
- - [dorado-0.7.3-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.7.3-win64.zip)
+ - [dorado-0.8.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.8.0-linux-x64.tar.gz)
+ - [dorado-0.8.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.8.0-linux-arm64.tar.gz)
+ - [dorado-0.8.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.8.0-osx-arm64.zip)
+ - [dorado-0.8.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.8.0-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -311,18 +311,45 @@ Dorado supports single-read error correction with the integration of the [HERRO]
 
 To correct reads, run:
 ```
-$ dorado correct reads.fastq(.gz) > corrected_reads.fasta
+$ dorado correct reads.fastq > corrected_reads.fasta
 ```
 
-Dorado correct only supports FASTX(.gz) as the input and generates a FASTA file as output. The input can be uncompressed or compressed with `bgz`. An index file is generated for the input FASTX file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space (no more than 10GB should be necessary for a whole genome dataset).
+Dorado correct only supports FASTQ(.gz) as the input and generates a FASTA file as output. The input can be uncompressed or compressed with `bgz`. An index file is generated for the input FASTQ file in the same folder unless one is already present. Please ensure that the folder with the input file is writeable by the `dorado` process and has sufficient disk space.
 
-The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( > 64 cores), large system memory ( > 256GB) and a modern GPU with a large VRAM ( > 32GB).
+The error correction tool is both compute and memory intensive. As a result, it is best run on a system with multiple high performance CPU cores ( >= 64 cores), large system memory ( >= 256GB) and a modern GPU with a large VRAM ( >= 32GB).
 
 All required model weights are downloaded automatically by Dorado. However, the weights can also be pre-downloaded and passed via command line in case of offline execution. To do so, run:
 ```
 $ dorado download --model herro-v1
-$ dorado correct -m herro-v1 reads.fastq(.gz) > corrected_reads.fasta
+$ dorado correct -m herro-v1 reads.fastq > corrected_reads.fasta
 ```
+Dorado Correct now also provides a feature to run mapping (CPU-only stage) and inference (GPU-intensive stage) individually. This enables separation of the CPU and GPU heavy stages into individual steps which can even be run on different nodes with appropriate compute characteristics. Example:
+```
+$ dorado correct reads.fastq --to-paf > overlaps.paf
+$ dorado correct reads.fastq --from-paf overlaps.paf > corrected_reads.fasta
+```
+Gzipped PAF is currently not supported for the `--from-paf` option.
+
+Additionally, if a run was stopped or has failed, Dorado Correct provides a "resume" functionality. The resume feature takes a list of previously corrected reads (e.g. a `.fai` index from the previous run) and skips the previously processed reads:
+```
+$ samtools faidx corrected_reads.1.fasta    # Output from the previously interrupted run.
+$ dorado correct reads.fastq --resume-from corrected_reads.1.fasta.fai > corrected_reads.2.fasta
+```
+The input file format for the `--resume-from` feature can be any plain text file where the first whitespace-delimited column (or a full row) consists of sequence names to skip, one per row.
+
+#### Troubleshooting
+1. In case the process is consuming too much memory for your system, try running it with a smaller index size. For example:
+    ```
+    $ dorado correct reads.fastq --index-size 4G > corrected_reads.fasta
+    ```
+2. The auto-computed inference batch size may still be too high for your system. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size / selecting it manually. For example:
+    ```
+    $ dorado correct reads.fastq --batch-size <number> > corrected_reads.fasta
+    ```
+3. In case your output FASTA file contains a very low amount of corrected reads compared to the input, please check the following:
+    - The input dataset has average read length `>=10kbp`. Dorado Correct is designed for long reads, and it will not work on short libraries.
+    - Input coverage is reasonable, preferrably `>=30x`.
+    - Check the average base qualities of the input dataset. Dorado Correct expects accurate inputs for both mapping and inference.
 
 ## Available basecalling models
 
@@ -336,7 +363,7 @@ $ dorado download --model all
 
 The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. Below is a sample model name explained:
 
-`dna_r10.4.1_e8.2_400bps_hac@v4.3.0`
+`dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
 
 - **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna002` or `rna004`, depending on the kit.
 
@@ -348,7 +375,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
-- **Model Version Number (`v4.3.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
+- **Model Version Number (`v5.0.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
 
 
 ### **DNA models:**
@@ -360,8 +387,8 @@ The versioning of modification models is bound to the basecalling model. This me
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v5.0.0** | | | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v2<br />v2<br />v2<br />v2 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v2<br />v2<br />v2<br />v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.3.0 | | | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
@@ -393,18 +420,21 @@ The versioning of modification models is bound to the basecalling model. This me
 
 ### **RNA models:**
 
-**Note:** The BAM format does not support `U` bases. Therefore, when Dorado is performing RNA basecalling, the resulting output files will include `T` instead of `U`. This is consistent across output file types. The same applies to parsing inputs. Any input HTS file (e.g. FASTQ generated by `guppy`/`basecall_server`) with `U` bases is not handled by `dorado`.
+**Note:** The BAM format does not support `U` bases. Therefore, when Dorado is performing RNA basecalling, the resulting output files will include `T` instead of `U`. This is consistent across output file types.
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **rna004_130bps_fast@v5.0.0** | N/A | N/A | 4 kHz |
-| **rna004_130bps_hac@v5.0.0** | m6A<br />pseU | v1<br />v1<br />v1 | 4 kHz |
-| **rna004_130bps_sup@v5.0.0** | m6A<br />pseU | v1<br />v1<br />v1 | 4 kHz |
-| rna004_130bps_fast@v3.0.1 | N/A | N/A | 4 kHz |
-| rna004_130bps_hac@v3.0.1 | N/A | N/A | 4 kHz |
+| **rna004_130bps_fast@v5.1.0** | | | 4 kHz |
+| **rna004_130bps_hac@v5.1.0** | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
+| **rna004_130bps_sup@v5.1.0** | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_fast@v5.0.0 | | | 4 kHz |
+| rna004_130bps_hac@v5.0.0 | m6A<br />m6A_DRACH<br />pseU | v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_sup@v5.0.0 | m6A<br />m6A_DRACH<br />pseU | v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_fast@v3.0.1 | | | 4 kHz |
+| rna004_130bps_hac@v3.0.1 | | | 4 kHz |
 | rna004_130bps_sup@v3.0.1 | m6A_DRACH | v1 | 4 kHz |
-| rna002_70bps_fast@v3 | N/A | N/A | 3 kHz |
-| rna002_70bps_hac@v3 | N/A | N/A | 3 kHz |
+| rna002_70bps_fast@v3 | | | 3 kHz |
+| rna002_70bps_hac@v3 | | | 3 kHz |
 
 
 ## Automatic model selection complex
@@ -524,7 +554,4 @@ Low GPU utilization can lead to reduced basecalling speed. This problem can be i
 
 (c) 2024 Oxford Nanopore Technologies PLC.
 
-Dorado is distributed under the terms of the Oxford Nanopore
-Technologies PLC.  Public License, v. 1.0.  If a copy of the License
-was not distributed with this file, You can obtain one at
-http://nanoporetech.com
+Dorado is distributed under the terms of the Oxford Nanopore Technologies PLC.  Public License, v. 1.0.  If a copy of the License was not distributed with this file, You can obtain one at http://nanoporetech.com
