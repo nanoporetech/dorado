@@ -77,4 +77,24 @@ public:
     }
 };
 
+/// <summary>
+/// RAII helper to provide scoped stderr suppression
+/// </summary>
+class [[nodiscard]] SuppressStdout final {
+    const int m_fd;
+
+public:
+    SuppressStdout() : m_fd(suppress_stdout()) {}
+    ~SuppressStdout() { restore_stdout(m_fd); }
+
+    /// <summary>
+    /// Invoke a function with stdout suppressed
+    /// </summary>
+    template <typename Func>
+    static void invoke(Func &&func) {
+        SuppressStdout suppression{};
+        func();
+    }
+};
+
 }  // namespace dorado::utils

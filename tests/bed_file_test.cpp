@@ -1,6 +1,7 @@
 #include "alignment/bed_file.h"
 
 #include "TestUtils.h"
+#include "utils/stream_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -22,7 +23,7 @@ TEST_CASE(CUT_TAG " load from valid file all entries loaded", CUT_TAG) {
     auto data_dir = get_data_dir("bedfile_test");
     auto test_file = (data_dir / "test_bed.bed").string();
     dorado::alignment::BedFile bed;
-    bed.load(test_file);
+    CHECK(bed.load(test_file));
     const auto& entries = bed.entries("Lambda");
     REQUIRE(entries.size() == size_t(4));
     std::vector<size_t> expected_starts{40000, 41000, 80000, 81000};
@@ -45,6 +46,63 @@ TEST_CASE(CUT_TAG " load from stream with valid input does not throw.", CUT_TAG)
 TEST_CASE(CUT_TAG " load from stream with valid single record creates single entry.", CUT_TAG) {
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{LAMBDA_1.bed_line};
+    CHECK(cut.load(input_stream));
+
+    const auto entries = cut.entries("Lambda");
+
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0] == LAMBDA_1);
+}
+
+TEST_CASE(
+        CUT_TAG
+        " load from stream with 'track' header line plus valid single record creates single entry.",
+        CUT_TAG) {
+    dorado::alignment::BedFile cut{};
+    std::istringstream input_stream{"track blah\tblah2\n" + LAMBDA_1.bed_line};
+    CHECK(cut.load(input_stream));
+
+    const auto entries = cut.entries("Lambda");
+
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0] == LAMBDA_1);
+}
+
+TEST_CASE(CUT_TAG
+          " load from stream with 'browser' header line plus valid single record creates single "
+          "entry.",
+          CUT_TAG) {
+    dorado::alignment::BedFile cut{};
+    std::istringstream input_stream{"browser blah\tblah2\n" + LAMBDA_1.bed_line};
+    CHECK(cut.load(input_stream));
+
+    const auto entries = cut.entries("Lambda");
+
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0] == LAMBDA_1);
+}
+
+TEST_CASE(CUT_TAG
+          " load from stream with '#' comment header line plus valid single record creates single "
+          "entry.",
+          CUT_TAG) {
+    dorado::alignment::BedFile cut{};
+    std::istringstream input_stream{"# col1, col2, col3\n" + LAMBDA_1.bed_line};
+    CHECK(cut.load(input_stream));
+
+    const auto entries = cut.entries("Lambda");
+
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0] == LAMBDA_1);
+}
+
+TEST_CASE(CUT_TAG
+          " load from stream with multiple header lines plus valid single record creates single "
+          "entry.",
+          CUT_TAG) {
+    dorado::alignment::BedFile cut{};
+    std::istringstream input_stream{"browser blah\tblah2\ntrack blah\tblah2\n# col1, col2, col3\n" +
+                                    LAMBDA_1.bed_line};
     CHECK(cut.load(input_stream));
 
     const auto entries = cut.entries("Lambda");
@@ -87,27 +145,45 @@ TEST_CASE(CUT_TAG
 }
 
 TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
-    auto [line, genome, start, end, strand, valid] =
-            GENERATE(table<std::string, std::string, std::size_t, std::size_t, char, bool>({
-                    {"Lambda\t1234\t2345\tcomment1\t100\t+", "Lambda", 1234, 2345, '+', true},
-                    {"Lambda\t1234\t2345", "Lambda", 1234, 2345, '.', true},
-                    {"Lambda 1234 2345", "Lambda", 0, 0, 0, false},
-            }));
-    const BedFile::Entry EXPECTED{line, start, end, strand};
+    // clang-format off
+    auto [line, genome, start, end, strand, valid] = GENERATE(
+        table<std::string, std::string, std::size_t, std::size_t, char, bool>({
+            {"Lambda\t1234\t2345\tcomment1\t100\t+", "Lambda", 1234, 2345, '+', true},
+            {"Lambda\t1234\t2345", "Lambda", 1234, 2345, '.', true},
+            {"Lambda 1234 2345", "Lambda", 0, 0, 0, false},
+            {"Lambda\tabc\t2345", "Lambda", 0, 0, 0, false},
+            {"Lambda\t1234\t2345\tcomment with spaces", "Lambda", 1234, 2345, '.', true},
+            {"Lambda\t12345\t23456\tspaces column\t100", "Lambda", 12345, 23456, '.', true},
+            {"Lambda\t1234\t2345\tinvalid strand\t100\tTTT", "Lambda", 0, 0, 0, false},
+            {"12Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t123,234\t456,567", "12Fields", 1, 2, '+', true},
+            {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, 0, false},
+            {"empty_middle_field\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_field", 0, 0, 0, false},
+            {"trailing_whitespace\t1\t2\tab c\t100\t+\t\t \t", "trailing_whitespace", 1, 2, '+', true},
+        }));
+    // clang-format on
     CAPTURE(line);
 
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{RANDOM_1.bed_line + "\n" + line + "\n" + RANDOM_2.bed_line};
 
+    bool load_result;
+    {
+        utils::SuppressStdout suppress_error_message{};
+        load_result = cut.load(input_stream);
+    }
+    if (!valid) {
+        CHECK_FALSE(load_result);
+        return;
+    }
+
+    CHECK(load_result);
+
+    const BedFile::Entry EXPECTED{line, start, end, strand};
     CHECK(cut.load(input_stream));
     const auto entries = cut.entries(genome);
 
-    if (valid) {
-        REQUIRE(entries.size() == 1);
-        CHECK(entries[0] == EXPECTED);
-    } else {
-        CHECK(entries.empty());
-    }
+    REQUIRE(entries.size() == 1);
+    CHECK(entries[0] == EXPECTED);
 
     auto second_genome_entries = cut.entries("Random");
     REQUIRE(second_genome_entries.size() == 2);

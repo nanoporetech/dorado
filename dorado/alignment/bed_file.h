@@ -10,10 +10,10 @@ namespace dorado::alignment {
 class BedFile {
 public:
     struct Entry {
-        std::string bed_line;
-        size_t start;
-        size_t end;
-        char strand;
+        std::string bed_line{};
+        size_t start{};
+        size_t end{};
+        char strand{'.'};
     };
 
     using Entries = std::vector<Entry>;
