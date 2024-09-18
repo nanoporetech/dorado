@@ -32,7 +32,7 @@ WaitingTask PriorityTaskQueue::pop() {
     }
 
     WaitingTask result{(*producer_queue_itr)->pop(), popped_priority};
-    m_producer_queue_list.pop_front();
+    m_producer_queue_list.erase(producer_queue_itr);
     return result;
 }
 
@@ -47,7 +47,7 @@ WaitingTask PriorityTaskQueue::pop(TaskPriority priority) {
     }
 
     WaitingTask result{(*producer_queue_itr)->pop(), priority};
-    m_producer_queue_list.pop_front();
+    m_producer_queue_list.erase(producer_queue_itr);
     return result;
 }
 
