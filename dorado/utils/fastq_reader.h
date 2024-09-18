@@ -22,10 +22,22 @@ public:
     const std::string& qstring() const;
 
     std::string_view read_id_view() const;
+
+    // Retrieves the run_id from the header if it has been embedded in minKNOW style format
+    // or an enpty string if not found.
+    // e.g.
+    // @read_0 runid=123 sampleid=... etc.
+    // would return "123"
     std::string_view run_id_view() const;
+
+    // Retrieves list of bam tags if they have been embedded in the header.
+    // When dorado uses HtsLib to output to fastq some tags will be embedded in
+    // the header these will be returned in string format e.g.
+    // result[0]: "st:Z:2023-06-22T07:17:48.308+00:00"
+    // result[1]: "RG:Z:6a94c5e38fbe36232d63fd05555e41368b204cda_dna_r10.4.1_e8.2_400bps_hac@v4.3.0"
+    // etc ...
     std::vector<std::string> get_bam_tags() const;
 
-    //  Testability. Public to allow utests to check processing of tags embedded in the header record
     bool set_header(std::string value);
 
     static std::optional<FastqRecord> try_create(std::istream& input_stream,

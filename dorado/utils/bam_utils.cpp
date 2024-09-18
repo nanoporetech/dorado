@@ -112,6 +112,26 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 
 }  // namespace
 
+bool try_add_fastq_header_tag(bam1_t* record, const std::string& header) {
+    // validate the fastq header contains only printable characters including SPACE
+    // i.e. ' ' (0x20) through to '~' (0x7E)
+    // Note this will not write an HtsLib generated fastq header line which has the bam tags appended
+    if (std::any_of(header.begin(), header.end(), [](char c) { return c < 0x20 || c > 0x7e; })) {
+        return false;
+    }
+
+    return bam_aux_append(record, "fq", 'Z', static_cast<int>(header.size() + 1),
+                          reinterpret_cast<const uint8_t*>(header.c_str())) == 0;
+}
+
+int remove_fastq_header_tag(bam1_t* record) {
+    auto tag_ptr = bam_aux_get(record, "fq");
+    if (!tag_ptr) {
+        return 0;  // return success result for bam_aux_del, as we assume it wasn't present.
+    }
+    return bam_aux_del(record, tag_ptr);
+}
+
 void add_hd_header_line(sam_hdr_t* hdr) {
     sam_hdr_add_line(hdr, "HD", "VN", SAM_FORMAT_VERSION, "SO", "unknown", nullptr);
 }
