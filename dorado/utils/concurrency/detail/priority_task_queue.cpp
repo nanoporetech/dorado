@@ -22,29 +22,23 @@ std::size_t PriorityTaskQueue::size(TaskPriority priority) const {
 }
 
 WaitingTask PriorityTaskQueue::pop() {
-    auto producer_queue_itr = m_producer_queue_list.begin();
-    TaskPriority popped_priority{TaskPriority::normal};
-    if (!m_low_producer_queue.empty() && producer_queue_itr == m_low_producer_queue.front()) {
-        m_low_producer_queue.pop();
-    } else {
-        popped_priority = TaskPriority::high;
-        m_high_producer_queue.pop();
-    }
-
-    WaitingTask result{(*producer_queue_itr)->pop(), popped_priority};
-    m_producer_queue_list.erase(producer_queue_itr);
-    return result;
+    assert(!m_producer_queue_list.empty());
+    const auto next_priority = m_producer_queue_list.front()->priority();
+    return pop(next_priority);
 }
 
 WaitingTask PriorityTaskQueue::pop(TaskPriority priority) {
     ProducerQueueList::iterator producer_queue_itr;
     if (priority == TaskPriority::high) {
+        assert(!m_high_producer_queue.empty());
         producer_queue_itr = m_high_producer_queue.front();
         m_high_producer_queue.pop();
     } else {
+        assert(!m_low_producer_queue.empty());
         producer_queue_itr = m_low_producer_queue.front();
         m_low_producer_queue.pop();
     }
+    assert(priority == (*producer_queue_itr)->priority());
 
     WaitingTask result{(*producer_queue_itr)->pop(), priority};
     m_producer_queue_list.erase(producer_queue_itr);
