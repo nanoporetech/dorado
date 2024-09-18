@@ -18,12 +18,6 @@ public:
 
     using Entries = std::vector<Entry>;
 
-private:
-    std::map<std::string, Entries> m_genomes;
-    std::string m_file_name{};
-    static const Entries NO_ENTRIES;
-
-public:
     BedFile() = default;
     BedFile(BedFile&& other) = delete;
     BedFile(const BedFile&) = delete;
@@ -36,6 +30,11 @@ public:
     const Entries& entries(const std::string& genome) const;
 
     const std::string& filename() const;
+
+private:
+    std::map<std::string, Entries> m_genomes;
+    std::string m_file_name{"<stream>"};
+    static const Entries NO_ENTRIES;
 };
 
 bool operator==(const BedFile::Entry& l, const BedFile::Entry& r);

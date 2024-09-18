@@ -1,5 +1,6 @@
 #include "bed_file.h"
 
+#include "utils/PostCondition.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -16,8 +17,8 @@ namespace {
 constexpr std::size_t MIN_COLS{3};
 constexpr std::size_t MAX_COLS{12};
 
-std::optional<std::vector<std::string>> get_tokens(const std::string& bed_line) {
-    std::vector<std::string> result{};
+bool get_tokens(const std::string& bed_line, std::vector<std::string>& tokens) {
+    tokens.clear();
     std::istringstream bed_line_stream(bed_line);
 
     // if too many columns include an extra column so caller can validate and find the error
@@ -27,15 +28,12 @@ std::optional<std::vector<std::string>> get_tokens(const std::string& bed_line) 
             break;
         }
         if (token.empty()) {
-            return std::nullopt;
+            return false;
         }
-        result.push_back(std::move(token));
+        tokens.push_back(std::move(token));
     }
 
-    if (result.empty()) {
-        return std::nullopt;
-    }
-    return result;
+    return !tokens.empty();
 }
 
 template <typename T>
@@ -61,31 +59,138 @@ bool try_get_strand(const std::string& token, char& target) {
     return false;
 }
 
-bool try_get_entry_from_bedline(std::string bed_line, std::string& genome, BedFile::Entry& entry) {
-    auto tokens = get_tokens(bed_line);
-    if (!tokens || tokens->size() < MIN_COLS || tokens->size() > MAX_COLS) {
-        return false;
-    }
-
-    BedFile::Entry result{};
-    if (!try_get((*tokens)[1], result.start) || !try_get((*tokens)[2], result.end)) {
-        return false;
-    }
-    if (tokens->size() >= 6 && !try_get_strand((*tokens)[5], result.strand)) {
-        return false;
-    }
-
-    result.bed_line = std::move(bed_line);
-    std::swap(entry, result);
-    std::swap(genome, (*tokens)[0]);
-
-    return true;
-}
-
-bool is_header_line(const std::string& candidate) {
+bool is_header(const std::string& candidate) {
     return utils::starts_with(candidate, "#") || utils::starts_with(candidate, "browser") ||
            utils::starts_with(candidate, "track");
 }
+
+class BedFileEntryParser {
+private:
+    std::string m_candidate_bed_line;
+    BedFile::Entry m_entry;
+    std::string m_genome;
+    std::string m_error_reason;
+    std::vector<std::string> m_tokens;
+    std::size_t m_columns_per_entry{};
+    bool m_in_header_section{true};
+    bool m_is_valid{true};
+
+    void reset(std::string bed_line) {
+        m_candidate_bed_line = std::move(bed_line);
+        m_entry = {};
+        m_genome = {};
+        m_error_reason = {};
+        m_is_valid = true;
+        m_tokens.clear();
+    }
+
+    bool validate_consistent_num_columns() {
+        if (m_columns_per_entry == 0) {
+            m_columns_per_entry = m_tokens.size();
+            return true;
+        }
+
+        if (m_tokens.size() == m_columns_per_entry) {
+            return true;
+        }
+
+        std::ostringstream oss{};
+        oss << "Inconsistent number of columns. Expected: " << m_columns_per_entry
+            << " actual: " << m_tokens.size() << ".";
+        m_error_reason = oss.str();
+        return false;
+    }
+
+    bool try_load_tokens() {
+        if (!get_tokens(m_candidate_bed_line, m_tokens)) {
+            m_error_reason = "Missing columns.";
+            return false;
+        }
+
+        if (!validate_consistent_num_columns()) {
+            return false;
+        }
+
+        const auto num_columns = m_tokens.size();
+        if (num_columns < MIN_COLS) {
+            m_error_reason = "Too few columns (minimum 3).";
+            return false;
+        }
+        if (num_columns > MAX_COLS) {
+            m_error_reason = "Too many columns (maximum 12).";
+            return false;
+        }
+
+        return true;
+    }
+
+    bool try_process_tokens() {
+        BedFile::Entry new_entry{};
+        if (!try_get(m_tokens[1], new_entry.start)) {
+            m_error_reason = "Unable to read column 2: [START]";
+            return false;
+        }
+
+        if (!try_get(m_tokens[2], new_entry.end)) {
+            m_error_reason = "Unable to read column 3: [END].";
+            return false;
+        }
+
+        if (m_tokens.size() > 5 && !try_get_strand(m_tokens[5], new_entry.strand)) {
+            m_error_reason = "Unable to read column 6: [STRAND].";
+            return false;
+        }
+
+        m_genome = m_tokens[0];
+        m_entry = std::move(new_entry);
+        m_entry.bed_line = std::move(m_candidate_bed_line);
+
+        return true;
+    }
+
+    void append_bed_line_to_err_message() {
+        if (m_is_valid) {
+            return;
+        }
+        std::ostringstream oss;
+        oss << m_error_reason << " LINE[" << std::quoted(m_candidate_bed_line) << "]";
+        m_error_reason = oss.str();
+    }
+
+    bool is_in_header_section() {
+        if (!m_in_header_section) {
+            return false;
+        }
+        if (is_header(m_candidate_bed_line)) {
+            return true;
+        }
+        m_in_header_section = false;
+        return false;
+    }
+
+public:
+    BedFile::Entry& entry() { return m_entry; }
+    const std::string& genome() const { return m_genome; };
+    const std::string& error_reason() const { return m_error_reason; }
+    bool is_header_line() const { return m_in_header_section; }
+    bool is_valid() const { return m_is_valid; }
+
+    bool parse(std::string bed_line) {
+        reset(std::move(bed_line));
+
+        if (is_in_header_section()) {
+            return true;
+        }
+
+        auto ensure_err_msg_has_bed_line =
+                utils::PostCondition([this] { append_bed_line_to_err_message(); });
+
+        if (!try_load_tokens() || !try_process_tokens()) {
+            m_is_valid = false;
+        }
+        return m_is_valid;
+    }
+};
 
 }  // namespace
 
@@ -116,32 +221,20 @@ bool BedFile::load(const std::string& bed_filename) {
 
 bool BedFile::load(std::istream& input_stream) {
     std::string bed_line;
-
-    auto is_header = [header_section = true](const std::string& candidate) mutable {
-        if (!header_section) {
-            return false;
-        }
-        if (is_header_line(candidate)) {
-            return true;
-        }
-        header_section = false;
-        return false;
-    };
-
-    while (std::getline(input_stream, bed_line)) {
-        // Remove whitespace from end of the line
-        utils::rtrim(bed_line);
-        if (bed_line.empty() || is_header(bed_line)) {
+    BedFileEntryParser parser{};
+    std::size_t line_number{1};
+    while (std::getline(input_stream, bed_line) && parser.parse(std::move(bed_line))) {
+        ++line_number;
+        if (parser.is_header_line()) {
             continue;
         }
+        m_genomes[parser.genome()].push_back(std::move(parser.entry()));
+    }
 
-        std::string genome;
-        BedFile::Entry entry;
-        if (!try_get_entry_from_bedline(std::move(bed_line), genome, entry)) {
-            spdlog::error("Invalid data reading bed file '{}'", m_file_name);
-            return false;
-        }
-        m_genomes[genome].push_back(std::move(entry));
+    if (!parser.is_valid()) {
+        spdlog::error("Invalid data reading bed file '{}' at line {}. {}", m_file_name, line_number,
+                      parser.error_reason());
+        return false;
     }
 
     return true;

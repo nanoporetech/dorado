@@ -113,7 +113,7 @@ TEST_CASE(CUT_TAG " load with header line after bed data line returns false.", C
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{LAMBDA_1.bed_line + "\nbrowser blah"};
 
-    utils::SuppressStdout suppress_error_message{};
+    utils::SuppressStdout suppress_load_error_message{};
     REQUIRE_FALSE(cut.load(input_stream));
 }
 
@@ -149,6 +149,16 @@ TEST_CASE(CUT_TAG
     CHECK(entries[1] == RANDOM_2);
 }
 
+TEST_CASE(CUT_TAG " load from stream with inconsistent number of columns returns false.", CUT_TAG) {
+    std::string three_column_line{"Lambda\t1234\t2345\n"};
+    std::string six_column_line{"Lambda\t1\t2\tabc\t100\t+\n"};
+    std::istringstream input_stream{three_column_line + six_column_line};
+    dorado::alignment::BedFile cut{};
+
+    utils::SuppressStdout suppress_load_error_message{};
+    REQUIRE_FALSE(cut.load(input_stream));
+}
+
 TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
     // clang-format off
     auto [line, genome, start, end, strand, valid] = GENERATE(
@@ -156,44 +166,34 @@ TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
             {"Lambda\t1234\t2345\tcomment1\t100\t+", "Lambda", 1234, 2345, '+', true},
             {"Lambda\t1234\t2345", "Lambda", 1234, 2345, '.', true},
             {"Lambda 1234 2345", "Lambda", 0, 0, 0, false},
+            {"Lambda\t1234", "Lambda", 0, 0, 0, false},
             {"Lambda\tabc\t2345", "Lambda", 0, 0, 0, false},
+            {"Lambda\t1234\tbcde", "Lambda", 0, 0, 0, false},
             {"Lambda\t1234\t2345\tcomment with spaces", "Lambda", 1234, 2345, '.', true},
             {"Lambda\t12345\t23456\tspaces column\t100", "Lambda", 12345, 23456, '.', true},
             {"Lambda\t1234\t2345\tinvalid strand\t100\tTTT", "Lambda", 0, 0, 0, false},
             {"12Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t123,234\t456,567", "12Fields", 1, 2, '+', true},
             {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, 0, false},
-            {"empty_middle_field\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_field", 0, 0, 0, false},
-            {"trailing_whitespace\t1\t2\tab c\t100\t+\t\t \t", "trailing_whitespace", 1, 2, '+', true},
+            {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 0, 0, 0, false},
+            {"empty_last_column\t1\t2\tab c\t100\t+\t\t \t", "empty_last_column", 1, 2, '+', false},
         }));
     // clang-format on
     CAPTURE(line);
 
     dorado::alignment::BedFile cut{};
-    std::istringstream input_stream{RANDOM_1.bed_line + "\n" + line + "\n" + RANDOM_2.bed_line};
+    std::istringstream input_stream{line};
 
-    bool load_result;
-    {
-        utils::SuppressStdout suppress_error_message{};
-        load_result = cut.load(input_stream);
-    }
     if (!valid) {
-        CHECK_FALSE(load_result);
+        utils::SuppressStdout suppress_load_error_message{};
+        REQUIRE_FALSE(cut.load(input_stream));
         return;
     }
 
-    CHECK(load_result);
+    REQUIRE(cut.load(input_stream));
 
-    const BedFile::Entry EXPECTED{line, start, end, strand};
-    CHECK(cut.load(input_stream));
     const auto entries = cut.entries(genome);
-
     REQUIRE(entries.size() == 1);
-    CHECK(entries[0] == EXPECTED);
-
-    auto second_genome_entries = cut.entries("Random");
-    REQUIRE(second_genome_entries.size() == 2);
-    CHECK(second_genome_entries[0] == RANDOM_1);
-    CHECK(second_genome_entries[1] == RANDOM_2);
+    CHECK(entries[0] == BedFile::Entry{line, start, end, strand});
 }
 
 }  // namespace dorado::alignment::bed_file::test
