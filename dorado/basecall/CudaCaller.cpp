@@ -55,9 +55,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     at::InferenceMode guard;
     m_module = load_crf_model(params.model_config, m_options);
 
-    const auto chunk_size = params.model_config.basecaller.chunk_size();
-    const auto batch_size = params.model_config.basecaller.batch_size();
-    determine_batch_dims(params, batch_size, chunk_size);
+    determine_batch_dims(params);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -197,9 +195,10 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     return {crfmodel_bytes_per_chunk_timestep, decode_bytes_per_chunk_timestep};
 }
 
-void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
-                                      int requested_batch_size,
-                                      int requested_chunk_size) {
+void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
+    auto requested_chunk_size = params.model_config.basecaller.chunk_size();
+    auto requested_batch_size = params.model_config.basecaller.batch_size();
+
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
@@ -389,16 +388,14 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
 
         // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
         std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + m_config.model_path.string() + "\", " +
-                                           std::to_string(chunk_size) + "}] = {\n";
+                                           "\", \"" + m_config.model_path.string() + "}] = {\n";
         for (const auto &batch_time : times_and_batch_sizes) {
             cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
                                     std::to_string(batch_time.first) + "f },\n";
         }
         cpp_autobatch_output += "    };\n";
         std::string cpp_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + "__" +
-                                   std::to_string(chunk_size) + ".txt";
+                                   m_config.model_path.string() + ".txt";
         std::ofstream cpp_bench_file(cpp_filename);
         cpp_bench_file << cpp_autobatch_output;
 
@@ -410,8 +407,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                                     std::to_string(batch_time.first) + "\n";
         }
         std::string csv_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + "__" +
-                                   std::to_string(chunk_size) + ".csv";
+                                   m_config.model_path.string() + ".csv";
         std::ofstream csv_bench_file(csv_filename);
         csv_bench_file << csv_autobatch_output;
     }
