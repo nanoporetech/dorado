@@ -25,9 +25,9 @@ namespace dorado::utils::concurrency {
 // to flush it's tasks without waiting for other pipleines to
 // also flush.
 class AsyncTaskExecutor {
-    std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> m_thread_pool_queue;
-    std::mutex m_mutex{};
-    std::condition_variable m_tasks_in_flight_cv{};
+    MultiQueueThreadPool::ThreadPoolQueue& m_thread_pool_queue;
+    std::mutex m_mutex;
+    std::condition_variable m_tasks_in_flight_cv;
     std::size_t m_num_tasks_in_flight{};
     std::unique_ptr<Latch> m_flushing_counter;
     std::size_t m_max_tasks_in_flight;

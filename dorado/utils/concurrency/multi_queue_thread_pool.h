@@ -41,27 +41,40 @@ public:
     MultiQueueThreadPool(std::size_t num_threads, std::string name);
     ~MultiQueueThreadPool();
 
-    void send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue);
-
     void join();
 
+    class ThreadPoolQueue;
+    ThreadPoolQueue& create_task_queue(TaskPriority priority);
+
     class ThreadPoolQueue {
+        friend class MultiQueueThreadPool;
+
+        MultiQueueThreadPool* m_parent;
+        detail::PriorityTaskQueue::TaskQueue& m_task_queue;
+
+        ThreadPoolQueue(MultiQueueThreadPool* parent,
+                        detail::PriorityTaskQueue::TaskQueue& task_queue);
+
+        ThreadPoolQueue(const ThreadPoolQueue&) = delete;
+        ThreadPoolQueue& operator=(const ThreadPoolQueue&) = delete;
+
     public:
-        virtual ~ThreadPoolQueue() = default;
-        virtual void push(TaskType task) = 0;
+        void push(TaskType task);
     };
-    std::unique_ptr<ThreadPoolQueue> create_task_queue(TaskPriority priority);
 
 private:
+    void send(TaskType task, detail::PriorityTaskQueue::TaskQueue& task_queue);
+
     std::string m_name{"async_task_exec"};
     const std::size_t m_num_threads;
     const std::size_t m_num_expansion_low_prio_threads;
-    std::vector<std::thread> m_threads{};
+    std::vector<std::thread> m_threads;
     std::atomic_bool m_done{false};  // Note that this flag is only accessed by the managed threads.
 
-    std::mutex m_mutex{};
-    detail::PriorityTaskQueue m_priority_task_queue{};
-    std::condition_variable m_message_received{};
+    std::mutex m_mutex;
+    std::vector<std::unique_ptr<ThreadPoolQueue>> m_queues;
+    detail::PriorityTaskQueue m_priority_task_queue;
+    std::condition_variable m_message_received;
     std::size_t m_normal_prio_tasks_in_flight{};
     std::size_t m_high_prio_tasks_in_flight{};
 

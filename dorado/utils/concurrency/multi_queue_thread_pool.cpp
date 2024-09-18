@@ -139,31 +139,20 @@ void MultiQueueThreadPool::process_task_queue() {
     }
 }
 
-namespace {
-
-class ThreadPoolQueueImpl : public MultiQueueThreadPool::ThreadPoolQueue {
-    MultiQueueThreadPool* m_parent;
-    detail::PriorityTaskQueue::TaskQueue& m_task_queue;
-
-public:
-    ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                        detail::PriorityTaskQueue::TaskQueue& task_queue);
-    void push(TaskType task) override;
-};
-
-ThreadPoolQueueImpl::ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                                         detail::PriorityTaskQueue::TaskQueue& task_queue)
+MultiQueueThreadPool::ThreadPoolQueue::ThreadPoolQueue(
+        MultiQueueThreadPool* parent,
+        detail::PriorityTaskQueue::TaskQueue& task_queue)
         : m_parent(parent), m_task_queue(task_queue) {}
 
-void ThreadPoolQueueImpl::push(TaskType task) { m_parent->send(std::move(task), m_task_queue); }
+void MultiQueueThreadPool::ThreadPoolQueue::push(TaskType task) {
+    m_parent->send(std::move(task), m_task_queue);
+}
 
-}  // namespace
-
-std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> MultiQueueThreadPool::create_task_queue(
+MultiQueueThreadPool::ThreadPoolQueue& MultiQueueThreadPool::create_task_queue(
         TaskPriority priority) {
     std::lock_guard lock(m_mutex);
-    return std::make_unique<ThreadPoolQueueImpl>(this,
-                                                 m_priority_task_queue.create_task_queue(priority));
+    auto& task_queue = m_priority_task_queue.create_task_queue(priority);
+    return *m_queues.emplace_back(new ThreadPoolQueue(this, task_queue));
 }
 
 }  // namespace dorado::utils::concurrency
