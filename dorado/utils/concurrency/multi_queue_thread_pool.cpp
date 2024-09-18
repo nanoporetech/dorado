@@ -34,11 +34,15 @@ MultiQueueThreadPool::~MultiQueueThreadPool() { join(); }
 
 void MultiQueueThreadPool::join() {
     // post as many done messages as there are threads to make sure all waiting threads will receive a wakeup
-    auto& terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
+    detail::PriorityTaskQueue::TaskQueue* terminate_task_queue;
+    {
+        std::lock_guard lock(m_mutex);
+        terminate_task_queue = &m_priority_task_queue.create_task_queue(TaskPriority::normal);
+    }
     for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
         {
             std::lock_guard lock(m_mutex);
-            terminate_task_queue.push([this] { m_done.store(true, std::memory_order_relaxed); });
+            terminate_task_queue->push([this] { m_done.store(true, std::memory_order_relaxed); });
         }
         m_message_received.notify_one();
     }
