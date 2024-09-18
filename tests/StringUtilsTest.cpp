@@ -2,7 +2,12 @@
 
 #include <catch2/catch.hpp>
 
-#define CUT_TAG "[string_utils]"
+#define CUT_TAG "[dorado::utils::string_utils]"
+
+#include <string>
+#include <string_view>
+
+namespace dorado::utils::string_view {
 
 TEST_CASE(CUT_TAG " split", CUT_TAG) {
     // clang-format off
@@ -82,3 +87,26 @@ TEST_CASE(CUT_TAG " ends_with") {
     auto starts_with = dorado::utils::ends_with(input, suffix);
     CHECK(starts_with == expected_results);
 }
+
+TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
+    // clang-format off
+    auto [input, expected] = GENERATE(
+            table<std::string, std::string_view>({
+            {"", ""},
+            {"a", "a"},
+            {"abc", "abc"},
+            {"def  ", "def"},
+            {"  \t   \t  ", ""},
+            {"  \t def  \t  \t", "  \t def"},
+            {"abc  \t\n  z", "abc  \t\n  z"},
+            {"abc  \t\n  z  ", "abc  \t\n  z"},
+    }));
+    // clang-format on
+    CAPTURE(input);
+
+    auto actual = rtrim_view(input);
+
+    REQUIRE(expected == actual);
+}
+
+}  // namespace dorado::utils::string_view

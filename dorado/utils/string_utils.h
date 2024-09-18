@@ -46,4 +46,10 @@ inline void rtrim(std::string& s) {
             s.end());
 }
 
+inline std::string_view rtrim_view(const std::string& s) {
+    const auto last_char_it =
+            std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base();
+    return std::string_view(s.data(), last_char_it - s.begin());
+}
+
 }  // namespace dorado::utils
