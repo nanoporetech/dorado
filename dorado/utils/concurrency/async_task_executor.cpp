@@ -13,7 +13,7 @@ AsyncTaskExecutor::~AsyncTaskExecutor() { flush(); }
 void AsyncTaskExecutor::send_impl(TaskType task) {
     increment_tasks_in_flight();
 
-    m_thread_pool_queue->push([task = std::move(task), this] {
+    m_thread_pool_queue.push([task = std::move(task), this] {
         task();
         decrement_tasks_in_flight();
     });
@@ -23,7 +23,7 @@ std::unique_ptr<std::thread> AsyncTaskExecutor::send_async(TaskType task) {
     increment_tasks_in_flight();
 
     auto sending_thread = std::make_unique<std::thread>([this, task = std::move(task)]() mutable {
-        m_thread_pool_queue->push([task = std::move(task), this] {
+        m_thread_pool_queue.push([task = std::move(task), this] {
             task();
             decrement_tasks_in_flight();
         });

@@ -28,11 +28,7 @@ struct WaitingTask {
 // The interface supports popping by priority.
 class PriorityTaskQueue {
 public:
-    class TaskQueue {
-    public:
-        virtual ~TaskQueue() = default;
-        virtual void push(TaskType task) = 0;
-    };
+    class TaskQueue;
     TaskQueue& create_task_queue(TaskPriority priority);
 
     WaitingTask pop();
@@ -44,35 +40,39 @@ public:
     bool empty() const;
     bool empty(TaskPriority priority) const;
 
-private:
-    class ProducerQueue : public TaskQueue {
+    class TaskQueue {
+        friend class PriorityTaskQueue;
+
         PriorityTaskQueue* m_parent;
         TaskPriority m_priority;
-        std::queue<TaskType> m_producer_queue{};
+        std::queue<TaskType> m_producer_queue;
+
+        TaskQueue(PriorityTaskQueue* parent, TaskPriority priority);
+        TaskType pop();
+
+        TaskQueue(const TaskQueue&) = delete;
+        TaskQueue& operator=(const TaskQueue&) = delete;
 
     public:
-        ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority);
-
-        TaskPriority priority() const { return m_priority; };
-
-        void push(TaskType task) override;
-        TaskType pop();
+        TaskPriority priority() const { return m_priority; }
+        void push(TaskType task);
     };
-    std::vector<std::unique_ptr<ProducerQueue>>
-            m_queue_repository{};  // ownership of producer queues
-    using ProducerQueueList = std::list<ProducerQueue*>;
-    ProducerQueueList m_producer_queue_list{};
-    std::queue<ProducerQueueList::iterator> m_low_producer_queue{};
-    std::queue<ProducerQueueList::iterator> m_high_producer_queue{};
+
+private:
+    std::vector<std::unique_ptr<TaskQueue>> m_queue_repository;  // ownership of producer queues
+    using TaskQueueList = std::list<TaskQueue*>;
+    TaskQueueList m_producer_queue_list;
+    std::queue<TaskQueueList::iterator> m_low_producer_queue;
+    std::queue<TaskQueueList::iterator> m_high_producer_queue;
     std::size_t m_num_normal_prio{};
     std::size_t m_num_high_prio{};
 
     using WaitingTaskList = std::list<std::shared_ptr<detail::WaitingTask>>;
-    WaitingTaskList m_task_list{};
-    std::queue<WaitingTaskList::iterator> m_low_queue{};
-    std::queue<WaitingTaskList::iterator> m_high_queue{};
+    WaitingTaskList m_task_list;
+    std::queue<WaitingTaskList::iterator> m_low_queue;
+    std::queue<WaitingTaskList::iterator> m_high_queue;
 
-    void queue_producer_task(ProducerQueue* producer_queue);
+    void queue_producer_task(TaskQueue* producer_queue);
 };
 
 }  // namespace dorado::utils::concurrency::detail
