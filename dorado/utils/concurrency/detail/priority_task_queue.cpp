@@ -5,7 +5,7 @@
 
 namespace dorado::utils::concurrency::detail {
 
-void PriorityTaskQueue::queue_producer_task(ProducerQueue* producer_queue) {
+void PriorityTaskQueue::queue_producer_task(TaskQueue* producer_queue) {
     m_producer_queue_list.push_back(producer_queue);
     auto task_itr = std::prev(m_producer_queue_list.end());
     if (producer_queue->priority() == TaskPriority::high) {
@@ -22,32 +22,26 @@ std::size_t PriorityTaskQueue::size(TaskPriority priority) const {
 }
 
 WaitingTask PriorityTaskQueue::pop() {
-    auto producer_queue_itr = m_producer_queue_list.begin();
-    TaskPriority popped_priority{TaskPriority::normal};
-    if (!m_low_producer_queue.empty() && producer_queue_itr == m_low_producer_queue.front()) {
-        m_low_producer_queue.pop();
-    } else {
-        popped_priority = TaskPriority::high;
-        m_high_producer_queue.pop();
-    }
-
-    WaitingTask result{(*producer_queue_itr)->pop(), popped_priority};
-    m_producer_queue_list.pop_front();
-    return result;
+    assert(!m_producer_queue_list.empty());
+    const auto next_priority = m_producer_queue_list.front()->priority();
+    return pop(next_priority);
 }
 
 WaitingTask PriorityTaskQueue::pop(TaskPriority priority) {
-    ProducerQueueList::iterator producer_queue_itr;
+    TaskQueueList::iterator producer_queue_itr;
     if (priority == TaskPriority::high) {
+        assert(!m_high_producer_queue.empty());
         producer_queue_itr = m_high_producer_queue.front();
         m_high_producer_queue.pop();
     } else {
+        assert(!m_low_producer_queue.empty());
         producer_queue_itr = m_low_producer_queue.front();
         m_low_producer_queue.pop();
     }
+    assert(priority == (*producer_queue_itr)->priority());
 
     WaitingTask result{(*producer_queue_itr)->pop(), priority};
-    m_producer_queue_list.pop_front();
+    m_producer_queue_list.erase(producer_queue_itr);
     return result;
 }
 
@@ -55,10 +49,10 @@ bool PriorityTaskQueue::empty() const { return size() == 0; }
 
 bool PriorityTaskQueue::empty(TaskPriority priority) const { return size(priority) == 0; }
 
-PriorityTaskQueue::ProducerQueue::ProducerQueue(PriorityTaskQueue* parent, TaskPriority priority)
+PriorityTaskQueue::TaskQueue::TaskQueue(PriorityTaskQueue* parent, TaskPriority priority)
         : m_parent(parent), m_priority(priority) {}
 
-void PriorityTaskQueue::ProducerQueue::push(TaskType task) {
+void PriorityTaskQueue::TaskQueue::push(TaskType task) {
     m_producer_queue.push(std::move(task));
     if (m_priority == TaskPriority::normal) {
         ++m_parent->m_num_normal_prio;
@@ -70,7 +64,7 @@ void PriorityTaskQueue::ProducerQueue::push(TaskType task) {
     }
 }
 
-TaskType PriorityTaskQueue::ProducerQueue::pop() {
+TaskType PriorityTaskQueue::TaskQueue::pop() {
     assert(!m_producer_queue.empty() && "Cannot pop an empty producer queue.");
     auto result = std::move(m_producer_queue.front());
     m_producer_queue.pop();
@@ -86,8 +80,7 @@ TaskType PriorityTaskQueue::ProducerQueue::pop() {
 }
 
 PriorityTaskQueue::TaskQueue& PriorityTaskQueue::create_task_queue(TaskPriority priority) {
-    m_queue_repository.emplace_back(std::make_unique<ProducerQueue>(this, priority));
-    return *m_queue_repository.back();
+    return *m_queue_repository.emplace_back(new TaskQueue(this, priority));
 }
 
 }  // namespace dorado::utils::concurrency::detail
