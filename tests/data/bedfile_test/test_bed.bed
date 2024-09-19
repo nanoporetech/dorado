@@ -1,6 +1,16 @@
+browser : functional header used by the UCSC Genome Browser to set options related to it
+
+# comment line in header with empty line both should be valid and ignored.
+
+track   : functional header used by genome browsers to specify display options related to it
+# comment line after header
 Lambda	40000	41000	COMMENTLINE1 with space	100	+
 Lambda	41000	42000	COMMENTLINE2	200	+
+# comment line in data section
 Lambda	80000	81000	COMMENTLINE3 with space	300	-
 Lambda	81000	82000	COMMENTLINE4 with space	400	+
+
+# empty lines are valid and ignored
+
 BACON	40000	41000	COMMENTLINE5 with space	500	+
 BACON	81000	82000	COMMENTLINE6 with space	600	-
