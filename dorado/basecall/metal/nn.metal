@@ -51,7 +51,6 @@ typedef metal::simdgroup_half8x8 simdgroup_ftype8x8;
 // (Scores are int8_t.)
 typedef float ftype_out;
 
-#define MAX_LAYER_SIZE 512
 #define KERNEL_INDEX_INPUTS                                                  \
     [[maybe_unused]] uint tid [[thread_index_in_threadgroup]],               \
             [[maybe_unused]] uint gid [[threadgroup_position_in_grid]],      \
