@@ -83,40 +83,38 @@ public:
 
 }  // namespace
 
-DEFINE_TEST("create_task_queue returns non-null object") {
+DEFINE_TEST("create_task_queue doesn't throw") {
     MultiQueueThreadPool cut{1, "test_executor"};
 
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
-
-    REQUIRE(task_queue != nullptr);
+    CHECK_NOTHROW(cut.create_task_queue(TaskPriority::normal));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue does not throw") {
     MultiQueueThreadPool cut{2, "test_executor"};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
+    auto& task_queue = cut.create_task_queue(TaskPriority::normal);
 
-    REQUIRE_NOTHROW(task_queue->push([] {}));
+    REQUIRE_NOTHROW(task_queue.push([] {}));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue invokes the task") {
     MultiQueueThreadPool cut{2, "test_executor"};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
+    auto& task_queue = cut.create_task_queue(TaskPriority::normal);
 
     Flag invoked{};
-    task_queue->push([&invoked] { invoked.signal(); });
+    task_queue.push([&invoked] { invoked.signal(); });
 
     REQUIRE(invoked.wait_for(TIMEOUT));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
     MultiQueueThreadPool cut{1, "test_executor"};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
+    auto& task_queue = cut.create_task_queue(TaskPriority::normal);
 
     Flag thread_id_assigned{};
 
     auto invocation_thread{std::this_thread::get_id()};
 
-    task_queue->push([&thread_id_assigned, &invocation_thread] {
+    task_queue.push([&thread_id_assigned, &invocation_thread] {
         invocation_thread = std::this_thread::get_id();
         thread_id_assigned.signal();
     });
@@ -128,10 +126,10 @@ DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
 DEFINE_TEST("MultiQueueThreadPool::join() with 2 active threads completes") {
     constexpr std::size_t num_threads{2};
     MultiQueueThreadPool cut{num_threads, "test_executor"};
-    auto task_queue = cut.create_task_queue(TaskPriority::normal);
+    auto& task_queue = cut.create_task_queue(TaskPriority::normal);
     Flag release_busy_tasks{};
     Latch all_busy_tasks_started{num_threads};
-    auto producer_threads = create_producer_threads(*task_queue, num_threads,
+    auto producer_threads = create_producer_threads(task_queue, num_threads,
                                                     [&release_busy_tasks, &all_busy_tasks_started] {
                                                         all_busy_tasks_started.count_down();
                                                         release_busy_tasks.wait();
@@ -165,12 +163,12 @@ DEFINE_TEST_FIXTURE_METHOD(
         "ThreadPoolQueue::push() high priority with pool size 2 and 2 busy normal tasks then high "
         "priority is "
         "invoked") {
-    auto normal_task_queue = cut->create_task_queue(TaskPriority::normal);
-    normal_task_queue->push(create_task(0));
-    normal_task_queue->push(create_task(1));
+    auto& normal_task_queue = cut->create_task_queue(TaskPriority::normal);
+    normal_task_queue.push(create_task(0));
+    normal_task_queue.push(create_task(1));
 
-    auto high_task_queue = cut->create_task_queue(TaskPriority::high);
-    high_task_queue->push(create_task(2));
+    auto& high_task_queue = cut->create_task_queue(TaskPriority::high);
+    high_task_queue.push(create_task(2));
 
     REQUIRE(task_started_flags[2]->wait_for(TIMEOUT));
 }

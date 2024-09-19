@@ -110,4 +110,68 @@ DEFINE_SCENARIO("prioritised pushing and popping with 2 high queues and one norm
     }
 }
 
+DEFINE_SCENARIO("Popping tasks") {
+    GIVEN("A high and a normal priority queue") {
+        PriorityTaskQueue queue;
+        auto& normal_prio_queue = queue.create_task_queue(TaskPriority::normal);
+        auto& high_prio_queue = queue.create_task_queue(TaskPriority::high);
+
+        WHEN("A task is pushed to each queue") {
+            // Check both orderings
+            const auto normal_first = GENERATE(true, false);
+            CAPTURE(normal_first);
+            const auto push_order = normal_first ? std::pair(&normal_prio_queue, &high_prio_queue)
+                                                 : std::pair(&high_prio_queue, &normal_prio_queue);
+            push_order.first->push([] {});
+            push_order.second->push([] {});
+
+            THEN("Queue sizes match") {
+                CHECK(queue.size() == 2);
+                CHECK(queue.size(TaskPriority::high) == 1);
+                CHECK(queue.size(TaskPriority::normal) == 1);
+            }
+
+            THEN("Popping explicit priorities match their priority") {
+                // Check both orderings
+                const auto pop_order =
+                        GENERATE(std::pair(TaskPriority::normal, TaskPriority::high),
+                                 std::pair(TaskPriority::high, TaskPriority::normal));
+                CAPTURE(pop_order.first, pop_order.second);
+
+                CHECK(queue.pop(pop_order.first).priority == pop_order.first);
+                CHECK(queue.size() == 1);
+                CHECK(queue.size(pop_order.first) == 0);
+                CHECK(queue.size(pop_order.second) == 1);
+
+                CHECK(queue.pop(pop_order.second).priority == pop_order.second);
+                CHECK(queue.size() == 0);
+                CHECK(queue.size(pop_order.first) == 0);
+                CHECK(queue.size(pop_order.second) == 0);
+            }
+
+            THEN("Popping 1 explicit priority and 1 arbitrary matches priorities") {
+                // Check both orderings
+                const auto priority = GENERATE(TaskPriority::normal, TaskPriority::high);
+                CAPTURE(priority);
+
+                CHECK(queue.pop(priority).priority == priority);
+                CHECK(queue.size() == 1);
+                CHECK(queue.size(priority) == 0);
+
+                CHECK(queue.pop().priority != priority);
+                CHECK(queue.size() == 0);
+            }
+
+            THEN("Popping arbitrary tasks don't match each other") {
+                const auto first_priority = queue.pop().priority;
+                CHECK(queue.size() == 1);
+                CHECK(queue.size(first_priority) == 0);
+
+                CHECK(queue.pop().priority != first_priority);
+                CHECK(queue.size() == 0);
+            }
+        }
+    }
+}
+
 }  // namespace dorado::utils::concurrency::detail::priority_task_queue_test
