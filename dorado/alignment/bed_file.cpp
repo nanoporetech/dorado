@@ -60,8 +60,11 @@ bool try_get_strand(const std::string& token, char& target) {
 }
 
 bool is_header(const std::string& candidate) {
-    return utils::starts_with(candidate, "#") || utils::starts_with(candidate, "browser") ||
-           utils::starts_with(candidate, "track");
+    return utils::starts_with(candidate, "browser") || utils::starts_with(candidate, "track");
+}
+
+bool is_comment(const std::string& candidate) {
+    return candidate.empty() || candidate.at(0) == '#';
 }
 
 class BedFileEntryParser {
@@ -71,12 +74,15 @@ private:
     std::string m_genome;
     std::string m_error_reason;
     std::vector<std::string> m_tokens;
+    bool m_is_comment_line;
     std::size_t m_columns_per_entry{};
     bool m_in_header_section{true};
     bool m_is_valid{true};
 
     void reset(std::string bed_line) {
         m_candidate_bed_line = std::move(bed_line);
+        utils::rtrim(m_candidate_bed_line);
+        m_is_comment_line = is_comment(m_candidate_bed_line);
         m_entry = {};
         m_genome = {};
         m_error_reason = {};
@@ -172,13 +178,15 @@ public:
     BedFile::Entry& entry() { return m_entry; }
     const std::string& genome() const { return m_genome; };
     const std::string& error_reason() const { return m_error_reason; }
-    bool is_header_line() const { return m_in_header_section; }
+
+    bool ignore_line() const { return m_is_comment_line || m_in_header_section; }
+
     bool is_valid() const { return m_is_valid; }
 
     bool parse(std::string bed_line) {
         reset(std::move(bed_line));
 
-        if (is_in_header_section()) {
+        if (m_is_comment_line || is_in_header_section()) {
             return true;
         }
 
@@ -225,7 +233,7 @@ bool BedFile::load(std::istream& input_stream) {
     std::size_t line_number{1};
     while (std::getline(input_stream, bed_line) && parser.parse(std::move(bed_line))) {
         ++line_number;
-        if (parser.is_header_line()) {
+        if (parser.ignore_line()) {
             continue;
         }
         m_genomes[parser.genome()].push_back(std::move(parser.entry()));

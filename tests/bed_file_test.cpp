@@ -150,13 +150,81 @@ TEST_CASE(CUT_TAG
 }
 
 TEST_CASE(CUT_TAG " load from stream with inconsistent number of columns returns false.", CUT_TAG) {
-    std::string three_column_line{"Lambda\t1234\t2345\n"};
-    std::string six_column_line{"Lambda\t1\t2\tabc\t100\t+\n"};
+    const std::string three_column_line{"Lambda\t1234\t2345\n"};
+    const std::string six_column_line{"Lambda\t1\t2\tabc\t100\t+\n"};
     std::istringstream input_stream{three_column_line + six_column_line};
     dorado::alignment::BedFile cut{};
 
     utils::SuppressStdout suppress_load_error_message{};
     REQUIRE_FALSE(cut.load(input_stream));
+}
+
+TEST_CASE(CUT_TAG
+          " load from stream 2 records where second record has empty last column returns false.",
+          CUT_TAG) {
+    const std::string four_column_line{"Lambda\t1234\t2345\tcomment\n"};
+    const std::string four_column_line_empty_last_col{"Lambda\t1234\t2345\t\n"};
+    std::istringstream input_stream{four_column_line + four_column_line_empty_last_col};
+    dorado::alignment::BedFile cut{};
+
+    utils::SuppressStdout suppress_load_error_message{};
+    REQUIRE_FALSE(cut.load(input_stream));
+}
+
+TEST_CASE(CUT_TAG " load valid bed with empty line at start.", CUT_TAG) {
+    const std::string empty_line_at_start{"  \t \nLambda\t1234\t2345\n"};
+    std::istringstream input_stream{empty_line_at_start};
+    dorado::alignment::BedFile cut{};
+
+    REQUIRE(cut.load(input_stream));
+}
+
+TEST_CASE(CUT_TAG " load valid bed with empty line in header section.", CUT_TAG) {
+    const std::string header_1{"browser blah\tblah2\n"};
+    const std::string empty_line{"  \t \t  \n"};
+    const std::string header_2{"track blah\tblah2\n"};
+    const std::string data_line{"Lambda\t1234\t2345\n"};
+    std::istringstream input_stream{header_1 + empty_line + header_2 + data_line};
+    dorado::alignment::BedFile cut{};
+
+    REQUIRE(cut.load(input_stream));
+    CHECK(cut.entries("Lambda").size() == 1);
+}
+
+TEST_CASE(CUT_TAG " load valid bed with empty line between data lines.", CUT_TAG) {
+    const std::string header{"#blah\tblah2\n"};
+    const std::string data_1{"Lambda\t234\t345\n"};
+    const std::string empty_line{"  \t \t  \n"};
+    const std::string data_2{"Lambda\t123\t234\n"};
+    std::istringstream input_stream{header + data_1 + empty_line + data_2};
+    dorado::alignment::BedFile cut{};
+
+    REQUIRE(cut.load(input_stream));
+    CHECK(cut.entries("Lambda").size() == 2);
+}
+
+TEST_CASE(CUT_TAG " load valid bed with # line between data lines.", CUT_TAG) {
+    const std::string header{"#blah\tblah2\n"};
+    const std::string data_1{"Lambda\t234\t345\n"};
+    const std::string comment_line{"# some comment\n"};
+    const std::string data_2{"Lambda\t123\t234\n"};
+    std::istringstream input_stream{header + data_1 + comment_line + data_2};
+    dorado::alignment::BedFile cut{};
+
+    REQUIRE(cut.load(input_stream));
+    CHECK(cut.entries("Lambda").size() == 2);
+}
+
+TEST_CASE(CUT_TAG " load valid bed with # line at end.", CUT_TAG) {
+    const std::string header{"#blah\tblah2\n"};
+    const std::string data_1{"Lambda\t234\t345\n"};
+    const std::string data_2{"Lambda\t123\t234\n"};
+    const std::string comment_line{"# some comment\n"};
+    std::istringstream input_stream{header + data_1 + data_2 + comment_line};
+    dorado::alignment::BedFile cut{};
+
+    REQUIRE(cut.load(input_stream));
+    CHECK(cut.entries("Lambda").size() == 2);
 }
 
 TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
@@ -175,7 +243,7 @@ TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
             {"12Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t123,234\t456,567", "12Fields", 1, 2, '+', true},
             {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, 0, false},
             {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 0, 0, 0, false},
-            {"empty_last_column\t1\t2\tab c\t100\t+\t\t \t", "empty_last_column", 1, 2, '+', false},
+            {"empty_last_column\t1\t2\tab c\t100\t+\t\t \t", "empty_last_column", 1, 2, '+', true},
         }));
     // clang-format on
     CAPTURE(line);
@@ -184,8 +252,12 @@ TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
     std::istringstream input_stream{line};
 
     if (!valid) {
-        utils::SuppressStdout suppress_load_error_message{};
-        REQUIRE_FALSE(cut.load(input_stream));
+        bool load_result;
+        {
+            utils::SuppressStdout suppress_load_error_message{};
+            load_result = cut.load(input_stream);
+        }
+        REQUIRE_FALSE(load_result);
         return;
     }
 
