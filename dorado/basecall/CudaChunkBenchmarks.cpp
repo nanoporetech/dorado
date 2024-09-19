@@ -20,14 +20,13 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         GPUName gpu_name,
-        const std::string& model_path,
-        ChunkSize chunk_size) const {
+        const std::string& model_path) const {
     // Strip any extra path elements from the model folder name
     ModelName model_name = std::filesystem::path(model_path).filename().string();
 
     // Try looking up the specified gpu name directly
-    if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) != m_chunk_benchmarks.end()) {
-        return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
+    if (m_chunk_benchmarks.find({gpu_name, model_name}) != m_chunk_benchmarks.end()) {
+        return m_chunk_benchmarks.at({gpu_name, model_name});
     }
 
     // If the direct lookup fails, try looking up via an alias
@@ -38,9 +37,8 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
 
     if (gpu_name_alias.find(gpu_name) != gpu_name_alias.end()) {
         gpu_name = gpu_name_alias[gpu_name];
-        if (m_chunk_benchmarks.find({gpu_name, model_name, chunk_size}) !=
-            m_chunk_benchmarks.end()) {
-            return m_chunk_benchmarks.at({gpu_name, model_name, chunk_size});
+        if (m_chunk_benchmarks.find({gpu_name, model_name}) != m_chunk_benchmarks.end()) {
+            return m_chunk_benchmarks.at({gpu_name, model_name});
         }
     }
 
@@ -49,16 +47,15 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
 
 bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
                                             const std::string& model_path,
-                                            ChunkSize chunk_size,
                                             const std::vector<std::pair<float, int>>& timings) {
     // Strip any extra path elements from the model folder name
     ModelName model_name = std::filesystem::path(model_path).filename().string();
 
-    if (get_chunk_timings(gpu_name, model_name, chunk_size)) {
+    if (get_chunk_timings(gpu_name, model_name)) {
         return false;
     }
 
-    auto& new_benchmarks = m_chunk_benchmarks[{gpu_name, model_name, chunk_size}];
+    auto& new_benchmarks = m_chunk_benchmarks[{gpu_name, model_name}];
     for (auto& timing : timings) {
         new_benchmarks[timing.second] = timing.first;
     }

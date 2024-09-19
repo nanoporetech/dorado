@@ -327,7 +327,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
-            prop->name, m_config.model_path.string(), chunk_size);
+            prop->name, m_config.model_path.string());
     if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
         spdlog::warn(std::string("Unable to find chunk benchmarks for GPU \"") + prop->name +
                      "\", model " + m_config.model_path.string() + " and chunk size " +
@@ -388,7 +388,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
         // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
         std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + m_config.model_path.string() + "}] = {\n";
+                                           "\", \"" + m_config.model_path.string() + "\"}] = {\n";
         for (const auto &batch_time : times_and_batch_sizes) {
             cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
                                     std::to_string(batch_time.first) + "f },\n";
@@ -417,12 +417,12 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
         // will be of benefit to basecall servers which won't have to keep re-generating the benchmarks each time a
         // runner is created.
         CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, m_config.model_path.string(),
-                                                          chunk_size, times_and_batch_sizes);
+                                                          times_and_batch_sizes);
 
         spdlog::debug(
-                "Adding chunk timings to internal cache for GPU {}, model {}, chunk size {} ({} "
+                "Adding chunk timings to internal cache for GPU {}, model {} ({} "
                 "entries)",
-                prop->name, m_config.model_path.string(), chunk_size, times_and_batch_sizes.size());
+                prop->name, m_config.model_path.string(), times_and_batch_sizes.size());
     }
 
     // Find the first batch size that was under the threshold.

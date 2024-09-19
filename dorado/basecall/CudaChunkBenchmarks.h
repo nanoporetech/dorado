@@ -15,8 +15,7 @@ private:
     using ChunkTimings = std::map<int, float>;
     using ModelName = std::string;
     using GPUName = std::string;
-    using ChunkSize = int;
-    std::map<std::tuple<GPUName, ModelName, ChunkSize>, ChunkTimings> m_chunk_benchmarks;
+    std::map<std::tuple<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
 
 public:
     static CudaChunkBenchmarks& instance() {
@@ -25,12 +24,10 @@ public:
     }
 
     std::optional<const ChunkTimings> get_chunk_timings(GPUName gpu_name,
-                                                        const std::string& model_path,
-                                                        ChunkSize chunk_size) const;
+                                                        const std::string& model_path) const;
 
     bool add_chunk_timings(const GPUName& gpu_name,
                            const std::string& model_path,
-                           ChunkSize chunk_size,
                            const std::vector<std::pair<float, int>>& timings);
 };
 
