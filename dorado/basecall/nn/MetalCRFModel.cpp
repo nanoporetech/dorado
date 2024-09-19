@@ -467,7 +467,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
     conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
     conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
-    if (!finishCommandBuffer("convolutions", command_buffer, try_count)) {
+    if (!run_command_buffer("convolutions", command_buffer, try_count)) {
         return nullptr;
     }
 
@@ -494,14 +494,14 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                   tg_buffer_lens, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
-            if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
+            if (!run_command_buffer(lstm_label.c_str(), command_buffer, try_count)) {
                 return nullptr;
             }
 #endif
         }
 
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
-        if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
+        if (!run_command_buffer(lstm_label.c_str(), command_buffer, try_count)) {
             return nullptr;
         }
 #endif

@@ -248,12 +248,21 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
-bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+    commit_command_buffer(label, cb);
+    return wait_on_command_buffer(cb, try_count);
+}
+
+void commit_command_buffer(const char *label, MTL::CommandBuffer *cb) {
     name_mtl_object(cb, label);
     cb->commit();
+}
+
+bool wait_on_command_buffer(MTL::CommandBuffer *cb, int try_count) {
     cb->waitUntilCompleted();
 
     auto status = cb->status();
+    auto label = cb->label()->cString(NS::ASCIIStringEncoding);
     bool success = (status == MTL::CommandBufferStatusCompleted);
     if (success) {
         spdlog::trace("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
@@ -263,7 +272,7 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
         spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
                      fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
-            report_error(cb->error(), "finishCommandBuffer");
+            report_error(cb->error(), "wait_on_command_buffer");
         }
     }
     return success;

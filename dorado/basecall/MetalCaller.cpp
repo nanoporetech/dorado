@@ -440,7 +440,7 @@ bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_cou
                                mtl_for_tensor(m_bwd_NTC.at(i)), mtl_for_tensor(m_posts_NTC.at(i))},
                               {}, m_out_batch_size, m_states);
     }
-    return finishCommandBuffer("linear/scan/softmax", cb, try_count);
+    return run_command_buffer("linear/scan/softmax", cb, try_count);
 }
 
 bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
@@ -561,7 +561,7 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
                            mtl_for_tensor(m_posts_NTC)},
                           {}, m_batch_size, m_states);
 
-    return finishCommandBuffer("linear/scan/softmax", cb, try_count);
+    return run_command_buffer("linear/scan/softmax", cb, try_count);
 }
 
 bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
