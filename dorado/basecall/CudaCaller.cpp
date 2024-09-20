@@ -308,15 +308,24 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     }
 
     float best_time = std::numeric_limits<float>::max();
-    // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
-    // trade-off between getting more accurate measurements and avoiding excessive startup time,
-    // while making chunk size a multiple of 16 * stride_inner as required by koi transformer kernels.
-    const int chunk_size = std::min(m_batch_dims.back().T_in, m_config.stride * 288);
-    // We limit the maximum when doing benchmarking to avoid excessive startup time.
-    // The limit for transformer models should be increased at a later time.
-    const int max_batch_size_limit = m_config.is_tx_model() ? 512 : 10240;
+
+    int chunk_size = m_batch_dims.back().T_in;
     int max_batch_size = *std::max_element(max_batch_sizes.begin(), max_batch_sizes.end());
-    max_batch_size = std::min(max_batch_size, max_batch_size_limit);
+    if (params.emit_batchsize_benchmarks) {
+        // When we are emitting benchmarks, prefer accuracy over speed of benchmark generation, so run the benchmarks
+        //  at full chunk size.  We must round down the requested chunk size to a multiple of the minimum granularity.
+        size_t chunk_granularity = params.model_config.chunk_size_granularity();
+        chunk_size = int((chunk_size / chunk_granularity) * chunk_granularity);
+    } else {
+        // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
+        // trade-off between getting more accurate measurements and avoiding excessive startup time,
+        // while making chunk size a multiple of 16 * stride_inner as required by koi transformer kernels.
+        chunk_size = std::min(chunk_size, m_config.stride * 288);
+        // We limit the maximum when doing benchmarking to avoid excessive startup time.
+        // The limit for transformer models should be increased at a later time.
+        const int max_batch_size_limit = m_config.is_tx_model() ? 512 : 10240;
+        max_batch_size = std::min(max_batch_size, max_batch_size_limit);
+    }
     spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,
                   granularity);
 
