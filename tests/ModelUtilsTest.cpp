@@ -1,3 +1,4 @@
+#include "TestUtils.h"
 #include "models/kits.h"
 #include "models/models.h"
 
@@ -124,5 +125,51 @@ TEST_CASE(TEST_TAG " Get simplex model info by name") {
 
     SECTION("Check unknown model raises") {
         CHECK_THROWS_AS(dorado::models::get_simplex_model_info("unknown"), std::runtime_error);
+    }
+}
+
+TEST_CASE(TEST_TAG "  get_supported_model_info", TEST_TAG) {
+    std::vector<std::string> expected_models = {
+            "rna004_130bps_fast@v3.0.1", "dna_r9.4.1_e8_hac@v3.3",
+            "dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mC_5hmC@v1",
+            "dna_r10.4.1_e8.2_5khz_stereo@v1.2"};
+
+    SECTION("No path") {
+        std::string model_info = dorado::models::get_supported_model_info("");
+
+        // Check that it seems to contain some models we expect
+        for (const auto& expected_model : expected_models) {
+            CHECK(model_info.find(expected_model) != std::string::npos);
+        }
+    }
+
+    SECTION("Path Filtering") {
+        auto tmp_dir = make_temp_dir("get_supported_model_info_test");
+
+        // This should return no models as they don't exist in the directory
+        std::string model_info = dorado::models::get_supported_model_info(tmp_dir.m_path.string());
+        for (const auto& expected_model : expected_models) {
+            CHECK(model_info.find(expected_model) == std::string::npos);
+        }
+
+        // Making the modbase dir should not make it appear, as it's canonical model doesn't exist
+        std::filesystem::create_directory(tmp_dir.m_path /
+                                          "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mC_5hmC@v1");
+        model_info = dorado::models::get_supported_model_info(tmp_dir.m_path.string());
+        CHECK(model_info.find("dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mC_5hmC@v1") ==
+              std::string::npos);
+
+        // Adding the canonical model dir should make it appear, and the modbase model above, but not the stereo model
+        std::filesystem::create_directory(tmp_dir.m_path / "dna_r10.4.1_e8.2_400bps_sup@v4.3.0");
+        model_info = dorado::models::get_supported_model_info(tmp_dir.m_path.string());
+        CHECK(model_info.find("dna_r10.4.1_e8.2_400bps_sup@v4.3.0") != std::string::npos);
+        CHECK(model_info.find("dna_r10.4.1_e8.2_400bps_sup@v4.3.0_5mC_5hmC@v1") !=
+              std::string::npos);
+        CHECK(model_info.find("dna_r10.4.1_e8.2_5khz_stereo@v1.2") == std::string::npos);
+
+        // Adding the stereo model dir should make it appear.
+        std::filesystem::create_directory(tmp_dir.m_path / "dna_r10.4.1_e8.2_5khz_stereo@v1.2");
+        model_info = dorado::models::get_supported_model_info(tmp_dir.m_path.string());
+        CHECK(model_info.find("dna_r10.4.1_e8.2_5khz_stereo@v1.2") != std::string::npos);
     }
 }

@@ -1232,11 +1232,20 @@ std::string extract_model_names_from_paths(const std::vector<std::filesystem::pa
     return model_names;
 }
 
-std::string get_supported_model_info() {
+bool model_exists_in_folder(const std::string& name,
+                            const std::filesystem::path& model_download_folder) {
+    if (model_download_folder.empty()) {
+        return true;
+    }
+    auto model_path = model_download_folder / name;
+    return std::filesystem::exists(model_path) && std::filesystem::is_directory(model_path);
+}
+
+std::string get_supported_model_info(const std::filesystem::path& model_download_folder) {
     std::string result = "{\n";
 
     const auto& canonical_base_map = mods_canonical_base_map();
-
+    bool chemistry_emitted = false;
     for (const auto& variant : chemistry_kits()) {
         const auto& chemistry = variant.first;
         const auto& chemistry_kit_info = variant.second;
@@ -1244,6 +1253,20 @@ std::string get_supported_model_info() {
         if (chemistry == Chemistry::UNKNOWN) {
             continue;
         }
+
+        // Check if there are any available canonical models for this chemistry - if not, we don't emit it.
+        bool simplex_model_found = false;
+        for (const auto& simplex_model : simplex_models()) {
+            if (simplex_model.chemistry == variant.first &&
+                model_exists_in_folder(simplex_model.name, model_download_folder)) {
+                simplex_model_found = true;
+                break;  // We can stop
+            }
+        }
+        if (!simplex_model_found) {
+            continue;
+        }
+        chemistry_emitted = true;
 
         // Chemistry name
         result += "\"" + chemistry_kit_info.name + "\":{\n";
@@ -1283,7 +1306,8 @@ std::string get_supported_model_info() {
 
         result += "  \"simplex_models\":{\n";
         for (const auto& simplex_model : simplex_models()) {
-            if (simplex_model.chemistry == variant.first) {
+            if (simplex_model.chemistry == variant.first &&
+                model_exists_in_folder(simplex_model.name, model_download_folder)) {
                 result += "    \"" + simplex_model.name + "\":{\n";
 
                 result += "      \"variant\": \"" + to_string(simplex_model.simplex.variant) + "\"";
@@ -1299,22 +1323,32 @@ std::string get_supported_model_info() {
                 // Dump out all the mod models that are compatible with this simplex model
                 const auto mod_matches = find_models(modified_models(), variant.first,
                                                      simplex_model.simplex, ModsVariantPair());
-                if (!mod_matches.empty()) {
+                bool mod_models_available = false;
+                for (const auto& mod_model : mod_matches) {
+                    if (model_exists_in_folder(mod_model.name, model_download_folder)) {
+                        mod_models_available = true;
+                        break;
+                    }
+                }
+
+                if (mod_models_available) {
                     result += ",\n      \"modified_models\":{\n";
                     for (const auto& mod_model : mod_matches) {
-                        result += "        \"" + mod_model.name + "\":{\n";
-                        result += "            \"canonical_base\": \"" +
-                                  canonical_base_map.at(mod_model.mods.variant) + "\",\n";
-                        result += "            \"variant\": \"" +
-                                  to_string(mod_model.mods.variant) + "\"";
-                        // If there is a newer model for this condition, add the outdated flag.
-                        const auto mod_type_matches =
-                                find_models(modified_models(), variant.first, simplex_model.simplex,
-                                            {mod_model.mods.variant, ModelVersion::NONE});
-                        if (mod_type_matches.back().name != mod_model.name) {
-                            result += ",\n            \"outdated\": true";
+                        if (model_exists_in_folder(mod_model.name, model_download_folder)) {
+                            result += "        \"" + mod_model.name + "\":{\n";
+                            result += "            \"canonical_base\": \"" +
+                                      canonical_base_map.at(mod_model.mods.variant) + "\",\n";
+                            result += "            \"variant\": \"" +
+                                      to_string(mod_model.mods.variant) + "\"";
+                            // If there is a newer model for this condition, add the outdated flag.
+                            const auto mod_type_matches = find_models(
+                                    modified_models(), variant.first, simplex_model.simplex,
+                                    {mod_model.mods.variant, ModelVersion::NONE});
+                            if (mod_type_matches.back().name != mod_model.name) {
+                                result += ",\n            \"outdated\": true";
+                            }
+                            result += "\n        },\n";
                         }
-                        result += "\n        },\n";
                     }
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
                     result += "\n      }";
@@ -1322,18 +1356,28 @@ std::string get_supported_model_info() {
 
                 const auto stereo_matches = find_models(stereo_models(), variant.first,
                                                         simplex_model.simplex, ModsVariantPair());
-                if (!stereo_matches.empty()) {
+                bool stereo_models_available = false;
+                for (const auto& stereo_model : stereo_matches) {
+                    if (model_exists_in_folder(stereo_model.name, model_download_folder)) {
+                        stereo_models_available = true;
+                        break;
+                    }
+                }
+
+                if (stereo_models_available) {
                     result += ",\n      \"stereo_models\":{\n";
                     for (const auto& stereo_model : stereo_matches) {
-                        result += "        \"" + stereo_model.name + "\":{\n";
-                        // If there is a newer model for this condition, add the outdated flag.
-                        const auto duplex_type_matches =
-                                find_models(stereo_models(), variant.first, simplex_model.simplex,
-                                            {stereo_model.mods.variant, ModelVersion::NONE});
-                        if (duplex_type_matches.back().name != stereo_model.name) {
-                            result += ",\n            \"outdated\": true";
+                        if (model_exists_in_folder(stereo_model.name, model_download_folder)) {
+                            result += "        \"" + stereo_model.name + "\":{\n";
+                            // If there is a newer model for this condition, add the outdated flag.
+                            const auto duplex_type_matches = find_models(
+                                    stereo_models(), variant.first, simplex_model.simplex,
+                                    {stereo_model.mods.variant, ModelVersion::NONE});
+                            if (duplex_type_matches.back().name != stereo_model.name) {
+                                result += ",\n            \"outdated\": true";
+                            }
+                            result += "\n        },\n";
                         }
-                        result += "\n        },\n";
                     }
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
                     result += "\n      }";
@@ -1344,7 +1388,9 @@ std::string get_supported_model_info() {
         result = result.substr(0, result.length() - 2);  // trim last ",\n"
         result += "\n  }\n},\n";
     }
-    result = result.substr(0, result.length() - 2);  // trim last ",\n"
+    if (chemistry_emitted) {
+        result = result.substr(0, result.length() - 2);  // trim last ",\n"
+    }
 
     result += "\n}\n";
 

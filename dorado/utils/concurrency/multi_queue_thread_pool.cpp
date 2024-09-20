@@ -34,11 +34,15 @@ MultiQueueThreadPool::~MultiQueueThreadPool() { join(); }
 
 void MultiQueueThreadPool::join() {
     // post as many done messages as there are threads to make sure all waiting threads will receive a wakeup
-    auto& terminate_task_queue = m_priority_task_queue.create_task_queue(TaskPriority::normal);
+    detail::PriorityTaskQueue::TaskQueue* terminate_task_queue;
+    {
+        std::lock_guard lock(m_mutex);
+        terminate_task_queue = &m_priority_task_queue.create_task_queue(TaskPriority::normal);
+    }
     for (uint32_t thread_index{0}; thread_index < m_num_threads * 2; ++thread_index) {
         {
             std::lock_guard lock(m_mutex);
-            terminate_task_queue.push([this] { m_done.store(true, std::memory_order_relaxed); });
+            terminate_task_queue->push([this] { m_done.store(true, std::memory_order_relaxed); });
         }
         m_message_received.notify_one();
     }
@@ -135,31 +139,20 @@ void MultiQueueThreadPool::process_task_queue() {
     }
 }
 
-namespace {
-
-class ThreadPoolQueueImpl : public MultiQueueThreadPool::ThreadPoolQueue {
-    MultiQueueThreadPool* m_parent;
-    detail::PriorityTaskQueue::TaskQueue& m_task_queue;
-
-public:
-    ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                        detail::PriorityTaskQueue::TaskQueue& task_queue);
-    void push(TaskType task) override;
-};
-
-ThreadPoolQueueImpl::ThreadPoolQueueImpl(MultiQueueThreadPool* parent,
-                                         detail::PriorityTaskQueue::TaskQueue& task_queue)
+MultiQueueThreadPool::ThreadPoolQueue::ThreadPoolQueue(
+        MultiQueueThreadPool* parent,
+        detail::PriorityTaskQueue::TaskQueue& task_queue)
         : m_parent(parent), m_task_queue(task_queue) {}
 
-void ThreadPoolQueueImpl::push(TaskType task) { m_parent->send(std::move(task), m_task_queue); }
+void MultiQueueThreadPool::ThreadPoolQueue::push(TaskType task) {
+    m_parent->send(std::move(task), m_task_queue);
+}
 
-}  // namespace
-
-std::unique_ptr<MultiQueueThreadPool::ThreadPoolQueue> MultiQueueThreadPool::create_task_queue(
+MultiQueueThreadPool::ThreadPoolQueue& MultiQueueThreadPool::create_task_queue(
         TaskPriority priority) {
     std::lock_guard lock(m_mutex);
-    return std::make_unique<ThreadPoolQueueImpl>(this,
-                                                 m_priority_task_queue.create_task_queue(priority));
+    auto& task_queue = m_priority_task_queue.create_task_queue(priority);
+    return *m_queues.emplace_back(new ThreadPoolQueue(this, task_queue));
 }
 
 }  // namespace dorado::utils::concurrency

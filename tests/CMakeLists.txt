@@ -20,7 +20,7 @@ add_executable(dorado_tests
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp
     BasecallerParamsTest.cpp
-    BedFileTest.cpp
+    bed_file_test.cpp
     CigarTest.cpp
     CliUtilsTest.cpp
     context_container_test.cpp

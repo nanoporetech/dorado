@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BedFile.h"
+#include "bed_file.h"
 
 #include <map>
 #include <memory>
