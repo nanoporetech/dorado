@@ -177,25 +177,25 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
 
 template <typename READ>
 void AlignerNode::align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read) {
-    executor.send([this, read = std::move(read)]() mutable {
+    executor.send([this, read_ = std::move(read)]() mutable {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
-        align_read_common(read->read_common, tbuf.get());
-        send_message_to_sink(std::move(read));
+        align_read_common(read_->read_common, tbuf.get());
+        send_message_to_sink(std::move(read_));
     });
 }
 
 void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
                                     BamMessage&& bam_message) {
-    executor.send([this, bam_message = std::move(bam_message)] {
+    executor.send([this, bam_message_ = std::move(bam_message)] {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                               .align(bam_message.bam_ptr.get(), tbuf.get());
+                               .align(bam_message_.bam_ptr.get(), tbuf.get());
         for (auto& record : records) {
             if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
                 auto ref_id = record->core.tid;
                 add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
             }
-            send_message_to_sink(BamMessage{std::move(record), bam_message.client_info});
+            send_message_to_sink(BamMessage{std::move(record), bam_message_.client_info});
         }
     });
 }
