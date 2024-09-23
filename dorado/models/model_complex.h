@@ -44,12 +44,12 @@ public:
 // could be a actual model complex tries to find the ModelInfo from the models lib.
 class ModelComplexSearch {
 public:
-    ModelComplexSearch(const ModelComplex& selection, Chemistry chemsitry, bool suggestions);
+    ModelComplexSearch(const ModelComplex& selection, Chemistry chemistry, bool suggestions);
     // Return the model complex
     ModelComplex complex() { return m_complex; }
-    // Return the chemistry found
+    // Return the chemistry
     Chemistry chemistry() { return m_chemistry; }
-    // Find a simplex model which matches the user's command and chemistry
+    // Return the simplex model found during initialisation
     ModelInfo simplex() const;
     // Find a stereo model which matches the chemistry
     ModelInfo stereo() const;
@@ -59,6 +59,8 @@ public:
     std::vector<ModelInfo> simplex_mods() const;
 
 private:
+    // Resolve the simplex model which matches the user's command and chemistry
+    ModelInfo resolve_simplex() const;
     // The user's model complex input
     const ModelComplex m_complex;
     // If a ModelVariant was set, the chemistry (e.g. R10.4.1 / RNA004) is deduced from the
