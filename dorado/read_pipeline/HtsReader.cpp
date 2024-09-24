@@ -168,8 +168,8 @@ bool HtsReader::try_initialise_generator(const std::string& filename) {
     }
     m_header = generator->header();
     m_format = generator->format();
-    m_bam_record_generator = [generator = std::move(generator)](bam1_t& bam_record) {
-        return generator->try_get_next_record(bam_record);
+    m_bam_record_generator = [generator_ = std::move(generator)](bam1_t& bam_record) {
+        return generator_->try_get_next_record(bam_record);
     };
     return true;
 }
