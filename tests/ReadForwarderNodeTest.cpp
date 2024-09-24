@@ -13,7 +13,7 @@ TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
     };
 
     dorado::PipelineDescriptor pipeline_desc;
-    pipeline_desc.add_node<dorado::ReadForwarderNode>({}, 10, add_to_vec_callback);
+    pipeline_desc.add_node<dorado::ReadForwarderNode>({}, 10, 1, add_to_vec_callback);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     // Test that only simplex and duplex reads are passed out of ReadForwarderNode.
