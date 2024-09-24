@@ -189,7 +189,15 @@ bool Downloader::validate_checksum(std::string_view data, const models::ModelInf
 }
 
 void Downloader::extract(const fs::path& archive) const {
-    elz::extractZip(archive, m_directory);
+    spdlog::trace("Extracting model archive: '{}'.", archive.u8string());
+
+    try {
+        elz::extractZip(archive, m_directory);
+    } catch (const elz::zip_exception& e) {
+        spdlog::error("Failed to unzip model archive: '{}'.", e.what());
+        throw;
+    }
+
     fs::remove(archive);
 }
 

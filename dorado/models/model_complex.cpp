@@ -29,8 +29,8 @@ ModelComplex ModelComplexParser::parse(const std::string& arg) {
                 spdlog::trace("Model option: '{}' unknown - assuming path", variant_str);
                 selection.model = ModelVariantPair{model_variant};
             } else {
-                spdlog::trace("'{}' found variant: '{}' and version: '{}'", variant_str,
-                              to_string(model_variant), to_string(version));
+                spdlog::trace("Model complex: '{}' found variant: '{}' and version: '{}'",
+                              variant_str, to_string(model_variant), to_string(version));
                 selection.model = ModelVariantPair{model_variant, version};
             }
         } else {
@@ -135,15 +135,23 @@ ModelComplexSearch::ModelComplexSearch(const ModelComplex& complex,
         : m_complex(complex),
           m_chemistry(chemistry),
           m_suggestions(suggestions),
-          m_simplex_model_info(simplex()) {}
+          m_simplex_model_info(resolve_simplex()) {}
 
-ModelInfo ModelComplexSearch::simplex() const {
+ModelInfo ModelComplexSearch::resolve_simplex() const {
     if (m_complex.is_path()) {
         throw std::logic_error(
                 "Cannot use model ModelComplexSearch with a simplex model complex which is a path");
     }
     return find_model(simplex_models(), "simplex", m_chemistry, m_complex.model, ModsVariantPair(),
                       m_suggestions);
+}
+
+ModelInfo ModelComplexSearch::simplex() const {
+    if (m_complex.is_path()) {
+        throw std::logic_error(
+                "Cannot use model ModelComplexSearch with a simplex model complex which is a path");
+    }
+    return m_simplex_model_info;
 }
 
 ModelInfo ModelComplexSearch::stereo() const {

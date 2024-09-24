@@ -136,7 +136,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
     if (Chemistry::UNKNOWN == chemistry) {
         throw std::runtime_error("Cannot get model without chemistry");
     }
-    const auto matches = find_models(models, chemistry, model, mods);
+    const std::vector<ModelInfo> matches = find_models(models, chemistry, model, mods);
 
     if (matches.empty()) {
         spdlog::error("Failed to get {} model", description);
@@ -146,8 +146,13 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
         throw std::runtime_error("No matches for " + format_msg(chemistry, model, mods));
     }
 
-    // Get the only match or the latest model
-    return matches.back();
+    // Get the only match or the latest model as models are sorted in ascending version order
+    const ModelInfo& selection = matches.back();
+    if (matches.size() > 1) {
+        spdlog::trace("Selected {} model: '{}' from {} matches.", description, selection.name,
+                      matches.size());
+    }
+    return selection;
 }
 
 std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
