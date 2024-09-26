@@ -2,8 +2,8 @@
 
 namespace dorado::basecall {
 
-void AddQuadro_GV100Benchmarks(
-        std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks) {
+void AddQuadro_GV100Benchmarks(std::map<std::pair<std::string, std::string>,
+                                        std::unordered_map<int, float>>& chunk_benchmarks) {
     chunk_benchmarks[{"Quadro GV100", "dna_r10.4.1_e8.2_260bps_fast@v4.1.0"}] = {
             {64, 0.133248f},  {128, 0.075928f},  {192, 0.059051f}, {256, 0.048244f},
             {320, 0.041699f}, {448, 0.040158f},  {512, 0.038198f}, {576, 0.033886f},

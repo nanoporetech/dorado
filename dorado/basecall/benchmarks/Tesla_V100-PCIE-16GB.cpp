@@ -2,8 +2,8 @@
 
 namespace dorado::basecall {
 
-void AddTesla_V100_PCIE_16GBBenchmarks(
-        std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks) {
+void AddTesla_V100_PCIE_16GBBenchmarks(std::map<std::pair<std::string, std::string>,
+                                                std::unordered_map<int, float>>& chunk_benchmarks) {
     chunk_benchmarks[{"Tesla V100-PCIE-16GB", "dna_r10.4.1_e8.2_260bps_fast@v4.1.0"}] = {
             {64, 0.107872f},  {128, 0.060736f}, {192, 0.046971f}, {256, 0.038268f},
             {320, 0.032979f}, {512, 0.032126f}, {576, 0.029948f}, {640, 0.028114f},

@@ -2,8 +2,8 @@
 
 namespace dorado::basecall {
 
-void AddNVIDIA_RTX_A6000Benchmarks(
-        std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks) {
+void AddNVIDIA_RTX_A6000Benchmarks(std::map<std::pair<std::string, std::string>,
+                                            std::unordered_map<int, float>>& chunk_benchmarks) {
     chunk_benchmarks[{"NVIDIA RTX A6000", "dna_r10.4.1_e8.2_260bps_fast@v4.1.0"}] = {
             {64, 0.081234f},   {128, 0.047160f},  {192, 0.036165f},  {256, 0.031301f},
             {320, 0.027645f},  {576, 0.026394f},  {640, 0.025800f},  {1344, 0.025478f},

@@ -3,7 +3,7 @@
 #include <map>
 #include <optional>
 #include <string>
-#include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -12,10 +12,10 @@ namespace dorado::basecall {
 class CudaChunkBenchmarks final {
 private:
     CudaChunkBenchmarks();
-    using ChunkTimings = std::map<int, float>;
+    using ChunkTimings = std::unordered_map<int, float>;
     using ModelName = std::string;
     using GPUName = std::string;
-    std::map<std::tuple<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
+    std::map<std::pair<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
 
 public:
     static CudaChunkBenchmarks& instance() {

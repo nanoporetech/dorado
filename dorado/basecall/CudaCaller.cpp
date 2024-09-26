@@ -309,6 +309,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     float best_time = std::numeric_limits<float>::max();
 
+    assert(m_batch_dims.size() > 0);
     int chunk_size = m_batch_dims.back().T_in;
     // We limit the maximum when doing benchmarking to avoid excessive startup time.
     // The limit for transformer models should be increased at a later time.
@@ -319,8 +320,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     if (params.emit_batchsize_benchmarks) {
         // When we are emitting benchmarks, prefer accuracy over speed of benchmark generation, so run the benchmarks
         //  at full chunk size.  We must round down the requested chunk size to a multiple of the minimum granularity.
-        size_t chunk_granularity = params.model_config.chunk_size_granularity();
-        chunk_size = int((chunk_size / chunk_granularity) * chunk_granularity);
+        const size_t chunk_granularity = params.model_config.chunk_size_granularity();
+        chunk_size = static_cast<int>((chunk_size / chunk_granularity) * chunk_granularity);
     } else {
         // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
         // trade-off between getting more accurate measurements and avoiding excessive startup time,

@@ -63,7 +63,7 @@ echo "#include \"${gpu_name}.h\"
 
 namespace dorado::basecall {
 
-void Add${gpu_name_no_dashes}Benchmarks(std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks) {" >> ${gpu_name}.cpp
+void Add${gpu_name_no_dashes}Benchmarks(std::map<std::pair<std::string, std::string>, std::unordered_map<int, float>>& chunk_benchmarks) {" >> ${gpu_name}.cpp
 
 # Add the chunk benchmarks for every model 
 cat chunk_benchmarks__*.txt >> ${gpu_name}.cpp
@@ -77,9 +77,9 @@ echo "#pragma once
 
 #include <map>
 #include <string>
-#include <tuple>
+#include <unordered_map>
 
 namespace dorado::basecall {
-    void Add${gpu_name_no_dashes}Benchmarks(std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks);
+    void Add${gpu_name_no_dashes}Benchmarks(std::map<std::pair<std::string, std::string>, std::unordered_map<int, float>>& chunk_benchmarks);
 } // namespace dorado::basecall
 " >> ${gpu_name}.h

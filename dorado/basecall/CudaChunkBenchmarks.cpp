@@ -25,8 +25,9 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
     ModelName model_name = std::filesystem::path(model_path).filename().string();
 
     // Try looking up the specified gpu name directly
-    if (m_chunk_benchmarks.find({gpu_name, model_name}) != m_chunk_benchmarks.end()) {
-        return m_chunk_benchmarks.at({gpu_name, model_name});
+    auto iter = m_chunk_benchmarks.find({gpu_name, model_name});
+    if (iter != m_chunk_benchmarks.cend()) {
+        return iter->second;
     }
 
     // If the direct lookup fails, try looking up via an alias
@@ -35,10 +36,11 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
             {"NVIDIA A800 80GB PCIe", "NVIDIA A100 80GB PCIe"},
     };
 
-    if (gpu_name_alias.find(gpu_name) != gpu_name_alias.end()) {
+    if (gpu_name_alias.find(gpu_name) != gpu_name_alias.cend()) {
         gpu_name = gpu_name_alias[gpu_name];
-        if (m_chunk_benchmarks.find({gpu_name, model_name}) != m_chunk_benchmarks.end()) {
-            return m_chunk_benchmarks.at({gpu_name, model_name});
+        iter = m_chunk_benchmarks.find({gpu_name, model_name});
+        if (iter != m_chunk_benchmarks.cend()) {
+            return iter->second;
         }
     }
 

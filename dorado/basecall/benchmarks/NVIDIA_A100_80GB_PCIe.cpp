@@ -3,7 +3,8 @@
 namespace dorado::basecall {
 
 void AddNVIDIA_A100_80GB_PCIeBenchmarks(
-        std::map<std::tuple<std::string, std::string>, std::map<int, float>>& chunk_benchmarks) {
+        std::map<std::pair<std::string, std::string>, std::unordered_map<int, float>>&
+                chunk_benchmarks) {
     chunk_benchmarks[{"NVIDIA A100 80GB PCIe", "dna_r10.4.1_e8.2_260bps_fast@v4.1.0"}] = {
             {64, 0.098176f},   {128, 0.054744f},  {192, 0.038688f},  {256, 0.032228f},
             {320, 0.027174f},  {384, 0.024059f},  {640, 0.022741f},  {704, 0.021700f},
