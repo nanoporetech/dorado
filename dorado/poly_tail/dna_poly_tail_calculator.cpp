@@ -93,6 +93,11 @@ float DNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
     return static_cast<float>(quantiles[0]);
 }
 
+int DNAPolyTailCalculator::signal_length_adjustment(const SimplexRead& read, int signal_len) const {
+    bool is_prom = read.read_common.flow_cell_product_code.find("PRO") != std::string::npos;
+    return is_prom ? 0 : static_cast<int>(std::round(signal_len * 0.063f));
+}
+
 std::pair<int, int> DNAPolyTailCalculator::signal_range(int signal_anchor,
                                                         int signal_len,
                                                         float samples_per_base) const {

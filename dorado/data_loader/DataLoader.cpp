@@ -223,6 +223,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
+    new_read->read_common.flow_cell_product_code = run_info_data->flow_cell_product_code;
     new_read->read_common.position_id = run_info_data->sequencer_position;
     new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.is_duplex = false;
@@ -1038,6 +1039,8 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
         std::string exp_start_time = get_string_attribute(tracking_id_group, "exp_start_time");
         std::string flow_cell_id = get_string_attribute(tracking_id_group, "flow_cell_id");
+        std::string flow_cell_product_code =
+                get_string_attribute(tracking_id_group, "flow_cell_product_code");
         std::string device_id = get_string_attribute(tracking_id_group, "device_id");
         std::string group_protocol_id =
                 get_string_attribute(tracking_id_group, "group_protocol_id");
@@ -1060,6 +1063,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->read_common.attributes.start_time = start_time_str;
         new_read->read_common.attributes.fast5_filename = fast5_filename;
         new_read->read_common.flowcell_id = flow_cell_id;
+        new_read->read_common.flow_cell_product_code = flow_cell_product_code;
         new_read->read_common.position_id = device_id;
         new_read->read_common.experiment_id = group_protocol_id;
         new_read->read_common.is_duplex = false;

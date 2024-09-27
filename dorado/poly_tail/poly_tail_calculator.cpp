@@ -262,7 +262,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
             signal_info.signal_anchor, signal_info.is_fwd_strand, read, num_samples_per_base);
 
     auto signal_len = signal_end - signal_start;
-    signal_len -= signal_length_adjustment(signal_len);
+    signal_len -= signal_length_adjustment(read, signal_len);
 
     int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
                     signal_info.trailing_adapter_bases;

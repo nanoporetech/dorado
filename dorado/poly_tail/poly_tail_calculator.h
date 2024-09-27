@@ -38,8 +38,7 @@ public:
     virtual SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const = 0;
 
     // returns the number of bases in the polyA/T tail, or -1 on failure
-    int calculate_num_bases(const dorado::SimplexRead& read,
-                            const SignalAnchorInfo& signal_info) const;
+    int calculate_num_bases(const SimplexRead& read, const SignalAnchorInfo& signal_info) const;
 
     static int max_tail_length() { return 750; };
 
@@ -48,7 +47,7 @@ protected:
     virtual float average_samples_per_base(const std::vector<float>& sizes) const = 0;
 
     // Returns any adjustment required for the provided signal_len
-    virtual int signal_length_adjustment(int signal_len) const = 0;
+    virtual int signal_length_adjustment(const SimplexRead& read, int signal_len) const = 0;
 
     // Floor for average signal value of poly tail.
     virtual float min_avg_val() const = 0;

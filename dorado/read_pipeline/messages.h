@@ -47,6 +47,7 @@ public:
     std::vector<uint8_t> moves;           // Move table
     std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
     std::string run_id;                   // Run ID - used in read group
+    std::string flow_cell_product_code;   // Flowcell product code
     std::string flowcell_id;    // Flowcell ID - used in read group and for sample sheet aliasing
     std::string position_id;    // Position ID - used for sample sheet aliasing
     std::string experiment_id;  // Experiment ID - used for sample sheet aliasing
