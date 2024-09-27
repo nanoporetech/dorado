@@ -2,9 +2,9 @@
 
 #include <map>
 #include <string>
-#include <tuple>
+#include <unordered_map>
 
 namespace dorado::basecall {
-void AddNVIDIA_RTX_A6000Benchmarks(std::map<std::tuple<std::string, std::string, int>,
-                                            std::map<int, float>>& chunk_benchmarks);
+void AddNVIDIA_RTX_A6000Benchmarks(std::map<std::pair<std::string, std::string>,
+                                            std::unordered_map<int, float>>& chunk_benchmarks);
 }  // namespace dorado::basecall

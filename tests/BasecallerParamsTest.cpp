@@ -27,7 +27,7 @@ TEST_CASE(CUT_TAG ": test update from config", CUT_TAG) {
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
     base.update(path);
 
-    CHECK(base.chunk_size() == 12000);
+    CHECK(base.chunk_size() == 12288);
     CHECK(base.overlap() == 600);
     // batchsize is ignored in the config
     CHECK(base.batch_size() == default_parameters.batchsize);

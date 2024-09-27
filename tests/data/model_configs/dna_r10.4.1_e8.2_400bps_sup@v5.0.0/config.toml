@@ -111,6 +111,6 @@ deepnorm_beta = 0.2886751
 attn_window = [127, 128]
 
 [basecaller]
-chunksize = 12000
+chunksize = 12288
 overlap = 600
 batchsize = 128

@@ -579,6 +579,17 @@ bool CRFModelConfig::has_normalised_basecaller_params() const {
         spdlog::error("Expected normalised chunksize - got: {} - for model stride: {}", cs, si);
         is_normalised = false;
     }
+
+    if (is_tx_model()) {
+        if (cs % (si * 16) != 0) {
+            spdlog::error(
+                    "Expected normalised chunksize of stride * 16 for transformer model - got: {} "
+                    "- for model stride * 16: {}",
+                    cs, si * 16);
+            is_normalised = false;
+        }
+    }
+
     const auto ov = basecaller.overlap();
     if (ov % si != 0) {
         spdlog::error("Expected normalised overlap - got: {} - for model stride: {}", ov, si);

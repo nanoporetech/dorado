@@ -729,6 +729,7 @@ generate_auto_benchmarks:linux:x86:focal:
        - GPU: "gpu-a100"
        - GPU: "gpu-v100"
        - GPU: "gpu-a6000"
+  timeout: 3h
 
 # MLHub
 

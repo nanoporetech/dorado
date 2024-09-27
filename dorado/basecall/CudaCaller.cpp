@@ -55,9 +55,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     at::InferenceMode guard;
     m_module = load_crf_model(params.model_config, m_options);
 
-    const auto chunk_size = params.model_config.basecaller.chunk_size();
-    const auto batch_size = params.model_config.basecaller.batch_size();
-    determine_batch_dims(params, batch_size, chunk_size);
+    determine_batch_dims(params);
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
@@ -197,9 +195,10 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     return {crfmodel_bytes_per_chunk_timestep, decode_bytes_per_chunk_timestep};
 }
 
-void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
-                                      int requested_batch_size,
-                                      int requested_chunk_size) {
+void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
+    auto requested_chunk_size = params.model_config.basecaller.chunk_size();
+    auto requested_batch_size = params.model_config.basecaller.batch_size();
+
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
@@ -309,15 +308,26 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
     }
 
     float best_time = std::numeric_limits<float>::max();
-    // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
-    // trade-off between getting more accurate measurements and avoiding excessive startup time,
-    // while making chunk size a multiple of 16 * stride as required by koi transformer kernels.
-    const int chunk_size = std::min(m_batch_dims.back().T_in, m_config.stride * 288);
+
+    assert(m_batch_dims.size() > 0);
+    int chunk_size = m_batch_dims.back().T_in;
     // We limit the maximum when doing benchmarking to avoid excessive startup time.
     // The limit for transformer models should be increased at a later time.
-    const int max_batch_size_limit = m_config.is_tx_model() ? 512 : 10240;
     int max_batch_size = *std::max_element(max_batch_sizes.begin(), max_batch_sizes.end());
+    const int max_batch_size_limit = m_config.is_tx_model() ? 1024 : 10240;
     max_batch_size = std::min(max_batch_size, max_batch_size_limit);
+
+    if (params.emit_batchsize_benchmarks) {
+        // When we are emitting benchmarks, prefer accuracy over speed of benchmark generation, so run the benchmarks
+        //  at full chunk size.  We must round down the requested chunk size to a multiple of the minimum granularity.
+        const size_t chunk_granularity = params.model_config.chunk_size_granularity();
+        chunk_size = static_cast<int>((chunk_size / chunk_granularity) * chunk_granularity);
+    } else {
+        // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
+        // trade-off between getting more accurate measurements and avoiding excessive startup time,
+        // while making chunk size a multiple of 16 * stride_inner as required by koi transformer kernels.
+        chunk_size = std::min(chunk_size, m_config.stride * 288);
+    }
     spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,
                   granularity);
 
@@ -328,7 +338,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
 
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
-            prop->name, m_config.model_path.string(), chunk_size);
+            prop->name, m_config.model_path.string());
     if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
         spdlog::warn(std::string("Unable to find chunk benchmarks for GPU \"") + prop->name +
                      "\", model " + m_config.model_path.string() + " and chunk size " +
@@ -389,16 +399,14 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
 
         // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
         std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + m_config.model_path.string() + "\", " +
-                                           std::to_string(chunk_size) + "}] = {\n";
+                                           "\", \"" + m_config.model_path.string() + "\"}] = {\n";
         for (const auto &batch_time : times_and_batch_sizes) {
             cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
                                     std::to_string(batch_time.first) + "f },\n";
         }
         cpp_autobatch_output += "    };\n";
         std::string cpp_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + "__" +
-                                   std::to_string(chunk_size) + ".txt";
+                                   m_config.model_path.string() + ".txt";
         std::ofstream cpp_bench_file(cpp_filename);
         cpp_bench_file << cpp_autobatch_output;
 
@@ -410,8 +418,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                                     std::to_string(batch_time.first) + "\n";
         }
         std::string csv_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + "__" +
-                                   std::to_string(chunk_size) + ".csv";
+                                   m_config.model_path.string() + ".csv";
         std::ofstream csv_bench_file(csv_filename);
         csv_bench_file << csv_autobatch_output;
     }
@@ -421,12 +428,12 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
         // will be of benefit to basecall servers which won't have to keep re-generating the benchmarks each time a
         // runner is created.
         CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, m_config.model_path.string(),
-                                                          chunk_size, times_and_batch_sizes);
+                                                          times_and_batch_sizes);
 
         spdlog::debug(
-                "Adding chunk timings to internal cache for GPU {}, model {}, chunk size {} ({} "
+                "Adding chunk timings to internal cache for GPU {}, model {} ({} "
                 "entries)",
-                prop->name, m_config.model_path.string(), chunk_size, times_and_batch_sizes.size());
+                prop->name, m_config.model_path.string(), times_and_batch_sizes.size());
     }
 
     // Find the first batch size that was under the threshold.
