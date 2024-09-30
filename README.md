@@ -549,6 +549,23 @@ Low GPU utilization can lead to reduced basecalling speed. This problem can be i
 2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
 3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
 
+### Windows PowerShell encoding
+
+When running in PowerShell on Windows, care must be taken, as the default encoding for application output is typically UTF-16LE.  This will cause file corruption if standard output is redirected to a file.  It is recommended to use the `--output-dir` argument to emit BAM files if PowerShell must be used.  For example, the following command will create corrupt output which cannot be read by samtools:
+
+`PS > dorado basecaller <args> > out.bam`
+
+Instead, use:
+
+`PS > dorado basecaller <args> --output-dir .`
+
+For text-based output formats (SAM or FASTQ), it is possible to override the encoding on output using the `out-file` command.  This command will produce a well formed ascii SAM file:
+
+`PS > dorado basecaller <args> --emit-sam | out-file -encoding Ascii out.sam`
+
+Note that `out-file` with `Ascii` encoding will not produce well-formed BAM files.
+
+Read more about Powershell output encoding [here](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_character_encoding?view=powershell-7.4).
 
 ## Licence and Copyright
 
