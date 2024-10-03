@@ -2,6 +2,21 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.8.1] (3 Oct 2024)
+
+This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release, including corrected configuration for DNA v5 SUP-compatible 5mC_5hmC and 5mCG_5hmCG models, improved cDNA poly(A) tail estimation for data from MinION flow cells, reduced basecaller startup time on supported GPUs, and more.
+
+* <todo>                                   - Corrected bug causing dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_5hmC@v2 to call CpG contexts only and dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mCG_5hmCG@v2 to call all contexts
+* eb4649442bbe1ef84eb72fd62e30586c9a45c10d - Improve cDNA poly(A) tail estimation for MinION flow cells
+* 762e88689b31099081a7fcd39b959ddc4c7eb2e1 - Cache batch sizes to significantly reduce basecaller startup time on supported GPUs
+* 22269a8eed928ed04fbf7731ff99fe4454f87493 - Prevent "Trim interval <range> is invalid for sequence" error when performing trimming
+* f156ae6237fa4602d759dc6ee05b1b367e77c09c - Prevent write permission error for model download folder when file write is not required
+* fcb9d53ab168f42cdd02cfa740158a0ce0b5cc84 - Include run name in output files from `dorado demux` even if input files are FASTQ
+* a4c96490a4409d961ce59b642478ff453d217776 - BED file handling: only split columns on tabs, not spaces; load files with spaces in region names
+* e62cbc851a087d778fbde24ebe0ae85b96d28a9e - Allow comment lines in the middle of the BED file
+* f15c0b38286dccda86e3244e535e69e30edb60cd - Fix compilation in AppleClang 16
+
+
 # [0.8.0] (16 Sept 2024)
 
 This release of Dorado adds v5.1 RNA models with new `inosine_m6A` and `m5C` RNA modified base models, updates existing modified base models, improves the speed of v5 SUP basecalling models on A100/H100 GPUs, and enhances the flexibility and stability of `dorado correct`. It also introduces per-barcode configuration for poly(A) estimation with interrupted tails, adds new `--output-dir` and `--bed-file` arguments to Dorado basecalling commands, and includes a variety of other improvements for stability and usability.
