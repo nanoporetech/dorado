@@ -50,7 +50,7 @@ private:
 
     HtsFiles m_files;
     void input_thread_fn();
-    int write(bam1_t* record);
+    int write(bam1_t& record);
     const bool m_write_fastq;
     const bool m_sort_bam;
     const std::unique_ptr<const utils::SampleSheet> m_sample_sheet;

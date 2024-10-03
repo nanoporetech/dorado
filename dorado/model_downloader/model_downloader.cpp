@@ -40,25 +40,34 @@ bool download_models(const std::string& target_directory, const std::string& sel
 }
 
 std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::string& description) {
-    // parent_dir is either a temporary directory in the CWD or the users selection
-    const auto parent_dir = utils::get_downloads_path(m_models_dir);
+    const fs::path parent_dir =
+            m_models_dir.has_value() ? m_models_dir.value() : utils::create_temporary_directory();
 
     // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
     /*const*/ fs::path model_dir = parent_dir / model.name;
 
-    if (std::filesystem::exists(model_dir)) {
+    if (fs::exists(model_dir)) {
+        spdlog::trace("Found existing model at '{}'.", model_dir.u8string());
         return model_dir;
     }
 
+    if (m_models_dir.has_value()) {
+        spdlog::trace("Model does not exist at '{}' - downloading it instead.",
+                      model_dir.u8string());
+    }
+
+    if (!utils::has_write_permission(parent_dir)) {
+        throw std::runtime_error("Failed to prepare model download directory");
+    }
+
     if (!download_models(parent_dir.u8string(), model.name)) {
-        throw std::runtime_error("Failed to download + " + description + " model: " + model.name);
+        throw std::runtime_error("Failed to download + " + description + " model: '" + model.name +
+                                 "'.");
     }
 
     if (is_temporary()) {
         // Check parent_dir is temp preventing unintentionally deleting work
         if (parent_dir.filename().u8string().find(utils::TEMP_MODELS_DIR_PREFIX) == 0) {
-            spdlog::trace("Temporary {} model '{}' downloaded into: '{}'", description, model.name,
-                          parent_dir.u8string());
             m_temp_models.emplace(parent_dir);
         } else {
             spdlog::warn(
@@ -66,6 +75,8 @@ std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::st
                     description, utils::TEMP_MODELS_DIR_PREFIX, parent_dir.u8string());
         }
     }
+
+    spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.u8string());
     return model_dir;
 }
 

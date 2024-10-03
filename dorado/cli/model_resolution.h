@@ -44,7 +44,7 @@ inline std::optional<std::filesystem::path> get_models_directory(
             std::exit(EXIT_FAILURE);
         }
         path = std::filesystem::canonical(path);
-        spdlog::debug("set models directory to: '{}'", path.u8string());
+        spdlog::debug("Set models directory to: '{}'.", path.u8string());
         return path;
     } else if (env_path != nullptr) {
         auto path = std::filesystem::path(env_path);

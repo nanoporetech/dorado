@@ -10,7 +10,9 @@ namespace dorado {
 // Sends on messages that are reads to the supplied callback.
 class ReadForwarderNode : public MessageSink {
 public:
-    ReadForwarderNode(size_t max_reads, std::function<void(Message &&)> message_callback);
+    ReadForwarderNode(size_t max_reads,
+                      int num_threads,
+                      std::function<void(Message &&)> message_callback);
     ~ReadForwarderNode() { stop_input_processing(); }
     std::string get_name() const override { return "ReadForwarderNode"; }
     stats::NamedStats sample_stats() const override { return stats::from_obj(m_work_queue); }

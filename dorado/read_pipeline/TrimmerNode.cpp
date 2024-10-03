@@ -24,7 +24,8 @@ using Interval = std::pair<int, int>;
 std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_info,
                                                    int seqlen,
                                                    Interval adapter_interval,
-                                                   Interval barcoding_interval) {
+                                                   Interval barcoding_interval,
+                                                   const std::string_view read_id) {
     const auto& adapter_info = client_info.contexts().get_ptr<const dorado::demux::AdapterInfo>();
     const auto& barcode_info = client_info.contexts().get_ptr<const dorado::demux::BarcodingInfo>();
 
@@ -53,6 +54,12 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
     if (trim_barcodes) {
         trim_interval.first = std::max(trim_interval.first, barcoding_interval.first);
         trim_interval.second = std::min(trim_interval.second, barcoding_interval.second);
+    }
+
+    if (trim_interval.second <= trim_interval.first) {
+        spdlog::debug("Invalid trim interval for read id {}: {}-{}. Trimming will be skipped.",
+                      read_id, trim_interval.first, trim_interval.second);
+        return {false, false, {0, 0}};
     }
 
     return {trim_barcodes, trim_adapter, trim_interval};
@@ -93,7 +100,7 @@ void TrimmerNode::process_read(BamMessage& bam_message) {
 
     auto [trim_adapter, trim_barcodes, trim_interval] =
             get_trim_interval(*bam_message.client_info, seqlen, bam_message.adapter_trim_interval,
-                              bam_message.barcode_trim_interval);
+                              bam_message.barcode_trim_interval, bam_get_qname(irecord));
 
     if (trim_adapter || trim_barcodes) {
         bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
@@ -113,7 +120,7 @@ void TrimmerNode::process_read(SimplexRead& read) {
 
     auto [trim_adapter, trim_barcodes, trim_interval] = get_trim_interval(
             *read.read_common.client_info, seqlen, read.read_common.adapter_trim_interval,
-            read.read_common.barcode_trim_interval);
+            read.read_common.barcode_trim_interval, read.read_common.read_id);
 
     if (trim_adapter || trim_barcodes) {
         Trimmer::trim_sequence(read, trim_interval);

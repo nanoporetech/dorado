@@ -144,12 +144,12 @@ TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TA
     CHECK(config.tx->upsample.scale_factor == 2);
     CHECK(config.tx->upsample.d_model == 512);
 
-    CHECK(config.basecaller.chunk_size() == 12000);
+    CHECK(config.basecaller.chunk_size() == 12288);
     CHECK(config.basecaller.overlap() == 600);
     // Model config basecaller.batchsize is always ignored - expect default
     CHECK(config.basecaller.batch_size() == dorado::utils::default_parameters.batchsize);
 
-    // We know that chunksize and overlap over stride inner are zero (12000 % 12 && 600 % 12)
+    // We know that chunksize and overlap over stride inner are zero (12288 % (12 * 16) && 600 % 12)
     CHECK(config.has_normalised_basecaller_params());
 }
 

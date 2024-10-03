@@ -188,7 +188,8 @@ dorado_aligner_options_test() (
 )
 dorado_aligner_options_test
 
-if ! uname -r | grep -q -E 'tegra|minit'; then
+# Skip duplex tests if NO_TEST_DUPLEX is set.
+if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 

@@ -3,6 +3,7 @@
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/messages.h"
+#include "utils/bam_utils.h"
 #include "utils/fastq_reader.h"
 #include "utils/types.h"
 
@@ -77,6 +78,7 @@ bool try_assign_bam_from_fastq(bam1_t& record, const utils::FastqRecord& fastq_r
     }
 
     write_bam_aux_tags_from_fastq(record, fastq_record);
+    utils::try_add_fastq_header_tag(&record, fastq_record.header());
     return true;
 }
 
@@ -149,8 +151,8 @@ public:
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
         : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    if (!try_initialise_generator<HtsLibBamRecordGenerator>(filename) &&
-        !try_initialise_generator<FastqBamRecordGenerator>(filename)) {
+    if (!try_initialise_generator<FastqBamRecordGenerator>(filename) &&
+        !try_initialise_generator<HtsLibBamRecordGenerator>(filename)) {
         throw std::runtime_error("Could not open file: " + filename);
     }
     is_aligned = m_header->n_targets > 0;
@@ -166,8 +168,8 @@ bool HtsReader::try_initialise_generator(const std::string& filename) {
     }
     m_header = generator->header();
     m_format = generator->format();
-    m_bam_record_generator = [generator = std::move(generator)](bam1_t& bam_record) {
-        return generator->try_get_next_record(bam_record);
+    m_bam_record_generator = [generator_ = std::move(generator)](bam1_t& bam_record) {
+        return generator_->try_get_next_record(bam_record);
     };
     return true;
 }

@@ -9,6 +9,7 @@
 
 struct sam_hdr_t;
 struct kstring_t;
+struct bam1_t;
 
 namespace dorado::utils {
 
@@ -24,6 +25,17 @@ struct AlignmentOps {
     size_t deletions;
     size_t substitutions;
 };
+
+// Attempts to write the fastq header record line to the custom tag "fq"
+// This means data written by minKNOW into the fastq header record, such as
+// run_id is not lost when converting to bam and can be retrieved from the
+// "fq" tag.
+// Note, this will fail if the header contains illegal characters such as TAB.
+// So headers from HtsLib generated fastq files may not get written as they
+// can contain a tab separated list of tags such as RG, st etc.
+bool try_add_fastq_header_tag(bam1_t* record, const std::string& fastq_header);
+
+int remove_fastq_header_tag(bam1_t* record);
 
 void add_hd_header_line(sam_hdr_t* hdr);
 

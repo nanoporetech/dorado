@@ -94,7 +94,8 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
 // for most dRNA data. This exponential fit was done based on the standards data.
 // TODO: In order to improve this, perhaps another pass over the tail interval is needed
 // to get a more refined boundary estimation?
-int RNAPolyTailCalculator::signal_length_adjustment(int signal_len) const {
+int RNAPolyTailCalculator::signal_length_adjustment([[maybe_unused]] const SimplexRead& read,
+                                                    int signal_len) const {
     return int(std::round(
             std::min(100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len)))));
 }
