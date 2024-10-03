@@ -49,14 +49,14 @@ const std::unordered_map<std::string, ModelVersion> map = {
         {"v0.0.0", ModelVersion::v0_0_0}, {"v0.1.0", ModelVersion::v0_1_0},
         {"v1.0.0", ModelVersion::v1_0_0}, {"v1.1.0", ModelVersion::v1_1_0},
         {"v1.2.0", ModelVersion::v1_2_0}, {"v2.0.0", ModelVersion::v2_0_0},
-        {"v3.0.0", ModelVersion::v3_0_0}, {"v3.0.1", ModelVersion::v3_0_1},
-        {"v3.1.0", ModelVersion::v3_1_0}, {"v3.3.0", ModelVersion::v3_3_0},
-        {"v3.4.0", ModelVersion::v3_4_0}, {"v3.5.0", ModelVersion::v3_5_0},
-        {"v3.5.2", ModelVersion::v3_5_2}, {"v3.6.0", ModelVersion::v3_6_0},
-        {"v4.0.0", ModelVersion::v4_0_0}, {"v4.1.0", ModelVersion::v4_1_0},
-        {"v4.2.0", ModelVersion::v4_2_0}, {"v4.3.0", ModelVersion::v4_3_0},
-        {"v5.0.0", ModelVersion::v5_0_0}, {"v5.1.0", ModelVersion::v5_1_0},
-        {"latest", ModelVersion::NONE}};
+        {"v2.0.1", ModelVersion::v2_0_1}, {"v3.0.0", ModelVersion::v3_0_0},
+        {"v3.0.1", ModelVersion::v3_0_1}, {"v3.1.0", ModelVersion::v3_1_0},
+        {"v3.3.0", ModelVersion::v3_3_0}, {"v3.4.0", ModelVersion::v3_4_0},
+        {"v3.5.0", ModelVersion::v3_5_0}, {"v3.5.2", ModelVersion::v3_5_2},
+        {"v3.6.0", ModelVersion::v3_6_0}, {"v4.0.0", ModelVersion::v4_0_0},
+        {"v4.1.0", ModelVersion::v4_1_0}, {"v4.2.0", ModelVersion::v4_2_0},
+        {"v4.3.0", ModelVersion::v4_3_0}, {"v5.0.0", ModelVersion::v5_0_0},
+        {"v5.1.0", ModelVersion::v5_1_0}, {"latest", ModelVersion::NONE}};
 }  // namespace version
 
 const std::unordered_map<std::string, ModelVariant>& model_variants_map() {

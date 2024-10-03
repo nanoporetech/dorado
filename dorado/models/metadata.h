@@ -42,6 +42,7 @@ enum class ModelVersion : uint8_t {
     v1_1_0,
     v1_2_0,
     v2_0_0,
+    v2_0_1,
     v3_0_0,
     v3_0_1,
     v3_1_0,
