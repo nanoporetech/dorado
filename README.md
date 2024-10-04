@@ -537,7 +537,9 @@ Dorado operates on a broad range of GPUs but it is primarily developed for Nvidi
 
 A potential solution to this issue could be setting a manual batch size using the following command:
 
-`dorado basecaller --batchsize 64 ...`
+```
+dorado basecaller --batchsize 64 ...
+```
 
 **Note:** Reducing memory consumption by modifying the `chunksize` parameter is not recommended as it influences the basecalling results.
 
@@ -553,15 +555,21 @@ Low GPU utilization can lead to reduced basecalling speed. This problem can be i
 
 When running in PowerShell on Windows, care must be taken, as the default encoding for application output is typically UTF-16LE.  This will cause file corruption if standard output is redirected to a file.  It is recommended to use the `--output-dir` argument to emit BAM files if PowerShell must be used.  For example, the following command will create corrupt output which cannot be read by samtools:
 
-`PS > dorado basecaller <args> > out.bam`
+```
+PS > dorado basecaller <args> > out.bam
+```
 
 Instead, use:
 
-`PS > dorado basecaller <args> --output-dir .`
+```
+PS > dorado basecaller <args> --output-dir .
+```
 
 For text-based output formats (SAM or FASTQ), it is possible to override the encoding on output using the `out-file` command.  This command will produce a well formed ascii SAM file:
 
-`PS > dorado basecaller <args> --emit-sam | out-file -encoding Ascii out.sam`
+```
+PS > dorado basecaller <args> --emit-sam | out-file -encoding Ascii out.sam
+```
 
 Note that `out-file` with `Ascii` encoding will not produce well-formed BAM files.
 
