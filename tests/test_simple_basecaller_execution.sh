@@ -60,7 +60,7 @@ if ! uname -r | grep -q -E 'tegra|minit'; then
     dorado_check_bam_not_empty
 fi
 
-$dorado_bin basecaller $model_complex,5mCG_5hmCG $data_dir/pod5 -b ${batch} --emit-moves > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex,5mCG_5hmCG $data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz/ -b ${batch} --emit-moves > $output_dir/calls.bam
 
 # Check that the read group has the required model info in its header
 if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
@@ -73,7 +73,7 @@ if ! grep -q "modbase_models=${model_name}_5mCG_5hmCG" $output_dir/calls.sam; th
 fi
 
 echo dorado basecaller mixed model complex and --modified-bases
-$dorado_bin basecaller $model_complex $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex $data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz/ -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
 samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
 samtools view -h $output_dir/calls.bam | grep "MN:i:"
