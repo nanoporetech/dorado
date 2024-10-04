@@ -6,7 +6,7 @@ set -ex
 set -o pipefail
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <dorado executable> [4k model] [batch size] [5k model]"
+    echo "Usage: $0 <dorado executable> [4k model] [batch size] [5k model] [5k v43 model] [rna004 model] [model speed] [model version]"
     exit 1
 fi
 
@@ -17,6 +17,11 @@ batch=${3:-384}
 model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
 model_name_5k_v43=${5:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
 model_name_rna004=${6:-rna004_130bps_hac@v3.0.1}
+
+model_speed=${7:-"hac"}
+version=${8:-"v4.2.0"}
+model_complex="${model_speed}@${version}"
+
 data_dir=$test_dir/data
 output_dir_name=test_output_$(echo $RANDOM | head -c 10)
 output_dir=${test_dir}/${output_dir_name}
@@ -55,6 +60,8 @@ if ! uname -r | grep -q -E 'tegra|minit'; then
     dorado_check_bam_not_empty
 fi
 
+$dorado_bin basecaller $model_complex,5mCG_5hmCG $data_dir/pod5 -b ${batch} --emit-moves > $output_dir/calls.bam
+
 # Check that the read group has the required model info in its header
 if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
     echo "Output SAM file does not contain basecall model name in header!"
@@ -64,6 +71,12 @@ if ! grep -q "modbase_models=${model_name}_5mCG_5hmCG" $output_dir/calls.sam; th
     echo "Output SAM file does not contain modbase model name in header!"
     exit 1
 fi
+
+echo dorado basecaller mixed model complex and --modified-bases
+$dorado_bin basecaller $model_complex $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
+samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
+samtools view -h $output_dir/calls.bam | grep "MN:i:"
 
 set +e
 if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
@@ -193,7 +206,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     echo dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
-    echo dorado in-line duplex test stage
+    echo dorado in-line duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
@@ -202,7 +215,16 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         exit 1
     fi
 
-    echo dorado pairs file based duplex test stage
+    echo dorado in-line duplex test stage - complex
+    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
+    samtools quickcheck -u $output_dir/duplex_calls.bam
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+    if [[ $num_duplex_reads -ne "2" ]]; then
+        echo "Duplex basecalling missing reads."
+        exit 1
+    fi
+
+    echo dorado pairs file based duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
@@ -211,17 +233,17 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         exit 1
     fi
 
-    echo dorado in-line duplex from model complex
-    $dorado_bin duplex hac@v4.2.0 $data_dir/duplex/pod5 > $output_dir/duplex_calls_complex.bam
-    samtools quickcheck -u $output_dir/duplex_calls_complex.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls_complex.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+    echo dorado pairs file based duplex test stage - complex
+    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
+    samtools quickcheck -u $output_dir/duplex_calls.bam
+    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads - model complex"
+        echo "Duplex basecalling missing reads."
         exit 1
     fi
 
     echo dorado in-line modbase duplex from model complex
-    $dorado_bin duplex hac@v4.2.0,5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
+    $dorado_bin duplex ${model_complex},5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
     samtools quickcheck -u $output_dir/duplex_calls_mods.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
