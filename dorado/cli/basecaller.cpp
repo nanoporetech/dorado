@@ -191,7 +191,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("A space separated list of modified base codes. Choose from: " + mods_codes +
                       ".")
                 .nargs(argparse::nargs_pattern::at_least_one)
-                .action([&mods_codes](const std::string& value) {
+                .action([mods_codes](const std::string& value) {
                     const auto& mods = models::modified_model_variants();
                     if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
                         spdlog::error("'{}' is not a supported modification please select from {}",
