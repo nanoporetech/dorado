@@ -39,7 +39,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     // AVX registers have 8 floats.
     static constexpr size_t kFloatsPerRegister = 8;
 
-    // TODO: we might get better performance with a higher unroll factor.
+    // There seems to be no improvement by unrolling this (tested on pipelinedev).
     static constexpr size_t kUnrollFactor = 1;
 
     // Matches torch behaviour.
