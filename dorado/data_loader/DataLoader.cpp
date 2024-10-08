@@ -42,23 +42,37 @@ namespace {
  *                  True for recursive mode, false for non-recursive mode.
  * @return A vector of directory entries fetched from the specified path.
  */
-auto fetch_directory_entries(const std::filesystem::path& path, bool recursive) {
-    using DirEntry = std::filesystem::directory_entry;
-
-    std::vector<DirEntry> entries;
+std::vector<std::filesystem::directory_entry> fetch_directory_entries(
+        const std::filesystem::path& path,
+        bool recursive) {
+    std::vector<std::filesystem::directory_entry> entries;
 
     if (std::filesystem::is_directory(path)) {
-        if (recursive) {
-            for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
-                entries.push_back(entry);
+        try {
+            if (recursive) {
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                             path, std::filesystem::directory_options::skip_permission_denied)) {
+                    entries.push_back(entry);
+                }
+            } else {
+                for (const auto& entry : std::filesystem::directory_iterator(
+                             path, std::filesystem::directory_options::skip_permission_denied)) {
+                    entries.push_back(entry);
+                }
             }
-        } else {
-            for (const auto& entry : std::filesystem::directory_iterator(path)) {
-                entries.push_back(entry);
-            }
+        } catch (const std::filesystem::filesystem_error& fex) {
+            spdlog::error("File system error reading directory entries for {}. ErrCode[{}] {}",
+                          path.string(), fex.code().value(), fex.what());
+            return {};
+        } catch (const std::exception& ex) {
+            spdlog::error("Error reading directory entries for {}. {}", path.string(), ex.what());
+            return {};
+        } catch (...) {
+            spdlog::error("Unexpected error reading directory entries for {}", path.string());
+            return {};
         }
     } else {
-        entries.push_back(DirEntry(path));
+        entries.emplace_back(path);
     }
 
     return entries;
