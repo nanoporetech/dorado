@@ -35,6 +35,8 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         throw std::runtime_error("AlignerNode reference path does not exist: " + index_file);
     case dorado::alignment::IndexLoadResult::validation_error:
         throw std::runtime_error("AlignerNode validation error checking minimap options");
+    case dorado::alignment::IndexLoadResult::file_open_error:
+        throw std::runtime_error("Error opening index file: " + index_file);
     case dorado::alignment::IndexLoadResult::split_index_not_supported:
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger index "
