@@ -1,5 +1,6 @@
 option(DORADO_DISABLE_TESTS "Disable building the tests" OFF)
 option(DORADO_RUN_TESTS "Run the tests. Certain platforms don't have the infrastructure to do this atm" ON)
+option(DORADO_ENABLE_BENCHMARK_TESTS "Enable benchmarks to run as part of the tests" OFF)
 
 if (DORADO_DISABLE_TESTS)
     return()
@@ -79,10 +80,6 @@ if (NOT IOS)
             ModelSearchTest.cpp
     )
 endif()
-target_compile_definitions(dorado_tests
-    PRIVATE
-        DORADO_IOS_BUILD=$<BOOL:${IOS}>
-)
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
@@ -113,6 +110,11 @@ target_include_directories(dorado_tests_common
     SYSTEM
     PUBLIC
         ${DORADO_3RD_PARTY_SOURCE}/catch2
+)
+target_compile_definitions(dorado_tests_common
+    PUBLIC
+        DORADO_IOS_BUILD=$<BOOL:${IOS}>
+        $<$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>:CATCH_CONFIG_ENABLE_BENCHMARKING>
 )
 
 
