@@ -18,9 +18,7 @@ namespace {
 __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
-    // TODO -- handle large counts properly.
-    assert(int(count) <= std::numeric_limits<int>::max());
-    auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
+    auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
 }
