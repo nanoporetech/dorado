@@ -225,9 +225,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("--barcode-arrangement")
-                .help("Path to file with custom barcode arrangement.");
+                .help("Path to file with custom barcode arrangement. Requires --kit-name.");
         parser.visible.add_argument("--barcode-sequences")
-                .help("Path to file with custom barcode sequences.");
+                .help("Path to file with custom barcode sequences. Requires --kit-name and "
+                      "--barcode-arrangement.");
         parser.visible.add_argument("--primer-sequences")
                 .help("Path to file with custom primer sequences.")
                 .default_value(std::nullopt);
@@ -484,10 +485,9 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
 
-    const bool is_rna_adapter = is_rna_model(model_config) &&
-                                (adapter_info->rna_adapters ||
-                                 (barcoding_info && (!barcoding_info->kit_name.empty() ||
-                                                     barcoding_info->custom_kit.has_value())));
+    const bool is_rna_adapter =
+            is_rna_model(model_config) &&
+            (adapter_info->rna_adapters || (barcoding_info && !barcoding_info->kit_name.empty()));
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
@@ -756,8 +756,10 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
         barcoding_info->trim = !no_trim_barcodes;
-        barcoding_info->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
-        barcoding_info->custom_seqs = parser.visible.present<std::string>("--barcode-sequences");
+        barcoding_info->custom_kit =
+                parser.visible.present<std::string>("--barcode-arrangement").value_or("");
+        barcoding_info->custom_seqs =
+                parser.visible.present<std::string>("--barcode-sequences").value_or("");
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
