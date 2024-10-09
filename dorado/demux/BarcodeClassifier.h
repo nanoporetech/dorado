@@ -20,13 +20,7 @@ class BarcodeClassifier {
     struct BarcodeCandidateKit;
 
 public:
-    BarcodeClassifier(KitInfoProvider kit_info_provider);
-
-    BarcodeClassifier(const std::vector<std::string>& kit_names,
-                      const std::optional<std::string>& custom_kit,
-                      const std::optional<std::string>& custom_sequences)
-            : BarcodeClassifier(KitInfoProvider(kit_names, custom_kit, custom_sequences)) {};
-
+    BarcodeClassifier(const std::string& kit_name);
     ~BarcodeClassifier();
 
     BarcodeScoreResult barcode(const std::string& seq,

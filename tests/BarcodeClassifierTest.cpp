@@ -3,10 +3,13 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "demux/barcoding_info.h"
+#include "demux/parse_custom_kit.h"
+#include "demux/parse_custom_sequences.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/TrimmerNode.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
@@ -27,25 +30,16 @@ namespace dorado::barcode_classifier_test {
 
 namespace {
 std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
-        const std::vector<std::string>& kit_names,
+        const std::string& kit_name,
         bool barcode_both_ends,
         bool trim_barcode,
-        demux::BarcodingInfo::FilterSet allowed_barcodes,
-        const std::optional<std::string>& custom_kit,
-        const std::optional<std::string>& custom_seqs) {
-    if (kit_names.empty() && !custom_kit) {
+        demux::BarcodingInfo::FilterSet allowed_barcodes) {
+    if (kit_name.empty()) {
         return {};
     }
 
-    // Use either the kit name, or the custom kit path as the "kit name" specifier since
-    // the custom kit's name is not determined till the kit is parsed.
-    std::string kit_name = "";
-    if (!kit_names.empty()) {
-        kit_name = kit_names[0];
-    }
-    auto result = demux::BarcodingInfo{kit_name,     barcode_both_ends,
-                                       trim_barcode, std::move(allowed_barcodes),
-                                       custom_kit,   custom_seqs};
+    auto result = demux::BarcodingInfo{kit_name, barcode_both_ends, trim_barcode,
+                                       std::move(allowed_barcodes)};
     return std::make_shared<demux::BarcodingInfo>(std::move(result));
 }
 
@@ -67,20 +61,18 @@ TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     CHECK(kit_names.size() > 0);
 
     for (auto& kit_name : kit_names) {
-        CHECK_NOTHROW(demux::BarcodeClassifier({kit_name}, std::nullopt, std::nullopt));
+        CHECK_NOTHROW(demux::BarcodeClassifier(kit_name));
     }
-
-    CHECK_NOTHROW(demux::BarcodeClassifier(kit_names, std::nullopt, std::nullopt));
 }
 
 TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP) {
-    CHECK_THROWS(demux::BarcodeClassifier({"MY_RANDOM_KIT"}, std::nullopt, std::nullopt));
+    CHECK_THROWS(demux::BarcodeClassifier("MY_RANDOM_KIT"));
 }
 
 TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RBK114-96"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("SQK-RBK114-96");
 
     for (std::string bc :
          {"SQK-RBK114-96_BC01", "SQK-RBK114-96_RBK39", "SQK-RBK114-96_BC92", "unclassified"}) {
@@ -107,7 +99,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RPB004"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("SQK-RPB004");
 
     for (std::string bc :
          {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
@@ -136,7 +128,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
 TEST_CASE("BarcodeClassifier: test double ended barcode with different variants", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("EXP-PBC096");
 
     for (std::string bc :
          {"EXP-PBC096_BC04", "EXP-PBC096_BC37", "EXP-PBC096_BC83", "unclassified"}) {
@@ -165,7 +157,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("EXP-PBC096");
 
     // Check case where both ends don't match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_fail.fastq";
@@ -182,7 +174,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
 TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("EXP-PBC096");
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_barcode_both_ends_pass.fastq";
@@ -199,7 +191,7 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
 TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended kit", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
-    demux::BarcodeClassifier classifier({"EXP-PBC096"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("EXP-PBC096");
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "EXP-PBC096_midstrand.fasta";
@@ -215,7 +207,7 @@ TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended k
 TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended kit", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
-    demux::BarcodeClassifier classifier({"SQK-RBK114-96"}, std::nullopt, std::nullopt);
+    demux::BarcodeClassifier classifier("SQK-RBK114-96");
 
     // Check case where both ends do match.
     auto bc_file = data_dir / "SQK-RBK114-96_midstrand.fasta";
@@ -237,7 +229,7 @@ TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    std::vector<std::string> kits = {"SQK-RPB004"};
+    std::string kit = "SQK-RPB004";
     const bool barcode_both_ends = GENERATE(true, false);
     CAPTURE(barcode_both_ends);
     constexpr bool no_trim = false;
@@ -262,8 +254,7 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info = create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt,
-                                                std::nullopt, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
@@ -396,7 +387,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    std::vector<std::string> kits = {"SQK-16S024"};
+    std::string kit = "SQK-16S024";
     bool barcode_both_ends = false;
     bool no_trim = false;
     auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
@@ -411,8 +402,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     reader.read();
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info = create_barcoding_info(kits, barcode_both_ends, !no_trim, std::nullopt,
-                                                std::nullopt, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));
@@ -489,27 +479,31 @@ TEST_CASE("BarcodeClassifierNode: test primer/barcode overlap correction", TEST_
 
 struct CustomDoubleEndedKitInput {
     std::string kit_file;
-    std::optional<std::string> seqs_file;
+    std::string seqs_file;
 };
 
 TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
-    auto [kit_file, seqs_file] = GENERATE(
-            CustomDoubleEndedKitInput{
-                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml")
-                            .string(),
-                    std::nullopt},
-            CustomDoubleEndedKitInput{
-                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml")
-                            .string(),
-                    (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
-                     "RPB004_sequences.fasta")
-                            .string()});
+    auto [kit_file, seqs_file] = GENERATE(CustomDoubleEndedKitInput{
+            (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml").string(),
+            (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004_sequences.fasta")
+                    .string()});
 
-    demux::BarcodeClassifier classifier({}, kit_file, seqs_file);
+    auto kit_info = dorado::demux::parse_custom_arrangement(kit_file);
+    REQUIRE(kit_info.has_value());
+    dorado::barcode_kits::add_custom_barcode_kit(kit_info->first, kit_info->second);
+    auto kit_cleanup =
+            dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
 
-    for (std::string bc :
-         {"SQK-RPB004_BC01", "SQK-RPB004_BC05", "SQK-RPB004_BC11", "unclassified"}) {
+    auto custom_barcodes = dorado::demux::parse_custom_sequences(seqs_file);
+    dorado::barcode_kits::add_custom_barcodes(custom_barcodes);
+    auto barcode_cleanup =
+            dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });
+
+    demux::BarcodeClassifier classifier(kit_info->first);
+
+    for (std::string bc : {"CUSTOM-SQK-RPB004_CUSTOM-BC01", "CUSTOM-SQK-RPB004_CUSTOM-BC05",
+                           "CUSTOM-SQK-RPB004_CUSTOM-BC11", "unclassified"}) {
         auto bc_file = data_dir / (bc + ".fastq");
         HtsReader reader(bc_file.string(), std::nullopt);
         while (reader.read()) {
@@ -530,18 +524,6 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
             }
         }
     }
-}
-
-TEST_CASE(
-        "BarcodeClassifier: Fail if no kit name is passed and custom kit doesn't contain "
-        "arrangement",
-        TEST_GROUP) {
-    const fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
-    const auto kit_file = data_dir / "scoring_params.toml";
-
-    CHECK_THROWS_WITH(
-            demux::BarcodeClassifier({}, kit_file.string(), std::nullopt),
-            "Either custom kit must include kit arrangement or a kit name needs to be passed in.");
 }
 
 }  // namespace dorado::barcode_classifier_test

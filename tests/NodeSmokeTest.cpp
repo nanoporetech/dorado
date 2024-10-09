@@ -4,6 +4,8 @@
 #include "basecall/CRFModelConfig.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "demux/parse_custom_kit.h"
+#include "demux/parse_custom_sequences.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/models.h"
@@ -19,6 +21,7 @@
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
 #include "torch_utils/trim_rapid_adapter.h"
+#include "utils/PostCondition.h"
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
 
@@ -331,8 +334,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
 
 struct BarcodeKitInputs {
     std::string kit_name;
-    std::optional<std::string> custom_kit;
-    std::optional<std::string> custom_sequences;
+    std::string custom_kit;
+    std::string custom_sequences;
 };
 
 DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
@@ -340,12 +343,12 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     auto no_trim = GENERATE(true, false);
     auto pipeline_restart = GENERATE(false, true);
     auto kit_inputs =
-            GENERATE(BarcodeKitInputs{"SQK-RPB004", std::nullopt, std::nullopt},
+            GENERATE(BarcodeKitInputs{"SQK-RPB004", "", ""},
                      BarcodeKitInputs{"",
                                       (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
                                        "test_kit_single_ended.toml")
                                               .string(),
-                                      std::nullopt},
+                                      std::string{}},
                      BarcodeKitInputs{"",
                                       (fs::path(get_data_dir("barcode_demux/custom_barcodes")) /
                                        "test_kit_single_ended.toml")
@@ -358,12 +361,25 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     CAPTURE(kit_inputs);
     CAPTURE(pipeline_restart);
 
+    if (!kit_inputs.custom_kit.empty()) {
+        auto kit_info = dorado::demux::parse_custom_arrangement(kit_inputs.custom_kit);
+        REQUIRE(kit_info.has_value());
+        dorado::barcode_kits::add_custom_barcode_kit(kit_info->first, kit_info->second);
+    }
+    auto kit_cleanup =
+            dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
+
+    if (!kit_inputs.custom_sequences.empty()) {
+        auto custom_barcodes = dorado::demux::parse_custom_sequences(kit_inputs.custom_sequences);
+        dorado::barcode_kits::add_custom_barcodes(custom_barcodes);
+    }
+    auto barcode_cleanup =
+            dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });
+
     auto barcoding_info = std::make_shared<dorado::demux::BarcodingInfo>();
     barcoding_info->kit_name = kit_inputs.kit_name;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    barcoding_info->custom_kit = kit_inputs.custom_kit;
-    barcoding_info->custom_seqs = kit_inputs.custom_sequences;
     client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
             std::move(barcoding_info));
 

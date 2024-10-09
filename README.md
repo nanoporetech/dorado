@@ -299,7 +299,7 @@ Dorado is able to use a sample sheet to restrict the barcode classifications to 
 
 #### Custom barcodes
 
-In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado also supports specifying custom barcode kit arrangements and sequences. This is done by passing a barcode arrangement file via the `--barcode-arrangement` argument (either to `dorado demux` or `dorado basecaller`). Custom barcode sequences can optionally be specified via the `--barcode-sequences` option. See [here](documentation/CustomBarcodes.md) for more details.
+In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado also supports specifying custom barcode kit arrangements and sequences. This is done by passing a barcode arrangement file via the `--barcode-arrangement` argument (either to `dorado demux` or `dorado basecaller`) and specifying the `--kit-name` listed in that file. Custom barcode sequences can optionally be specified via the `--barcode-sequences` option. See [here](documentation/CustomBarcodes.md) for more details.
 
 ### Poly(A) tail estimation
 

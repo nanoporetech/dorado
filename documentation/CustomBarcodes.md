@@ -66,11 +66,11 @@ The table below describes the arrangement options in more detail.
 | Option | Description |
 | -- | -- |
 | name | (Required) Name of the barcode arrangement. This name will be used to report the barcode classification. |
-| kit | (Optional) Which class of barcodes this arrangement belongs to (if any). |
-| mask1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string. |
-| mask2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
-| mask2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string. |
+| kit | (Required) Which class of barcodes this arrangement belongs to. Must differ from the built-in kits pre-defined in dorado. |
+| mask1_front | (Required) The leading flank for the front barcode (applies to single and double ended barcodes). Can be an empty string if `mask1_rear` is set. |
+| mask1_rear | (Required) The trailing flank for the front barcode (applies to single and double ended barcodes). Can be an empty string if `mask1_front` is set. |
+| mask2_front | (Optional) The leading flank for the rear barcode (applies to double ended barcodes only). Can be an empty string if `mask2_rear` is set |
+| mask2_rear | (Optional) The trailing flank for the rear barcode (applies to double ended barcodes only). Can be an empty string if `mask2_front` is set. |
 | barcode1_pattern | (Required) An expression capturing the sequences to use for the front barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | barcode2_pattern | (Optional) An expression capturing the sequences to use for the rear barcode. Pattern must match sequences from pre-built list in Dorado or in the custom sequences file. |
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
@@ -113,18 +113,19 @@ For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases
 ### Custom Sequences File 
 
 In addition to specifying a custom barcode arrangement, new barcode sequences can also be specified in a FASTQ format. There are only 2 requirements -
-* The sequence names to follow the `prefix%\d+i` format (e.g. `BC%02i` for barcodes needing 2 digit indexing, or `NB%04i` for barcodes with 4 digit indexing, etc.).
+* The sequence names to follow the `prefix%\d+i` format (e.g. `MY-BC%02i` for barcodes needing 2 digit indexing, or `MY-NB%04i` for barcodes with 4 digit indexing, etc.).
 * All barcode sequence lengths must match.
+* All barcode names must differ from those pre-defined in dorado.
 
 This is an example sequences file.
 
 ```
->BC01
+>MY-BC01
 TTTT
->BC02
+>MY-BC02
 AAAA
->BC03
+>MY-BC03
 GGGG
->BC04
+>MY-BC04
 CCCC
 ```

@@ -179,9 +179,9 @@ struct BarcodeClassifier::BarcodeCandidateKit {
     std::string barcode_kit;
 };
 
-BarcodeClassifier::BarcodeClassifier(KitInfoProvider kit_info_provider)
-        : m_kit_info_provider(std::move(kit_info_provider)),
-          m_scoring_params(m_kit_info_provider.scoring_params()),
+BarcodeClassifier::BarcodeClassifier(const std::string& kit_name)
+        : m_kit_info_provider(kit_name),
+          m_scoring_params(m_kit_info_provider.get_kit_info(kit_name).scoring_params),
           m_barcode_candidates(generate_candidates()) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;

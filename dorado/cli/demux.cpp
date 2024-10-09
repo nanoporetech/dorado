@@ -1,6 +1,8 @@
 #include "alignment/alignment_processing_items.h"
 #include "cli/cli_utils.h"
 #include "demux/barcoding_info.h"
+#include "demux/parse_custom_kit.h"
+#include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
 #include "read_pipeline/BarcodeClassifierNode.h"
 #include "read_pipeline/BarcodeDemuxerNode.h"
@@ -54,8 +56,7 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
         const dorado::utils::SampleSheet* sample_sheet) {
     auto result = std::make_shared<dorado::demux::BarcodingInfo>();
     result->kit_name = parser.visible.present<std::string>("--kit-name").value_or("");
-    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
-    if (result->kit_name.empty() && !result->custom_kit) {
+    if (result->kit_name.empty()) {
         return nullptr;
     }
     result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
@@ -63,11 +64,22 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
     if (sample_sheet) {
         result->allowed_barcodes = sample_sheet->get_barcode_values();
     }
-    result->custom_seqs = parser.visible.present("--barcode-sequences");
 
     return result;
 }
 
+std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_info(
+        const std::string& custom_kit_file) {
+    auto custom_kit_info = dorado::demux::parse_custom_arrangement(custom_kit_file);
+    if (!custom_kit_info) {
+        spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
+        std::exit(EXIT_FAILURE);
+    }
+
+    custom_kit_info->second.scoring_params = dorado::demux::parse_scoring_params(
+            custom_kit_file, dorado::barcode_kits::BarcodeKitScoringParams{});
+    return *custom_kit_info;
+}
 }  // anonymous namespace
 
 namespace dorado {
@@ -262,6 +274,20 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
     if (barcoding_info) {
+        std::optional<std::string> custom_seqs =
+                parser.visible.present<std::string>("--barcode-sequences");
+        if (custom_seqs.has_value()) {
+            std::unordered_map<std::string, std::string> custom_barcodes =
+                    demux::parse_custom_sequences(*custom_seqs);
+            barcode_kits::add_custom_barcodes(custom_barcodes);
+        }
+
+        std::optional<std::string> custom_kit =
+                parser.visible.present<std::string>("--barcode-arrangement");
+        if (custom_kit.has_value()) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+        }
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         auto trimmer = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
         pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, demux_threads);

@@ -1,5 +1,6 @@
 #include "TestUtils.h"
 #include "read_pipeline/HtsReader.h"
+#include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 
@@ -74,20 +75,30 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
     }
 
     SECTION("Read groups with barcode kit") {
-        const std::string KIT_NAME{"SQK-RAB204"};
-        auto kit_info = dorado::barcode_kits::get_kit_info(KIT_NAME);
+        const std::string CUSTOM_BARCODE_NAME{"CUSTOM-BC01"};
+        const std::string CUSTOM_BARCODE_SEQUENCE{"AAA"};
+        const std::string KIT_NAME{"CUSTOM-SQK-RAB204"};
+        auto kit_info = barcode_kits::KitInfo{KIT_NAME, false,  false,
+                                              false,    "ACGT", "ACGT",
+                                              "ACGT",   "ACGT", {CUSTOM_BARCODE_NAME},
+                                              {},       {}};
         dorado::SamHdrPtr sam_header(sam_hdr_init());
 
-        const std::string CUSTOM_BARCODE_NAME{"BC01"};
-        const std::string CUSTOM_BARCODE_SEQUENCE{"AAA"};
         std::unordered_map<std::string, std::string> custom_barcodes{
                 {CUSTOM_BARCODE_NAME, CUSTOM_BARCODE_SEQUENCE}};
 
+        barcode_kits::add_custom_barcode_kit(KIT_NAME, kit_info);
+        auto kit_cleanup = dorado::utils::PostCondition(
+                [] { dorado::barcode_kits::clear_custom_barcode_kits(); });
+        barcode_kits::add_custom_barcodes(custom_barcodes);
+        auto barcode_cleanup =
+                dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });
+
         dorado::utils::add_rg_headers_with_barcode_kit(sam_header.get(), read_groups, KIT_NAME,
-                                                       *kit_info, custom_barcodes, nullptr);
+                                                       nullptr);
 
         // Check the IDs of the groups are all there.
-        const size_t total_groups = read_groups.size() * (kit_info->barcodes.size() + 1);
+        const size_t total_groups = read_groups.size() * (kit_info.barcodes.size() + 1);
         CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(total_groups));
 
         // Check that the IDs match the expected format.
@@ -97,7 +108,7 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
             CHECK(get_barcode_tag(sam_header.get(), id.c_str()) == std::nullopt);
 
             // The headers with barcodes should contain those barcodes.
-            for (const auto &barcode_name : kit_info->barcodes) {
+            for (const auto &barcode_name : kit_info.barcodes) {
                 const auto full_id = id + "_" +
                                      dorado::barcode_kits::generate_standard_barcode_name(
                                              KIT_NAME, barcode_name);
