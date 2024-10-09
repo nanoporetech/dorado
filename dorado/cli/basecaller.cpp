@@ -75,7 +75,7 @@ namespace dorado {
 
 namespace {
 
-const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
+void validate_barcode_kit_info(const std::string& kit_name) {
     const auto kit_info = barcode_kits::get_kit_info(kit_name);
     if (!kit_info) {
         spdlog::error(
@@ -84,7 +84,6 @@ const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
                 kit_name);
         std::exit(EXIT_FAILURE);
     }
-    return *kit_info;
 }
 
 std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
@@ -94,6 +93,9 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
         spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
         std::exit(EXIT_FAILURE);
     }
+
+    custom_kit_info->second.scoring_params =
+            demux::parse_scoring_params(custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
     return *custom_kit_info;
 }
 
@@ -436,19 +438,18 @@ void setup(const std::vector<std::string>& args,
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
-        std::unordered_map<std::string, std::string> custom_barcodes{};
-        if (barcoding_info->custom_seqs) {
-            custom_barcodes = demux::parse_custom_sequences(*barcoding_info->custom_seqs);
+        if (!barcoding_info->custom_seqs.empty()) {
+            std::unordered_map<std::string, std::string> custom_barcodes =
+                    demux::parse_custom_sequences(barcoding_info->custom_seqs);
+            barcode_kits::add_custom_barcodes(custom_barcodes);
         }
-        if (barcoding_info->custom_kit) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*barcoding_info->custom_kit);
-            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
-                                                   custom_barcodes, sample_sheet.get());
-        } else {
-            const auto& kit_info = get_barcode_kit_info(barcoding_info->kit_name);
-            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
-                                                   kit_info, custom_barcodes, sample_sheet.get());
+        if (!barcoding_info->custom_kit.empty()) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(barcoding_info->custom_kit);
+            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
         }
+        validate_barcode_kit_info(barcoding_info->kit_name);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
+                                               sample_sheet.get());
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
@@ -733,16 +734,24 @@ int basecaller(int argc, char* argv[]) {
         polya_config = parser.visible.get<std::string>("--poly-a-config");
     }
 
-    if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
-        spdlog::error(
-                "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
-                "one.");
-        return EXIT_FAILURE;
+    if (parser.visible.is_used("--barcode-sequences")) {
+        if (!parser.visible.is_used("--kit-name") ||
+            !parser.visible.is_used("--barcode-arrangement")) {
+            spdlog::error("--barcode-sequences requires --barcode-arrangement and --kit-name.");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (parser.visible.is_used("--barcode-arrangement")) {
+        if (!parser.visible.is_used("--kit-name")) {
+            spdlog::error("--barcode-arrangement requires --kit-name.");
+            return EXIT_FAILURE;
+        }
     }
 
     std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
     std::unique_ptr<const utils::SampleSheet> sample_sheet{};
-    if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
+    if (parser.visible.is_used("--kit-name")) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
