@@ -154,17 +154,22 @@ else()
             set(TORCH_PATCH_SUFFIX -ont.3)
             set(TORCH_LIB_SUFFIX "/libtorch")
             set(USING_STATIC_TORCH_LIB TRUE)
-            add_compile_options(
-                # Note we need to use the generator expression to avoid setting this for CUDA.
-                $<$<COMPILE_LANGUAGE:CXX>:/wd4624> # from libtorch: destructor was implicitly defined as deleted 
-            )
-
             # Torch Windows static build includes some win headers without defining NOMINMAX.
             add_compile_options(-DNOMINMAX)
         else()
             set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
             set(TORCH_LIB_SUFFIX "/libtorch")
         endif()
+
+        # Note we need to use the generator expression to avoid setting this for CUDA.
+        add_compile_options(
+            # from libtorch: destructor was implicitly defined as deleted
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4624>
+            # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
+            # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
+            # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4702>
+        )
     endif()
 
     if (USING_STATIC_TORCH_LIB)
