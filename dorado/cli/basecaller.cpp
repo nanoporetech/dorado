@@ -230,8 +230,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("Path to file with custom barcode sequences. Requires --kit-name and "
                       "--barcode-arrangement.");
         parser.visible.add_argument("--primer-sequences")
-                .help("Path to file with custom primer sequences.")
-                .default_value(std::nullopt);
+                .help("Path to file with custom primer sequences.");
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -770,15 +769,10 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    std::optional<std::string> custom_primer_file = std::nullopt;
-    if (parser.visible.is_used("--primer-sequences")) {
-        custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
-    }
-
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = !no_trim_adapters;
     adapter_info->trim_primers = !no_trim_primers;
-    adapter_info->custom_seqs = custom_primer_file;
+    adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
 
     fs::path model_path;
