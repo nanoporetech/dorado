@@ -284,13 +284,17 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
         auto bytes_per_chunk = (crfmodel_bytes_per_ct + decode_bytes_per_ct) * batch_dim.T_out;
         int max_batch_size = int(gpu_mem_limit / bytes_per_chunk);
         max_batch_size -= max_batch_size % granularity;
-        if (max_batch_size <= granularity) {
-            spdlog::warn("{} maximum safe estimated batch size at chunk size {} is only {}.",
-                         m_device, batch_dim.T_in, max_batch_size);
-            continue;
+        if (max_batch_size < granularity) {
+            spdlog::warn(
+                    "{} maximum safe estimated batch size at chunk size {} is only {}. Required "
+                    "minimum is {}, GPU may run out of memory.",
+                    m_device, batch_dim.T_in, max_batch_size, granularity);
+            max_batch_size = granularity;
+        } else {
+            spdlog::debug("{} maximum safe estimated batch size at chunk size {} is {}", m_device,
+                          batch_dim.T_in, max_batch_size);
         }
-        spdlog::debug("{} maximum safe estimated batch size at chunk size {} is {}", m_device,
-                      batch_dim.T_in, max_batch_size);
+
         if (requested_batch_size == 0) {
             max_batch_sizes.push_back(max_batch_size);
         } else {
