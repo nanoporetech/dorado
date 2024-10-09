@@ -82,7 +82,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     const auto* src_ptr = src;
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
-        for (size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
+        for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
             const FloatRegister elems_f32 = simd_load(src_ptr);
             const HalfRegister elems_f16 = simd_convert(elems_f32);
             simd_store(dest_ptr, elems_f16);
