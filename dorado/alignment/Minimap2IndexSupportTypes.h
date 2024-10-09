@@ -19,6 +19,7 @@ enum class IndexLoadResult {
     validation_error,
     no_index_loaded,
     end_of_index,
+    file_open_error,
     success,
 };
 

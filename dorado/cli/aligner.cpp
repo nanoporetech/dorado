@@ -54,6 +54,8 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         throw std::runtime_error("Alignment reference path does not exist: " + filename);
     case dorado::alignment::IndexLoadResult::validation_error:
         throw std::runtime_error("Validation error checking minimap options");
+    case dorado::alignment::IndexLoadResult::file_open_error:
+        throw std::runtime_error("Error opening index file: " + filename);
     case dorado::alignment::IndexLoadResult::split_index_not_supported:
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger "
