@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <numeric>
+#include <set>
+#include <stdexcept>
 
 namespace dorado::barcode_kits {
 
@@ -186,7 +188,7 @@ const KitInfo kit_rlb = {
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
-const std::unordered_map<std::string, KitInfo> kit_info_map = {
+std::unordered_map<std::string, KitInfo> kit_info_map = {
         // SQK-16S024 && SQK-16S114-24
         {"SQK-16S024", kit_16S},
         {"SQK-16S114-24", kit_16S},
@@ -440,7 +442,7 @@ const std::unordered_map<std::string, KitInfo> kit_info_map = {
          }},
 };
 
-const std::unordered_map<std::string, std::string> barcodes = {
+std::unordered_map<std::string, std::string> barcodes = {
         // BC** barcodes.
         {"BC01", "AAGAAAGTTGTCGGTGTCTTTGTG"},
         {"BC02", "TCGATTCCGTTTGTAGTCGTCTGT"},
@@ -895,6 +897,9 @@ const std::unordered_map<std::string, std::string> barcodes = {
         {"16X_H02R_16", "CACAGCAAGA"},
 };
 
+std::unordered_set<std::string> custom_kit_names;
+std::unordered_set<std::string> custom_barcode_names;
+
 }  // namespace
 
 const std::unordered_map<std::string, KitInfo>& get_kit_infos() { return kit_info_map; }
@@ -919,6 +924,50 @@ const std::unordered_set<std::string>& get_barcode_identifiers() {
         return ids;
     }();
     return identifiers;
+}
+
+void add_custom_barcode_kit(const std::string& kit_name, const KitInfo& custom_kit_info) {
+    auto [_, success] = kit_info_map.insert({kit_name, custom_kit_info});
+    if (!success) {
+        std::string error =
+                std::string("Custom kit name \"").append(kit_name).append("\" already exists.");
+        throw std::runtime_error(error);
+    }
+    custom_kit_names.insert(kit_name);
+}
+
+void add_custom_barcodes(const std::unordered_map<std::string, std::string>& custom_barcodes) {
+    std::set<std::string> duplicated_barcode_names;
+    for (auto [barcode_name, barcode_seq] : custom_barcodes) {
+        auto [_, success] = barcodes.insert({barcode_name, barcode_seq});
+        if (!success) {
+            duplicated_barcode_names.insert(barcode_name);
+        }
+    }
+
+    if (!duplicated_barcode_names.empty()) {
+        std::string error = std::string("Custom barcode names already exist:");
+        for (const auto& name : duplicated_barcode_names) {
+            error.append("\n").append(name);
+        }
+        throw std::runtime_error(error);
+    }
+
+    for (auto [barcode_name, _] : custom_barcodes) {
+        custom_barcode_names.insert(barcode_name);
+    }
+}
+
+void clear_custom_barcode_kits() {
+    for (const auto& kit_name : custom_kit_names) {
+        kit_info_map.erase(kit_name);
+    }
+}
+
+void clear_custom_barcodes() {
+    for (const auto& barcode_name : custom_barcode_names) {
+        barcodes.erase(barcode_name);
+    }
 }
 
 std::string barcode_kits_list_str() {
