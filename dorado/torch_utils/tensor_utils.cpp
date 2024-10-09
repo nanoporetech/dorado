@@ -52,9 +52,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 #define simd_load1(ptr) _mm256_broadcast_ss(ptr)
 #define simd_convert(reg) _mm256_cvtps_ph(reg, kRoundNearestEven)
 #define simd_store(ptr, reg) _mm_storeu_si128(reinterpret_cast<HalfRegister*>(ptr), reg)
-#define simd_store1(ptr, reg)                      \
-    *(reinterpret_cast<std::int16_t*>(dest_ptr)) = \
-            static_cast<std::int16_t>(_mm_extract_epi16(elem_f16, 0))
+#define simd_store1(ptr, reg) *ptr = c10::Half(_mm_extract_epi16(reg, 0), c10::Half::from_bits())
 
 #else
     // Neon registers have 4 floats.
