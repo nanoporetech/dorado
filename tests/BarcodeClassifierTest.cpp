@@ -33,16 +33,13 @@ std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
         const std::string& kit_name,
         bool barcode_both_ends,
         bool trim_barcode,
-        demux::BarcodingInfo::FilterSet allowed_barcodes,
-        const std::string& custom_kit,
-        const std::string& custom_seqs) {
+        demux::BarcodingInfo::FilterSet allowed_barcodes) {
     if (kit_name.empty()) {
         return {};
     }
 
-    auto result = demux::BarcodingInfo{kit_name,     barcode_both_ends,
-                                       trim_barcode, std::move(allowed_barcodes),
-                                       custom_kit,   custom_seqs};
+    auto result = demux::BarcodingInfo{kit_name, barcode_both_ends, trim_barcode,
+                                       std::move(allowed_barcodes)};
     return std::make_shared<demux::BarcodingInfo>(std::move(result));
 }
 
@@ -257,8 +254,7 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info =
-            create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt, "", "");
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
@@ -406,8 +402,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     reader.read();
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info =
-            create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt, "", "");
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));

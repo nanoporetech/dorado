@@ -380,8 +380,6 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     barcoding_info->kit_name = kit_inputs.kit_name;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    barcoding_info->custom_kit = kit_inputs.custom_kit;
-    barcoding_info->custom_seqs = kit_inputs.custom_sequences;
     client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
             std::move(barcoding_info));
 

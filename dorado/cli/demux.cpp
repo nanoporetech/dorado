@@ -61,8 +61,6 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
     }
     result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
     result->trim = !parser.visible.get<bool>("--no-trim");
-    result->custom_kit = parser.visible.present<std::string>("--barcode-arrangement").value_or("");
-    result->custom_seqs = parser.visible.present("--barcode-sequences").value_or("");
     if (sample_sheet) {
         result->allowed_barcodes = sample_sheet->get_barcode_values();
     }
@@ -276,16 +274,20 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
     if (barcoding_info) {
-        if (!barcoding_info->custom_seqs.empty()) {
+        std::optional<std::string> custom_seqs =
+                parser.visible.present<std::string>("--barcode-sequences");
+        if (custom_seqs.has_value()) {
             std::unordered_map<std::string, std::string> custom_barcodes =
-                    demux::parse_custom_sequences(barcoding_info->custom_seqs);
+                    demux::parse_custom_sequences(*custom_seqs);
             barcode_kits::add_custom_barcodes(custom_barcodes);
         }
-        if (!barcoding_info->custom_kit.empty()) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(barcoding_info->custom_kit);
+
+        std::optional<std::string> custom_kit =
+                parser.visible.present<std::string>("--barcode-arrangement");
+        if (custom_kit.has_value()) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
             barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
         }
-
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         auto trimmer = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
         pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, demux_threads);

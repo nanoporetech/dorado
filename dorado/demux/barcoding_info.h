@@ -12,8 +12,6 @@ struct BarcodingInfo {
     bool barcode_both_ends{false};
     bool trim{false};
     FilterSet allowed_barcodes;
-    std::string custom_kit;
-    std::string custom_seqs;
 };
 
 }  // namespace dorado::demux

@@ -439,15 +439,6 @@ void setup(const std::vector<std::string>& args,
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
-        if (!barcoding_info->custom_seqs.empty()) {
-            std::unordered_map<std::string, std::string> custom_barcodes =
-                    demux::parse_custom_sequences(barcoding_info->custom_seqs);
-            barcode_kits::add_custom_barcodes(custom_barcodes);
-        }
-        if (!barcoding_info->custom_kit.empty()) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(barcoding_info->custom_kit);
-            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
-        }
         validate_barcode_kit_info(barcoding_info->kit_name);
         utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
                                                sample_sheet.get());
@@ -756,10 +747,21 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
         barcoding_info->trim = !no_trim_barcodes;
-        barcoding_info->custom_kit =
-                parser.visible.present<std::string>("--barcode-arrangement").value_or("");
-        barcoding_info->custom_seqs =
-                parser.visible.present<std::string>("--barcode-sequences").value_or("");
+
+        std::optional<std::string> custom_seqs =
+                parser.visible.present<std::string>("--barcode-sequences");
+        if (custom_seqs.has_value()) {
+            std::unordered_map<std::string, std::string> custom_barcodes =
+                    demux::parse_custom_sequences(*custom_seqs);
+            barcode_kits::add_custom_barcodes(custom_barcodes);
+        }
+
+        std::optional<std::string> custom_kit =
+                parser.visible.present<std::string>("--barcode-arrangement");
+        if (custom_kit.has_value()) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+        }
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
