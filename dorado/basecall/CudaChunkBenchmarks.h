@@ -17,7 +17,7 @@ private:
     using ModelName = std::string;
     using GPUName = std::string;
 
-    std::mutex m_chunk_benchmarks_mutex;
+    mutable std::mutex m_chunk_benchmarks_mutex;
     std::map<std::pair<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
 
     // Must be called with m_chunk_benchmarks_mutex already locked.
