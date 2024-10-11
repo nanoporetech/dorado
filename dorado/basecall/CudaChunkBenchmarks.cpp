@@ -18,9 +18,9 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
     AddTesla_V100_PCIE_16GBBenchmarks(m_chunk_benchmarks);
 }
 
-std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
-        GPUName gpu_name,
-        const std::string& model_path) const {
+std::optional<const CudaChunkBenchmarks::ChunkTimings>
+CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
+                                                const std::string& model_path) const {
     // Strip any extra path elements from the model folder name
     ModelName model_name = std::filesystem::path(model_path).filename().string();
 
@@ -36,9 +36,9 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
             {"NVIDIA A800 80GB PCIe", "NVIDIA A100 80GB PCIe"},
     };
 
-    if (gpu_name_alias.find(gpu_name) != gpu_name_alias.cend()) {
-        gpu_name = gpu_name_alias[gpu_name];
-        iter = m_chunk_benchmarks.find({gpu_name, model_name});
+    auto alias_name = gpu_name_alias.find(gpu_name);
+    if (alias_name != gpu_name_alias.cend()) {
+        iter = m_chunk_benchmarks.find({alias_name->second, model_name});
         if (iter != m_chunk_benchmarks.cend()) {
             return iter->second;
         }
@@ -47,13 +47,22 @@ std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_
     return {};
 }
 
+std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
+        const GPUName& gpu_name,
+        const std::string& model_path) const {
+    std::lock_guard guard(m_chunk_benchmarks_mutex);
+    return get_chunk_timings_internal(gpu_name, model_path);
+}
+
 bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
                                             const std::string& model_path,
                                             const std::vector<std::pair<float, int>>& timings) {
+    std::lock_guard guard(m_chunk_benchmarks_mutex);
+
     // Strip any extra path elements from the model folder name
     ModelName model_name = std::filesystem::path(model_path).filename().string();
 
-    if (get_chunk_timings(gpu_name, model_name)) {
+    if (get_chunk_timings_internal(gpu_name, model_name)) {
         return false;
     }
 
