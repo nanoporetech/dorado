@@ -372,6 +372,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
         dorado/cli/correct.cpp
+        dorado/cli/consensus.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
         dorado/cli/model_resolution.h

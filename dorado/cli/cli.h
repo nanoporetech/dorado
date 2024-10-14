@@ -8,5 +8,6 @@ int demuxer(int argc, char *argv[]);
 int summary(int argc, char *argv[]);
 int trim(int argc, char *argv[]);
 int correct(int argc, char *argv[]);
+int consensus(int argc, char *argv[]);
 
 }  // namespace dorado
