@@ -205,10 +205,14 @@ int aligner(int argc, char* argv[]) {
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
                                                          false};
     if (!processing_items.initialise()) {
+        spdlog::error("Could not initialise for input {}", reads);
         return EXIT_FAILURE;
     }
-
     const auto& all_files = processing_items.get();
+    if (all_files.empty()) {
+        spdlog::info("No input files found");
+        return EXIT_SUCCESS;
+    }
     spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;

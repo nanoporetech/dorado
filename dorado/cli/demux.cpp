@@ -217,6 +217,10 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     const auto& all_files = processing_items.get();
+    if (all_files.empty()) {
+        spdlog::info("No input files found");
+        return EXIT_SUCCESS;
+    }
     spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
