@@ -299,6 +299,15 @@ if [[ $num_demuxed_reads -ne "2" ]]; then
     exit 1
 fi
 
+echo dorado demux doesnt crash on an empty input directory
+rm -rf empty_dir
+mkdir empty_dir
+$dorado_bin demux empty_dir --kit-name EXP-PBC096 --output-dir $output_dir/empty_dir
+if [[ $? -ne "0" ]]; then
+    echo "dorado crashed when given an empty input directory"
+    exit 1
+fi
+
 echo dorado trim test stage
 file1=$data_dir/adapter_trim/lsk109_single_read.fastq
 file2=$output_dir/lsk109_single_read_trimmed.fastq
