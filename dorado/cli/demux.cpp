@@ -20,6 +20,7 @@
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -211,6 +212,12 @@ int demuxer(int argc, char* argv[]) {
     auto strip_alignment = !no_trim;
     std::vector<std::string> args(argv, argv + argc);
 
+    // Only allow `reads` to be empty if we're accepting input from a pipe
+    if (reads.empty() && utils::is_fd_tty(stdin)) {
+        std::cout << parser.visible << '\n';
+        return EXIT_FAILURE;
+    }
+
     alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
     if (!processing_items.initialise()) {
         spdlog::error("Could not initialise for input {}", reads);
@@ -232,16 +239,6 @@ int demuxer(int argc, char* argv[]) {
     spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
 
     auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
-
-    // Only allow `reads` to be empty if we're accepting input from a pipe
-    if (reads.empty()) {
-#ifndef _WIN32
-        if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << '\n';
-            return EXIT_FAILURE;
-        }
-#endif
-    }
 
     HtsReader reader(all_files[0].input, read_list);
     utils::MergeHeaders hdr_merger(strip_alignment);
