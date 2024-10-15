@@ -13,8 +13,8 @@
 namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(const std::filesystem::path& data_path,
-                                                            std::string model_name,
-                                                            std::string modbase_model_names,
+                                                            const std::string& model_name,
+                                                            const std::string& modbase_model_names,
                                                             bool recursive_file_loading);
 
 int get_num_reads(const std::filesystem::path& data_path,

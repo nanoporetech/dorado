@@ -11,8 +11,8 @@
 namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(const std::filesystem::path& data_path,
-                                                            std::string model_name,
-                                                            std::string modbase_model_names,
+                                                            const std::string& model_name,
+                                                            const std::string& modbase_model_names,
                                                             bool recursive_file_loading) {
     std::unordered_map<std::string, ReadGroup> read_groups;
     const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
