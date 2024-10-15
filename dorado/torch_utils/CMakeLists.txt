@@ -5,6 +5,7 @@ add_library(dorado_torch_utils
     gpu_monitor.cpp
     gpu_monitor.h
     gpu_profiling.h
+    module_utils.h
     tensor_utils.cpp
     tensor_utils.h
     torch_utils.cpp
