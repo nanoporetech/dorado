@@ -41,6 +41,7 @@ add_executable(dorado_tests
     ModBaseEncoderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
+    ModelSearchTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     myers_test.cpp
@@ -76,8 +77,7 @@ if (NOT IOS)
             # No FAST5 or POD5 on iOS
             Fast5DataLoaderTest.cpp
             Pod5DataLoaderTest.cpp
-            # No dorado_io_lib on iOS
-            ModelSearchTest.cpp
+            FileInfoTest.cpp
     )
 endif()
 if (DORADO_GPU_BUILD)
@@ -166,7 +166,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         target_link_libraries(${TEST_BIN}
             PRIVATE
                 dorado_io_lib
-                ${POD5_LIBRARIES}
+                dorado_file_info
         )
     endif()
 

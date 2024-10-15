@@ -1,20 +1,20 @@
-add_library(dorado_io_lib
-    DataLoader.cpp
-    DataLoader.h
+add_library(dorado_file_info STATIC
+    file_info.cpp
+    file_info.h
 )
 
-target_include_directories(dorado_io_lib
+target_include_directories(dorado_file_info
 SYSTEM
 PRIVATE
     ${POD5_INCLUDE}
     ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
 )
 
-target_link_libraries(dorado_io_lib
-PUBLIC
-    dorado_lib
+target_link_libraries(dorado_file_info
+PUBLIC    
+    dorado_models_lib
+    dorado_utils
 PRIVATE
-    spdlog::spdlog
     ${POD5_LIBRARIES}
     HDF5::HDF5
     vbz_hdf_plugin
@@ -22,10 +22,10 @@ PRIVATE
     ${ZLIB_LIBRARIES}
 )
 
-set_target_properties(dorado_io_lib
+set_target_properties(dorado_file_info
 PROPERTIES
 LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
-enable_warnings_as_errors(dorado_io_lib)
+enable_warnings_as_errors(dorado_file_info)

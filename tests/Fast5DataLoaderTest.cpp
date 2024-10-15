@@ -34,27 +34,3 @@ TEST_CASE(TEST_GROUP "Test loading single-read Fast5 file, matched read list") {
     auto read_list = std::unordered_set<std::string>{"59097f00-0f1c-4fac-aea2-3c23d79b0a58"};
     CHECK(CountSinkReads(get_fast5_data_dir(), "cpu", 1, 0, read_list, {}) == 1);
 }
-
-TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list.") {
-    auto data_path = get_fast5_data_dir();
-
-    SECTION("fast5 file only, no read ids list") {
-        CHECK(dorado::DataLoader::get_num_reads(data_path, std::nullopt, {}, false) == 1);
-    }
-
-    SECTION("fast5 file and read ids with 0 reads") {
-        auto read_list = std::unordered_set<std::string>();
-        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, {}, false) == 0);
-    }
-    SECTION("fast5 file and read ids with 2 reads") {
-        auto read_list = std::unordered_set<std::string>();
-        read_list.insert("1");
-        read_list.insert("2");
-        CHECK(dorado::DataLoader::get_num_reads(data_path, read_list, {}, false) == 1);
-    }
-}
-
-TEST_CASE(TEST_GROUP "Find sample rate from fast5") {
-    auto data_path = get_fast5_data_dir();
-    CHECK(dorado::DataLoader::get_sample_rate(data_path, false) == 6024);
-}

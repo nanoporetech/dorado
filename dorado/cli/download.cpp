@@ -1,7 +1,7 @@
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
-#include "data_loader/DataLoader.h"
 #include "dorado_version.h"
+#include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/models.h"
@@ -83,8 +83,7 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
     }
 
     if (!data.empty()) {
-        const auto chemisty =
-                DataLoader::get_unique_sequencing_chemisty(data.u8string(), recursive);
+        const auto chemisty = file_info::get_unique_sequencing_chemisty(data.u8string(), recursive);
         auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
 
         try {
