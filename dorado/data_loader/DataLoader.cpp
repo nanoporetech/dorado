@@ -4,6 +4,7 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
+#include "utils/fs_utils.h"
 #include "utils/thread_naming.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
@@ -28,55 +29,6 @@
 namespace dorado {
 
 namespace {
-
-/**
- * @brief Fetches directory entries from a specified path.
- *
- * This function fetches all directory entries from the specified path. If the path is not a directory,
- * it will return a vector containing a single entry representing the specified file.
- * It can operate in two modes: recursive and non-recursive. In recursive mode, it fetches entries from
- * all subdirectories recursively. In non-recursive mode, it only fetches entries from the top-level directory.
- *
- * @param path The path from which to fetch the directory entries. It can be a path to a file or a directory.
- * @param recursive A boolean flag indicating whether to operate in recursive mode.
- *                  True for recursive mode, false for non-recursive mode.
- * @return A vector of directory entries fetched from the specified path.
- */
-std::vector<std::filesystem::directory_entry> fetch_directory_entries(
-        const std::filesystem::path& path,
-        bool recursive) {
-    std::vector<std::filesystem::directory_entry> entries;
-
-    if (std::filesystem::is_directory(path)) {
-        try {
-            if (recursive) {
-                for (const auto& entry : std::filesystem::recursive_directory_iterator(
-                             path, std::filesystem::directory_options::skip_permission_denied)) {
-                    entries.push_back(entry);
-                }
-            } else {
-                for (const auto& entry : std::filesystem::directory_iterator(
-                             path, std::filesystem::directory_options::skip_permission_denied)) {
-                    entries.push_back(entry);
-                }
-            }
-        } catch (const std::filesystem::filesystem_error& fex) {
-            spdlog::error("File system error reading directory entries for {}. ErrCode[{}] {}",
-                          path.string(), fex.code().value(), fex.what());
-            return {};
-        } catch (const std::exception& ex) {
-            spdlog::error("Error reading directory entries for {}. {}", path.string(), ex.what());
-            return {};
-        } catch (...) {
-            spdlog::error("Unexpected error reading directory entries for {}", path.string());
-            return {};
-        }
-    } else {
-        entries.emplace_back(path);
-    }
-
-    return entries;
-}
 
 // ReadID should be a drop-in replacement for read_id_t
 static_assert(sizeof(dorado::ReadID) == sizeof(read_id_t));
@@ -405,8 +357,8 @@ void DataLoader::load_reads(const std::filesystem::path& path,
         }
     };
 
-    auto filtered_entries =
-            filter_fast5_for_mixed_datasets(fetch_directory_entries(path, recursive_file_loading));
+    auto filtered_entries = filter_fast5_for_mixed_datasets(
+            utils::fetch_directory_entries(path, recursive_file_loading));
     iterate_directory(filtered_entries);
 }
 
@@ -446,7 +398,7 @@ int DataLoader::get_num_reads(const std::filesystem::path& data_path,
         }
     };
 
-    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
 
     // Remove the reads in the ignore list from the total dataset read count.
     num_reads -= ignore_read_list.size();
@@ -546,7 +498,7 @@ void DataLoader::load_read_channels(const std::filesystem::path& data_path,
         }
     };
 
-    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
 }
 
 std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
@@ -611,7 +563,7 @@ std::unordered_map<std::string, ReadGroup> DataLoader::load_read_groups(
         }
     };
 
-    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
 
     return read_groups;
 }
@@ -630,7 +582,7 @@ bool DataLoader::is_read_data_present(const std::filesystem::path& data_path,
         return false;
     };
 
-    return check_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    return check_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
 }
 
 uint16_t DataLoader::get_sample_rate(const std::filesystem::path& data_path,
@@ -713,7 +665,7 @@ uint16_t DataLoader::get_sample_rate(const std::filesystem::path& data_path,
         }
     };
 
-    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
 
     if (sample_rate) {
         return *sample_rate;
@@ -791,7 +743,7 @@ std::set<models::ChemistryKey> DataLoader::get_sequencing_chemistries(
         }
     };
 
-    iterate_directory(fetch_directory_entries(data_path, recursive_file_loading));
+    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
     return chemistries;
 }
 

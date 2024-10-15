@@ -22,4 +22,21 @@ std::filesystem::path get_downloads_path(const std::optional<std::filesystem::pa
 // Removes paths
 void clean_temporary_models(const std::set<std::filesystem::path>& paths);
 
+/**
+ * @brief Fetches directory entries from a specified path.
+ *
+ * This function fetches all directory entries from the specified path. If the path is not a directory,
+ * it will return a vector containing a single entry representing the specified file.
+ * It can operate in two modes: recursive and non-recursive. In recursive mode, it fetches entries from
+ * all subdirectories recursively. In non-recursive mode, it only fetches entries from the top-level directory.
+ *
+ * @param path The path from which to fetch the directory entries. It can be a path to a file or a directory.
+ * @param recursive A boolean flag indicating whether to operate in recursive mode.
+ *                  True for recursive mode, false for non-recursive mode.
+ * @return A vector of directory entries fetched from the specified path.
+ */
+std::vector<std::filesystem::directory_entry> fetch_directory_entries(
+        const std::filesystem::path& path,
+        bool recursive);
+
 }  // namespace dorado::utils
