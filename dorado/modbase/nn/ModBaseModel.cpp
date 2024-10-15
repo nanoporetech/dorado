@@ -1,8 +1,8 @@
 #include "ModBaseModel.h"
 
 #include "modbase/ModBaseModelConfig.h"
+#include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/module_utils.h"
 
 #include <toml.hpp>
 #include <torch/torch.h>

@@ -317,13 +317,11 @@ target_include_directories(dorado_lib
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
-        ${POD5_INCLUDE}
 )
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
         ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/toml11
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
@@ -396,6 +394,7 @@ if(NOT DORADO_DISABLE_DORADO)
     target_link_libraries(dorado
         dorado_lib
         dorado_io_lib
+        dorado_file_info
         dorado_models_lib
         dorado_model_downloader_lib
         dorado_compat
@@ -406,29 +405,8 @@ if(NOT DORADO_DISABLE_DORADO)
 endif()
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    add_library(dorado_io_lib
-        dorado/data_loader/DataLoader.cpp
-        dorado/data_loader/DataLoader.h
-     )
-
-    target_link_libraries(dorado_io_lib
-        PUBLIC
-            dorado_lib
-        PRIVATE
-            ${POD5_LIBRARIES}
-            HDF5::HDF5
-            vbz_hdf_plugin
-            ${CMAKE_DL_LIBS}
-            ${ZLIB_LIBRARIES}
-    )
-
-    set_target_properties(dorado_io_lib
-        PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    )
-
-    enable_warnings_as_errors(dorado_io_lib)
+    add_subdirectory(dorado/data_loader)
+    add_subdirectory(dorado/file_info)
 endif()
 
 add_subdirectory(tests)
@@ -442,7 +420,7 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
         include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_file_info)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
         endforeach()
         setup_target_for_coverage_gcovr_html(

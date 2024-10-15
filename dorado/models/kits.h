@@ -215,7 +215,9 @@ using ChemistryMap = std::map<ChemistryKey, Chemistry>;
 const ChemistryMap& chemistry_map();
 Chemistry get_chemistry(const ChemistryKey& key);
 Chemistry get_chemistry(const std::string& chemistry);
-
+ChemistryKey get_chemistry_key(const std::string& flow_cell_product_code,
+                               const std::string& sequencing_kit,
+                               SamplingRate sample_rate);
 std::string to_string(const ChemistryKey& ck);
 std::string to_string(const Chemistry& chemistry);
 

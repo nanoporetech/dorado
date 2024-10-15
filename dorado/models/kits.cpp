@@ -401,6 +401,15 @@ Chemistry get_chemistry(const std::string& chemistry) {
     return get_code(chemistry, Chemistry::UNKNOWN, chemistry_kits());
 }
 
+ChemistryKey get_chemistry_key(const std::string& flow_cell_product_code,
+                               const std::string& sequencing_kit,
+                               SamplingRate sample_rate) {
+    const auto fc = models::flowcell_code(flow_cell_product_code);
+    const auto kit = models::kit_code(sequencing_kit);
+    const auto key = models::ChemistryKey(fc, kit, sample_rate);
+    return key;
+}
+
 KitInfo ConditionInfo::get_kit_info() const { return kit_info(m_kit); };
 
 const std::unordered_map<SampleType, SampleTypeInfo>& sample_types() {

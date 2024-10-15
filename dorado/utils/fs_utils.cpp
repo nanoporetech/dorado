@@ -87,4 +87,40 @@ void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     }
 }
 
+std::vector<std::filesystem::directory_entry> fetch_directory_entries(
+        const std::filesystem::path& path,
+        bool recursive) {
+    std::vector<std::filesystem::directory_entry> entries;
+
+    if (std::filesystem::is_directory(path)) {
+        try {
+            if (recursive) {
+                for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                             path, std::filesystem::directory_options::skip_permission_denied)) {
+                    entries.push_back(entry);
+                }
+            } else {
+                for (const auto& entry : std::filesystem::directory_iterator(
+                             path, std::filesystem::directory_options::skip_permission_denied)) {
+                    entries.push_back(entry);
+                }
+            }
+        } catch (const std::filesystem::filesystem_error& fex) {
+            spdlog::error("File system error reading directory entries for {}. ErrCode[{}] {}",
+                          path.string(), fex.code().value(), fex.what());
+            return {};
+        } catch (const std::exception& ex) {
+            spdlog::error("Error reading directory entries for {}. {}", path.string(), ex.what());
+            return {};
+        } catch (...) {
+            spdlog::error("Unexpected error reading directory entries for {}", path.string());
+            return {};
+        }
+    } else {
+        entries.emplace_back(path);
+    }
+
+    return entries;
+}
+
 }  // namespace dorado::utils

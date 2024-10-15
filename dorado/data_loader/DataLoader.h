@@ -16,8 +16,6 @@
 #include <unordered_set>
 #include <vector>
 
-struct Pod5FileReader;
-
 namespace dorado {
 
 class Pipeline;
@@ -28,11 +26,6 @@ using SimplexReadPtr = std::unique_ptr<SimplexRead>;
 constexpr size_t POD5_READ_ID_SIZE = 16;
 using ReadID = std::array<uint8_t, POD5_READ_ID_SIZE>;
 typedef std::map<int, std::vector<ReadID>> channel_to_read_id_t;
-
-struct Pod5Destructor {
-    void operator()(Pod5FileReader*);
-};
-using Pod5Ptr = std::unique_ptr<Pod5FileReader, Pod5Destructor>;
 
 class DataLoader {
 public:
@@ -46,32 +39,6 @@ public:
     void load_reads(const std::filesystem::path& path,
                     bool recursive_file_loading,
                     ReadOrder traversal_order);
-
-    static std::unordered_map<std::string, ReadGroup> load_read_groups(
-            const std::filesystem::path& data_path,
-            std::string model_name,
-            std::string modbase_model_names,
-            bool recursive_file_loading);
-
-    static int get_num_reads(const std::filesystem::path& data_path,
-                             std::optional<std::unordered_set<std::string>> read_list,
-                             const std::unordered_set<std::string>& ignore_read_list,
-                             bool recursive_file_loading);
-
-    static bool is_read_data_present(const std::filesystem::path& data_path,
-                                     bool recursive_file_loading);
-
-    static uint16_t get_sample_rate(const std::filesystem::path& data_path,
-                                    bool recursive_file_loading);
-
-    // Inspects the sequencing data metadata to determine the sequencing chemistry used.
-    // Calls get_sequencing_chemistries but will error if the data is inhomogeneous
-    static models::Chemistry get_unique_sequencing_chemisty(const std::string& data,
-                                                            bool recursive_file_loading);
-
-    static std::set<models::ChemistryKey> get_sequencing_chemistries(
-            const std::filesystem::path& data_path,
-            bool recursive_file_loading);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
