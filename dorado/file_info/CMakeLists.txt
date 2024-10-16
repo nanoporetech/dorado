@@ -6,7 +6,6 @@ add_library(dorado_file_info STATIC
 target_include_directories(dorado_file_info
     SYSTEM
     PRIVATE
-        ${POD5_INCLUDE}
         ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
 )
 
@@ -15,7 +14,7 @@ PUBLIC
     dorado_models_lib
     dorado_utils
 PRIVATE
-    ${POD5_LIBRARIES}
+    pod5_libs
     HDF5::HDF5
     vbz_hdf_plugin
     ${ZLIB_LIBRARIES}
