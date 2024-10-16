@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.8.1] (3 Oct 2024)
 
-This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release, including corrected configuration for DNA v5 SUP-compatible 5mC_5hmC and 5mCG_5hmCG models, improved cDNA poly(A) tail estimation for data from MinION flow cells, reduced basecaller startup time on supported GPUs, and more.
+This release of Dorado includes fixes and improvements to the Dorado 0.8.0 release, including corrected configuration for DNA v5 SUP-compatible 5mC_5hmC and 5mCG_5hmCG models, improved cDNA poly(A) tail estimation for data from MinION flow cells, reduced basecaller startup time on supported GPUs, and more.
 
 * f74d8917ba3472e07ae4d00bb2e3a745048c8c84 - Corrected bug causing dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_5hmC@v2 to call CpG contexts only and dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mCG_5hmCG@v2 to call all contexts
 * eb4649442bbe1ef84eb72fd62e30586c9a45c10d - Improve cDNA poly(A) tail estimation for MinION flow cells
