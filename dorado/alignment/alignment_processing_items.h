@@ -30,10 +30,8 @@ class AlignmentProcessingItems {
 
     std::vector<AlignmentProcessingInfo> m_processing_list{};
 
-    template <class ITER>
     void create_working_file_map();
 
-    template <class ITER>
     void add_all_valid_files();
 
     bool check_recursive_arg_false();

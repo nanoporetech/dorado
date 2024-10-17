@@ -2,6 +2,7 @@
 
 #include "utils/PostCondition.h"
 #include "utils/fastq_reader.h"
+#include "utils/fs_utils.h"
 #include "utils/scoped_trace_log.h"
 #include "utils/stream_utils.h"
 #include "utils/tty_utils.h"
@@ -150,20 +151,19 @@ bool AlignmentProcessingItems::initialise_for_file() {
     return true;
 }
 
-template <class ITER>
 void AlignmentProcessingItems::create_working_file_map() {
+    auto all_files = utils::fetch_directory_entries(m_input_path, m_recursive_input);
     utils::SuppressStderr stderr_suppressed{};
     const fs::path input_root(m_input_path);
-    for (const fs::directory_entry& dir_entry : ITER(input_root)) {
+    for (const fs::directory_entry& dir_entry : all_files) {
         const auto& input_path = dir_entry.path();
         auto relative_path = fs::relative(input_path, input_root);
         try_add_to_working_files(input_root, relative_path);
     }
 }
 
-template <class ITER>
 void AlignmentProcessingItems::add_all_valid_files() {
-    create_working_file_map<ITER>();
+    create_working_file_map();
 
     const fs::path input_root(m_input_path);
     const fs::path output_root(m_output_folder);
@@ -183,6 +183,8 @@ void AlignmentProcessingItems::add_all_valid_files() {
             }
         }
     }
+
+    m_working_paths.clear();
 }
 
 bool AlignmentProcessingItems::initialise_for_folder() {
@@ -194,11 +196,7 @@ bool AlignmentProcessingItems::initialise_for_folder() {
         return false;
     }
 
-    if (m_recursive_input) {
-        add_all_valid_files<fs::recursive_directory_iterator>();
-    } else {
-        add_all_valid_files<fs::directory_iterator>();
-    }
+    add_all_valid_files();
 
     return true;
 }
