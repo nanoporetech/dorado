@@ -27,8 +27,8 @@ void clean_temporary_models(const std::set<std::filesystem::path>& paths);
 /**
  * @brief Fetches directory entries from a specified path.
  *
- * This function fetches all directory entries from the specified path. If the path is not a directory,
- * it will return a vector containing a single entry representing the specified file.
+ * This function fetches all non-folder directory entries from the specified path. If the path is not a 
+ * directory, it will return a vector containing a single entry representing the specified file.
  * It can operate in two modes: recursive and non-recursive. In recursive mode, it fetches entries from
  * all subdirectories recursively. In non-recursive mode, it only fetches entries from the top-level directory.
  *
