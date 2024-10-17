@@ -271,176 +271,167 @@ void DataLoader::load_reads(const std::filesystem::path& path,
         return;
     }
 
-    auto iterate_directory = [&](const auto& iterator) {
-        switch (traversal_order) {
-        case ReadOrder::BY_CHANNEL:
-            // If traversal in channel order is required, the following algorithm
-            // is used -
-            // 1. iterate through all the read metadata to collect channel information
-            // across all pod5 files
-            // 2. store the read list sorted by channel number
-            spdlog::info("> Reading read channel info");
-            load_read_channels(path, recursive_file_loading);
-            spdlog::info("> Processed read channel info");
-            // 3. for each channel, iterate through all files and in each iteration
-            // only load the reads that correspond to that channel.
-            for (int channel = 0; channel <= m_max_channel; channel++) {
-                if (m_reads_by_channel.find(channel) != m_reads_by_channel.end()) {
-                    // Sort the read ids within a channel by its mux
-                    // and start time.
-                    spdlog::debug("Sort channel {}", channel);
-                    auto& reads = m_reads_by_channel.at(channel);
-                    std::sort(reads.begin(), reads.end(), [](ReadSortInfo& a, ReadSortInfo& b) {
-                        if (a.mux != b.mux) {
-                            return a.mux < b.mux;
-                        } else {
-                            return a.read_number < b.read_number;
-                        }
-                    });
-                    // Once sorted, create a hash table from read id
-                    // to index in the sorted list to quickly fetch the
-                    // read location and its neighbors.
-                    for (size_t i = 0; i < reads.size(); i++) {
-                        m_read_id_to_index[reads[i].read_id] = i;
+    auto filtered_entries = filter_fast5_for_mixed_datasets(
+            utils::fetch_directory_entries(path, recursive_file_loading));
+
+    switch (traversal_order) {
+    case ReadOrder::BY_CHANNEL:
+        // If traversal in channel order is required, the following algorithm
+        // is used -
+        // 1. iterate through all the read metadata to collect channel information
+        // across all pod5 files
+        // 2. store the read list sorted by channel number
+        spdlog::info("> Reading read channel info");
+        load_read_channels(path, recursive_file_loading);
+        spdlog::info("> Processed read channel info");
+        // 3. for each channel, iterate through all files and in each iteration
+        // only load the reads that correspond to that channel.
+        for (int channel = 0; channel <= m_max_channel; channel++) {
+            if (m_reads_by_channel.find(channel) != m_reads_by_channel.end()) {
+                // Sort the read ids within a channel by its mux
+                // and start time.
+                spdlog::debug("Sort channel {}", channel);
+                auto& reads = m_reads_by_channel.at(channel);
+                std::sort(reads.begin(), reads.end(), [](ReadSortInfo& a, ReadSortInfo& b) {
+                    if (a.mux != b.mux) {
+                        return a.mux < b.mux;
+                    } else {
+                        return a.read_number < b.read_number;
                     }
-                    spdlog::debug("Sorted channel {}", channel);
+                });
+                // Once sorted, create a hash table from read id
+                // to index in the sorted list to quickly fetch the
+                // read location and its neighbors.
+                for (size_t i = 0; i < reads.size(); i++) {
+                    m_read_id_to_index[reads[i].read_id] = i;
                 }
-                for (const auto& entry : iterator) {
-                    if (m_loaded_read_count == m_max_reads) {
-                        break;
-                    }
-                    auto entry_path = std::filesystem::path(entry);
-                    std::string ext = entry_path.extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(),
-                                   [](unsigned char c) { return std::tolower(c); });
-                    if (ext == ".fast5") {
-                        throw std::runtime_error(
-                                "Traversing reads by channel is only available for POD5. "
-                                "Encountered FAST5 at " +
-                                entry_path.string());
-                    } else if (ext == ".pod5") {
-                        auto& channel_to_read_ids =
-                                m_file_channel_read_order_map.at(entry_path.string());
-                        auto& read_ids = channel_to_read_ids[channel];
-                        if (!read_ids.empty()) {
-                            load_pod5_reads_from_file_by_read_ids(entry_path.string(), read_ids);
-                        }
-                    }
-                }
-                // Erase sorted list as it's not needed anymore.
-                m_reads_by_channel.erase(channel);
+                spdlog::debug("Sorted channel {}", channel);
             }
-            break;
-        case ReadOrder::UNRESTRICTED:
-            for (const auto& entry : iterator) {
+            for (const auto& entry : filtered_entries) {
                 if (m_loaded_read_count == m_max_reads) {
                     break;
                 }
-                spdlog::debug("Load reads from file {}", entry.path().string());
-                std::string ext = std::filesystem::path(entry).extension().string();
+                auto entry_path = std::filesystem::path(entry);
+                std::string ext = entry_path.extension().string();
                 std::transform(ext.begin(), ext.end(), ext.begin(),
                                [](unsigned char c) { return std::tolower(c); });
                 if (ext == ".fast5") {
-                    load_fast5_reads_from_file(entry.path().string());
+                    throw std::runtime_error(
+                            "Traversing reads by channel is only available for POD5. "
+                            "Encountered FAST5 at " +
+                            entry_path.string());
                 } else if (ext == ".pod5") {
-                    load_pod5_reads_from_file(entry.path().string());
+                    auto& channel_to_read_ids =
+                            m_file_channel_read_order_map.at(entry_path.string());
+                    auto& read_ids = channel_to_read_ids[channel];
+                    if (!read_ids.empty()) {
+                        load_pod5_reads_from_file_by_read_ids(entry_path.string(), read_ids);
+                    }
                 }
             }
-            break;
-        default:
-            throw std::runtime_error("Unsupported traversal order detected: " +
-                                     dorado::to_string(traversal_order));
+            // Erase sorted list as it's not needed anymore.
+            m_reads_by_channel.erase(channel);
         }
-    };
-
-    auto filtered_entries = filter_fast5_for_mixed_datasets(
-            utils::fetch_directory_entries(path, recursive_file_loading));
-    iterate_directory(filtered_entries);
+        break;
+    case ReadOrder::UNRESTRICTED:
+        for (const auto& entry : filtered_entries) {
+            if (m_loaded_read_count == m_max_reads) {
+                break;
+            }
+            spdlog::debug("Load reads from file {}", entry.path().string());
+            std::string ext = std::filesystem::path(entry).extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            if (ext == ".fast5") {
+                load_fast5_reads_from_file(entry.path().string());
+            } else if (ext == ".pod5") {
+                load_pod5_reads_from_file(entry.path().string());
+            }
+        }
+        break;
+    default:
+        throw std::runtime_error("Unsupported traversal order detected: " +
+                                 dorado::to_string(traversal_order));
+    }
 }
 
 void DataLoader::load_read_channels(const std::filesystem::path& data_path,
                                     bool recursive_file_loading) {
-    auto iterate_directory = [&](const auto& iterator) {
-        for (const auto& entry : iterator) {
-            auto file_path = std::filesystem::path(entry);
-            std::string ext = file_path.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
-            if (ext != ".pod5") {
+    for (const auto& entry : utils::fetch_directory_entries(data_path, recursive_file_loading)) {
+        auto file_path = std::filesystem::path(entry);
+        std::string ext = file_path.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext != ".pod5") {
+            continue;
+        }
+        pod5_init();
+
+        // Use a std::map to store by sorted channel order.
+        m_file_channel_read_order_map.emplace(file_path.string(), channel_to_read_id_t());
+        auto& channel_to_read_id = m_file_channel_read_order_map[file_path.string()];
+
+        // Open the file ready for walking:
+        Pod5FileReader_t* file = pod5_open_file(file_path.string().c_str());
+
+        if (!file) {
+            spdlog::error("Failed to open file {}: {}", file_path.string().c_str(),
+                          pod5_get_error_string());
+            continue;
+        }
+        std::size_t batch_count = 0;
+        if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
+            spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+        }
+
+        for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
+            Pod5ReadRecordBatch_t* batch = nullptr;
+            if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
+                spdlog::error("Failed to get batch: {}", pod5_get_error_string());
                 continue;
             }
-            pod5_init();
 
-            // Use a std::map to store by sorted channel order.
-            m_file_channel_read_order_map.emplace(file_path.string(), channel_to_read_id_t());
-            auto& channel_to_read_id = m_file_channel_read_order_map[file_path.string()];
-
-            // Open the file ready for walking:
-            Pod5FileReader_t* file = pod5_open_file(file_path.string().c_str());
-
-            if (!file) {
-                spdlog::error("Failed to open file {}: {}", file_path.string().c_str(),
-                              pod5_get_error_string());
+            std::size_t batch_row_count = 0;
+            if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
+                spdlog::error("Failed to get batch row count");
                 continue;
             }
-            std::size_t batch_count = 0;
-            if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
-                spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
-            }
 
-            for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-                Pod5ReadRecordBatch_t* batch = nullptr;
-                if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
-                    spdlog::error("Failed to get batch: {}", pod5_get_error_string());
+            for (std::size_t row = 0; row < batch_row_count; ++row) {
+                uint16_t read_table_version = 0;
+                ReadBatchRowInfo_t read_data;
+                if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
+                                                      &read_data, &read_table_version) != POD5_OK) {
+                    spdlog::error("Failed to get read {}", row);
                     continue;
                 }
 
-                std::size_t batch_row_count = 0;
-                if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
-                    spdlog::error("Failed to get batch row count");
-                    continue;
+                int channel = read_data.channel;
+
+                // Update maximum number of channels encountered.
+                m_max_channel = std::max(m_max_channel, channel);
+
+                // Store the read_id in the channel's list.
+                ReadID read_id;
+                std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
+                channel_to_read_id[channel].push_back(read_id);
+
+                char read_id_tmp[POD5_READ_ID_LEN];
+                if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+                    spdlog::error("Failed to format read id");
                 }
-
-                for (std::size_t row = 0; row < batch_row_count; ++row) {
-                    uint16_t read_table_version = 0;
-                    ReadBatchRowInfo_t read_data;
-                    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
-                                                          &read_data,
-                                                          &read_table_version) != POD5_OK) {
-                        spdlog::error("Failed to get read {}", row);
-                        continue;
-                    }
-
-                    int channel = read_data.channel;
-
-                    // Update maximum number of channels encountered.
-                    m_max_channel = std::max(m_max_channel, channel);
-
-                    // Store the read_id in the channel's list.
-                    ReadID read_id;
-                    std::memcpy(read_id.data(), read_data.read_id, POD5_READ_ID_SIZE);
-                    channel_to_read_id[channel].push_back(read_id);
-
-                    char read_id_tmp[POD5_READ_ID_LEN];
-                    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
-                        spdlog::error("Failed to format read id");
-                    }
-                    std::string rid(read_id_tmp);
-                    m_reads_by_channel[channel].push_back(
-                            {rid, read_data.well, read_data.read_number});
-                }
-
-                if (pod5_free_read_batch(batch) != POD5_OK) {
-                    spdlog::error("Failed to release batch");
-                }
+                std::string rid(read_id_tmp);
+                m_reads_by_channel[channel].push_back({rid, read_data.well, read_data.read_number});
             }
-            if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader");
+
+            if (pod5_free_read_batch(batch) != POD5_OK) {
+                spdlog::error("Failed to release batch");
             }
         }
-    };
-
-    iterate_directory(utils::fetch_directory_entries(data_path, recursive_file_loading));
+        if (pod5_close_and_free_reader(file) != POD5_OK) {
+            spdlog::error("Failed to close and free POD5 reader");
+        }
+    }
 }
 
 void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
