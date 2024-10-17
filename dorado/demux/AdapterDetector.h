@@ -17,8 +17,8 @@ public:
     AdapterDetector(const std::optional<std::string>& custom_primer_file);
     ~AdapterDetector();
 
-    AdapterScoreResult find_adapters(const std::string& seq) const;
-    AdapterScoreResult find_primers(const std::string& seq) const;
+    AdapterScoreResult find_adapters(const std::string& seq, const std::string& kit_name);
+    AdapterScoreResult find_primers(const std::string& seq, const std::string& kit_name);
 
     struct Query {
         std::string name;
@@ -27,14 +27,16 @@ public:
         bool operator<(const Query& rhs) const { return name < rhs.name; }
     };
 
-    const std::vector<Query>& get_adapter_sequences() const;
-    const std::vector<Query>& get_primer_sequences() const;
+    std::vector<Query>& get_adapter_sequences(const std::string& kit_name);
+    std::vector<Query>& get_primer_sequences(const std::string& kit_name);
 
 private:
     enum QueryType { ADAPTER, PRIMER };
 
-    std::vector<Query> m_adapter_sequences;
-    std::vector<Query> m_primer_sequences;
+    std::mutex m_mutex;
+    std::unordered_map<std::string, std::vector<Query>> m_adapter_sequences;
+    std::unordered_map<std::string, std::vector<Query>> m_primer_sequences;
+    std::vector<Query> m_custom_primer_sequences;
     AdapterScoreResult detect(const std::string& seq,
                               const std::vector<Query>& queries,
                               QueryType query_type) const;
