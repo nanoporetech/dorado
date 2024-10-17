@@ -187,12 +187,12 @@ add_library(dorado_lib
     dorado/demux/barcoding_info.h
     dorado/demux/KitInfoProvider.cpp
     dorado/demux/KitInfoProvider.h
+    dorado/demux/Trimmer.cpp
+    dorado/demux/Trimmer.h
     dorado/demux/parse_custom_kit.cpp
     dorado/demux/parse_custom_kit.h
     dorado/demux/parse_custom_sequences.cpp
     dorado/demux/parse_custom_sequences.h
-    dorado/demux/Trimmer.cpp
-    dorado/demux/Trimmer.h
     dorado/read_pipeline/AdapterDetectorNode.cpp
     dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/AlignerNode.cpp
@@ -254,6 +254,8 @@ add_library(dorado_lib
     dorado/read_pipeline/StereoDuplexEncoderNode.h
     dorado/read_pipeline/SubreadTaggerNode.cpp
     dorado/read_pipeline/SubreadTaggerNode.h
+    dorado/read_pipeline/TrimmerNode.cpp
+    dorado/read_pipeline/TrimmerNode.h
     dorado/read_pipeline/messages.cpp
     dorado/read_pipeline/messages.h
     dorado/read_pipeline/flush_options.h
@@ -265,8 +267,6 @@ add_library(dorado_lib
     dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
-    dorado/read_pipeline/TrimmerNode.cpp
-    dorado/read_pipeline/TrimmerNode.h
     dorado/splitter/DuplexReadSplitter.cpp
     dorado/splitter/DuplexReadSplitter.h
     dorado/splitter/RNAReadSplitter.cpp

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "read_pipeline/MessageSink.h"
+#include "MessageSink.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 

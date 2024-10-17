@@ -1,7 +1,7 @@
 #pragma once
 
-#include "read_pipeline/MessageSink.h"
-#include "read_pipeline/messages.h"
+#include "MessageSink.h"
+#include "messages.h"
 #include "utils/stats.h"
 
 #include <spdlog/spdlog.h>

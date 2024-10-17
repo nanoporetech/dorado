@@ -1,10 +1,10 @@
 #pragma once
 
+#include "ClientInfo.h"
+#include "MessageSink.h"
 #include "alignment/BedFileAccess.h"
 #include "alignment/IndexFileAccess.h"
 #include "alignment/Minimap2Options.h"
-#include "read_pipeline/ClientInfo.h"
-#include "read_pipeline/MessageSink.h"
 #include "utils/concurrency/task_priority.h"
 #include "utils/stats.h"
 #include "utils/types.h"
