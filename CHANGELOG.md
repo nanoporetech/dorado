@@ -2,6 +2,18 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.8.2] (21 Oct 2024)
+
+This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release, including
+
+* 543ccc1a4b78c8d04960a769d03d1f61ca75d0e3 - Improve documentation on running dorado in PowerShell on Windows
+* 3a8094a134dc448803c00aa93f6160c96241a9ab - Clarify "Unable to find chunk benchmarks" warning to indicate that it is not an error
+* bac446937f5bc378ebf14169d7287b6e4c5b5efb - Fix error when passing invalid option to basecaller `--modified-bases` argument
+* 7f40154aed13324865123386b278f3782eafa107 - Fix bug when running on GPUs with less than the recommended VRAM
+* a993a32f6904991135ce14387740b0216b2136c9 - Prevent loss of small numbers of reads from `dorado correct`
+* bbbeb9a72a79e77101f67dbab2a1c5f1cc4dd1d3 - Fix error when `dorado demux` is provided an empty input directory
+
+
 # [0.8.1] (3 Oct 2024)
 
 This release of Dorado includes fixes and improvements to the Dorado 0.8.0 release, including corrected configuration for DNA v5 SUP-compatible 5mC_5hmC and 5mCG_5hmCG models, improved cDNA poly(A) tail estimation for data from MinION flow cells, reduced basecaller startup time on supported GPUs, and more.
