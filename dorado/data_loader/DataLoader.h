@@ -59,7 +59,10 @@ private:
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
-    void load_read_channels(const std::filesystem::path& data_path, bool recursive_file_loading);
+    void load_read_channels(const std::vector<std::filesystem::directory_entry>& files);
+
+    void load_reads_by_channel(const std::vector<std::filesystem::directory_entry>& files);
+    void load_reads_unrestricted(const std::vector<std::filesystem::directory_entry>& files);
 
     void initialise_read(ReadCommon& read) const;
 
