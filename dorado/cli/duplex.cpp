@@ -92,8 +92,7 @@ struct DuplexModels {
 // simplex model otherwise there's no way to match a stereo model.
 // Otherwise, the user passed a ModelComplex which is parsed and the data is inspected to find the conditions.
 ModelComplexSearch get_model_search(const std::string& model_arg,
-                                    const std::string& reads,
-                                    const bool recursive_file_loading) {
+                                    const file_info::DirectoryFiles& input_files) {
     const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
     if (model_complex.is_path()) {
         if (!fs::exists(std::filesystem::path(model_arg))) {
@@ -122,7 +121,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
     }
 
     // Inspect data to find chemistry.
-    const auto chemistry = file_info::get_unique_sequencing_chemisty(reads, recursive_file_loading);
+    const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files);
     return ModelComplexSearch(model_complex, chemistry, true);
 }
 
@@ -131,12 +130,11 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& mod_bases_models,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
-                         const std::string& reads,
+                         const file_info::DirectoryFiles& input_files,
                          const basecall::BasecallerParams& basecaller_params,
-                         const bool recursive_file_loading,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
-    ModelComplexSearch model_search = get_model_search(model_arg, reads, recursive_file_loading);
+    ModelComplexSearch model_search = get_model_search(model_arg, input_files);
     const ModelComplex inferred_model_complex = model_search.complex();
 
     if (!mods_model_arguments_valid(inferred_model_complex, mod_bases, mod_bases_models)) {
@@ -182,7 +180,7 @@ DuplexModels load_models(const std::string& model_arg,
             bool inspect_ok = true;
             models::SamplingRate data_sample_rate = 0;
             try {
-                data_sample_rate = file_info::get_sample_rate(reads, recursive_file_loading);
+                data_sample_rate = file_info::get_sample_rate(input_files);
             } catch (const std::exception& e) {
                 inspect_ok = false;
                 spdlog::warn(
@@ -456,11 +454,13 @@ int duplex(int argc, char* argv[]) {
 
         bool recursive_file_loading = parser.visible.get<bool>("--recursive");
 
+        file_info::DirectoryFiles input_files{reads, recursive_file_loading};
+
         size_t num_reads = 0;
         if (basespace_duplex) {
             num_reads = read_list_from_pairs.size();
         } else {
-            num_reads = file_info::get_num_reads(reads, read_list, {}, recursive_file_loading);
+            num_reads = file_info::get_num_reads(input_files, read_list, {});
             if (num_reads == 0) {
                 spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
                 return EXIT_FAILURE;
@@ -574,8 +574,7 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-
-            if (!file_info::is_read_data_present(reads, recursive_file_loading)) {
+            if (!file_info::is_read_data_present(input_files)) {
                 std::string err = "No POD5 or FAST5 data found in path: " + reads;
                 throw std::runtime_error(err);
             }
@@ -586,10 +585,9 @@ int duplex(int argc, char* argv[]) {
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
-            const DuplexModels models =
-                    load_models(model, mod_bases, mod_bases_models, stereo_model_arg,
-                                models_directory, reads, basecaller_params, recursive_file_loading,
-                                skip_model_compatibility_check, device);
+            const DuplexModels models = load_models(
+                    model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
+                    input_files, basecaller_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 
@@ -608,10 +606,8 @@ int duplex(int argc, char* argv[]) {
             // Write read group info to header.
             auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
             // TODO: supply modbase model names once duplex modbase is complete
-            auto read_groups = file_info::load_read_groups(reads, models.model_name, "",
-                                                           recursive_file_loading);
-            read_groups.merge(
-                    file_info::load_read_groups(reads, duplex_rg_name, "", recursive_file_loading));
+            auto read_groups = file_info::load_read_groups(input_files, models.model_name, "");
+            read_groups.merge(file_info::load_read_groups(input_files, duplex_rg_name, ""));
             utils::add_rg_headers(hdr.get(), read_groups);
 
             const size_t num_runners = default_parameters.num_runners;

@@ -83,7 +83,8 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
     }
 
     if (!data.empty()) {
-        const auto chemisty = file_info::get_unique_sequencing_chemisty(data.u8string(), recursive);
+        const auto chemisty =
+                file_info::get_unique_sequencing_chemisty({data.u8string(), recursive});
         auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
 
         try {

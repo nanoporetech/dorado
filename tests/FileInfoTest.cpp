@@ -1,76 +1,76 @@
 #include "TestUtils.h"
 #include "file_info/file_info.h"
+#include "utils/stream_utils.h"
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "[FileInfoTest]"
+#define TEST_GROUP "[dorado::file_info]"
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list.", TEST_GROUP) {
     auto data_path = get_fast5_data_dir();
-
+    dorado::file_info::DirectoryFiles input_files{data_path, false};
     SECTION("fast5 file only, no read ids list") {
-        CHECK(dorado::file_info::get_num_reads(data_path, std::nullopt, {}, false) == 1);
+        CHECK(dorado::file_info::get_num_reads(input_files, std::nullopt, {}) == 1);
     }
 
     SECTION("fast5 file and read ids with 0 reads") {
         auto read_list = std::unordered_set<std::string>();
-        CHECK(dorado::file_info::get_num_reads(data_path, read_list, {}, false) == 0);
+        CHECK(dorado::file_info::get_num_reads(input_files, read_list, {}) == 0);
     }
     SECTION("fast5 file and read ids with 2 reads") {
         auto read_list = std::unordered_set<std::string>();
         read_list.insert("1");
         read_list.insert("2");
-        CHECK(dorado::file_info::get_num_reads(data_path, read_list, {}, false) == 1);
+        CHECK(dorado::file_info::get_num_reads(input_files, read_list, {}) == 1);
     }
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from fast5", TEST_GROUP) {
     auto data_path = get_fast5_data_dir();
-    CHECK(dorado::file_info::get_sample_rate(data_path, false) == 6024);
+    CHECK(dorado::file_info::get_sample_rate({data_path, false}) == 6024);
 }
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.", TEST_GROUP) {
     auto data_path = get_pod5_data_dir();
-
+    dorado::file_info::DirectoryFiles input_files{data_path, false};
     SECTION("pod5 file only, no read ids list") {
-        CHECK(dorado::file_info::get_num_reads(data_path, std::nullopt, {}, false) == 1);
+        CHECK(dorado::file_info::get_num_reads(input_files, std::nullopt, {}) == 1);
     }
 
     SECTION("pod5 file and read ids with 0 reads") {
         auto read_list = std::unordered_set<std::string>();
-        CHECK(dorado::file_info::get_num_reads(data_path, read_list, {}, false) == 0);
+        CHECK(dorado::file_info::get_num_reads(input_files, read_list, {}) == 0);
     }
     SECTION("pod5 file and read ids with 2 reads") {
         auto read_list = std::unordered_set<std::string>();
         read_list.insert("1");
         read_list.insert("2");
-        CHECK(dorado::file_info::get_num_reads(data_path, read_list, {}, false) == 1);
+        CHECK(dorado::file_info::get_num_reads(input_files, read_list, {}) == 1);
     }
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from single pod5.", TEST_GROUP) {
     auto single_read_path = get_pod5_data_dir();
-    CHECK(dorado::file_info::get_sample_rate(single_read_path, false) == 4000);
+    CHECK(dorado::file_info::get_sample_rate({single_read_path, false}) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from pod5 dir.", TEST_GROUP) {
     auto data_path = get_pod5_data_dir();
-    CHECK(dorado::file_info::get_sample_rate(data_path, false) == 4000);
+    CHECK(dorado::file_info::get_sample_rate({data_path, false}) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Find sample rate from nested pod5.", TEST_GROUP) {
     auto data_path = get_nested_pod5_data_dir();
-    CHECK(dorado::file_info::get_sample_rate(data_path, true) == 4000);
+    CHECK(dorado::file_info::get_sample_rate({data_path, true}) == 4000);
 }
 
 TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list", TEST_GROUP) {
     auto data_path = get_data_dir("multi_read_pod5");
-
+    dorado::file_info::DirectoryFiles input_files{data_path, false};
     SECTION("read ignore list with 1 read") {
         auto read_ignore_list = std::unordered_set<std::string>();
         read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
-        CHECK(dorado::file_info::get_num_reads(data_path, std::nullopt, read_ignore_list, false) ==
-              3);
+        CHECK(dorado::file_info::get_num_reads(input_files, std::nullopt, read_ignore_list) == 3);
     }
 
     SECTION("same read in read_ids and ignore list") {
@@ -78,7 +78,7 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list", TEST_GROUP)
         read_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
         auto read_ignore_list = std::unordered_set<std::string>();
         read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
-        CHECK(dorado::file_info::get_num_reads(data_path, read_list, read_ignore_list, false) == 0);
+        CHECK(dorado::file_info::get_num_reads(input_files, read_list, read_ignore_list) == 0);
     }
 }
 
@@ -99,13 +99,14 @@ TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemisty", TEST_GROUP) {
         CAPTURE(condition);
         auto data = fs::path(get_data_dir("pod5")) / condition;
         CHECK(fs::exists(data));
-        auto result = dorado::file_info::get_unique_sequencing_chemisty(data.u8string(), false);
+        auto result = dorado::file_info::get_unique_sequencing_chemisty({data.u8string(), false});
         CHECK(result == expected);
     }
 
     SECTION("get_chemistry throws with inhomogeneous") {
         auto data = fs::path(get_data_dir("pod5")) / "mixed";
-        CHECK_THROWS(dorado::file_info::get_unique_sequencing_chemisty(data.u8string(), true),
+        dorado::utils::SuppressStdout suppress_error_message{};
+        CHECK_THROWS(dorado::file_info::get_unique_sequencing_chemisty({data.u8string(), true}),
                      Catch::Matchers::Contains(
                              "Could not uniquely resolve chemistry from inhomogeneous data"));
     }
