@@ -153,11 +153,15 @@ void CorrectionMapperNode::load_read_fn() {
 
 void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
     utils::set_thread_name("errcorr_copy");
-    while (!m_copy_terminate.load()) {
+    while (true) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
         m_copy_cv.wait(lock, [&] {
             return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
         });
+
+        if (m_shadow_correction_records.empty() && m_copy_terminate.load()) {
+            break;
+        }
 
         for (auto& shadow_data : m_shadow_correction_records) {
             spdlog::debug("Pushing {} records downstream of mapping.", shadow_data.size());
