@@ -1,3 +1,6 @@
+# CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
+include_guard(GLOBAL)
+
 set(POD5_VERSION 0.3.15)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
