@@ -25,7 +25,7 @@ public:
 
     BarcodeScoreResult barcode(const std::string& seq,
                                bool barcode_both_ends,
-                               const BarcodingInfo::FilterSet& allowed_barcodes) const;
+                               const BarcodeFilterSet& allowed_barcodes) const;
 
 private:
     const KitInfoProvider m_kit_info_provider;
@@ -43,20 +43,20 @@ private:
     std::vector<BarcodeScoreResult> calculate_barcode_score_different_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
-            const BarcodingInfo::FilterSet& allowed_barcodes) const;
+            const BarcodeFilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score_double_ends(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
-            const BarcodingInfo::FilterSet& allowed_barcodes) const;
+            const BarcodeFilterSet& allowed_barcodes) const;
     std::vector<BarcodeScoreResult> calculate_barcode_score(
             std::string_view read_seq,
             const BarcodeCandidateKit& candidate,
-            const BarcodingInfo::FilterSet& allowed_barcodes,
+            const BarcodeFilterSet& allowed_barcodes,
             bool rear_barcodes) const;
     BarcodeScoreResult find_best_barcode(const std::string& read_seq,
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
-                                         const BarcodingInfo::FilterSet& allowed_barcodes) const;
+                                         const BarcodeFilterSet& allowed_barcodes) const;
 };
 
 }  // namespace demux
