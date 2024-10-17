@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.8.2] (21 Oct 2024)
 
-This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release, including
+This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release.
 
 * 543ccc1a4b78c8d04960a769d03d1f61ca75d0e3 - Improve documentation on running dorado in PowerShell on Windows
 * 3a8094a134dc448803c00aa93f6160c96241a9ab - Clarify "Unable to find chunk benchmarks" warning to indicate that it is not an error
