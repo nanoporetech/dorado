@@ -6,6 +6,7 @@ All notable changes to Dorado will be documented in this file.
 
 This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release.
 
+* 9a81cbc269b742cad64b514a50aeb30a7bf25811 - Fix errors when running `dorado basecaller` on multi-gpu systems
 * 543ccc1a4b78c8d04960a769d03d1f61ca75d0e3 - Improve documentation on running dorado in PowerShell on Windows
 * 3a8094a134dc448803c00aa93f6160c96241a9ab - Clarify "Unable to find chunk benchmarks" warning to indicate that it is not an error
 * bac446937f5bc378ebf14169d7287b6e4c5b5efb - Fix error when passing invalid option to basecaller `--modified-bases` argument
