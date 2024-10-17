@@ -188,7 +188,7 @@ void validate_options(const Options& opt) {
 
 }  // namespace
 
-int consensus(int argc, char* argv[]) {
+int polish(int argc, char* argv[]) {
     // Initialize CLI options. The parse_args below requires a non-const reference.
     // Verbosity is passed into a callback, so we need it here.
     int verbosity = 0;
