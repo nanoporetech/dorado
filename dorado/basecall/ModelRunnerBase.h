@@ -25,6 +25,7 @@ public:
     virtual size_t batch_size() const = 0;
     // Timeout is short for simplex, longer for duplex which gets a subset of reads
     virtual int batch_timeout_ms() const { return is_duplex_model(config()) ? 5000 : 100; }
+    virtual bool is_low_latency() const { return false; }
     virtual void terminate() = 0;
     virtual void restart() = 0;
     virtual std::string get_name() const = 0;
