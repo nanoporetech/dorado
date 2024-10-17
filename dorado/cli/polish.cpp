@@ -45,11 +45,12 @@ struct Options {
     // Optional parameters.
     std::filesystem::path model_path;
     int32_t verbosity = 0;
-    int32_t threads = 0;
-    int32_t infer_threads = 0;
+    int32_t threads = 1;
+    int32_t infer_threads = 1;
     std::string device;
-    int32_t batch_size = 0;
-    int32_t window_size = 1000;
+    int32_t batch_size = 128;
+    int32_t window_size = 10000;
+    int32_t window_overlap = 1000;
 };
 
 /// \brief Define the CLI options.
@@ -94,11 +95,15 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Advanced arguments");
         parser->visible.add_argument("-b", "--batch-size")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
-                .default_value(0)
+                .default_value(128)
                 .scan<'i', int>();
         parser->visible.add_argument("-w", "--window-size")
-                .help("Batch size for inference. Default: 0 for auto batch size detection.")
-                .default_value(0)
+                .help("Window size for calling consensus.")
+                .default_value(10000)
+                .scan<'i', int>();
+        parser->visible.add_argument("-w", "--window-overlap")
+                .help("Overlap length between windows.")
+                .default_value(1000)
                 .scan<'i', int>();
     }
 
