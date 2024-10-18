@@ -339,16 +339,9 @@ void DataLoader::load_reads_unrestricted(
     }
 }
 
-void DataLoader::load_reads(const std::filesystem::path& path,
-                            bool recursive_file_loading,
+void DataLoader::load_reads(const std::vector<std::filesystem::directory_entry>& dir_entries,
                             ReadOrder traversal_order) {
-    if (!std::filesystem::exists(path)) {
-        spdlog::error("Requested input path {} does not exist!", path.string());
-        return;
-    }
-
-    auto filtered_entries = filter_fast5_for_mixed_datasets(
-            utils::fetch_directory_entries(path, recursive_file_loading));
+    auto filtered_entries = filter_fast5_for_mixed_datasets(dir_entries);
 
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:

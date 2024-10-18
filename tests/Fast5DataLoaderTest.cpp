@@ -1,6 +1,5 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "data_loader/DataLoader.h"
 #include "read_pipeline/ReadPipeline.h"
 
 #include <catch2/catch.hpp>

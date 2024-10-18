@@ -3,6 +3,7 @@
 #include "data_loader/DataLoader.h"
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/fs_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -57,7 +58,8 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0, std::nullopt, {});
-    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
+    auto folder_entries = dorado::utils::fetch_directory_entries(data_path, true);
+    loader.load_reads(folder_entries, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
@@ -95,7 +97,8 @@ TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by cha
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0, std::nullopt, {});
-    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
+    auto folder_entries = dorado::utils::fetch_directory_entries(data_path, true);
+    loader.load_reads(folder_entries, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     std::sort(reads.begin(), reads.end(), [](auto& a, auto& b) {

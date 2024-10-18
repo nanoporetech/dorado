@@ -1,7 +1,6 @@
 // Add some utilities for CLI.
 #pragma once
 
-#include "data_loader/DataLoader.h"
 #include "dorado_version.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"

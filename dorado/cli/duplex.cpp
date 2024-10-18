@@ -738,8 +738,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
-            loader.load_reads(reads, parser.visible.get<bool>("--recursive"),
-                              ReadOrder::BY_CHANNEL);
+            loader.load_reads(input_files.entries(), ReadOrder::BY_CHANNEL);
 
             utils::clean_temporary_models(temp_model_paths);
         }

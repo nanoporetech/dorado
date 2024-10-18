@@ -1,5 +1,6 @@
 #pragma once
 
+#include "file_info/file_info.h"
 #include "models/kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -36,8 +37,7 @@ public:
                std::optional<std::unordered_set<std::string>> read_list,
                std::unordered_set<std::string> read_ignore_list);
     ~DataLoader() = default;
-    void load_reads(const std::filesystem::path& path,
-                    bool recursive_file_loading,
+    void load_reads(const std::vector<std::filesystem::directory_entry>& dir_entries,
                     ReadOrder traversal_order);
 
     std::string get_name() const { return "Dataloader"; }

@@ -593,9 +593,7 @@ void setup(const std::vector<std::string>& args,
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
-
-    // Run pipeline.
-    loader.load_reads(input_files.path(), input_files.recursive(), ReadOrder::UNRESTRICTED);
+    loader.load_reads(input_files.entries(), ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
