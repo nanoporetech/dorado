@@ -121,7 +121,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
     }
 
     // Inspect data to find chemistry.
-    const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files);
+    const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files.entries());
     return ModelComplexSearch(model_complex, chemistry, true);
 }
 
@@ -180,7 +180,7 @@ DuplexModels load_models(const std::string& model_arg,
             bool inspect_ok = true;
             models::SamplingRate data_sample_rate = 0;
             try {
-                data_sample_rate = file_info::get_sample_rate(input_files);
+                data_sample_rate = file_info::get_sample_rate(input_files.entries());
             } catch (const std::exception& e) {
                 inspect_ok = false;
                 spdlog::warn(
@@ -460,7 +460,7 @@ int duplex(int argc, char* argv[]) {
         if (basespace_duplex) {
             num_reads = read_list_from_pairs.size();
         } else {
-            num_reads = file_info::get_num_reads(input_files, read_list, {});
+            num_reads = file_info::get_num_reads(input_files.entries(), read_list, {});
             if (num_reads == 0) {
                 spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
                 return EXIT_FAILURE;
@@ -574,7 +574,7 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-            if (!file_info::is_read_data_present(input_files)) {
+            if (!file_info::is_read_data_present(input_files.entries())) {
                 std::string err = "No POD5 or FAST5 data found in path: " + reads;
                 throw std::runtime_error(err);
             }
@@ -606,8 +606,10 @@ int duplex(int argc, char* argv[]) {
             // Write read group info to header.
             auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
             // TODO: supply modbase model names once duplex modbase is complete
-            auto read_groups = file_info::load_read_groups(input_files, models.model_name, "");
-            read_groups.merge(file_info::load_read_groups(input_files, duplex_rg_name, ""));
+            auto read_groups =
+                    file_info::load_read_groups(input_files.entries(), models.model_name, "");
+            read_groups.merge(
+                    file_info::load_read_groups(input_files.entries(), duplex_rg_name, ""));
             utils::add_rg_headers(hdr.get(), read_groups);
 
             const size_t num_runners = default_parameters.num_runners;

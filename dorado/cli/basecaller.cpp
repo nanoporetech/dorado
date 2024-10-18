@@ -317,13 +317,13 @@ void setup(const std::vector<std::string>& args,
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
-    if (!file_info::is_read_data_present(input_files)) {
+    if (!file_info::is_read_data_present(input_files.entries())) {
         std::string err = "No POD5 or FAST5 data found in path: " + input_files.path().string();
         throw std::runtime_error(err);
     }
 
     auto read_list = utils::load_read_list(read_list_file_path);
-    size_t num_reads = file_info::get_num_reads(input_files, read_list, {});
+    size_t num_reads = file_info::get_num_reads(input_files.entries(), read_list, {});
     if (num_reads == 0) {
         spdlog::error("No POD5 or FAST5 reads found in path: " + input_files.path().string());
         std::exit(EXIT_FAILURE);
@@ -338,7 +338,7 @@ void setup(const std::vector<std::string>& args,
         bool inspect_ok = true;
         models::SamplingRate data_sample_rate = 0;
         try {
-            data_sample_rate = file_info::get_sample_rate(input_files);
+            data_sample_rate = file_info::get_sample_rate(input_files.entries());
         } catch (const std::exception& e) {
             inspect_ok = false;
             spdlog::warn(
@@ -425,7 +425,8 @@ void setup(const std::vector<std::string>& args,
                 num_runners, 0);
     }
 
-    auto read_groups = file_info::load_read_groups(input_files, model_name, modbase_model_names);
+    auto read_groups =
+            file_info::load_read_groups(input_files.entries(), model_name, modbase_model_names);
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
@@ -795,7 +796,7 @@ int basecaller(int argc, char* argv[]) {
         mods_model_paths = model_resolution::get_non_complex_mods_models(
                 model_path, mod_bases, mod_bases_models, downloader);
     } else {
-        const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files);
+        const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files.entries());
         const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");
