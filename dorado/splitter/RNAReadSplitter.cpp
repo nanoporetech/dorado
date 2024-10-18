@@ -1,6 +1,6 @@
 #include "RNAReadSplitter.h"
 
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/messages.h"
 #include "splitter/splitter_utils.h"
 #include "utils/uuid_utils.h"
 

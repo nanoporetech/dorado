@@ -2,7 +2,6 @@
 
 #include "PostCondition.h"
 #include "barcode_kits.h"
-#include "demux/barcoding_info.h"
 #include "string_utils.h"
 
 #include <algorithm>
@@ -227,9 +226,7 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     return "";
 }
 
-demux::BarcodingInfo::FilterSet SampleSheet::get_barcode_values() const {
-    return m_allowed_barcodes;
-}
+BarcodeFilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
 
 bool SampleSheet::barcode_is_permitted(const std::string& barcode_name) const {
     if (!m_allowed_barcodes.has_value()) {

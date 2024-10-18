@@ -1,7 +1,7 @@
 #pragma once
 
-#include "read_pipeline/ClientInfo.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "ClientInfo.h"
+#include "messages.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 

@@ -33,7 +33,7 @@ std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
         const std::string& kit_name,
         bool barcode_both_ends,
         bool trim_barcode,
-        demux::BarcodingInfo::FilterSet allowed_barcodes) {
+        BarcodeFilterSet allowed_barcodes) {
     if (kit_name.empty()) {
         return {};
     }

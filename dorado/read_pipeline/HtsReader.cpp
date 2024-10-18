@@ -1,8 +1,7 @@
 #include "HtsReader.h"
 
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/ReadPipeline.h"
-#include "read_pipeline/messages.h"
+#include "DefaultClientInfo.h"
+#include "ReadPipeline.h"
 #include "utils/bam_utils.h"
 #include "utils/fastq_reader.h"
 #include "utils/types.h"

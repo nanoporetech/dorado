@@ -113,6 +113,8 @@ struct ReadGroup {
     std::string experiment_id;
 };
 
+using BarcodeFilterSet = std::optional<std::unordered_set<std::string>>;
+
 struct BamDestructor {
     void operator()(bam1_t *);
 };
