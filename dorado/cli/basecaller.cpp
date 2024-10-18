@@ -34,6 +34,7 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#include "utils/fs_utils.h"
 #include "utils/string_utils.h"
 
 #include <argparse.hpp>
@@ -285,7 +286,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
-           const file_info::DirectoryFiles& input_files,
+           const utils::DirectoryFiles& input_files,
            const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
@@ -654,7 +655,7 @@ int basecaller(int argc, char* argv[]) {
     const auto data = parser.visible.get<std::string>("data");
     const auto recursive = parser.visible.get<bool>("--recursive");
 
-    file_info::DirectoryFiles input_files{data, recursive};
+    utils::DirectoryFiles input_files{data, recursive};
 
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");

@@ -92,7 +92,7 @@ struct DuplexModels {
 // simplex model otherwise there's no way to match a stereo model.
 // Otherwise, the user passed a ModelComplex which is parsed and the data is inspected to find the conditions.
 ModelComplexSearch get_model_search(const std::string& model_arg,
-                                    const file_info::DirectoryFiles& input_files) {
+                                    const utils::DirectoryFiles& input_files) {
     const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
     if (model_complex.is_path()) {
         if (!fs::exists(std::filesystem::path(model_arg))) {
@@ -130,7 +130,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& mod_bases_models,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
-                         const file_info::DirectoryFiles& input_files,
+                         const utils::DirectoryFiles& input_files,
                          const basecall::BasecallerParams& basecaller_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
@@ -454,7 +454,7 @@ int duplex(int argc, char* argv[]) {
 
         bool recursive_file_loading = parser.visible.get<bool>("--recursive");
 
-        file_info::DirectoryFiles input_files{reads, recursive_file_loading};
+        utils::DirectoryFiles input_files{reads, recursive_file_loading};
 
         size_t num_reads = 0;
         if (basespace_duplex) {

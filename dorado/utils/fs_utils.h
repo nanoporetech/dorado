@@ -41,4 +41,20 @@ std::vector<std::filesystem::directory_entry> fetch_directory_entries(
         const std::filesystem::path& path,
         bool recursive);
 
+/**
+ * Class caching directory entries for a folder, along with the path.
+ */
+class DirectoryFiles final {
+    const std::filesystem::path m_data_path;
+    bool m_recursive;
+    const std::vector<std::filesystem::directory_entry> m_directory_entries;
+
+public:
+    DirectoryFiles(std::filesystem::path data_path, bool recursive);
+
+    const std::filesystem::path& path() const;
+
+    const std::vector<std::filesystem::directory_entry>& entries() const;
+};
+
 }  // namespace dorado::utils

@@ -129,4 +129,15 @@ std::vector<std::filesystem::directory_entry> fetch_directory_entries(
     return entries;
 }
 
+DirectoryFiles::DirectoryFiles(std::filesystem::path data_path, bool recursive)
+        : m_data_path(std::move(data_path)),
+          m_recursive(recursive),
+          m_directory_entries(utils::fetch_directory_entries(m_data_path, m_recursive)) {}
+
+const std::filesystem::path& DirectoryFiles::path() const { return m_data_path; }
+
+const std::vector<std::filesystem::directory_entry>& DirectoryFiles::entries() const {
+    return m_directory_entries;
+}
+
 }  // namespace dorado::utils

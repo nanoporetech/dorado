@@ -1,7 +1,6 @@
 #include "file_info.h"
 
 #include "utils/PostCondition.h"
-#include "utils/fs_utils.h"
 #include "utils/time_utils.h"
 
 #include <highfive/H5Easy.hpp>
@@ -11,7 +10,7 @@
 namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(
-        const DirectoryFiles& dir_files,
+        const utils::DirectoryFiles& dir_files,
         const std::string& model_name,
         const std::string& modbase_model_names) {
     std::unordered_map<std::string, ReadGroup> read_groups;
@@ -71,7 +70,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
     return read_groups;
 }
 
-int get_num_reads(const DirectoryFiles& dir_files,
+int get_num_reads(const utils::DirectoryFiles& dir_files,
                   std::optional<std::unordered_set<std::string>> read_list,
                   const std::unordered_set<std::string>& ignore_read_list) {
     size_t num_reads = 0;
@@ -119,7 +118,7 @@ int get_num_reads(const DirectoryFiles& dir_files,
     return int(num_reads);
 }
 
-bool is_read_data_present(const DirectoryFiles& dir_files) {
+bool is_read_data_present(const utils::DirectoryFiles& dir_files) {
     for (const auto& entry : dir_files.entries()) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -131,7 +130,7 @@ bool is_read_data_present(const DirectoryFiles& dir_files) {
     return false;
 }
 
-uint16_t get_sample_rate(const DirectoryFiles& dir_files) {
+uint16_t get_sample_rate(const utils::DirectoryFiles& dir_files) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
     for (const auto& entry : dir_files.entries()) {
@@ -215,7 +214,7 @@ uint16_t get_sample_rate(const DirectoryFiles& dir_files) {
     }
 }
 
-std::set<models::ChemistryKey> get_sequencing_chemistries(const DirectoryFiles& dir_files) {
+std::set<models::ChemistryKey> get_sequencing_chemistries(const utils::DirectoryFiles& dir_files) {
     std::set<models::ChemistryKey> chemistries;
 
     for (const auto& entry : dir_files.entries()) {
@@ -282,7 +281,7 @@ std::set<models::ChemistryKey> get_sequencing_chemistries(const DirectoryFiles& 
     return chemistries;
 }
 
-models::Chemistry get_unique_sequencing_chemisty(const DirectoryFiles& dir_files) {
+models::Chemistry get_unique_sequencing_chemisty(const utils::DirectoryFiles& dir_files) {
     std::set<models::ChemistryKey> data_chemistries = get_sequencing_chemistries(dir_files);
 
     if (data_chemistries.empty()) {
@@ -316,19 +315,6 @@ models::Chemistry get_unique_sequencing_chemisty(const DirectoryFiles& dir_files
         throw std::runtime_error("Could not uniquely resolve chemistry from inhomogeneous data");
     }
     return *std::begin(found);
-}
-
-DirectoryFiles::DirectoryFiles(std::filesystem::path data_path, bool recursive)
-        : m_data_path(std::move(data_path)),
-          m_recursive(recursive),
-          m_directory_entries(utils::fetch_directory_entries(m_data_path, m_recursive)) {}
-
-const std::filesystem::path& DirectoryFiles::path() const { return m_data_path; }
-
-bool DirectoryFiles::recursive() const { return m_recursive; }
-
-const std::vector<std::filesystem::directory_entry>& DirectoryFiles::entries() const {
-    return m_directory_entries;
 }
 
 }  // namespace dorado::file_info

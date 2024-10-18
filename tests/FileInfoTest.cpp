@@ -8,7 +8,7 @@
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list.", TEST_GROUP) {
     auto data_path = get_fast5_data_dir();
-    dorado::file_info::DirectoryFiles input_files{data_path, false};
+    dorado::utils::DirectoryFiles input_files{data_path, false};
     SECTION("fast5 file only, no read ids list") {
         CHECK(dorado::file_info::get_num_reads(input_files, std::nullopt, {}) == 1);
     }
@@ -32,7 +32,7 @@ TEST_CASE(TEST_GROUP "Find sample rate from fast5", TEST_GROUP) {
 
 TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.", TEST_GROUP) {
     auto data_path = get_pod5_data_dir();
-    dorado::file_info::DirectoryFiles input_files{data_path, false};
+    dorado::utils::DirectoryFiles input_files{data_path, false};
     SECTION("pod5 file only, no read ids list") {
         CHECK(dorado::file_info::get_num_reads(input_files, std::nullopt, {}) == 1);
     }
@@ -66,7 +66,7 @@ TEST_CASE(TEST_GROUP "Find sample rate from nested pod5.", TEST_GROUP) {
 
 TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list", TEST_GROUP) {
     auto data_path = get_data_dir("multi_read_pod5");
-    dorado::file_info::DirectoryFiles input_files{data_path, false};
+    dorado::utils::DirectoryFiles input_files{data_path, false};
     SECTION("read ignore list with 1 read") {
         auto read_ignore_list = std::unordered_set<std::string>();
         read_ignore_list.insert("0007f755-bc82-432c-82be-76220b107ec5");  // read present in POD5
