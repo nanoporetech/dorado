@@ -65,6 +65,7 @@
 #include <optional>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 using dorado::utils::default_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
@@ -76,6 +77,27 @@ namespace fs = std::filesystem;
 namespace dorado {
 
 namespace {
+
+/**
+ * Class caching directory entries for a folder, along with the path.
+ */
+class InputFiles final {
+    const std::filesystem::path m_data_path;
+    bool m_recursive;
+    const std::vector<std::filesystem::directory_entry> m_directory_entries;
+
+public:
+    InputFiles(std::filesystem::path data_path, bool recursive)
+            : m_data_path(std::move(data_path)),
+              m_recursive(recursive),
+              m_directory_entries(utils::fetch_directory_entries(m_data_path, m_recursive)) {}
+
+    const std::filesystem::path& path() const { return m_data_path; }
+
+    const std::vector<std::filesystem::directory_entry>& entries() const {
+        return m_directory_entries;
+    }
+};
 
 void validate_barcode_kit_info(const std::string& kit_name) {
     const auto kit_info = barcode_kits::get_kit_info(kit_name);
@@ -286,7 +308,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
-           const utils::DirectoryFiles& input_files,
+           const InputFiles& input_files,
            const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
@@ -653,10 +675,8 @@ int basecaller(int argc, char* argv[]) {
     }
 
     const auto model_arg = parser.visible.get<std::string>("model");
-    const auto data = parser.visible.get<std::string>("data");
-    const auto recursive = parser.visible.get<bool>("--recursive");
-
-    utils::DirectoryFiles input_files{data, recursive};
+    InputFiles input_files{parser.visible.get<std::string>("data"),
+                           parser.visible.get<bool>("--recursive")};
 
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
