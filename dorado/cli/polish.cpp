@@ -8,6 +8,8 @@
 #include "utils/parameters.h"
 
 #include <spdlog/spdlog.h>
+#include <torch/script.h>
+#include <torch/torch.h>
 
 #include <algorithm>
 #include <cctype>
@@ -193,6 +195,71 @@ void validate_options(const Options& opt) {
 
 }  // namespace
 
+void run_experimental(const Options& opt) {
+    std::vector<std::string> devices;
+    // int32_t infer_threads = 1;
+
+    if (opt.device == "cpu") {
+        // infer_threads = 1;
+        devices.push_back(opt.device);
+    }
+#if DORADO_CUDA_BUILD
+    else if (utils::starts_with(device, "cuda")) {
+        devices = dorado::utils::parse_cuda_device_string(opt.device);
+        if (devices.empty()) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
+    }
+#else
+    else {
+        throw std::runtime_error("Unsupported device: " + opt.device);
+    }
+#endif
+    // const float batch_factor = (utils::starts_with(opt.device, "cuda")) ? 0.4f : 0.8f;
+    // for (size_t d = 0; d < devices.size(); d++) {
+    //     const auto& dev = devices[d];
+    //     for (int i = 0; i < infer_threads; i++) {
+    //         int device_batch_size = opt.batch_size;
+    //         // if (batch_size == 0) {
+    //         //     device_batch_size = calculate_batch_size(dev, batch_factor);
+    //         //     if (device_batch_size == 0) {
+    //         //         throw std::runtime_error("Insufficient memory to run inference on " + dev);
+    //         //     }
+    //         // }
+    //         spdlog::info("Using batch size {} on device {} in inference thread {}.",
+    //                      device_batch_size, dev, i);
+    //         // m_infer_threads.push_back(std::thread(&CorrectionInferenceNode::infer_fn, this, dev,
+    //         //                                       (int)d, device_batch_size));
+    //     }
+    // }
+
+    const std::string device_str = devices.front();
+    torch::Device device = torch::Device(device_str);
+
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Stream> stream;
+    if (opt.device.is_cuda()) {
+        stream = c10::cuda::getStreamFromPool(false, opt.device.index());
+    }
+    c10::cuda::OptionalCUDAStreamGuard guard(stream);
+#endif
+
+    at::InferenceMode infer_guard;
+
+    // const std::string model_path = (opt.model_path / "weights.pt").string(); // (m_model_config.model_dir / m_model_config.weights_file).string();
+    const std::string model_path = opt.model_path.string();
+    torch::jit::script::Module module;
+    try {
+        spdlog::debug("Loading model on {}...", device_str);
+        module = torch::jit::load(model_path, device);
+        spdlog::debug("Loaded model on {}!", device_str);
+    } catch (const c10::Error& e) {
+        throw std::runtime_error("Error loading model from " + model_path +
+                                 " with error: " + e.what());
+    }
+    module.eval();
+}
+
 int polish(int argc, char* argv[]) {
     // Initialize CLI options. The parse_args below requires a non-const reference.
     // Verbosity is passed into a callback, so we need it here.
@@ -216,6 +283,13 @@ int polish(int argc, char* argv[]) {
 
     // Check if input options are good.
     validate_options(opt);
+
+    if (std::empty(opt.model_path)) {
+        throw std::runtime_error(
+                "WIP. Currently can only load a model. Not yet fetching a model automatically.");
+    }
+
+    run_experimental(opt);
 
     return 0;
 }
