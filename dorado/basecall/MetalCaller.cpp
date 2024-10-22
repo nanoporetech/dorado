@@ -15,6 +15,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -173,8 +174,8 @@ void MetalCaller::metal_thread_fn() {
 
             // If we repeatedly submitted CBs without success, we give up.
             if (!cb_success) {
-                spdlog::critical("Failed to successfully submit GPU command buffers.");
-                throw std::runtime_error("Failed to successfully submit GPU command buffers.");
+                spdlog::critical("Exiting. Failed to successfully submit GPU command buffers.");
+                std::exit(EXIT_FAILURE);
             }
         }
 
