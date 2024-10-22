@@ -7,6 +7,7 @@
 #include "cli/model_resolution.h"
 #include "data_loader/DataLoader.h"
 #include "dorado_version.h"
+#include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
@@ -121,8 +122,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg,
     }
 
     // Inspect data to find chemistry.
-    const auto chemistry =
-            DataLoader::get_unique_sequencing_chemisty(reads, recursive_file_loading);
+    const auto chemistry = file_info::get_unique_sequencing_chemisty(reads, recursive_file_loading);
     return ModelComplexSearch(model_complex, chemistry, true);
 }
 
@@ -182,7 +182,7 @@ DuplexModels load_models(const std::string& model_arg,
             bool inspect_ok = true;
             models::SamplingRate data_sample_rate = 0;
             try {
-                data_sample_rate = DataLoader::get_sample_rate(reads, recursive_file_loading);
+                data_sample_rate = file_info::get_sample_rate(reads, recursive_file_loading);
             } catch (const std::exception& e) {
                 inspect_ok = false;
                 spdlog::warn(
@@ -460,7 +460,7 @@ int duplex(int argc, char* argv[]) {
         if (basespace_duplex) {
             num_reads = read_list_from_pairs.size();
         } else {
-            num_reads = DataLoader::get_num_reads(reads, read_list, {}, recursive_file_loading);
+            num_reads = file_info::get_num_reads(reads, read_list, {}, recursive_file_loading);
             if (num_reads == 0) {
                 spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
                 return EXIT_FAILURE;
@@ -575,7 +575,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
 
-            if (!DataLoader::is_read_data_present(reads, recursive_file_loading)) {
+            if (!file_info::is_read_data_present(reads, recursive_file_loading)) {
                 std::string err = "No POD5 or FAST5 data found in path: " + reads;
                 throw std::runtime_error(err);
             }
@@ -608,10 +608,10 @@ int duplex(int argc, char* argv[]) {
             // Write read group info to header.
             auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
             // TODO: supply modbase model names once duplex modbase is complete
-            auto read_groups = DataLoader::load_read_groups(reads, models.model_name, "",
-                                                            recursive_file_loading);
-            read_groups.merge(DataLoader::load_read_groups(reads, duplex_rg_name, "",
-                                                           recursive_file_loading));
+            auto read_groups = file_info::load_read_groups(reads, models.model_name, "",
+                                                           recursive_file_loading);
+            read_groups.merge(
+                    file_info::load_read_groups(reads, duplex_rg_name, "", recursive_file_loading));
             utils::add_rg_headers(hdr.get(), read_groups);
 
             const size_t num_runners = default_parameters.num_runners;

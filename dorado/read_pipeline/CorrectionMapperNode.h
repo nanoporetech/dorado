@@ -1,11 +1,10 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "MessageSink.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
-#include "read_pipeline/MessageSink.h"
-#include "read_pipeline/messages.h"
+#include "messages.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -24,6 +23,8 @@
 #include <vector>
 
 namespace dorado {
+
+class Pipeline;
 
 class CorrectionMapperNode : public MessageSink {
 public:

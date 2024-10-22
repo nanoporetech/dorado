@@ -9,6 +9,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
@@ -16,6 +17,7 @@
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/tty_utils.h"
 
 #include <minimap.h>
 #include <spdlog/spdlog.h>
@@ -54,6 +56,8 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         throw std::runtime_error("Alignment reference path does not exist: " + filename);
     case dorado::alignment::IndexLoadResult::validation_error:
         throw std::runtime_error("Validation error checking minimap options");
+    case dorado::alignment::IndexLoadResult::file_open_error:
+        throw std::runtime_error("Error opening index file: " + filename);
     case dorado::alignment::IndexLoadResult::split_index_not_supported:
         throw std::runtime_error(
                 "Dorado doesn't support split index for alignment. Please re-run with larger "
@@ -200,13 +204,24 @@ int aligner(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     align_info->minimap_options = std::move(*minimap_options);
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
-                                                         false};
-    if (!processing_items.initialise()) {
+
+    // Only allow `reads` to be empty if we're accepting input from a pipe
+    if (reads.empty() && utils::is_fd_tty(stdin)) {
+        std::cout << parser.visible << '\n';
         return EXIT_FAILURE;
     }
 
+    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
+                                                         false};
+    if (!processing_items.initialise()) {
+        spdlog::error("Could not initialise for input {}", reads);
+        return EXIT_FAILURE;
+    }
     const auto& all_files = processing_items.get();
+    if (all_files.empty()) {
+        spdlog::info("No input files found");
+        return EXIT_SUCCESS;
+    }
     spdlog::info("num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
@@ -217,16 +232,6 @@ int aligner(int argc, char* argv[]) {
     std::tie(aligner_threads, writer_threads) =
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
-
-    // Only allow `reads` to be empty if we're accepting input from a pipe
-    if (reads.empty()) {
-#ifndef _WIN32
-        if (isatty(fileno(stdin))) {
-            std::cout << parser.visible << '\n';
-            return EXIT_FAILURE;
-        }
-#endif
-    }
 
     std::shared_ptr<dorado::alignment::IndexFileAccess> index_file_access;
     try {

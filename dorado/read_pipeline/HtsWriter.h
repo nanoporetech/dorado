@@ -1,5 +1,5 @@
 #pragma once
-#include "read_pipeline/ReadPipeline.h"
+#include "MessageSink.h"
 #include "utils/hts_file.h"
 #include "utils/stats.h"
 

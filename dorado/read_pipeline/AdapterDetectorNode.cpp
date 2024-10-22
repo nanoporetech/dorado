@@ -4,6 +4,7 @@
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
+#include "messages.h"
 #include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"

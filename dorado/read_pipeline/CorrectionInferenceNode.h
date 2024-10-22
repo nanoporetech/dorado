@@ -1,9 +1,9 @@
 #pragma once
 
+#include "MessageSink.h"
 #include "correct/types.h"
 #include "hts_io/FastxRandomReader.h"
-#include "read_pipeline/MessageSink.h"
-#include "read_pipeline/messages.h"
+#include "messages.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"

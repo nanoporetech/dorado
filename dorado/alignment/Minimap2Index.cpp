@@ -39,6 +39,10 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
         int num_threads,
         bool allow_split_index) {
     m_index_reader = create_index_reader(index_file, m_options.index_options->get());
+    if (!m_index_reader) {
+        // Reason could be not having permissions to open the file
+        return {nullptr, IndexLoadResult::file_open_error};
+    }
     std::shared_ptr<mm_idx_t> index(mm_idx_reader_read(m_index_reader.get(), num_threads),
                                     IndexDeleter());
 

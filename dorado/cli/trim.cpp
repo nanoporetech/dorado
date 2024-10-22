@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
@@ -98,12 +99,10 @@ int trim(int argc, char* argv[]) {
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
     if (reads.empty()) {
-#ifndef _WIN32
-        if (isatty(fileno(stdin))) {
+        if (utils::is_fd_tty(stdin)) {
             std::cout << parser << '\n';
             return EXIT_FAILURE;
         }
-#endif
         reads.push_back("-");
     } else if (reads.size() > 1) {
         spdlog::error("> multi file input not yet handled");

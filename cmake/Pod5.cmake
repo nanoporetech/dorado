@@ -1,7 +1,9 @@
+# CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
+include_guard(GLOBAL)
+
 set(POD5_VERSION 0.3.15)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
-set(POD5_INCLUDE ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/include)
 
 # If we're building with ASAN enabled then we don't want to statically link to POD5 since that
 # also forces us to link to libarrow which causes issues with std::vector due to parts of the
@@ -62,6 +64,13 @@ endif()
 
 download_and_extract(${POD5_URL} ${POD5_DIR})
 
+# Create the target which other libraries can link to.
+add_library(pod5_libs INTERFACE)
+target_link_libraries(pod5_libs INTERFACE ${POD5_LIBRARIES})
+target_include_directories(pod5_libs SYSTEM INTERFACE ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/include)
+
 # pod5 makes use of threads and jemalloc requires the dl* symbols, so make sure to link to them.
 find_package(Threads REQUIRED)
-list(APPEND POD5_LIBRARIES Threads::Threads ${CMAKE_DL_LIBS})
+add_library(pod5_deps INTERFACE)
+target_link_libraries(pod5_deps INTERFACE Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(pod5_libs INTERFACE pod5_deps)

@@ -291,11 +291,20 @@ if [[ $num_summary_lines -ne "4" ]]; then
 fi
 
 echo dorado custom demux test stage
-$dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
-samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_SQK-RPB004_barcode01.bam
-num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_SQK-RPB004_barcode01.bam)
+$dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --kit-name CUSTOM-SQK-RPB004 --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
+samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam
+num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam)
 if [[ $num_demuxed_reads -ne "2" ]]; then
     echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
+    exit 1
+fi
+
+echo dorado demux doesnt crash on an empty input directory
+rm -rf empty_dir
+mkdir empty_dir
+$dorado_bin demux empty_dir --kit-name EXP-PBC096 --output-dir $output_dir/empty_dir
+if [[ $? -ne "0" ]]; then
+    echo "dorado crashed when given an empty input directory"
     exit 1
 fi
 

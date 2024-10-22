@@ -1,9 +1,9 @@
 #include "CRFModel.h"
 
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
-#include "utils/module_utils.h"
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"

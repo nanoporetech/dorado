@@ -1,0 +1,8 @@
+[arrangement]
+name = "test_kit_single_ended"
+first_index = 1
+last_index = 4
+kit = "BC"
+mask1_front = "C"
+mask1_rear = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA"
+barcode1_pattern = "CUSTOM-BC%02i"

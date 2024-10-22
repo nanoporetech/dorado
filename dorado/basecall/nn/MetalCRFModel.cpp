@@ -1,6 +1,6 @@
 #include "MetalCRFModel.h"
 
-#include "utils/module_utils.h"
+#include "torch_utils/module_utils.h"
 
 #include <spdlog/spdlog.h>
 

@@ -1,11 +1,13 @@
 #include "Trimmer.h"
 
+#include "read_pipeline/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 using Slice = at::indexing::Slice;
 

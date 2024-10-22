@@ -1,8 +1,8 @@
 #include "DuplexReadSplitter.h"
 
 #include "myers.h"
-#include "read_pipeline/read_utils.h"
-#include "splitter/splitter_utils.h"
+#include "read_pipeline/messages.h"
+#include "splitter_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 #include "utils/sequence_utils.h"

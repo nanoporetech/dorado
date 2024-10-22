@@ -13,57 +13,94 @@
 
 namespace {
 
+#if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
 #if ENABLE_AVX2_IMPL
 __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
-    // TODO -- handle large counts properly.
-    assert(int(count) <= std::numeric_limits<int>::max());
-    auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int>(count)});
+    auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
 }
+#endif  // ENABLE_NEON_IMPL
 
+#if ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 #if ENABLE_AVX2_IMPL
 // We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
 // feature from AVX2.  All relevant CPUs have it.
-__attribute__((target("avx2,f16c"))) void convert_f32_to_f16_impl(c10::Half* const dest,
-                                                                  const float* const src,
-                                                                  std::size_t count) {
+__attribute__((target("avx2,f16c")))
+#endif
+void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     if (!count) {
         return;
     }
 
-    // Unroll to AVX register size: 8 floats.
-    static constexpr size_t kUnroll = 8;
+#if ENABLE_AVX2_IMPL
+    // AVX registers have 8 floats.
+    static constexpr size_t kFloatsPerRegister = 8;
+
+    // There seems to be no improvement by unrolling this (tested on pipelinedev).
+    static constexpr size_t kUnrollFactor = 1;
 
     // Matches torch behaviour.
     const int kRoundNearestEven = 0;
 
-    // Main vectorised loop: 8 floats per iteration.
+    using FloatRegister = __m256;
+    using HalfRegister = __m128i;
+
+#define simd_load(ptr) _mm256_loadu_ps(ptr)
+#define simd_load1(ptr) _mm256_broadcast_ss(ptr)
+#define simd_convert(reg) _mm256_cvtps_ph(reg, kRoundNearestEven)
+#define simd_store(ptr, reg) _mm_storeu_si128(reinterpret_cast<HalfRegister*>(ptr), reg)
+#define simd_store1(ptr, reg) *ptr = c10::Half(_mm_extract_epi16(reg, 0), c10::Half::from_bits())
+
+#else
+    // Neon registers have 4 floats.
+    static constexpr size_t kFloatsPerRegister = 4;
+
+    // An unroll factor of 2 gives ~30% improvement on Apple Silicon.
+    // Any higher unrolling shows no difference.
+    static constexpr size_t kUnrollFactor = 2;
+
+    using FloatRegister = float32x4_t;
+    using HalfRegister = float16x4_t;
+
+#define simd_load(ptr) vld1q_f32(ptr)
+#define simd_load1(ptr) vdupq_n_f32(*ptr)
+#define simd_convert(reg) vcvt_f16_f32(reg)
+#define simd_store(ptr, reg) vst1_f16(reinterpret_cast<float16_t*>(ptr), reg)
+#define simd_store1(ptr, reg) *ptr = vget_lane_f16(reg, 0)
+
+#endif
+
+    // Outer unroll.
+    static constexpr size_t kUnroll = kFloatsPerRegister * kUnrollFactor;
+
+    // Main vectorised loop.
     const auto* src_ptr = src;
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
-        const __m256 elems_f32 = _mm256_loadu_ps(src_ptr);
-        const __m128i elems_f16 = _mm256_cvtps_ph(elems_f32, kRoundNearestEven);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(dest_ptr), elems_f16);
-        src_ptr += kUnroll;
-        dest_ptr += kUnroll;
+        for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
+            const FloatRegister elems_f32 = simd_load(src_ptr);
+            const HalfRegister elems_f16 = simd_convert(elems_f32);
+            simd_store(dest_ptr, elems_f16);
+            src_ptr += kFloatsPerRegister;
+            dest_ptr += kFloatsPerRegister;
+        }
     }
 
-    // Loop for final 0-7 floats.
+    // Loop for final floats.
     // TODO -- probably nicer to use masked loads/stores.
     const size_t remaining_count = count % kUnroll;
     for (size_t i = 0; i < remaining_count; ++i) {
-        const __m256 elem_f32 = _mm256_broadcast_ss(src_ptr);
-        const __m128i elem_f16 = _mm256_cvtps_ph(elem_f32, kRoundNearestEven);
-        *(reinterpret_cast<std::int16_t*>(dest_ptr)) =
-                static_cast<std::int16_t>(_mm_extract_epi16(elem_f16, 0));
+        const FloatRegister elem_f32 = simd_load1(src_ptr);
+        const HalfRegister elem_f16 = simd_convert(elem_f32);
+        simd_store1(dest_ptr, elem_f16);
         ++src_ptr;
         ++dest_ptr;
     }
 }
-#endif
+#endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 
 }  // namespace
 

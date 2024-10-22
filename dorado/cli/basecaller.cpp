@@ -11,6 +11,7 @@
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
+#include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/model_complex.h"
@@ -75,7 +76,7 @@ namespace dorado {
 
 namespace {
 
-const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
+void validate_barcode_kit_info(const std::string& kit_name) {
     const auto kit_info = barcode_kits::get_kit_info(kit_name);
     if (!kit_info) {
         spdlog::error(
@@ -84,7 +85,6 @@ const barcode_kits::KitInfo& get_barcode_kit_info(const std::string& kit_name) {
                 kit_name);
         std::exit(EXIT_FAILURE);
     }
-    return *kit_info;
 }
 
 std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
@@ -94,6 +94,9 @@ std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
         spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
         std::exit(EXIT_FAILURE);
     }
+
+    custom_kit_info->second.scoring_params =
+            demux::parse_scoring_params(custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
     return *custom_kit_info;
 }
 
@@ -223,12 +226,12 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("--barcode-arrangement")
-                .help("Path to file with custom barcode arrangement.");
+                .help("Path to file with custom barcode arrangement. Requires --kit-name.");
         parser.visible.add_argument("--barcode-sequences")
-                .help("Path to file with custom barcode sequences.");
+                .help("Path to file with custom barcode sequences. Requires --kit-name and "
+                      "--barcode-arrangement.");
         parser.visible.add_argument("--primer-sequences")
-                .help("Path to file with custom primer sequences.")
-                .default_value(std::nullopt);
+                .help("Path to file with custom primer sequences.");
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -314,13 +317,13 @@ void setup(const std::vector<std::string>& args,
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
-    if (!DataLoader::is_read_data_present(data_path, recursive_file_loading)) {
+    if (!file_info::is_read_data_present(data_path, recursive_file_loading)) {
         std::string err = "No POD5 or FAST5 data found in path: " + data_path;
         throw std::runtime_error(err);
     }
 
     auto read_list = utils::load_read_list(read_list_file_path);
-    size_t num_reads = DataLoader::get_num_reads(
+    size_t num_reads = file_info::get_num_reads(
             data_path, read_list, {} /*reads_already_processed*/, recursive_file_loading);
     if (num_reads == 0) {
         spdlog::error("No POD5 or FAST5 reads found in path: " + data_path);
@@ -336,7 +339,7 @@ void setup(const std::vector<std::string>& args,
         bool inspect_ok = true;
         models::SamplingRate data_sample_rate = 0;
         try {
-            data_sample_rate = DataLoader::get_sample_rate(data_path, recursive_file_loading);
+            data_sample_rate = file_info::get_sample_rate(data_path, recursive_file_loading);
         } catch (const std::exception& e) {
             inspect_ok = false;
             spdlog::warn(
@@ -423,8 +426,8 @@ void setup(const std::vector<std::string>& args,
                 num_runners, 0);
     }
 
-    auto read_groups = DataLoader::load_read_groups(data_path, model_name, modbase_model_names,
-                                                    recursive_file_loading);
+    auto read_groups = file_info::load_read_groups(data_path, model_name, modbase_model_names,
+                                                   recursive_file_loading);
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
@@ -436,19 +439,9 @@ void setup(const std::vector<std::string>& args,
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
-        std::unordered_map<std::string, std::string> custom_barcodes{};
-        if (barcoding_info->custom_seqs) {
-            custom_barcodes = demux::parse_custom_sequences(*barcoding_info->custom_seqs);
-        }
-        if (barcoding_info->custom_kit) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*barcoding_info->custom_kit);
-            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, kit_name, kit_info,
-                                                   custom_barcodes, sample_sheet.get());
-        } else {
-            const auto& kit_info = get_barcode_kit_info(barcoding_info->kit_name);
-            utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
-                                                   kit_info, custom_barcodes, sample_sheet.get());
-        }
+        validate_barcode_kit_info(barcoding_info->kit_name);
+        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
+                                               sample_sheet.get());
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
@@ -483,10 +476,9 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
 
-    const bool is_rna_adapter = is_rna_model(model_config) &&
-                                (adapter_info->rna_adapters ||
-                                 (barcoding_info && (!barcoding_info->kit_name.empty() ||
-                                                     barcoding_info->custom_kit.has_value())));
+    const bool is_rna_adapter =
+            is_rna_model(model_config) &&
+            (adapter_info->rna_adapters || (barcoding_info && !barcoding_info->kit_name.empty()));
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
@@ -733,22 +725,43 @@ int basecaller(int argc, char* argv[]) {
         polya_config = parser.visible.get<std::string>("--poly-a-config");
     }
 
-    if (parser.visible.is_used("--kit-name") && parser.visible.is_used("--barcode-arrangement")) {
-        spdlog::error(
-                "--kit-name and --barcode-arrangement cannot be used together. Please provide only "
-                "one.");
-        return EXIT_FAILURE;
+    if (parser.visible.is_used("--barcode-sequences")) {
+        if (!parser.visible.is_used("--kit-name") ||
+            !parser.visible.is_used("--barcode-arrangement")) {
+            spdlog::error("--barcode-sequences requires --barcode-arrangement and --kit-name.");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (parser.visible.is_used("--barcode-arrangement")) {
+        if (!parser.visible.is_used("--kit-name")) {
+            spdlog::error("--barcode-arrangement requires --kit-name.");
+            return EXIT_FAILURE;
+        }
     }
 
     std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
     std::unique_ptr<const utils::SampleSheet> sample_sheet{};
-    if (parser.visible.is_used("--kit-name") || parser.visible.is_used("--barcode-arrangement")) {
+    if (parser.visible.is_used("--kit-name")) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
         barcoding_info->trim = !no_trim_barcodes;
-        barcoding_info->custom_kit = parser.visible.present<std::string>("--barcode-arrangement");
-        barcoding_info->custom_seqs = parser.visible.present<std::string>("--barcode-sequences");
+
+        std::optional<std::string> custom_seqs =
+                parser.visible.present<std::string>("--barcode-sequences");
+        if (custom_seqs.has_value()) {
+            std::unordered_map<std::string, std::string> custom_barcodes =
+                    demux::parse_custom_sequences(*custom_seqs);
+            barcode_kits::add_custom_barcodes(custom_barcodes);
+        }
+
+        std::optional<std::string> custom_kit =
+                parser.visible.present<std::string>("--barcode-arrangement");
+        if (custom_kit.has_value()) {
+            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+        }
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
@@ -757,15 +770,10 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    std::optional<std::string> custom_primer_file = std::nullopt;
-    if (parser.visible.is_used("--primer-sequences")) {
-        custom_primer_file = parser.visible.get<std::string>("--primer-sequences");
-    }
-
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = !no_trim_adapters;
     adapter_info->trim_primers = !no_trim_primers;
-    adapter_info->custom_seqs = custom_primer_file;
+    adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
 
     fs::path model_path;
@@ -788,7 +796,7 @@ int basecaller(int argc, char* argv[]) {
         mods_model_paths = model_resolution::get_non_complex_mods_models(
                 model_path, mod_bases, mod_bases_models, downloader);
     } else {
-        const auto chemistry = DataLoader::get_unique_sequencing_chemisty(data, recursive);
+        const auto chemistry = file_info::get_unique_sequencing_chemisty(data, recursive);
         const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");

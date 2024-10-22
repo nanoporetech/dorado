@@ -74,6 +74,21 @@ TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
         const float kAbsTolerance = 0.0f;
         CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance, kAbsTolerance));
     }
+
+#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
+    {
+        const auto num_elems = GENERATE(1'000, 100'000, 10'000'000);
+        const auto elems_f32 = torch::rand({num_elems}, torch::kFloat32);
+        auto elems_converted_f16 = torch::zeros({num_elems}, torch::kHalf);
+
+        BENCHMARK("torch convert " + std::to_string(num_elems)) { elems_f32.to(torch::kHalf); };
+
+        BENCHMARK("our convert " + std::to_string(num_elems)) {
+            dorado::utils::convert_f32_to_f16(elems_converted_f16.data_ptr<c10::Half>(),
+                                              elems_f32.data_ptr<float>(), num_elems);
+        };
+    }
+#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
 }
 
 TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {

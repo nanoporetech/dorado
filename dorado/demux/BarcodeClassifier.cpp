@@ -108,7 +108,7 @@ int extract_barcode_penalty(std::string_view barcode,
     return penalty;
 }
 
-bool barcode_is_permitted(const demux::BarcodingInfo::FilterSet& allowed_barcodes,
+bool barcode_is_permitted(const BarcodeFilterSet& allowed_barcodes,
                           const std::string& barcode_name) {
     if (!allowed_barcodes.has_value()) {
         return true;
@@ -179,17 +179,16 @@ struct BarcodeClassifier::BarcodeCandidateKit {
     std::string barcode_kit;
 };
 
-BarcodeClassifier::BarcodeClassifier(KitInfoProvider kit_info_provider)
-        : m_kit_info_provider(std::move(kit_info_provider)),
-          m_scoring_params(m_kit_info_provider.scoring_params()),
+BarcodeClassifier::BarcodeClassifier(const std::string& kit_name)
+        : m_kit_info_provider(kit_name),
+          m_scoring_params(m_kit_info_provider.get_kit_info(kit_name).scoring_params),
           m_barcode_candidates(generate_candidates()) {}
 
 BarcodeClassifier::~BarcodeClassifier() = default;
 
-BarcodeScoreResult BarcodeClassifier::barcode(
-        const std::string& seq,
-        bool barcode_both_ends,
-        const BarcodingInfo::FilterSet& allowed_barcodes) const {
+BarcodeScoreResult BarcodeClassifier::barcode(const std::string& seq,
+                                              bool barcode_both_ends,
+                                              const BarcodeFilterSet& allowed_barcodes) const {
     auto best_barcode =
             find_best_barcode(seq, m_barcode_candidates, barcode_both_ends, allowed_barcodes);
     return best_barcode;
@@ -334,7 +333,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_different_double_ends(
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
-        const BarcodingInfo::FilterSet& allowed_barcodes) const {
+        const BarcodeFilterSet& allowed_barcodes) const {
     std::string_view read_top = read_seq.substr(0, m_scoring_params.front_barcode_window);
     int bottom_start =
             std::max(0, static_cast<int>(read_seq.length()) - m_scoring_params.rear_barcode_window);
@@ -573,7 +572,7 @@ float BarcodeClassifier::find_midstrand_barcode_different_double_ends(
 std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_double_ends(
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
-        const BarcodingInfo::FilterSet& allowed_barcodes) const {
+        const BarcodeFilterSet& allowed_barcodes) const {
     std::string_view read_top = read_seq.substr(0, m_scoring_params.front_barcode_window);
     int bottom_start =
             std::max(0, static_cast<int>(read_seq.length()) - m_scoring_params.rear_barcode_window);
@@ -706,7 +705,7 @@ float BarcodeClassifier::find_midstrand_barcode_double_ends(
 std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         std::string_view read_seq,
         const BarcodeCandidateKit& candidate,
-        const BarcodingInfo::FilterSet& allowed_barcodes,
+        const BarcodeFilterSet& allowed_barcodes,
         bool rear_barcodes) const {
     std::string_view read_top;
     if (rear_barcodes) {
@@ -822,7 +821,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const std::string& read_seq,
         const std::vector<BarcodeCandidateKit>& candidates,
         bool barcode_both_ends,
-        const BarcodingInfo::FilterSet& allowed_barcodes) const {
+        const BarcodeFilterSet& allowed_barcodes) const {
     if (read_seq.length() == 0) {
         return UNCLASSIFIED;
     }

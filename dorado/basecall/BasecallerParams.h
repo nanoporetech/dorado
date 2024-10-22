@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basecall/ModelRunnerBase.h"
+#include "ModelRunnerBase.h"
 #include "utils/parameters.h"
 
 #include <cmath>

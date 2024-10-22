@@ -1,5 +1,6 @@
 option(DORADO_DISABLE_TESTS "Disable building the tests" OFF)
 option(DORADO_RUN_TESTS "Run the tests. Certain platforms don't have the infrastructure to do this atm" ON)
+option(DORADO_ENABLE_BENCHMARK_TESTS "Enable benchmarks to run as part of the tests" OFF)
 
 if (DORADO_DISABLE_TESTS)
     return()
@@ -40,6 +41,7 @@ add_executable(dorado_tests
     ModBaseEncoderTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
+    ModelSearchTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     myers_test.cpp
@@ -75,14 +77,9 @@ if (NOT IOS)
             # No FAST5 or POD5 on iOS
             Fast5DataLoaderTest.cpp
             Pod5DataLoaderTest.cpp
-            # No dorado_io_lib on iOS
-            ModelSearchTest.cpp
+            FileInfoTest.cpp
     )
 endif()
-target_compile_definitions(dorado_tests
-    PRIVATE
-        DORADO_IOS_BUILD=$<BOOL:${IOS}>
-)
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
@@ -113,6 +110,11 @@ target_include_directories(dorado_tests_common
     SYSTEM
     PUBLIC
         ${DORADO_3RD_PARTY_SOURCE}/catch2
+)
+target_compile_definitions(dorado_tests_common
+    PUBLIC
+        DORADO_IOS_BUILD=$<BOOL:${IOS}>
+        $<$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>:CATCH_CONFIG_ENABLE_BENCHMARKING>
 )
 
 
@@ -164,7 +166,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         target_link_libraries(${TEST_BIN}
             PRIVATE
                 dorado_io_lib
-                ${POD5_LIBRARIES}
+                dorado_file_info
         )
     endif()
 

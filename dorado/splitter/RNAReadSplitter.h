@@ -1,6 +1,6 @@
 #pragma once
 #include "ReadSplitter.h"
-#include "splitter/splitter_utils.h"
+#include "splitter_utils.h"
 
 #include <functional>
 #include <string>
