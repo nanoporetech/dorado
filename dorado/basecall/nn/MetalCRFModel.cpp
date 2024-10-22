@@ -1,6 +1,7 @@
 #include "MetalCRFModel.h"
 
 #include "torch_utils/module_utils.h"
+#include "utils/math_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -96,7 +97,7 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
         // dividing by stride.
         const int output_time_step_count = chunk_size / stride;
         constexpr int kMaxTimeSteps = 20;
-        const int num_pieces = (output_time_step_count + kMaxTimeSteps - 1) / kMaxTimeSteps;
+        const int num_pieces = utils::div_round_up(output_time_step_count, kMaxTimeSteps);
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, output_time_step_count);
@@ -140,7 +141,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
 
     std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
             {"kConvOutputClamp", activation == Activation::SWISH_CLAMP},
-            {"kConvTanhActivation", activation == Activation::TANH}};
+            {"kConvTanhActivation", activation == Activation::TANH},
+    };
     const int kernel_threads = kSIMDGroupWidth * kernel_simd_groups;
     std::string kernel_name = "conv" + std::to_string(layer);
     // Layer 1 and 2 conv kernels are tailored to specific feature sizes.
@@ -221,7 +223,7 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         // kernels increase the likelihood of command buffer submission errors, of various
         // types.  Each args buffer here is for a different time step range.
         constexpr int kMaxTimeSteps = 20;
-        const int num_pieces = (lstm_chunk_size + kMaxTimeSteps - 1) / kMaxTimeSteps;
+        const int num_pieces = utils::div_round_up(lstm_chunk_size, kMaxTimeSteps);
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, lstm_chunk_size);
@@ -278,10 +280,16 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     kernel_thread_groups = get_mtl_device_core_count();
     const int lstm_threads = kernel_simd_groups * kSIMDGroupWidth;
     lstm_cps[0] = make_cps(m_device, "lstm",
-                           {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", false}},
+                           {
+                                   {"kLstmLayerSize", config.lstm_size},
+                                   {"kLstmReversedInTime", false},
+                           },
                            lstm_threads);
     lstm_cps[1] = make_cps(m_device, "lstm",
-                           {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", true}},
+                           {
+                                   {"kLstmLayerSize", config.lstm_size},
+                                   {"kLstmReversedInTime", true},
+                           },
                            lstm_threads);
 
     // The temp buffer used for these purposes (number of elements of `torch_dtype` in []):
@@ -329,23 +337,25 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         const bool kSecondLayerBias = false;
         linear2 = register_module("linear2",
                                   MetalLinear(decomposition, config.outsize, kSecondLayerBias));
-        const auto linear_constants1 = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", config.lstm_size},
-                 {"kLinearOutSize", decomposition},
-                 {"kLinearOutputScale", 1.0f},
-                 {"kLinearOutputClamp", false},
-                 {"kLinearOutputTanh", false},
-                 {"kLinearOutputAsByte", false}});
+        const auto linear_constants1 = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", config.lstm_size},
+                {"kLinearOutSize", decomposition},
+                {"kLinearOutputScale", 1.0f},
+                {"kLinearOutputClamp", false},
+                {"kLinearOutputTanh", false},
+                {"kLinearOutputAsByte", false},
+        });
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants1, linear_threads);
-        const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", decomposition},
-                 {"kLinearOutSize", config.outsize},
-                 // Rescale from clamped [-5.0, 5.0] range to byte range.
-                 {"kLinearOutputScale", 127.0f / 5.0f},
-                 {"kLinearOutputClamp", true},
-                 {"kLinearOutputTanh", false},
-                 {"kLinearOutputAsByte", true}});
+        const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", decomposition},
+                {"kLinearOutSize", config.outsize},
+                // Rescale from clamped [-5.0, 5.0] range to byte range.
+                {"kLinearOutputScale", 127.0f / 5.0f},
+                {"kLinearOutputClamp", true},
+                {"kLinearOutputTanh", false},
+                {"kLinearOutputAsByte", true},
+        });
         linear_cps[1] = make_cps(m_device, "linear", linear_constants2, linear_threads);
         // We use mat_temp for the output of the first linear layer, so ensure it is large
         // enough for that purpose.
@@ -354,15 +364,16 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     } else {
         const bool is_v3_model = (config.num_features == 1 && cv1.size == 4) ||
                                  (config.num_features == 13 && cv1.size == 16);
-        const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", config.lstm_size},
-                 {"kLinearOutSize", config.outsize},
-                 // If v4, rescale from clamped [-5.0, 5.0] range to byte range.
-                 // If v3, rescale from tanh [-1.0, 1,0] range to byte range.
-                 {"kLinearOutputScale", is_v3_model ? 127.0f : (127.0f / 5.0f)},
-                 {"kLinearOutputClamp", !is_v3_model},
-                 {"kLinearOutputTanh", is_v3_model},
-                 {"kLinearOutputAsByte", true}});
+        const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", config.lstm_size},
+                {"kLinearOutSize", config.outsize},
+                // If v4, rescale from clamped [-5.0, 5.0] range to byte range.
+                // If v3, rescale from tanh [-1.0, 1,0] range to byte range.
+                {"kLinearOutputScale", is_v3_model ? 127.0f : (127.0f / 5.0f)},
+                {"kLinearOutputClamp", !is_v3_model},
+                {"kLinearOutputTanh", is_v3_model},
+                {"kLinearOutputAsByte", true},
+        });
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants, linear_threads);
         // Single matmul that may or may not have a bias.

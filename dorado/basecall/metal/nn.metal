@@ -1,7 +1,7 @@
 #include <metal_stdlib>
 using namespace metal;
 
-constant int TILE_SIZE = 8;
+static constexpr constant int TILE_SIZE = 8;
 
 // Values set via the FunctionConstantValues object passed in at MTL::Function
 // creation time.
