@@ -1,8 +1,10 @@
 #include "MetalCRFModel.h"
 
 #include "torch_utils/module_utils.h"
+#include "utils/PostCondition.h"
 #include "utils/math_utils.h"
 
+#include <os/signpost.h>
 #include <spdlog/spdlog.h>
 
 #include <stdexcept>
@@ -19,6 +21,15 @@ constexpr int kSIMDGroupWidth = 32;
 
 constexpr auto torch_dtype = torch::kF16;
 const size_t dtype_bytes = torch::elementSize(torch_dtype);
+
+static os_log_t s_poi_os_log = os_log_create("MetalCRFModel", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
+#define POINT_OF_INTEREST_SCOPE(name, ...)                                   \
+    os_signpost_id_t _poi_id = os_signpost_id_generate(s_poi_os_log);        \
+    os_signpost_interval_begin(s_poi_os_log, _poi_id, name, "" __VA_ARGS__); \
+    auto _poi_scope = dorado::utils::PostCondition(                          \
+            [&] { os_signpost_interval_end(s_poi_os_log, _poi_id, name); }); \
+    static_assert(true, "Force semicolon")
+
 }  // namespace
 
 using namespace dorado::utils;
