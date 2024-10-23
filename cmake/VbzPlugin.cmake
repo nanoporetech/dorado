@@ -15,8 +15,12 @@ function(add_hdf_vbz_plugin)
                 -B ${ZSTD_BUILD_DIR}
                 -A x64
                 -D CMAKE_CONFIGURATION_TYPES=Release
+            COMMAND_ERROR_IS_FATAL ANY
         )
-        execute_process(COMMAND cmake --build ${ZSTD_BUILD_DIR} --config Release)
+        execute_process(
+            COMMAND cmake --build ${ZSTD_BUILD_DIR} --config Release
+            COMMAND_ERROR_IS_FATAL ANY
+        )
 
         # On windows we need to tell hdf_plugins where we put the built zstd lib
         set(CONAN_INCLUDE_DIRS_RELEASE ${DORADO_3RD_PARTY_SOURCE}/zstd/lib)
@@ -35,8 +39,12 @@ function(add_hdf_vbz_plugin)
                 -S ${DORADO_3RD_PARTY_SOURCE}/zstd/build/cmake
                 -B ${ZSTD_BUILD_DIR}
                 -D CMAKE_INSTALL_PREFIX=${ZSTD_INSTALL_DIR}
+            COMMAND_ERROR_IS_FATAL ANY
         )
-        execute_process(COMMAND cmake --build ${ZSTD_BUILD_DIR} --target install)
+        execute_process(
+            COMMAND cmake --build ${ZSTD_BUILD_DIR} --target install
+            COMMAND_ERROR_IS_FATAL ANY
+        )
 
         list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty/hdf_plugins/cmake")
         # Findzstd.cmake uses conan variables to determine where things are.

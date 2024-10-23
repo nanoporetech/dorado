@@ -214,7 +214,12 @@ else()
         file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
     else()
         set(PYTORCH_BUILD_VERSION "import torch; print('%s+cu%s' % (torch.__version__, torch.version.cuda.replace('.', '')), end='')")
-        execute_process(COMMAND python3 -c "${PYTORCH_BUILD_VERSION}" OUTPUT_VARIABLE TORCH_BUILD_VERSION WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        execute_process(
+            COMMAND python3 -c "${PYTORCH_BUILD_VERSION}"
+            OUTPUT_VARIABLE TORCH_BUILD_VERSION
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            COMMAND_ERROR_IS_FATAL ANY
+        )
     endif()
     message(STATUS "TORCH_BUILD_VERSION: ${TORCH_BUILD_VERSION}")
 endif()
