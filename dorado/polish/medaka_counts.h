@@ -1,6 +1,10 @@
 #ifndef _MEDAKA_COUNTS_H
 #define _MEDAKA_COUNTS_H
 
+#include "medaka_bamiter.h"
+
+#include <cstddef>
+
 // medaka-style feature data
 typedef struct _plp_data {
     size_t buffer_cols;
@@ -12,19 +16,6 @@ typedef struct _plp_data {
     size_t *minor;
 } _plp_data;
 typedef _plp_data *plp_data;
-
-/** Format an array values as a comma seperate string
- *
- * @param values integer input array
- * @param length size of input array
- * @param result output char buffer of size 4 * length * sizeof char
- * @returns void
- *
- * The output buffer size comes from:
- *    a single value is max 3 chars
- *    + 1 for comma (or \0 at end)
- */
-void format_uint8_array(uint8_t *values, size_t length, char *result);
 
 // Simple container for strings
 typedef struct string_set {
@@ -40,16 +31,16 @@ typedef struct string_set {
  */
 void destroy_string_set(string_set strings);
 
-/** Retrieves contents of key-value tab delimited file.
- *
- *  @param fname input file path.
- *  @returns a string_set
- *
- *  The return value can be free'd with destroy_string_set.
- *  key-value pairs are stored sequentially in the string set
- *
- */
-string_set read_key_value(char *fname);
+// /** Retrieves contents of key-value tab delimited file.
+//  *
+//  *  @param fname input file path.
+//  *  @returns a string_set
+//  *
+//  *  The return value can be free'd with destroy_string_set.
+//  *  key-value pairs are stored sequentially in the string set
+//  *
+//  */
+// string_set read_key_value(char *fname);
 
 // medaka-style base encoding
 static const char plp_bases[] = "acgtACGTdD";
@@ -123,8 +114,8 @@ void print_pileup_data(plp_data pileup, size_t num_dtypes, char *dtypes[], size_
  *  @param tag_value by which to filter data
  *  @param keep_missing alignments which do not have tag
  *  @param weibull_summation use predefined bam tags to perform homopolymer partial counts.
- *  @param read group used for filtering. 
- *  @param mininimum mapping quality for filtering. 
+ *  @param read group used for filtering.
+ *  @param mininimum mapping quality for filtering.
  *  @returns a pileup counts data pointer.
  *
  *  The return value can be freed with destroy_plp_data.
@@ -146,7 +137,7 @@ plp_data calculate_pileup(const char *region,
                           size_t num_homop,
                           const char tag_name[2],
                           const int tag_value,
-                          const _Bool keep_missing,
+                          const bool keep_missing,
                           bool weibull_summation,
                           const char *read_group,
                           const int min_mapQ);

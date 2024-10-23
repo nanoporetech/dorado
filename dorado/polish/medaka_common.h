@@ -21,7 +21,7 @@ static inline int min(int a, int b) { return a < b ? a : b; }
  *  @returns pointer to allocated memory
  *
  */
-void *xalloc(size_t num, size_t size, char *msg);
+void *xalloc(size_t num, size_t size, const char *msg);
 
 /** Reallocates memory with a message on failure.
  *
@@ -31,17 +31,7 @@ void *xalloc(size_t num, size_t size, char *msg);
  *  @returns pointer to allocated memory
  *
  */
-void *xrealloc(void *ptr, size_t size, char *msg);
-
-/** Retrieves a substring.
- *
- *  @param string input string.
- *  @param postion start position of substring.
- *  @param length length of substring required.
- *  @returns string pointer.
- *
- */
-char *substring(char *string, int position, int length);
+void *xrealloc(void *ptr, size_t size, const char *msg);
 
 /** Format a uint32_t to a string
  *

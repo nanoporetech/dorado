@@ -37,27 +37,6 @@ void swap_strings(char **a, char **b) {
     *b = temp;
 }
 
-/** Format an array values as a comma seperate string
- *
- * @param values integer input array
- * @param length size of input array
- * @param result output char buffer of size 4 * length * sizeof char
- * @returns void
- *
- * The output buffer size comes from:
- *    a single value is max 3 chars
- *    + 1 for comma (or \0 at end)
- */
-void format_uint8_array(uint8_t *values, size_t length, char *result) {
-    size_t len = 0;
-    for (size_t i = 0; i < length; ++i) {
-        len += uint8_to_str(values[i], result + len);
-        strcpy(result + len, ",");
-        len += 1;
-    }
-    result[len - 1] = '\0';
-}
-
 /** Destroys a string set
  *
  *  @param data the object to cleanup.
@@ -71,46 +50,47 @@ void destroy_string_set(string_set strings) {
     free(strings.strings);
 }
 
-/** Retrieves contents of key-value tab delimited file.
- *
- *  @param fname input file path.
- *  @returns a string_set
- *
- *  The return value can be free'd with destroy_string_set.
- *  key-value pairs are stored sequentially in the string set
- *
- */
-string_set read_key_value(char *fname) {
-    FILE *fp;
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    kvec_t(char *) strings;
-    kv_init(strings);
+// /** Retrieves contents of key-value tab delimited file.
+//  *
+//  *  @param fname input file path.
+//  *  @returns a string_set
+//  *
+//  *  The return value can be free'd with destroy_string_set.
+//  *  key-value pairs are stored sequentially in the string set
+//  *
+//  */
+// string_set read_key_value(char *fname) {
+//     FILE *fp;
+//     char *line = NULL;
+//     size_t len = 0;
+//     ssize_t read;
 
-    fp = fopen(fname, "r");
-    if (fp == NULL) {
-        exit(EXIT_FAILURE);
-    }
+//     kvec_t(char *) strings;
+//     kv_init(strings);
 
-    while ((read = getdelim(&line, &len, '\t', fp)) != -1) {
-        line[read - 1] = '\0';
-        char *key = NULL;
-        swap_strings(&key, &line);
-        kv_push(char *, strings, key);
-        read = getline(&line, &len, fp);
-        line[read - 1] = '\0';
-        char *value = NULL;
-        swap_strings(&value, &line);
-        kv_push(char *, strings, value);
-    }
-    free(line);
-    // move strings into a simpler container (awkward to pass kvec_t through cffi)
-    string_set my_strings;
-    my_strings.n = strings.n;
-    my_strings.strings = strings.a;
-    return (my_strings);
-}
+//     fp = fopen(fname, "r");
+//     if (fp == NULL) {
+//         exit(EXIT_FAILURE);
+//     }
+
+//     while ((read = getdelim(&line, &len, '\t', fp)) != -1) {
+//         line[read - 1] = '\0';
+//         char *key = NULL;
+//         swap_strings(&key, &line);
+//         kv_push(char *, strings, key);
+//         read = getline(&line, &len, fp);
+//         line[read - 1] = '\0';
+//         char *value = NULL;
+//         swap_strings(&value, &line);
+//         kv_push(char *, strings, value);
+//     }
+//     free(line);
+//     // move strings into a simpler container (awkward to pass kvec_t through cffi)
+//     string_set my_strings;
+//     my_strings.n = strings.n;
+//     my_strings.strings = strings.a;
+//     return (my_strings);
+// }
 
 /** Constructs a pileup data structure.
  *
@@ -131,20 +111,20 @@ plp_data create_plp_data(size_t n_cols,
                          size_t num_homop,
                          size_t fixed_size) {
     assert(buffer_cols >= n_cols);
-    plp_data data = xalloc(1, sizeof(_plp_data), "plp_data");
+    plp_data data = (plp_data)xalloc(1, sizeof(_plp_data), "plp_data");
     data->buffer_cols = buffer_cols;
     data->num_dtypes = num_dtypes;
     data->num_homop = num_homop;
     data->n_cols = n_cols;
     if (fixed_size != 0) {
         assert(buffer_cols == n_cols);
-        data->matrix = xalloc(fixed_size * n_cols, sizeof(size_t), "matrix");
+        data->matrix = (size_t *)xalloc(fixed_size * n_cols, sizeof(size_t), "matrix");
     } else {
-        data->matrix =
-                xalloc(featlen * num_dtypes * buffer_cols * num_homop, sizeof(size_t), "matrix");
+        data->matrix = (size_t *)xalloc(featlen * num_dtypes * buffer_cols * num_homop,
+                                        sizeof(size_t), "matrix");
     }
-    data->major = xalloc(buffer_cols, sizeof(size_t), "major");
-    data->minor = xalloc(buffer_cols, sizeof(size_t), "minor");
+    data->major = (size_t *)xalloc(buffer_cols, sizeof(size_t), "major");
+    data->minor = (size_t *)xalloc(buffer_cols, sizeof(size_t), "minor");
     return data;
 }
 
@@ -159,9 +139,9 @@ void enlarge_plp_data(plp_data pileup, size_t buffer_cols) {
     size_t old_size = featlen * pileup->num_dtypes * pileup->num_homop * pileup->buffer_cols;
     size_t new_size = featlen * pileup->num_dtypes * pileup->num_homop * buffer_cols;
 
-    pileup->matrix = xrealloc(pileup->matrix, new_size * sizeof(size_t), "matrix");
-    pileup->major = xrealloc(pileup->major, buffer_cols * sizeof(size_t), "major");
-    pileup->minor = xrealloc(pileup->minor, buffer_cols * sizeof(size_t), "minor");
+    pileup->matrix = (size_t *)xrealloc(pileup->matrix, new_size * sizeof(size_t), "matrix");
+    pileup->major = (size_t *)xrealloc(pileup->major, buffer_cols * sizeof(size_t), "major");
+    pileup->minor = (size_t *)xrealloc(pileup->minor, buffer_cols * sizeof(size_t), "minor");
     // zero out new part of matrix
     for (size_t i = old_size; i < new_size; ++i) {
         pileup->matrix[i] = 0;
@@ -225,7 +205,7 @@ float *_get_weibull_scores(const bam_pileup1_t *p,
                            khash_t(BADREADS) * bad_reads) {
     // Create homopolymer scores using Weibull shape and scale parameters.
     // If prerequisite sam tags are not present an array of zero counts is returned.
-    float *fraction_counts = xalloc(num_homop, sizeof(float), "weibull_counts");
+    float *fraction_counts = (float *)xalloc(num_homop, sizeof(float), "weibull_counts");
     static const char *wtags[] = {"WL", "WK"};  // scale, shape
     double wtag_vals[2] = {0.0, 0.0};
     for (size_t i = 0; i < 2; ++i) {
@@ -310,7 +290,7 @@ plp_data calculate_pileup(const char *region,
     //   at ":", copy the input then set ":" to null terminator
     //   to get `chr`.
     int start, end;
-    char *chr = xalloc(strlen(region) + 1, sizeof(char), "chr");
+    char *chr = (char *)xalloc(strlen(region) + 1, sizeof(char), "chr");
     strcpy(chr, region);
     char *reg_chr = (char *)hts_parse_reg(chr, &start, &end);
     // start and end now zero-based end exclusive
@@ -327,7 +307,7 @@ plp_data calculate_pileup(const char *region,
     sam_hdr_t *hdr = bam_set->hdr;
 
     // setup bam interator
-    mplp_data *data = xalloc(1, sizeof(mplp_data), "pileup init data");
+    mplp_data *data = (mplp_data *)xalloc(1, sizeof(mplp_data), "pileup init data");
     data->fp = fp;
     data->hdr = hdr;
     data->iter = bam_itr_querys(idx, hdr, region);
@@ -338,7 +318,8 @@ plp_data calculate_pileup(const char *region,
     data->read_group = read_group;
 
     bam_mplp_t mplp = bam_mplp_init(1, read_bam, (void **)&data);
-    const bam_pileup1_t **plp = xalloc(1, sizeof(bam_pileup1_t *), "pileup");
+    const bam_pileup1_t **plp =
+            (const bam_pileup1_t **)xalloc(1, sizeof(bam_pileup1_t *), "pileup");
     int ret, pos, tid, n_plp;
 
     // allocate output assuming one insertion per ref position
@@ -374,7 +355,7 @@ plp_data calculate_pileup(const char *region,
         }
 
         // reallocate output if necessary
-        if (n_cols + max_ins > pileup->buffer_cols) {
+        if ((n_cols + max_ins) > static_cast<int>(pileup->buffer_cols)) {
             float cols_per_pos = (float)(n_cols + max_ins) / (1 + pos - start);
             // max_ins can dominate so add at least that
             buffer_cols = max_ins + max(2 * pileup->buffer_cols, (int)cols_per_pos * (end - start));
@@ -408,7 +389,7 @@ plp_data calculate_pileup(const char *region,
                 }
                 if (!failed) {
                     bool found = false;
-                    for (dtype = 0; dtype < num_dtypes; ++dtype) {
+                    for (dtype = 0; dtype < static_cast<int>(num_dtypes); ++dtype) {
                         if (strcmp(dtypes[dtype], tag_val) == 0) {
                             found = true;
                             break;
