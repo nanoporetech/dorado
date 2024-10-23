@@ -317,7 +317,9 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             m_batched_chunks[worker_id].push_back(std::move(chunk));
 
-            if (m_batched_chunks.size() == 1 || !measure_timeout_from_first_chunk) {
+            if (m_batched_chunks[worker_id].size() == 1 || !measure_timeout_from_first_chunk) {
+                // If we're measuring the timeout from the first chunk, we only reset the timer
+                // if this is the first chunk to be added to the buffer.
                 chunk_reserve_time = std::chrono::system_clock::now();
             }
         }
