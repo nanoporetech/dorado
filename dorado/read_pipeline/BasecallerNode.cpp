@@ -251,18 +251,26 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 #endif
     at::InferenceMode inference_mode_guard;
 
-    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    auto chunk_reserve_time = std::chrono::system_clock::now();
     const size_t batch_size = m_model_runners[worker_id]->batch_size();
     const size_t chunk_size = m_model_runners[worker_id]->chunk_size();
-    const int batch_timeout_ms = m_model_runners[worker_id]->batch_timeout_ms();
+    const bool is_low_latency = m_model_runners[worker_id]->is_low_latency();
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
+
+    const int batch_timeout_ms = (is_low_latency && m_low_latency_batch_timeout_ms != 0)
+                                         ? m_low_latency_batch_timeout_ms
+                                         : m_model_runners[worker_id]->batch_timeout_ms();
+
+    const bool measure_timeout_from_first_chunk =
+            (is_low_latency && m_low_latency_timeout_from_first_chunk);
+
     while (true) {
 #if DORADO_METAL_BUILD
         utils::ScopedAutoReleasePool inner_pool;
 #endif
         std::unique_ptr<BasecallingChunk> chunk;
         const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(
-                chunk, last_chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
+                chunk, chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
 
         if (pop_status == utils::AsyncQueueStatus::Terminate) {
             break;
@@ -275,7 +283,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                 basecall_current_batch(worker_id);
             }
 
-            last_chunk_reserve_time = std::chrono::system_clock::now();
+            chunk_reserve_time = std::chrono::system_clock::now();
             continue;
         }
 
@@ -309,12 +317,15 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             m_batched_chunks[worker_id].push_back(std::move(chunk));
 
-            last_chunk_reserve_time = std::chrono::system_clock::now();
+            if (m_batched_chunks.size() == 1 || !measure_timeout_from_first_chunk) {
+                chunk_reserve_time = std::chrono::system_clock::now();
+            }
         }
 
         if (m_batched_chunks[worker_id].size() == batch_size) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(worker_id);
+            chunk_reserve_time = std::chrono::system_clock::now();
         }
     }
 
@@ -378,6 +389,24 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
             break;
         }
         m_chunk_sizes.push_back(runner_ptr->chunk_size());
+    }
+
+    auto high_priority_batch_timeout_env = getenv("HIGH_PRIORITY_BATCH_TIMEOUT");
+    if (high_priority_batch_timeout_env) {
+        // Override batch timeout for high-priority pipelines.
+        m_low_latency_batch_timeout_ms = atoi(high_priority_batch_timeout_env);
+        spdlog::info("Overriding batch timeout for high-priority pipeline to {} ms.",
+                     m_low_latency_batch_timeout_ms);
+    } else {
+        m_low_latency_batch_timeout_ms = 0;
+    }
+    auto timeout_from_first_chunk_env = getenv("HIGH_PRIORITY_BATCH_TIMEOUT_FROM_FIRST_CHUNK");
+    if (timeout_from_first_chunk_env) {
+        m_low_latency_timeout_from_first_chunk = true;
+        spdlog::info(
+                "Batch timeout for high-priority pipelines will be measured from first chunk.");
+    } else {
+        m_low_latency_timeout_from_first_chunk = false;
     }
 
     auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();

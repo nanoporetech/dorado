@@ -39,7 +39,21 @@ private:
 public:
     ~TempDir() {
         if (!m_path.empty()) {
-            std::filesystem::remove_all(m_path);
+            bool deleted = false;
+            size_t tries = 0;
+            while (!deleted && tries < 5) {
+                try {
+                    tries++;
+                    deleted = std::filesystem::remove_all(m_path);
+                } catch (std::exception& e) {
+                    std::string what = e.what();
+                    spdlog::warn(what);
+                }
+            }
+            if (!deleted) {
+                spdlog::warn(std::string("Could not delete ") + m_path.string() +
+                             " after 5 retries!");
+            }
         }
     }
 

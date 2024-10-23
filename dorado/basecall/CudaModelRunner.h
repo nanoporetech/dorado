@@ -24,6 +24,7 @@ public:
     size_t chunk_size() const final;
     size_t batch_size() const final;
     int batch_timeout_ms() const final;
+    bool is_low_latency() const final;
     void terminate() final;
     void restart() final;
     std::string get_name() const final;
