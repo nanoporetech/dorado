@@ -1,10 +1,8 @@
 #include "MetalCRFModel.h"
 
 #include "torch_utils/module_utils.h"
-#include "utils/PostCondition.h"
 #include "utils/math_utils.h"
 
-#include <os/signpost.h>
 #include <spdlog/spdlog.h>
 
 #include <stdexcept>
@@ -22,13 +20,7 @@ constexpr int kSIMDGroupWidth = 32;
 constexpr auto torch_dtype = torch::kF16;
 const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
-static os_log_t s_poi_os_log = os_log_create("MetalCRFModel", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
-#define POINT_OF_INTEREST_SCOPE(name, ...)                                   \
-    os_signpost_id_t _poi_id = os_signpost_id_generate(s_poi_os_log);        \
-    os_signpost_interval_begin(s_poi_os_log, _poi_id, name, "" __VA_ARGS__); \
-    auto _poi_scope = dorado::utils::PostCondition(                          \
-            [&] { os_signpost_interval_end(s_poi_os_log, _poi_id, name); }); \
-    static_assert(true, "Force semicolon")
+CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
 
 }  // namespace
 
@@ -470,23 +462,29 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   uint64_t linear_hold_off_id,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
-    auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+    {
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, "convolutions", "try_count=%i", try_count);
+        auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
-    if (in.dtype() != torch::kF16) {
-        throw std::runtime_error("Input tensor must be float16.");
-    }
-    conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
-    conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
-    conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
-    if (!run_command_buffer("convolutions", command_buffer, try_count)) {
-        return nullptr;
+        if (in.dtype() != torch::kF16) {
+            throw std::runtime_error("Input tensor must be float16.");
+        }
+        conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
+        conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
+        conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
+        if (!run_command_buffer("convolutions", command_buffer, try_count)) {
+            return nullptr;
+        }
     }
 
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, "lstm", "id=%s, try_count=%i", lstm_label.c_str(),
+                                try_count);
+
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
-        command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+        auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
 
         const int kResBufSize =
@@ -499,7 +497,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                      mtl_for_tensor(rnn->t_weights_bias),
                                                      mat_state.get()};
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
-            command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+            auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
             launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
                                   tg_buffer_lens, kernel_thread_groups,
@@ -518,7 +516,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
 #endif
     }
 
-    command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+    auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
     // The output buffers of conv/LSTM layers are not used by the decoding, so
     // can be overwritten by subsequent batches as soon as they have been consumed by
@@ -580,6 +578,7 @@ MTL::CommandBuffer *MetalCRFModelImpl::forward_async(at::Tensor &in,
                                                      uint64_t linear_hold_off_id,
                                                      int try_count,
                                                      std::vector<at::Tensor> &out) {
+    POINT_OF_INTEREST_SCOPE(MetalCRFModel, "forward_async", "try_count=%i", try_count);
     return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count, out);
 }
 

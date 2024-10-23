@@ -43,6 +43,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // Functions here that create autorelease objects should be called with an autorelease pool set up,
 // which on MacOS isn't the case unless something like ScopedAutoReleasePool is used.
 
+CREATE_POINT_OF_INTEREST_ID(metal_utils);
+
 void report_error(const NS::Error *error, const char *function) {
     if (error == nil) {
         return;
@@ -249,6 +251,8 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
 }
 
 bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+    POINT_OF_INTEREST_SCOPE(metal_utils, "run_command_buffer", "label=%s", label);
+
     name_mtl_object(cb, label);
     cb->commit();
     cb->waitUntilCompleted();
