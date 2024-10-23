@@ -1,6 +1,7 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
+#include "polish/model.h"
 #include "torch_utils/auto_detect_device.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
@@ -247,7 +248,7 @@ void run_experimental(const Options& opt) {
     at::InferenceMode infer_guard;
 
     // const std::string model_path = (opt.model_path / "weights.pt").string(); // (m_model_config.model_dir / m_model_config.weights_file).string();
-    const std::string model_path = opt.model_path.string();
+    const std::string model_path = opt.model_path / "model.pt";
     torch::jit::script::Module module;
     try {
         spdlog::debug("Loading model on {}...", device_str);
@@ -288,6 +289,9 @@ int polish(int argc, char* argv[]) {
         throw std::runtime_error(
                 "WIP. Currently can only load a model. Not yet fetching a model automatically.");
     }
+
+    [[maybe_unused]] polisher::ModelConfig config =
+            polisher::parse_model_config(opt.model_path / "config.toml");
 
     run_experimental(opt);
 
