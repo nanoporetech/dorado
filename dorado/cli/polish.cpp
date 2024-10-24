@@ -296,8 +296,7 @@ void run_experimental(const Options& opt) {
 
     {
         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
-        const polisher::CountsFeatureEncoderResult result =
-                polisher::counts_feature_encoder(bam_set, "contig_15:1-5");
+        const auto result = polisher::counts_feature_encoder(bam_set, "contig_15:1-5");
         std::cout << "result.feature_matrix =\n" << result.feature_matrix << "\n";
         std::cout << "result.positions =\n" << result.positions << "\n";
         destroy_bam_fset(bam_set);

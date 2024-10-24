@@ -6,8 +6,8 @@
 
 namespace dorado::polisher {
 
-CountsFeatureEncoderResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
-    CountsFeatureEncoderResult result;
+CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
+    CountsResult result;
 
     // Create a tensor for the feature matrix (equivalent to np_counts in Python).
     // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
@@ -34,8 +34,32 @@ CountsFeatureEncoderResult plp_data_to_tensors(const plp_data& data, const size_
     return result;
 }
 
-CountsFeatureEncoderResult counts_feature_encoder(const bam_fset* bam_set,
-                                                  const std::string_view region) {
+CountsResult construct_pileup_counts(const bam_fset* bam_set,
+                                     const std::string_view region,
+                                     size_t num_qstrat = 1,
+                                     size_t num_dtypes = 1,
+                                     char** dtypes = NULL,
+                                     const std::string_view tag_name = {},
+                                     int tag_value = 0,
+                                     bool keep_missing = false,
+                                     size_t num_homop = 1,
+                                     bool weibull_summation = false,
+                                     const char* read_group = NULL,
+                                     const int min_mapQ = 1) {
+    // Compute the pileup.
+    const plp_data pileup =
+            calculate_pileup(region.data(), bam_set, num_dtypes, dtypes, num_homop, tag_name.data(),
+                             tag_value, keep_missing, weibull_summation, read_group, min_mapQ);
+    // Create Torch tensors from the pileup.
+    const size_t n_rows = featlen * num_dtypes * num_qstrat;
+    CountsResult result = plp_data_to_tensors(pileup, n_rows);
+
+    destroy_plp_data(pileup);
+
+    return result;
+}
+
+CountsResult counts_feature_encoder(const bam_fset* bam_set, const std::string_view region) {
     // TODO: Make sure which of these need to be parametrized to emulate `medaka inference`.
     size_t num_qstrat = 1;
     size_t num_dtypes = 1;
@@ -47,21 +71,11 @@ CountsFeatureEncoderResult counts_feature_encoder(const bam_fset* bam_set,
     bool weibull_summation = false;
     const char* read_group = NULL;
     const int min_mapQ = 1;
+    // feature_indices = pileup_counts_norm_indices(self.dtypes)
 
-    // Compute the pileup.
-    const plp_data pileup =
-            calculate_pileup(region.data(), bam_set, num_dtypes, dtypes, num_homop, tag_name,
-                             tag_value, keep_missing, weibull_summation, read_group, min_mapQ);
-
-    // print_pileup_data(pileup, num_dtypes, dtypes, num_homop);
-    // fprintf(stdout, "pileup is length %zu, with buffer of %zu columns\n", pileup->n_cols,
-    //         pileup->buffer_cols);
-
-    // Create Torch tensors from the pileup.
-    const size_t n_rows = featlen * num_dtypes * num_qstrat;
-    CountsFeatureEncoderResult result = plp_data_to_tensors(pileup, n_rows);
-
-    destroy_plp_data(pileup);
+    CountsResult result = construct_pileup_counts(
+            bam_set, region, num_qstrat, num_dtypes, dtypes, std::string_view(tag_name, 2),
+            tag_value, keep_missing, num_homop, weibull_summation, read_group, min_mapQ);
 
     return result;
 }

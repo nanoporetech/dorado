@@ -17,7 +17,7 @@ enum class NormaliseType {
     FWD_REV,
 };
 
-struct CountsFeatureEncoderResult {
+struct CountsResult {
     torch::Tensor feature_matrix;
     torch::Tensor positions;
 };
@@ -32,7 +32,6 @@ struct CountsFeatureEncoderResult {
 //     CountsFeatureEncoder(const NormaliseType normalise, );
 // };
 
-CountsFeatureEncoderResult counts_feature_encoder(const bam_fset* bam_set,
-                                                  const std::string_view region);
+CountsResult counts_feature_encoder(const bam_fset* bam_set, const std::string_view region);
 
 }  // namespace dorado::polisher
