@@ -305,6 +305,16 @@ add_library(dorado_lib
     dorado/correct/infer.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
+    dorado/polish/features.cpp
+    dorado/polish/features.h
+    dorado/polish/model.cpp
+    dorado/polish/model.h
+    dorado/polish/medaka_bamiter.cpp
+    dorado/polish/medaka_bamiter.h
+    dorado/polish/medaka_common.cpp
+    dorado/polish/medaka_common.h
+    dorado/polish/medaka_counts.cpp
+    dorado/polish/medaka_counts.h
 )
 
 enable_warnings_as_errors(dorado_lib)
