@@ -2,6 +2,8 @@
 
 #include "polish/medaka_bamiter.h"
 
+#include <torch/torch.h>
+
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
@@ -15,11 +17,22 @@ enum class NormaliseType {
     FWD_REV,
 };
 
-class CountsFeatureEncoder {
-public:
-    CountsFeatureEncoder(const NormaliseType normalise);
+struct CountsFeatureEncoderResult {
+    torch::Tensor feature_matrix;
+    torch::Tensor positions;
 };
 
-void counts_feature_encoder(const bam_fset* bam_set, const std::string_view region);
+// struct CountsFeatureEncoderResults {
+// };
+
+// struct CountsFeatureEncoderResults;
+
+// class CountsFeatureEncoder {
+// public:
+//     CountsFeatureEncoder(const NormaliseType normalise, );
+// };
+
+CountsFeatureEncoderResult counts_feature_encoder(const bam_fset* bam_set,
+                                                  const std::string_view region);
 
 }  // namespace dorado::polisher
