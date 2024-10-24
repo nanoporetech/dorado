@@ -1,6 +1,9 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
+#include "polish/features.h"
+#include "polish/medaka_bamiter.h"
+#include "polish/medaka_counts.h"
 #include "polish/model.h"
 #include "torch_utils/auto_detect_device.h"
 #include "utils/arg_parse_ext.h"
@@ -23,6 +26,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_set>
 #include <vector>
@@ -196,6 +200,36 @@ void validate_options(const Options& opt) {
 
 }  // namespace
 
+// void run_experimental_counts(const Options& opt) {
+//     // Test-run the Medaka pileup code.
+//     {
+//         // const std::string_view region("contig_15:1-20001");
+//         const std::string_view region("contig_15:1-5");
+
+//         size_t num_dtypes = 1;
+//         char **dtypes = NULL;
+//         char tag_name[2] = "";
+//         int tag_value = 0;
+//         bool keep_missing = false;
+//         size_t num_homop = 1;
+//         bool weibull_summation = false;
+//         const char* read_group = NULL;
+//         const int min_mapQ = 1;
+
+//         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
+
+//         plp_data pileup = calculate_pileup(
+//             region.data(), bam_set, num_dtypes, dtypes,
+//             num_homop, tag_name, tag_value, keep_missing,
+//             weibull_summation, read_group, min_mapQ);
+
+//         print_pileup_data(pileup, num_dtypes, dtypes, num_homop);
+//         fprintf(stdout, "pileup is length %zu, with buffer of %zu columns\n", pileup->n_cols, pileup->buffer_cols);
+//         destroy_plp_data(pileup);
+//         destroy_bam_fset(bam_set);
+//     }
+// }
+
 void run_experimental(const Options& opt) {
     std::vector<std::string> devices;
     // int32_t infer_threads = 1;
@@ -259,6 +293,12 @@ void run_experimental(const Options& opt) {
                                  " with error: " + e.what());
     }
     module.eval();
+
+    {
+        bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
+        polisher::counts_feature_encoder(bam_set, "contig_15:1-5");
+        destroy_bam_fset(bam_set);
+    }
 }
 
 int polish(int argc, char* argv[]) {
