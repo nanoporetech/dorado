@@ -171,7 +171,10 @@ void destroy_plp_data(plp_data data) {
  *  @returns void
  *
  */
-void print_pileup_data(plp_data pileup, size_t num_dtypes, char *dtypes[], size_t num_homop) {
+void print_pileup_data(const plp_data pileup,
+                       const size_t num_dtypes,
+                       const char *dtypes[],
+                       const size_t num_homop) {
     fprintf(stdout, "pos\tins\t");
     if (num_dtypes > 1) {  //TODO header for multiple dtypes and num_homop > 1
         for (size_t i = 0; i < num_dtypes; ++i) {
@@ -270,7 +273,7 @@ float *_get_weibull_scores(const bam_pileup1_t *p,
 plp_data calculate_pileup(const char *region,
                           const bam_fset *bam_set,
                           size_t num_dtypes,
-                          char *dtypes[],
+                          const char *dtypes[],
                           size_t num_homop,
                           const char tag_name[2],
                           const int tag_value,
