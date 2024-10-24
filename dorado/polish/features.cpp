@@ -6,6 +6,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
     CountsResult result;
 
@@ -34,22 +36,56 @@ CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
     return result;
 }
 
-CountsResult construct_pileup_counts(const bam_fset* bam_set,
+/**
+ * \brief Function to calculate feature vector normalization groups
+ * \param dtypes Vector of data type names (strings).
+ * \param num_qstrat Qscore stratifications.
+ * \return Lookup of the form: key = (dtype, strand) -> vector of indices
+ */
+std::unordered_map<std::pair<std::string, bool>, std::vector<size_t>, KeyHash>
+pileup_counts_norm_indices(const std::vector<std::string>& dtypes, const size_t num_qstrat = 1) {
+    // Create a map to store the indices.
+    std::unordered_map<std::pair<std::string, bool>, std::vector<size_t>, KeyHash> indices;
+
+    const size_t plp_bases_size = featlen;  // TODO: plp_bases.size()
+
+    // Iterate over each datatype.
+    for (size_t dti = 0; dti < dtypes.size(); ++dti) {
+        const std::string& dt = dtypes[dti];
+
+        // Iterate over qscore stratification layers.
+        for (size_t qindex = 0; qindex < num_qstrat; ++qindex) {
+            // Iterate over the base codes (e.g., 'a', 'c', 'g', 't', etc.)
+            for (size_t base_i = 0; base_i < plp_bases_size; ++base_i) {
+                const char code = plp_bases[base_i];
+                const bool is_rev = std::islower(code);
+                const size_t index = base_i + dti * num_qstrat * featlen + qindex * featlen;
+                indices[std::make_pair(dt, is_rev)].push_back(index);
+            }
+        }
+    }
+
+    return indices;
+}
+
+CountsResult construct_pileup_counts(bam_fset* bam_set,
                                      const std::string_view region,
                                      size_t num_qstrat = 1,
                                      size_t num_dtypes = 1,
-                                     char** dtypes = NULL,
-                                     const std::string_view tag_name = {},
+                                     const char** dtypes = NULL,
+                                     const std::string tag_name = {},
+                                     //  const std::string_view tag_name = {},
                                      int tag_value = 0,
                                      bool keep_missing = false,
-                                     size_t num_homop = 1,
+                                     //  size_t num_homop = 1,
                                      bool weibull_summation = false,
                                      const char* read_group = NULL,
                                      const int min_mapQ = 1) {
     // Compute the pileup.
-    const plp_data pileup =
-            calculate_pileup(region.data(), bam_set, num_dtypes, dtypes, num_homop, tag_name.data(),
-                             tag_value, keep_missing, weibull_summation, read_group, min_mapQ);
+    // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
+    const plp_data pileup = calculate_pileup(region.data(), bam_set, num_dtypes, dtypes, num_qstrat,
+                                             tag_name.data(), tag_value, keep_missing,
+                                             weibull_summation, read_group, min_mapQ);
     // Create Torch tensors from the pileup.
     const size_t n_rows = featlen * num_dtypes * num_qstrat;
     CountsResult result = plp_data_to_tensors(pileup, n_rows);
@@ -59,25 +95,74 @@ CountsResult construct_pileup_counts(const bam_fset* bam_set,
     return result;
 }
 
-CountsResult counts_feature_encoder(const bam_fset* bam_set, const std::string_view region) {
-    // TODO: Make sure which of these need to be parametrized to emulate `medaka inference`.
-    size_t num_qstrat = 1;
-    size_t num_dtypes = 1;
-    char** dtypes = NULL;
-    char tag_name[2] = "";
-    int tag_value = 0;
-    bool keep_missing = false;
-    size_t num_homop = 1;
-    bool weibull_summation = false;
-    const char* read_group = NULL;
-    const int min_mapQ = 1;
-    // feature_indices = pileup_counts_norm_indices(self.dtypes)
+}  // namespace
+
+CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set) : m_bam_set{bam_set} {}
+
+CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
+                                           const NormaliseType normalise_type,
+                                           const std::vector<std::string>& dtypes,
+                                           const std::string_view tag_name,
+                                           const int32_t tag_value,
+                                           const bool tag_keep_missing,
+                                           const std::string_view read_group,
+                                           const int32_t min_mapq,
+                                           const bool symmetric_indels)
+        : m_bam_set{bam_set},
+          m_normalise_type{normalise_type},
+          m_dtypes{dtypes},
+          m_tag_name{tag_name},
+          m_tag_value{tag_value},
+          m_tag_keep_missing{tag_keep_missing},
+          m_read_group{read_group},
+          m_min_mapq{min_mapq},
+          m_symmetric_indels{symmetric_indels},
+          m_feature_indices{pileup_counts_norm_indices(dtypes)} {}
+
+CountsResult CountsFeatureEncoder::encode_region(const std::string_view region) {
+    constexpr size_t num_qstrat = 1;
+    constexpr bool weibull_summation = false;
+
+    std::vector<const char*> dtypes;
+    for (const auto& dtype : m_dtypes) {
+        dtypes.emplace_back(dtype.c_str());
+    }
+
+    const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
+    const char** dtypes_ptr = std::empty(dtypes) ? nullptr : dtypes.data();
+    // const char* tag_name_ptr = std::empty(m_tag_name) ? nullptr: m_tag_name.c_str();
 
     CountsResult result = construct_pileup_counts(
-            bam_set, region, num_qstrat, num_dtypes, dtypes, std::string_view(tag_name, 2),
-            tag_value, keep_missing, num_homop, weibull_summation, read_group, min_mapQ);
+            m_bam_set, region, num_qstrat, dtypes.size(), dtypes_ptr, m_tag_name.c_str(),
+            m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
     return result;
 }
+
+// CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region) {
+//     // TODO: Make sure which of these need to be parametrized to emulate `medaka inference`.
+//     // Parameters for the pileup.
+//     const size_t num_qstrat = 1;
+//     const size_t num_dtypes = 1;
+//     const bool weibull_summation = false;
+
+//     // Parameters for the CountsFeatureEncoder.
+//     // const NormaliseType normalise_type{NormaliseType::TOTAL};
+//     const char** dtypes = NULL;
+//     // std::string_view tag_name;
+//     const std::string tag_name;
+//     const int32_t tag_value = 0;
+//     const bool tag_keep_missing = false;
+//     const char* read_group = NULL;
+//     const int min_mapQ = 1;
+//     // const bool symmetric_indels = false;
+//     // feature_indices = pileup_counts_norm_indices(self.dtypes)
+
+//     CountsResult result = construct_pileup_counts(
+//             bam_set, region, num_qstrat, num_dtypes, dtypes, tag_name,
+//             tag_value, tag_keep_missing, weibull_summation, read_group, min_mapQ);
+
+//     return result;
+// }
 
 }  // namespace dorado::polisher
