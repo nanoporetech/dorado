@@ -285,6 +285,10 @@ plp_data calculate_pileup(const char *region,
         fprintf(stderr, "Recieved invalid num_dtypes and dtypes args.\n");
         exit(1);
     }
+    if (num_dtypes == 0) {
+        fprintf(stderr, "The num_dtypes needs to be > 0.\n");
+        exit(1);
+    }
     const size_t dtype_featlen = featlen * num_dtypes * num_homop;
 
     // extract `chr`:`start`-`end` from `region`

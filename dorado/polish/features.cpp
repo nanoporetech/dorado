@@ -128,13 +128,14 @@ CountsResult CountsFeatureEncoder::encode_region(const std::string_view region) 
         dtypes.emplace_back(dtype.c_str());
     }
 
-    const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
+    // If there is only one data type, then the dtypes pointer needs to be nullptr.
     const char** dtypes_ptr = std::empty(dtypes) ? nullptr : dtypes.data();
-    // const char* tag_name_ptr = std::empty(m_tag_name) ? nullptr: m_tag_name.c_str();
+    const int32_t num_dtypes = static_cast<int32_t>(std::size(dtypes)) + 1;
+    const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
 
     CountsResult result = construct_pileup_counts(
-            m_bam_set, region, num_qstrat, dtypes.size(), dtypes_ptr, m_tag_name.c_str(),
-            m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
+            m_bam_set, region, num_qstrat, num_dtypes, dtypes_ptr, m_tag_name.c_str(), m_tag_value,
+            m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
     return result;
 }
