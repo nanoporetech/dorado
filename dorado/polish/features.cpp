@@ -13,11 +13,10 @@ CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
 
     // Create a tensor for the feature matrix (equivalent to np_counts in Python).
     // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
-    result.feature_matrix =
-            torch::from_blob(data->matrix,
-                             {static_cast<long>(data->n_cols), static_cast<long>(n_rows)},
-                             torch::kInt64)
-                    .clone();
+    result.counts = torch::from_blob(data->matrix,
+                                     {static_cast<long>(data->n_cols), static_cast<long>(n_rows)},
+                                     torch::kInt64)
+                            .clone();
 
     // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
     // We'll store the major and minor arrays as two separate columns in a single tensor.
@@ -42,24 +41,24 @@ CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
  * \param num_qstrat Qscore stratifications.
  * \return Lookup of the form: key = (dtype, strand) -> vector of indices
  */
-std::unordered_map<std::pair<std::string, bool>, std::vector<size_t>, KeyHash>
-pileup_counts_norm_indices(const std::vector<std::string>& dtypes, const size_t num_qstrat = 1) {
+FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dtypes,
+                                              const size_t num_qstrat = 1) {
     // Create a map to store the indices.
-    std::unordered_map<std::pair<std::string, bool>, std::vector<size_t>, KeyHash> indices;
+    FeatureIndicesType indices;
 
-    const size_t plp_bases_size = featlen;  // TODO: plp_bases.size()
+    const int64_t plp_bases_size = static_cast<int64_t>(featlen);  // TODO: plp_bases.size()
 
     // Iterate over each datatype.
-    for (size_t dti = 0; dti < dtypes.size(); ++dti) {
+    for (int64_t dti = 0; dti < static_cast<int64_t>(std::size(dtypes)); ++dti) {
         const std::string& dt = dtypes[dti];
 
         // Iterate over qscore stratification layers.
-        for (size_t qindex = 0; qindex < num_qstrat; ++qindex) {
+        for (int64_t qindex = 0; qindex < static_cast<int64_t>(num_qstrat); ++qindex) {
             // Iterate over the base codes (e.g., 'a', 'c', 'g', 't', etc.)
-            for (size_t base_i = 0; base_i < plp_bases_size; ++base_i) {
+            for (int64_t base_i = 0; base_i < plp_bases_size; ++base_i) {
                 const char code = plp_bases[base_i];
                 const bool is_rev = std::islower(code);
-                const size_t index = base_i + dti * num_qstrat * featlen + qindex * featlen;
+                const int64_t index = base_i + dti * num_qstrat * featlen + qindex * featlen;
                 indices[std::make_pair(dt, is_rev)].push_back(index);
             }
         }
@@ -98,7 +97,6 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
                                                   //  const std::string_view tag_name = {},
                                                   int tag_value = 0,
                                                   bool keep_missing = false,
-                                                  //  size_t num_homop = 1,
                                                   bool weibull_summation = false,
                                                   const char* read_group = NULL,
                                                   const int min_mapQ = 1) {
@@ -111,7 +109,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
     const size_t n_rows = featlen * num_dtypes * num_qstrat;
     CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
 
-    print_pileup_data(pileup, num_dtypes, dtypes, num_qstrat);
+    // print_pileup_data(pileup, num_dtypes, dtypes, num_qstrat);
 
     destroy_plp_data(pileup);
 
@@ -142,12 +140,12 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
             } else {
                 int64_t start = 0;
                 for (const int64_t i : gaps) {
-                    split_results.emplace_back(CountsResult{data.feature_matrix.slice(0, start, i),
+                    split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
                                                             data.positions.slice(0, start, i)});
                     start = i;
                 }
-                split_results.emplace_back(CountsResult{data.feature_matrix.slice(0, start),
-                                                        data.positions.slice(0, start)});
+                split_results.emplace_back(
+                        CountsResult{data.counts.slice(0, start), data.positions.slice(0, start)});
             }
         }
 
@@ -169,7 +167,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
             if (counts_buffer.empty() || (first_major - last_major) == 1) {
                 // New or contiguous chunk.
                 last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
-                counts_buffer.emplace_back(std::move(data.feature_matrix));
+                counts_buffer.emplace_back(std::move(data.counts));
                 positions_buffer.emplace_back(std::move(data.positions));
 
             } else {
@@ -177,7 +175,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
                 last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
                 results.emplace_back(
                         CountsResult{concatenate(counts_buffer), concatenate(positions_buffer)});
-                counts_buffer = {std::move(data.feature_matrix)};
+                counts_buffer = {std::move(data.counts)};
                 positions_buffer = {std::move(data.positions)};
             }
         }
@@ -197,6 +195,104 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
     std::vector<CountsResult> results = merge_chunks(split_results);
 
     return results;
+}
+
+/**
+ * \brief This is analogous to the `_post_process_pileup` function in Medaka.
+ *
+ * NOTE: This can update the pileup counts if `sym_indels == true`.
+ */
+Sample counts_to_features(CountsResult& pileup,
+                          const std::string& ref_name,
+                          const int64_t ref_start,
+                          const int64_t ref_end,
+                          const bool sym_indels,
+                          const FeatureIndicesType& feature_indices,
+                          const NormaliseType normalise_type) {
+    const int64_t start = pileup.positions.select(1, MAJOR_COLUMN).index({0}).item<int64_t>();
+    const int64_t end = pileup.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+
+    if ((start != ref_start) || ((end + 1) != ref_end)) {
+        spdlog::warn("Pileup counts do not span requested region, requested {}, received {}-{}.",
+                     ref_name, ref_start, ref_end, start, end);
+    }
+
+    const auto minor_inds = torch::nonzero(pileup.positions.select(1, MINOR_COLUMN) > 0).squeeze();
+    const auto major_pos_at_minor_inds = pileup.positions.index({minor_inds, MAJOR_COLUMN});
+    const auto major_ind_at_minor_inds = torch::searchsorted(
+            pileup.positions.select(1, MAJOR_COLUMN), major_pos_at_minor_inds, "left");
+
+    auto depth = pileup.counts.sum(1);
+    depth.index_put_({minor_inds}, depth.index({major_ind_at_minor_inds}));
+    const auto depth_unsequezed = depth.unsqueeze(1).to(FeatureTensorType);
+
+    if (sym_indels) {
+        for (const auto& [key, inds] : feature_indices) {
+            // const std::string& data_type = kv.first.first;
+            const bool is_rev = key.second;
+            const torch::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
+
+            const auto dt_depth =
+                    pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
+            // dt_depth.index_put_({minor_inds}, dt_depth.index({major_ind_at_minor_inds}));
+
+            // Define deletion index based on rev_del/fwd_del logic
+            const int64_t featlen_index = is_rev ? rev_del : fwd_del;
+            const int64_t dtype_size = featlen;
+
+            // Find the deletion index
+            // std::vector<int64_t> deletion_indices;
+            for (const int64_t x : inds) {
+                if ((x % dtype_size) == featlen_index) {
+                    // deletion_indices.emplace_back(x);
+                    pileup.counts.index_put_({minor_inds, x},
+                                             dt_depth.index({major_ind_at_minor_inds}) -
+                                                     dt_depth.index({minor_inds}));
+                }
+            }
+            // // Ensure we have at least one valid deletion index
+            // if (!deletion_indices.empty()) {
+            //     del_ind = deletion_indices[0];  // Take the first valid index
+            //     // Update counts for minor indices based on the calculated depths
+            //     counts.index_put_({minor_inds, del_ind}, dt_depth.index({major_ind_at_minor_inds}) - dt_depth.index({minor_inds}));
+            // } else {
+            //     // Handle the case where no deletion index is found (optional)
+            //     // e.g., log a warning or set a default behavior
+            // }
+        }
+    }
+
+    torch::Tensor feature_array;
+    if (normalise_type == NormaliseType::TOTAL) {
+        feature_array =
+                pileup.counts / torch::max(depth_unsequezed, torch::ones_like(depth_unsequezed));
+
+    } else if (normalise_type == NormaliseType::FWD_REV) {
+        feature_array = torch::empty_like(pileup.counts, FeatureTensorType);
+        for (const auto& kv : feature_indices) {
+            const std::vector<int64_t>& inds = kv.second;
+            const torch::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
+
+            auto dt_depth = pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
+            dt_depth.index_put_({minor_inds}, dt_depth.index({major_ind_at_minor_inds}));
+            feature_array.index_put_(
+                    {torch::indexing::Slice(), inds_tensor},
+                    pileup.counts.index({torch::indexing::Slice(), inds_tensor}) /
+                            torch::max(depth_unsequezed, torch::ones_like(depth_unsequezed)));
+        }
+    } else {
+        feature_array = pileup.counts;
+        feature_array = feature_array.to(FeatureTensorType);
+    }
+
+    // Step 5: Create and return Sample object
+    Sample sample{ref_name, feature_array, pileup.positions, depth};
+
+    // Log the result
+    std::cout << "Processed " << sample.ref_name << " (median depth "
+              << torch::median(depth).item<float>() << ")" << std::endl;
+
+    return sample;
 }
 
 }  // namespace
@@ -244,13 +340,22 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             m_bam_set, region, num_qstrat, num_dtypes, dtypes_ptr, m_tag_name.c_str(), m_tag_value,
             m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
-    static constexpr int32_t depth = 0;
-
     std::vector<Sample> results;
 
     for (auto& data : pileups) {
-        results.emplace_back(Sample{ref_name, ref_start, ref_end, std::move(data.feature_matrix),
-                                    std::move(data.positions), depth});
+        if (!data.counts.numel()) {
+            spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
+                         region);
+            results.emplace_back(Sample{ref_name, {}, std::move(data.positions), {}});
+            continue;
+        }
+
+        // results.emplace_back(Sample{ref_name, data.counts,
+        //                             data.positions, {}});
+
+        results.emplace_back(counts_to_features(data, ref_name, ref_start, ref_end,
+                                                m_symmetric_indels, m_feature_indices,
+                                                m_normalise_type));
     }
 
     return results;

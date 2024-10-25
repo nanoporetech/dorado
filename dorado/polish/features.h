@@ -4,6 +4,7 @@
 #include "polish/sample.h"
 
 #include <torch/torch.h>
+#include <torch/types.h>
 
 #include <string>
 #include <string_view>
@@ -23,7 +24,7 @@ enum class NormaliseType {
 };
 
 struct CountsResult {
-    torch::Tensor feature_matrix;
+    torch::Tensor counts;
     torch::Tensor positions;
 };
 
@@ -41,6 +42,10 @@ constexpr int32_t MAJOR_COLUMN = 0;  // ID of the major column in the positions 
 constexpr int32_t MINOR_COLUMN = 1;  // ID of the minor column in the positions tensor (deletions).
 
 // struct CountsFeatureEncoderResults;
+
+using FeatureIndicesType =
+        std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
+constexpr auto FeatureTensorType = torch::kFloat32;
 
 class CountsFeatureEncoder {
 public:
@@ -71,8 +76,7 @@ private:
     [[maybe_unused]] int32_t m_min_mapq = 1;
     [[maybe_unused]] bool m_symmetric_indels = false;
 
-    std::unordered_map<std::pair<std::string, bool>, std::vector<size_t>, KeyHash>
-            m_feature_indices;
+    FeatureIndicesType m_feature_indices;
 };
 
 // CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region);

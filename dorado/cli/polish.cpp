@@ -300,7 +300,7 @@ void run_experimental(const Options& opt) {
         // {
         //     const auto result = polisher::counts_feature_encoder(bam_set, "contig_15:1-5");
         //     std::cout << "Standalone function:\n";
-        //     std::cout << "result.feature_matrix =\n" << result.feature_matrix << "\n";
+        //     std::cout << "result.counts =\n" << result.counts << "\n";
         //     std::cout << "result.positions =\n" << result.positions << "\n";
         // }
         {

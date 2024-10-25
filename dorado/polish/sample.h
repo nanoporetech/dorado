@@ -9,11 +9,9 @@ namespace dorado::polisher {
 
 struct Sample {
     std::string ref_name;
-    int64_t start = 0;
-    int64_t end = 0;
     torch::Tensor features;
     torch::Tensor positions;
-    int32_t depth = 0;
+    torch::Tensor depth;
 };
 
 }  // namespace dorado::polisher
