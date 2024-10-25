@@ -72,6 +72,15 @@ pileup_counts_norm_indices(const std::vector<std::string>& dtypes, const size_t 
  * \brief Creates pileup counts for feature array for a given region.
  * \param bam_set File stream for the open BAM file for random access lookup.
  * \param region Htslib-style region string. Start is 1-based, and end is inclusive.
+ * \param
+ * \param
+ * \param
+ * \param
+ * \param
+ * \param
+ * \param
+ * \param
+ * \param
  * \returns Vector of CountsResult objects. More than 1 object can be returned if the region
  *          was split internally. This can happen if there are discontinuities in positions
  *          caused e.g. by gaps in coverage.
@@ -95,7 +104,6 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
                                                   const int min_mapQ = 1) {
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
-    std::cout << "[construct_pileup_counts] region = " << region << "\n";
     const plp_data pileup = calculate_pileup(region.c_str(), bam_set, num_dtypes, dtypes,
                                              num_qstrat, tag_name.c_str(), tag_value, keep_missing,
                                              weibull_summation, read_group, min_mapQ);
@@ -110,40 +118,85 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
     // // TODO: __enforce_pileup_chunk_contiguity
     // return enforce_pileup_chunk_contiguity(counts_result);
 
-    // const auto split_on_discontinuities = [](const std::vector<CountsResult>& pileups) {
-    //     std::vector<CountsResult> split_results;
+    const auto find_gaps = [](const torch::Tensor& positions,
+                              int64_t threshold = 1) -> std::vector<int64_t> {
+        const torch::Tensor diffs = (positions.size(0) >= 2)
+                                            ? (positions.slice(0, 1) - positions.slice(0, 0, -1))
+                                            : torch::empty({0}, positions.options());
+        const auto gaps = torch::nonzero(diffs > threshold).view(-1).to(torch::kInt64);
+        return std::vector<int64_t>(gaps.data_ptr<int64_t>(),
+                                    gaps.data_ptr<int64_t>() + gaps.numel());
+    };
 
-    //     // First pass: split at discontinuities within each chunk
-    //     for (const auto& data: pileups) {
-    //         auto positions_major = data.positions.select(1, 0);  // Accessing the 'major' column
-    //         // auto move = positions_major.slice(0, 1) - positions_major.slice(0, 0, -1);
-    //         [[maybe_unused]] torch::Tensor move = positions_major.slice(0, 1) - positions_major.slice(0, 0, -1);
-    //         // auto gaps = find_gaps(move);
+    const auto split_on_discontinuities = [&find_gaps](const std::vector<CountsResult>& pileups) {
+        std::vector<CountsResult> split_results;
 
-    //         split_results.emplace_back(data);
+        // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
+        for (const auto& data : pileups) {
+            const auto positions_major =
+                    data.positions.select(1, MAJOR_COLUMN);  // Accessing the 'major' column
+            const std::vector<int64_t> gaps = find_gaps(positions_major);
 
-    //         // if (gaps.empty()) {
-    //         //     split_results.emplace_back(counts, positions);
-    //         // } else {
-    //         //     int64_t start = 0;
-    //         //     for (auto i : gaps) {
-    //         //         split_results.emplace_back(
-    //         //             counts.slice(0, start, i),
-    //         //             positions.slice(0, start, i));
-    //         //         start = i;
-    //         //     }
-    //         //     split_results.emplace_back(
-    //         //         counts.slice(0, start),
-    //         //         positions.slice(0, start));
-    //         // }
-    //     }
+            if (std::empty(gaps)) {
+                split_results.emplace_back(data);
+            } else {
+                int64_t start = 0;
+                for (const int64_t i : gaps) {
+                    split_results.emplace_back(CountsResult{data.feature_matrix.slice(0, start, i),
+                                                            data.positions.slice(0, start, i)});
+                    start = i;
+                }
+                split_results.emplace_back(CountsResult{data.feature_matrix.slice(0, start),
+                                                        data.positions.slice(0, start)});
+            }
+        }
 
-    //     return split_results;
-    // };
+        return split_results;
+    };
 
-    // return split_on_discontinuities({counts_result});
+    const auto merge_chunks = [](std::vector<CountsResult>& pileups) {
+        std::vector<torch::Tensor> counts_buffer;
+        std::vector<torch::Tensor> positions_buffer;
+        int64_t last_major = -1;
 
-    return {counts_result};
+        std::vector<CountsResult> results;
+
+        for (auto& data : pileups) {
+            if (!data.positions.size(0)) {
+                continue;
+            }
+            const auto first_major = data.positions.select(1, MAJOR_COLUMN)[0].item<int64_t>();
+            if (counts_buffer.empty() || (first_major - last_major) == 1) {
+                // New or contiguous chunk.
+                last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+                counts_buffer.emplace_back(std::move(data.feature_matrix));
+                positions_buffer.emplace_back(std::move(data.positions));
+
+            } else {
+                // Discontinuity found, finalize the current chunk
+                last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+                results.emplace_back(
+                        CountsResult{concatenate(counts_buffer), concatenate(positions_buffer)});
+                counts_buffer = {std::move(data.feature_matrix)};
+                positions_buffer = {std::move(data.positions)};
+            }
+        }
+
+        if (!counts_buffer.empty()) {
+            results.emplace_back(
+                    CountsResult{concatenate(counts_buffer), concatenate(positions_buffer)});
+        }
+
+        return results;
+    };
+
+    // First pass: split at discontinuities within each chunk.
+    std::vector<CountsResult> split_results = split_on_discontinuities({counts_result});
+
+    // Second pass: merge neighboring chunks if they have no distance between them.
+    std::vector<CountsResult> results = merge_chunks(split_results);
+
+    return results;
 }
 
 }  // namespace
