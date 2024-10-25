@@ -5,6 +5,7 @@
 #include "polish/medaka_bamiter.h"
 #include "polish/medaka_counts.h"
 #include "polish/model.h"
+#include "polish/sample.h"
 #include "torch_utils/auto_detect_device.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
@@ -305,9 +306,13 @@ void run_experimental(const Options& opt) {
         {
             std::cout << "Class:\n";
             polisher::CountsFeatureEncoder encoder(bam_set);
-            const auto result = encoder.encode_region("contig_15:1-5");
-            std::cout << "result.feature_matrix =\n" << result.feature_matrix << "\n";
-            std::cout << "result.positions =\n" << result.positions << "\n";
+            const std::vector<polisher::Sample> results = encoder.encode_region("contig_15", 0, 5);
+            for (size_t i = 0; i < std::size(results); ++i) {
+                std::cout << "[i = " << i << "] results[i].features =\n"
+                          << results[i].features << "\n";
+                std::cout << "[i = " << i << "] results[i].positions =\n"
+                          << results[i].positions << "\n";
+            }
         }
 
         destroy_bam_fset(bam_set);

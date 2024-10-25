@@ -26,12 +26,12 @@ CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
     // Copy 'major' data into the first column of the positions tensor.
     torch::Tensor major_tensor =
             torch::from_blob(data->major, {static_cast<long>(data->n_cols)}, torch::kInt64).clone();
-    result.positions.select(1, 0).copy_(major_tensor);
+    result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
 
     // Copy 'minor' data into the second column of the positions tensor.
     torch::Tensor minor_tensor =
             torch::from_blob(data->minor, {static_cast<long>(data->n_cols)}, torch::kInt64).clone();
-    result.positions.select(1, 1).copy_(minor_tensor);
+    result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
 
     return result;
 }
@@ -68,31 +68,82 @@ pileup_counts_norm_indices(const std::vector<std::string>& dtypes, const size_t 
     return indices;
 }
 
-CountsResult construct_pileup_counts(bam_fset* bam_set,
-                                     const std::string_view region,
-                                     size_t num_qstrat = 1,
-                                     size_t num_dtypes = 1,
-                                     const char** dtypes = NULL,
-                                     const std::string tag_name = {},
-                                     //  const std::string_view tag_name = {},
-                                     int tag_value = 0,
-                                     bool keep_missing = false,
-                                     //  size_t num_homop = 1,
-                                     bool weibull_summation = false,
-                                     const char* read_group = NULL,
-                                     const int min_mapQ = 1) {
+/**
+ * \brief Creates pileup counts for feature array for a given region.
+ * \param bam_set File stream for the open BAM file for random access lookup.
+ * \param region Htslib-style region string. Start is 1-based, and end is inclusive.
+ * \returns Vector of CountsResult objects. More than 1 object can be returned if the region
+ *          was split internally. This can happen if there are discontinuities in positions
+ *          caused e.g. by gaps in coverage.
+ *
+ * NOTE: The original implementation had another parameter here: `region_split=100000` which
+ *          chunked the regions for parallel processing and returned these chunks separately in the end as well.
+ *          Here, we move this responsibility onto the caller of the function.
+ */
+std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
+                                                  const std::string& region,
+                                                  size_t num_qstrat = 1,
+                                                  size_t num_dtypes = 1,
+                                                  const char** dtypes = NULL,
+                                                  const std::string tag_name = {},
+                                                  //  const std::string_view tag_name = {},
+                                                  int tag_value = 0,
+                                                  bool keep_missing = false,
+                                                  //  size_t num_homop = 1,
+                                                  bool weibull_summation = false,
+                                                  const char* read_group = NULL,
+                                                  const int min_mapQ = 1) {
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
-    const plp_data pileup = calculate_pileup(region.data(), bam_set, num_dtypes, dtypes, num_qstrat,
-                                             tag_name.data(), tag_value, keep_missing,
+    std::cout << "[construct_pileup_counts] region = " << region << "\n";
+    const plp_data pileup = calculate_pileup(region.c_str(), bam_set, num_dtypes, dtypes,
+                                             num_qstrat, tag_name.c_str(), tag_value, keep_missing,
                                              weibull_summation, read_group, min_mapQ);
     // Create Torch tensors from the pileup.
     const size_t n_rows = featlen * num_dtypes * num_qstrat;
-    CountsResult result = plp_data_to_tensors(pileup, n_rows);
+    CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
+
+    print_pileup_data(pileup, num_dtypes, dtypes, num_qstrat);
 
     destroy_plp_data(pileup);
 
-    return result;
+    // // TODO: __enforce_pileup_chunk_contiguity
+    // return enforce_pileup_chunk_contiguity(counts_result);
+
+    // const auto split_on_discontinuities = [](const std::vector<CountsResult>& pileups) {
+    //     std::vector<CountsResult> split_results;
+
+    //     // First pass: split at discontinuities within each chunk
+    //     for (const auto& data: pileups) {
+    //         auto positions_major = data.positions.select(1, 0);  // Accessing the 'major' column
+    //         // auto move = positions_major.slice(0, 1) - positions_major.slice(0, 0, -1);
+    //         [[maybe_unused]] torch::Tensor move = positions_major.slice(0, 1) - positions_major.slice(0, 0, -1);
+    //         // auto gaps = find_gaps(move);
+
+    //         split_results.emplace_back(data);
+
+    //         // if (gaps.empty()) {
+    //         //     split_results.emplace_back(counts, positions);
+    //         // } else {
+    //         //     int64_t start = 0;
+    //         //     for (auto i : gaps) {
+    //         //         split_results.emplace_back(
+    //         //             counts.slice(0, start, i),
+    //         //             positions.slice(0, start, i));
+    //         //         start = i;
+    //         //     }
+    //         //     split_results.emplace_back(
+    //         //         counts.slice(0, start),
+    //         //         positions.slice(0, start));
+    //         // }
+    //     }
+
+    //     return split_results;
+    // };
+
+    // return split_on_discontinuities({counts_result});
+
+    return {counts_result};
 }
 
 }  // namespace
@@ -119,7 +170,9 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes)} {}
 
-CountsResult CountsFeatureEncoder::encode_region(const std::string_view region) {
+std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_name,
+                                                        const int64_t ref_start,
+                                                        const int64_t ref_end) {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -128,16 +181,26 @@ CountsResult CountsFeatureEncoder::encode_region(const std::string_view region) 
         dtypes.emplace_back(dtype.c_str());
     }
 
-    // If there is only one data type, then the dtypes pointer needs to be nullptr.
     const char** dtypes_ptr = std::empty(dtypes) ? nullptr : dtypes.data();
     const int32_t num_dtypes = static_cast<int32_t>(std::size(dtypes)) + 1;
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
+    const std::string region =
+            ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
 
-    CountsResult result = construct_pileup_counts(
+    std::vector<CountsResult> pileups = construct_pileup_counts(
             m_bam_set, region, num_qstrat, num_dtypes, dtypes_ptr, m_tag_name.c_str(), m_tag_value,
             m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
-    return result;
+    static constexpr int32_t depth = 0;
+
+    std::vector<Sample> results;
+
+    for (auto& data : pileups) {
+        results.emplace_back(Sample{ref_name, ref_start, ref_end, std::move(data.feature_matrix),
+                                    std::move(data.positions), depth});
+    }
+
+    return results;
 }
 
 // CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region) {

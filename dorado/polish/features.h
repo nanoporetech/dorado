@@ -1,6 +1,7 @@
 #pragma once
 
 #include "polish/medaka_bamiter.h"
+#include "polish/sample.h"
 
 #include <torch/torch.h>
 
@@ -36,6 +37,9 @@ struct KeyHash {
     }
 };
 
+constexpr int32_t MAJOR_COLUMN = 0;  // ID of the major column in the positions tensor.
+constexpr int32_t MINOR_COLUMN = 1;  // ID of the minor column in the positions tensor (deletions).
+
 // struct CountsFeatureEncoderResults;
 
 class CountsFeatureEncoder {
@@ -52,7 +56,9 @@ public:
                          const int32_t min_mapq,
                          const bool symmetric_indels);
 
-    CountsResult encode_region(const std::string_view region);
+    std::vector<Sample> encode_region(const std::string& ref_name,
+                                      const int64_t ref_start,
+                                      const int64_t ref_end);
 
 private:
     [[maybe_unused]] bam_fset* m_bam_set = nullptr;
