@@ -123,7 +123,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
         const torch::Tensor diffs = (positions.size(0) >= 2)
                                             ? (positions.slice(0, 1) - positions.slice(0, 0, -1))
                                             : torch::empty({0}, positions.options());
-        const auto gaps = torch::nonzero(diffs > threshold).view(-1).to(torch::kInt64);
+        const auto gaps = (torch::nonzero(diffs > threshold).flatten() + 1).to(torch::kInt64);
         return std::vector<int64_t>(gaps.data_ptr<int64_t>(),
                                     gaps.data_ptr<int64_t>() + gaps.numel());
     };
