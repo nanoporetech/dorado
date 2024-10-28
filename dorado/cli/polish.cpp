@@ -72,7 +72,7 @@ ParserPtr create_cli(int& verbosity) {
         // Positional arguments group
         parser->visible.add_argument("in_aln_bam").help("Aligned reads in BAM format");
         parser->visible.add_argument("in_draft_fastx").help("Draft assembly for polishing");
-        parser->visible.add_argument("out_consensus").help("Output consensus FASTA file.");
+        parser->visible.add_argument("out_consensus").help("Output consensus FASTA/FASTQ file.");
     }
     {
         // Default "Optional arguments" group
@@ -167,6 +167,13 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     return opt;
 }
 
+std::string get_lowercase_extension(const std::filesystem::path& path) {
+    std::string ext = path.extension().string();
+    std::transform(std::begin(ext), std::end(ext), std::begin(ext),
+                   [](unsigned char c) { return std::tolower(c); });
+    return ext;
+}
+
 void validate_options(const Options& opt) {
     // Parameter validation.
     if (!cli::validate_device_string(opt.device)) {
@@ -192,6 +199,15 @@ void validate_options(const Options& opt) {
     if (opt.window_size <= 0) {
         spdlog::error("Window size should be > 0. Given: {}.", opt.window_size);
         std::exit(EXIT_FAILURE);
+    }
+    {
+        const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
+        if ((ext != ".fasta") && (ext != ".fastq") && (ext != ".fa") && (ext != ".fq")) {
+            spdlog::error(
+                    "Unknown extension of output file: {}. Supported: .fasta, .fastq, .fa, .fq.",
+                    opt.out_consensus_fn.string());
+            std::exit(EXIT_FAILURE);
+        }
     }
 
     if (!std::empty(opt.model_path) && !std::filesystem::exists(opt.model_path)) {
@@ -232,34 +248,39 @@ void validate_options(const Options& opt) {
 //     }
 // }
 
-void print_output(const c10::IValue& output) {
-    if (output.isTensor()) {
-        // Single tensor output
-        std::cout << "Single tensor output: " << output.toTensor() << "\n";
+// void print_output(const c10::IValue& output) {
+//     if (output.isTensor()) {
+//         // Single tensor output
+//         std::cout << "Single tensor output: " << output.toTensor() << "\n";
 
-        // const torch::Tensor row_sum = output.toTensor().sum(1);
-        // std::cout << "Sum: " << row_sum << "\n";
+//         // const torch::Tensor row_sum = output.toTensor().sum(1);
+//         // std::cout << "Sum: " << row_sum << "\n";
 
-    } else if (output.isTuple()) {
-        // Tuple output - unpack and print each element
-        auto outputTuple = output.toTuple()->elements();
-        std::cout << "Tuple output with " << outputTuple.size() << " elements:" << std::endl;
-        for (size_t i = 0; i < outputTuple.size(); ++i) {
-            if (outputTuple[i].isTensor()) {
-                std::cout << "Element " << i << ":\n";
-                std::cout << outputTuple[i].toTensor() << "\n";
-            } else {
-                std::cout << "Element " << i << " is not a tensor." << std::endl;
-            }
-        }
-    } else {
-        std::cout << "Output is neither a tensor nor a tuple." << std::endl;
-    }
-}
+//     } else if (output.isTuple()) {
+//         // Tuple output - unpack and print each element
+//         auto outputTuple = output.toTuple()->elements();
+//         std::cout << "Tuple output with " << outputTuple.size() << " elements:" << std::endl;
+//         for (size_t i = 0; i < outputTuple.size(); ++i) {
+//             if (outputTuple[i].isTensor()) {
+//                 std::cout << "Element " << i << ":\n";
+//                 std::cout << outputTuple[i].toTensor() << "\n";
+//             } else {
+//                 std::cout << "Element " << i << " is not a tensor." << std::endl;
+//             }
+//         }
+//     } else {
+//         std::cout << "Output is neither a tensor nor a tuple." << std::endl;
+//     }
+// }
 
 void run_experimental(const Options& opt) {
     std::vector<std::string> devices;
     // int32_t infer_threads = 1;
+
+    // Check the output extension to determine if we need
+    // to compute the QVs too.
+    const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
+    const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
     if (opt.device == "cpu") {
         // infer_threads = 1;
@@ -327,15 +348,12 @@ void run_experimental(const Options& opt) {
                                                         const int32_t mtx_idx) {
         utils::ScopedProfileRange infer("infer", 1);
 
+        // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
-        // std::vector<torch::Tensor> batch_positions;
         for (auto& sample : samples) {
             batch_features.emplace_back(std::move(sample.features));
-            // batch_positions.emplace_back(std::move(sample.positions));
         }
-        // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         torch::Tensor batch_features_tensor = torch::stack(batch_features);
-        // torch::Tensor batch_positions_tensor = torch::stack(batch_positions);
 
         std::unique_lock<std::mutex> lock(gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
@@ -347,7 +365,6 @@ void run_experimental(const Options& opt) {
         c10::IValue output;
         try {
             output = module.forward(inputs);
-
         } catch (std::runtime_error& e) {
 #if DORADO_CUDA_BUILD
             spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
@@ -361,24 +378,7 @@ void run_experimental(const Options& opt) {
 
         spdlog::info("Inference done.");
 
-        // print_output(output);
-
         return output.toTensor();
-
-        // for (size_t i = 0; i < std::size(samples); ++i) {
-        //     std::cout << "[i = " << i << "] logits =\n"
-        //                 << output->elements() << "\n";
-        //     std::cout << "[i = " << i << "] samples[i].positions =\n"
-        //                 << samples[i].positions << "\n";
-        // }
-
-        // auto base_logits = output.toTuple()->elements()[1].toTensor();
-        // auto preds = base_logits.argmax(1, false).to(torch::kCPU);
-        // auto split_preds = preds.split_with_sizes(sizes);
-        // for (size_t w = 0; w < split_preds.size(); w++) {
-        //     auto decoded_output = decode_preds(split_preds[w]);
-        //     wfs[w].inferred_bases = decoded_output;
-        // }
     };
 
     {
@@ -420,25 +420,41 @@ void run_experimental(const Options& opt) {
 
             const torch::Tensor output = batch_infer(samples_to_infer, 0);
 
-            std::vector<polisher::ConsensusResult> results = encoder.decode_bases(output, true);
+            std::vector<polisher::ConsensusResult> results =
+                    encoder.decode_bases(output, with_quals);
 
-            for (size_t i = 0; i < std::size(results); ++i) {
-                std::string& seq = results[i].seq;
-                seq.erase(std::remove(seq.begin(), seq.end(), '*'), seq.end());
-                std::cout << ">consensus-" << region_name << ':' << (region_start + 1) << '-'
-                          << region_end << '\n'
-                          << seq << '\n';
+            // Write output.
+            {
+                std::ofstream ofs(opt.out_consensus_fn);
+                for (size_t i = 0; i < std::size(results); ++i) {
+                    std::string& seq = results[i].seq;
+                    std::string& quals = results[i].quals;
+
+                    size_t n = 0;
+                    for (size_t j = 0; j < std::size(seq); ++j) {
+                        if (seq[j] == '*') {
+                            continue;
+                        }
+                        seq[n] = seq[j];
+                        quals[n] = quals[j];
+                        ++n;
+                    }
+                    seq.resize(n);
+                    quals.resize(n);
+                    // seq.erase(std::remove(seq.begin(), seq.end(), '*'), seq.end());
+
+                    if (with_quals) {
+                        ofs << "@consensus-" << region_name << ':' << (region_start + 1) << '-'
+                            << region_end << '\n'
+                            << results[i].seq << "\n+\n"
+                            << results[i].quals << '\n';
+                    } else {
+                        ofs << ">consensus-" << region_name << ':' << (region_start + 1) << '-'
+                            << region_end << '\n'
+                            << seq << '\n';
+                    }
+                }
             }
-
-            // for (size_t i = 0; i < std::size(results); ++i) {
-            //     std::cout << "@consensus-" << region_name << ':' << (region_start + 1) << '-' << region_end << '\n' << results[i].seq
-            //               << "\n+\n" << results[i].quals << '\n';
-            // }
-
-            // for (size_t i = 0; i < std::size(results); ++i) {
-            //     std::cout << "[output i = " << i << "]\nseq:  " << results[i].seq
-            //               << "\nqual: " << results[i].quals << "\n";
-            // }
 
             // const at::Tensor collated_features = collate<float>(quals_batch, 0.f, torch::kFloat32);
 
