@@ -9,6 +9,7 @@
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/arg_parse_ext.h"
+#include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
@@ -58,7 +59,7 @@ struct Options {
     int32_t infer_threads = 1;
     std::string device;
     int32_t batch_size = 128;
-    int32_t window_size = 10000;
+    int32_t window_len = 10000;
     int32_t window_overlap = 1000;
 };
 
@@ -106,7 +107,7 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
                 .default_value(128)
                 .scan<'i', int>();
-        parser->visible.add_argument("-w", "--window-size")
+        parser->visible.add_argument("-w", "--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
                 .scan<'i', int>();
@@ -161,7 +162,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
 
     opt.batch_size = parser.visible.get<int>("batch-size");
-    opt.window_size = parser.visible.get<int>("window-size");
+    opt.window_len = parser.visible.get<int>("window-len");
+    opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.verbosity = verbosity;
 
     return opt;
@@ -196,8 +198,15 @@ void validate_options(const Options& opt) {
         spdlog::error("Batch size should be > 0. Given: {}.", opt.batch_size);
         std::exit(EXIT_FAILURE);
     }
-    if (opt.window_size <= 0) {
-        spdlog::error("Window size should be > 0. Given: {}.", opt.window_size);
+    if (opt.window_len <= 0) {
+        spdlog::error("Window size should be > 0. Given: {}.", opt.window_len);
+        std::exit(EXIT_FAILURE);
+    }
+    if ((opt.window_overlap < 0) || (opt.window_overlap >= opt.window_len)) {
+        spdlog::error(
+                "Window overlap should be >= 0 and < window_len. Given: window_overlap = {}, "
+                "window_len = {}.",
+                opt.window_overlap, opt.window_len);
         std::exit(EXIT_FAILURE);
     }
     {
@@ -272,6 +281,65 @@ void validate_options(const Options& opt) {
 //         std::cout << "Output is neither a tensor nor a tuple." << std::endl;
 //     }
 // }
+
+std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
+        const std::filesystem::path& in_fastx_fn) {
+    if (!utils::check_fai_exists(in_fastx_fn)) {
+        utils::create_fai_index(in_fastx_fn);
+    }
+
+    const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
+
+    std::vector<std::pair<std::string, int64_t>> ret;
+    std::string line;
+    std::ifstream ifs(fai_path);
+    while (std::getline(ifs, line)) {
+        if (std::empty(line)) {
+            continue;
+        }
+        std::string name;
+        int64_t length = 0;
+        std::istringstream iss(line);
+        iss >> name >> length;
+        ret.emplace_back(std::move(name), length);
+    }
+    return ret;
+}
+
+struct Window {
+    std::string name;
+    int64_t start = 0;
+    int64_t end = 0;
+    int64_t length = 0;
+    int32_t num_windows = 0;
+};
+
+std::vector<Window> create_windows(const std::vector<std::pair<std::string, int64_t>>& seq_lens,
+                                   const int32_t window_len,
+                                   const int32_t window_overlap) {
+    if (window_overlap >= window_len) {
+        spdlog::error(
+                "The window overlap cannot be larger than the window size! window_len = {}, "
+                "window_overlap = {}\n",
+                window_len, window_overlap);
+        return {};
+    }
+    std::vector<Window> ret;
+    for (int32_t seq_id = 0; seq_id < static_cast<int32_t>(std::size(seq_lens)); ++seq_id) {
+        const auto& [name, length] = seq_lens[seq_id];
+        const int32_t num_windows =
+                static_cast<int32_t>(std::ceil(static_cast<double>(length) / window_len));
+        ret.reserve(std::size(ret) + num_windows);
+        for (int64_t start = 0; start < length; start += (window_len - window_overlap)) {
+            const int64_t end = std::min(length, start + window_len);
+            ret.emplace_back(Window{name, start, end, length, num_windows});
+            if (end == length) {
+                break;
+            }
+        }
+    }
+    return ret;
+}
 
 void run_experimental(const Options& opt) {
     std::vector<std::string> devices;
@@ -383,20 +451,39 @@ void run_experimental(const Options& opt) {
 
     {
         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
-        // {
-        //     const auto result = polisher::counts_feature_encoder(bam_set, "contig_15:1-5");
-        //     std::cout << "Standalone function:\n";
-        //     std::cout << "result.counts =\n" << result.counts << "\n";
-        //     std::cout << "result.positions =\n" << result.positions << "\n";
+
+        spdlog::info("Loading draft sequence lengths.");
+
+        const std::vector<std::pair<std::string, int64_t>> draft_lens =
+                load_seq_lengths(opt.in_draft_fastx_fn);
+
+        // for (size_t i = 0; i < std::size(draft_lens); ++i) {
+        //     const auto& [name, length] = draft_lens[i];
+        //     std::cerr << "[draft i = " << i << "] name = " << name << ", length = " << length << "\n";
         // }
-        {
-            const std::string region_name = "contig_15";
-            const int64_t region_start = 0;
-            const int64_t region_end = 10000;
+
+        spdlog::info("Creating windows.");
+
+        const std::vector<Window> windows =
+                create_windows(draft_lens, opt.window_len, opt.window_overlap);
+
+        spdlog::info("Created {} windows from {} sequences.", std::size(windows),
+                     std::size(draft_lens));
+
+        // for (size_t i = 0; i < std::size(windows); ++i) {
+        //     std::cerr << "[window i = " << i << "] name = " << windows[i].name << ", start = " << windows[i].start << ", end = " << windows[i].end << ", len = " << windows[i].length << ", num_windows = " << windows[i].num_windows << "\n";
+        // }
+
+        std::ofstream ofs(opt.out_consensus_fn);
+
+        for (const auto& window : windows) {
+            // const std::string region_name = "contig_15";
+            // const int64_t region_start = 0;
+            // const int64_t region_end = 10000;
 
             polisher::CountsFeatureEncoder encoder(bam_set);
             std::vector<polisher::Sample> samples =
-                    encoder.encode_region(region_name, region_start, region_end);
+                    encoder.encode_region(window.name, window.start, window.end);
 
             // for (size_t i = 0; i < std::size(samples); ++i) {
             //     std::cerr << "[i = " << i << "] samples[i].features =\n"
@@ -408,7 +495,7 @@ void run_experimental(const Options& opt) {
             std::vector<polisher::Sample> samples_to_infer;
             std::vector<polisher::Sample> remainders;
             for (auto& sample : samples) {
-                // if (static_cast<int32_t>(std::size(sample.positions)) < opt.window_size) {
+                // if (static_cast<int32_t>(std::size(sample.positions)) < opt.window_len) {
                 //     remainders.emplace_back(std::move(sample));
                 //     continue;
                 // }
@@ -425,7 +512,6 @@ void run_experimental(const Options& opt) {
 
             // Write output.
             {
-                std::ofstream ofs(opt.out_consensus_fn);
                 for (size_t i = 0; i < std::size(results); ++i) {
                     std::string& seq = results[i].seq;
                     std::string& quals = results[i].quals;
@@ -444,13 +530,13 @@ void run_experimental(const Options& opt) {
                     // seq.erase(std::remove(seq.begin(), seq.end(), '*'), seq.end());
 
                     if (with_quals) {
-                        ofs << "@consensus-" << region_name << ':' << (region_start + 1) << '-'
-                            << region_end << '\n'
+                        ofs << "@consensus-" << window.name << ':' << (window.start + 1) << '-'
+                            << window.end << '\n'
                             << results[i].seq << "\n+\n"
                             << results[i].quals << '\n';
                     } else {
-                        ofs << ">consensus-" << region_name << ':' << (region_start + 1) << '-'
-                            << region_end << '\n'
+                        ofs << ">consensus-" << window.name << ':' << (window.start + 1) << '-'
+                            << window.end << '\n'
                             << seq << '\n';
                     }
                 }
@@ -473,7 +559,7 @@ void run_experimental(const Options& opt) {
             //          SHORT windows need special handling. In Medaka, these are interchangeably called "_quarantined" or "remainders" (self.remainders.extend(remain)).
             //          Medaka currently calls these windows with batch_size = 1, which means it does not do any sort of padding, but instead it only runs individual
             //          windows, which may be wasteful.
-            //          We could pad everything to window_size length and just push to the same tensor for batch processing. Potentially use Joyjit's function
+            //          We could pad everything to window_len length and just push to the same tensor for batch processing. Potentially use Joyjit's function
             //          from Dorado Correct to `collate`.
         }
 
