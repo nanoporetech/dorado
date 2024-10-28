@@ -313,6 +313,16 @@ void run_experimental(const Options& opt) {
                 std::cout << "[i = " << i << "] results[i].positions =\n"
                           << results[i].positions << "\n";
             }
+
+            // TODO here: Current code implements the logic in SampleGenerator._fill_features and everything upstream.
+            //              But, I still need to implement SampleGenerator.samples() which separates the small chunks into "quarantined" samples,
+            //              and also splits large chunks of the Sample object into smaller overlapping ones.
+            //              This is implemented in the medaka.common.Sample.chunks() function.
+            // Workflow is:
+            //  SampleGenerator.samples() <-prediction.DataLoader._run_region() <- prediction.DataLoader._region_worker() <- DataLoader.__init__()
+            //
+            // Note that there is also a path SampleGenerator.samples() <- SampleGenerator._samples_worker <- SampleGenerator.create_samples, but that one is called
+            //  from a different subtool, `features`.
         }
 
         destroy_bam_fset(bam_set);
