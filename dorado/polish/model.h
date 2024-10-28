@@ -22,6 +22,9 @@ struct ModelConfig {
     // int32_t feature_vector_length = 0;
     // std::string feature_encoder_normalise;
     // bool feature_encoder_tag_keep_missing = false;
+
+    std::string label_encoding_scheme{
+            "BaseEncodingScheme"};  // TODO: Implement this fully. Medaka can have multiple `label_scheme` decoders.
 };
 
 ModelConfig parse_model_config(const std::filesystem::path& config_path);

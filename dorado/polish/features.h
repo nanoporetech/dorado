@@ -28,6 +28,11 @@ struct CountsResult {
     torch::Tensor positions;
 };
 
+struct ConsensusResult {
+    std::string seq;
+    std::string quals;
+};
+
 // struct CountsFeatureEncoderResults {
 // };
 
@@ -64,6 +69,8 @@ public:
     std::vector<Sample> encode_region(const std::string& ref_name,
                                       const int64_t ref_start,
                                       const int64_t ref_end);
+
+    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits, const bool with_probs);
 
 private:
     [[maybe_unused]] bam_fset* m_bam_set = nullptr;

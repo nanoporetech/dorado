@@ -288,9 +288,9 @@ Sample counts_to_features(CountsResult& pileup,
     // Step 5: Create and return Sample object
     Sample sample{ref_name, feature_array, pileup.positions, depth};
 
-    // Log the result
-    std::cout << "Processed " << sample.ref_name << " (median depth "
-              << torch::median(depth).item<float>() << ")" << std::endl;
+    // // Log the result
+    // std::cerr << "Processed " << sample.ref_name << " (median depth "
+    //           << torch::median(depth).item<float>() << ")" << std::endl;
 
     return sample;
 }
@@ -356,6 +356,50 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
         results.emplace_back(counts_to_features(data, ref_name, ref_start, ref_end,
                                                 m_symmetric_indels, m_feature_indices,
                                                 m_normalise_type));
+    }
+
+    return results;
+}
+
+std::vector<ConsensusResult> CountsFeatureEncoder::decode_bases(const torch::Tensor& logits,
+                                                                const bool with_probs) {
+    static constexpr std::string_view label_scheme{"*ACGT"};
+
+    const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
+
+    std::vector<ConsensusResult> results(indices.size(0));
+
+    for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
+        const auto& positions = indices[sample_id];
+
+        std::string& seq = results[sample_id].seq;
+        seq.resize(positions.size(0), '*');
+
+        for (int64_t j = 0; j < positions.size(0); ++j) {
+            const int64_t class_index = positions[j].item<int64_t>();
+            assert(class_index < static_cast<int64_t>(std::size(label_scheme)));
+            seq[j] = label_scheme[class_index];
+        }
+    }
+
+    if (with_probs) {
+        const torch::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
+
+        // std::cerr << "probs: " << probs << "\n";
+
+        for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
+            std::string& quals = results[sample_id].quals;
+            quals.clear();
+
+            const auto phred_scores =
+                    (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0, 40).to(torch::kUInt8) +
+                    33;
+
+            quals.resize(phred_scores.size(0), '!');
+            for (int64_t j = 0; j < phred_scores.size(0); ++j) {
+                quals[j] = static_cast<char>(phred_scores[j].item<uint8_t>());
+            }
+        }
     }
 
     return results;

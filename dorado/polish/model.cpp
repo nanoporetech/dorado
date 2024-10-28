@@ -60,7 +60,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
         throw std::runtime_error("Model config must include [feature_encoder] section");
     }
 
-    print_toml(config_toml);
+    // print_toml(config_toml);
 
     ModelConfig cfg;
 

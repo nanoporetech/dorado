@@ -7,6 +7,7 @@
 #include "polish/model.h"
 #include "polish/sample.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/gpu_profiling.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
@@ -231,6 +232,31 @@ void validate_options(const Options& opt) {
 //     }
 // }
 
+void print_output(const c10::IValue& output) {
+    if (output.isTensor()) {
+        // Single tensor output
+        std::cout << "Single tensor output: " << output.toTensor() << "\n";
+
+        // const torch::Tensor row_sum = output.toTensor().sum(1);
+        // std::cout << "Sum: " << row_sum << "\n";
+
+    } else if (output.isTuple()) {
+        // Tuple output - unpack and print each element
+        auto outputTuple = output.toTuple()->elements();
+        std::cout << "Tuple output with " << outputTuple.size() << " elements:" << std::endl;
+        for (size_t i = 0; i < outputTuple.size(); ++i) {
+            if (outputTuple[i].isTensor()) {
+                std::cout << "Element " << i << ":\n";
+                std::cout << outputTuple[i].toTensor() << "\n";
+            } else {
+                std::cout << "Element " << i << " is not a tensor." << std::endl;
+            }
+        }
+    } else {
+        std::cout << "Output is neither a tensor nor a tuple." << std::endl;
+    }
+}
+
 void run_experimental(const Options& opt) {
     std::vector<std::string> devices;
     // int32_t infer_threads = 1;
@@ -295,6 +321,66 @@ void run_experimental(const Options& opt) {
     }
     module.eval();
 
+    std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
+
+    auto batch_infer = [&gpu_mutexes, &device, &module](std::vector<polisher::Sample>& samples,
+                                                        const int32_t mtx_idx) {
+        utils::ScopedProfileRange infer("infer", 1);
+
+        std::vector<torch::Tensor> batch_features;
+        // std::vector<torch::Tensor> batch_positions;
+        for (auto& sample : samples) {
+            batch_features.emplace_back(std::move(sample.features));
+            // batch_positions.emplace_back(std::move(sample.positions));
+        }
+        // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
+        torch::Tensor batch_features_tensor = torch::stack(batch_features);
+        // torch::Tensor batch_positions_tensor = torch::stack(batch_positions);
+
+        std::unique_lock<std::mutex> lock(gpu_mutexes[mtx_idx]);
+        std::vector<torch::jit::IValue> inputs;
+        {
+            utils::ScopedProfileRange move_to_device("move_to_device", 1);
+            inputs.push_back(batch_features_tensor.to(device));
+        }
+
+        c10::IValue output;
+        try {
+            output = module.forward(inputs);
+
+        } catch (std::runtime_error& e) {
+#if DORADO_CUDA_BUILD
+            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
+            c10::cuda::CUDACachingAllocator::emptyCache();
+            output = module.forward(inputs);
+#else
+            throw e;
+#endif
+        }
+        lock.unlock();
+
+        spdlog::info("Inference done.");
+
+        // print_output(output);
+
+        return output.toTensor();
+
+        // for (size_t i = 0; i < std::size(samples); ++i) {
+        //     std::cout << "[i = " << i << "] logits =\n"
+        //                 << output->elements() << "\n";
+        //     std::cout << "[i = " << i << "] samples[i].positions =\n"
+        //                 << samples[i].positions << "\n";
+        // }
+
+        // auto base_logits = output.toTuple()->elements()[1].toTensor();
+        // auto preds = base_logits.argmax(1, false).to(torch::kCPU);
+        // auto split_preds = preds.split_with_sizes(sizes);
+        // for (size_t w = 0; w < split_preds.size(); w++) {
+        //     auto decoded_output = decode_preds(split_preds[w]);
+        //     wfs[w].inferred_bases = decoded_output;
+        // }
+    };
+
     {
         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
         // {
@@ -304,15 +390,57 @@ void run_experimental(const Options& opt) {
         //     std::cout << "result.positions =\n" << result.positions << "\n";
         // }
         {
-            std::cout << "Class:\n";
+            const std::string region_name = "contig_15";
+            const int64_t region_start = 0;
+            const int64_t region_end = 10000;
+
             polisher::CountsFeatureEncoder encoder(bam_set);
-            const std::vector<polisher::Sample> results = encoder.encode_region("contig_15", 0, 5);
-            for (size_t i = 0; i < std::size(results); ++i) {
-                std::cout << "[i = " << i << "] results[i].features =\n"
-                          << results[i].features << "\n";
-                std::cout << "[i = " << i << "] results[i].positions =\n"
-                          << results[i].positions << "\n";
+            std::vector<polisher::Sample> samples =
+                    encoder.encode_region(region_name, region_start, region_end);
+
+            // for (size_t i = 0; i < std::size(samples); ++i) {
+            //     std::cerr << "[i = " << i << "] samples[i].features =\n"
+            //               << samples[i].features << "\n";
+            //     std::cerr << "[i = " << i << "] samples[i].positions =\n"
+            //               << samples[i].positions << "\n";
+            // }
+
+            std::vector<polisher::Sample> samples_to_infer;
+            std::vector<polisher::Sample> remainders;
+            for (auto& sample : samples) {
+                // if (static_cast<int32_t>(std::size(sample.positions)) < opt.window_size) {
+                //     remainders.emplace_back(std::move(sample));
+                //     continue;
+                // }
+                samples_to_infer.emplace_back(std::move(sample));
             }
+
+            spdlog::info("Inference on batch size: {}", std::size(samples_to_infer));
+            spdlog::info("Remainders size: {}", remainders.size());
+
+            const torch::Tensor output = batch_infer(samples_to_infer, 0);
+
+            std::vector<polisher::ConsensusResult> results = encoder.decode_bases(output, true);
+
+            for (size_t i = 0; i < std::size(results); ++i) {
+                std::string& seq = results[i].seq;
+                seq.erase(std::remove(seq.begin(), seq.end(), '*'), seq.end());
+                std::cout << ">consensus-" << region_name << ':' << (region_start + 1) << '-'
+                          << region_end << '\n'
+                          << seq << '\n';
+            }
+
+            // for (size_t i = 0; i < std::size(results); ++i) {
+            //     std::cout << "@consensus-" << region_name << ':' << (region_start + 1) << '-' << region_end << '\n' << results[i].seq
+            //               << "\n+\n" << results[i].quals << '\n';
+            // }
+
+            // for (size_t i = 0; i < std::size(results); ++i) {
+            //     std::cout << "[output i = " << i << "]\nseq:  " << results[i].seq
+            //               << "\nqual: " << results[i].quals << "\n";
+            // }
+
+            // const at::Tensor collated_features = collate<float>(quals_batch, 0.f, torch::kFloat32);
 
             // TODO here: Current code implements the logic in SampleGenerator._fill_features and everything upstream.
             //              But, I still need to implement SampleGenerator.samples() which separates the small chunks into "quarantined" samples,
@@ -323,6 +451,14 @@ void run_experimental(const Options& opt) {
             //
             // Note that there is also a path SampleGenerator.samples() <- SampleGenerator._samples_worker <- SampleGenerator.create_samples, but that one is called
             //  from a different subtool, `features`.
+            //
+            // TODO 2: All windows which are of length chunk_size have exactly the same dimensions (since the rows are fixed to counts and not actual reads), so no padding
+            //          is needed. Instead, we can just stack these features into this batch tensor.
+            //          SHORT windows need special handling. In Medaka, these are interchangeably called "_quarantined" or "remainders" (self.remainders.extend(remain)).
+            //          Medaka currently calls these windows with batch_size = 1, which means it does not do any sort of padding, but instead it only runs individual
+            //          windows, which may be wasteful.
+            //          We could pad everything to window_size length and just push to the same tensor for batch processing. Potentially use Joyjit's function
+            //          from Dorado Correct to `collate`.
         }
 
         destroy_bam_fset(bam_set);
