@@ -6,6 +6,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"

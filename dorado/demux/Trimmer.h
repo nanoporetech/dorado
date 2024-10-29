@@ -1,8 +1,15 @@
 #pragma once
-#include "read_pipeline/ReadPipeline.h"
 #include "utils/types.h"
 
+#include <utility>
+
+struct bam1_t;
+
 namespace dorado {
+
+class SimplexRead;
+struct AdapterScoreResult;
+struct BarcodeScoreResult;
 
 class Trimmer {
 public:

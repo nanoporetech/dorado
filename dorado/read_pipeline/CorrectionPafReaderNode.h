@@ -1,9 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
-#include "read_pipeline/MessageSink.h"
-#include "read_pipeline/flush_options.h"
-#include "read_pipeline/messages.h"
+#include "MessageSink.h"
 #include "utils/stats.h"
 
 #include <string>
@@ -11,6 +8,8 @@
 #include <unordered_set>
 
 namespace dorado {
+
+class Pipeline;
 
 class CorrectionPafReaderNode : public MessageSink {
 public:

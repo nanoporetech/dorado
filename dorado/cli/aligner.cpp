@@ -9,6 +9,7 @@
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/ProgressTracker.h"
+#include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"

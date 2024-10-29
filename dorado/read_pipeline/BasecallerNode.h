@@ -1,6 +1,6 @@
 #pragma once
 
-#include "read_pipeline/MessageSink.h"
+#include "MessageSink.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -53,12 +53,16 @@ private:
 
     size_t get_chunk_queue_idx(size_t read_raw_size);
 
+    // Override for batch timeout to use for low-latency pipelines. Zero means use the normal timeout.
+    int m_low_latency_batch_timeout_ms;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<basecall::RunnerPtr> m_model_runners;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
+    // Whether the batch timeout for low-latency pipelines should be from the first chunk time.
+    bool m_low_latency_timeout_from_first_chunk;
     // Whether the model is for rna
     bool m_is_rna_model;
     // model_name

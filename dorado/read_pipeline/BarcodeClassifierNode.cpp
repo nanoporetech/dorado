@@ -5,6 +5,7 @@
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "messages.h"
 #include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"

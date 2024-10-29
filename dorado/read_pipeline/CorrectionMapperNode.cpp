@@ -2,6 +2,7 @@
 
 #include "ClientInfo.h"
 #include "HtsReader.h"
+#include "ReadPipeline.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"

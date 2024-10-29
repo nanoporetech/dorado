@@ -1,7 +1,7 @@
 #pragma once
 
+#include "MessageSink.h"
 #include "basecall/CRFModelConfig.h"
-#include "read_pipeline/MessageSink.h"
 #include "torch_utils/trim_rapid_adapter.h"
 #include "utils/stats.h"
 

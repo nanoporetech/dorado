@@ -1,6 +1,5 @@
 #pragma once
 
-#include "spdlog/spdlog.h"
 #include "utils/fs_utils.h"
 #include "utils/string_utils.h"
 

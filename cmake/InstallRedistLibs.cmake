@@ -31,14 +31,22 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 get_filename_component(target_name ${target} NAME)
                 get_filename_component(link_name ${link} NAME)
                 if (NOT target_name STREQUAL link_name)
-                    execute_process(COMMAND ln -rfs ${target_name} ${link_name} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                    execute_process(
+                        COMMAND ln -rfs ${target_name} ${link_name}
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                        COMMAND_ERROR_IS_FATAL ANY
+                    )
                     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${link_name} DESTINATION lib COMPONENT redist_libs)
 
                     # create links to the versioned links above
                     # e.g. libcublas.so => libcublas.so.11
                     string(REGEX REPLACE "[.]so[.0-9]*$" ".so" base_link ${link_name})
                     if (NOT base_link STREQUAL link_name)
-                        execute_process(COMMAND ln -rfs ${link_name} ${base_link} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                        execute_process(
+                            COMMAND ln -rfs ${link_name} ${base_link}
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                            COMMAND_ERROR_IS_FATAL ANY
+                        )
                         install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${base_link} DESTINATION lib COMPONENT redist_libs)
                     endif()
                 endif()
