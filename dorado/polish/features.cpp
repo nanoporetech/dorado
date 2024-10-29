@@ -217,14 +217,15 @@ Sample counts_to_features(CountsResult& pileup,
     const int64_t end = pileup.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
 
     if ((start != ref_start) || ((end + 1) != ref_end)) {
-        spdlog::warn("Pileup counts do not span requested region, requested {}, received {}-{}.",
-                     ref_name, ref_start, ref_end, start, end);
+        spdlog::warn(
+                "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}.",
+                ref_name, ref_start, ref_end, start, end);
     }
 
     const auto minor_inds = torch::nonzero(pileup.positions.select(1, MINOR_COLUMN) > 0).squeeze();
     const auto major_pos_at_minor_inds = pileup.positions.index({minor_inds, MAJOR_COLUMN});
     const auto major_ind_at_minor_inds = torch::searchsorted(
-            pileup.positions.select(1, MAJOR_COLUMN), major_pos_at_minor_inds, "left");
+            pileup.positions.select(1, MAJOR_COLUMN).contiguous(), major_pos_at_minor_inds, "left");
 
     auto depth = pileup.counts.sum(1);
     depth.index_put_({minor_inds}, depth.index({major_ind_at_minor_inds}));

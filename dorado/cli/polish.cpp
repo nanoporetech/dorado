@@ -550,8 +550,8 @@ polisher::ConsensusResult stitch_sequence(
 
             // Find midpoint indices using searchsorted.
             auto prev_sample_positions =
-                    samples[samples_for_seq[last_i].second].positions.select(1, 0);
-            auto curr_sample_positions = sample.positions.select(1, 0);
+                    samples[samples_for_seq[last_i].second].positions.select(1, 0).contiguous();
+            auto curr_sample_positions = sample.positions.select(1, 0).contiguous();
 
             const int64_t prev_sample_mid_idx =
                     torch::searchsorted(prev_sample_positions, overlap_middle, /*right=*/false)
@@ -673,6 +673,7 @@ void run_experimental(const Options& opt) {
         throw std::runtime_error("Error loading model from " + model_path +
                                  " with error: " + e.what());
     }
+
     module.eval();
 
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
@@ -812,6 +813,9 @@ void run_experimental(const Options& opt) {
         // Encode samples (features). A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples;
         for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
+            if ((win_id % 10000) == 0) {
+                spdlog::info("Encoded {} windows.", win_id);
+            }
             const auto& window = windows[win_id];
             const std::string& name = draft_lens[window.seq_id].first;
             std::vector<polisher::Sample> new_samples =
@@ -1013,6 +1017,10 @@ int polish(int argc, char* argv[]) {
     if (opt.verbosity) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
     }
+
+    spdlog::set_level(spdlog::level::info);
+
+    spdlog::flush_every(std::chrono::seconds(1));  // flush every 3 seconds
 
     // Check if input options are good.
     validate_options(opt);
