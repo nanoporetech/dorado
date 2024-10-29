@@ -20,6 +20,13 @@
 #include <torch/script.h>
 #include <torch/torch.h>
 
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#endif
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -600,12 +607,15 @@ void run_experimental(const Options& opt) {
     const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
     const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
+    spdlog::info("Setting up the device.");
+
     if (opt.device == "cpu") {
         // infer_threads = 1;
         devices.push_back(opt.device);
     }
 #if DORADO_CUDA_BUILD
-    else if (utils::starts_with(device, "cuda")) {
+    else if (utils::starts_with(opt.device, "cuda")) {
+        spdlog::info("Parsing CUDA device string.");
         devices = dorado::utils::parse_cuda_device_string(opt.device);
         if (devices.empty()) {
             throw std::runtime_error("CUDA device requested but no devices found.");
@@ -637,13 +647,18 @@ void run_experimental(const Options& opt) {
     const std::string device_str = devices.front();
     torch::Device device = torch::Device(device_str);
 
+    spdlog::info("device_str = {}", device_str);
+
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
-    if (opt.device.is_cuda()) {
-        stream = c10::cuda::getStreamFromPool(false, opt.device.index());
+    if (device.is_cuda()) {
+        spdlog::info("Acquiring a CUDA stream.");
+        stream = c10::cuda::getStreamFromPool(false, device.index());
     }
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
 #endif
+
+    spdlog::info("Loading the model.");
 
     at::InferenceMode infer_guard;
 
