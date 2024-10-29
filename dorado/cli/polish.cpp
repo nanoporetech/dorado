@@ -540,13 +540,22 @@ void run_experimental(const Options& opt) {
                 torch::Tensor output = batch_infer(in_samples, start, end, 0);
 
                 // Convert to sequences and qualities.
-                std::vector<polisher::ConsensusResult> result =
+                std::vector<polisher::ConsensusResult> new_results =
                         encoder.decode_bases(output, gen_qual);
 
-                assert(static_cast<int64_t>(std::size(result)) == (end - start));
+                assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
-                results.insert(std::end(results), std::make_move_iterator(std::begin(result)),
-                               std::make_move_iterator(std::end(result)));
+                // Trim the padding from the back of each sequence, and append.
+                for (int64_t j = 0; j < static_cast<int64_t>(std::size(new_results)); ++j) {
+                    auto& result = new_results[j];
+                    const int64_t actual_size = in_samples[start + j].features.size(0);
+                    result.seq.resize(actual_size);
+                    result.quals.resize(actual_size);
+                    results.emplace_back(std::move(result));
+                }
+
+                // results.insert(std::end(results), std::make_move_iterator(std::begin(result)),
+                //                std::make_move_iterator(std::end(result)));
             }
 
             assert(std::size(results) == std::size(in_samples));
