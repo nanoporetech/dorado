@@ -311,6 +311,7 @@ struct Window {
     int64_t start = 0;
     int64_t end = 0;
     int64_t length = 0;
+    int32_t window_id = 0;
     int32_t num_windows = 0;
 };
 
@@ -327,17 +328,22 @@ std::vector<Window> create_windows(const std::vector<std::pair<std::string, int6
     std::vector<Window> ret;
     for (int32_t seq_id = 0; seq_id < static_cast<int32_t>(std::size(seq_lens)); ++seq_id) {
         const auto& [name, length] = seq_lens[seq_id];
+
         const int32_t num_windows =
                 static_cast<int32_t>(std::ceil(static_cast<double>(length) / window_len));
+
         ret.reserve(std::size(ret) + num_windows);
-        for (int64_t start = 0; start < length; start += (window_len - window_overlap)) {
+
+        int32_t win_id = 0;
+        for (int64_t start = 0; start < length; start += (window_len - window_overlap), ++win_id) {
             const int64_t end = std::min(length, start + window_len);
-            ret.emplace_back(Window{name, start, end, length, num_windows});
+            ret.emplace_back(Window{name, start, end, length, win_id, num_windows});
             if (end == length) {
                 break;
             }
         }
     }
+
     return ret;
 }
 
