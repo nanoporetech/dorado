@@ -37,8 +37,20 @@ public:
                std::optional<std::unordered_set<std::string>> read_list,
                std::unordered_set<std::string> read_ignore_list);
     ~DataLoader() = default;
-    void load_reads(const std::vector<std::filesystem::directory_entry>& dir_entries,
-                    ReadOrder traversal_order);
+
+    // Holds the directory entries for the pod5 or fast5 files from the input path.
+    // If there are both fast5 and pod5 only the pod5 will be held.
+    // Used as input to loading reads to ensure any mixed input files types has been
+    // correctly filtered to either pod5 or fast5 only.
+    class InputFiles final {
+        std::vector<std::filesystem::directory_entry> m_entries;
+
+    public:
+        InputFiles(const std::filesystem::path& path, bool recursive);
+        const std::vector<std::filesystem::directory_entry>& get() const;
+    };
+
+    void load_reads(const InputFiles& input_files, ReadOrder traversal_order);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
@@ -53,6 +65,12 @@ public:
     void add_read_initialiser(ReadInitialiserF func) {
         m_read_initialisers.push_back(std::move(func));
     }
+
+    // Retrieves the pod5 or fast5 entries from the input path.
+    // If there are both fast5 and pod5 only the pod5 will be returned.
+    static std::vector<std::filesystem::directory_entry> get_directory_entries(
+            const std::filesystem::path& path,
+            bool recursive_file_loading);
 
 private:
     void load_fast5_reads_from_file(const std::string& path);

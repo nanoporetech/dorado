@@ -12,7 +12,9 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <set>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -53,6 +55,45 @@ fs::path replace_extension(fs::path output_path) {
     }
     return output_path.replace_extension("bam");
 }
+
+class WorkingFileLut {
+    std::unordered_map<std::string, std::vector<std::filesystem::path>> m_working_paths{};
+    const std::string& m_output_folder;
+
+    void add_to_working_files(const std::filesystem::path& input_relative_path) {
+        auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
+
+        m_working_paths[output.string()].push_back(input_relative_path);
+    }
+
+    bool try_add_to_working_files(const fs::path& input_root, const fs::path& input_relative_path) {
+        if (!is_valid_input_file(input_root / input_relative_path)) {
+            return false;
+        }
+
+        add_to_working_files(input_relative_path);
+        return true;
+    }
+
+public:
+    WorkingFileLut(const std::string& input_root_folder,
+                   bool recursive,
+                   const std::string& output_folder)
+            : m_output_folder(output_folder) {
+        auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
+        dorado::utils::SuppressStderr stderr_suppressed{};
+        const fs::path input_root(input_root_folder);
+        for (const fs::directory_entry& dir_entry : all_files) {
+            const auto& input_path = dir_entry.path();
+            auto relative_path = fs::relative(input_path, input_root);
+            try_add_to_working_files(input_root, relative_path);
+        }
+    }
+
+    const std::unordered_map<std::string, std::vector<std::filesystem::path>>& get() const {
+        return m_working_paths;
+    }
+};
 
 }  // namespace
 
@@ -104,23 +145,6 @@ bool AlignmentProcessingItems::check_output_folder_for_input_folder(
     return true;
 }
 
-void AlignmentProcessingItems::add_to_working_files(
-        const std::filesystem::path& input_relative_path) {
-    auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
-
-    m_working_paths[output.string()].push_back(input_relative_path);
-}
-
-bool AlignmentProcessingItems::try_add_to_working_files(const fs::path& input_root,
-                                                        const fs::path& input_relative_path) {
-    if (!is_valid_input_file(input_root / input_relative_path)) {
-        return false;
-    }
-
-    add_to_working_files(input_relative_path);
-    return true;
-}
-
 bool AlignmentProcessingItems::initialise_for_file() {
     if (!check_recursive_arg_false()) {
         return false;
@@ -151,23 +175,12 @@ bool AlignmentProcessingItems::initialise_for_file() {
     return true;
 }
 
-void AlignmentProcessingItems::create_working_file_map() {
-    auto all_files = utils::fetch_directory_entries(m_input_path, m_recursive_input);
-    utils::SuppressStderr stderr_suppressed{};
-    const fs::path input_root(m_input_path);
-    for (const fs::directory_entry& dir_entry : all_files) {
-        const auto& input_path = dir_entry.path();
-        auto relative_path = fs::relative(input_path, input_root);
-        try_add_to_working_files(input_root, relative_path);
-    }
-}
-
 void AlignmentProcessingItems::add_all_valid_files() {
-    create_working_file_map();
+    WorkingFileLut working_file_lut{m_input_path, m_recursive_input, m_output_folder};
 
     const fs::path input_root(m_input_path);
     const fs::path output_root(m_output_folder);
-    for (const auto& output_to_inputs_pair : m_working_paths) {
+    for (const auto& output_to_inputs_pair : working_file_lut.get()) {
         const auto& input_files = output_to_inputs_pair.second;
         if (input_files.size() == 1) {
             // single unique output file name
@@ -183,8 +196,6 @@ void AlignmentProcessingItems::add_all_valid_files() {
             }
         }
     }
-
-    m_working_paths.clear();
 }
 
 bool AlignmentProcessingItems::initialise_for_folder() {

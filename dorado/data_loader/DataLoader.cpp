@@ -339,16 +339,13 @@ void DataLoader::load_reads_unrestricted(
     }
 }
 
-void DataLoader::load_reads(const std::vector<std::filesystem::directory_entry>& dir_entries,
-                            ReadOrder traversal_order) {
-    auto filtered_entries = filter_fast5_for_mixed_datasets(dir_entries);
-
+void DataLoader::load_reads(const InputFiles& input_files, ReadOrder traversal_order) {
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:
-        load_reads_by_channel(filtered_entries);
+        load_reads_by_channel(input_files.get());
         break;
     case ReadOrder::UNRESTRICTED:
-        load_reads_unrestricted(filtered_entries);
+        load_reads_unrestricted(input_files.get());
         break;
     default:
         throw std::runtime_error("Unsupported traversal order detected: " +
@@ -722,6 +719,13 @@ DataLoader::DataLoader(Pipeline& pipeline,
     assert(m_num_worker_threads > 0);
     static std::once_flag vbz_init_flag;
     std::call_once(vbz_init_flag, vbz_register);
+}
+
+DataLoader::InputFiles::InputFiles(const std::filesystem::path& path, bool recursive)
+        : m_entries(utils::fetch_directory_entries(path, recursive)) {}
+
+const std::vector<std::filesystem::directory_entry>& DataLoader::InputFiles::get() const {
+    return m_entries;
 }
 
 stats::NamedStats DataLoader::sample_stats() const {

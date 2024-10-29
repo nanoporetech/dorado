@@ -81,22 +81,15 @@ namespace {
 /**
  * Class caching directory entries for a folder, along with the path.
  */
-class InputFiles final {
+class InputFolderInfo final {
     const std::filesystem::path m_data_path;
-    bool m_recursive;
-    const std::vector<std::filesystem::directory_entry> m_directory_entries;
+    const DataLoader::InputFiles m_input_files;
 
 public:
-    InputFiles(std::filesystem::path data_path, bool recursive)
-            : m_data_path(std::move(data_path)),
-              m_recursive(recursive),
-              m_directory_entries(utils::fetch_directory_entries(m_data_path, m_recursive)) {}
-
+    InputFolderInfo(std::filesystem::path data_path, bool recursive)
+            : m_data_path(std::move(data_path)), m_input_files(m_data_path, recursive) {}
     const std::filesystem::path& path() const { return m_data_path; }
-
-    const std::vector<std::filesystem::directory_entry>& entries() const {
-        return m_directory_entries;
-    }
+    const DataLoader::InputFiles& files() const { return m_input_files; }
 };
 
 void validate_barcode_kit_info(const std::string& kit_name) {
@@ -308,7 +301,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
-           const InputFiles& input_files,
+           const InputFolderInfo& input_folder_info,
            const std::vector<fs::path>& remora_models,
            const std::string& device,
            const std::string& ref,
@@ -339,15 +332,16 @@ void setup(const std::vector<std::string>& args,
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
 
-    if (!file_info::is_read_data_present(input_files.entries())) {
-        std::string err = "No POD5 or FAST5 data found in path: " + input_files.path().string();
+    if (!file_info::is_read_data_present(input_folder_info.files().get())) {
+        std::string err =
+                "No POD5 or FAST5 data found in path: " + input_folder_info.path().string();
         throw std::runtime_error(err);
     }
 
     auto read_list = utils::load_read_list(read_list_file_path);
-    size_t num_reads = file_info::get_num_reads(input_files.entries(), read_list, {});
+    size_t num_reads = file_info::get_num_reads(input_folder_info.files().get(), read_list, {});
     if (num_reads == 0) {
-        spdlog::error("No POD5 or FAST5 reads found in path: " + input_files.path().string());
+        spdlog::error("No POD5 or FAST5 reads found in path: " + input_folder_info.path().string());
         std::exit(EXIT_FAILURE);
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
@@ -360,7 +354,7 @@ void setup(const std::vector<std::string>& args,
         bool inspect_ok = true;
         models::SamplingRate data_sample_rate = 0;
         try {
-            data_sample_rate = file_info::get_sample_rate(input_files.entries());
+            data_sample_rate = file_info::get_sample_rate(input_folder_info.files().get());
         } catch (const std::exception& e) {
             inspect_ok = false;
             spdlog::warn(
@@ -447,8 +441,8 @@ void setup(const std::vector<std::string>& args,
                 num_runners, 0);
     }
 
-    auto read_groups =
-            file_info::load_read_groups(input_files.entries(), model_name, modbase_model_names);
+    auto read_groups = file_info::load_read_groups(input_folder_info.files().get(), model_name,
+                                                   modbase_model_names);
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
@@ -617,7 +611,7 @@ void setup(const std::vector<std::string>& args,
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
-    loader.load_reads(input_files.entries(), ReadOrder::UNRESTRICTED);
+    loader.load_reads(input_folder_info.files(), ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
@@ -675,8 +669,8 @@ int basecaller(int argc, char* argv[]) {
     }
 
     const auto model_arg = parser.visible.get<std::string>("model");
-    InputFiles input_files{parser.visible.get<std::string>("data"),
-                           parser.visible.get<bool>("--recursive")};
+    InputFolderInfo input_folder_info{parser.visible.get<std::string>("data"),
+                                      parser.visible.get<bool>("--recursive")};
 
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
@@ -816,7 +810,8 @@ int basecaller(int argc, char* argv[]) {
         mods_model_paths = model_resolution::get_non_complex_mods_models(
                 model_path, mod_bases, mod_bases_models, downloader);
     } else {
-        const auto chemistry = file_info::get_unique_sequencing_chemisty(input_files.entries());
+        const auto chemistry =
+                file_info::get_unique_sequencing_chemisty(input_folder_info.files().get());
         const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");
@@ -852,7 +847,7 @@ int basecaller(int argc, char* argv[]) {
                                     parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
     try {
-        setup(args, model_config, input_files, mods_model_paths, device,
+        setup(args, model_config, input_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
               default_parameters.remora_batchsize, default_parameters.remora_threads,
