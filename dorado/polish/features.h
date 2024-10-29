@@ -76,15 +76,15 @@ public:
                                               const bool with_probs) const;
 
 private:
-    [[maybe_unused]] bam_fset* m_bam_set = nullptr;
-    [[maybe_unused]] NormaliseType m_normalise_type{NormaliseType::TOTAL};
-    [[maybe_unused]] std::vector<std::string> m_dtypes;
-    [[maybe_unused]] std::string m_tag_name;
-    [[maybe_unused]] int32_t m_tag_value = 0;
-    [[maybe_unused]] bool m_tag_keep_missing = false;
-    [[maybe_unused]] std::string m_read_group;
-    [[maybe_unused]] int32_t m_min_mapq = 1;
-    [[maybe_unused]] bool m_symmetric_indels = false;
+    bam_fset* m_bam_set = nullptr;
+    NormaliseType m_normalise_type{NormaliseType::TOTAL};
+    std::vector<std::string> m_dtypes;
+    std::string m_tag_name;
+    int32_t m_tag_value = 0;
+    bool m_tag_keep_missing = false;
+    std::string m_read_group;
+    int32_t m_min_mapq = 1;
+    bool m_symmetric_indels = false;
 
     FeatureIndicesType m_feature_indices;
 };
