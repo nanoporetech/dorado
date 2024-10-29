@@ -206,6 +206,8 @@ Sample counts_to_features(CountsResult& pileup,
                           const std::string& ref_name,
                           const int64_t ref_start,
                           const int64_t ref_end,
+                          const int32_t seq_id,
+                          const int32_t win_id,
                           const bool sym_indels,
                           const FeatureIndicesType& feature_indices,
                           const NormaliseType normalise_type) {
@@ -286,7 +288,8 @@ Sample counts_to_features(CountsResult& pileup,
     }
 
     // Step 5: Create and return Sample object
-    Sample sample{ref_name, feature_array, pileup.positions, depth};
+    Sample sample{ref_name,  feature_array, pileup.positions, depth,
+                  ref_start, ref_end,       seq_id,           win_id};
 
     // // Log the result
     // std::cerr << "Processed " << sample.ref_name << " (median depth "
@@ -321,7 +324,9 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
 
 std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_name,
                                                         const int64_t ref_start,
-                                                        const int64_t ref_end) {
+                                                        const int64_t ref_end,
+                                                        const int32_t seq_id,
+                                                        const int32_t win_id) {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -346,14 +351,21 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
         if (!data.counts.numel()) {
             spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
                          region);
-            results.emplace_back(Sample{ref_name, {}, std::move(data.positions), {}});
+            results.emplace_back(Sample{ref_name,
+                                        {},
+                                        std::move(data.positions),
+                                        {},
+                                        ref_start,
+                                        ref_end,
+                                        seq_id,
+                                        win_id});
             continue;
         }
 
         // results.emplace_back(Sample{ref_name, data.counts,
         //                             data.positions, {}});
 
-        results.emplace_back(counts_to_features(data, ref_name, ref_start, ref_end,
+        results.emplace_back(counts_to_features(data, ref_name, ref_start, ref_end, seq_id, win_id,
                                                 m_symmetric_indels, m_feature_indices,
                                                 m_normalise_type));
     }
