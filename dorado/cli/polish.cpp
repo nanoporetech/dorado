@@ -411,24 +411,184 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
+// polisher::ConsensusResult stitch_sequence(
+//         const std::filesystem::path& in_draft_fn,
+//         const std::string& header,
+//         const std::vector<polisher::Sample>& samples,
+//         const std::vector<polisher::ConsensusResult>& sample_results,
+//         const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
+
+//     // Fetch the draft for gap filling.
+//     const std::string draft = fetch_seq(in_draft_fn, header);
+
+//     // Initialize the start/end trim coordinates for each sample.
+//     std::vector<Interval> trim_coords;
+//     trim_coords.reserve(std::size(samples_for_seq));
+//     for (const auto& [_, sample_id]: samples_for_seq) {
+//         const polisher::Sample& sample = samples[sample_id];
+//         trim_coords.emplace_back(Interval{0, static_cast<int32_t>(sample.positions.size(0))});
+//     }
+
+//     polisher::ConsensusResult ret;
+
+//     for (int64_t i = 1; i < static_cast<int64_t>(std::size(sample_results)); ++i) {
+//         const auto& sample_id_1 = samples_for_seq[i - 1].second;
+//         const auto& sample_id_2 = samples_for_seq[i].second;
+//         const polisher::Sample& s1 = samples[sample_id_1];
+//         const polisher::Sample& s2 = samples[sample_id_2];
+
+//         const int64_t s1_start = s1.positions.index({0, polisher::MAJOR_COLUMN}).item<int64_t>();
+//         const int64_t s1_end = s1.positions.index({-1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
+//         const int64_t s2_start = s2.positions.index({0, polisher::MAJOR_COLUMN}).item<int64_t>();
+//         const int64_t s2_end = s2.positions.index({-1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
+
+//         std::cerr << "[stitching i = " << i << "] s1_start = " << s1_start << ", s1_end = " << s1_end << ", s2_start = " << s2_start << ", s2_end = " << s2_end << "\n";
+//     }
+
+//     // This won't work well for stitching because it's missing the gap-filled regions, and the trim coordinates need to be
+//     // the indices in the positions vector, and not the positions themselves.
+//     // Splice the trimmed sequences.
+//     for (size_t i = 0; i < std::size(trim_coords); ++i) {
+//         const auto& [_, sample_id] = samples_for_seq[i];
+//         const polisher::ConsensusResult sample_result = sample_results[sample_id];
+
+//         // Fill the gap if needed.
+//         if (i > 0) {
+//             const auto& sample_id_1 = samples_for_seq[i - 1].second;
+//             const auto& sample_id_2 = samples_for_seq[i].second;
+//             const polisher::Sample& s1 = samples[sample_id_1];
+//             const polisher::Sample& s2 = samples[sample_id_2];
+//             const Interval& trim_1 = trim_coords[i - 1];
+//             const Interval& trim_2 = trim_coords[i];
+//             const int64_t s1_start = s1.positions.index({trim_1.start, polisher::MAJOR_COLUMN}).item<int64_t>();
+//             const int64_t s1_end = s1.positions.index({trim_1.end - 1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
+//             const int64_t s2_start = s2.positions.index({trim_2.start, polisher::MAJOR_COLUMN}).item<int64_t>();
+//             const int64_t s2_end = s2.positions.index({trim_2.end - 1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
+
+//             if (s2_start > s1_end) {
+//                 const int64_t fill_len = s2_start - s1_end - 1;
+//                 ret.seq += draft.substr(s1_end + 1, fill_len);
+//                 ret.quals += std::string(fill_len, '!');
+//             }
+//         }
+
+//         const Interval& trim = trim_coords[i];
+//         ret.seq += sample_result.seq.substr(trim.start, trim_coords[i].end - trim_coords[i].start);
+//         if (!std::empty(sample_result.quals)) {
+//             ret.quals += sample_result.quals.substr(trim_coords[i].start, trim_coords[i].end - trim_coords[i].start);
+//         } else {
+//             ret.quals += std::string(trim_coords[i].end - trim_coords[i].start, '!');
+//         }
+//     }
+
+//     return ret;
+// }
+
 polisher::ConsensusResult stitch_sequence(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
-        const std::vector<polisher::Sample>& /*samples*/,
-        const std::vector<polisher::ConsensusResult>& /*results_samples*/,
-        const std::vector<std::pair<int32_t, int32_t>>& /*samples_for_seq*/) {
-    // const std::filesystem::path fai_path = utils::get_fai_path(in_draft_fn);
+        const std::vector<polisher::Sample>& samples,
+        const std::vector<polisher::ConsensusResult>& sample_results,
+        const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
+    if (std::empty(samples_for_seq)) {
+        return {};
+    }
 
-    polisher::ConsensusResult ret;
-
+    // Fetch the draft sequence for gap filling.
     const std::string draft = fetch_seq(in_draft_fn, header);
 
-    std::cerr << "draft.size() = " << draft.size() << "\n";
-    std::cerr << "draft seq: " << draft << "\n";
+    // Initialize output consensus sequence and quality strings.
+    std::string consensus_seq;
+    std::string consensus_quals;
 
-    ret.seq = draft;
+    // Track the end position of the last processed sample.
+    int64_t last_end = -1;
+    size_t last_i = -1;
 
-    return ret;
+    // Append the entire sequence of the current sample if no overlap was found.
+    {
+        const int sample_index = samples_for_seq[0].second;
+        const polisher::Sample& sample = samples[sample_index];
+        const polisher::ConsensusResult& result = sample_results[sample_index];
+        consensus_seq = result.seq;
+        consensus_quals = result.quals;
+        last_end = sample.positions.index({-1, 0}).item<int64_t>();
+        last_i = 0;
+    }
+
+    // Iterate over samples in `samples_for_seq`.
+    for (size_t i = 1; i < samples_for_seq.size(); ++i) {
+        const int sample_index = samples_for_seq[i].second;
+        const polisher::Sample& sample = samples[sample_index];
+        const polisher::ConsensusResult& result = sample_results[sample_index];
+
+        // Define the start and end positions of the current sample in draft coordinates.
+        const int64_t start = sample.positions.index({0, 0}).item<int64_t>();
+        const int64_t end = sample.positions.index({-1, 0}).item<int64_t>();
+
+        // std::cerr << "[stitching i = " << i << "] samples_for_seq.size() = " << samples_for_seq.size()
+        //     << ", consensus_seq.size() = "
+        //     << consensus_seq.size()
+        //     << ", consensus_quals.size() = " << consensus_quals.size()
+        //     << ", last_end = " << last_end
+        //     << ", start = " << start << ", end = " << end << "\n";
+
+        if (end < last_end) {
+            continue;
+        }
+
+        if (last_end >= start) {
+            // Compute midpoint of overlap.
+            const int64_t overlap_middle = (last_end + start) / 2;
+
+            // Find midpoint indices using searchsorted.
+            auto prev_sample_positions =
+                    samples[samples_for_seq[last_i].second].positions.select(1, 0);
+            auto curr_sample_positions = sample.positions.select(1, 0);
+
+            const int64_t prev_sample_mid_idx =
+                    torch::searchsorted(prev_sample_positions, overlap_middle, /*right=*/false)
+                            .item<int64_t>();
+            const int64_t curr_sample_mid_idx =
+                    torch::searchsorted(curr_sample_positions, overlap_middle, /*right=*/true)
+                            .item<int64_t>();
+
+            // Trim the previous consensus to avoid the overlap.
+            const int64_t num_to_remove =
+                    static_cast<int64_t>(
+                            std::size(sample_results[samples_for_seq[last_i].second].seq)) -
+                    prev_sample_mid_idx;
+            // std::cerr << "prev_sample_mid_idx = " << prev_sample_mid_idx << ", curr_sample_mid_idx = " << curr_sample_mid_idx
+            //     << ", num_to_remove = " << num_to_remove << "\n";
+            consensus_seq.resize(consensus_seq.size() - num_to_remove);
+            consensus_quals.resize(consensus_quals.size() - num_to_remove);
+            // consensus_seq.erase(consensus_seq.size() - (last_end - overlap_middle + 1));
+            // consensus_quals.erase(consensus_quals.size() - (last_end - overlap_middle + 1));
+
+            // Append non-overlapping portion of current sample.
+            consensus_seq += result.seq.substr(curr_sample_mid_idx);
+            consensus_quals += result.quals.substr(curr_sample_mid_idx);
+
+        } else if (start > (last_end + 1)) {
+            // Gap case between the previous sample and the current sample.
+            const int64_t gap_start = last_end + 1;
+            const int64_t gap_end = start;
+
+            // Fill gap with draft sequence and low-quality placeholders.
+            consensus_seq += draft.substr(gap_start, gap_end - gap_start);
+            consensus_quals += std::string(gap_end - gap_start, '!');
+        }
+
+        // // Append the entire sequence of the current sample if no overlap was found.
+        // consensus_seq += result.seq;
+        // consensus_quals += result.quals;
+
+        // Update the last processed end position.
+        last_end = end;
+        last_i = i;
+    }
+
+    return polisher::ConsensusResult{consensus_seq, consensus_quals};
 }
 
 void run_experimental(const Options& opt) {
@@ -572,6 +732,11 @@ void run_experimental(const Options& opt) {
                 result.quals.resize(actual_size);
                 results.emplace_back(std::move(result));
             }
+
+            spdlog::info(
+                    "Processed another batch of {} samples. Total samples processed: {}, "
+                    "num_samples = {}.",
+                    (end - start), end, num_samples);
         }
 
         assert(std::size(results) == std::size(in_samples));
@@ -627,6 +792,8 @@ void run_experimental(const Options& opt) {
 
         polisher::CountsFeatureEncoder encoder(bam_set);
 
+        spdlog::info("Starting to encode regions for {} windows.", std::size(windows));
+
         // Encode samples (features). A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples;
         for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
@@ -639,6 +806,8 @@ void run_experimental(const Options& opt) {
                            std::make_move_iterator(std::end(new_samples)));
         }
 
+        spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
+
         const std::vector<polisher::ConsensusResult> results_samples =
                 process_samples(encoder, samples, opt.batch_size, with_quals);
 
@@ -649,12 +818,12 @@ void run_experimental(const Options& opt) {
                     ", std::size(samples) = " + std::to_string(std::size(samples))};
         }
 
-        for (size_t i = 0; i < std::size(results_samples); ++i) {
-            std::cerr << "[results_samples i = " << i << "] seq_id = " << samples[i].seq_id
-                      << ", win_id = " << samples[i].window_id
-                      << ", seq len = " << std::size(results_samples[i].seq)
-                      << ", seq: " << results_samples[i].seq << "\n";
-        }
+        // for (size_t i = 0; i < std::size(results_samples); ++i) {
+        //     std::cerr << "[results_samples i = " << i << "] seq_id = " << samples[i].seq_id
+        //               << ", win_id = " << samples[i].window_id
+        //               << ", seq len = " << std::size(results_samples[i].seq)
+        //               << ", seq: " << results_samples[i].seq << "\n";
+        // }
 
         // Stitching information, collect all samples for each sequence.
         std::vector<std::vector<std::pair<int32_t, int32_t>>> samples_for_seqs(
@@ -677,11 +846,11 @@ void run_experimental(const Options& opt) {
             // Sort by region start position, for every sequence.
             std::sort(std::begin(data), std::end(data));
 
-            for (size_t i = 0; i < std::size(data); ++i) {
-                std::cerr << "[seq_id = " << seq_id << ", i = " << i
-                          << "] start = " << data[i].first << ", sample_id = " << data[i].second
-                          << "\n";
-            }
+            // for (size_t i = 0; i < std::size(data); ++i) {
+            //     std::cerr << "[seq_id = " << seq_id << ", i = " << i
+            //               << "] start = " << data[i].first << ", sample_id = " << data[i].second
+            //               << "\n";
+            // }
 
             const polisher::ConsensusResult consensus =
                     stitch_sequence(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
