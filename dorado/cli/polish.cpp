@@ -15,6 +15,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
+#include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
 #include <torch/torch.h>
@@ -366,6 +367,70 @@ std::pair<std::vector<Window>, std::vector<Interval>> create_windows(
 // Sample trim_sample(const Sample& sample) {
 // }
 
+std::string fetch_seq(const std::filesystem::path& index_fn,
+                      const std::string& seq_name,
+                      int32_t start = 0,
+                      int32_t end = -1) {
+    faidx_t* fai = fai_load(index_fn.c_str());
+    if (!fai) {
+        spdlog::error("Failed to load index for file: '{}'.", index_fn.string());
+        return {};
+    }
+
+    const int32_t seq_len = faidx_seq_len(fai, seq_name.c_str());
+
+    start = std::max(start, 0);
+    end = (end < 0) ? seq_len : std::min(end, seq_len);
+
+    int32_t temp_seq_len = 0;
+    char* seq = faidx_fetch_seq(fai, seq_name.c_str(), start, end - 1, &temp_seq_len);
+
+    if (end <= start) {
+        spdlog::error(
+                "Cannot load sequence because end <= start! seq_name = {}, start = {}, end = {}.",
+                seq_name, start, end);
+        return {};
+    }
+
+    if (temp_seq_len != (end - start)) {
+        spdlog::error(
+                "Loaded sequence length does not match the specified interval! seq_name = {}, "
+                "start = {}, end = {}, loaded len = {}.",
+                seq_name, start, end, temp_seq_len);
+        return {};
+    }
+
+    std::string ret;
+    if (seq) {
+        ret = std::string(seq, temp_seq_len);
+        free(seq);
+    }
+
+    fai_destroy(fai);
+
+    return ret;
+}
+
+polisher::ConsensusResult stitch_sequence(
+        const std::filesystem::path& in_draft_fn,
+        const std::string& header,
+        const std::vector<polisher::Sample>& /*samples*/,
+        const std::vector<polisher::ConsensusResult>& /*results_samples*/,
+        const std::vector<std::pair<int32_t, int32_t>>& /*samples_for_seq*/) {
+    // const std::filesystem::path fai_path = utils::get_fai_path(in_draft_fn);
+
+    polisher::ConsensusResult ret;
+
+    const std::string draft = fetch_seq(in_draft_fn, header);
+
+    std::cerr << "draft.size() = " << draft.size() << "\n";
+    std::cerr << "draft seq: " << draft << "\n";
+
+    ret.seq = draft;
+
+    return ret;
+}
+
 void run_experimental(const Options& opt) {
     std::vector<std::string> devices;
     // int32_t infer_threads = 1;
@@ -514,6 +579,36 @@ void run_experimental(const Options& opt) {
         return results;
     };
 
+    const auto write_seq = [](std::ostream& os, const std::string& seq_name,
+                              const polisher::ConsensusResult& result, const bool write_quals) {
+        if (std::empty(result.seq)) {
+            return;
+        }
+
+        std::string seq(std::size(result.seq), '\0');
+        std::string quals(std::size(result.seq), '!');
+
+        size_t n = 0;
+        for (size_t j = 0; j < std::size(result.seq); ++j) {
+            if (result.seq[j] == '*') {
+                continue;
+            }
+            seq[n] = result.seq[j];
+            if (!std::empty(result.quals)) {
+                quals[n] = result.quals[j];
+            }
+            ++n;
+        }
+        seq.resize(n);
+        quals.resize(n);
+
+        if (write_quals) {
+            os << '@' << seq_name << '\n' << seq << "\n+\n" << quals << '\n';
+        } else {
+            os << '>' << seq_name << '\n' << seq << '\n';
+        }
+    };
+
     // Main processing code.
     {
         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
@@ -525,13 +620,10 @@ void run_experimental(const Options& opt) {
 
         spdlog::info("Creating windows.");
 
-        const auto& [windows, seq_window_ranges] =
-                create_windows(draft_lens, opt.window_len, opt.window_overlap);
+        const auto& [windows, _] = create_windows(draft_lens, opt.window_len, opt.window_overlap);
 
         spdlog::info("Created {} windows from {} sequences.", std::size(windows),
                      std::size(draft_lens));
-
-        std::ofstream ofs(opt.out_consensus_fn);
 
         polisher::CountsFeatureEncoder encoder(bam_set);
 
@@ -562,6 +654,41 @@ void run_experimental(const Options& opt) {
                       << ", win_id = " << samples[i].window_id
                       << ", seq len = " << std::size(results_samples[i].seq)
                       << ", seq: " << results_samples[i].seq << "\n";
+        }
+
+        // Stitching information, collect all samples for each sequence.
+        std::vector<std::vector<std::pair<int32_t, int32_t>>> samples_for_seqs(
+                std::size(draft_lens));
+        for (int32_t i = 0; i < static_cast<int32_t>(std::size(samples)); ++i) {
+            const polisher::Sample& sample = samples[i];
+            samples_for_seqs[sample.seq_id].emplace_back(sample.region_start, i);
+        }
+
+        std::ofstream ofs(opt.out_consensus_fn);
+
+        // Stitch the windows.
+        for (size_t seq_id = 0; seq_id < std::size(samples_for_seqs); ++seq_id) {
+            auto& data = samples_for_seqs[seq_id];
+
+            if (std::empty(data)) {
+                continue;
+            }
+
+            // Sort by region start position, for every sequence.
+            std::sort(std::begin(data), std::end(data));
+
+            for (size_t i = 0; i < std::size(data); ++i) {
+                std::cerr << "[seq_id = " << seq_id << ", i = " << i
+                          << "] start = " << data[i].first << ", sample_id = " << data[i].second
+                          << "\n";
+            }
+
+            const polisher::ConsensusResult consensus =
+                    stitch_sequence(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
+                                    results_samples, data);
+
+            const std::string header = std::string("consensus") + "-" + draft_lens[seq_id].first;
+            write_seq(ofs, header, consensus, with_quals);
         }
 
         destroy_bam_fset(bam_set);
