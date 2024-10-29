@@ -326,7 +326,7 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
                                                         const int64_t ref_start,
                                                         const int64_t ref_end,
                                                         const int32_t seq_id,
-                                                        const int32_t win_id) {
+                                                        const int32_t win_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -374,7 +374,7 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
 }
 
 std::vector<ConsensusResult> CountsFeatureEncoder::decode_bases(const torch::Tensor& logits,
-                                                                const bool with_probs) {
+                                                                const bool with_probs) const {
     static constexpr std::string_view label_scheme{"*ACGT"};
 
     const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
