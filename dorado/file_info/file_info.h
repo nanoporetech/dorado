@@ -28,7 +28,7 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
 
 // Inspects the sequencing data metadata to determine the sequencing chemistry used.
 // Throws runtime_error if the data is inhomogeneous.
-models::Chemistry get_unique_sequencing_chemisty(
+models::Chemistry get_unique_sequencing_chemistry(
         const std::vector<std::filesystem::directory_entry>& dir_files);
 
 }  // namespace dorado::file_info

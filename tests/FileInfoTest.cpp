@@ -89,7 +89,7 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list", TEST_GROUP)
     }
 }
 
-TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemisty", TEST_GROUP) {
+TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemistry", TEST_GROUP) {
     using CC = models::Chemistry;
     namespace fs = std::filesystem;
 
@@ -106,14 +106,14 @@ TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemisty", TEST_GROUP) {
         CAPTURE(condition);
         auto data = fs::path(get_data_dir("pod5")) / condition;
         CHECK(fs::exists(data));
-        auto result = get_unique_sequencing_chemisty(dir_entries(data.u8string(), false));
+        auto result = get_unique_sequencing_chemistry(dir_entries(data.u8string(), false));
         CHECK(result == expected);
     }
 
     SECTION("get_chemistry throws with inhomogeneous") {
         auto data = fs::path(get_data_dir("pod5")) / "mixed";
         utils::SuppressStdout suppress_error_message{};
-        CHECK_THROWS(get_unique_sequencing_chemisty(dir_entries(data.u8string(), true)),
+        CHECK_THROWS(get_unique_sequencing_chemistry(dir_entries(data.u8string(), true)),
                      Catch::Matchers::Contains(
                              "Could not uniquely resolve chemistry from inhomogeneous data"));
     }

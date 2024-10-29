@@ -811,7 +811,7 @@ int basecaller(int argc, char* argv[]) {
                 model_path, mod_bases, mod_bases_models, downloader);
     } else {
         const auto chemistry =
-                file_info::get_unique_sequencing_chemisty(input_folder_info.files().get());
+                file_info::get_unique_sequencing_chemistry(input_folder_info.files().get());
         const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");

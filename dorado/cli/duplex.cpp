@@ -122,7 +122,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
     }
 
     // Inspect data to find chemistry.
-    const auto chemistry = file_info::get_unique_sequencing_chemisty(dir_entries);
+    const auto chemistry = file_info::get_unique_sequencing_chemistry(dir_entries);
     return ModelComplexSearch(model_complex, chemistry, true);
 }
 

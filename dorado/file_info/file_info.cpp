@@ -282,7 +282,7 @@ std::set<models::ChemistryKey> get_sequencing_chemistries(
     return chemistries;
 }
 
-models::Chemistry get_unique_sequencing_chemisty(
+models::Chemistry get_unique_sequencing_chemistry(
         const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::set<models::ChemistryKey> data_chemistries = get_sequencing_chemistries(dir_files);
 
