@@ -722,7 +722,8 @@ DataLoader::DataLoader(Pipeline& pipeline,
 }
 
 DataLoader::InputFiles::InputFiles(const std::filesystem::path& path, bool recursive)
-        : m_entries(utils::fetch_directory_entries(path, recursive)) {}
+        : m_entries(filter_fast5_for_mixed_datasets(
+                  utils::fetch_directory_entries(path, recursive))) {}
 
 const std::vector<std::filesystem::directory_entry>& DataLoader::InputFiles::get() const {
     return m_entries;
