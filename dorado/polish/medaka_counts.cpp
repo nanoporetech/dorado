@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include "medaka_counts.h"
 
 #include "htslib/sam.h"
