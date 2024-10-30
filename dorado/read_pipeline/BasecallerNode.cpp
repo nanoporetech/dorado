@@ -87,9 +87,7 @@ void BasecallerNode::input_thread_fn() {
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
-        size_t raw_size =
-                read_common_data.raw_data
-                        .sizes()[read_common_data.raw_data.sizes().size() - 1];  // Time dimension.
+        size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
         size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
         size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
