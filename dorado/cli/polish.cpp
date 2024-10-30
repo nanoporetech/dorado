@@ -15,6 +15,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 
+#include <cxxpool.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
@@ -792,8 +793,6 @@ void run_experimental(const Options& opt) {
 
     // Main processing code.
     {
-        bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
-
         spdlog::info("Loading draft sequence lengths.");
 
         const std::vector<std::pair<std::string, int64_t>> draft_lens =
@@ -806,29 +805,125 @@ void run_experimental(const Options& opt) {
         spdlog::info("Created {} windows from {} sequences.", std::size(windows),
                      std::size(draft_lens));
 
-        polisher::CountsFeatureEncoder encoder(bam_set);
-
-        spdlog::info("Starting to encode regions for {} windows.", std::size(windows));
-
-        // Encode samples (features). A window can have multiple samples if there was a gap.
-        std::vector<polisher::Sample> samples;
-        for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
-            if ((win_id % 10000) == 0) {
-                spdlog::info("Encoded {} windows.", win_id);
-            }
-            const auto& window = windows[win_id];
-            const std::string& name = draft_lens[window.seq_id].first;
-            std::vector<polisher::Sample> new_samples =
-                    encoder.encode_region(name, window.start, window.end, window.seq_id, win_id);
-
-            samples.insert(std::end(samples), std::make_move_iterator(std::begin(new_samples)),
-                           std::make_move_iterator(std::end(new_samples)));
+        // Open the BAM file for each thread and spawn encoders.
+        spdlog::info("Creating {} encoders.", opt.threads);
+        std::vector<bam_fset*> bam_sets;
+        std::vector<polisher::CountsFeatureEncoder> encoders;
+        for (int32_t i = 0; i < opt.threads; ++i) {
+            bam_sets.emplace_back(create_bam_fset(opt.in_aln_bam_fn.c_str()));
+            encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
         }
+
+        // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
+        std::vector<polisher::Sample> samples;
+        {
+            std::vector<std::future<void>> futures;
+            futures.reserve(std::size(samples));
+
+            const auto worker_samples =
+                    [&windows, &draft_lens, &encoders](
+                            const int32_t thread_id, const int32_t start, const int32_t end,
+                            std::vector<std::vector<polisher::Sample>>& results) {
+                        for (int32_t i = start; i < end; ++i) {
+                            const auto& window = windows[i];
+                            const std::string& name = draft_lens[window.seq_id].first;
+                            results[i] = encoders[thread_id].encode_region(
+                                    name, window.start, window.end, window.seq_id, i);
+                        }
+                    };
+
+            const auto compute_chunks = [](const int32_t num_items, const int32_t num_chunks) {
+                std::vector<std::pair<int32_t, int32_t>> chunks;
+                const int32_t chunk_size = num_items / num_chunks;
+                std::vector<int32_t> chunk_sizes(num_chunks, chunk_size);
+                for (int32_t i = 0; i < (num_items % num_chunks); ++i) {
+                    ++chunk_sizes[i];
+                }
+                int32_t sum = 0;
+                for (const int32_t v : chunk_sizes) {
+                    if (v == 0) {
+                        continue;
+                    }
+                    chunks.emplace_back(sum, sum + v);
+                    sum += v;
+                }
+                if (sum != num_items) {
+                    throw std::runtime_error{
+                            "Wrong sum of items divided into chunks! num_items = " +
+                            std::to_string(num_items) + ", num_chunks = " +
+                            std::to_string(num_chunks) + ", sum = " + std::to_string(sum)};
+                }
+                return chunks;
+            };
+
+            std::vector<std::vector<polisher::Sample>> win_results(std::size(windows));
+
+            // const int32_t num_items = static_cast<int32_t>(std::size(windows));
+            // const int32_t num_threads = opt.threads;
+            // const int32_t chunk_size = (num_items + num_threads - 1) / num_threads;
+
+            const int32_t num_items = static_cast<int32_t>(std::size(windows));
+            const std::vector<std::pair<int32_t, int32_t>> chunks =
+                    compute_chunks(num_items, opt.threads);
+
+            spdlog::info("Starting to encode regions for {} windows using {} threads.",
+                         std::size(windows), std::size(chunks));
+
+            cxxpool::thread_pool pool{std::size(chunks)};
+            for (int32_t thread_id = 0; thread_id < static_cast<int32_t>(std::size(chunks));
+                 ++thread_id) {
+                const auto [chunk_start, chunk_end] = chunks[thread_id];
+                futures.emplace_back(pool.push(worker_samples, thread_id, chunk_start, chunk_end,
+                                               std::ref(win_results)));
+            }
+
+            // for (int32_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+            //     const int32_t chunk_start = thread_id * chunk_size;
+            //     const int32_t chunk_end = std::min(num_items, chunk_start + chunk_size);
+            //     futures.emplace_back(pool.push(worker_samples, thread_id, chunk_start, chunk_end, std::ref(win_results)));
+            // }
+
+            for (auto& f : futures) {
+                f.wait();
+            }
+
+            // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
+            //     futures.emplace_back(pool.push(worker_samples, win_id, std::ref(win_results)));
+            // }
+            // for (auto& f : futures) {
+            //     f.wait();
+            // }
+
+            // Flatten the samples.
+            int64_t num_samples = 0;
+            for (const auto& win_samples : win_results) {
+                num_samples += static_cast<int64_t>(std::size(win_samples));
+            }
+            samples.reserve(num_samples);
+            for (auto& win_samples : win_results) {
+                samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
+                               std::make_move_iterator(std::end(win_samples)));
+            }
+        }
+
+        // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
+        //     if ((win_id % 10000) == 0) {
+        //         spdlog::info("Encoded {} windows.", win_id);
+        //     }
+        //     const auto& window = windows[win_id];
+        //     const std::string& name = draft_lens[window.seq_id].first;
+        //     std::vector<polisher::Sample> new_samples =
+        //             encoder.encode_region(name, window.start, window.end, window.seq_id, win_id);
+
+        //     samples.insert(std::end(samples), std::make_move_iterator(std::begin(new_samples)),
+        //                    std::make_move_iterator(std::end(new_samples)));
+        // }
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
 
+        // TODO: Separate the encoder and the decoder. The decoder does not need the BAM file.
         const std::vector<polisher::ConsensusResult> results_samples =
-                process_samples(encoder, samples, opt.batch_size, with_quals);
+                process_samples(encoders.front(), samples, opt.batch_size, with_quals);
 
         if (std::size(results_samples) != std::size(samples)) {
             throw std::runtime_error{
@@ -879,7 +974,9 @@ void run_experimental(const Options& opt) {
             write_seq(ofs, header, consensus, with_quals);
         }
 
-        destroy_bam_fset(bam_set);
+        for (auto& bam_set : bam_sets) {
+            destroy_bam_fset(bam_set);
+        }
     }
 
     // for (size_t i = 0; i < std::size(results_remainders); ++i) {
