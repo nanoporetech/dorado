@@ -64,7 +64,6 @@ inline size_t CountSinkReads(const std::filesystem::path& data_path,
 
     dorado::DataLoader loader(*pipeline, device, num_worker_threads, max_reads,
                               std::move(read_list), std::move(read_ignore_list));
-    auto folder_entries = dorado::utils::fetch_directory_entries(data_path, false);
     loader.load_reads({data_path, false}, dorado::ReadOrder::UNRESTRICTED);
     pipeline.reset();
     return messages.size();

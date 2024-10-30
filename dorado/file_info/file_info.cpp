@@ -217,16 +217,15 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
 std::set<models::ChemistryKey> get_sequencing_chemistries(
         const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::set<models::ChemistryKey> chemistries;
-
+    bool fast5_found{false};
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         auto file_path = entry.path().string();
         if (ext == ".fast5") {
-            throw std::runtime_error("Cannot automate model selection using fast5 files");
+            fast5_found = true;
         }
-
         if (ext != ".pod5") {
             continue;
         }
@@ -278,6 +277,9 @@ std::set<models::ChemistryKey> get_sequencing_chemistries(
                 }
             }
         };
+    }
+    if (fast5_found) {
+        spdlog::warn("Cannot automate model selection using fast5 files");
     }
     return chemistries;
 }

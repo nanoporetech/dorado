@@ -35,7 +35,7 @@ std::set<std::string>& get_supported_compression_extensions() {
     return supported_compression_extensions;
 };
 
-bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
+bool is_loadable_by_htslib(const fs::path& input_path) {
     dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
     if (!hts_file) {
         return false;
@@ -45,7 +45,7 @@ bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
     return header != nullptr;
 }
 
-bool is_valid_input_file(const std::filesystem::path& input_path) {
+bool is_valid_input_file(const fs::path& input_path) {
     return is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string());
 }
 
@@ -57,10 +57,10 @@ fs::path replace_extension(fs::path output_path) {
 }
 
 class WorkingFileLut {
-    std::unordered_map<std::string, std::vector<std::filesystem::path>> m_working_paths{};
+    std::unordered_map<std::string, std::vector<fs::path>> m_working_paths{};
     const std::string& m_output_folder;
 
-    void add_to_working_files(const std::filesystem::path& input_relative_path) {
+    void add_to_working_files(const fs::path& input_relative_path) {
         auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
 
         m_working_paths[output.string()].push_back(input_relative_path);
@@ -90,7 +90,7 @@ public:
         }
     }
 
-    const std::unordered_map<std::string, std::vector<std::filesystem::path>>& get() const {
+    const std::unordered_map<std::string, std::vector<fs::path>>& get() const {
         return m_working_paths;
     }
 };
