@@ -114,7 +114,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Advanced arguments");
         parser->visible.add_argument("-b", "--batch-size")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
-                .default_value(128)
+                .default_value(100)
                 .scan<'i', int>();
         parser->visible.add_argument("-w", "--window-len")
                 .help("Window size for calling consensus.")
