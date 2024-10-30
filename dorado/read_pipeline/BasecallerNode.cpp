@@ -101,7 +101,7 @@ void BasecallerNode::input_thread_fn() {
         read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
                 working_read, offset, chunk_in_read_idx++, chunk_size));
         size_t num_chunks = 1;
-        auto last_chunk_offset = raw_size - chunk_size;
+        auto last_chunk_offset = raw_size > chunk_size ? raw_size - chunk_size : 0;
         auto misalignment = last_chunk_offset % m_model_stride;
         if (misalignment != 0) {
             // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
