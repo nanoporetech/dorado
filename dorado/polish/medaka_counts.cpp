@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <ostream>
 // #include <errno.h>
 
@@ -92,13 +93,13 @@ void print_pileup_data(std::ostream &os,
     }
 }
 
-float *_get_weibull_scores(const bam_pileup1_t *p,
-                           const size_t indel,
-                           const size_t num_homop,
-                           khash_t(BADREADS) * bad_reads) {
+std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
+                                       const size_t indel,
+                                       const size_t num_homop,
+                                       khash_t(BADREADS) * bad_reads) {
     // Create homopolymer scores using Weibull shape and scale parameters.
     // If prerequisite sam tags are not present an array of zero counts is returned.
-    float *fraction_counts = (float *)xalloc(num_homop, sizeof(float), "weibull_counts");
+    std::vector<float> fraction_counts(num_homop);
     static const char *wtags[] = {"WL", "WK"};  // scale, shape
     double wtag_vals[2] = {0.0, 0.0};
     for (size_t i = 0; i < 2; ++i) {
@@ -193,20 +194,9 @@ PileupData calculate_pileup(const std::string &chr_name,
 
     const std::string region = chr_name + ':' + std::to_string(start) + '-' + std::to_string(end);
 
-    // // setup bam interator
-    // std::array<mplp_data, 1> data_vec;
-    // mplp_data* data = &data_vec[0];
-    // data.fp = fp;
-    // data.hdr = hdr;
-    // data.iter = bam_itr_querys(idx, hdr, region.c_str());
-    // data.min_mapQ = min_mapq;
-    // memcpy(data.tag_name, tag_name.c_str(), 2);
-    // data.tag_value = tag_value;
-    // data.keep_missing = keep_missing;
-    // data.read_group = read_group;
-    // bam_mplp_t mplp = bam_mplp_init(1, read_bam, (void **)&data_vec.data());
+    std::unique_ptr<mplp_data> data = std::make_unique<mplp_data>();
+    mplp_data *raw_data_ptr = data.get();
 
-    mplp_data *data = (mplp_data *)xalloc(1, sizeof(mplp_data), "pileup init data");
     data->fp = fp;
     data->hdr = hdr;
     data->iter = bam_itr_querys(idx, hdr, region.c_str());
@@ -215,7 +205,7 @@ PileupData calculate_pileup(const std::string &chr_name,
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = read_group;
-    bam_mplp_t mplp = bam_mplp_init(1, read_bam, (void **)&data);
+    bam_mplp_t mplp = bam_mplp_init(1, read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
     // const bam_pileup1_t** plp_ptr = &plp.data();
@@ -345,14 +335,13 @@ PileupData calculate_pileup(const std::string &chr_name,
                             + base_i;  // the base
 
                     if (weibull_summation) {
-                        float *fraction_counts =
+                        const std::vector<float> fraction_counts =
                                 _get_weibull_scores(p, query_pos_offset, num_homop, no_rle_tags);
                         for (size_t qstrat = 0; qstrat < num_homop; ++qstrat) {
                             static const int32_t scale = 10000;
                             pileup_matrix[partial_index + featlen * qstrat] +=
                                     scale * fraction_counts[qstrat];
                         }
-                        free(fraction_counts);
                     } else {
                         int32_t qstrat = 0;
                         if (num_homop > 1) {
@@ -375,8 +364,6 @@ PileupData calculate_pileup(const std::string &chr_name,
 
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);
-
-    free(data);
 
     return pileup;
 }

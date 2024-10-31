@@ -369,8 +369,8 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
         // results.emplace_back(Sample{ref_name, data.counts,
         //                             data.positions, {}});
 
-        results.emplace_back(counts_to_features(data, ref_name, ref_start, ref_end, seq_id, win_id,
-                                                m_symmetric_indels, m_feature_indices,
+        results.emplace_back(counts_to_features(data, ref_name, ref_start + 1, ref_end, seq_id,
+                                                win_id, m_symmetric_indels, m_feature_indices,
                                                 m_normalise_type));
     }
 

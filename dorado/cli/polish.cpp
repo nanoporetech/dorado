@@ -988,6 +988,8 @@ void run_experimental(const Options& opt) {
         }
     }
 
+    spdlog::info("Done!");
+
     // for (size_t i = 0; i < std::size(results_remainders); ++i) {
     //     std::cerr << "[results_remainders i = " << i << "] len = " << std::size(results_remainders[i].seq) << ", seq: " << results_remainders[i].seq << "\n";
     // }
