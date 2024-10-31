@@ -3,16 +3,6 @@
 
 #include <stdint.h>
 
-/** Simple integer min/max
- * @param a
- * @param b
- *
- * @returns the min/max of a and b
- *
- */
-static inline int max(int a, int b) { return a > b ? a : b; }
-static inline int min(int a, int b) { return a < b ? a : b; }
-
 /** Allocates zero-initialised memory with a message on failure.
  *
  *  @param num number of elements to allocate.
@@ -32,14 +22,5 @@ void *xalloc(size_t num, size_t size, const char *msg);
  *
  */
 void *xrealloc(void *ptr, size_t size, const char *msg);
-
-/** Format a uint32_t to a string
- *
- * @param value to format.
- * @param dst destination char.
- * @returns length of string.
- *
- */
-size_t uint8_to_str(uint8_t value, char *dst);
 
 #endif
