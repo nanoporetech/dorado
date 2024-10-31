@@ -90,7 +90,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("-t", "--threads")
                 .help("Number of threads for processing. "
                       "Default uses all available threads.")
-                .default_value(0)
+                .default_value(1)
                 .scan<'i', int>();
 
         parser->visible.add_argument("--infer-threads")
@@ -233,6 +233,30 @@ void validate_options(const Options& opt) {
         spdlog::error("Input model directory {} does not exist!", opt.model_path.string());
         std::exit(EXIT_FAILURE);
     }
+}
+
+const std::vector<std::pair<int32_t, int32_t>> compute_chunks(const int32_t num_items,
+                                                              const int32_t num_chunks) {
+    std::vector<std::pair<int32_t, int32_t>> chunks;
+    const int32_t chunk_size = num_items / num_chunks;
+    std::vector<int32_t> chunk_sizes(num_chunks, chunk_size);
+    for (int32_t i = 0; i < (num_items % num_chunks); ++i) {
+        ++chunk_sizes[i];
+    }
+    int32_t sum = 0;
+    for (const int32_t v : chunk_sizes) {
+        if (v == 0) {
+            continue;
+        }
+        chunks.emplace_back(sum, sum + v);
+        sum += v;
+    }
+    if (sum != num_items) {
+        throw std::runtime_error{
+                "Wrong sum of items divided into chunks! num_items = " + std::to_string(num_items) +
+                ", num_chunks = " + std::to_string(num_chunks) + ", sum = " + std::to_string(sum)};
+    }
+    return chunks;
 }
 
 }  // namespace
@@ -817,14 +841,17 @@ void run_experimental(const Options& opt) {
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples;
         {
-            std::vector<std::future<void>> futures;
-            futures.reserve(std::size(samples));
-
             const auto worker_samples =
                     [&windows, &draft_lens, &encoders](
                             const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<std::vector<polisher::Sample>>& results) {
                         for (int32_t i = start; i < end; ++i) {
+                            if (thread_id == 0) {
+                                spdlog::info(
+                                        "Processed i = {}, start = {}, end = {} ({} %).", i, start,
+                                        end,
+                                        100.0 * static_cast<double>(i - start) / (end - start));
+                            }
                             const auto& window = windows[i];
                             const std::string& name = draft_lens[window.seq_id].first;
                             results[i] = encoders[thread_id].encode_region(
@@ -832,48 +859,28 @@ void run_experimental(const Options& opt) {
                         }
                     };
 
-            const auto compute_chunks = [](const int32_t num_items, const int32_t num_chunks) {
-                std::vector<std::pair<int32_t, int32_t>> chunks;
-                const int32_t chunk_size = num_items / num_chunks;
-                std::vector<int32_t> chunk_sizes(num_chunks, chunk_size);
-                for (int32_t i = 0; i < (num_items % num_chunks); ++i) {
-                    ++chunk_sizes[i];
-                }
-                int32_t sum = 0;
-                for (const int32_t v : chunk_sizes) {
-                    if (v == 0) {
-                        continue;
-                    }
-                    chunks.emplace_back(sum, sum + v);
-                    sum += v;
-                }
-                if (sum != num_items) {
-                    throw std::runtime_error{
-                            "Wrong sum of items divided into chunks! num_items = " +
-                            std::to_string(num_items) + ", num_chunks = " +
-                            std::to_string(num_chunks) + ", sum = " + std::to_string(sum)};
-                }
-                return chunks;
-            };
-
             std::vector<std::vector<polisher::Sample>> win_results(std::size(windows));
-
-            // const int32_t num_items = static_cast<int32_t>(std::size(windows));
-            // const int32_t num_threads = opt.threads;
-            // const int32_t chunk_size = (num_items + num_threads - 1) / num_threads;
 
             const int32_t num_items = static_cast<int32_t>(std::size(windows));
             const std::vector<std::pair<int32_t, int32_t>> chunks =
                     compute_chunks(num_items, opt.threads);
 
+            for (size_t i = 0; i < std::size(chunks); ++i) {
+                const auto& [start, end] = chunks[i];
+                std::cerr << "[chunk i = " << i << "] start = " << start << ", end = " << end
+                          << "\n";
+            }
+
             spdlog::info("Starting to encode regions for {} windows using {} threads.",
                          std::size(windows), std::size(chunks));
 
             cxxpool::thread_pool pool{std::size(chunks)};
-            for (int32_t thread_id = 0; thread_id < static_cast<int32_t>(std::size(chunks));
-                 ++thread_id) {
-                const auto [chunk_start, chunk_end] = chunks[thread_id];
-                futures.emplace_back(pool.push(worker_samples, thread_id, chunk_start, chunk_end,
+
+            std::vector<std::future<void>> futures;
+            futures.reserve(std::size(chunks));
+            for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
+                const auto [chunk_start, chunk_end] = chunks[tid];
+                futures.emplace_back(pool.push(worker_samples, tid, chunk_start, chunk_end,
                                                std::ref(win_results)));
             }
 
@@ -894,10 +901,12 @@ void run_experimental(const Options& opt) {
             //     f.wait();
             // }
 
+            spdlog::info("Flattening the samples.");
+
             // Flatten the samples.
-            int64_t num_samples = 0;
+            size_t num_samples = 0;
             for (const auto& win_samples : win_results) {
-                num_samples += static_cast<int64_t>(std::size(win_samples));
+                num_samples += std::size(win_samples);
             }
             samples.reserve(num_samples);
             for (auto& win_samples : win_results) {
