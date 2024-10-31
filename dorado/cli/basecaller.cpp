@@ -225,6 +225,11 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("Require both ends of a read to be barcoded for a double ended barcode.")
                 .default_value(false)
                 .implicit_value(true);
+        parser.visible.add_argument("--disallow-inferior-barcodes")
+                .help("Declassify reads if a better barcode match over the threshold exists at "
+                      "either end of the read for double ended kits.")
+                .default_value(false)
+                .implicit_value(true);
         parser.visible.add_argument("--barcode-arrangement")
                 .help("Path to file with custom barcode arrangement. Requires --kit-name.");
         parser.visible.add_argument("--barcode-sequences")
@@ -746,6 +751,8 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
+        barcoding_info->disallow_inferior_barcodes =
+                parser.visible.get<bool>("--disallow-inferior-barcodes");
         barcoding_info->trim = !no_trim_barcodes;
 
         std::optional<std::string> custom_seqs =

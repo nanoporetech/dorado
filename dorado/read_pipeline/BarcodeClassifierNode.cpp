@@ -89,6 +89,7 @@ void BarcodeClassifierNode::barcode(BamMessage& read, const demux::BarcodingInfo
     }
 
     auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
+                                    barcoding_info->disallow_inferior_barcodes,
                                     barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
@@ -121,6 +122,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
+                                    barcoding_info->disallow_inferior_barcodes,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
     spdlog::trace("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);

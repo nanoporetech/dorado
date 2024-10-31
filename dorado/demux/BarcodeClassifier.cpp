@@ -188,9 +188,10 @@ BarcodeClassifier::~BarcodeClassifier() = default;
 
 BarcodeScoreResult BarcodeClassifier::barcode(const std::string& seq,
                                               bool barcode_both_ends,
+                                              bool disallow_inferior_barcodes,
                                               const BarcodeFilterSet& allowed_barcodes) const {
-    auto best_barcode =
-            find_best_barcode(seq, m_barcode_candidates, barcode_both_ends, allowed_barcodes);
+    auto best_barcode = find_best_barcode(seq, m_barcode_candidates, barcode_both_ends,
+                                          disallow_inferior_barcodes, allowed_barcodes);
     return best_barcode;
 }
 
@@ -821,6 +822,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const std::string& read_seq,
         const std::vector<BarcodeCandidateKit>& candidates,
         bool barcode_both_ends,
+        bool disallow_inferior_barcodes,
         const BarcodeFilterSet& allowed_barcodes) const {
     if (read_seq.length() == 0) {
         return UNCLASSIFIED;
@@ -955,6 +957,28 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
             spdlog::trace("Max of top {} and bottom penalties {} > max barcode penalty {}",
                           out.top_penalty, out.bottom_penalty,
                           m_scoring_params.max_barcode_penalty);
+            return UNCLASSIFIED;
+        }
+    }
+
+    if (kit.double_ends && disallow_inferior_barcodes) {
+        // For more stringent classification, ensure that neither end of a read has a higher scoring
+        //  barcode, if any of the barcodes at that end are better than the threshold.
+        auto best_top_result = std::min_element(
+                results.begin(), results.end(),
+                [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
+        auto best_bottom_result = std::min_element(
+                results.begin(), results.end(),
+                [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
+
+        if (((out.barcode_name != best_top_result->barcode_name) &&
+             (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
+            ((out.barcode_name != best_bottom_result->barcode_name) &&
+             (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty))) {
+            spdlog::trace(
+                    "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
+                    out.barcode_name, best_top_result->barcode_name,
+                    best_bottom_result->barcode_name);
             return UNCLASSIFIED;
         }
     }
