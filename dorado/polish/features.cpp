@@ -32,8 +32,6 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
             torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
 
-    result.positions = result.positions.contiguous();
-
     return result;
 }
 
