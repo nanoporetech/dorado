@@ -24,14 +24,12 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
 
     // Copy 'major' data into the first column of the positions tensor.
     torch::Tensor major_tensor =
-            torch::from_blob(data.major().data(), {static_cast<long>(data.n_cols())}, torch::kInt64)
-                    .clone();
+            torch::from_blob(data.major().data(), data.n_cols(), torch::kInt64).clone();
     result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
 
     // Copy 'minor' data into the second column of the positions tensor.
     torch::Tensor minor_tensor =
-            torch::from_blob(data.minor().data(), {static_cast<long>(data.n_cols())}, torch::kInt64)
-                    .clone();
+            torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
 
     result.positions = result.positions.contiguous();
