@@ -8,28 +8,30 @@ namespace dorado::polisher {
 
 namespace {
 
-CountsResult plp_data_to_tensors(const plp_data& data, const size_t n_rows) {
+CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     CountsResult result;
 
     // Create a tensor for the feature matrix (equivalent to np_counts in Python).
     // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
-    result.counts = torch::from_blob(data->matrix,
-                                     {static_cast<long>(data->n_cols), static_cast<long>(n_rows)},
+    result.counts = torch::from_blob(data.matrix().data(),
+                                     {static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
                                      torch::kInt64)
                             .clone();
 
     // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
     // We'll store the major and minor arrays as two separate columns in a single tensor.
-    result.positions = torch::empty({static_cast<long>(data->n_cols), 2}, torch::kInt64);
+    result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
 
     // Copy 'major' data into the first column of the positions tensor.
     torch::Tensor major_tensor =
-            torch::from_blob(data->major, {static_cast<long>(data->n_cols)}, torch::kInt64).clone();
+            torch::from_blob(data.major().data(), {static_cast<long>(data.n_cols())}, torch::kInt64)
+                    .clone();
     result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
 
     // Copy 'minor' data into the second column of the positions tensor.
     torch::Tensor minor_tensor =
-            torch::from_blob(data->minor, {static_cast<long>(data->n_cols)}, torch::kInt64).clone();
+            torch::from_blob(data.minor().data(), {static_cast<long>(data.n_cols())}, torch::kInt64)
+                    .clone();
     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
 
     result.positions = result.positions.contiguous();
@@ -48,7 +50,9 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
     // Create a map to store the indices.
     FeatureIndicesType indices;
 
-    const int64_t plp_bases_size = static_cast<int64_t>(featlen);  // TODO: plp_bases.size()
+    const int64_t plp_bases_size = static_cast<int64_t>(std::size(PILEUP_BASES));
+
+    constexpr size_t featlen = std::size(PILEUP_BASES);
 
     // Iterate over each datatype.
     for (int64_t dti = 0; dti < static_cast<int64_t>(std::size(dtypes)); ++dti) {
@@ -58,7 +62,7 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
         for (int64_t qindex = 0; qindex < static_cast<int64_t>(num_qstrat); ++qindex) {
             // Iterate over the base codes (e.g., 'a', 'c', 'g', 't', etc.)
             for (int64_t base_i = 0; base_i < plp_bases_size; ++base_i) {
-                const char code = plp_bases[base_i];
+                const char code = PILEUP_BASES[base_i];
                 const bool is_rev = std::islower(code);
                 const int64_t index = base_i + dti * num_qstrat * featlen + qindex * featlen;
                 indices[std::make_pair(dt, is_rev)].push_back(index);
@@ -90,30 +94,32 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
  *          chunked the regions for parallel processing and returned these chunks separately in the end as well.
  *          Here, we move this responsibility onto the caller of the function.
  */
-std::vector<CountsResult> construct_pileup_counts(bam_fset* bam_set,
-                                                  const std::string& region,
+std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
+                                                  const std::string& ref_name,
+                                                  const int32_t ref_start,
+                                                  const int32_t ref_end,
                                                   size_t num_qstrat = 1,
                                                   size_t num_dtypes = 1,
-                                                  const char** dtypes = NULL,
+                                                  const std::vector<std::string>& dtypes = {},
                                                   const std::string tag_name = {},
-                                                  //  const std::string_view tag_name = {},
                                                   int tag_value = 0,
                                                   bool keep_missing = false,
                                                   bool weibull_summation = false,
                                                   const char* read_group = NULL,
-                                                  const int min_mapQ = 1) {
+                                                  const int min_mapq = 1) {
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
-    const plp_data pileup = calculate_pileup(region.c_str(), bam_set, num_dtypes, dtypes,
-                                             num_qstrat, tag_name.c_str(), tag_value, keep_missing,
-                                             weibull_summation, read_group, min_mapQ);
+    // NOTE 2: the from_blob expects non-const data, so can't define the pileup as const here.
+    PileupData pileup = calculate_pileup(ref_name, ref_start, ref_end, bam_set, num_dtypes, dtypes,
+                                         num_qstrat, tag_name, tag_value, keep_missing,
+                                         weibull_summation, read_group, min_mapq);
     // Create Torch tensors from the pileup.
-    const size_t n_rows = featlen * num_dtypes * num_qstrat;
+    const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
     CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
 
     // print_pileup_data(pileup, num_dtypes, dtypes, num_qstrat);
 
-    destroy_plp_data(pileup);
+    // destroy_plp_data(pileup);
 
     // // TODO: __enforce_pileup_chunk_contiguity
     // return enforce_pileup_chunk_contiguity(counts_result);
@@ -241,9 +247,9 @@ Sample counts_to_features(CountsResult& pileup,
                     pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
             // dt_depth.index_put_({minor_inds}, dt_depth.index({major_ind_at_minor_inds}));
 
-            // Define deletion index based on rev_del/fwd_del logic
-            const int64_t featlen_index = is_rev ? rev_del : fwd_del;
-            const int64_t dtype_size = featlen;
+            // Define deletion index.
+            const int64_t featlen_index = is_rev ? PILEUP_POS_DEL_REV : PILEUP_POS_DEL_FWD;
+            const int64_t dtype_size = std::size(PILEUP_BASES);
 
             // Find the deletion index
             // std::vector<int64_t> deletion_indices;
@@ -333,20 +339,15 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
-    std::vector<const char*> dtypes;
-    for (const auto& dtype : m_dtypes) {
-        dtypes.emplace_back(dtype.c_str());
-    }
-
-    const char** dtypes_ptr = std::empty(dtypes) ? nullptr : dtypes.data();
-    const int32_t num_dtypes = static_cast<int32_t>(std::size(dtypes)) + 1;
+    const int32_t num_dtypes = static_cast<int32_t>(std::size(m_dtypes)) + 1;
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
     const std::string region =
             ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
 
     std::vector<CountsResult> pileups = construct_pileup_counts(
-            m_bam_set, region, num_qstrat, num_dtypes, dtypes_ptr, m_tag_name.c_str(), m_tag_value,
-            m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
+            *m_bam_set, ref_name, ref_start + 1, ref_end, num_qstrat, num_dtypes, m_dtypes,
+            m_tag_name, m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr,
+            m_min_mapq);
 
     std::vector<Sample> results;
 

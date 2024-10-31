@@ -1,96 +1,79 @@
-#ifndef _MEDAKA_COUNTS_H
-#define _MEDAKA_COUNTS_H
+#pragma once
 
 #include "medaka_bamiter.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <string_view>
+#include <vector>
 
-// medaka-style feature data
-typedef struct _plp_data {
-    size_t buffer_cols;
-    size_t num_dtypes;
-    size_t num_homop;
-    size_t n_cols;
-    size_t *matrix;
-    size_t *major;
-    size_t *minor;
-} _plp_data;
-typedef _plp_data *plp_data;
-
-// Simple container for strings
-typedef struct string_set {
-    size_t n;
-    char **strings;
-} string_set;
-
-/** Destroys a string set
- *
- *  @param data the object to cleanup.
- *  @returns void.
- *
- */
-void destroy_string_set(string_set strings);
-
-// /** Retrieves contents of key-value tab delimited file.
-//  *
-//  *  @param fname input file path.
-//  *  @returns a string_set
-//  *
-//  *  The return value can be free'd with destroy_string_set.
-//  *  key-value pairs are stored sequentially in the string set
-//  *
-//  */
-// string_set read_key_value(char *fname);
+namespace dorado::polisher {
 
 // medaka-style base encoding
-static const char plp_bases[] = "acgtACGTdD";
-static const size_t featlen = 10;  // len of the above
-static const size_t fwd_del = 9;   // position of D
-static const size_t rev_del = 8;   // position of d
+static constexpr std::string_view PILEUP_BASES{"acgtACGTdD"};
+static constexpr size_t PILEUP_POS_DEL_FWD = 9;  // position of D
+static constexpr size_t PILEUP_POS_DEL_REV = 8;  // position of d
 
 // bam tag used for datatypes
-static const char datatype_tag[] = "DT";
+static constexpr std::string_view DATATYPE_TAG{"DT\0"};
 
-// convert 16bit IUPAC (+16 for strand) to plp_bases index
-static const int num2countbase[32] = {
+// convert 16bit IUPAC (+16 for strand) to PILEUP_BASES index
+static constexpr std::array<int32_t, 32> NUM_TO_COUNT_BASE{
         -1, 4, 5, -1, 6, -1, -1, -1, 7, -1, -1, -1, -1, -1, -1, -1,
         -1, 0, 1, -1, 2, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1, -1,
 };
 
-/** Constructs a pileup data structure.
- *
- *  @param n_cols number of pileup columns.
- *  @param buffer_cols number of pileup columns.
- *  @param num_dtypes number of datatypes in pileup.
- *  @param num_homop maximum homopolymer length to consider.
- *  @param fixed_size if not zero data matrix is allocated as fixed_size * n_cols, ignoring other arguments
- *  @see destroy_plp_data
- *  @returns a plp_data pointer.
- *
- *  The return value can be freed with destroy_plp_data.
- *
- */
-plp_data create_plp_data(size_t n_cols,
-                         size_t buffer_cols,
-                         size_t num_dtypes,
-                         size_t num_homop,
-                         size_t fixed_size);
+class PileupData {
+public:
+    /** Constructs a pileup data structure.
+     *
+     *  @param n_cols number of pileup columns.
+     *  @param buffer_cols number of pileup columns.
+     *  @param num_dtypes number of datatypes in pileup.
+     *  @param num_homop maximum homopolymer length to consider.
+     *  @param fixed_size if not zero data matrix is allocated as fixed_size * n_cols, ignoring other arguments.
+     *
+     *  The return value can be freed with destroy_plp_data.
+     *
+     */
+    PileupData(const size_t n_cols,
+               const size_t buffer_cols,
+               const size_t num_dtypes,
+               const size_t num_homop,
+               const size_t fixed_size);
 
-/** Enlarge the internal buffers of a pileup data structure.
- *
- *  @param pileup a plp_data pointer.
- *  @param buffer_cols number of pileup columns for which to allocate memory
- *
- */
-void enlarge_plp_data(plp_data pileup, size_t buffer_cols);
+    /** Resize the internal buffers of a pileup data structure.
+     *
+     *  @param buffer_cols number of pileup columns for which to allocate memory.
+     *
+     */
+    void resize_cols(const size_t buffer_cols);
 
-/** Destroys a pileup data structure.
- *
- *  @param data the object to cleanup.
- *  @returns void.
- *
- */
-void destroy_plp_data(plp_data data);
+    size_t buffer_cols() const { return m_buffer_cols; }
+    size_t num_dtypes() const { return m_num_dtypes; }
+    size_t num_homop() const { return m_num_homop; }
+    size_t n_cols() const { return m_n_cols; }
+
+    const std::vector<size_t>& matrix() const { return m_matrix; }
+    const std::vector<size_t>& major() const { return m_major; }
+    const std::vector<size_t>& minor() const { return m_minor; }
+
+    std::vector<size_t>& matrix() { return m_matrix; }
+    std::vector<size_t>& major() { return m_major; }
+    std::vector<size_t>& minor() { return m_minor; }
+
+    void n_cols(const size_t val) { m_n_cols = val; }
+
+private:
+    size_t m_buffer_cols = 0;
+    size_t m_num_dtypes = 0;
+    size_t m_num_homop = 0;
+    size_t m_n_cols = 0;
+    std::vector<size_t> m_matrix;
+    std::vector<size_t> m_major;
+    std::vector<size_t> m_minor;
+};
 
 /** Prints a pileup data structure.
  *
@@ -101,9 +84,10 @@ void destroy_plp_data(plp_data data);
  *  @returns void
  *
  */
-void print_pileup_data(const plp_data pileup,
+void print_pileup_data(std::ostream& os,
+                       const PileupData& pileup,
                        const size_t num_dtypes,
-                       const char *dtypes[],
+                       const std::vector<std::string>& dtypes,
                        const size_t num_homop);
 
 /** Generates medaka-style feature data in a region of a bam.
@@ -133,16 +117,18 @@ void print_pileup_data(const plp_data pileup,
  *  determined by keep_missing.
  *
  */
-plp_data calculate_pileup(const char *region,
-                          const bam_fset *bam_set,
-                          size_t num_dtypes,
-                          const char *dtypes[],
-                          size_t num_homop,
-                          const char tag_name[2],
-                          const int tag_value,
-                          const bool keep_missing,
-                          bool weibull_summation,
-                          const char *read_group,
-                          const int min_mapQ);
+PileupData calculate_pileup(const std::string& seq_name,
+                            const int32_t region_start,
+                            const int32_t region_end,
+                            const bam_fset& bam_file,
+                            const size_t num_dtypes,
+                            const std::vector<std::string>& dtypes,
+                            const size_t num_homop,
+                            const std::string& tag_name,
+                            const int32_t tag_value,
+                            const bool keep_missing,
+                            const bool weibull_summation,
+                            const char* read_group,
+                            const int32_t min_mapq);
 
-#endif
+}  // namespace dorado::polisher
