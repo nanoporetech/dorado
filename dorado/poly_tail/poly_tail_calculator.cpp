@@ -75,41 +75,6 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::pair<float, float> last_interval_stats;
     const int kStride = 3;
 
-    auto try_merge_latest_intervals = [&, right = right_end]() {  // keep clang-tidy happy
-        if (intervals.size() > 1) {
-            auto last_interval = intervals.rbegin();
-            auto prev_last_interval = std::next(last_interval);
-
-            // Attempt to merge the last interval and the previous one if
-            // 1. the gap between the intervals is small and
-            // 2. the averages of the two intervals are close and
-            // 3. the first interval is longer than some threshold and
-            // 4. the second interval is longer than some threshold or reaches the end of the range
-            spdlog::trace("Evaluate for merge {}-{} with {}-{}", prev_last_interval->first,
-                          prev_last_interval->second, last_interval->first, last_interval->second);
-
-            const auto [avg_1, stdev_1] =
-                    calc_stats(prev_last_interval->first, prev_last_interval->second);
-            const auto [avg_2, stdev_2] = calc_stats(last_interval->first, last_interval->second);
-            if ((last_interval->first - prev_last_interval->second < kMaxSampleGap) &&
-                (std::abs(avg_2 - avg_1) < kMeanValueProximity) &&
-                (prev_last_interval->second - prev_last_interval->first >
-                         kMinIntervalSizeForMerge &&
-                 (last_interval->second - last_interval->first > kMinIntervalSizeForMerge ||
-                  last_interval->second >= (right - kStride)))) {
-                spdlog::trace("Merge interval {}-{} with {}-{}", prev_last_interval->first,
-                              prev_last_interval->second, last_interval->first,
-                              last_interval->second);
-                prev_last_interval->second = last_interval->second;
-
-                intervals.pop_back();
-                return true;
-            }
-        }
-        return false;
-    };
-
-    bool in_range = false;
     for (int s = left_end; s < (right_end - kMaxSampleGap); s += kStride) {
         const int e = s + kMaxSampleGap;
         auto [avg, stdev] = calc_stats(s, e);
@@ -130,26 +95,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                                   e, avg, stdev);
                     last_interval->second = e;
                 } else {
-                    try_merge_latest_intervals();
                     spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                     intervals.push_back({s, e});
                 }
             }
             last_interval_stats = {avg, stdev};
-            in_range = true;
-        } else if (in_range) {
-            if (try_merge_latest_intervals()) {
-                // recalc stats for new interval
-                auto last_interval = intervals.rbegin();
-                last_interval_stats = calc_stats(last_interval->first, last_interval->second);
-            }
-            in_range = false;
         }
-    }
-
-    if (in_range) {
-        // We won't have attempted to merge the final two ranges if we were still in a range at the end
-        try_merge_latest_intervals();
     }
 
     std::string int_str = "";
@@ -163,11 +114,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // In the example below, tail estimation should include both stretches
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
-    const size_t num_bases = read.read_common.seq.length();
-    const auto num_samples = read.read_common.get_raw_data_samples();
-    const auto stride = read.read_common.model_stride;
-    const auto seq_to_sig_map =
-            dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
+    const int kMaxInterruption =
+            static_cast<int>(std::round(num_samples_per_base * m_config.tail_interrupt_length));
 
     std::vector<std::pair<int, int>> clustered_intervals;
     for (const auto& i : intervals) {
@@ -175,11 +123,16 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             clustered_intervals.push_back(i);
         } else {
             auto& last = clustered_intervals.back();
-            auto start = std::lower_bound(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
-                                          last.second);
-            auto end = std::upper_bound(start, std::end(seq_to_sig_map), i.first);
-            auto bases = static_cast<int>(std::distance(start, end));
-            if (bases <= m_config.tail_interrupt_length) {
+            auto [avg_1, std_1] = calc_stats(last.first, last.second);
+            auto [avg_2, std_2] = calc_stats(i.first, i.second);
+            bool mean_proximity_ok = std::abs(avg_2 - avg_1) < kMeanValueProximity;
+            auto separation = i.first - last.second;
+            bool skip_glitch = std::abs(separation) < kMaxSampleGap &&
+                               last.second - last.first > kMinIntervalSizeForMerge &&
+                               (i.second - i.first > kMinIntervalSizeForMerge ||
+                                i.second >= right_end - kStride);
+            bool allow_linker = separation >= 0 && separation < kMaxInterruption;
+            if (mean_proximity_ok && (skip_glitch || allow_linker)) {
                 last.second = i.second;
             } else {
                 clustered_intervals.push_back(i);
