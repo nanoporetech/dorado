@@ -63,8 +63,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = int(std::round(num_samples_per_base * 5));
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge =
-            std::max(static_cast<int>(std::round(10 * num_samples_per_base)), 200);
+    const int kMinIntervalSizeForMerge = kMaxSampleGap * 2;
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
