@@ -22,9 +22,6 @@ protected:
         // in anchor determination.
         return {interval.second - interval.first, interval.second - interval.first};
     }
-    std::pair<int, int> signal_range(int signal_anchor,
-                                     int signal_len,
-                                     float samples_per_base) const override;
 };
 
 }  // namespace dorado::poly_tail

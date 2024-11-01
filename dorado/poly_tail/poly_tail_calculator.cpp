@@ -18,6 +18,17 @@ namespace {
 const int kMaxTailLength = PolyTailCalculator::max_tail_length();
 }
 
+std::pair<int, int> PolyTailCalculator::signal_range(int signal_anchor,
+                                                     int signal_len,
+                                                     float samples_per_base,
+                                                     bool fwd) const {
+    const int kSpread = int(std::round(samples_per_base * max_tail_length()));
+    const float start_scale = fwd ? 1.f : 0.1f;
+    const float end_scale = fwd ? 0.1f : 1.f;
+    return {std::max(0, static_cast<int>(signal_anchor - kSpread * start_scale)),
+            std::min(signal_len, static_cast<int>(signal_anchor + kSpread * end_scale))};
+}
+
 float PolyTailCalculator::estimate_samples_per_base(const dorado::SimplexRead& read) const {
     const size_t num_bases = read.read_common.seq.length();
     const auto num_samples = read.read_common.get_raw_data_samples();
@@ -67,7 +78,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
-    auto [left_end, right_end] = signal_range(signal_anchor, signal_len, num_samples_per_base);
+    auto [left_end, right_end] = signal_range(signal_anchor, signal_len, num_samples_per_base, fwd);
     spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
     std::vector<std::pair<int, int>> intervals;
