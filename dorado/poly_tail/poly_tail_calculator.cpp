@@ -16,7 +16,14 @@ namespace dorado::poly_tail {
 
 namespace {
 const int kMaxTailLength = PolyTailCalculator::max_tail_length();
-}
+
+struct Interval {
+    int start;
+    int end;
+    float avg;
+};
+
+}  // namespace
 
 std::pair<int, int> PolyTailCalculator::signal_range(int signal_anchor,
                                                      int signal_len,
@@ -81,8 +88,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     auto [left_end, right_end] = signal_range(signal_anchor, signal_len, num_samples_per_base, fwd);
     spdlog::trace("Bounds left {}, right {}", left_end, right_end);
 
-    std::vector<std::pair<int, int>> intervals;
-    std::pair<float, float> last_interval_stats;
+    std::vector<Interval> intervals;
     const int kStride = 3;
 
     for (int s = left_end; s < (right_end - kMaxSampleGap); s += kStride) {
@@ -91,31 +97,30 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
         if (avg > kMinAvgVal && stdev < kVar) {
             if (intervals.empty()) {
                 spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
-                intervals.push_back({s, e});
+                intervals.push_back({s, e, avg});
             } else {
                 // If new interval overlaps with the previous interval and
                 // intervals have a similar mean, just extend the previous interval.
-                auto last_interval = intervals.rbegin();
-                if (last_interval->second >= s &&
-                    std::abs(avg - last_interval_stats.first) < kMeanValueProximity) {
+                auto& last_interval = intervals.back();
+                if (last_interval.end >= s &&
+                    std::abs(avg - last_interval.avg) < kMeanValueProximity) {
                     // recalc stats for new interval
-                    std::tie(avg, stdev) = calc_stats(last_interval->first, e);
+                    std::tie(avg, stdev) = calc_stats(last_interval.start, e);
                     spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}",
-                                  last_interval->first, last_interval->second, last_interval->first,
-                                  e, avg, stdev);
-                    last_interval->second = e;
+                                  last_interval.start, last_interval.end, last_interval.start, e,
+                                  avg, stdev);
+                    last_interval = Interval{last_interval.start, e, avg};
                 } else {
                     spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
-                    intervals.push_back({s, e});
+                    intervals.push_back({s, e, avg});
                 }
             }
-            last_interval_stats = {avg, stdev};
         }
     }
 
     std::string int_str = "";
     for (const auto& in : intervals) {
-        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+        int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
     spdlog::trace("found intervals {}", int_str);
 
@@ -127,23 +132,21 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     const int kMaxInterruption =
             static_cast<int>(std::round(num_samples_per_base * m_config.tail_interrupt_length));
 
-    std::vector<std::pair<int, int>> clustered_intervals;
+    std::vector<Interval> clustered_intervals;
     for (const auto& i : intervals) {
         if (clustered_intervals.empty()) {
             clustered_intervals.push_back(i);
         } else {
             auto& last = clustered_intervals.back();
-            auto [avg_1, std_1] = calc_stats(last.first, last.second);
-            auto [avg_2, std_2] = calc_stats(i.first, i.second);
-            bool mean_proximity_ok = std::abs(avg_2 - avg_1) < kMeanValueProximity;
-            auto separation = i.first - last.second;
-            bool skip_glitch = std::abs(separation) < kMaxSampleGap &&
-                               last.second - last.first > kMinIntervalSizeForMerge &&
-                               (i.second - i.first > kMinIntervalSizeForMerge ||
-                                i.second >= right_end - kStride);
+            bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
+            auto separation = i.start - last.end;
+            bool skip_glitch =
+                    std::abs(separation) < kMaxSampleGap &&
+                    last.end - last.start > kMinIntervalSizeForMerge &&
+                    (i.end - i.start > kMinIntervalSizeForMerge || i.end >= right_end - kStride);
             bool allow_linker = separation >= 0 && separation < kMaxInterruption;
             if (mean_proximity_ok && (skip_glitch || allow_linker)) {
-                last.second = i.second;
+                last.end = i.end;
             } else {
                 clustered_intervals.push_back(i);
             }
@@ -152,25 +155,25 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
     int_str = "";
     for (const auto& in : clustered_intervals) {
-        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+        int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
     spdlog::trace("clustered intervals {}", int_str);
 
     // Once the clustered intervals are available, filter them by how
     // close they are to the anchor.
-    std::vector<std::pair<int, int>> filtered_intervals;
+    std::vector<Interval> filtered_intervals;
     std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
-                 std::back_inserter(filtered_intervals), [&](auto& i) {
-                     auto buffer = buffer_range(i, num_samples_per_base);
+                 std::back_inserter(filtered_intervals), [&](const auto& i) {
+                     auto buffer = buffer_range({i.start, i.end}, num_samples_per_base);
                      // Only keep intervals that are close-ish to the signal anchor.
                      // i.e. the anchor needs to be within the buffer region of
                      // the interval
                      // <----buffer.first---|--- interval ---|---- buffer.second---->
                      bool within_anchor_dist =
-                             (signal_anchor >= std::max(0, i.first - buffer.first)) &&
-                             (signal_anchor <= (i.second + buffer.second));
+                             (signal_anchor >= std::max(0, i.start - buffer.first)) &&
+                             (signal_anchor <= (i.end + buffer.second));
                      bool meets_min_base_count =
-                             (i.second - i.first) >=
+                             (i.end - i.start) >=
                              std::round(num_samples_per_base * m_config.min_base_count);
 
                      return within_anchor_dist && meets_min_base_count;
@@ -178,7 +181,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
     int_str = "";
     for (const auto& in : filtered_intervals) {
-        int_str += std::to_string(in.first) + "-" + std::to_string(in.second) + ", ";
+        int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
     spdlog::trace("filtered intervals {}", int_str);
 
@@ -190,26 +193,25 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // Choose the longest interval. If there is a tie for the longest interval,
     // choose the one that is closest to the anchor.
     auto best_interval = std::max_element(filtered_intervals.begin(), filtered_intervals.end(),
-                                          [&](auto& l, auto& r) {
-                                              auto l_size = l.second - l.first;
-                                              auto r_size = r.second - r.first;
+                                          [&](const auto& l, const auto& r) {
+                                              auto l_size = l.end - l.start;
+                                              auto r_size = r.end - r.start;
                                               if (l_size != r_size) {
                                                   return l_size < r_size;
                                               } else {
                                                   if (fwd) {
-                                                      return std::abs(l.second - signal_anchor) <
-                                                             std::abs(r.second - signal_anchor);
+                                                      return std::abs(l.end - signal_anchor) <
+                                                             std::abs(r.end - signal_anchor);
                                                   } else {
-                                                      return std::abs(l.first - signal_anchor) <
-                                                             std::abs(r.first - signal_anchor);
+                                                      return std::abs(l.start - signal_anchor) <
+                                                             std::abs(r.start - signal_anchor);
                                                   }
                                               }
                                           });
 
-    spdlog::trace("Anchor {} Range {} {}", signal_anchor, best_interval->first,
-                  best_interval->second);
+    spdlog::trace("Anchor {} Range {} {}", signal_anchor, best_interval->start, best_interval->end);
 
-    return *best_interval;
+    return std::make_pair(best_interval->start, best_interval->end);
 }
 
 int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
