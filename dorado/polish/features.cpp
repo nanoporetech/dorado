@@ -257,10 +257,7 @@ Sample counts_to_features_2(CountsResult& pileup,
                             [[maybe_unused]] const int32_t win_id,
                             [[maybe_unused]] const bool sym_indels,
                             [[maybe_unused]] const FeatureIndicesType& feature_indices,
-                            [[maybe_unused]] const NormaliseType normalise_type,
-                            std::unordered_map<std::string, int64_t>& timers) {
-    timer::TimerHighRes timer;
-
+                            [[maybe_unused]] const NormaliseType normalise_type) {
     const int64_t start = pileup.positions_major.front();
     const int64_t end = pileup.positions_major.back();
 
@@ -269,12 +266,7 @@ Sample counts_to_features_2(CountsResult& pileup,
                 "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}, "
                 "pileup.positions_major.size() = {}",
                 ref_name, ref_start, ref_end, start, end, std::size(pileup.positions_major));
-        // for (size_t i = 0; i < std::size(pileup.positions_major); ++i) {
-        //     std::cerr << "[pileup.positions_major i = " << i << "] pos = " << pileup.positions_major[i] << "\n";
-        // }
     }
-    timers["01-select"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
 
     // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
     // on a very high level with lots of redundancy in computation.
@@ -295,17 +287,8 @@ Sample counts_to_features_2(CountsResult& pileup,
             last_non_minor_index = i;
         }
     }
-    timers["02+03+04-major_ind_at_minor_inds"] += timer.GetElapsedMilliseconds();
-    timers["stats-minor_inds.size()"] += minor_inds.size();
-    timer.Reset();
-
-    // depth.index_put_({minor_inds}, depth.index({major_ind_at_minor_inds}));
 
     auto depth = pileup.counts.sum(1);
-    timers["05a-sum"] += timer.GetElapsedMilliseconds();
-    timers["stats-pileup.counts.size(0)"] += pileup.counts.size(0);
-    timers["stats-pileup.counts.size(1)"] += pileup.counts.size(1);
-    timer.Reset();
 
     auto depth_data = depth.data_ptr<int64_t>();
     for (size_t i = 0; i < std::size(minor_inds); ++i) {
@@ -313,14 +296,7 @@ Sample counts_to_features_2(CountsResult& pileup,
             depth_data[minor_inds[i]] = depth_data[major_ind_at_minor_inds[i]];
         }
     }
-
-    timers["05b-index_put_"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
-
     const auto depth_unsequezed = depth.unsqueeze(1).to(FeatureTensorType);
-
-    timers["06-depth_unsequezed"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
 
     if (sym_indels) {
         const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
@@ -362,9 +338,6 @@ Sample counts_to_features_2(CountsResult& pileup,
         }
     }
 
-    timers["07-symmetric"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
-
     torch::Tensor feature_array;
     if (normalise_type == NormaliseType::TOTAL) {
         feature_array =
@@ -392,10 +365,6 @@ Sample counts_to_features_2(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
-    timers["08-normalize"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
-
-    // Step 5: Create and return Sample object
     Sample sample{ref_name,
                   std::move(feature_array),
                   std::move(pileup.positions_major),
@@ -405,13 +374,6 @@ Sample counts_to_features_2(CountsResult& pileup,
                   ref_end,
                   seq_id,
                   win_id};
-
-    timers["09-sample"] += timer.GetElapsedMilliseconds();
-    timer.Reset();
-
-    // // Log the result
-    // std::cerr << "Processed " << sample.ref_name << " (median depth "
-    //           << torch::median(depth).item<float>() << ")" << std::endl;
 
     return sample;
 }
@@ -444,11 +406,7 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
                                                         const int64_t ref_start,
                                                         const int64_t ref_end,
                                                         const int32_t seq_id,
-                                                        const int32_t win_id,
-                                                        const bool verbose) const {
-    std::unordered_map<std::string, int64_t> timings;
-    timer::TimerHighRes timer;
-
+                                                        const int32_t win_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -462,9 +420,6 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             m_tag_name, m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr,
             m_min_mapq);
 
-    timings["construct_pileup_counts"] = timer.GetElapsedMilliseconds();
-    timer.Reset();
-
     // if (true) {
     //     return {};
     // }
@@ -475,32 +430,14 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
         if (!data.counts.numel()) {
             spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
                          region);
-            results.emplace_back(Sample{ref_name,
-                                        {},
-                                        std::move(data.positions_major),
-                                        std::move(data.positions_minor),
-                                        {},
-                                        ref_start,
-                                        ref_end,
-                                        seq_id,
-                                        win_id});
+            results.emplace_back(
+                    Sample{ref_name, {}, {}, {}, {}, ref_start, ref_end, seq_id, win_id});
             continue;
         }
 
-        results.emplace_back(std::move(counts_to_features_2(
-                data, ref_name, ref_start + 1, ref_end, seq_id, win_id, m_symmetric_indels,
-                m_feature_indices, m_normalise_type, timings)));
-    }
-
-    timings["samples"] = timer.GetElapsedMilliseconds();
-    timer.Reset();
-
-    if (verbose) {
-        std::cerr << "[encode_region] Encoded region: " << ref_name << ":" << ref_start << "-"
-                  << ref_end << "\n";
-        for (const auto& [key, val] : timings) {
-            std::cerr << "[encode_region] Timing | " << key << ": " << val << "\n";
-        }
+        results.emplace_back(std::move(counts_to_features_2(data, ref_name, ref_start + 1, ref_end,
+                                                            seq_id, win_id, m_symmetric_indels,
+                                                            m_feature_indices, m_normalise_type)));
     }
 
     // if (true) {

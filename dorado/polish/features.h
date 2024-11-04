@@ -68,8 +68,7 @@ public:
                                       const int64_t ref_start,
                                       const int64_t ref_end,
                                       const int32_t seq_id,
-                                      const int32_t win_id,
-                                      const bool verbose) const;
+                                      const int32_t win_id) const;
 
     std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits,
                                               const bool with_probs) const;

@@ -673,6 +673,21 @@ void run_experimental(const Options& opt) {
         torch::Tensor batch_features_tensor =
                 correction::collate<float>(batch_features, 0.0f, polisher::FeatureTensorType);
 
+        spdlog::info(
+                "About to call forward(): batch_features_tensor.size() = ({}, {}, {}), approx "
+                "size: {} MB.",
+                batch_features_tensor.size(0), batch_features_tensor.size(1),
+                batch_features_tensor.size(2),
+                batch_features_tensor.numel() * batch_features_tensor.element_size() /
+                        (1024.0 * 1024.0));
+        // batch_features_tensor.size(0) * batch_features_tensor.size(1) * batch_features_tensor.size(2) * sizeof(float));
+
+        // if (batch_features_tensor.size(1) == 129083) {
+        //     for (int64_t i = sample_start; i < sample_end; ++i) {
+        //         spdlog::info("[IS] [i = {}] shape: ({}, {})", i, samples[i].features.size(0), samples[i].features.size(1));
+        //     }
+        // }
+
         std::unique_lock<std::mutex> lock(gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
         {
@@ -683,7 +698,7 @@ void run_experimental(const Options& opt) {
         c10::IValue output;
         try {
             output = module.forward(inputs);
-        } catch (std::runtime_error& e) {
+        } catch (std::exception& e) {
 #if DORADO_CUDA_BUILD
             spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
             c10::cuda::CUDACachingAllocator::emptyCache();
@@ -811,8 +826,7 @@ void run_experimental(const Options& opt) {
                                         100.0 * static_cast<double>(i - start) / (end - start));
                             }
                             results[i] = encoders[thread_id].encode_region(
-                                    name, window.start, window.end, window.seq_id, i,
-                                    thread_id == 0);
+                                    name, window.start, window.end, window.seq_id, i);
                         }
                     };
 
