@@ -633,11 +633,13 @@ public:
         }
     }
 
-    void load_bias(const device ftype* const bias, int col) {
+    void load_bias(const device ftype* bias, int col) {
+        bias += col * SIMD_TILES_N * TILE_SIZE;
         for (int i = 0; i < SIMD_TILES_N; ++i) {
             for (int j = 0; j < SIMD_TILES_M; ++j) {
-                simdgroup_load(acc(j, i), bias + col + i * TILE_SIZE, 0);
+                simdgroup_load(acc(j, i), bias, 0);
             }
+            bias += TILE_SIZE;
         }
     }
 
@@ -1005,7 +1007,7 @@ kernel void conv3_simd(const device ConvArgs* const args,
             int start_pad_tiles = max(0, -start_pos) * in_size_tiles;
             int end_pad_tiles = max(0, start_pos + win_size - chunk_size_in) * in_size_tiles;
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 TileBlock<RowMajor> mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE,
                                           start_pos * in_size_tiles * TILE_SIZE);
                 TileBlock<RowMajor> mat_b(weights_buf, out_size, 0,
@@ -1159,7 +1161,7 @@ kernel void lstm(const device LstmArgs* const args,
         const int timestep_in = kLstmReversedInTime ? chunk_size - iter : iter;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 auto mat_a = MatLayoutLSTM::tnc_block(in_out, 0, batch_size, kLstmLayerSize,
                                                       timestep_in, m_blk, 0);
                 TileBlock<RowMajor> mat_b(weights_buf, w_stride, 0,
@@ -1241,7 +1243,7 @@ kernel void linear(const device LinearArgs* const args,
 
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 auto mat_a =
                         InputMatLayout::tnc_block(in_buf, chunk_size, in_batch_size, kLinearInSize,
                                                   ts, m_blk + in_batch_block_offset, 0);
