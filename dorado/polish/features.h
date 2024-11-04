@@ -25,7 +25,8 @@ enum class NormaliseType {
 
 struct CountsResult {
     torch::Tensor counts;
-    torch::Tensor positions;
+    std::vector<int64_t> positions_major;
+    std::vector<int64_t> positions_minor;
 };
 
 struct ConsensusResult {
@@ -42,9 +43,6 @@ struct KeyHash {
         return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
     }
 };
-
-constexpr int32_t MAJOR_COLUMN = 0;  // ID of the major column in the positions tensor.
-constexpr int32_t MINOR_COLUMN = 1;  // ID of the minor column in the positions tensor (deletions).
 
 // struct CountsFeatureEncoderResults;
 
@@ -70,7 +68,8 @@ public:
                                       const int64_t ref_start,
                                       const int64_t ref_end,
                                       const int32_t seq_id,
-                                      const int32_t win_id) const;
+                                      const int32_t win_id,
+                                      const bool verbose) const;
 
     std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits,
                                               const bool with_probs) const;

@@ -24,11 +24,11 @@ KHASH_SET_INIT_STR(BADREADS)
 
 namespace dorado::polisher {
 
-PileupData::PileupData(const size_t n_cols,
-                       const size_t buffer_cols,
-                       const size_t num_dtypes,
-                       const size_t num_homop,
-                       const size_t fixed_size)
+PileupData::PileupData(const int64_t n_cols,
+                       const int64_t buffer_cols,
+                       const int64_t num_dtypes,
+                       const int64_t num_homop,
+                       const int64_t fixed_size)
         : m_buffer_cols{buffer_cols},
           m_num_dtypes{num_dtypes},
           m_num_homop{num_homop},
@@ -37,14 +37,14 @@ PileupData::PileupData(const size_t n_cols,
         assert(buffer_cols == n_cols);
         m_matrix.resize(fixed_size * n_cols, 0);
     } else {
-        m_matrix.resize(std::size(PILEUP_BASES) * num_dtypes * buffer_cols * num_homop, 0);
+        m_matrix.resize(PILEUP_BASES_SIZE * num_dtypes * buffer_cols * num_homop, 0);
     }
     m_major.resize(buffer_cols);
     m_minor.resize(buffer_cols);
 }
 
-void PileupData::resize_cols(const size_t buffer_cols) {
-    const size_t new_size = std::size(PILEUP_BASES) * m_num_dtypes * m_num_homop * buffer_cols;
+void PileupData::resize_cols(const int64_t buffer_cols) {
+    const int64_t new_size = PILEUP_BASES_SIZE * m_num_dtypes * m_num_homop * buffer_cols;
     m_matrix.resize(new_size, 0);
     m_major.resize(buffer_cols, 0);
     m_minor.resize(buffer_cols, 0);
@@ -62,30 +62,31 @@ void PileupData::resize_cols(const size_t buffer_cols) {
  */
 void print_pileup_data(std::ostream &os,
                        const PileupData &pileup,
-                       const size_t num_dtypes,
+                       const int64_t num_dtypes,
                        const std::vector<std::string> &dtypes,
-                       const size_t num_homop) {
+                       const int64_t num_homop) {
     os << "pos\tins\t";
     if (num_dtypes > 1) {  //TODO header for multiple dtypes and num_homop > 1
-        for (size_t i = 0; i < num_dtypes; ++i) {
-            for (size_t j = 0; j < std::size(PILEUP_BASES); ++j) {
+        for (int64_t i = 0; i < num_dtypes; ++i) {
+            for (int64_t j = 0; j < PILEUP_BASES_SIZE; ++j) {
                 os << dtypes[i] << '.' << PILEUP_BASES[j] << '\t';
             }
         }
     } else {
-        for (size_t k = 0; k < num_homop; ++k) {
-            for (size_t j = 0; j < std::size(PILEUP_BASES); ++j) {
+        for (int64_t k = 0; k < num_homop; ++k) {
+            for (int64_t j = 0; j < PILEUP_BASES_SIZE; ++j) {
                 os << PILEUP_BASES[j] << '.' << (k + 1) << '\t';
             }
         }
     }
     os << "depth\n";
-    for (size_t j = 0; j < pileup.n_cols(); ++j) {
-        size_t s = 0;
+    for (int64_t j = 0; j < static_cast<int64_t>(pileup.n_cols()); ++j) {
+        int64_t s = 0;
         os << pileup.major()[j] << '\t' << pileup.minor()[j] << '\t';
-        for (size_t i = 0; i < (num_dtypes * std::size(PILEUP_BASES) * num_homop); ++i) {
-            const size_t c =
-                    pileup.matrix().at(j * num_dtypes * std::size(PILEUP_BASES) * num_homop + i);
+        for (int64_t i = 0; i < static_cast<int64_t>(num_dtypes * PILEUP_BASES_SIZE * num_homop);
+             ++i) {
+            const int64_t c =
+                    pileup.matrix().at(j * num_dtypes * PILEUP_BASES_SIZE * num_homop + i);
             s += c;
             os << c << '\t';
         }
@@ -94,15 +95,15 @@ void print_pileup_data(std::ostream &os,
 }
 
 std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
-                                       const size_t indel,
-                                       const size_t num_homop,
+                                       const int64_t indel,
+                                       const int64_t num_homop,
                                        khash_t(BADREADS) * bad_reads) {
     // Create homopolymer scores using Weibull shape and scale parameters.
     // If prerequisite sam tags are not present an array of zero counts is returned.
     std::vector<float> fraction_counts(num_homop);
     static const char *wtags[] = {"WL", "WK"};  // scale, shape
     double wtag_vals[2] = {0.0, 0.0};
-    for (size_t i = 0; i < 2; ++i) {
+    for (int64_t i = 0; i < 2; ++i) {
         uint8_t *tag = bam_aux_get(p->b, wtags[i]);
         if (tag == NULL) {
             char *read_id = bam_get_qname(p->b);
@@ -128,7 +129,7 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     // found tags, fill in values
     float scale = wtag_vals[0];  //wl
     float shape = wtag_vals[1];  //wk
-    for (size_t x = 1; x < num_homop + 1; ++x) {
+    for (int64_t x = 1; x < num_homop + 1; ++x) {
         float a = pow((x - 1) / scale, shape);
         float b = pow(x / scale, shape);
         fraction_counts[x - 1] = fmax(0.0, -exp(-a) * expm1(a - b));
@@ -165,9 +166,9 @@ PileupData calculate_pileup(const std::string &chr_name,
                             const int32_t start,
                             const int32_t end,
                             const bam_fset &bam_file,
-                            const size_t num_dtypes,
+                            const int64_t num_dtypes,
                             const std::vector<std::string> &dtypes,
-                            const size_t num_homop,
+                            const int64_t num_homop,
                             const std::string &tag_name,
                             const int32_t tag_value,
                             const bool keep_missing,
@@ -183,8 +184,7 @@ PileupData calculate_pileup(const std::string &chr_name,
         throw std::runtime_error("The num_dtypes needs to be > 0.");
     }
 
-    constexpr size_t featlen = std::size(PILEUP_BASES);
-    const size_t dtype_featlen = featlen * num_dtypes * num_homop;
+    const int64_t dtype_featlen = PILEUP_BASES_SIZE * num_dtypes * num_homop;
 
     // open bam etc.
     // this is all now deferred to the caller
@@ -217,16 +217,16 @@ PileupData calculate_pileup(const std::string &chr_name,
 
     // allocate output assuming one insertion per ref position
     int32_t n_cols = 0;
-    const size_t buffer_cols = 2 * (end - start);
+    const int64_t buffer_cols = 2 * (end - start);
     PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
 
-    size_t *pileup_matrix = pileup.matrix().data();
-    size_t *pileup_major = pileup.major().data();
-    size_t *pileup_minor = pileup.minor().data();
+    int64_t *pileup_matrix = pileup.matrix().data();
+    int64_t *pileup_major = pileup.major().data();
+    int64_t *pileup_minor = pileup.minor().data();
 
     // get counts
-    size_t major_col = 0;  // index into `pileup` corresponding to pos
-    n_cols = 0;            // number of processed columns (including insertions)
+    int64_t major_col = 0;  // index into `pileup` corresponding to pos
+    n_cols = 0;             // number of processed columns (including insertions)
     khash_t(BADREADS) *no_rle_tags = kh_init(BADREADS);  // maintain set of reads without rle tags
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
@@ -256,9 +256,9 @@ PileupData calculate_pileup(const std::string &chr_name,
         if ((n_cols + max_ins) > static_cast<int32_t>(pileup.buffer_cols())) {
             const float cols_per_pos = static_cast<float>(n_cols + max_ins) / (1 + pos - start);
             // max_ins can dominate so add at least that
-            const size_t new_buffer_cols =
+            const int64_t new_buffer_cols =
                     max_ins + std::max(2 * pileup.buffer_cols(),
-                                       static_cast<size_t>(cols_per_pos * (end - start)));
+                                       static_cast<int64_t>(cols_per_pos * (end - start)));
             pileup.resize_cols(new_buffer_cols);
             pileup_matrix = pileup.matrix().data();
             pileup_major = pileup.major().data();
@@ -313,8 +313,8 @@ PileupData calculate_pileup(const std::string &chr_name,
                 // deletions are kept in the first layer of qscore stratification, if any
                 int32_t qstrat = 0;
                 base_i = bam_is_rev(p->b) ? PILEUP_POS_DEL_REV : PILEUP_POS_DEL_FWD;
-                pileup_matrix[major_col + featlen * dtype * num_homop + featlen * qstrat +
-                              base_i] += 1;
+                pileup_matrix[major_col + PILEUP_BASES_SIZE * dtype * num_homop +
+                              PILEUP_BASES_SIZE * qstrat + base_i] += 1;
                 min_minor = 1;  // in case there is also an indel, skip the major position
             }
             // loop over any query bases at or inserted after pos
@@ -328,29 +328,29 @@ PileupData calculate_pileup(const std::string &chr_name,
 
                 base_i = NUM_TO_COUNT_BASE[base_j];
                 if (base_i != -1) {  // not an ambiguity code
-                    const size_t partial_index =
-                            major_col + dtype_featlen * minor  // skip to column
-                            + featlen * dtype * num_homop      // skip to datatype
-                            //+ featlen * qstrat                           // skip to qstrat/homop
+                    const int64_t partial_index =
+                            major_col + dtype_featlen * minor        // skip to column
+                            + PILEUP_BASES_SIZE * dtype * num_homop  // skip to datatype
+                            //+ PILEUP_BASES_SIZE * qstrat                           // skip to qstrat/homop
                             + base_i;  // the base
 
                     if (weibull_summation) {
                         const std::vector<float> fraction_counts =
                                 _get_weibull_scores(p, query_pos_offset, num_homop, no_rle_tags);
-                        for (size_t qstrat = 0; qstrat < num_homop; ++qstrat) {
+                        for (int64_t qstrat = 0; qstrat < num_homop; ++qstrat) {
                             static const int32_t scale = 10000;
-                            pileup_matrix[partial_index + featlen * qstrat] +=
+                            pileup_matrix[partial_index + PILEUP_BASES_SIZE * qstrat] +=
                                     scale * fraction_counts[qstrat];
                         }
                     } else {
                         int32_t qstrat = 0;
                         if (num_homop > 1) {
                             // want something in [0, num_homop-1]
-                            qstrat = std::min<size_t>(
+                            qstrat = std::min<int64_t>(
                                     bam_get_qual(p->b)[p->qpos + query_pos_offset], num_homop);
                             qstrat = std::max(0, qstrat - 1);
                         }
-                        pileup_matrix[partial_index + featlen * qstrat] += 1;
+                        pileup_matrix[partial_index + PILEUP_BASES_SIZE * qstrat] += 1;
                     }
                 }
             }
@@ -361,6 +361,8 @@ PileupData calculate_pileup(const std::string &chr_name,
     kh_destroy(BADREADS, no_rle_tags);
 
     pileup.n_cols(n_cols);
+    pileup.major().resize(n_cols);
+    pileup.minor().resize(n_cols);
 
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);

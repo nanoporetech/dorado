@@ -444,76 +444,12 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
 }
 
 // polisher::ConsensusResult stitch_sequence(
-//         const std::filesystem::path& in_draft_fn,
-//         const std::string& header,
-//         const std::vector<polisher::Sample>& samples,
-//         const std::vector<polisher::ConsensusResult>& sample_results,
-//         const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
-
-//     // Fetch the draft for gap filling.
-//     const std::string draft = fetch_seq(in_draft_fn, header);
-
-//     // Initialize the start/end trim coordinates for each sample.
-//     std::vector<Interval> trim_coords;
-//     trim_coords.reserve(std::size(samples_for_seq));
-//     for (const auto& [_, sample_id]: samples_for_seq) {
-//         const polisher::Sample& sample = samples[sample_id];
-//         trim_coords.emplace_back(Interval{0, static_cast<int32_t>(sample.positions.size(0))});
-//     }
-
-//     polisher::ConsensusResult ret;
-
-//     for (int64_t i = 1; i < static_cast<int64_t>(std::size(sample_results)); ++i) {
-//         const auto& sample_id_1 = samples_for_seq[i - 1].second;
-//         const auto& sample_id_2 = samples_for_seq[i].second;
-//         const polisher::Sample& s1 = samples[sample_id_1];
-//         const polisher::Sample& s2 = samples[sample_id_2];
-
-//         const int64_t s1_start = s1.positions.index({0, polisher::MAJOR_COLUMN}).item<int64_t>();
-//         const int64_t s1_end = s1.positions.index({-1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
-//         const int64_t s2_start = s2.positions.index({0, polisher::MAJOR_COLUMN}).item<int64_t>();
-//         const int64_t s2_end = s2.positions.index({-1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
-
-//         std::cerr << "[stitching i = " << i << "] s1_start = " << s1_start << ", s1_end = " << s1_end << ", s2_start = " << s2_start << ", s2_end = " << s2_end << "\n";
-//     }
-
-//     // This won't work well for stitching because it's missing the gap-filled regions, and the trim coordinates need to be
-//     // the indices in the positions vector, and not the positions themselves.
-//     // Splice the trimmed sequences.
-//     for (size_t i = 0; i < std::size(trim_coords); ++i) {
-//         const auto& [_, sample_id] = samples_for_seq[i];
-//         const polisher::ConsensusResult sample_result = sample_results[sample_id];
-
-//         // Fill the gap if needed.
-//         if (i > 0) {
-//             const auto& sample_id_1 = samples_for_seq[i - 1].second;
-//             const auto& sample_id_2 = samples_for_seq[i].second;
-//             const polisher::Sample& s1 = samples[sample_id_1];
-//             const polisher::Sample& s2 = samples[sample_id_2];
-//             const Interval& trim_1 = trim_coords[i - 1];
-//             const Interval& trim_2 = trim_coords[i];
-//             const int64_t s1_start = s1.positions.index({trim_1.start, polisher::MAJOR_COLUMN}).item<int64_t>();
-//             const int64_t s1_end = s1.positions.index({trim_1.end - 1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
-//             const int64_t s2_start = s2.positions.index({trim_2.start, polisher::MAJOR_COLUMN}).item<int64_t>();
-//             const int64_t s2_end = s2.positions.index({trim_2.end - 1, polisher::MAJOR_COLUMN}).item<int64_t>() + 1;
-
-//             if (s2_start > s1_end) {
-//                 const int64_t fill_len = s2_start - s1_end - 1;
-//                 ret.seq += draft.substr(s1_end + 1, fill_len);
-//                 ret.quals += std::string(fill_len, '!');
-//             }
-//         }
-
-//         const Interval& trim = trim_coords[i];
-//         ret.seq += sample_result.seq.substr(trim.start, trim_coords[i].end - trim_coords[i].start);
-//         if (!std::empty(sample_result.quals)) {
-//             ret.quals += sample_result.quals.substr(trim_coords[i].start, trim_coords[i].end - trim_coords[i].start);
-//         } else {
-//             ret.quals += std::string(trim_coords[i].end - trim_coords[i].start, '!');
-//         }
-//     }
-
-//     return ret;
+//         [[maybe_unused]] const std::filesystem::path& in_draft_fn,
+//         [[maybe_unused]] const std::string& header,
+//         [[maybe_unused]] const std::vector<polisher::Sample>& samples,
+//         [[maybe_unused]] const std::vector<polisher::ConsensusResult>& sample_results,
+//         [[maybe_unused]] const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
+//     return {};
 // }
 
 polisher::ConsensusResult stitch_sequence(
@@ -544,7 +480,7 @@ polisher::ConsensusResult stitch_sequence(
         const polisher::ConsensusResult& result = sample_results[sample_index];
         consensus_seq = result.seq;
         consensus_quals = result.quals;
-        last_end = sample.positions.index({-1, 0}).item<int64_t>();
+        last_end = sample.positions_major.back();
         last_i = 0;
     }
 
@@ -555,8 +491,8 @@ polisher::ConsensusResult stitch_sequence(
         const polisher::ConsensusResult& result = sample_results[sample_index];
 
         // Define the start and end positions of the current sample in draft coordinates.
-        const int64_t start = sample.positions.index({0, 0}).item<int64_t>();
-        const int64_t end = sample.positions.index({-1, 0}).item<int64_t>();
+        const int64_t start = sample.positions_major.front();
+        const int64_t end = sample.positions_major.back();
 
         // std::cerr << "[stitching i = " << i << "] samples_for_seq.size() = " << samples_for_seq.size()
         //     << ", consensus_seq.size() = "
@@ -574,16 +510,30 @@ polisher::ConsensusResult stitch_sequence(
             const int64_t overlap_middle = (last_end + start) / 2;
 
             // Find midpoint indices using searchsorted.
-            auto prev_sample_positions =
-                    samples[samples_for_seq[last_i].second].positions.select(1, 0).contiguous();
-            auto curr_sample_positions = sample.positions.select(1, 0).contiguous();
+            const std::vector<int64_t>& prev_sample_positions =
+                    samples[samples_for_seq[last_i].second]
+                            .positions_major;  // .select(1, 0).contiguous();
+            const std::vector<int64_t>& curr_sample_positions =
+                    sample.positions_major;  // .select(1, 0).contiguous();
 
+            // const int64_t prev_sample_mid_idx =
+            //         torch::searchsorted(prev_sample_positions, overlap_middle, /*right=*/false)
+            //                 .item<int64_t>();
+            // const int64_t curr_sample_mid_idx =
+            //         torch::searchsorted(curr_sample_positions, overlap_middle, /*right=*/true)
+            //                 .item<int64_t>();
+
+            // Find the index for prev_sample_positions (equivalent to right=false)
+            const auto prev_sample_mid_iter = std::lower_bound(
+                    prev_sample_positions.begin(), prev_sample_positions.end(), overlap_middle);
             const int64_t prev_sample_mid_idx =
-                    torch::searchsorted(prev_sample_positions, overlap_middle, /*right=*/false)
-                            .item<int64_t>();
+                    std::distance(prev_sample_positions.begin(), prev_sample_mid_iter);
+
+            // Find the index for curr_sample_positions (equivalent to right=true)
+            const auto curr_sample_mid_iter = std::upper_bound(
+                    curr_sample_positions.begin(), curr_sample_positions.end(), overlap_middle);
             const int64_t curr_sample_mid_idx =
-                    torch::searchsorted(curr_sample_positions, overlap_middle, /*right=*/true)
-                            .item<int64_t>();
+                    std::distance(curr_sample_positions.begin(), curr_sample_mid_iter);
 
             // Trim the previous consensus to avoid the overlap.
             const int64_t num_to_remove =
@@ -701,6 +651,11 @@ void run_experimental(const Options& opt) {
 
     module.eval();
 
+    // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
+    //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
+    torch::set_num_threads(1);
+    at::set_num_interop_threads(opt.threads);
+
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
     auto batch_infer = [&gpu_mutexes, &device, &module](
@@ -739,7 +694,7 @@ void run_experimental(const Options& opt) {
         }
         lock.unlock();
 
-        spdlog::info("Inference done.");
+        // spdlog::info("Inference done.");
 
         return output.toTensor();
     };
@@ -846,16 +801,18 @@ void run_experimental(const Options& opt) {
                             const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<std::vector<polisher::Sample>>& results) {
                         for (int32_t i = start; i < end; ++i) {
-                            if (thread_id == 0) {
-                                spdlog::info(
-                                        "Processed i = {}, start = {}, end = {} ({} %).", i, start,
-                                        end,
-                                        100.0 * static_cast<double>(i - start) / (end - start));
-                            }
                             const auto& window = windows[i];
                             const std::string& name = draft_lens[window.seq_id].first;
+                            if (thread_id == 0) {
+                                spdlog::info(
+                                        "Processing i = {}, start = {}, end = {}, region = "
+                                        "{}:{}-{} ({} %).",
+                                        i, start, end, name, window.start, window.end,
+                                        100.0 * static_cast<double>(i - start) / (end - start));
+                            }
                             results[i] = encoders[thread_id].encode_region(
-                                    name, window.start, window.end, window.seq_id, i);
+                                    name, window.start, window.end, window.seq_id, i,
+                                    thread_id == 0);
                         }
                     };
 
@@ -929,6 +886,9 @@ void run_experimental(const Options& opt) {
         // }
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
+
+        // Increase the number of threads again for inter-op parallelism.
+        torch::set_num_threads(opt.threads);
 
         // TODO: Separate the encoder and the decoder. The decoder does not need the BAM file.
         const std::vector<polisher::ConsensusResult> results_samples =

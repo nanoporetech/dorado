@@ -12,8 +12,9 @@ namespace dorado::polisher {
 
 // medaka-style base encoding
 static constexpr std::string_view PILEUP_BASES{"acgtACGTdD"};
-static constexpr size_t PILEUP_POS_DEL_FWD = 9;  // position of D
-static constexpr size_t PILEUP_POS_DEL_REV = 8;  // position of d
+static constexpr int64_t PILEUP_BASES_SIZE = static_cast<int64_t>(std::size(PILEUP_BASES));
+static constexpr int64_t PILEUP_POS_DEL_FWD = 9;  // position of D
+static constexpr int64_t PILEUP_POS_DEL_REV = 8;  // position of d
 
 // bam tag used for datatypes
 static constexpr std::string_view DATATYPE_TAG{"DT\0"};
@@ -37,42 +38,42 @@ public:
      *  The return value can be freed with destroy_plp_data.
      *
      */
-    PileupData(const size_t n_cols,
-               const size_t buffer_cols,
-               const size_t num_dtypes,
-               const size_t num_homop,
-               const size_t fixed_size);
+    PileupData(const int64_t n_cols,
+               const int64_t buffer_cols,
+               const int64_t num_dtypes,
+               const int64_t num_homop,
+               const int64_t fixed_size);
 
     /** Resize the internal buffers of a pileup data structure.
      *
      *  @param buffer_cols number of pileup columns for which to allocate memory.
      *
      */
-    void resize_cols(const size_t buffer_cols);
+    void resize_cols(const int64_t buffer_cols);
 
-    size_t buffer_cols() const { return m_buffer_cols; }
-    size_t num_dtypes() const { return m_num_dtypes; }
-    size_t num_homop() const { return m_num_homop; }
-    size_t n_cols() const { return m_n_cols; }
+    int64_t buffer_cols() const { return m_buffer_cols; }
+    int64_t num_dtypes() const { return m_num_dtypes; }
+    int64_t num_homop() const { return m_num_homop; }
+    int64_t n_cols() const { return m_n_cols; }
 
-    const std::vector<size_t>& matrix() const { return m_matrix; }
-    const std::vector<size_t>& major() const { return m_major; }
-    const std::vector<size_t>& minor() const { return m_minor; }
+    const std::vector<int64_t>& matrix() const { return m_matrix; }
+    const std::vector<int64_t>& major() const { return m_major; }
+    const std::vector<int64_t>& minor() const { return m_minor; }
 
-    std::vector<size_t>& matrix() { return m_matrix; }
-    std::vector<size_t>& major() { return m_major; }
-    std::vector<size_t>& minor() { return m_minor; }
+    std::vector<int64_t>& matrix() { return m_matrix; }
+    std::vector<int64_t>& major() { return m_major; }
+    std::vector<int64_t>& minor() { return m_minor; }
 
-    void n_cols(const size_t val) { m_n_cols = val; }
+    void n_cols(const int64_t val) { m_n_cols = val; }
 
 private:
-    size_t m_buffer_cols = 0;
-    size_t m_num_dtypes = 0;
-    size_t m_num_homop = 0;
-    size_t m_n_cols = 0;
-    std::vector<size_t> m_matrix;
-    std::vector<size_t> m_major;
-    std::vector<size_t> m_minor;
+    int64_t m_buffer_cols = 0;
+    int64_t m_num_dtypes = 0;
+    int64_t m_num_homop = 0;
+    int64_t m_n_cols = 0;
+    std::vector<int64_t> m_matrix;
+    std::vector<int64_t> m_major;
+    std::vector<int64_t> m_minor;
 };
 
 /** Prints a pileup data structure.
@@ -86,9 +87,9 @@ private:
  */
 void print_pileup_data(std::ostream& os,
                        const PileupData& pileup,
-                       const size_t num_dtypes,
+                       const int64_t num_dtypes,
                        const std::vector<std::string>& dtypes,
-                       const size_t num_homop);
+                       const int64_t num_homop);
 
 /** Generates medaka-style feature data in a region of a bam.
  *
@@ -121,9 +122,9 @@ PileupData calculate_pileup(const std::string& seq_name,
                             const int32_t region_start,
                             const int32_t region_end,
                             const bam_fset& bam_file,
-                            const size_t num_dtypes,
+                            const int64_t num_dtypes,
                             const std::vector<std::string>& dtypes,
-                            const size_t num_homop,
+                            const int64_t num_homop,
                             const std::string& tag_name,
                             const int32_t tag_value,
                             const bool keep_missing,

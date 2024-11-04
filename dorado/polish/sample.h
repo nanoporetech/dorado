@@ -10,7 +10,8 @@ namespace dorado::polisher {
 struct Sample {
     std::string ref_name;
     torch::Tensor features;
-    torch::Tensor positions;
+    std::vector<int64_t> positions_major;
+    std::vector<int64_t> positions_minor;
     torch::Tensor depth;
     int64_t region_start = 0;
     int64_t region_end = 0;

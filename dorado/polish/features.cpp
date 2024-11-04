@@ -3,37 +3,11 @@
 #include "polish/medaka_counts.h"
 
 #include <spdlog/spdlog.h>
+#include <utils/timer_high_res.h>
 
 namespace dorado::polisher {
 
 namespace {
-
-// CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
-//     CountsResult result;
-
-//     // Create a tensor for the feature matrix (equivalent to np_counts in Python).
-//     // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
-//     result.counts = torch::from_blob(data.matrix().data(),
-//                                      {static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
-//                                      torch::kInt64)
-//                             .clone();
-
-//     // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
-//     // We'll store the major and minor arrays as two separate columns in a single tensor.
-//     result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
-
-//     // Copy 'major' data into the first column of the positions tensor.
-//     torch::Tensor major_tensor =
-//             torch::from_blob(data.major().data(), data.n_cols(), torch::kInt64).clone();
-//     result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
-
-//     // Copy 'minor' data into the second column of the positions tensor.
-//     torch::Tensor minor_tensor =
-//             torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
-//     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
-
-//     return result;
-// }
 
 CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     CountsResult result;
@@ -46,26 +20,10 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     std::memcpy(result.counts.data_ptr<int64_t>(), data.matrix().data(),
                 data.n_cols() * n_rows * sizeof(int64_t));
 
-    // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
-    // We'll store the major and minor arrays as two separate columns in a single tensor.
-    result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
+    std::swap(result.positions_major, data.major());
+    std::swap(result.positions_minor, data.minor());
 
-    // Copy 'major' data into the first column of the positions tensor.
-    torch::Tensor major_tensor =
-            torch::from_blob(data.major().data(), data.n_cols(), torch::kInt64).clone();
-    result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
-
-    // Copy 'minor' data into the second column of the positions tensor.
-    torch::Tensor minor_tensor =
-            torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
-    result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
-
-    // // Allocate `result.positions` and copy `major` and `minor` columns
-    // result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
-
-    // // Copy `major` and `minor` data directly into the allocated `result.positions` tensor
-    // std::memcpy(result.positions.select(1, MAJOR_COLUMN).data_ptr<int64_t>(), data.major().data(), data.n_cols() * sizeof(int64_t));
-    // std::memcpy(result.positions.select(1, MINOR_COLUMN).data_ptr<int64_t>(), data.minor().data(), data.n_cols() * sizeof(int64_t));
+    // std::cerr << "data.n_cols() = " << data.n_cols() << "\n";
 
     return result;
 }
@@ -159,14 +117,15 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
     // // TODO: __enforce_pileup_chunk_contiguity
     // return enforce_pileup_chunk_contiguity(counts_result);
 
-    const auto find_gaps = [](const torch::Tensor& positions,
+    const auto find_gaps = [](const std::vector<int64_t>& positions,
                               int64_t threshold = 1) -> std::vector<int64_t> {
-        const torch::Tensor diffs = (positions.size(0) >= 2)
-                                            ? (positions.slice(0, 1) - positions.slice(0, 0, -1))
-                                            : torch::empty({0}, positions.options());
-        const auto gaps = (torch::nonzero(diffs > threshold).flatten() + 1).to(torch::kInt64);
-        return std::vector<int64_t>(gaps.data_ptr<int64_t>(),
-                                    gaps.data_ptr<int64_t>() + gaps.numel());
+        std::vector<int64_t> ret;
+        for (size_t i = 1; i < std::size(positions); ++i) {
+            if ((positions[i] - positions[i - 1]) > threshold) {
+                ret.emplace_back(i);
+            }
+        }
+        return ret;
     };
 
     const auto split_on_discontinuities = [&find_gaps](std::vector<CountsResult>& pileups) {
@@ -174,60 +133,89 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
 
         // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
         for (auto& data : pileups) {
-            const auto positions_major =
-                    data.positions.select(1, MAJOR_COLUMN);  // Accessing the 'major' column
-            const std::vector<int64_t> gaps = find_gaps(positions_major);
+            const std::vector<int64_t> gaps = find_gaps(data.positions_major);
 
             if (std::empty(gaps)) {
                 split_results.emplace_back(std::move(data));
             } else {
                 int64_t start = 0;
                 for (const int64_t i : gaps) {
-                    split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
-                                                            data.positions.slice(0, start, i)});
+                    std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
+                                                       data.positions_major.begin() + i);
+                    std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
+                                                       data.positions_minor.begin() + i);
+                    split_results.emplace_back(
+                            CountsResult{std::move(data.counts.slice(0, start, i)),
+                                         std::move(new_major_pos), std::move(new_minor_pos)});
                     start = i;
                 }
-                split_results.emplace_back(
-                        CountsResult{data.counts.slice(0, start), data.positions.slice(0, start)});
+                if (start < static_cast<int64_t>(std::size(data.positions_major))) {
+                    std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
+                                                       data.positions_major.end());
+                    std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
+                                                       data.positions_minor.end());
+                    split_results.emplace_back(CountsResult{std::move(data.counts.slice(0, start)),
+                                                            std::move(new_major_pos),
+                                                            std::move(new_minor_pos)});
+                }
             }
         }
 
         return split_results;
     };
 
-    const auto merge_chunks = [](std::vector<CountsResult>& pileups) {
+    const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
+        size_t size = 0;
+        for (const auto& vec : vecs) {
+            size += std::size(vec);
+        }
+        std::vector<int64_t> ret;
+        ret.reserve(size);
+        for (const auto& vec : vecs) {
+            ret.insert(ret.end(), vec.cbegin(), vec.cend());
+        }
+        return ret;
+    };
+
+    const auto merge_chunks = [&cat_vectors](std::vector<CountsResult>& pileups) {
         std::vector<torch::Tensor> counts_buffer;
-        std::vector<torch::Tensor> positions_buffer;
+        std::vector<std::vector<int64_t>> positions_major_buffer;
+        std::vector<std::vector<int64_t>> positions_minor_buffer;
         int64_t last_major = -1;
 
         std::vector<CountsResult> results;
 
         for (auto& data : pileups) {
-            if (data.positions.size(0) == 0) {
+            if (std::empty(data.positions_major)) {
                 continue;
             }
-            const auto first_major = data.positions.select(1, MAJOR_COLUMN)[0].item<int64_t>();
+            const int64_t first_major = data.positions_major.front();
             if (counts_buffer.empty() || (first_major - last_major) == 1) {
                 // New or contiguous chunk.
-                last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+                last_major = data.positions_major.back();
                 counts_buffer.emplace_back(std::move(data.counts));
-                positions_buffer.emplace_back(std::move(data.positions));
+                positions_major_buffer.emplace_back(std::move(data.positions_major));
+                positions_minor_buffer.emplace_back(std::move(data.positions_minor));
 
             } else {
                 // Discontinuity found, finalize the current chunk
-                last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+                last_major = data.positions_major.back();
 
                 // The torch::cat is slow, so just move if there is nothing to concatenate.
                 if (std::size(counts_buffer) == 1) {
                     results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-                                                      std::move(positions_buffer.front())});
+                                                      std::move(positions_major_buffer.front()),
+                                                      std::move(positions_minor_buffer.front())});
                 } else {
-                    results.emplace_back(
-                            CountsResult{std::move(torch::cat(std::move(counts_buffer))),
-                                         std::move(torch::cat(std::move(positions_buffer)))});
+                    results.emplace_back(CountsResult{
+                            std::move(torch::cat(std::move(counts_buffer))),
+                            std::move(cat_vectors(positions_major_buffer)),
+                            std::move(cat_vectors(positions_minor_buffer)),
+                    });
                 }
                 counts_buffer = {std::move(data.counts)};
-                positions_buffer = {std::move(data.positions)};
+                positions_major_buffer = {std::move(data.positions_major)};
+                positions_minor_buffer = {std::move(data.positions_minor)};
             }
         }
 
@@ -235,11 +223,14 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
             // The torch::cat is slow, so just move if there is nothing to concatenate.
             if (std::size(counts_buffer) == 1) {
                 results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-                                                  std::move(positions_buffer.front())});
+                                                  std::move(positions_major_buffer.front()),
+                                                  std::move(positions_minor_buffer.front())});
             } else {
-                results.emplace_back(
-                        CountsResult{std::move(torch::cat(std::move(counts_buffer))),
-                                     std::move(torch::cat(std::move(positions_buffer)))});
+                results.emplace_back(CountsResult{
+                        std::move(torch::cat(std::move(counts_buffer))),
+                        std::move(cat_vectors(positions_major_buffer)),
+                        std::move(cat_vectors(positions_minor_buffer)),
+                });
             }
         }
 
@@ -258,39 +249,84 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
     return results;
 }
 
-/**
- * \brief This is analogous to the `_post_process_pileup` function in Medaka.
- *
- * NOTE: This can update the pileup counts if `sym_indels == true`.
- */
-Sample counts_to_features(CountsResult& pileup,
-                          const std::string& ref_name,
-                          const int64_t ref_start,
-                          const int64_t ref_end,
-                          const int32_t seq_id,
-                          const int32_t win_id,
-                          const bool sym_indels,
-                          const FeatureIndicesType& feature_indices,
-                          const NormaliseType normalise_type) {
-    const int64_t start = pileup.positions.select(1, MAJOR_COLUMN).index({0}).item<int64_t>();
-    const int64_t end = pileup.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
+Sample counts_to_features_2(CountsResult& pileup,
+                            const std::string& ref_name,
+                            const int64_t ref_start,
+                            const int64_t ref_end,
+                            [[maybe_unused]] const int32_t seq_id,
+                            [[maybe_unused]] const int32_t win_id,
+                            [[maybe_unused]] const bool sym_indels,
+                            [[maybe_unused]] const FeatureIndicesType& feature_indices,
+                            [[maybe_unused]] const NormaliseType normalise_type,
+                            std::unordered_map<std::string, int64_t>& timers) {
+    timer::TimerHighRes timer;
+
+    const int64_t start = pileup.positions_major.front();
+    const int64_t end = pileup.positions_major.back();
 
     if ((start != ref_start) || ((end + 1) != ref_end)) {
         spdlog::warn(
-                "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}.",
-                ref_name, ref_start, ref_end, start, end);
+                "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}, "
+                "pileup.positions_major.size() = {}",
+                ref_name, ref_start, ref_end, start, end, std::size(pileup.positions_major));
+        // for (size_t i = 0; i < std::size(pileup.positions_major); ++i) {
+        //     std::cerr << "[pileup.positions_major i = " << i << "] pos = " << pileup.positions_major[i] << "\n";
+        // }
     }
+    timers["01-select"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
 
-    const auto minor_inds = torch::nonzero(pileup.positions.select(1, MINOR_COLUMN) > 0).squeeze();
-    const auto major_pos_at_minor_inds = pileup.positions.index({minor_inds, MAJOR_COLUMN});
-    const auto major_ind_at_minor_inds = torch::searchsorted(
-            pileup.positions.select(1, MAJOR_COLUMN).contiguous(), major_pos_at_minor_inds, "left");
+    // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
+    // on a very high level with lots of redundancy in computation.
+    const int64_t num_rows = static_cast<int64_t>(std::size(pileup.positions_major));
+    std::vector<int64_t> minor_inds;
+    std::vector<int64_t> major_pos_at_minor_inds;
+    std::vector<int64_t> major_ind_at_minor_inds;
+    minor_inds.reserve(num_rows);
+    major_pos_at_minor_inds.reserve(num_rows);
+    major_ind_at_minor_inds.reserve(num_rows);
+    int32_t last_non_minor_index = -1;
+    for (int64_t i = 0; i < num_rows; ++i) {
+        if (pileup.positions_minor[i] > 0) {
+            minor_inds.emplace_back(i);
+            major_pos_at_minor_inds.emplace_back(pileup.positions_major[i]);
+            major_ind_at_minor_inds.emplace_back(last_non_minor_index);
+        } else {
+            last_non_minor_index = i;
+        }
+    }
+    timers["02+03+04-major_ind_at_minor_inds"] += timer.GetElapsedMilliseconds();
+    timers["stats-minor_inds.size()"] += minor_inds.size();
+    timer.Reset();
+
+    // depth.index_put_({minor_inds}, depth.index({major_ind_at_minor_inds}));
 
     auto depth = pileup.counts.sum(1);
-    depth.index_put_({minor_inds}, depth.index({major_ind_at_minor_inds}));
+    timers["05a-sum"] += timer.GetElapsedMilliseconds();
+    timers["stats-pileup.counts.size(0)"] += pileup.counts.size(0);
+    timers["stats-pileup.counts.size(1)"] += pileup.counts.size(1);
+    timer.Reset();
+
+    auto depth_data = depth.data_ptr<int64_t>();
+    for (size_t i = 0; i < std::size(minor_inds); ++i) {
+        if (major_ind_at_minor_inds[i] != -1) {
+            depth_data[minor_inds[i]] = depth_data[major_ind_at_minor_inds[i]];
+        }
+    }
+
+    timers["05b-index_put_"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
+
     const auto depth_unsequezed = depth.unsqueeze(1).to(FeatureTensorType);
 
+    timers["06-depth_unsequezed"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
+
     if (sym_indels) {
+        const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
+        const torch::Tensor major_ind_at_minor_inds_tensor =
+                torch::tensor(major_ind_at_minor_inds, torch::kInt64);
+
         for (const auto& [key, inds] : feature_indices) {
             // const std::string& data_type = kv.first.first;
             const bool is_rev = key.second;
@@ -302,16 +338,16 @@ Sample counts_to_features(CountsResult& pileup,
 
             // Define deletion index.
             const int64_t featlen_index = is_rev ? PILEUP_POS_DEL_REV : PILEUP_POS_DEL_FWD;
-            const int64_t dtype_size = std::size(PILEUP_BASES);
+            const int64_t dtype_size = PILEUP_BASES_SIZE;
 
             // Find the deletion index
             // std::vector<int64_t> deletion_indices;
             for (const int64_t x : inds) {
                 if ((x % dtype_size) == featlen_index) {
                     // deletion_indices.emplace_back(x);
-                    pileup.counts.index_put_({minor_inds, x},
-                                             dt_depth.index({major_ind_at_minor_inds}) -
-                                                     dt_depth.index({minor_inds}));
+                    pileup.counts.index_put_({minor_inds_tensor, x},
+                                             dt_depth.index({major_ind_at_minor_inds_tensor}) -
+                                                     dt_depth.index({minor_inds_tensor}));
                 }
             }
             // // Ensure we have at least one valid deletion index
@@ -326,6 +362,9 @@ Sample counts_to_features(CountsResult& pileup,
         }
     }
 
+    timers["07-symmetric"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
+
     torch::Tensor feature_array;
     if (normalise_type == NormaliseType::TOTAL) {
         feature_array =
@@ -333,12 +372,16 @@ Sample counts_to_features(CountsResult& pileup,
 
     } else if (normalise_type == NormaliseType::FWD_REV) {
         feature_array = torch::empty_like(pileup.counts, FeatureTensorType);
+        const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
+        const torch::Tensor major_ind_at_minor_inds_tensor =
+                torch::tensor(major_ind_at_minor_inds, torch::kInt64);
         for (const auto& kv : feature_indices) {
             const std::vector<int64_t>& inds = kv.second;
             const torch::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
 
             auto dt_depth = pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
-            dt_depth.index_put_({minor_inds}, dt_depth.index({major_ind_at_minor_inds}));
+            dt_depth.index_put_({minor_inds_tensor},
+                                dt_depth.index({major_ind_at_minor_inds_tensor}));
             feature_array.index_put_(
                     {torch::indexing::Slice(), inds_tensor},
                     pileup.counts.index({torch::indexing::Slice(), inds_tensor}) /
@@ -349,15 +392,22 @@ Sample counts_to_features(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
+    timers["08-normalize"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
+
     // Step 5: Create and return Sample object
     Sample sample{ref_name,
                   std::move(feature_array),
-                  std::move(pileup.positions),
+                  std::move(pileup.positions_major),
+                  std::move(pileup.positions_minor),
                   depth,
                   ref_start,
                   ref_end,
                   seq_id,
                   win_id};
+
+    timers["09-sample"] += timer.GetElapsedMilliseconds();
+    timer.Reset();
 
     // // Log the result
     // std::cerr << "Processed " << sample.ref_name << " (median depth "
@@ -394,7 +444,11 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
                                                         const int64_t ref_start,
                                                         const int64_t ref_end,
                                                         const int32_t seq_id,
-                                                        const int32_t win_id) const {
+                                                        const int32_t win_id,
+                                                        const bool verbose) const {
+    std::unordered_map<std::string, int64_t> timings;
+    timer::TimerHighRes timer;
+
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -408,6 +462,9 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             m_tag_name, m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr,
             m_min_mapq);
 
+    timings["construct_pileup_counts"] = timer.GetElapsedMilliseconds();
+    timer.Reset();
+
     // if (true) {
     //     return {};
     // }
@@ -420,7 +477,8 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
                          region);
             results.emplace_back(Sample{ref_name,
                                         {},
-                                        std::move(data.positions),
+                                        std::move(data.positions_major),
+                                        std::move(data.positions_minor),
                                         {},
                                         ref_start,
                                         ref_end,
@@ -429,12 +487,20 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             continue;
         }
 
-        // results.emplace_back(Sample{ref_name, data.counts,
-        //                             data.positions, {}});
+        results.emplace_back(std::move(counts_to_features_2(
+                data, ref_name, ref_start + 1, ref_end, seq_id, win_id, m_symmetric_indels,
+                m_feature_indices, m_normalise_type, timings)));
+    }
 
-        results.emplace_back(std::move(counts_to_features(data, ref_name, ref_start + 1, ref_end,
-                                                          seq_id, win_id, m_symmetric_indels,
-                                                          m_feature_indices, m_normalise_type)));
+    timings["samples"] = timer.GetElapsedMilliseconds();
+    timer.Reset();
+
+    if (verbose) {
+        std::cerr << "[encode_region] Encoded region: " << ref_name << ":" << ref_start << "-"
+                  << ref_end << "\n";
+        for (const auto& [key, val] : timings) {
+            std::cerr << "[encode_region] Timing | " << key << ": " << val << "\n";
+        }
     }
 
     // if (true) {
