@@ -8,15 +8,43 @@ namespace dorado::polisher {
 
 namespace {
 
+// CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
+//     CountsResult result;
+
+//     // Create a tensor for the feature matrix (equivalent to np_counts in Python).
+//     // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
+//     result.counts = torch::from_blob(data.matrix().data(),
+//                                      {static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
+//                                      torch::kInt64)
+//                             .clone();
+
+//     // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
+//     // We'll store the major and minor arrays as two separate columns in a single tensor.
+//     result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
+
+//     // Copy 'major' data into the first column of the positions tensor.
+//     torch::Tensor major_tensor =
+//             torch::from_blob(data.major().data(), data.n_cols(), torch::kInt64).clone();
+//     result.positions.select(1, MAJOR_COLUMN).copy_(major_tensor);
+
+//     // Copy 'minor' data into the second column of the positions tensor.
+//     torch::Tensor minor_tensor =
+//             torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
+//     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
+
+//     return result;
+// }
+
 CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     CountsResult result;
 
-    // Create a tensor for the feature matrix (equivalent to np_counts in Python).
-    // Torch tensors are row-major, so we create a tensor of size (n_cols, n_rows).
-    result.counts = torch::from_blob(data.matrix().data(),
-                                     {static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
-                                     torch::kInt64)
-                            .clone();
+    // Allocate a tensor of the appropriate size directly for `result.counts` on the CPU
+    result.counts = torch::empty({static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
+                                 torch::kInt64);
+
+    // Copy the data from `data.matrix()` into `result.counts`
+    std::memcpy(result.counts.data_ptr<int64_t>(), data.matrix().data(),
+                data.n_cols() * n_rows * sizeof(int64_t));
 
     // Create a tensor for the positions (equivalent to positions['major'] and positions['minor']).
     // We'll store the major and minor arrays as two separate columns in a single tensor.
@@ -31,6 +59,13 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     torch::Tensor minor_tensor =
             torch::from_blob(data.minor().data(), data.n_cols(), torch::kInt64).clone();
     result.positions.select(1, MINOR_COLUMN).copy_(minor_tensor);
+
+    // // Allocate `result.positions` and copy `major` and `minor` columns
+    // result.positions = torch::empty({static_cast<long>(data.n_cols()), 2}, torch::kInt64);
+
+    // // Copy `major` and `minor` data directly into the allocated `result.positions` tensor
+    // std::memcpy(result.positions.select(1, MAJOR_COLUMN).data_ptr<int64_t>(), data.major().data(), data.n_cols() * sizeof(int64_t));
+    // std::memcpy(result.positions.select(1, MINOR_COLUMN).data_ptr<int64_t>(), data.minor().data(), data.n_cols() * sizeof(int64_t));
 
     return result;
 }
@@ -113,6 +148,10 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
     const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
     CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
 
+    // if (true) {
+    //     return {counts_result};
+    // }
+
     // print_pileup_data(pileup, num_dtypes, dtypes, num_qstrat);
 
     // destroy_plp_data(pileup);
@@ -130,17 +169,17 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
                                     gaps.data_ptr<int64_t>() + gaps.numel());
     };
 
-    const auto split_on_discontinuities = [&find_gaps](const std::vector<CountsResult>& pileups) {
+    const auto split_on_discontinuities = [&find_gaps](std::vector<CountsResult>& pileups) {
         std::vector<CountsResult> split_results;
 
         // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
-        for (const auto& data : pileups) {
+        for (auto& data : pileups) {
             const auto positions_major =
                     data.positions.select(1, MAJOR_COLUMN);  // Accessing the 'major' column
             const std::vector<int64_t> gaps = find_gaps(positions_major);
 
             if (std::empty(gaps)) {
-                split_results.emplace_back(data);
+                split_results.emplace_back(std::move(data));
             } else {
                 int64_t start = 0;
                 for (const int64_t i : gaps) {
@@ -164,7 +203,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
         std::vector<CountsResult> results;
 
         for (auto& data : pileups) {
-            if (!data.positions.size(0)) {
+            if (data.positions.size(0) == 0) {
                 continue;
             }
             const auto first_major = data.positions.select(1, MAJOR_COLUMN)[0].item<int64_t>();
@@ -177,26 +216,44 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
             } else {
                 // Discontinuity found, finalize the current chunk
                 last_major = data.positions.select(1, MAJOR_COLUMN).index({-1}).item<int64_t>();
-                results.emplace_back(
-                        CountsResult{concatenate(counts_buffer), concatenate(positions_buffer)});
+
+                // The torch::cat is slow, so just move if there is nothing to concatenate.
+                if (std::size(counts_buffer) == 1) {
+                    results.emplace_back(CountsResult{std::move(counts_buffer.front()),
+                                                      std::move(positions_buffer.front())});
+                } else {
+                    results.emplace_back(
+                            CountsResult{std::move(torch::cat(std::move(counts_buffer))),
+                                         std::move(torch::cat(std::move(positions_buffer)))});
+                }
                 counts_buffer = {std::move(data.counts)};
                 positions_buffer = {std::move(data.positions)};
             }
         }
 
         if (!counts_buffer.empty()) {
-            results.emplace_back(
-                    CountsResult{concatenate(counts_buffer), concatenate(positions_buffer)});
+            // The torch::cat is slow, so just move if there is nothing to concatenate.
+            if (std::size(counts_buffer) == 1) {
+                results.emplace_back(CountsResult{std::move(counts_buffer.front()),
+                                                  std::move(positions_buffer.front())});
+            } else {
+                results.emplace_back(
+                        CountsResult{std::move(torch::cat(std::move(counts_buffer))),
+                                     std::move(torch::cat(std::move(positions_buffer)))});
+            }
         }
 
         return results;
     };
 
     // First pass: split at discontinuities within each chunk.
-    std::vector<CountsResult> split_results = split_on_discontinuities({counts_result});
+    std::vector<CountsResult> results;
+    results.emplace_back(std::move(counts_result));
+
+    results = split_on_discontinuities(results);
 
     // Second pass: merge neighboring chunks if they have no distance between them.
-    std::vector<CountsResult> results = merge_chunks(split_results);
+    results = merge_chunks(results);
 
     return results;
 }
@@ -288,13 +345,19 @@ Sample counts_to_features(CountsResult& pileup,
                             torch::max(depth_unsequezed, torch::ones_like(depth_unsequezed)));
         }
     } else {
-        feature_array = pileup.counts;
+        feature_array = std::move(pileup.counts);
         feature_array = feature_array.to(FeatureTensorType);
     }
 
     // Step 5: Create and return Sample object
-    Sample sample{ref_name,  feature_array, pileup.positions, depth,
-                  ref_start, ref_end,       seq_id,           win_id};
+    Sample sample{ref_name,
+                  std::move(feature_array),
+                  std::move(pileup.positions),
+                  depth,
+                  ref_start,
+                  ref_end,
+                  seq_id,
+                  win_id};
 
     // // Log the result
     // std::cerr << "Processed " << sample.ref_name << " (median depth "
@@ -345,6 +408,10 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             m_tag_name, m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr,
             m_min_mapq);
 
+    // if (true) {
+    //     return {};
+    // }
+
     std::vector<Sample> results;
 
     for (auto& data : pileups) {
@@ -365,10 +432,14 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
         // results.emplace_back(Sample{ref_name, data.counts,
         //                             data.positions, {}});
 
-        results.emplace_back(counts_to_features(data, ref_name, ref_start + 1, ref_end, seq_id,
-                                                win_id, m_symmetric_indels, m_feature_indices,
-                                                m_normalise_type));
+        results.emplace_back(std::move(counts_to_features(data, ref_name, ref_start + 1, ref_end,
+                                                          seq_id, win_id, m_symmetric_indels,
+                                                          m_feature_indices, m_normalise_type)));
     }
+
+    // if (true) {
+    //     return {};
+    // }
 
     return results;
 }
