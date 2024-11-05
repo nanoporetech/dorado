@@ -651,6 +651,10 @@ void run_experimental(const Options& opt) {
 
     module.eval();
 
+    // Move the model to GPU and convert to half precision
+    module.to(torch::kCUDA);
+    module.to(torch::kHalf);
+
     // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
     //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
     torch::set_num_threads(1);
@@ -671,7 +675,9 @@ void run_experimental(const Options& opt) {
         }
         // torch::Tensor batch_features_tensor = torch::stack(batch_features);
         torch::Tensor batch_features_tensor =
-                correction::collate<float>(batch_features, 0.0f, polisher::FeatureTensorType);
+                correction::collate<float>(batch_features, 0.0f, polisher::FeatureTensorType)
+                        .to(device)
+                        .to(torch::kHalf);
 
         spdlog::info(
                 "About to call forward(): batch_features_tensor.size() = ({}, {}, {}), approx "
@@ -692,7 +698,7 @@ void run_experimental(const Options& opt) {
         std::vector<torch::jit::IValue> inputs;
         {
             utils::ScopedProfileRange move_to_device("move_to_device", 1);
-            inputs.push_back(batch_features_tensor.to(device));
+            inputs.emplace_back(batch_features_tensor.to(device));
         }
 
         c10::IValue output;
@@ -709,9 +715,13 @@ void run_experimental(const Options& opt) {
         }
         lock.unlock();
 
+        torch::Tensor result = output.toTensor().to(torch::kFloat32);
+
         // spdlog::info("Inference done.");
 
-        return output.toTensor();
+        // return output.toTensor();
+
+        return result;
     };
 
     const auto process_samples = [&batch_infer](const polisher::CountsFeatureEncoder& encoder,
