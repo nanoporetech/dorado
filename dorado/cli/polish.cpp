@@ -6,6 +6,7 @@
 #include "polish/medaka_bamiter.h"
 #include "polish/medaka_counts.h"
 #include "polish/model.h"
+#include "polish/polish_models.h"
 #include "polish/sample.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
@@ -257,6 +258,55 @@ const std::vector<std::pair<int32_t, int32_t>> compute_chunks(const int32_t num_
                 ", num_chunks = " + std::to_string(num_chunks) + ", sum = " + std::to_string(sum)};
     }
     return chunks;
+}
+
+std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& model_path,
+                                                   const std::string& device_str,
+                                                   torch::Device& device) {
+    // Load weights from the model file.
+    torch::jit::script::Module module;
+
+    try {
+        spdlog::info("Loading weights from file: {}", model_path.string());
+        module = torch::jit::load(model_path.string());
+    } catch (const c10::Error& e) {
+        throw std::runtime_error("Error loading model from " + model_path.string() +
+                                 " with error: " + e.what());
+    }
+
+    // Construct the model.
+    spdlog::info("Creating the GRU model.");
+    std::unique_ptr<polisher::GRUModel> model = std::make_unique<polisher::GRUModel>(10, 5, 128);
+
+    spdlog::info("Setting the weights.");
+    auto state_dict = module.named_parameters();
+    for (const auto& p : state_dict) {
+        auto* param = model->named_parameters().find(p.name);
+        if (param != nullptr) {
+            param->copy_(p.value);
+        } else {
+            throw std::runtime_error(
+                    "Some loaded parameters cannot be found in the C++ model! name = " + p.name);
+        }
+    }
+    spdlog::info("Moving the model to the device: {}", device_str);
+    model->to(device);
+    spdlog::info("Moved the model to the device: {}. Converting to half.", device_str);
+    model->to_half();
+    spdlog::info("Converted the model to half. Calling model->eval().");
+    model->eval();
+    spdlog::info("Model ready.");
+
+    size_t total_params = 0;
+    size_t total_bytes = 0;
+    for (const auto& param : model->parameters()) {
+        total_params += param.numel();
+        total_bytes += param.numel() * param.element_size();
+    }
+    spdlog::info("Total parameters: {}", total_params);
+    spdlog::info("Total size (in MB): {} MB", (total_bytes / (1024.0 * 1024.0)));
+
+    return model;
 }
 
 }  // namespace
@@ -633,35 +683,14 @@ void run_experimental(const Options& opt) {
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
 #endif
 
-    spdlog::info("Loading the model.");
-
     at::InferenceMode infer_guard;
-
-    // const std::string model_path = (opt.model_path / "weights.pt").string(); // (m_model_config.model_dir / m_model_config.weights_file).string();
-    const std::string model_path = opt.model_path / "model.pt";
-    torch::jit::script::Module module;
-    try {
-        spdlog::debug("Loading model on {}...", device_str);
-        module = torch::jit::load(model_path, device);
-        spdlog::debug("Loaded model on {}!", device_str);
-    } catch (const c10::Error& e) {
-        throw std::runtime_error("Error loading model from " + model_path +
-                                 " with error: " + e.what());
-    }
-
-    module.eval();
-
-    // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
-    //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
-    torch::set_num_threads(1);
-    at::set_num_interop_threads(opt.threads);
 
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
-    auto batch_infer = [&gpu_mutexes, &device, &module](
-                               const std::vector<polisher::Sample>& samples,
-                               const int64_t sample_start, const int64_t sample_end,
-                               const int32_t mtx_idx) {
+    auto batch_infer = [&gpu_mutexes, &device](polisher::TorchModel& model,
+                                               const std::vector<polisher::Sample>& samples,
+                                               const int64_t sample_start, const int64_t sample_end,
+                                               const int32_t mtx_idx) {
         utils::ScopedProfileRange infer("infer", 1);
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
@@ -680,41 +709,22 @@ void run_experimental(const Options& opt) {
                 batch_features_tensor.size(2),
                 batch_features_tensor.numel() * batch_features_tensor.element_size() /
                         (1024.0 * 1024.0));
-        // batch_features_tensor.size(0) * batch_features_tensor.size(1) * batch_features_tensor.size(2) * sizeof(float));
-
-        // if (batch_features_tensor.size(1) == 129083) {
-        //     for (int64_t i = sample_start; i < sample_end; ++i) {
-        //         spdlog::info("[IS] [i = {}] shape: ({}, {})", i, samples[i].features.size(0), samples[i].features.size(1));
-        //     }
-        // }
 
         std::unique_lock<std::mutex> lock(gpu_mutexes[mtx_idx]);
-        std::vector<torch::jit::IValue> inputs;
-        {
-            utils::ScopedProfileRange move_to_device("move_to_device", 1);
-            inputs.push_back(batch_features_tensor.to(device));
-        }
 
-        c10::IValue output;
+        torch::Tensor output;
         try {
-            output = module.forward(inputs);
+            output = model.predict_on_batch(std::move(batch_features_tensor), device);
         } catch (std::exception& e) {
-#if DORADO_CUDA_BUILD
-            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
-            c10::cuda::CUDACachingAllocator::emptyCache();
-            output = module.forward(inputs);
-#else
             throw e;
-#endif
         }
         lock.unlock();
 
-        // spdlog::info("Inference done.");
-
-        return output.toTensor();
+        return output;
     };
 
-    const auto process_samples = [&batch_infer](const polisher::CountsFeatureEncoder& encoder,
+    const auto process_samples = [&batch_infer](polisher::TorchModel& model,
+                                                const polisher::CountsFeatureEncoder& encoder,
                                                 const std::vector<polisher::Sample>& in_samples,
                                                 const int32_t batch_size, const bool gen_qual) {
         /**
@@ -727,7 +737,7 @@ void run_experimental(const Options& opt) {
             const int64_t end = std::min((start + batch_size), num_samples);
 
             // Inference.
-            torch::Tensor output = batch_infer(in_samples, start, end, 0);
+            torch::Tensor output = batch_infer(model, in_samples, start, end, 0);
 
             // Convert to sequences and qualities.
             std::vector<polisher::ConsensusResult> new_results =
@@ -811,6 +821,11 @@ void run_experimental(const Options& opt) {
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples;
         {
+            // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
+            //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
+            torch::set_num_threads(1);
+            at::set_num_interop_threads(opt.threads);
+
             const auto worker_samples =
                     [&windows, &draft_lens, &encoders, &opt](
                             const int32_t thread_id, const int32_t start, const int32_t end,
@@ -885,7 +900,16 @@ void run_experimental(const Options& opt) {
                 samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
                                std::make_move_iterator(std::end(win_samples)));
             }
+
+            // Increase the number of threads again for inter-op parallelism.
+            torch::set_num_threads(opt.threads);
+            // at::set_num_interop_threads(1);
         }
+
+        // Construct the model.
+        spdlog::info("Loading the model.");
+        const std::unique_ptr<polisher::TorchModel> model =
+                create_model(opt.model_path / "model.pt", device_str, device);
 
         // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
         //     if ((win_id % 10000) == 0) {
@@ -902,12 +926,9 @@ void run_experimental(const Options& opt) {
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
 
-        // Increase the number of threads again for inter-op parallelism.
-        torch::set_num_threads(opt.threads);
-
         // TODO: Separate the encoder and the decoder. The decoder does not need the BAM file.
         const std::vector<polisher::ConsensusResult> results_samples =
-                process_samples(encoders.front(), samples, opt.batch_size, with_quals);
+                process_samples(*model, encoders.front(), samples, opt.batch_size, with_quals);
 
         if (std::size(results_samples) != std::size(samples)) {
             throw std::runtime_error{

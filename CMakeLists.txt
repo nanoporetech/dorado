@@ -315,6 +315,8 @@ add_library(dorado_lib
     dorado/polish/medaka_common.h
     dorado/polish/medaka_counts.cpp
     dorado/polish/medaka_counts.h
+    dorado/polish/polish_models.cpp
+    dorado/polish/polish_models.h
     dorado/polish/sample.h
 )
 
