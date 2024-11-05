@@ -45,7 +45,7 @@ if(NOT TARGET htslib) # lazy include guard
                 BUILD_IN_SOURCE 1
                 CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
                 COMMAND ${AUTOCONF_COMMAND}
-                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
+                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${CONFIGURE_FLAGS}
                 BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
                 COMMAND ${INSTALL_NAME}
                 INSTALL_COMMAND ""
