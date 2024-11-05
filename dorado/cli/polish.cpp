@@ -72,6 +72,7 @@ struct Options {
     int32_t batch_size = 128;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
+    int32_t bam_chunk = 1000000;
 };
 
 /// \brief Define the CLI options.
@@ -126,6 +127,10 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Overlap length between windows.")
                 .default_value(1000)
                 .scan<'i', int>();
+        parser->visible.add_argument("--bam-chunk")
+                .help("Size of draft chunks to parse from the input BAM at a time.")
+                .default_value(1000000)
+                .scan<'i', int>();
     }
 
     return parser;
@@ -175,6 +180,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.batch_size = parser.visible.get<int>("batch-size");
     opt.window_len = parser.visible.get<int>("window-len");
     opt.window_overlap = parser.visible.get<int>("window-overlap");
+    opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.verbosity = verbosity;
 
     return opt;
@@ -211,6 +217,10 @@ void validate_options(const Options& opt) {
     }
     if (opt.window_len <= 0) {
         spdlog::error("Window size should be > 0. Given: {}.", opt.window_len);
+        std::exit(EXIT_FAILURE);
+    }
+    if (opt.bam_chunk <= 0) {
+        spdlog::error("BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
     if ((opt.window_overlap < 0) || (opt.window_overlap >= opt.window_len)) {
@@ -696,6 +706,9 @@ void run_experimental(const Options& opt) {
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
         for (int64_t i = sample_start; i < sample_end; ++i) {
+            std::cout << "[i = " << i
+                      << "] sample.positions = " << samples[i].positions_major.front() << " - "
+                      << samples[i].positions_major.back() << "\n";
             batch_features.emplace_back(samples[i].features);
         }
         // torch::Tensor batch_features_tensor = torch::stack(batch_features);
@@ -804,7 +817,9 @@ void run_experimental(const Options& opt) {
 
         spdlog::info("Creating windows.");
 
-        const auto& [windows, _] = create_windows(draft_lens, opt.window_len, opt.window_overlap);
+        // Create BAM windows (regions) to create pileup. The features (samples) will
+        // be split further into windows of window_len in size prior to inference.
+        const auto& [windows, _] = create_windows(draft_lens, opt.bam_chunk, opt.window_overlap);
 
         spdlog::info("Created {} windows from {} sequences.", std::size(windows),
                      std::size(draft_lens));
