@@ -249,15 +249,15 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
     return results;
 }
 
-Sample counts_to_features_2(CountsResult& pileup,
-                            const std::string& ref_name,
-                            const int64_t ref_start,
-                            const int64_t ref_end,
-                            [[maybe_unused]] const int32_t seq_id,
-                            [[maybe_unused]] const int32_t win_id,
-                            [[maybe_unused]] const bool sym_indels,
-                            [[maybe_unused]] const FeatureIndicesType& feature_indices,
-                            [[maybe_unused]] const NormaliseType normalise_type) {
+Sample counts_to_features(CountsResult& pileup,
+                          const std::string& ref_name,
+                          const int64_t ref_start,
+                          const int64_t ref_end,
+                          [[maybe_unused]] const int32_t seq_id,
+                          [[maybe_unused]] const int32_t win_id,
+                          [[maybe_unused]] const bool sym_indels,
+                          [[maybe_unused]] const FeatureIndicesType& feature_indices,
+                          [[maybe_unused]] const NormaliseType normalise_type) {
     const int64_t start = pileup.positions_major.front();
     const int64_t end = pileup.positions_major.back();
 
@@ -435,9 +435,9 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
             continue;
         }
 
-        results.emplace_back(std::move(counts_to_features_2(data, ref_name, ref_start + 1, ref_end,
-                                                            seq_id, win_id, m_symmetric_indels,
-                                                            m_feature_indices, m_normalise_type)));
+        results.emplace_back(std::move(counts_to_features(data, ref_name, ref_start + 1, ref_end,
+                                                          seq_id, win_id, m_symmetric_indels,
+                                                          m_feature_indices, m_normalise_type)));
     }
 
     // if (true) {
