@@ -812,7 +812,7 @@ void run_experimental(const Options& opt) {
         std::vector<polisher::Sample> samples;
         {
             const auto worker_samples =
-                    [&windows, &draft_lens, &encoders](
+                    [&windows, &draft_lens, &encoders, &opt](
                             const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<std::vector<polisher::Sample>>& results) {
                         for (int32_t i = start; i < end; ++i) {
@@ -826,7 +826,8 @@ void run_experimental(const Options& opt) {
                                         100.0 * static_cast<double>(i - start) / (end - start));
                             }
                             results[i] = encoders[thread_id].encode_region(
-                                    name, window.start, window.end, window.seq_id, i);
+                                    name, window.start, window.end, window.seq_id, i,
+                                    opt.window_len, opt.window_overlap);
                         }
                     };
 
