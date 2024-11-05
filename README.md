@@ -56,7 +56,7 @@ Dorado has been tested extensively and supported on the following systems:
 | | H100 | CUDA Driver ≥520 |
 | Apple | Apple Silicon (M1/M2) | |
 
-Linux or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
+Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
@@ -303,7 +303,7 @@ In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado
 
 ### Poly(A) tail estimation
 
-Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences and estimation of interrupted tails can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
+Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA, and can be configured for use with custom primer sequences, interrupted tails, and plasmids. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences, estimation of interrupted tails, and plasmid support can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
 
 ### Read Error Correction
 
