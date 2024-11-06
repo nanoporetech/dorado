@@ -72,9 +72,6 @@ public:
                                       const int64_t chunk_len,
                                       const int64_t chunk_overlap) const;
 
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits,
-                                              const bool with_probs) const;
-
 private:
     bam_fset* m_bam_set = nullptr;
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
@@ -87,6 +84,12 @@ private:
     bool m_symmetric_indels = false;
 
     FeatureIndicesType m_feature_indices;
+};
+
+class CountsFeatureDecoder {
+public:
+    static std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits,
+                                                     const bool with_probs);
 };
 
 // CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region);

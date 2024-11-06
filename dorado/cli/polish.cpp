@@ -604,6 +604,87 @@ polisher::ConsensusResult stitch_sequence(
     return polisher::ConsensusResult{consensus_seq, consensus_quals};
 }
 
+std::vector<polisher::Sample> create_samples(
+        const std::filesystem::path& in_aln_bam_fn,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const std::vector<Window>& windows,
+        const int32_t num_threads,
+        const int32_t window_len,
+        const int32_t window_overlap) {
+    // Open the BAM file for each thread and spawn encoders.
+    spdlog::info("Creating {} encoders.", num_threads);
+    std::vector<bam_fset*> bam_sets;
+    std::vector<polisher::CountsFeatureEncoder> encoders;
+    for (int32_t i = 0; i < num_threads; ++i) {
+        bam_sets.emplace_back(create_bam_fset(in_aln_bam_fn.c_str()));
+        encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
+    }
+
+    const auto worker_samples = [&](const int32_t thread_id, const int32_t start, const int32_t end,
+                                    std::vector<std::vector<polisher::Sample>>& results) {
+        for (int32_t i = start; i < end; ++i) {
+            const auto& window = windows[i];
+            const std::string& name = draft_lens[window.seq_id].first;
+            if (thread_id == 0) {
+                spdlog::info(
+                        "Processing i = {}, start = {}, end = {}, region = "
+                        "{}:{}-{} ({} %).",
+                        i, start, end, name, window.start, window.end,
+                        100.0 * static_cast<double>(i - start) / (end - start));
+            }
+            results[i] = encoders[thread_id].encode_region(
+                    name, window.start, window.end, window.seq_id, i, window_len, window_overlap);
+        }
+    };
+
+    std::vector<std::vector<polisher::Sample>> win_results(std::size(windows));
+
+    const int32_t num_items = static_cast<int32_t>(std::size(windows));
+    const std::vector<std::pair<int32_t, int32_t>> chunks = compute_chunks(num_items, num_threads);
+
+    for (size_t i = 0; i < std::size(chunks); ++i) {
+        const auto& [start, end] = chunks[i];
+        std::cerr << "[chunk i = " << i << "] start = " << start << ", end = " << end << "\n";
+    }
+
+    spdlog::info("Starting to encode regions for {} windows using {} threads.", std::size(windows),
+                 std::size(chunks));
+
+    cxxpool::thread_pool pool{std::size(chunks)};
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(chunks));
+    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
+        const auto [chunk_start, chunk_end] = chunks[tid];
+        futures.emplace_back(
+                pool.push(worker_samples, tid, chunk_start, chunk_end, std::ref(win_results)));
+    }
+    for (auto& f : futures) {
+        f.wait();
+    }
+
+    spdlog::info("Flattening the samples.");
+
+    // Flatten the samples.
+    size_t num_samples = 0;
+    for (const auto& win_samples : win_results) {
+        num_samples += std::size(win_samples);
+    }
+
+    std::vector<polisher::Sample> samples;
+    samples.reserve(num_samples);
+    for (auto& win_samples : win_results) {
+        samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
+                       std::make_move_iterator(std::end(win_samples)));
+    }
+
+    for (auto& bam_set : bam_sets) {
+        destroy_bam_fset(bam_set);
+    }
+
+    return samples;
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
@@ -674,7 +755,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
     const auto process_samples = [&batch_infer, &gpu_mutexes](
                                          polisher::TorchModel& model,
-                                         const polisher::CountsFeatureEncoder& encoder,
+                                         const polisher::CountsFeatureDecoder& decoder,
                                          const std::vector<polisher::Sample>& in_samples,
                                          const int32_t batch_size, const bool gen_qual) {
         /**
@@ -691,7 +772,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
             // Convert to sequences and qualities.
             std::vector<polisher::ConsensusResult> new_results =
-                    encoder.decode_bases(output, gen_qual);
+                    decoder.decode_bases(output, gen_qual);
 
             assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
@@ -762,87 +843,18 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         spdlog::info("Created {} windows from {} sequences.", std::size(windows),
                      std::size(draft_lens));
 
-        // Open the BAM file for each thread and spawn encoders.
-        spdlog::info("Creating {} encoders.", opt.threads);
-        std::vector<bam_fset*> bam_sets;
-        std::vector<polisher::CountsFeatureEncoder> encoders;
-        for (int32_t i = 0; i < opt.threads; ++i) {
-            bam_sets.emplace_back(create_bam_fset(opt.in_aln_bam_fn.c_str()));
-            encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
-        }
+        // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
+        //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
+        torch::set_num_threads(1);
+        at::set_num_interop_threads(opt.threads);
 
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
-        std::vector<polisher::Sample> samples;
-        {
-            // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
-            //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
-            torch::set_num_threads(1);
-            at::set_num_interop_threads(opt.threads);
+        std::vector<polisher::Sample> samples =
+                create_samples(opt.in_aln_bam_fn, draft_lens, windows, opt.threads, opt.window_len,
+                               opt.window_overlap);
 
-            const auto worker_samples =
-                    [&windows, &draft_lens, &encoders, &opt](
-                            const int32_t thread_id, const int32_t start, const int32_t end,
-                            std::vector<std::vector<polisher::Sample>>& results) {
-                        for (int32_t i = start; i < end; ++i) {
-                            const auto& window = windows[i];
-                            const std::string& name = draft_lens[window.seq_id].first;
-                            if (thread_id == 0) {
-                                spdlog::info(
-                                        "Processing i = {}, start = {}, end = {}, region = "
-                                        "{}:{}-{} ({} %).",
-                                        i, start, end, name, window.start, window.end,
-                                        100.0 * static_cast<double>(i - start) / (end - start));
-                            }
-                            results[i] = encoders[thread_id].encode_region(
-                                    name, window.start, window.end, window.seq_id, i,
-                                    opt.window_len, opt.window_overlap);
-                        }
-                    };
-
-            std::vector<std::vector<polisher::Sample>> win_results(std::size(windows));
-
-            const int32_t num_items = static_cast<int32_t>(std::size(windows));
-            const std::vector<std::pair<int32_t, int32_t>> chunks =
-                    compute_chunks(num_items, opt.threads);
-
-            for (size_t i = 0; i < std::size(chunks); ++i) {
-                const auto& [start, end] = chunks[i];
-                std::cerr << "[chunk i = " << i << "] start = " << start << ", end = " << end
-                          << "\n";
-            }
-
-            spdlog::info("Starting to encode regions for {} windows using {} threads.",
-                         std::size(windows), std::size(chunks));
-
-            cxxpool::thread_pool pool{std::size(chunks)};
-
-            std::vector<std::future<void>> futures;
-            futures.reserve(std::size(chunks));
-            for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
-                const auto [chunk_start, chunk_end] = chunks[tid];
-                futures.emplace_back(pool.push(worker_samples, tid, chunk_start, chunk_end,
-                                               std::ref(win_results)));
-            }
-            for (auto& f : futures) {
-                f.wait();
-            }
-
-            spdlog::info("Flattening the samples.");
-
-            // Flatten the samples.
-            size_t num_samples = 0;
-            for (const auto& win_samples : win_results) {
-                num_samples += std::size(win_samples);
-            }
-            samples.reserve(num_samples);
-            for (auto& win_samples : win_results) {
-                samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
-                               std::make_move_iterator(std::end(win_samples)));
-            }
-
-            // Increase the number of threads again for inter-op parallelism.
-            torch::set_num_threads(opt.threads);
-        }
+        // Increase the number of threads again for inter-op parallelism.
+        torch::set_num_threads(opt.threads);
 
         // Construct the model.
         spdlog::info("Loading the model.");
@@ -851,9 +863,10 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
 
-        // TODO: Separate the encoder and the decoder. The decoder does not need the BAM file.
+        const polisher::CountsFeatureDecoder decoder;
+
         const std::vector<polisher::ConsensusResult> results_samples =
-                process_samples(*model, encoders.front(), samples, opt.batch_size, with_quals);
+                process_samples(*model, decoder, samples, opt.batch_size, with_quals);
 
         if (std::size(results_samples) != std::size(samples)) {
             throw std::runtime_error{
@@ -889,10 +902,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
             const std::string header = std::string("consensus") + "-" + draft_lens[seq_id].first;
             write_seq(ofs, header, consensus, with_quals);
-        }
-
-        for (auto& bam_set : bam_sets) {
-            destroy_bam_fset(bam_set);
         }
     }
 

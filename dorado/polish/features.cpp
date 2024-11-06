@@ -512,8 +512,8 @@ std::vector<Sample> CountsFeatureEncoder::encode_region(const std::string& ref_n
     return results;
 }
 
-std::vector<ConsensusResult> CountsFeatureEncoder::decode_bases(const torch::Tensor& logits,
-                                                                const bool with_probs) const {
+std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits,
+                                                                const bool with_probs) {
     static constexpr std::string_view label_scheme{"*ACGT"};
 
     const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
