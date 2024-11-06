@@ -50,18 +50,18 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
 
+    float avg = average_samples_per_base(sizes);
     auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
-    float sum2 = 0.f;
+    float sum_diff_2 = 0.f;
     int count = 0;
     for (auto s : sizes) {
         if (s >= quantiles[0] && s <= quantiles[1]) {
-            sum2 += s * s;
+            sum_diff_2 += (s - avg) * (s - avg);
             count++;
         }
     }
 
-    float avg = average_samples_per_base(sizes);
-    float stddev = (count > 0 ? std::sqrt((sum2 / count) - avg * avg) : 0.f);
+    float stddev = (count > 0 ? std::sqrt(sum_diff_2 / count) : 0.f);
     return {avg, stddev};
 }
 
