@@ -194,7 +194,10 @@ PileupData calculate_pileup(const std::string &chr_name,
     hts_idx_t *idx = bam_file.idx;
     sam_hdr_t *hdr = bam_file.hdr;
 
-    const std::string region = chr_name + ':' + std::to_string(start) + '-' + std::to_string(end);
+    const int32_t start_one_based = start + 1;
+
+    const std::string region =
+            chr_name + ':' + std::to_string(start_one_based) + '-' + std::to_string(end);
 
     std::unique_ptr<mplp_data> data = std::make_unique<mplp_data>();
     mplp_data *raw_data_ptr = data.get();
@@ -237,7 +240,7 @@ PileupData calculate_pileup(const std::string &chr_name,
         if (c_name != chr_name) {
             continue;
         }
-        if (pos < start) {
+        if (pos < start_one_based) {
             continue;
         }
         if (pos >= end) {
@@ -256,7 +259,8 @@ PileupData calculate_pileup(const std::string &chr_name,
 
         // reallocate output if necessary
         if ((n_cols + max_ins) > static_cast<int32_t>(pileup.buffer_cols())) {
-            const float cols_per_pos = static_cast<float>(n_cols + max_ins) / (1 + pos - start);
+            const float cols_per_pos =
+                    static_cast<float>(n_cols + max_ins) / (1 + pos - start_one_based);
             // max_ins can dominate so add at least that
             const int64_t new_buffer_cols =
                     max_ins + std::max(2 * pileup.buffer_cols(),

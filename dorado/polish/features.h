@@ -64,13 +64,10 @@ public:
                          const int32_t min_mapq,
                          const bool symmetric_indels);
 
-    std::vector<Sample> encode_region(const std::string& ref_name,
-                                      const int64_t ref_start,
-                                      const int64_t ref_end,
-                                      const int32_t seq_id,
-                                      const int32_t win_id,
-                                      const int64_t chunk_len,
-                                      const int64_t chunk_overlap) const;
+    Sample encode_region(const std::string& ref_name,
+                         const int64_t ref_start,
+                         const int64_t ref_end,
+                         const int32_t seq_id) const;
 
 private:
     bam_fset* m_bam_set = nullptr;

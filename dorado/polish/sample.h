@@ -15,8 +15,12 @@ struct Sample {
     torch::Tensor depth;
     int32_t seq_id = -1;
 
-    int64_t start() const { return (std::empty(positions_major) ? -1 : positions_major.front()); }
-    int64_t end() const { return (std::empty(positions_major) ? -1 : positions_major.back()); }
+    int64_t start() const {
+        return (std::empty(positions_major) ? -1 : (positions_major.front() - 1));
+    }
+    int64_t end() const {
+        return (std::empty(positions_major) ? -1 : (positions_major.back() + 1));
+    }
 };
 
 }  // namespace dorado::polisher

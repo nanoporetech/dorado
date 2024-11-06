@@ -685,7 +685,7 @@ std::vector<polisher::Sample> create_samples(
     }
 
     const auto worker_samples = [&](const int32_t thread_id, const int32_t start, const int32_t end,
-                                    std::vector<std::vector<polisher::Sample>>& results) {
+                                    std::vector<polisher::Sample>& results) {
         for (int32_t i = start; i < end; ++i) {
             const auto& window = windows[i];
             const std::string& name = draft_lens[window.seq_id].first;
@@ -696,8 +696,8 @@ std::vector<polisher::Sample> create_samples(
                         i, start, end, name, window.start, window.end,
                         100.0 * static_cast<double>(i - start) / (end - start));
             }
-            results[i] = encoders[thread_id].encode_region(
-                    name, window.start, window.end, window.seq_id, i, window_len, window_overlap);
+            results[i] = encoders[thread_id].encode_region(name, window.start, window.end,
+                                                           window.seq_id);
         }
     };
 
@@ -709,7 +709,7 @@ std::vector<polisher::Sample> create_samples(
 
     // Process windows in parallel.
     cxxpool::thread_pool pool{std::size(chunks)};
-    std::vector<std::vector<polisher::Sample>> parallel_results(std::size(windows));
+    std::vector<polisher::Sample> parallel_results(std::size(windows));
     std::vector<std::future<void>> futures;
     futures.reserve(std::size(chunks));
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
@@ -723,24 +723,26 @@ std::vector<polisher::Sample> create_samples(
 
     spdlog::info("Flattening the samples.");
 
-    // Flatten the samples.
-    size_t num_samples = 0;
-    for (const auto& win_samples : parallel_results) {
-        num_samples += std::size(win_samples);
-    }
+    return parallel_results;
 
-    std::vector<polisher::Sample> samples;
-    samples.reserve(num_samples);
-    for (auto& win_samples : parallel_results) {
-        samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
-                       std::make_move_iterator(std::end(win_samples)));
-    }
+    // // Flatten the samples.
+    // size_t num_samples = 0;
+    // for (const auto& win_samples : parallel_results) {
+    //     num_samples += std::size(win_samples);
+    // }
 
-    for (auto& bam_set : bam_sets) {
-        destroy_bam_fset(bam_set);
-    }
+    // std::vector<polisher::Sample> samples;
+    // samples.reserve(num_samples);
+    // for (auto& win_samples : parallel_results) {
+    //     samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
+    //                    std::make_move_iterator(std::end(win_samples)));
+    // }
 
-    return samples;
+    // for (auto& bam_set : bam_sets) {
+    //     destroy_bam_fset(bam_set);
+    // }
+
+    // return samples;
 }
 
 }  // namespace
@@ -781,9 +783,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
         for (int64_t i = sample_start; i < sample_end; ++i) {
-            std::cout << "[i = " << i
-                      << "] sample.positions = " << samples[i].positions_major.front() << " - "
-                      << samples[i].positions_major.back() << "\n";
+            std::cout << "[i = " << i << "] sample.positions = " << samples[i].start() << " - "
+                      << samples[i].end() << "\n";
             batch_features.emplace_back(samples[i].features);
         }
         // torch::Tensor batch_features_tensor = torch::stack(batch_features);

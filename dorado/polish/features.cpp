@@ -83,19 +83,19 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
  *          chunked the regions for parallel processing and returned these chunks separately in the end as well.
  *          Here, we move this responsibility onto the caller of the function.
  */
-std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
-                                                  const std::string& ref_name,
-                                                  const int32_t ref_start,
-                                                  const int32_t ref_end,
-                                                  size_t num_qstrat = 1,
-                                                  size_t num_dtypes = 1,
-                                                  const std::vector<std::string>& dtypes = {},
-                                                  const std::string tag_name = {},
-                                                  int tag_value = 0,
-                                                  bool keep_missing = false,
-                                                  bool weibull_summation = false,
-                                                  const char* read_group = NULL,
-                                                  const int min_mapq = 1) {
+CountsResult construct_pileup_counts(bam_fset& bam_set,
+                                     const std::string& ref_name,
+                                     const int32_t ref_start,
+                                     const int32_t ref_end,
+                                     size_t num_qstrat = 1,
+                                     size_t num_dtypes = 1,
+                                     const std::vector<std::string>& dtypes = {},
+                                     const std::string tag_name = {},
+                                     int tag_value = 0,
+                                     bool keep_missing = false,
+                                     bool weibull_summation = false,
+                                     const char* read_group = NULL,
+                                     const int min_mapq = 1) {
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     // NOTE 2: the from_blob expects non-const data, so can't define the pileup as const here.
@@ -106,156 +106,154 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
     const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
     CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
 
-    const auto find_gaps = [](const std::vector<int64_t>& positions,
-                              int64_t threshold = 1) -> std::vector<int64_t> {
-        std::vector<int64_t> ret;
-        for (size_t i = 1; i < std::size(positions); ++i) {
-            if ((positions[i] - positions[i - 1]) > threshold) {
-                ret.emplace_back(i);
-            }
-        }
-        return ret;
-    };
+    return counts_result;
 
-    const auto split_on_discontinuities = [&find_gaps](std::vector<CountsResult>& pileups) {
-        std::vector<CountsResult> split_results;
+    // const auto find_gaps = [](const std::vector<int64_t>& positions,
+    //                           int64_t threshold = 1) -> std::vector<int64_t> {
+    //     std::vector<int64_t> ret;
+    //     for (size_t i = 1; i < std::size(positions); ++i) {
+    //         if ((positions[i] - positions[i - 1]) > threshold) {
+    //             ret.emplace_back(i);
+    //         }
+    //     }
+    //     return ret;
+    // };
 
-        // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
-        for (auto& data : pileups) {
-            const std::vector<int64_t> gaps = find_gaps(data.positions_major);
+    // const auto split_on_discontinuities = [&find_gaps](std::vector<CountsResult>& pileups) {
+    //     std::vector<CountsResult> split_results;
 
-            if (std::empty(gaps)) {
-                split_results.emplace_back(std::move(data));
-            } else {
-                int64_t start = 0;
-                for (const int64_t i : gaps) {
-                    std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
-                                                       data.positions_major.begin() + i);
-                    std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
-                                                       data.positions_minor.begin() + i);
-                    split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
-                                                            std::move(new_major_pos),
-                                                            std::move(new_minor_pos)});
-                    start = i;
-                }
-                if (start < static_cast<int64_t>(std::size(data.positions_major))) {
-                    std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
-                                                       data.positions_major.end());
-                    std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
-                                                       data.positions_minor.end());
-                    split_results.emplace_back(CountsResult{data.counts.slice(0, start),
-                                                            std::move(new_major_pos),
-                                                            std::move(new_minor_pos)});
-                }
-            }
-        }
+    //     // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
+    //     for (auto& data : pileups) {
+    //         const std::vector<int64_t> gaps = find_gaps(data.positions_major);
 
-        return split_results;
-    };
+    //         if (std::empty(gaps)) {
+    //             split_results.emplace_back(std::move(data));
+    //         } else {
+    //             int64_t start = 0;
+    //             for (const int64_t i : gaps) {
+    //                 std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
+    //                                                    data.positions_major.begin() + i);
+    //                 std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
+    //                                                    data.positions_minor.begin() + i);
+    //                 split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
+    //                                                         std::move(new_major_pos),
+    //                                                         std::move(new_minor_pos)});
+    //                 start = i;
+    //             }
+    //             if (start < static_cast<int64_t>(std::size(data.positions_major))) {
+    //                 std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
+    //                                                    data.positions_major.end());
+    //                 std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
+    //                                                    data.positions_minor.end());
+    //                 split_results.emplace_back(CountsResult{data.counts.slice(0, start),
+    //                                                         std::move(new_major_pos),
+    //                                                         std::move(new_minor_pos)});
+    //             }
+    //         }
+    //     }
 
-    const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
-        size_t size = 0;
-        for (const auto& vec : vecs) {
-            size += std::size(vec);
-        }
-        std::vector<int64_t> ret;
-        ret.reserve(size);
-        for (const auto& vec : vecs) {
-            ret.insert(ret.end(), vec.cbegin(), vec.cend());
-        }
-        return ret;
-    };
+    //     return split_results;
+    // };
 
-    const auto merge_chunks = [&cat_vectors](std::vector<CountsResult>& pileups) {
-        std::vector<torch::Tensor> counts_buffer;
-        std::vector<std::vector<int64_t>> positions_major_buffer;
-        std::vector<std::vector<int64_t>> positions_minor_buffer;
-        int64_t last_major = -1;
+    // const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
+    //     size_t size = 0;
+    //     for (const auto& vec : vecs) {
+    //         size += std::size(vec);
+    //     }
+    //     std::vector<int64_t> ret;
+    //     ret.reserve(size);
+    //     for (const auto& vec : vecs) {
+    //         ret.insert(ret.end(), vec.cbegin(), vec.cend());
+    //     }
+    //     return ret;
+    // };
 
-        std::vector<CountsResult> results;
+    // const auto merge_chunks = [&cat_vectors](std::vector<CountsResult>& pileups) {
+    //     std::vector<torch::Tensor> counts_buffer;
+    //     std::vector<std::vector<int64_t>> positions_major_buffer;
+    //     std::vector<std::vector<int64_t>> positions_minor_buffer;
+    //     int64_t last_major = -1;
 
-        for (auto& data : pileups) {
-            if (std::empty(data.positions_major)) {
-                continue;
-            }
-            const int64_t first_major = data.positions_major.front();
-            if (counts_buffer.empty() || (first_major - last_major) == 1) {
-                // New or contiguous chunk.
-                last_major = data.positions_major.back();
-                counts_buffer.emplace_back(std::move(data.counts));
-                positions_major_buffer.emplace_back(std::move(data.positions_major));
-                positions_minor_buffer.emplace_back(std::move(data.positions_minor));
+    //     std::vector<CountsResult> results;
 
-            } else {
-                // Discontinuity found, finalize the current chunk
-                last_major = data.positions_major.back();
+    //     for (auto& data : pileups) {
+    //         if (std::empty(data.positions_major)) {
+    //             continue;
+    //         }
+    //         const int64_t first_major = data.positions_major.front();
+    //         if (counts_buffer.empty() || (first_major - last_major) == 1) {
+    //             // New or contiguous chunk.
+    //             last_major = data.positions_major.back();
+    //             counts_buffer.emplace_back(std::move(data.counts));
+    //             positions_major_buffer.emplace_back(std::move(data.positions_major));
+    //             positions_minor_buffer.emplace_back(std::move(data.positions_minor));
 
-                // The torch::cat is slow, so just move if there is nothing to concatenate.
-                if (std::size(counts_buffer) == 1) {
-                    results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-                                                      std::move(positions_major_buffer.front()),
-                                                      std::move(positions_minor_buffer.front())});
-                } else {
-                    results.emplace_back(CountsResult{
-                            torch::cat(std::move(counts_buffer)),
-                            cat_vectors(positions_major_buffer),
-                            cat_vectors(positions_minor_buffer),
-                    });
-                }
-                counts_buffer = {std::move(data.counts)};
-                positions_major_buffer = {std::move(data.positions_major)};
-                positions_minor_buffer = {std::move(data.positions_minor)};
-            }
-        }
+    //         } else {
+    //             // Discontinuity found, finalize the current chunk
+    //             last_major = data.positions_major.back();
 
-        if (!counts_buffer.empty()) {
-            // The torch::cat is slow, so just move if there is nothing to concatenate.
-            if (std::size(counts_buffer) == 1) {
-                results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-                                                  std::move(positions_major_buffer.front()),
-                                                  std::move(positions_minor_buffer.front())});
-            } else {
-                results.emplace_back(CountsResult{
-                        torch::cat(std::move(counts_buffer)),
-                        cat_vectors(positions_major_buffer),
-                        cat_vectors(positions_minor_buffer),
-                });
-            }
-        }
+    //             // The torch::cat is slow, so just move if there is nothing to concatenate.
+    //             if (std::size(counts_buffer) == 1) {
+    //                 results.emplace_back(CountsResult{std::move(counts_buffer.front()),
+    //                                                   std::move(positions_major_buffer.front()),
+    //                                                   std::move(positions_minor_buffer.front())});
+    //             } else {
+    //                 results.emplace_back(CountsResult{
+    //                         torch::cat(std::move(counts_buffer)),
+    //                         cat_vectors(positions_major_buffer),
+    //                         cat_vectors(positions_minor_buffer),
+    //                 });
+    //             }
+    //             counts_buffer = {std::move(data.counts)};
+    //             positions_major_buffer = {std::move(data.positions_major)};
+    //             positions_minor_buffer = {std::move(data.positions_minor)};
+    //         }
+    //     }
 
-        return results;
-    };
+    //     if (!counts_buffer.empty()) {
+    //         // The torch::cat is slow, so just move if there is nothing to concatenate.
+    //         if (std::size(counts_buffer) == 1) {
+    //             results.emplace_back(CountsResult{std::move(counts_buffer.front()),
+    //                                               std::move(positions_major_buffer.front()),
+    //                                               std::move(positions_minor_buffer.front())});
+    //         } else {
+    //             results.emplace_back(CountsResult{
+    //                     torch::cat(std::move(counts_buffer)),
+    //                     cat_vectors(positions_major_buffer),
+    //                     cat_vectors(positions_minor_buffer),
+    //             });
+    //         }
+    //     }
 
-    // First pass: split at discontinuities within each chunk.
-    std::vector<CountsResult> results;
-    results.emplace_back(std::move(counts_result));
+    //     return results;
+    // };
 
-    results = split_on_discontinuities(results);
+    // // First pass: split at discontinuities within each chunk.
+    // std::vector<CountsResult> results;
+    // results.emplace_back(std::move(counts_result));
 
-    // Second pass: merge neighboring chunks if they have no distance between them.
-    results = merge_chunks(results);
+    // results = split_on_discontinuities(results);
 
-    return results;
+    // // Second pass: merge neighboring chunks if they have no distance between them.
+    // results = merge_chunks(results);
+
+    // return results;
 }
 
 Sample counts_to_features(CountsResult& pileup,
-                          const std::string& ref_name,
-                          const int64_t ref_start,
-                          const int64_t ref_end,
-                          [[maybe_unused]] const int32_t seq_id,
-                          [[maybe_unused]] const int32_t win_id,
-                          [[maybe_unused]] const bool sym_indels,
-                          [[maybe_unused]] const FeatureIndicesType& feature_indices,
-                          [[maybe_unused]] const NormaliseType normalise_type) {
-    const int64_t start = pileup.positions_major.front();
-    const int64_t end = pileup.positions_major.back();
+                          const int32_t seq_id,
+                          const bool sym_indels,
+                          const FeatureIndicesType& feature_indices,
+                          const NormaliseType normalise_type) {
+    // const int64_t start = pileup.positions_major.front();
+    // const int64_t end = pileup.positions_major.back();
 
-    if ((start != ref_start) || ((end + 1) != ref_end)) {
-        spdlog::warn(
-                "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}, "
-                "pileup.positions_major.size() = {}",
-                ref_name, ref_start, ref_end, start, end, std::size(pileup.positions_major));
-    }
+    // if ((start != ref_start) || ((end + 1) != ref_end)) {
+    //     spdlog::warn(
+    //             "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}, "
+    //             "pileup.positions_major.size() = {}",
+    //             ref_name, ref_start, ref_end, start, end, std::size(pileup.positions_major));
+    // }
 
     // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
     // on a very high level with lots of redundancy in computation.
@@ -441,50 +439,30 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes)} {}
 
-std::vector<Sample> CountsFeatureEncoder::encode_region(
-        const std::string& ref_name,
-        const int64_t ref_start,
-        const int64_t ref_end,
-        const int32_t seq_id,
-        const int32_t win_id,
-        [[maybe_unused]] const int64_t chunk_len,
-        [[maybe_unused]] const int64_t chunk_overlap) const {
+Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
+                                           const int64_t ref_start,
+                                           const int64_t ref_end,
+                                           const int32_t seq_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
     const int32_t num_dtypes = static_cast<int32_t>(std::size(m_dtypes)) + 1;
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
-    const std::string region =
-            ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
 
-    std::vector<CountsResult> pileups = construct_pileup_counts(
-            *m_bam_set, ref_name, ref_start + 1, ref_end, num_qstrat, num_dtypes, m_dtypes,
-            m_tag_name, m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr,
-            m_min_mapq);
+    CountsResult pileup = construct_pileup_counts(
+            *m_bam_set, ref_name, ref_start, ref_end, num_qstrat, num_dtypes, m_dtypes, m_tag_name,
+            m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
-    std::vector<Sample> results;
-
-    for (auto& data : pileups) {
-        if (!data.counts.numel()) {
-            spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
-                         region);
-            // results.emplace_back(
-            //         Sample{{}, {}, {}, {}, seq_id});
-            continue;
-        }
-
-        Sample new_sample =
-                counts_to_features(data, ref_name, ref_start + 1, ref_end, seq_id, win_id,
-                                   m_symmetric_indels, m_feature_indices, m_normalise_type);
-
-        // // Split the new sample in chunks in case the insertions make it much longer than the window.
-        // std::vector<Sample> new_samples = split_sample(new_sample, chunk_len, chunk_overlap);
-        // results.insert(results.end(), std::make_move_iterator(new_samples.begin()),
-        //                std::make_move_iterator(new_samples.end()));
-        results.emplace_back(std::move(new_sample));
+    if (!pileup.counts.numel()) {
+        const std::string region =
+                ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
+        spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
+                     region);
+        return {};
     }
 
-    return results;
+    return counts_to_features(pileup, seq_id, m_symmetric_indels, m_feature_indices,
+                              m_normalise_type);
 }
 
 std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits,
