@@ -609,6 +609,239 @@ polisher::ConsensusResult stitch_sequence(
     return polisher::ConsensusResult{consensus_seq, consensus_quals};
 }
 
+void debug_print_samples(std::ostream& os,
+                         const std::vector<polisher::Sample>& samples,
+                         int64_t start = 0,
+                         int64_t end = -1,
+                         int64_t debug_id = -1) {
+    start = std::max<int64_t>(0, start);
+    end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
+
+    for (int64_t i = start; i < end; ++i) {
+        os << "[i = " << i << "] sample.positions = " << samples[i].start() << " - "
+           << samples[i].end() << " , dist = " << (samples[i].end() - samples[i].start())
+           << " , tensor = [";
+        os.flush();
+        for (int32_t k = 0;
+             k < std::min(3, static_cast<int32_t>(std::size(samples[i].positions_major))); ++k) {
+            os << "(" << samples[i].positions_major[k] << ", " << samples[i].positions_minor[k]
+               << ") ";
+            os.flush();
+        }
+        std::cout << " ...";
+        os.flush();
+        for (int32_t k =
+                     std::max(0, static_cast<int32_t>(std::size(samples[i].positions_major) - 3));
+             k < static_cast<int32_t>(std::size(samples[i].positions_major)); ++k) {
+            os << " (" << samples[i].positions_major[k] << ", " << samples[i].positions_minor[k]
+               << ")";
+            os.flush();
+        }
+        os << "] , size = " << std::size(samples[i].positions_major) << "\n";
+        os.flush();
+
+        if (i == debug_id) {
+            const auto depth = samples[i].depth.slice(/*dim=*/0, /*start=*/0);
+            for (int32_t k = 0; k < static_cast<int32_t>(std::size(samples[i].positions_major));
+                 ++k) {
+                os << "[k = " << k << "] pos = (" << samples[i].positions_major[k] << ", "
+                   << samples[i].positions_minor[k] << "), depth = " << depth[k].item<float>()
+                   << "\n";
+                os.flush();
+            }
+        }
+    }
+}
+
+std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& sample) {
+    std::vector<polisher::Sample> results;
+
+    const auto find_gaps = [](const std::vector<int64_t>& positions,
+                              int64_t threshold = 1) -> std::vector<int64_t> {
+        std::vector<int64_t> ret;
+        for (size_t i = 1; i < std::size(positions); ++i) {
+            if ((positions[i] - positions[i - 1]) > threshold) {
+                ret.emplace_back(i);
+            }
+        }
+        return ret;
+    };
+
+    // for (auto& data : pileups) {
+    const std::vector<int64_t> gaps = find_gaps(sample.positions_major);
+
+    if (std::empty(gaps)) {
+        return {sample};
+
+    } else {
+        int64_t start = 0;
+        for (const int64_t i : gaps) {
+            std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
+                                               sample.positions_major.begin() + i);
+            std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
+                                               sample.positions_minor.begin() + i);
+
+            results.emplace_back(polisher::Sample{
+                    sample.features.slice(0, start, i), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id});
+            start = i;
+        }
+
+        if (start < static_cast<int64_t>(std::size(sample.positions_major))) {
+            std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
+                                               sample.positions_major.end());
+            std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
+                                               sample.positions_minor.end());
+            results.emplace_back(polisher::Sample{
+                    sample.features.slice(0, start), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id});
+        }
+    }
+    // }
+
+    return results;
+}
+
+std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sample>& samples) {
+    std::vector<torch::Tensor> features_buffer;
+    std::vector<std::vector<int64_t>> positions_major_buffer;
+    std::vector<std::vector<int64_t>> positions_minor_buffer;
+    std::vector<torch::Tensor> depth_buffer;
+    int32_t seq_id_buffer = -1;
+    int64_t last_end = -1;
+
+    std::vector<polisher::Sample> results;
+
+    const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
+        size_t size = 0;
+        for (const auto& vec : vecs) {
+            size += std::size(vec);
+        }
+        std::vector<int64_t> ret;
+        ret.reserve(size);
+        for (const auto& vec : vecs) {
+            ret.insert(std::end(ret), std::cbegin(vec), std::cend(vec));
+        }
+        return ret;
+    };
+
+    for (auto& sample : samples) {
+        if (std::empty(sample.positions_major)) {
+            continue;
+        }
+        const int64_t start = sample.start();
+        if (std::empty(features_buffer) || (start - last_end) == 0) {
+            // New or contiguous chunk.
+            last_end = sample.end();
+            features_buffer.emplace_back(std::move(sample.features));
+            positions_major_buffer.emplace_back(std::move(sample.positions_major));
+            positions_minor_buffer.emplace_back(std::move(sample.positions_minor));
+            depth_buffer.emplace_back(std::move(sample.depth));
+            seq_id_buffer = sample.seq_id;
+
+        } else {
+            // Discontinuity found, finalize the current chunk
+            last_end = sample.end();
+
+            // The torch::cat is slow, so just move if there is nothing to concatenate.
+            if (std::size(features_buffer) == 1) {
+                results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
+                                                      std::move(positions_major_buffer.front()),
+                                                      std::move(positions_minor_buffer.front()),
+                                                      std::move(depth_buffer.front()),
+                                                      seq_id_buffer});
+            } else {
+                results.emplace_back(polisher::Sample{
+                        torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
+                        cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
+                        seq_id_buffer});
+            }
+            features_buffer = {std::move(sample.features)};
+            positions_major_buffer = {std::move(sample.positions_major)};
+            positions_minor_buffer = {std::move(sample.positions_minor)};
+            depth_buffer = {std::move(sample.depth)};
+            seq_id_buffer = sample.seq_id;
+        }
+    }
+
+    if (!features_buffer.empty()) {
+        // The torch::cat is slow, so just move if there is nothing to concatenate.
+        if (std::size(features_buffer) == 1) {
+            results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
+                                                  std::move(positions_major_buffer.front()),
+                                                  std::move(positions_minor_buffer.front()),
+                                                  std::move(depth_buffer.front()), seq_id_buffer});
+        } else {
+            results.emplace_back(polisher::Sample{
+                    torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
+                    cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
+                    seq_id_buffer});
+        }
+    }
+
+    return results;
+}
+
+/**
+ * \brief Takes an input sample and splits it bluntly if it has too many positions. This can happen when
+ *          there are many long insertions in an input window, and can easily cause out-of-memory issues on the GPU
+ *          if the sample is not split.
+ *          Splitting is implemented to match Medaka, where a simple sliding window is used to create smaller samples.
+ *          In case of a smalle trailing portion (smaller than chunk_len), a potentially large overlap is produced to
+ *          cover this region instead of just outputing the small chunk.
+ */
+std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& samples,
+                                            const int64_t chunk_len,
+                                            const int64_t chunk_overlap) {
+    if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
+        throw std::runtime_error(
+                "Wrong chunk_overlap length. chunk_len = " + std::to_string(chunk_len) +
+                ", chunk_overlap = " + std::to_string(chunk_overlap));
+    }
+
+    const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
+                                 const int64_t end) {
+        torch::Tensor new_features = sample.features.slice(0, start, end);
+        std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
+                                       std::begin(sample.positions_major) + end);
+        std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
+                                       std::begin(sample.positions_minor) + end);
+        torch::Tensor new_depth = sample.depth.slice(0, start, end);
+        return polisher::Sample{std::move(new_features), std::move(new_major), std::move(new_minor),
+                                std::move(new_depth), sample.seq_id};
+    };
+
+    std::vector<polisher::Sample> results;
+    results.reserve(std::size(samples));
+
+    for (auto& sample : samples) {
+        const int64_t sample_len = static_cast<int64_t>(std::size(sample.positions_major));
+
+        if (sample_len <= chunk_len) {
+            return {std::move(sample)};
+        }
+
+        const int64_t step = chunk_len - chunk_overlap;
+
+        int64_t end = 0;
+        for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
+            end = start + chunk_len;
+            // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
+            results.emplace_back(create_chunk(sample, start, end));
+        }
+
+        // This will create a chunk with potentially large overlap.
+        if (end < sample_len) {
+            const int64_t start = sample_len - chunk_len;
+            end = sample_len;
+            // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
+            results.emplace_back(create_chunk(sample, start, end));
+        }
+    }
+
+    return results;
+}
+
 std::vector<polisher::Sample> create_samples(
         const std::filesystem::path& in_aln_bam_fn,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -659,6 +892,8 @@ std::vector<polisher::Sample> create_samples(
         std::cerr << "[bam_windows i = " << i << "] " << bam_windows[i] << "\n";
     }
 
+    // Create individual windows, most of which are non-overlapping.
+    // To mimic Medaka, the non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
     std::vector<Interval> merge_intervals;
     for (size_t i = 0; i < std::size(bam_windows); ++i) {
@@ -684,65 +919,142 @@ std::vector<polisher::Sample> create_samples(
         windows.insert(windows.end(), sub_windows.begin(), sub_windows.end());
     }
 
-    const auto worker_samples = [&](const int32_t thread_id, const int32_t start, const int32_t end,
-                                    std::vector<polisher::Sample>& results) {
-        for (int32_t i = start; i < end; ++i) {
-            const auto& window = windows[i];
-            const std::string& name = draft_lens[window.seq_id].first;
-            if (thread_id == 0) {
-                spdlog::info(
-                        "Processing i = {}, start = {}, end = {}, region = "
-                        "{}:{}-{} ({} %).",
-                        i, start, end, name, window.start, window.end,
-                        100.0 * static_cast<double>(i - start) / (end - start));
+    // Convert windows to samples in parallel.
+    std::vector<polisher::Sample> parallel_results;
+    {
+        const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
+                                std::vector<polisher::Sample>& results) {
+            for (int32_t i = start; i < end; ++i) {
+                const auto& window = windows[i];
+                const std::string& name = draft_lens[window.seq_id].first;
+                if (thread_id == 0) {
+                    spdlog::info(
+                            "Processing i = {}, start = {}, end = {}, region = "
+                            "{}:{}-{} ({} %).",
+                            i, start, end, name, window.start, window.end,
+                            100.0 * static_cast<double>(i - start) / (end - start));
+                }
+                results[i] = encoders[thread_id].encode_region(name, window.start, window.end,
+                                                               window.seq_id);
             }
-            results[i] = encoders[thread_id].encode_region(name, window.start, window.end,
-                                                           window.seq_id);
+        };
+        parallel_results.resize(std::size(windows));
+        const std::vector<std::pair<int32_t, int32_t>> chunks =
+                compute_chunks(static_cast<int32_t>(std::size(windows)), num_threads);
+        spdlog::info("Starting to encode regions for {} windows using {} threads.",
+                     std::size(windows), std::size(chunks));
+        cxxpool::thread_pool pool{std::size(chunks)};
+        std::vector<std::future<void>> futures;
+        futures.reserve(std::size(chunks));
+        for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
+            const auto [chunk_start, chunk_end] = chunks[tid];
+            futures.emplace_back(
+                    pool.push(worker, tid, chunk_start, chunk_end, std::ref(parallel_results)));
         }
-    };
-
-    const int32_t num_items = static_cast<int32_t>(std::size(windows));
-    const std::vector<std::pair<int32_t, int32_t>> chunks = compute_chunks(num_items, num_threads);
-
-    spdlog::info("Starting to encode regions for {} windows using {} threads.", std::size(windows),
-                 std::size(chunks));
-
-    // Process windows in parallel.
-    cxxpool::thread_pool pool{std::size(chunks)};
-    std::vector<polisher::Sample> parallel_results(std::size(windows));
-    std::vector<std::future<void>> futures;
-    futures.reserve(std::size(chunks));
-    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
-        const auto [chunk_start, chunk_end] = chunks[tid];
-        futures.emplace_back(
-                pool.push(worker_samples, tid, chunk_start, chunk_end, std::ref(parallel_results)));
-    }
-    for (auto& f : futures) {
-        f.wait();
+        for (auto& f : futures) {
+            f.wait();
+        }
     }
 
-    spdlog::info("Flattening the samples.");
+    spdlog::info("Merging the samples into {} BAM chunks.", std::size(merge_intervals));
 
-    return parallel_results;
+    // Three tasks for this worker:
+    //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
+    //  2. Check for discontinuities in any of the samples and split (gap in coverage).
+    //  3. Split the merged samples into equally sized pieces which will be used for inference.
+    std::vector<std::vector<polisher::Sample>> merged_samples;
+    {
+        const auto worker = [&](const int32_t start, const int32_t end,
+                                std::vector<std::vector<polisher::Sample>>& results) {
+            for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
+                const Interval interval = merge_intervals[bam_chunk_id];
 
-    // // Flatten the samples.
-    // size_t num_samples = 0;
-    // for (const auto& win_samples : parallel_results) {
-    //     num_samples += std::size(win_samples);
-    // }
+                if (bam_chunk_id == 0) {
+                    std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                              << "] interval = [" << interval.start << ", " << interval.end
+                              << ">:\n";
+                    std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                              << "] Input (parallel_results):\n";
+                    debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
+                }
 
-    // std::vector<polisher::Sample> samples;
-    // samples.reserve(num_samples);
-    // for (auto& win_samples : parallel_results) {
-    //     samples.insert(std::end(samples), std::make_move_iterator(std::begin(win_samples)),
-    //                    std::make_move_iterator(std::end(win_samples)));
-    // }
+                std::vector<polisher::Sample> local_samples;
 
-    // for (auto& bam_set : bam_sets) {
-    //     destroy_bam_fset(bam_set);
-    // }
+                // Split all samples on discontinuities.
+                for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
+                    auto& sample = parallel_results[sample_id];
+                    std::vector<polisher::Sample> split_samples =
+                            split_sample_on_discontinuities(sample);
+                    local_samples.insert(std::end(local_samples),
+                                         std::make_move_iterator(std::begin(split_samples)),
+                                         std::make_move_iterator(std::end(split_samples)));
+                }
 
-    // return samples;
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After splitting on discontinuities (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
+
+                local_samples = merge_adjacent_samples(local_samples);
+
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After merging adjacent (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
+
+                local_samples = split_samples(local_samples, window_len, window_overlap);
+
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After splitting samples (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
+
+                results[bam_chunk_id] = std::move(local_samples);
+            }
+        };
+        merged_samples.resize(std::size(merge_intervals));
+        // Process BAM windows in parallel.
+        const std::vector<std::pair<int32_t, int32_t>> chunks =
+                compute_chunks(static_cast<int32_t>(std::size(merge_intervals)), 1);
+        spdlog::info("Starting to merge samples for {} BAM windows using {} threads.",
+                     std::size(merge_intervals), std::size(chunks));
+        cxxpool::thread_pool pool{std::size(chunks)};
+        // std::vector<polisher::Sample> parallel_results(std::size(windows));
+        std::vector<std::future<void>> futures;
+        futures.reserve(std::size(chunks));
+        for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
+            const auto [chunk_start, chunk_end] = chunks[tid];
+            futures.emplace_back(
+                    pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples)));
+        }
+        for (auto& f : futures) {
+            f.wait();
+        }
+    }
+
+    // Flatten the samples.
+    size_t num_samples = 0;
+    for (const auto& vals : merged_samples) {
+        num_samples += std::size(vals);
+    }
+
+    std::vector<polisher::Sample> samples;
+    samples.reserve(num_samples);
+    for (auto& vals : merged_samples) {
+        samples.insert(std::end(samples), std::make_move_iterator(std::begin(vals)),
+                       std::make_move_iterator(std::end(vals)));
+    }
+
+    for (auto& bam_set : bam_sets) {
+        destroy_bam_fset(bam_set);
+    }
+
+    spdlog::info("Total num samples to infer: {}", std::size(samples));
+
+    return samples;
 }
 
 }  // namespace
@@ -780,11 +1092,11 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                           std::mutex& gpu_mutex) {
         utils::ScopedProfileRange infer("infer", 1);
 
+        // debug_print_samples(std::cout, samples, sample_start, sample_end);
+
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
         for (int64_t i = sample_start; i < sample_end; ++i) {
-            std::cout << "[i = " << i << "] sample.positions = " << samples[i].start() << " - "
-                      << samples[i].end() << "\n";
             batch_features.emplace_back(samples[i].features);
         }
         // torch::Tensor batch_features_tensor = torch::stack(batch_features);

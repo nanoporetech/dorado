@@ -165,8 +165,8 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
  *
  */
 PileupData calculate_pileup(const std::string &chr_name,
-                            const int32_t start,
-                            const int32_t end,
+                            const int32_t start,  // Zero-based.
+                            const int32_t end,    // Non-inclusive.
                             const bam_fset &bam_file,
                             const int64_t num_dtypes,
                             const std::vector<std::string> &dtypes,
@@ -194,10 +194,8 @@ PileupData calculate_pileup(const std::string &chr_name,
     hts_idx_t *idx = bam_file.idx;
     sam_hdr_t *hdr = bam_file.hdr;
 
-    const int32_t start_one_based = start + 1;
-
     const std::string region =
-            chr_name + ':' + std::to_string(start_one_based) + '-' + std::to_string(end);
+            chr_name + ':' + std::to_string(start + 1) + '-' + std::to_string(end);
 
     std::unique_ptr<mplp_data> data = std::make_unique<mplp_data>();
     mplp_data *raw_data_ptr = data.get();
@@ -240,7 +238,7 @@ PileupData calculate_pileup(const std::string &chr_name,
         if (c_name != chr_name) {
             continue;
         }
-        if (pos < start_one_based) {
+        if (pos < start) {
             continue;
         }
         if (pos >= end) {
@@ -259,8 +257,7 @@ PileupData calculate_pileup(const std::string &chr_name,
 
         // reallocate output if necessary
         if ((n_cols + max_ins) > static_cast<int32_t>(pileup.buffer_cols())) {
-            const float cols_per_pos =
-                    static_cast<float>(n_cols + max_ins) / (1 + pos - start_one_based);
+            const float cols_per_pos = static_cast<float>(n_cols + max_ins) / (1 + pos - start);
             // max_ins can dominate so add at least that
             const int64_t new_buffer_cols =
                     max_ins + std::max(2 * pileup.buffer_cols(),
