@@ -50,20 +50,19 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
 
-    return {average_samples_per_base(sizes), stdev_samples_per_base(sizes)};
-}
-
-float PolyTailCalculator::stdev_samples_per_base(const std::vector<float>& sizes) const {
     auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
-    float sum = 0.f;
+    float sum2 = 0.f;
     int count = 0;
     for (auto s : sizes) {
         if (s >= quantiles[0] && s <= quantiles[1]) {
-            sum += s * s;
+            sum2 += s * s;
             count++;
         }
     }
-    return (count > 0 ? std::sqrt(sum / count) : 0.f);
+
+    float avg = average_samples_per_base(sizes);
+    float stddev = (count > 0 ? std::sqrt((sum2 / count) - avg * avg) : 0.f);
+    return {avg, stddev};
 }
 
 std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_anchor,
@@ -145,8 +144,9 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // In the example below, tail estimation should include both stretches
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
+    // 2-sigma range should catch ~97% of the distribution
     const int kMaxInterruption = static_cast<int>(std::floor(
-            (num_samples_per_base + std_samples_per_base) * m_config.tail_interrupt_length));
+            (num_samples_per_base + 2 * std_samples_per_base) * m_config.tail_interrupt_length));
 
     std::vector<Interval> clustered_intervals;
     bool keep_merging = true;

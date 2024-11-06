@@ -63,7 +63,6 @@ protected:
                                      bool fwd) const;
 
     std::pair<float, float> estimate_samples_per_base(const dorado::SimplexRead& read) const;
-    float stdev_samples_per_base(const std::vector<float>& sizes) const;
 
     // Find the signal range near the provided anchor that corresponds to the polyA/T tail
     std::pair<int, int> determine_signal_bounds(int signal_anchor,
