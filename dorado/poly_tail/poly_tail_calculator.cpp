@@ -5,6 +5,7 @@
 #include "poly_tail_config.h"
 #include "read_pipeline/messages.h"
 #include "rna_poly_tail_calculator.h"
+#include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -36,7 +37,8 @@ std::pair<int, int> PolyTailCalculator::signal_range(int signal_anchor,
             std::min(signal_len, static_cast<int>(signal_anchor + kSpread * end_scale))};
 }
 
-float PolyTailCalculator::estimate_samples_per_base(const dorado::SimplexRead& read) const {
+std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
+        const dorado::SimplexRead& read) const {
     const size_t num_bases = read.read_common.seq.length();
     const auto num_samples = read.read_common.get_raw_data_samples();
     const auto stride = read.read_common.model_stride;
@@ -48,13 +50,27 @@ float PolyTailCalculator::estimate_samples_per_base(const dorado::SimplexRead& r
         sizes[i - 1] = static_cast<float>(seq_to_sig_map[i] - seq_to_sig_map[i - 1]);
     }
 
-    return average_samples_per_base(sizes);
+    return {average_samples_per_base(sizes), stdev_samples_per_base(sizes)};
+}
+
+float PolyTailCalculator::stdev_samples_per_base(const std::vector<float>& sizes) const {
+    auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
+    float sum = 0.f;
+    int count = 0;
+    for (auto s : sizes) {
+        if (s >= quantiles[0] && s <= quantiles[1]) {
+            sum += s * s;
+            count++;
+        }
+    }
+    return (count > 0 ? std::sqrt(sum / count) : 0.f);
 }
 
 std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_anchor,
                                                                 bool fwd,
                                                                 const dorado::SimplexRead& read,
-                                                                float num_samples_per_base) const {
+                                                                float num_samples_per_base,
+                                                                float std_samples_per_base) const {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = int(read.read_common.get_raw_data_samples());
 
@@ -129,8 +145,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // In the example below, tail estimation should include both stretches
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
-    const int kMaxInterruption =
-            static_cast<int>(std::round(num_samples_per_base * m_config.tail_interrupt_length));
+    const int kMaxInterruption = static_cast<int>(std::floor(
+            (num_samples_per_base + std_samples_per_base) * m_config.tail_interrupt_length));
 
     std::vector<Interval> clustered_intervals;
     for (const auto& i : intervals) {
@@ -219,12 +235,13 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     spdlog::trace("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
                   signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
 
-    auto num_samples_per_base = estimate_samples_per_base(read);
+    auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
 
     // Walk through signal. Require a minimum of length 10 poly-A since below that
     // the current algorithm returns a lot of false intervals.
-    auto [signal_start, signal_end] = determine_signal_bounds(
-            signal_info.signal_anchor, signal_info.is_fwd_strand, read, num_samples_per_base);
+    auto [signal_start, signal_end] =
+            determine_signal_bounds(signal_info.signal_anchor, signal_info.is_fwd_strand, read,
+                                    num_samples_per_base, stddev);
 
     auto signal_len = signal_end - signal_start;
     signal_len -= signal_length_adjustment(read, signal_len);
