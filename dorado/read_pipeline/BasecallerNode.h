@@ -61,8 +61,6 @@ private:
     size_t m_overlap;
     // Stride of the model in the runners
     size_t m_model_stride;
-    // Whether the batch timeout for low-latency pipelines should be from the first chunk time.
-    bool m_low_latency_timeout_from_first_chunk;
     // Whether the model is for rna
     bool m_is_rna_model;
     // model_name
