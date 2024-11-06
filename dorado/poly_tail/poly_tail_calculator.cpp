@@ -149,28 +149,39 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             (num_samples_per_base + std_samples_per_base) * m_config.tail_interrupt_length));
 
     std::vector<Interval> clustered_intervals;
-    for (const auto& i : intervals) {
-        if (clustered_intervals.empty()) {
-            clustered_intervals.push_back(i);
-        } else {
-            auto& last = clustered_intervals.back();
-            bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
-            auto separation = i.start - last.end;
-            bool skip_glitch =
-                    std::abs(separation) < kMaxSampleGap &&
-                    last.end - last.start > kMinIntervalSizeForMerge &&
-                    (i.end - i.start > kMinIntervalSizeForMerge || i.end >= right_end - kStride);
-            bool allow_linker = separation >= 0 && separation < kMaxInterruption;
-            if (mean_proximity_ok && (skip_glitch || allow_linker)) {
-                last.end = i.end;
-            } else {
+    bool keep_merging = true;
+    while (keep_merging) {  // break when we've stopped making changes
+        keep_merging = false;
+        for (const auto& i : intervals) {
+            if (clustered_intervals.empty()) {
                 clustered_intervals.push_back(i);
+            } else {
+                auto& last = clustered_intervals.back();
+                bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
+                auto separation = i.start - last.end;
+                bool skip_glitch = std::abs(separation) < kMaxSampleGap &&
+                                   last.end - last.start > kMinIntervalSizeForMerge &&
+                                   (i.end - i.start > kMinIntervalSizeForMerge ||
+                                    i.end >= right_end - kStride);
+                bool allow_linker = separation >= 0 && separation < kMaxInterruption;
+                if (mean_proximity_ok && (skip_glitch || allow_linker)) {
+                    // retain avg value from the best section to prevent drift for future merges
+                    auto& best = (i.end - i.start) < (last.end - last.start) ? last : i;
+                    spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end,
+                                  last.start, i.end);
+                    last = Interval{last.start, i.end, best.avg};
+                    keep_merging = true;
+                } else {
+                    clustered_intervals.push_back(i);
+                }
             }
         }
+        std::swap(clustered_intervals, intervals);
+        clustered_intervals.clear();
     }
 
     int_str = "";
-    for (const auto& in : clustered_intervals) {
+    for (const auto& in : intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
     spdlog::trace("clustered intervals {}", int_str);
@@ -178,8 +189,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // Once the clustered intervals are available, filter them by how
     // close they are to the anchor.
     std::vector<Interval> filtered_intervals;
-    std::copy_if(clustered_intervals.begin(), clustered_intervals.end(),
-                 std::back_inserter(filtered_intervals), [&](const auto& i) {
+    std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
+                 [&](const auto& i) {
                      auto buffer = buffer_range({i.start, i.end}, num_samples_per_base);
                      // Only keep intervals that are close-ish to the signal anchor.
                      // i.e. the anchor needs to be within the buffer region of
