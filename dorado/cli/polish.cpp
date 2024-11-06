@@ -607,8 +607,8 @@ polisher::ConsensusResult stitch_sequence(
 std::vector<polisher::Sample> create_samples(
         const std::filesystem::path& in_aln_bam_fn,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const std::vector<Window>& windows,
         const int32_t num_threads,
+        const int32_t bam_chunk,
         const int32_t window_len,
         const int32_t window_overlap) {
     // Open the BAM file for each thread and spawn encoders.
@@ -619,6 +619,13 @@ std::vector<polisher::Sample> create_samples(
         bam_sets.emplace_back(create_bam_fset(in_aln_bam_fn.c_str()));
         encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
     }
+
+    // Create BAM windows (regions) to create pileup. The features (samples) will
+    // be split further into windows of window_len in size prior to inference.
+    spdlog::info("Creating windows.");
+    const std::vector<Window> windows = create_windows(draft_lens, bam_chunk, window_overlap).first;
+    spdlog::info("Created {} windows from {} sequences.", std::size(windows),
+                 std::size(draft_lens));
 
     const auto worker_samples = [&](const int32_t thread_id, const int32_t start, const int32_t end,
                                     std::vector<std::vector<polisher::Sample>>& results) {
@@ -833,16 +840,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         const std::vector<std::pair<std::string, int64_t>> draft_lens =
                 load_seq_lengths(opt.in_draft_fastx_fn);
 
-        spdlog::info("Creating windows.");
-
-        // Create BAM windows (regions) to create pileup. The features (samples) will
-        // be split further into windows of window_len in size prior to inference.
-        const std::vector<Window> windows =
-                create_windows(draft_lens, opt.bam_chunk, opt.window_overlap).first;
-
-        spdlog::info("Created {} windows from {} sequences.", std::size(windows),
-                     std::size(draft_lens));
-
         // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
         //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
         torch::set_num_threads(1);
@@ -850,8 +847,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples =
-                create_samples(opt.in_aln_bam_fn, draft_lens, windows, opt.threads, opt.window_len,
-                               opt.window_overlap);
+                create_samples(opt.in_aln_bam_fn, draft_lens, opt.threads, opt.bam_chunk,
+                               opt.window_len, opt.window_overlap);
 
         // Increase the number of threads again for inter-op parallelism.
         torch::set_num_threads(opt.threads);
