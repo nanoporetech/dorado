@@ -701,11 +701,9 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
 
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
-    auto batch_infer = [&gpu_mutexes, &device_info](polisher::TorchModel& model,
-                                                    const std::vector<polisher::Sample>& samples,
-                                                    const int64_t sample_start,
-                                                    const int64_t sample_end,
-                                                    const int32_t mtx_idx) {
+    auto batch_infer = [](polisher::TorchModel& model, const std::vector<polisher::Sample>& samples,
+                          const int64_t sample_start, const int64_t sample_end,
+                          std::mutex& gpu_mutex) {
         utils::ScopedProfileRange infer("infer", 1);
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
@@ -728,11 +726,11 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
                 batch_features_tensor.numel() * batch_features_tensor.element_size() /
                         (1024.0 * 1024.0));
 
-        std::unique_lock<std::mutex> lock(gpu_mutexes[mtx_idx]);
+        std::unique_lock<std::mutex> lock(gpu_mutex);
 
         torch::Tensor output;
         try {
-            output = model.predict_on_batch(std::move(batch_features_tensor), device_info.device);
+            output = model.predict_on_batch(std::move(batch_features_tensor));
         } catch (std::exception& e) {
             throw e;
         }
@@ -741,10 +739,11 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
         return output;
     };
 
-    const auto process_samples = [&batch_infer](polisher::TorchModel& model,
-                                                const polisher::CountsFeatureEncoder& encoder,
-                                                const std::vector<polisher::Sample>& in_samples,
-                                                const int32_t batch_size, const bool gen_qual) {
+    const auto process_samples = [&batch_infer, &gpu_mutexes](
+                                         polisher::TorchModel& model,
+                                         const polisher::CountsFeatureEncoder& encoder,
+                                         const std::vector<polisher::Sample>& in_samples,
+                                         const int32_t batch_size, const bool gen_qual) {
         /**
          * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
          */
@@ -755,7 +754,7 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
             const int64_t end = std::min((start + batch_size), num_samples);
 
             // Inference.
-            torch::Tensor output = batch_infer(model, in_samples, start, end, 0);
+            torch::Tensor output = batch_infer(model, in_samples, start, end, gpu_mutexes[0]);
 
             // Convert to sequences and qualities.
             std::vector<polisher::ConsensusResult> new_results =
