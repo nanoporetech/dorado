@@ -4,19 +4,19 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace dorado::polisher {
 
 struct Sample {
-    std::string ref_name;
     torch::Tensor features;
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     torch::Tensor depth;
-    int64_t region_start = 0;
-    int64_t region_end = 0;
     int32_t seq_id = -1;
-    int32_t window_id = -1;
+
+    int64_t start() const { return (std::empty(positions_major) ? -1 : positions_major.front()); }
+    int64_t end() const { return (std::empty(positions_major) ? -1 : positions_major.back()); }
 };
 
 }  // namespace dorado::polisher
