@@ -359,63 +359,6 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
     return model;
 }
 
-}  // namespace
-
-// void run_experimental_counts(const Options& opt) {
-//     // Test-run the Medaka pileup code.
-//     {
-//         // const std::string_view region("contig_15:1-20001");
-//         const std::string_view region("contig_15:1-5");
-
-//         size_t num_dtypes = 1;
-//         char **dtypes = NULL;
-//         char tag_name[2] = "";
-//         int tag_value = 0;
-//         bool keep_missing = false;
-//         size_t num_homop = 1;
-//         bool weibull_summation = false;
-//         const char* read_group = NULL;
-//         const int min_mapQ = 1;
-
-//         bam_fset* bam_set = create_bam_fset(opt.in_aln_bam_fn.c_str());
-
-//         plp_data pileup = calculate_pileup(
-//             region.data(), bam_set, num_dtypes, dtypes,
-//             num_homop, tag_name, tag_value, keep_missing,
-//             weibull_summation, read_group, min_mapQ);
-
-//         print_pileup_data(pileup, num_dtypes, dtypes, num_homop);
-//         fprintf(stdout, "pileup is length %zu, with buffer of %zu columns\n", pileup->n_cols, pileup->buffer_cols);
-//         destroy_plp_data(pileup);
-//         destroy_bam_fset(bam_set);
-//     }
-// }
-
-// void print_output(const c10::IValue& output) {
-//     if (output.isTensor()) {
-//         // Single tensor output
-//         std::cout << "Single tensor output: " << output.toTensor() << "\n";
-
-//         // const torch::Tensor row_sum = output.toTensor().sum(1);
-//         // std::cout << "Sum: " << row_sum << "\n";
-
-//     } else if (output.isTuple()) {
-//         // Tuple output - unpack and print each element
-//         auto outputTuple = output.toTuple()->elements();
-//         std::cout << "Tuple output with " << outputTuple.size() << " elements:" << std::endl;
-//         for (size_t i = 0; i < outputTuple.size(); ++i) {
-//             if (outputTuple[i].isTensor()) {
-//                 std::cout << "Element " << i << ":\n";
-//                 std::cout << outputTuple[i].toTensor() << "\n";
-//             } else {
-//                 std::cout << "Element " << i << " is not a tensor." << std::endl;
-//             }
-//         }
-//     } else {
-//         std::cout << "Output is neither a tensor nor a tuple." << std::endl;
-//     }
-// }
-
 std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
         const std::filesystem::path& in_fastx_fn) {
     if (!utils::check_fai_exists(in_fastx_fn)) {
@@ -496,9 +439,6 @@ std::pair<std::vector<Window>, std::vector<Interval>> create_windows(
     return {ret, window_ranges};
 }
 
-// Sample trim_sample(const Sample& sample) {
-// }
-
 std::string fetch_seq(const std::filesystem::path& index_fn,
                       const std::string& seq_name,
                       int32_t start = 0,
@@ -542,15 +482,6 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
 
     return ret;
 }
-
-// polisher::ConsensusResult stitch_sequence(
-//         [[maybe_unused]] const std::filesystem::path& in_draft_fn,
-//         [[maybe_unused]] const std::string& header,
-//         [[maybe_unused]] const std::vector<polisher::Sample>& samples,
-//         [[maybe_unused]] const std::vector<polisher::ConsensusResult>& sample_results,
-//         [[maybe_unused]] const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
-//     return {};
-// }
 
 polisher::ConsensusResult stitch_sequence(
         const std::filesystem::path& in_draft_fn,
@@ -673,7 +604,9 @@ polisher::ConsensusResult stitch_sequence(
     return polisher::ConsensusResult{consensus_seq, consensus_quals};
 }
 
-void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices) {
+}  // namespace
+
+void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     if (std::empty(devices)) {
         spdlog::error("Zero devices initialized! Need at least one device to run.");
         std::exit(EXIT_FAILURE);
@@ -890,23 +823,9 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
                 futures.emplace_back(pool.push(worker_samples, tid, chunk_start, chunk_end,
                                                std::ref(win_results)));
             }
-
-            // for (int32_t thread_id = 0; thread_id < num_threads; ++thread_id) {
-            //     const int32_t chunk_start = thread_id * chunk_size;
-            //     const int32_t chunk_end = std::min(num_items, chunk_start + chunk_size);
-            //     futures.emplace_back(pool.push(worker_samples, thread_id, chunk_start, chunk_end, std::ref(win_results)));
-            // }
-
             for (auto& f : futures) {
                 f.wait();
             }
-
-            // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
-            //     futures.emplace_back(pool.push(worker_samples, win_id, std::ref(win_results)));
-            // }
-            // for (auto& f : futures) {
-            //     f.wait();
-            // }
 
             spdlog::info("Flattening the samples.");
 
@@ -923,26 +842,12 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
 
             // Increase the number of threads again for inter-op parallelism.
             torch::set_num_threads(opt.threads);
-            // at::set_num_interop_threads(1);
         }
 
         // Construct the model.
         spdlog::info("Loading the model.");
         const std::unique_ptr<polisher::TorchModel> model =
                 create_model(opt.model_path / "model.pt", device_info);
-
-        // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
-        //     if ((win_id % 10000) == 0) {
-        //         spdlog::info("Encoded {} windows.", win_id);
-        //     }
-        //     const auto& window = windows[win_id];
-        //     const std::string& name = draft_lens[window.seq_id].first;
-        //     std::vector<polisher::Sample> new_samples =
-        //             encoder.encode_region(name, window.start, window.end, window.seq_id, win_id);
-
-        //     samples.insert(std::end(samples), std::make_move_iterator(std::begin(new_samples)),
-        //                    std::make_move_iterator(std::end(new_samples)));
-        // }
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
 
@@ -956,13 +861,6 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
                     std::to_string(std::size(results_samples)) +
                     ", std::size(samples) = " + std::to_string(std::size(samples))};
         }
-
-        // for (size_t i = 0; i < std::size(results_samples); ++i) {
-        //     std::cerr << "[results_samples i = " << i << "] seq_id = " << samples[i].seq_id
-        //               << ", win_id = " << samples[i].window_id
-        //               << ", seq len = " << std::size(results_samples[i].seq)
-        //               << ", seq: " << results_samples[i].seq << "\n";
-        // }
 
         // Stitching information, collect all samples for each sequence.
         std::vector<std::vector<std::pair<int32_t, int32_t>>> samples_for_seqs(
@@ -985,12 +883,6 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
             // Sort by region start position, for every sequence.
             std::sort(std::begin(data), std::end(data));
 
-            // for (size_t i = 0; i < std::size(data); ++i) {
-            //     std::cerr << "[seq_id = " << seq_id << ", i = " << i
-            //               << "] start = " << data[i].first << ", sample_id = " << data[i].second
-            //               << "\n";
-            // }
-
             const polisher::ConsensusResult consensus =
                     stitch_sequence(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
                                     results_samples, data);
@@ -1005,120 +897,6 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
     }
 
     spdlog::info("Done!");
-
-    // for (size_t i = 0; i < std::size(results_remainders); ++i) {
-    //     std::cerr << "[results_remainders i = " << i << "] len = " << std::size(results_remainders[i].seq) << ", seq: " << results_remainders[i].seq << "\n";
-    // }
-
-    // // Inference.
-    // // Process each sample individually in batch size 1 for now, to avoid
-    // // differing sample lengths.
-    // // This should be done in batches later.
-    // std::vector<std::vector<torch::Tensor>> outputs;
-    // outputs.resize(std::size(samples));
-    // for (size_t win_id = 0; win_id < std::size(samples); ++win_id) {
-    //     outputs[win_id].reserve(std::size(samples[win_id]));
-    //     for (size_t j = 0; j < std::size(samples[win_id]); ++j) {
-    //         std::vector<polisher::Sample> samples_to_infer{samples[win_id][j]};
-    //         torch::Tensor output = batch_infer(std::move(samples_to_infer), 0);
-    //         outputs[win_id].emplace_back(std::move(output));
-    //     }
-    // }
-
-    // std::vector<std::vector<polisher::ConsensusResult>> results;
-    // results.resize(std::size(samples));
-    // for (size_t win_id = 0; win_id < std::size(samples); ++win_id) {
-    //     results[win_id].reserve(std::size(samples[win_id]));
-    //     for (size_t j = 0; j < std::size(outputs[win_id]); ++j) {
-    //         std::vector<polisher::ConsensusResult> result =
-    //                 encoder.decode_bases(outputs[win_id][j], with_quals);
-    //         results[win_id].insert(std::end(results[win_id]),
-    //                                std::make_move_iterator(std::begin(result)),
-    //                                std::make_move_iterator(std::end(result)));
-    //     }
-    // }
-
-    // for (const Interval interval: seq_window_ranges) {
-    //     for (int32_t i = interval.start; i < interval.end; ++i) {
-    //         const Window& window = windows[i];
-    //     }
-    // }
-
-    // for (const auto& window : windows) {
-    //     polisher::CountsFeatureEncoder encoder(bam_set);
-    //     std::vector<polisher::Sample> samples =
-    //             encoder.encode_region(window.name, window.start, window.end);
-
-    //     std::vector<polisher::Sample> samples_to_infer;
-    //     std::vector<polisher::Sample> remainders;
-    //     for (auto& sample : samples) {
-    //         // if (static_cast<int32_t>(std::size(sample.positions)) < opt.window_len) {
-    //         //     remainders.emplace_back(std::move(sample));
-    //         //     continue;
-    //         // }
-    //         samples_to_infer.emplace_back(std::move(sample));
-    //     }
-
-    //     spdlog::info("Inference on batch size: {}", std::size(samples_to_infer));
-    //     spdlog::info("Remainders size: {}", remainders.size());
-
-    //     const torch::Tensor output = batch_infer(samples_to_infer, 0);
-
-    //     std::vector<polisher::ConsensusResult> results =
-    //             encoder.decode_bases(output, with_quals);
-
-    //     // Write output.
-    //     {
-    //         for (size_t i = 0; i < std::size(results); ++i) {
-    //             std::string& seq = results[i].seq;
-    //             std::string& quals = results[i].quals;
-
-    //             size_t n = 0;
-    //             for (size_t j = 0; j < std::size(seq); ++j) {
-    //                 if (seq[j] == '*') {
-    //                     continue;
-    //                 }
-    //                 seq[n] = seq[j];
-    //                 quals[n] = quals[j];
-    //                 ++n;
-    //             }
-    //             seq.resize(n);
-    //             quals.resize(n);
-    //             // seq.erase(std::remove(seq.begin(), seq.end(), '*'), seq.end());
-
-    //             if (with_quals) {
-    //                 ofs << "@consensus-" << window.name << ':' << (window.start + 1) << '-'
-    //                     << window.end << '\n'
-    //                     << results[i].seq << "\n+\n"
-    //                     << results[i].quals << '\n';
-    //             } else {
-    //                 ofs << ">consensus-" << window.name << ':' << (window.start + 1) << '-'
-    //                     << window.end << '\n'
-    //                     << seq << '\n';
-    //             }
-    //         }
-    //     }
-    // }
-
-    // const at::Tensor collated_features = collate<float>(quals_batch, 0.f, torch::kFloat32);
-
-    // TODO here: Current code implements the logic in SampleGenerator._fill_features and everything upstream.
-    //              But, I still need to implement SampleGenerator.samples() which separates the small chunks into "quarantined" samples,
-    //              and also splits large chunks of the Sample object into smaller overlapping ones.
-    //              This is implemented in the medaka.common.Sample.chunks() function.
-    // Workflow is:
-    //  SampleGenerator.samples() <-prediction.DataLoader._run_region() <- prediction.DataLoader._region_worker() <- DataLoader.__init__()
-    //
-    // Note that there is also a path SampleGenerator.samples() <- SampleGenerator._samples_worker <- SampleGenerator.create_samples, but that one is called
-    //  from a different subtool, `features`.
-    //
-    // TODO 2: All windows which are of length chunk_size have exactly the same dimensions (since the rows are fixed to counts and not actual reads), so no padding
-    //          is needed. Instead, we can just stack these features into this batch tensor.
-    //          SHORT windows need special handling. In Medaka, these are interchangeably called "_quarantined" or "remainders" (self.remainders.extend(remain)).
-    //          Medaka currently calls these windows with batch_size = 1, which means it does not do any sort of padding, but instead it only runs individual
-    //          windows, which may be wasteful.
-    //          We could pad everything to window_len length and just push to the same tensor for batch processing. Potentially use Joyjit's function
-    //          from Dorado Correct to `collate`.
 }
 
 int polish(int argc, char* argv[]) {
@@ -1163,7 +941,7 @@ int polish(int argc, char* argv[]) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
     }
 
-    run_experimental(opt, devices);
+    run_polishing(opt, devices);
 
     return 0;
 }
