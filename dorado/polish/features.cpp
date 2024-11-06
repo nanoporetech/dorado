@@ -144,9 +144,9 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
                                                        data.positions_major.begin() + i);
                     std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
                                                        data.positions_minor.begin() + i);
-                    split_results.emplace_back(
-                            CountsResult{std::move(data.counts.slice(0, start, i)),
-                                         std::move(new_major_pos), std::move(new_minor_pos)});
+                    split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
+                                                            std::move(new_major_pos),
+                                                            std::move(new_minor_pos)});
                     start = i;
                 }
                 if (start < static_cast<int64_t>(std::size(data.positions_major))) {
@@ -154,7 +154,7 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
                                                        data.positions_major.end());
                     std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
                                                        data.positions_minor.end());
-                    split_results.emplace_back(CountsResult{std::move(data.counts.slice(0, start)),
+                    split_results.emplace_back(CountsResult{data.counts.slice(0, start),
                                                             std::move(new_major_pos),
                                                             std::move(new_minor_pos)});
                 }
@@ -208,9 +208,9 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
                                                       std::move(positions_minor_buffer.front())});
                 } else {
                     results.emplace_back(CountsResult{
-                            std::move(torch::cat(std::move(counts_buffer))),
-                            std::move(cat_vectors(positions_major_buffer)),
-                            std::move(cat_vectors(positions_minor_buffer)),
+                            torch::cat(std::move(counts_buffer)),
+                            cat_vectors(positions_major_buffer),
+                            cat_vectors(positions_minor_buffer),
                     });
                 }
                 counts_buffer = {std::move(data.counts)};
@@ -227,9 +227,9 @@ std::vector<CountsResult> construct_pileup_counts(bam_fset& bam_set,
                                                   std::move(positions_minor_buffer.front())});
             } else {
                 results.emplace_back(CountsResult{
-                        std::move(torch::cat(std::move(counts_buffer))),
-                        std::move(cat_vectors(positions_major_buffer)),
-                        std::move(cat_vectors(positions_minor_buffer)),
+                        torch::cat(std::move(counts_buffer)),
+                        cat_vectors(positions_major_buffer),
+                        cat_vectors(positions_minor_buffer),
                 });
             }
         }

@@ -6,6 +6,8 @@
 #include "medaka_bamiter.h"
 #include "medaka_common.h"
 
+#include <spdlog/spdlog.h>
+
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
@@ -112,15 +114,15 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
             if (k == kh_end(bad_reads)) {  // a new bad read
                 int putret;
                 k = kh_put(BADREADS, bad_reads, read_id, &putret);
-                fprintf(stderr, "Failed to retrieve Weibull parameter tag '%s' for read %s.\n",
-                        wtags[i], read_id);
+                spdlog::warn("Failed to retrieve Weibull parameter tag '{}' for read {}.\n",
+                             wtags[i], read_id);
             }
             return fraction_counts;
         }
         uint32_t taglen = bam_auxB_len(tag);
         if (p->qpos + indel >= taglen) {
-            fprintf(stderr, "%s tag was out of range for %s position %lu. taglen: %i\n", wtags[i],
-                    bam_get_qname(p->b), p->qpos + indel, taglen);
+            spdlog::warn("%s tag was out of range for %s position %lu. taglen: %i\n", wtags[i],
+                         bam_get_qname(p->b), p->qpos + indel, taglen);
             return fraction_counts;
         }
         wtag_vals[i] = bam_auxB2f(tag, p->qpos + indel);

@@ -95,11 +95,6 @@ public:
         return x;
     }
 
-    void to_half() {
-        this->to(torch::kHalf);
-        m_half_precision = true;
-    }
-
     // void move_to_device(torch::Device& device) {
     //     m_gru->to(device);
     //     m_linear->to(device);
