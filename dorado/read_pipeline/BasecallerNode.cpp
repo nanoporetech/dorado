@@ -260,9 +260,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                                          ? m_low_latency_batch_timeout_ms
                                          : m_model_runners[worker_id]->batch_timeout_ms();
 
-    const bool measure_timeout_from_first_chunk =
-            (is_low_latency && m_low_latency_timeout_from_first_chunk);
-
     while (true) {
 #if DORADO_METAL_BUILD
         utils::ScopedAutoReleasePool inner_pool;
@@ -316,9 +313,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             worker_chunks.push_back(std::move(chunk));
 
-            if (worker_chunks.size() == 1 || !measure_timeout_from_first_chunk) {
-                // If we're measuring the timeout from the first chunk, we only reset the timer
-                // if this is the first chunk to be added to the buffer.
+            if (worker_chunks.size() == 1) {
+                // If this is the first chunk to be added to the buffer, reset the timer.
                 chunk_reserve_time = std::chrono::system_clock::now();
             }
         }
@@ -400,14 +396,6 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                      m_low_latency_batch_timeout_ms);
     } else {
         m_low_latency_batch_timeout_ms = 0;
-    }
-    auto timeout_from_first_chunk_env = getenv("HIGH_PRIORITY_BATCH_TIMEOUT_FROM_FIRST_CHUNK");
-    if (timeout_from_first_chunk_env) {
-        m_low_latency_timeout_from_first_chunk = true;
-        spdlog::info(
-                "Batch timeout for high-priority pipelines will be measured from first chunk.");
-    } else {
-        m_low_latency_timeout_from_first_chunk = false;
     }
 
     auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();
