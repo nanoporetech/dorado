@@ -679,32 +679,10 @@ void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices
         std::exit(EXIT_FAILURE);
     }
 
-    // int32_t infer_threads = 1;
-
     // Check the output extension to determine if we need
     // to compute the QVs too.
     const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
     const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
-
-    // spdlog::info("Setting up the device.");
-
-    // const float batch_factor = (utils::starts_with(opt.device, "cuda")) ? 0.4f : 0.8f;
-    // for (size_t d = 0; d < devices.size(); d++) {
-    //     const auto& dev = devices[d];
-    //     for (int i = 0; i < infer_threads; i++) {
-    //         int device_batch_size = opt.batch_size;
-    //         // if (batch_size == 0) {
-    //         //     device_batch_size = calculate_batch_size(dev, batch_factor);
-    //         //     if (device_batch_size == 0) {
-    //         //         throw std::runtime_error("Insufficient memory to run inference on " + dev);
-    //         //     }
-    //         // }
-    //         spdlog::info("Using batch size {} on device {} in inference thread {}.",
-    //                      device_batch_size, dev, i);
-    //         // m_infer_threads.push_back(std::thread(&CorrectionInferenceNode::infer_fn, this, dev,
-    //         //                                       (int)d, device_batch_size));
-    //     }
-    // }
 
     const DeviceInfo& device_info = devices.front();
 
