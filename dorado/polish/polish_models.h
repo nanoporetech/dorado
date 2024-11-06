@@ -28,7 +28,7 @@ public:
     }
 
     // Predict on a batch with device and precision handling
-    torch::Tensor predict_on_batch(torch::Tensor x, torch::Device& device) {
+    torch::Tensor predict_on_batch(torch::Tensor x, const torch::Device& device) {
         x = x.to(device);
         if (m_half_precision) {
             x = x.to(torch::kHalf);

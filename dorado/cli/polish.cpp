@@ -56,6 +56,14 @@ namespace {
 
 using ParserPtr = std::unique_ptr<utils::arg_parse::ArgParser>;
 
+enum class DeviceType { CPU, CUDA, METAL, UNKNOWN };
+
+struct DeviceInfo {
+    std::string name;
+    DeviceType type;
+    torch::Device device;
+};
+
 /// \brief All options for this tool.
 struct Options {
     // Positional parameters.
@@ -68,7 +76,7 @@ struct Options {
     int32_t verbosity = 0;
     int32_t threads = 1;
     int32_t infer_threads = 1;
-    std::string device;
+    std::string device_str;
     int32_t batch_size = 128;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
@@ -150,6 +158,36 @@ int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
     return EXIT_SUCCESS;
 }
 
+std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
+    std::vector<DeviceInfo> devices;
+
+    if (devices_str == "cpu") {
+        // infer_threads = 1;
+        torch::Device torch_device = torch::Device(devices_str);
+        devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
+    }
+#if DORADO_CUDA_BUILD
+    else if (utils::starts_with(devices_str, "cuda")) {
+        spdlog::info("Parsing CUDA device string.");
+        const std::vector<std::string> parsed_devices =
+                dorado::utils::parse_cuda_device_string(devices_str);
+        if (parsed_devices.empty()) {
+            throw std::runtime_error("CUDA device requested but no devices found.");
+        }
+        for (const auto& val : parsed_devices) {
+            torch::Device torch_device = torch::Device(val);
+            devices.emplace_back(DeviceInfo{val, DeviceType::CUDA, std::move(torch_device)});
+        }
+    }
+#else
+    else {
+        throw std::runtime_error("Unsupported device: " + devices_str);
+    }
+#endif
+
+    return devices;
+}
+
 /// \brief This function simply fills out the Options struct with the parsed CLI args.
 Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosity) {
     Options opt;
@@ -167,13 +205,13 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.infer_threads = parser.visible.get<int>("infer-threads");
 
-    opt.device = parser.visible.get<std::string>("device");
+    opt.device_str = parser.visible.get<std::string>("device");
 
-    if (opt.device == cli::AUTO_DETECT_DEVICE) {
+    if (opt.device_str == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
-        opt.device = "cpu";
+        opt.device_str = "cpu";
 #else
-        opt.device = utils::get_auto_detected_device();
+        opt.device_str = utils::get_auto_detected_device();
 #endif
     }
 
@@ -195,7 +233,7 @@ std::string get_lowercase_extension(const std::filesystem::path& path) {
 
 void validate_options(const Options& opt) {
     // Parameter validation.
-    if (!cli::validate_device_string(opt.device)) {
+    if (!cli::validate_device_string(opt.device_str)) {
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn)) {
@@ -271,8 +309,7 @@ const std::vector<std::pair<int32_t, int32_t>> compute_chunks(const int32_t num_
 }
 
 std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& model_path,
-                                                   const std::string& device_str,
-                                                   torch::Device& device) {
+                                                   const DeviceInfo& device_info) {
     // Load weights from the model file.
     torch::jit::script::Module module;
 
@@ -299,11 +336,14 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
                     "Some loaded parameters cannot be found in the C++ model! name = " + p.name);
         }
     }
-    spdlog::info("Moving the model to the device: {}", device_str);
-    model->to(device);
-    spdlog::info("Moved the model to the device: {}. Converting to half.", device_str);
-    model->to_half();
-    spdlog::info("Converted the model to half. Calling model->eval().");
+    spdlog::info("Moving the model to the device: {}", device_info.name);
+    model->to(device_info.device);
+    spdlog::info("Moved the model to the device: {}. Converting to half.", device_info.name);
+    if (device_info.type == DeviceType::CUDA) {
+        model->to_half();
+        spdlog::info("Converted the model to half.");
+    }
+    spdlog::info("Calling model->eval().");
     model->eval();
     spdlog::info("Model ready.");
 
@@ -633,8 +673,12 @@ polisher::ConsensusResult stitch_sequence(
     return polisher::ConsensusResult{consensus_seq, consensus_quals};
 }
 
-void run_experimental(const Options& opt) {
-    std::vector<std::string> devices;
+void run_experimental(const Options& opt, const std::vector<DeviceInfo>& devices) {
+    if (std::empty(devices)) {
+        spdlog::error("Zero devices initialized! Need at least one device to run.");
+        std::exit(EXIT_FAILURE);
+    }
+
     // int32_t infer_threads = 1;
 
     // Check the output extension to determine if we need
@@ -642,25 +686,8 @@ void run_experimental(const Options& opt) {
     const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
     const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
-    spdlog::info("Setting up the device.");
+    // spdlog::info("Setting up the device.");
 
-    if (opt.device == "cpu") {
-        // infer_threads = 1;
-        devices.push_back(opt.device);
-    }
-#if DORADO_CUDA_BUILD
-    else if (utils::starts_with(opt.device, "cuda")) {
-        spdlog::info("Parsing CUDA device string.");
-        devices = dorado::utils::parse_cuda_device_string(opt.device);
-        if (devices.empty()) {
-            throw std::runtime_error("CUDA device requested but no devices found.");
-        }
-    }
-#else
-    else {
-        throw std::runtime_error("Unsupported device: " + opt.device);
-    }
-#endif
     // const float batch_factor = (utils::starts_with(opt.device, "cuda")) ? 0.4f : 0.8f;
     // for (size_t d = 0; d < devices.size(); d++) {
     //     const auto& dev = devices[d];
@@ -679,10 +706,9 @@ void run_experimental(const Options& opt) {
     //     }
     // }
 
-    const std::string device_str = devices.front();
-    torch::Device device = torch::Device(device_str);
+    const DeviceInfo& device_info = devices.front();
 
-    spdlog::info("device_str = {}", device_str);
+    spdlog::info("Using: device_str = {}", device_info.name);
 
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
@@ -697,10 +723,11 @@ void run_experimental(const Options& opt) {
 
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
-    auto batch_infer = [&gpu_mutexes, &device](polisher::TorchModel& model,
-                                               const std::vector<polisher::Sample>& samples,
-                                               const int64_t sample_start, const int64_t sample_end,
-                                               const int32_t mtx_idx) {
+    auto batch_infer = [&gpu_mutexes, &device_info](polisher::TorchModel& model,
+                                                    const std::vector<polisher::Sample>& samples,
+                                                    const int64_t sample_start,
+                                                    const int64_t sample_end,
+                                                    const int32_t mtx_idx) {
         utils::ScopedProfileRange infer("infer", 1);
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
@@ -727,7 +754,7 @@ void run_experimental(const Options& opt) {
 
         torch::Tensor output;
         try {
-            output = model.predict_on_batch(std::move(batch_features_tensor), device);
+            output = model.predict_on_batch(std::move(batch_features_tensor), device_info.device);
         } catch (std::exception& e) {
             throw e;
         }
@@ -925,7 +952,7 @@ void run_experimental(const Options& opt) {
         // Construct the model.
         spdlog::info("Loading the model.");
         const std::unique_ptr<polisher::TorchModel> model =
-                create_model(opt.model_path / "model.pt", device_str, device);
+                create_model(opt.model_path / "model.pt", device_info);
 
         // for (int32_t win_id = 0; win_id < static_cast<int32_t>(std::size(windows)); ++win_id) {
         //     if ((win_id % 10000) == 0) {
@@ -1153,7 +1180,13 @@ int polish(int argc, char* argv[]) {
     [[maybe_unused]] polisher::ModelConfig config =
             polisher::parse_model_config(opt.model_path / "config.toml");
 
-    run_experimental(opt);
+    const std::vector<DeviceInfo> devices = init_devices(opt.device_str);
+
+    if (std::empty(devices)) {
+        throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
+    }
+
+    run_experimental(opt, devices);
 
     return 0;
 }
