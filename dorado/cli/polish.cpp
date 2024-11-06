@@ -819,7 +819,8 @@ void run_experimental(const Options& opt) {
 
         // Create BAM windows (regions) to create pileup. The features (samples) will
         // be split further into windows of window_len in size prior to inference.
-        const auto& [windows, _] = create_windows(draft_lens, opt.bam_chunk, opt.window_overlap);
+        const std::vector<Window> windows =
+                create_windows(draft_lens, opt.bam_chunk, opt.window_overlap).first;
 
         spdlog::info("Created {} windows from {} sequences.", std::size(windows),
                      std::size(draft_lens));
