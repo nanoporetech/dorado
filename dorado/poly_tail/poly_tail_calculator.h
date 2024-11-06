@@ -57,9 +57,10 @@ protected:
                                              float samples_per_base) const = 0;
 
     // Determine the outer boundary of the signal space to consider based on the anchor.
-    virtual std::pair<int, int> signal_range(int signal_anchor,
-                                             int signal_len,
-                                             float samples_per_base) const = 0;
+    std::pair<int, int> signal_range(int signal_anchor,
+                                     int signal_len,
+                                     float samples_per_base,
+                                     bool fwd) const;
 
     float estimate_samples_per_base(const dorado::SimplexRead& read) const;
 

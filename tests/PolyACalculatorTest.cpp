@@ -33,7 +33,7 @@ struct TestCase {
 
 TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     auto [gt, data, is_rna] = GENERATE(
-            TestCase{140, "poly_a/r9_rev_cdna", false}, TestCase{32, "poly_a/r10_fwd_cdna", false},
+            TestCase{134, "poly_a/r9_rev_cdna", false}, TestCase{32, "poly_a/r10_fwd_cdna", false},
             TestCase{39, "poly_a/rna002", true}, TestCase{76, "poly_a/rna004", true});
 
     CAPTURE(data);
