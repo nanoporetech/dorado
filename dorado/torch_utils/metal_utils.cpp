@@ -46,7 +46,8 @@ void report_error(const NS::Error *error, const char *function) {
         return;
     }
     auto safe_c_str = [](NS::String *str) {
-        return str ? str->cString(NS::ASCIIStringEncoding) : "<none>";
+        const char *c_str = str ? str->cString(NS::ASCIIStringEncoding) : nullptr;
+        return c_str ? c_str : "<none>";
     };
     spdlog::error("function={}, code={}, domain={}, description={}", function, error->code(),
                   safe_c_str(error->domain()), safe_c_str(error->localizedDescription()));
