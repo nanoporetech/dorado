@@ -37,7 +37,7 @@ public:
     size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
-    int batch_timeout_ms() const { return m_low_latency ? 90 : 30000; }
+    int batch_timeout_ms() const { return m_low_latency ? 350 : 30000; }
     bool is_low_latency() const { return m_low_latency; }
 
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
