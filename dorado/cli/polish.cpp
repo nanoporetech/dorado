@@ -42,6 +42,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
 using namespace std::chrono_literals;
@@ -81,6 +82,7 @@ struct Options {
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1000000;
+    std::string region;
 };
 
 /// \brief Define the CLI options.
@@ -139,6 +141,9 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Size of draft chunks to parse from the input BAM at a time.")
                 .default_value(1000000)
                 .scan<'i', int>();
+        parser->visible.add_argument("--region")
+                .help("Process only this region of the input. Htslib format (start is 1-based, end "
+                      "is inclusive).");
     }
 
     return parser;
@@ -220,7 +225,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.verbosity = verbosity;
-
+    opt.region =
+            (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
     return opt;
 }
 
@@ -532,7 +538,7 @@ void debug_print_samples(std::ostream& os,
     end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
 
     for (int64_t i = start; i < end; ++i) {
-        debug_print_sample(os, samples[i], start, end, i == debug_id);
+        debug_print_sample(os, samples[i], 0, -1, i == debug_id);
     }
 }
 
@@ -865,13 +871,38 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& sampl
     return results;
 }
 
+std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string& region) {
+    const size_t colon_pos = region.find(':');
+    if (colon_pos == std::string::npos) {
+        return {region, -1, -1};
+    }
+
+    std::string name = region.substr(0, colon_pos);
+
+    if ((colon_pos + 1) == std::size(region)) {
+        return {std::move(name), -1, -1};
+    }
+
+    size_t dash_pos = region.find('-', colon_pos + 1);
+    dash_pos = (dash_pos == std::string::npos) ? std::size(region) : dash_pos;
+    const int64_t start =
+            ((dash_pos - colon_pos - 1) == 0)
+                    ? -1
+                    : std::stoll(region.substr(colon_pos + 1, dash_pos - colon_pos - 1)) - 1;
+    const int64_t end =
+            ((dash_pos + 1) < std::size(region)) ? std::stoll(region.substr(dash_pos + 1)) : -1;
+
+    return {std::move(name), start, end};
+}
+
 std::vector<polisher::Sample> create_samples(
         const std::filesystem::path& in_aln_bam_fn,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
         const int32_t bam_chunk,
-        [[maybe_unused]] const int32_t window_len,
-        const int32_t window_overlap) {
+        const int32_t window_len,
+        const int32_t window_overlap,
+        const std::string region = "") {
     // Open the BAM file for each thread and spawn encoders.
     spdlog::info("Creating {} encoders.", num_threads);
     std::vector<bam_fset*> bam_sets;
@@ -905,9 +936,36 @@ std::vector<polisher::Sample> create_samples(
         }
         return ret;
     }();
+
     spdlog::info("Creating BAM windows.");
-    const std::vector<Window> bam_windows =
-            create_windows(only_lens, bam_chunk, window_overlap).first;
+    const std::vector<Window> bam_windows = [&]() {
+        if (std::empty(region)) {
+            return create_windows(only_lens, bam_chunk, window_overlap).first;
+        } else {
+            const auto [region_name, region_start, region_end] = parse_region_string(region);
+            spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
+                         region_end);
+            int32_t seq_id = -1;
+            int64_t seq_length = 0;
+            for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
+                if (draft_lens[i].first == region_name) {
+                    seq_id = i;
+                    seq_length = draft_lens[i].second;
+                    break;
+                }
+            }
+            if (seq_id < 0) {
+                throw std::runtime_error(
+                        "Sequence provided by custom region not found in input! region_name = " +
+                        region_name);
+            }
+            std::vector<Window> windows{
+                    Window{seq_id, seq_length, region_start, region_end},
+            };
+            return windows;
+        }
+    }();
+
     spdlog::info("Created {} BAM windows from {} sequences.", std::size(bam_windows),
                  std::size(draft_lens));
 
@@ -1242,7 +1300,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples =
                 create_samples(opt.in_aln_bam_fn, draft_lens, opt.threads, opt.bam_chunk,
-                               opt.window_len, opt.window_overlap);
+                               opt.window_len, opt.window_overlap, opt.region);
 
         // Increase the number of threads again for inter-op parallelism.
         torch::set_num_threads(opt.threads);
