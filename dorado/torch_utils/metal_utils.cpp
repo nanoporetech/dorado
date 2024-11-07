@@ -8,6 +8,8 @@
 #include <sys/syslimits.h>
 #include <torch/version.h>
 
+#include <atomic>
+
 #if !TARGET_OS_IPHONE
 #include <objc/objc-runtime.h>
 #endif
@@ -407,6 +409,47 @@ size_t get_apple_physical_memory_bytes() {
         spdlog::warn("Failed to retrieve physical memory size: defaulting to {} bytes", mem_size);
     }
     return mem_size;
+}
+
+// MTLCaptureManager can only capture one thing at a time, so guard it with a global.
+static std::atomic_bool s_capturing{false};
+
+ScopedMetalCapture::ScopedMetalCapture(id device_or_queue,
+                                       const std::optional<std::filesystem::path> &path) {
+    if (s_capturing.exchange(true, std::memory_order_relaxed) != false) {
+        spdlog::error("Already performing a GPU capture");
+        std::abort();
+    }
+
+    // Setup descriptor of what to capture.
+    auto descriptor = NS::TransferPtr(MTL::CaptureDescriptor::alloc()->init());
+    descriptor->setCaptureObject(device_or_queue);
+
+    // Dump to a file if requested.
+    if (path.has_value()) {
+        descriptor->setDestination(MTL::CaptureDestination::CaptureDestinationGPUTraceDocument);
+        // Assume that the path is valid UTF-8.
+        auto pathstr =
+                NS::TransferPtr(NS::String::string(path->string().c_str(), NS::UTF8StringEncoding));
+        auto url = NS::TransferPtr(NS::URL::alloc()->initFileURLWithPath(pathstr.get()));
+        descriptor->setOutputURL(url.get());
+    }
+
+    // Start the capture.
+    auto *manager = MTL::CaptureManager::sharedCaptureManager();
+    m_active = wrap_func_with_err(manager->startCapture, descriptor.get());
+
+    if (!m_active && !getenv("MTL_CAPTURE_ENABLED")) {
+        spdlog::warn("Note that MTL_CAPTURE_ENABLED=1 must be set in order to capture");
+    }
+}
+
+ScopedMetalCapture::~ScopedMetalCapture() {
+    if (m_active) {
+        auto *manager = MTL::CaptureManager::sharedCaptureManager();
+        manager->stopCapture();
+    }
+    s_capturing.store(false, std::memory_order_relaxed);
 }
 
 }  // namespace dorado::utils

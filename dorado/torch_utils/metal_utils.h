@@ -10,6 +10,7 @@
 
 #include <ATen/core/TensorBody.h>
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -73,12 +74,27 @@ NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(at::Tensor &&t);
 // On construction, creates an autorelease pool for the current thread.
 // On destruction, drains the autorelease pool.
 class ScopedAutoReleasePool {
+    id m_autorelease_pool;
+
+    ScopedAutoReleasePool(const ScopedAutoReleasePool &) = delete;
+    ScopedAutoReleasePool &operator=(const ScopedAutoReleasePool &) = delete;
+
 public:
     ScopedAutoReleasePool();
     ~ScopedAutoReleasePool();
+};
 
-private:
-    id m_autorelease_pool;
+// Capture work on a queue or device between 2 points.
+// A path can be provided to dump the capture to a file.
+class ScopedMetalCapture {
+    bool m_active = false;
+
+    ScopedMetalCapture(const ScopedMetalCapture &) = delete;
+    ScopedMetalCapture &operator=(const ScopedMetalCapture &) = delete;
+
+public:
+    ScopedMetalCapture(id device_or_queue, const std::optional<std::filesystem::path> &path);
+    ~ScopedMetalCapture();
 };
 
 }  // namespace dorado::utils
