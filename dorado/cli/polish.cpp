@@ -237,7 +237,7 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn)) {
-        spdlog::error("Input reads file {} does not exist!", opt.in_aln_bam_fn.string());
+        spdlog::error("Input draft file {} does not exist!", opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_draft_fastx_fn)) {
