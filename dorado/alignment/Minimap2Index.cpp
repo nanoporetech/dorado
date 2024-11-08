@@ -159,6 +159,7 @@ void Minimap2Index::set_index(std::shared_ptr<const mm_idx_t> index) {
 
 HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
+    records.reserve(m_index->n_seq);
     for (uint32_t i = 0; i < m_index->n_seq; ++i) {
         records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
     }

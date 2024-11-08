@@ -57,7 +57,7 @@ public:
     /// N.B. will replace any existing concrete context already registered.
     /// If this is not the desired behaviour check exists() before calling.
     template <typename ALIAS, typename IMPL>
-    void register_context(std::shared_ptr<IMPL> context) {
+    void register_context(const std::shared_ptr<IMPL>& context) {
         auto context_as_alias_type = std::static_pointer_cast<ALIAS>(context);
         m_contexts[typeid(ALIAS)] =
                 std::make_unique<details::ContextHolder<ALIAS>>(std::move(context_as_alias_type));

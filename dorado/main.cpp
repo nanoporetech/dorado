@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     // Log cmd
     spdlog::info("Running: \"{}\"", dorado::utils::join(arguments, "\" \""));
 
-    const auto subcommand = arguments[0];
+    const auto& subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
         std::cerr << DORADO_VERSION << '\n';

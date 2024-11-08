@@ -177,8 +177,7 @@ int download(int argc, char* argv[]) {
     }
 
     if (list_structured) {
-        std::string structured_models = models::get_supported_model_info("");
-        std::cout << structured_models << std::endl;
+        std::cout << models::get_supported_model_info("") << '\n';
         return EXIT_SUCCESS;
     }
 

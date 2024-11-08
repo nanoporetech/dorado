@@ -22,7 +22,7 @@ void CorrectionPafWriterNode::input_thread_fn() {
         for (size_t i = 0; i < std::size(alignments.qnames); ++i) {
             utils::serialize_to_paf(std::cout, alignments.qnames[i], alignments.read_name,
                                     alignments.overlaps[i], 0, 0, 60, alignments.cigars[i]);
-            std::cout << std::endl;
+            std::cout << '\n';
         }
     }
 }

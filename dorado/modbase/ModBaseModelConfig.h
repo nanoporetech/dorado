@@ -86,11 +86,14 @@ struct ConvEncoder {
     const std::vector<ConvParams> stages;
     const LinearParams head;
 
-    ConvEncoder(const std::vector<ConvParams>& stem_,
-                const std::vector<ConvParams>& downsample_,
-                const std::vector<ConvParams>& stages_,
+    ConvEncoder(std::vector<ConvParams> stem_,
+                std::vector<ConvParams> downsample_,
+                std::vector<ConvParams> stages_,
                 const LinearParams& head_)
-            : stem(stem_), downsample(downsample_), stages(stages_), head(head_) {
+            : stem(std::move(stem_)),
+              downsample(std::move(downsample_)),
+              stages(std::move(stages_)),
+              head(head_) {
         if (stem.empty()) {
             throw std::runtime_error(err + "conv encoder: 'missing stem'.");
         }
@@ -109,14 +112,14 @@ struct RefinementParams {
     const size_t center_idx;             ///< The position in the kmer at which to check the levels
     const std::vector<float> levels;     ///< Expected kmer levels for rough rescaling
 
-    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0), levels({}) {};
+    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0) {}
     RefinementParams(const int kmer_len_,
                      const int center_idx_,
-                     const std::vector<float>& refine_kmer_levels_)
+                     std::vector<float> refine_kmer_levels_)
             : do_rough_rescale(true),
               kmer_len(static_cast<size_t>(kmer_len_)),
               center_idx(static_cast<size_t>(center_idx_)),
-              levels(refine_kmer_levels_) {
+              levels(std::move(refine_kmer_levels_)) {
         if (kmer_len < 1 || kmer_len_ < 1) {
             throw std::runtime_error(err + "refinement params: 'negative or zero kmer len'.");
         }
@@ -140,14 +143,14 @@ struct ModificationParams {
     const std::string motif;      ///< The motif to look for modified bases within.
     const size_t motif_offset{};  ///< The position of the canonical base within the motif.
 
-    ModificationParams(const std::vector<std::string>& codes_,
-                       const std::vector<std::string>& long_names_,
-                       const std::string& motif_,
+    ModificationParams(std::vector<std::string> codes_,
+                       std::vector<std::string> long_names_,
+                       std::string motif_,
                        const size_t motif_offset_)
-            : codes(codes_),
-              long_names(long_names_),
+            : codes(std::move(codes_)),
+              long_names(std::move(long_names_)),
               count(codes.size()),
-              motif(motif_),
+              motif(std::move(motif_)),
               motif_offset(motif_offset_) {
         if (motif.size() < motif_offset) {
             throw std::runtime_error(err + "mods params: 'invalid motif offset'.");
@@ -220,16 +223,16 @@ struct ModBaseModelConfig {
     ContextParams context;             ///< Params for the context over which mods are inferred
     RefinementParams refine;           ///< Params for kmer refinement
 
-    ModBaseModelConfig(const std::filesystem::path& model_path_,
-                       const ModelGeneralParams& general_,
-                       const ModificationParams& mods_,
-                       const ContextParams& context_,
-                       const RefinementParams& refine_)
-            : model_path(model_path_),
-              general(general_),
-              mods(mods_),
-              context(context_),
-              refine(refine_) {
+    ModBaseModelConfig(std::filesystem::path model_path_,
+                       ModelGeneralParams general_,
+                       ModificationParams mods_,
+                       ContextParams context_,
+                       RefinementParams refine_)
+            : model_path(std::move(model_path_)),
+              general(std::move(general_)),
+              mods(std::move(mods_)),
+              context(std::move(context_)),
+              refine(std::move(refine_)) {
         // Kmer length is duplicated in modbase model configs - check they match
         if (general.kmer_len != context.kmer_len) {
             auto kl_a = std::to_string(general.kmer_len);

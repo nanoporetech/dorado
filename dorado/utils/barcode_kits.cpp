@@ -938,7 +938,7 @@ void add_custom_barcode_kit(const std::string& kit_name, const KitInfo& custom_k
 
 void add_custom_barcodes(const std::unordered_map<std::string, std::string>& custom_barcodes) {
     std::set<std::string> duplicated_barcode_names;
-    for (auto [barcode_name, barcode_seq] : custom_barcodes) {
+    for (const auto& [barcode_name, barcode_seq] : custom_barcodes) {
         auto [_, success] = barcodes.insert({barcode_name, barcode_seq});
         if (!success) {
             duplicated_barcode_names.insert(barcode_name);
@@ -953,7 +953,7 @@ void add_custom_barcodes(const std::unordered_map<std::string, std::string>& cus
         throw std::runtime_error(error);
     }
 
-    for (auto [barcode_name, _] : custom_barcodes) {
+    for (const auto& [barcode_name, _] : custom_barcodes) {
         custom_barcode_names.insert(barcode_name);
     }
 }
