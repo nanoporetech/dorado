@@ -8,6 +8,7 @@
 #include "polish/model.h"
 #include "polish/polish_models.h"
 #include "polish/sample.h"
+#include "polish/trim.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/arg_parse_ext.h"
@@ -15,6 +16,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/ssize.h"
 
 #include <cxxpool.h>
 #include <htslib/faidx.h>
@@ -494,41 +496,6 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
-void debug_print_sample(std::ostream& os,
-                        const polisher::Sample& sample,
-                        int64_t start = 0,
-                        int64_t end = -1,
-                        bool debug = false) {
-    const int64_t len = static_cast<int64_t>(std::size(sample.positions_major));
-    start = std::max<int64_t>(0, start);
-    end = (end <= 0) ? len : end;
-
-    os << "sample.positions = " << sample.start() << " - " << sample.end()
-       << " , dist = " << (sample.end() - sample.start()) << " , tensor = [";
-    os.flush();
-    for (int32_t k = start; k < std::min(start + 3, len); ++k) {
-        os << "(" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ") ";
-        os.flush();
-    }
-    os << " ...";
-    os.flush();
-    for (int32_t k = std::max<int64_t>(0, end - 3); k < end; ++k) {
-        os << " (" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ")";
-        os.flush();
-    }
-    os << "] , size = " << std::size(sample.positions_major) << "\n";
-    os.flush();
-
-    if (debug) {
-        const auto depth = sample.depth.slice(/*dim=*/0, /*start=*/0);
-        for (int32_t k = 0; k < len; ++k) {
-            os << "[k = " << k << "] pos = (" << sample.positions_major[k] << ", "
-               << sample.positions_minor[k] << "), depth = " << depth[k].item<float>() << "\n";
-            os.flush();
-        }
-    }
-}
-
 void debug_print_samples(std::ostream& os,
                          const std::vector<polisher::Sample>& samples,
                          int64_t start = 0,
@@ -538,20 +505,25 @@ void debug_print_samples(std::ostream& os,
     end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
 
     for (int64_t i = start; i < end; ++i) {
-        debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+        os << "[i = " << i << "] ";
+        polisher::debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+        os << '\n';
     }
 }
 
-/**
- * \brief IMPORTANT: The input/output sequences here still contain '*' bases.
- */
-polisher::ConsensusResult stitch_sequence(
+polisher::ConsensusResult stitch_sequence_2(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
         const std::vector<polisher::Sample>& samples,
+        const std::vector<polisher::TrimInfo>& trims,
         const std::vector<polisher::ConsensusResult>& sample_results,
         const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
-    // Fetch the draft sequence for gap filling.
+    if (std::size(samples) != std::size(trims)) {
+        throw std::runtime_error("Number of samples and trims differs! std::size(samples) = " +
+                                 std::to_string(std::size(samples)) +
+                                 ", std::size(trims) = " + std::to_string(std::size(trims)));
+    }
+
     const std::string draft = fetch_seq(in_draft_fn, header);
 
     if (std::empty(samples_for_seq)) {
@@ -561,126 +533,185 @@ polisher::ConsensusResult stitch_sequence(
 
     polisher::ConsensusResult result;
 
-    // Track the end position of the last processed sample.
-    int64_t last_end = -1;
-    size_t last_i = -1;
-
-    // Append the entire sequence of the current sample if no overlap was found.
-    {
-        const int sample_index = samples_for_seq[0].second;
+    int64_t last_end = 0;
+    for (size_t i = 0; i < samples_for_seq.size(); ++i) {
+        const int32_t sample_index = samples_for_seq[i].second;
         const polisher::Sample& sample = samples[sample_index];
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
-        result = sample_result;
-        last_end = sample.positions_major.back();
-        last_i = 0;
-    }
+        const polisher::TrimInfo& trim = trims[sample_index];
 
-    for (size_t i = 1; i < samples_for_seq.size(); ++i) {
-        const int sample_index = samples_for_seq[i].second;
-        const polisher::Sample& sample = samples[sample_index];
-        const polisher::ConsensusResult& sample_result = sample_results[sample_index];
+        // if ((trim.start < 0) || (trim.end < 0)) {
+        //     result.seq += sample_result.seq;
+        //     result.quals += sample_result.quals;
 
-        // Define the start and end positions of the current sample in draft coordinates.
-        const int64_t start = sample.positions_major.front();
-        const int64_t end = sample.positions_major.back();
-
-        std::cerr << "[stitching i = " << i
-                  << "] samples_for_seq.size() = " << samples_for_seq.size()
-                  << ", consensus_seq.size() = " << std::size(result.seq)
-                  << ", consensus_quals.size() = " << std::size(result.quals)
-                  << ", last_end = " << last_end << ", start = " << start << ", end = " << end
-                  << "\n";
-
-        if (end < last_end) {
-            continue;
+        //     last_end = sample.positions_major.back();
+        // } else {
+        if (trim.start < 0) {
+            std::cerr << "trim.start = " << trim.start << "\n";
         }
 
-        if (last_end >= start) {
-            std::cerr << "    - Adding window.\n";
+        const int64_t start_pos = sample.positions_major[trim.start];
+        const int64_t end_pos = sample.positions_major.back();
 
-            if (last_end > start) {
-                std::cerr << "    - last_end > start! last_end = " << last_end
-                          << ", start = " << start << "\n";
-            }
-
-            // Compute midpoint of overlap.
-            const int64_t overlap_middle = (last_end + start) / 2;
-
-            const auto& prev_sample = samples[samples_for_seq[last_i].second];
-
-            // Find midpoint indices using searchsorted.
-            const std::vector<int64_t>& prev_sample_positions = prev_sample.positions_major;
-            const std::vector<int64_t>& curr_sample_positions = sample.positions_major;
-
-            // Find the index for prev_sample_positions (equivalent to right=false)
-            const auto prev_sample_mid_iter = std::lower_bound(
-                    prev_sample_positions.begin(), prev_sample_positions.end(), overlap_middle);
-            const int64_t prev_sample_mid_idx =
-                    std::distance(prev_sample_positions.begin(), prev_sample_mid_iter);
-
-            // Find the index for curr_sample_positions (equivalent to right=true)
-            const auto curr_sample_mid_iter = std::upper_bound(
-                    curr_sample_positions.begin(), curr_sample_positions.end(), overlap_middle);
-            const int64_t curr_sample_mid_idx =
-                    std::distance(curr_sample_positions.begin(), curr_sample_mid_iter) - 1;
-
-            // Trim the previous consensus to avoid the overlap.
-            const int64_t num_to_remove =
-                    static_cast<int64_t>(
-                            std::size(sample_results[samples_for_seq[last_i].second].seq)) -
-                    prev_sample_mid_idx;
-            // std::cerr << "prev_sample_mid_idx = " << prev_sample_mid_idx << ", curr_sample_mid_idx = " << curr_sample_mid_idx
-            //     << ", num_to_remove = " << num_to_remove << "\n";
-            const int64_t reduced_size =
-                    static_cast<int64_t>(std::size(result.seq)) - num_to_remove;
-            std::cerr << "    - reduced_size = " << reduced_size
-                      << ", size before = " << std::size(result.seq) << "\n";
-
-            result.seq.resize(reduced_size);
-            result.quals.resize(reduced_size);
-
-            std::cerr << "    - reduced seq back: '..." << result.seq.substr(reduced_size - 3)
-                      << "'\n";
-            // std::cerr << "    - reduced sample: ";
-            // debug_print_sample(std::cerr, prev_sample 0, reduced_size);
-
-            std::cerr << "    - new seq front: '"
-                      << sample_result.seq.substr(curr_sample_mid_idx).substr(0, 3) << "...'\n";
-            std::cerr << "    - new sample: ";
-            debug_print_sample(std::cerr, sample, curr_sample_mid_idx);
-
-            // consensus_seq.erase(consensus_seq.size() - (last_end - overlap_middle + 1));
-            // consensus_quals.erase(consensus_quals.size() - (last_end - overlap_middle + 1));
-
-            // Append non-overlapping portion of current sample.
-            result.seq += sample_result.seq.substr(curr_sample_mid_idx);
-            result.quals += sample_result.quals.substr(curr_sample_mid_idx);
-
-            std::cerr << "    - new size = " << std::size(result.seq) << "\n";
-
-        } else if (start > (last_end + 1)) {
-            // Gap case between the previous sample and the current sample.
-            const int64_t gap_start = last_end + 1;
-            const int64_t gap_end = start;
-
-            // Fill gap with draft sequence and low-quality placeholders.
-            result.seq += draft.substr(gap_start, gap_end - gap_start);
-            result.quals += std::string(gap_end - gap_start, '!');
-
-            std::cerr << "    - Adding draft.\n";
+        if (start_pos > (last_end + 1)) {
+            result.seq += draft.substr(last_end + 1, start_pos - last_end - 1);
+            result.quals += std::string(start_pos - last_end - 1, '!');
         }
 
-        // // Append the entire sequence of the current sample if no overlap was found.
-        // consensus_seq += result.seq;
-        // consensus_quals += result.quals;
+        result.seq += sample_result.seq.substr(trim.start);      // , trim.end - trim.start - 1);
+        result.quals += sample_result.quals.substr(trim.start);  // , trim.end - trim.start - 1);
 
-        // Update the last processed end position.
-        last_end = end;
-        last_i = i;
+        last_end = end_pos;
+        // }
     }
+
+    // if ((last_end + 1) < dorado::ssize(draft)) {
+    //     result.seq += draft.substr(last_end + 1);
+    //     result.quals += std::string(dorado::ssize(draft), '!');
+    // }
 
     return result;
 }
+
+// /**
+//  * \brief IMPORTANT: The input/output sequences here still contain '*' bases.
+//  */
+// polisher::ConsensusResult stitch_sequence(
+//         const std::filesystem::path& in_draft_fn,
+//         const std::string& header,
+//         const std::vector<polisher::Sample>& samples,
+//         const std::vector<polisher::ConsensusResult>& sample_results,
+//         const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
+//     // Fetch the draft sequence for gap filling.
+//     const std::string draft = fetch_seq(in_draft_fn, header);
+
+//     if (std::empty(samples_for_seq)) {
+//         std::string dummy_quals(std::size(draft), '!');
+//         return polisher::ConsensusResult{draft, std::move(dummy_quals)};
+//     }
+
+//     polisher::ConsensusResult result;
+
+//     // Track the end position of the last processed sample.
+//     int64_t last_end = -1;
+//     size_t last_i = -1;
+
+//     // Append the entire sequence of the current sample if no overlap was found.
+//     {
+//         const int sample_index = samples_for_seq[0].second;
+//         const polisher::Sample& sample = samples[sample_index];
+//         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
+//         result = sample_result;
+//         last_end = sample.positions_major.back();
+//         last_i = 0;
+//     }
+
+//     for (size_t i = 1; i < samples_for_seq.size(); ++i) {
+//         const int sample_index = samples_for_seq[i].second;
+//         const polisher::Sample& sample = samples[sample_index];
+//         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
+
+//         // Define the start and end positions of the current sample in draft coordinates.
+//         const int64_t start = sample.positions_major.front();
+//         const int64_t end = sample.positions_major.back();
+
+//         std::cerr << "[stitching i = " << i
+//                   << "] samples_for_seq.size() = " << samples_for_seq.size()
+//                   << ", consensus_seq.size() = " << std::size(result.seq)
+//                   << ", consensus_quals.size() = " << std::size(result.quals)
+//                   << ", last_end = " << last_end << ", start = " << start << ", end = " << end
+//                   << "\n";
+
+//         if (end < last_end) {
+//             continue;
+//         }
+
+//         if (last_end >= start) {
+//             std::cerr << "    - Adding window.\n";
+
+//             if (last_end > start) {
+//                 std::cerr << "    - last_end > start! last_end = " << last_end
+//                           << ", start = " << start << "\n";
+//             }
+
+//             // Compute midpoint of overlap.
+//             const int64_t overlap_middle = (last_end + start) / 2;
+
+//             const auto& prev_sample = samples[samples_for_seq[last_i].second];
+
+//             // Find midpoint indices using searchsorted.
+//             const std::vector<int64_t>& prev_sample_positions = prev_sample.positions_major;
+//             const std::vector<int64_t>& curr_sample_positions = sample.positions_major;
+
+//             // Find the index for prev_sample_positions (equivalent to right=false)
+//             const auto prev_sample_mid_iter = std::lower_bound(
+//                     prev_sample_positions.begin(), prev_sample_positions.end(), overlap_middle);
+//             const int64_t prev_sample_mid_idx =
+//                     std::distance(prev_sample_positions.begin(), prev_sample_mid_iter);
+
+//             // Find the index for curr_sample_positions (equivalent to right=true)
+//             const auto curr_sample_mid_iter = std::upper_bound(
+//                     curr_sample_positions.begin(), curr_sample_positions.end(), overlap_middle);
+//             const int64_t curr_sample_mid_idx =
+//                     std::distance(curr_sample_positions.begin(), curr_sample_mid_iter) - 1;
+
+//             // Trim the previous consensus to avoid the overlap.
+//             const int64_t num_to_remove =
+//                     static_cast<int64_t>(
+//                             std::size(sample_results[samples_for_seq[last_i].second].seq)) -
+//                     prev_sample_mid_idx;
+//             // std::cerr << "prev_sample_mid_idx = " << prev_sample_mid_idx << ", curr_sample_mid_idx = " << curr_sample_mid_idx
+//             //     << ", num_to_remove = " << num_to_remove << "\n";
+//             const int64_t reduced_size =
+//                     static_cast<int64_t>(std::size(result.seq)) - num_to_remove;
+//             std::cerr << "    - reduced_size = " << reduced_size
+//                       << ", size before = " << std::size(result.seq) << "\n";
+
+//             result.seq.resize(reduced_size);
+//             result.quals.resize(reduced_size);
+
+//             std::cerr << "    - reduced seq back: '..." << result.seq.substr(reduced_size - 3)
+//                       << "'\n";
+//             // std::cerr << "    - reduced sample: ";
+//             // debug_print_sample(std::cerr, prev_sample 0, reduced_size);
+
+//             std::cerr << "    - new seq front: '"
+//                       << sample_result.seq.substr(curr_sample_mid_idx).substr(0, 3) << "...'\n";
+//             std::cerr << "    - new sample: ";
+//             debug_print_sample(std::cerr, sample, curr_sample_mid_idx);
+
+//             // consensus_seq.erase(consensus_seq.size() - (last_end - overlap_middle + 1));
+//             // consensus_quals.erase(consensus_quals.size() - (last_end - overlap_middle + 1));
+
+//             // Append non-overlapping portion of current sample.
+//             result.seq += sample_result.seq.substr(curr_sample_mid_idx);
+//             result.quals += sample_result.quals.substr(curr_sample_mid_idx);
+
+//             std::cerr << "    - new size = " << std::size(result.seq) << "\n";
+
+//         } else if (start > (last_end + 1)) {
+//             // Gap case between the previous sample and the current sample.
+//             const int64_t gap_start = last_end + 1;
+//             const int64_t gap_end = start;
+
+//             // Fill gap with draft sequence and low-quality placeholders.
+//             result.seq += draft.substr(gap_start, gap_end - gap_start);
+//             result.quals += std::string(gap_end - gap_start, '!');
+
+//             std::cerr << "    - Adding draft.\n";
+//         }
+
+//         // // Append the entire sequence of the current sample if no overlap was found.
+//         // consensus_seq += result.seq;
+//         // consensus_quals += result.quals;
+
+//         // Update the last processed end position.
+//         last_end = end;
+//         last_i = i;
+//     }
+
+//     return result;
+// }
 
 std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& sample) {
     std::vector<polisher::Sample> results;
@@ -1302,6 +1333,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                 create_samples(opt.in_aln_bam_fn, draft_lens, opt.threads, opt.bam_chunk,
                                opt.window_len, opt.window_overlap, opt.region);
 
+        const std::vector<polisher::TrimInfo> trims = trim_samples(samples);
+
         // Increase the number of threads again for inter-op parallelism.
         torch::set_num_threads(opt.threads);
 
@@ -1345,9 +1378,13 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             // Sort by region start position, for every sequence.
             std::sort(std::begin(data), std::end(data));
 
+            std::cerr << "About to stitch.\n";
+
             const polisher::ConsensusResult consensus =
-                    stitch_sequence(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
-                                    results_samples, data);
+                    stitch_sequence_2(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
+                                      trims, results_samples, data);
+
+            std::cerr << "Done stitching.\n";
 
             const std::string header = std::string("consensus") + "-" + draft_lens[seq_id].first;
             write_seq(ofs, header, consensus, with_quals);
