@@ -105,7 +105,7 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
                                             stride,     win_size / 2,    chunk_size,
                                             batch_size, time_step_begin, time_step_end};
             auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
-            name_mtl_object(buffer, "conv_args");
+            name_mtl_object(buffer, fmt::format("conv_args_{}", i).c_str());
         }
         spdlog::debug("conv3 output_time_step_count {} => {} kernel launches",
                       output_time_step_count, num_pieces);
@@ -135,6 +135,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     int new_out_size = repeats * out_size;
     int rows = 2 * w_pad_rows + (win_size + (repeats - 1) * stride) * in_size + 1;
     t_weights_bias = torch::zeros({rows, new_out_size}, torch_dtype);
+    name_mtl_object(mtl_for_tensor(t_weights_bias),
+                    fmt::format("conv{}_weights_bias", layer).c_str());
 
     kernel_simd_groups = (layer == 3 || (layer == 2 && in_size == 16)) ? 4 : 16;
     kernel_thread_groups = get_mtl_device_core_count() * 4;
@@ -205,6 +207,7 @@ MetalLSTMImpl::MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) 
     // For non-obvious reasons the LSTM kernel runs faster if the U (or _hh) and W (or _ih) matrices are
     // spaced such that there is room for one more matrix between them. Thus a factor of 3 instead of 2.
     t_weights_bias = torch::empty({layer_size * 3 + 1, layer_size, kLstmGates}, torch_dtype);
+    name_mtl_object(mtl_for_tensor(t_weights_bias), "lstm_weights_bias");
 }
 
 MetalBlockImpl::MetalBlockImpl(int chunk_size_,
@@ -230,7 +233,7 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
             std::vector<int32_t> args{batch_size / kTileSize, lstm_chunk_size, time_step_begin,
                                       time_step_end};
             auto &buffer = m_args_lstm.emplace_back(create_vec_buffer(m_device, args));
-            name_mtl_object(buffer, "lstm_args");
+            name_mtl_object(buffer, fmt::format("lstm_args_{}", i).c_str());
         }
         spdlog::debug("lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size, num_pieces);
     }
@@ -246,7 +249,7 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
                                              lstm_chunk_size};
         auto &buffer = args_linear.at(i);
         buffer = create_vec_buffer(m_device, args_linear_);
-        name_mtl_object(buffer, "linear_args");
+        name_mtl_object(buffer, fmt::format("linear_args_{}", i).c_str());
     }
     args_linear2 = create_vec_buffer<int32_t>(
             device, {out_batch_tiles, 0, out_batch_tiles, lstm_chunk_size});
