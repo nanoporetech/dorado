@@ -33,16 +33,26 @@ public:
     void terminate();
     void restart();
 
+    // Default value for timeout for incomplete batches. Large value of 30 seconds is
+    // found to give good results with mistures of short and long reads.
+    static constexpr int DEFAULT_BATCH_TIMEOUT_MS = 30000;
+
+    // Default value for timeout of incomplete batches for low-latency pipelines. The
+    // value of 350 ms has been found to give good adaptive-sampling performance on all
+    // platforms.
+    static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
+
     std::pair<at::Tensor, at::Tensor> create_input_output_tensor(size_t batch_dims_idx) const;
     size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const CRFModelConfig &config() const { return m_config; }
-    int batch_timeout_ms() const { return m_low_latency ? 350 : 30000; }
     bool is_low_latency() const { return m_low_latency; }
-
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
-
     stats::NamedStats sample_stats() const;
+
+    int batch_timeout_ms() const {
+        return m_low_latency ? DEFAULT_LOW_LATENCY_TIMEOUT_MS : DEFAULT_BATCH_TIMEOUT_MS;
+    }
 
 private:
     struct NNTask;
