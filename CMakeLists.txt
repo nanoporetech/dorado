@@ -318,6 +318,9 @@ add_library(dorado_lib
     dorado/polish/polish_models.cpp
     dorado/polish/polish_models.h
     dorado/polish/sample.h
+    dorado/polish/trim.cpp
+    dorado/polish/trim.h
+    dorado/utils/ssize.h
 )
 
 enable_warnings_as_errors(dorado_lib)
