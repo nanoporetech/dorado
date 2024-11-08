@@ -1303,3 +1303,6 @@ linear<MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT>>(
         device void* const,
         threadgroup ftype (*const simd_out_buf)[TILE_SIZE * TILE_SIZE],
         KERNEL_INDEX_INPUTS);
+
+// Force inspection of a buffer for tracing.
+kernel void inspect_buffer(const device void*) {}

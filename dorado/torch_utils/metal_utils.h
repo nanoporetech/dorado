@@ -84,17 +84,21 @@ public:
     ~ScopedAutoReleasePool();
 };
 
-// Capture work on a queue or device between 2 points.
+// Capture work on a device between 2 points.
 // A path can be provided to dump the capture to a file.
 class ScopedMetalCapture {
-    bool m_active = false;
+    MTL::Device *m_device = nullptr;
 
     ScopedMetalCapture(const ScopedMetalCapture &) = delete;
     ScopedMetalCapture &operator=(const ScopedMetalCapture &) = delete;
 
 public:
-    ScopedMetalCapture(id device_or_queue, const std::optional<std::filesystem::path> &path);
+    ScopedMetalCapture(MTL::Device *device, const std::optional<std::filesystem::path> &path);
     ~ScopedMetalCapture();
+
+    // Traces only show the values in the buffers before the kernel executes,
+    // so use this to insert a marker after a call to inspect values.
+    void inspect_buffer(MTL::Buffer *buffer, MTL::CommandBuffer *cb);
 };
 
 }  // namespace dorado::utils

@@ -414,7 +414,7 @@ size_t get_apple_physical_memory_bytes() {
 // MTLCaptureManager can only capture one thing at a time, so guard it with a global.
 static std::atomic_bool s_capturing{false};
 
-ScopedMetalCapture::ScopedMetalCapture(id device_or_queue,
+ScopedMetalCapture::ScopedMetalCapture(MTL::Device *device,
                                        const std::optional<std::filesystem::path> &path) {
     if (s_capturing.exchange(true, std::memory_order_relaxed) != false) {
         spdlog::error("Already performing a GPU capture");
@@ -423,7 +423,7 @@ ScopedMetalCapture::ScopedMetalCapture(id device_or_queue,
 
     // Setup descriptor of what to capture.
     auto descriptor = NS::TransferPtr(MTL::CaptureDescriptor::alloc()->init());
-    descriptor->setCaptureObject(device_or_queue);
+    descriptor->setCaptureObject(device);
 
     // Dump to a file if requested.
     if (path.has_value()) {
@@ -437,19 +437,35 @@ ScopedMetalCapture::ScopedMetalCapture(id device_or_queue,
 
     // Start the capture.
     auto *manager = MTL::CaptureManager::sharedCaptureManager();
-    m_active = wrap_func_with_err(manager->startCapture, descriptor.get());
+    const bool active = wrap_func_with_err(manager->startCapture, descriptor.get());
 
-    if (!m_active && !getenv("MTL_CAPTURE_ENABLED")) {
+    if (active) {
+        m_device = device;
+    } else if (!getenv("MTL_CAPTURE_ENABLED")) {
+        // Developer probably forgot to set this, so help them out.
         spdlog::warn("Note that MTL_CAPTURE_ENABLED=1 must be set in order to capture");
     }
 }
 
 ScopedMetalCapture::~ScopedMetalCapture() {
-    if (m_active) {
+    if (m_device) {
         auto *manager = MTL::CaptureManager::sharedCaptureManager();
         manager->stopCapture();
     }
     s_capturing.store(false, std::memory_order_relaxed);
+}
+
+void ScopedMetalCapture::inspect_buffer(MTL::Buffer *buffer, MTL::CommandBuffer *cb) {
+    if (!m_device) {
+        return;
+    }
+
+    auto inspector = make_cps(m_device, "inspect_buffer", {}, {});
+    launch_kernel_no_wait(inspector.get(), cb, {buffer}, {}, 1, 1);
+    if (!run_command_buffer("inspect_buffer", cb, 0)) {
+        // Only a warning since it should still be visible in the trace
+        spdlog::warn("Buffer inspection failed");
+    }
 }
 
 }  // namespace dorado::utils
