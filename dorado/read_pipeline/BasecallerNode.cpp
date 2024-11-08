@@ -87,9 +87,7 @@ void BasecallerNode::input_thread_fn() {
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
-        size_t raw_size =
-                read_common_data.raw_data
-                        .sizes()[read_common_data.raw_data.sizes().size() - 1];  // Time dimension.
+        size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
         size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
         size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
@@ -101,7 +99,7 @@ void BasecallerNode::input_thread_fn() {
         read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
                 working_read, offset, chunk_in_read_idx++, chunk_size));
         size_t num_chunks = 1;
-        auto last_chunk_offset = raw_size - chunk_size;
+        auto last_chunk_offset = raw_size > chunk_size ? raw_size - chunk_size : 0;
         auto misalignment = last_chunk_offset % m_model_stride;
         if (misalignment != 0) {
             // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
