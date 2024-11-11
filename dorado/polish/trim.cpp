@@ -5,6 +5,7 @@
 #include <torch/torch.h>
 
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -22,6 +23,30 @@ enum class Relationship {
     S1_WITHIN_S2,
     UNKNOWN,
 };
+
+// clang-format off
+std::ostream& operator<<(std::ostream& os, const Relationship rel) {
+    switch (rel) {
+        case Relationship::DIFFERENT_REF_NAME: os << "DIFFERENT_REF_NAME"; break;
+        case Relationship::FORWARD_OVERLAP: os << "FORWARD_OVERLAP"; break;
+        case Relationship::REVERSE_OVERLAP: os << "REVERSE_OVERLAP"; break;
+        case Relationship::FORWARD_ABUTTED: os << "FORWARD_ABUTTED"; break;
+        case Relationship::REVERSE_ABUTTED: os << "REVERSE_ABUTTED"; break;
+        case Relationship::FORWARD_GAPPED: os << "FORWARD_GAPPED"; break;
+        case Relationship::REVERSE_GAPPED: os << "REVERSE_GAPPED"; break;
+        case Relationship::S2_WITHIN_S1: os << "S2_WITHIN_S1"; break;
+        case Relationship::S1_WITHIN_S2: os << "S1_WITHIN_S2"; break;
+        case Relationship::UNKNOWN: os << "UNKNOWN"; break;
+    }
+    return os;
+}
+// clang-format on
+
+std::string relationship_to_string(const Relationship rel) {
+    std::ostringstream oss;
+    oss << rel;
+    return oss.str();
+}
 
 Relationship relative_position(const Sample& s1, const Sample& s2) {
     // Helper lambdas for comparisons
@@ -91,11 +116,16 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     const Relationship rel = relative_position(s1, s2);
 
     if (rel == Relationship::FORWARD_ABUTTED) {
-        return {0, -1, false};
+        if (s2.start() == 595554) {
+            std::cerr << "Tu sam 1!\n";
+        }
+        return {dorado::ssize(s1.positions_major), 0, false};
     }
 
     if (rel != Relationship::FORWARD_OVERLAP) {
-        throw std::runtime_error("Cannot overlap samples! Relationship is not FORWARD_OVERLAP.");
+        throw std::runtime_error(
+                "Cannot overlap samples! Relationship is not FORWARD_OVERLAP. rel = " +
+                relationship_to_string(rel));
     }
 
     // Finding where the overlap starts and ends using std::lower_bound
@@ -159,8 +189,8 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     // const int64_t ovl_start_ind1 = std::distance(std::begin(s1.positions_major), it_ovl_start_ind1);
     // const int64_t ovl_end_ind2 = std::distance(std::begin(s2.positions_major), it_ovl_end_ind2);
 
-    int64_t end_1_ind = -1;
-    int64_t start_2_ind = -1;
+    int64_t end_1_ind = dorado::ssize(s1.positions_major);
+    int64_t start_2_ind = 0;
 
     const auto compare_subvectors = [](const std::vector<int64_t>& a, const int64_t a_start,
                                        const int64_t a_end, const std::vector<int64_t>& b,
@@ -202,6 +232,10 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
         end_1_ind = ovl_start_ind1 + pad_1;
         start_2_ind = ovl_end_ind2 - pad_2;
 
+        if (s2.start() == 595554) {
+            std::cerr << "Tu sam 2!\n";
+        }
+
         if (((end_1_ind - ovl_start_ind1) + (ovl_end_ind2 - start_2_ind)) != overlap_len) {
             end_1_ind = -1;
             start_2_ind = -1;
@@ -222,8 +256,8 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 
         constexpr int64_t UNIQ_MAJ = 3;
 
-        end_1_ind = -1;
-        start_2_ind = -1;
+        end_1_ind = dorado::ssize(s1.positions_major);
+        start_2_ind = 0;
 
         // std::cerr << "start_2_ind = " << start_2_ind << ", heuristic 1\n";
 
@@ -313,77 +347,108 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 }
 
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples) {
-    std::vector<TrimInfo> result;
+    std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
         return result;
     }
 
     size_t idx_s1 = 0;
-    int64_t start_1 = 0;
-    int64_t start_2 = 0;
+    // int64_t start_1 = 0;
+    // int64_t start_2 = 0;
     int64_t num_heuristic = 0;
+
+    result[0].start = 0;
+    result[0].end = dorado::ssize(samples.front().positions_major);
 
     for (size_t i = 1; i < std::size(samples); ++i) {
         const Sample& s1 = samples[idx_s1];
         const Sample& s2 = samples[i];
-        bool is_last_in_contig = false;
-        int64_t end_1 = -1;
+        // bool is_last_in_contig = false;
+        // int64_t end_1 = -1;
         bool heuristic = false;
 
         const Relationship rel = relative_position(s1, s2);
 
+        TrimInfo& trim1 = result[idx_s1];
+        TrimInfo& trim2 = result[i];
+
+        trim2.start = 0;
+        trim2.end = dorado::ssize(s2.positions_major);
+
         if (rel == Relationship::S2_WITHIN_S1) {
+            if (i == 69) {
+                std::cerr << "[debug i = " << i << "] S2_WITHIN_S1\n";
+            }
             continue;
 
         } else if (rel == Relationship::FORWARD_OVERLAP) {
-            std::tie(end_1, start_2, heuristic) = overlap_indices(s1, s2);
-            if (start_2 < 0) {
-                std::cerr << "[sample i = " << i << "] (FORWARD_OVERLAP) start_2 = " << start_2
-                          << "\n";
+            std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
+            if (trim2.start < 0) {
+                std::cerr << "[sample i = " << i
+                          << "] (FORWARD_OVERLAP) trim2.start = " << trim2.start << "\n";
+            }
+            if (i == 69) {
+                std::cerr << "[debug i = " << i << "] FORWARD_OVERLAP\n";
             }
 
         } else if (rel == Relationship::FORWARD_GAPPED) {
-            is_last_in_contig = true;
-            end_1 = -1;
-            start_2 = 0;
+            trim2.is_last_in_contig = true;
+
+            if (i == 69) {
+                std::cerr << "[debug i = " << i << "] FORWARD_GAPPED\n";
+            }
+
+        } else if (rel == Relationship::DIFFERENT_REF_NAME) {
+            // pass
+
+            // continue;
+            // is_last_in_contig = true;
         } else {
             try {
-                std::tie(end_1, start_2, heuristic) = overlap_indices(s1, s2);
-                if (start_2 < 0) {
-                    std::cerr << "[sample i = " << i << "] (else) start_2 = " << start_2 << "\n";
+                std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
+                if (trim2.start < 0) {
+                    std::cerr << "[sample i = " << i << "] (else) trim2.start = " << trim2.start
+                              << "\n";
+                }
+                if (i == 69) {
+                    std::cerr << "[debug i = " << i << "] else\n";
                 }
             } catch (const std::runtime_error& e) {
-                throw std::runtime_error("Unhandled overlap type whilst stitching chunks.");
+                throw std::runtime_error(
+                        "Unhandled overlap type whilst stitching chunks. Message: " +
+                        std::string(e.what()));
             }
         }
 
-        if (start_1 < 0 || start_2 < 0) {
-            std::cerr << "(1) [sample i = " << i << "] start1 = " << start_1
-                      << ", start_2 = " << start_2 << "\n    - sample 1: " << s1
+        if (trim1.start < 0 || trim2.start < 0) {
+            std::cerr << "(1) [sample i = " << i << "] trim1.start = " << trim1.start
+                      << ", trim2.start = " << trim2.start << "\n    - sample 1: " << s1
                       << "\n    - sample 2: " << s2 << "\n";
         }
-        result.emplace_back(TrimInfo{start_1, end_1, is_last_in_contig, heuristic});
+
+        // result.emplace_back(TrimInfo{start_1, end_1, is_last_in_contig, heuristic});
 
         idx_s1 = i;
-        start_1 = start_2;
+        // start_1 = start_2;
 
         num_heuristic += heuristic;
     }
 
     {
-        // const Sample& s1 = samples[idx_s1];
-        const bool is_last_in_contig = true;
-        const int64_t end_1 = -1;
-        const bool heuristic = false;
-        if (start_1 < 0) {
-            std::cerr << "(2) [sample last i = " << std::size(samples) << "] start1 = " << start_1
-                      << "\n    - sample 1: " << samples[samples.size() - 1]
-                      << "\n    - sample 2: " << samples.back() << "\n";
-        }
-        result.emplace_back(TrimInfo{start_1, end_1, is_last_in_contig, heuristic});
+        result.back().end = dorado::ssize(samples.back().positions_major);
+        result.back().is_last_in_contig = true;
 
-        num_heuristic += heuristic;
+        // // const Sample& s1 = samples[idx_s1];
+        // const bool is_last_in_contig = true;
+        // const int64_t end_1 = -1;
+        // const bool heuristic = false;
+        // if (start_1 < 0) {
+        //     std::cerr << "(2) [sample last i = " << std::size(samples) << "] start1 = " << start_1
+        //               << "\n    - sample 1: " << samples[samples.size() - 1]
+        //               << "\n    - sample 2: " << samples.back() << "\n";
+        // }
+        // result.emplace_back(TrimInfo{start_1, end_1, is_last_in_contig, heuristic});
     }
 
     assert(std::size(result) == std::size(samples));

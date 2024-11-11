@@ -511,13 +511,30 @@ void debug_print_samples(std::ostream& os,
     }
 }
 
+void remove_deletions(polisher::ConsensusResult& cons) {
+    size_t n = 0;
+    for (size_t j = 0; j < std::size(cons.seq); ++j) {
+        if (cons.seq[j] == '*') {
+            continue;
+        }
+        cons.seq[n] = cons.seq[j];
+        if (!std::empty(cons.quals)) {
+            cons.quals[n] = cons.quals[j];
+        }
+        ++n;
+    }
+    cons.seq.resize(n);
+    cons.quals.resize(n);
+}
+
 polisher::ConsensusResult stitch_sequence_2(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
         const std::vector<polisher::Sample>& samples,
         const std::vector<polisher::TrimInfo>& trims,
         const std::vector<polisher::ConsensusResult>& sample_results,
-        const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq) {
+        const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq,
+        const int32_t seq_id) {
     if (std::size(samples) != std::size(trims)) {
         throw std::runtime_error("Number of samples and trims differs! std::size(samples) = " +
                                  std::to_string(std::size(samples)) +
@@ -532,6 +549,10 @@ polisher::ConsensusResult stitch_sequence_2(
     }
 
     polisher::ConsensusResult result;
+
+    // spdlog::info("[stitch_sequence_2] samples_for_seq = {}", std::size(samples_for_seq));
+
+    std::ofstream ofs("debug.seq_id_" + std::to_string(seq_id) + ".fasta");
 
     int64_t last_end = 0;
     for (size_t i = 0; i < samples_for_seq.size(); ++i) {
@@ -558,8 +579,26 @@ polisher::ConsensusResult stitch_sequence_2(
             result.quals += std::string(start_pos - last_end - 1, '!');
         }
 
-        result.seq += sample_result.seq.substr(trim.start);      // , trim.end - trim.start - 1);
-        result.quals += sample_result.quals.substr(trim.start);  // , trim.end - trim.start - 1);
+        // if (dorado::ssize(result.seq) < 626427 && (dorado::ssize(result.seq) + (trim.end - trim.start)) >= 626427) {
+        //     const int32_t prev_sample_index = samples_for_seq[i - 1].second;
+        //     const polisher::Sample& prev_sample = samples[prev_sample_index];
+        //     const polisher::TrimInfo& prev_trim = trims[prev_sample_index];
+        //     std::cerr << "[edge]"
+        //         << "\n    -> curr: sample_index = " << sample_index << ", trim.start = " << trim.start << ", trim.end = " << trim.end << ", sample = " << sample
+        //         << "\n    -> prev: sample_index = " << prev_sample_index << ", trim.start = " << prev_trim.start << ", trim.end = " << prev_trim.end << ", sample = " << prev_sample << "\n";
+        // }
+
+        {
+            polisher::ConsensusResult tmp{
+                    sample_result.seq.substr(trim.start, trim.end - trim.start), {}};
+            remove_deletions(tmp);
+            ofs << ">seq_id_" << seq_id << "_part_" << i << '\n' << tmp.seq << '\n';
+        }
+
+        result.seq += sample_result.seq.substr(
+                trim.start, trim.end - trim.start);  // , trim.end - trim.start - 1);
+        result.quals += sample_result.quals.substr(
+                trim.start, trim.end - trim.start);  // , trim.end - trim.start - 1);
 
         last_end = end_pos;
         // }
@@ -973,7 +1012,7 @@ std::vector<polisher::Sample> create_samples(
         if (std::empty(region)) {
             return create_windows(only_lens, bam_chunk, window_overlap).first;
         } else {
-            const auto [region_name, region_start, region_end] = parse_region_string(region);
+            auto [region_name, region_start, region_end] = parse_region_string(region);
             spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
                          region_end);
             int32_t seq_id = -1;
@@ -984,6 +1023,12 @@ std::vector<polisher::Sample> create_samples(
                     seq_length = draft_lens[i].second;
                     break;
                 }
+            }
+            if (region_start < 0) {
+                region_start = 0;
+            }
+            if (region_end <= 0) {
+                region_end = seq_length;
             }
             if (seq_id < 0) {
                 throw std::runtime_error(
@@ -1010,7 +1055,7 @@ std::vector<polisher::Sample> create_samples(
     std::vector<Interval> merge_intervals;
     for (size_t i = 0; i < std::size(bam_windows); ++i) {
         const Window& bw = bam_windows[i];
-        std::cerr << "[bam_window i = " << i << "] " << bam_windows[i] << "\n";
+        // std::cerr << "[bam_window i = " << i << "] " << bam_windows[i] << "\n";
         std::vector<Window> sub_windows = create_windows({bw.end - bw.start}, window_len, 0).first;
         if (std::empty(sub_windows)) {
             continue;
@@ -1022,7 +1067,7 @@ std::vector<polisher::Sample> create_samples(
             w.seq_length = bw.seq_length;
             w.start += bw.start;
             w.end += bw.start;
-            std::cerr << "    [sub_window j = " << j << "] " << sub_windows[j] << "\n";
+            // std::cerr << "    [sub_window j = " << j << "] " << sub_windows[j] << "\n";
         }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
         const int32_t num_sub_windows = static_cast<int32_t>(std::size(sub_windows));
@@ -1040,7 +1085,7 @@ std::vector<polisher::Sample> create_samples(
                 const auto& window = windows[i];
                 const std::string& name = draft_lens[window.seq_id].first;
                 if (thread_id == 0) {
-                    spdlog::info(
+                    spdlog::debug(
                             "Processing i = {}, start = {}, end = {}, region = "
                             "{}:{}-{} ({} %).",
                             i, start, end, name, window.start, window.end,
@@ -1382,7 +1427,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
             const polisher::ConsensusResult consensus =
                     stitch_sequence_2(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
-                                      trims, results_samples, data);
+                                      trims, results_samples, data, seq_id);
 
             std::cerr << "Done stitching.\n";
 
