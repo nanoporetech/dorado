@@ -575,9 +575,9 @@ polisher::ConsensusResult stitch_sequence_2(
 
         //     last_end = sample.positions_major.back();
         // } else {
-        if (trim.start < 0) {
-            std::cerr << "trim.start = " << trim.start << "\n";
-        }
+        // if (trim.start < 0) {
+        //     std::cerr << "trim.start = " << trim.start << "\n";
+        // }
 
         const int64_t start_pos = sample.positions_major[trim.start];
         const int64_t end_pos = sample.positions_major.back();
@@ -616,7 +616,7 @@ polisher::ConsensusResult stitch_sequence_2(
     // Add the back draft part.
     if ((last_end + 1) < dorado::ssize(draft)) {
         result.seq += draft.substr(last_end + 1);
-        result.quals += std::string(dorado::ssize(draft), '!');
+        result.quals += std::string(dorado::ssize(draft) - last_end - 1, '!');
     }
 
     return result;
