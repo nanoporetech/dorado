@@ -392,17 +392,17 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
 }
 
 struct Window {
-    // std::string name;
     int32_t seq_id = -1;
     int64_t seq_length = 0;
     int64_t start = 0;
     int64_t end = 0;
-    // int32_t window_id = 0;
+    int32_t region_id = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
     os << "seq_id = " << w.seq_id << ", start = " << w.start << ", end = " << w.end
-       << ", seq_length = " << w.seq_length;  // << ", window_id = " << w.window_id;
+       << ", seq_length = " << w.seq_length
+       << ", region_id = " << w.region_id;  // << ", window_id = " << w.window_id;
     return os;
 }
 
@@ -420,7 +420,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_end,
                                    const int64_t seq_len,
                                    const int32_t window_len,
-                                   const int32_t window_overlap) {
+                                   const int32_t window_overlap,
+                                   const int32_t region_id = -1) {
     if (window_overlap >= window_len) {
         spdlog::error(
                 "The window overlap cannot be larger than the window size! window_len = {}, "
@@ -441,7 +442,9 @@ std::vector<Window> create_windows(const int32_t seq_id,
     for (int64_t start = seq_start; start < seq_end;
          start += (window_len - window_overlap), ++win_id) {
         const int64_t end = std::min(seq_end, start + window_len);
-        ret.emplace_back(Window{seq_id, seq_len, start, end});
+
+        ret.emplace_back(Window{seq_id, seq_len, start, end, region_id});
+
         if (end == seq_end) {
             break;
         }
@@ -788,9 +791,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.begin() + i);
 
-            results.emplace_back(polisher::Sample{
-                    sample.features.slice(0, start, i), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id});
+            results.emplace_back(
+                    polisher::Sample{sample.features.slice(0, start, i), std::move(new_major_pos),
+                                     std::move(new_minor_pos), sample.depth.slice(0, start, i),
+                                     sample.seq_id, sample.region_id});
             start = i;
         }
 
@@ -799,9 +803,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
                                                sample.positions_major.end());
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.end());
-            results.emplace_back(polisher::Sample{
-                    sample.features.slice(0, start), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id});
+            results.emplace_back(
+                    polisher::Sample{sample.features.slice(0, start), std::move(new_major_pos),
+                                     std::move(new_minor_pos), sample.depth.slice(0, start),
+                                     sample.seq_id, sample.region_id});
         }
     }
     // }
@@ -815,6 +820,7 @@ std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sampl
     std::vector<std::vector<int64_t>> positions_minor_buffer;
     std::vector<torch::Tensor> depth_buffer;
     int32_t seq_id_buffer = -1;
+    int32_t region_id_buffer = -1;
     int64_t last_end = -1;
 
     std::vector<polisher::Sample> results;
@@ -837,7 +843,10 @@ std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sampl
             continue;
         }
         const int64_t start = sample.start();
-        if (std::empty(features_buffer) || (start - last_end) == 0) {
+
+        if (std::empty(features_buffer) ||
+            ((sample.seq_id == seq_id_buffer) && (sample.region_id == region_id_buffer) &&
+             ((start - last_end) == 0))) {
             // New or contiguous chunk.
             last_end = sample.end();
             features_buffer.emplace_back(std::move(sample.features));
@@ -845,6 +854,7 @@ std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sampl
             positions_minor_buffer.emplace_back(std::move(sample.positions_minor));
             depth_buffer.emplace_back(std::move(sample.depth));
             seq_id_buffer = sample.seq_id;
+            region_id_buffer = sample.region_id;
 
         } else {
             // Discontinuity found, finalize the current chunk
@@ -856,33 +866,34 @@ std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sampl
                                                       std::move(positions_major_buffer.front()),
                                                       std::move(positions_minor_buffer.front()),
                                                       std::move(depth_buffer.front()),
-                                                      seq_id_buffer});
+                                                      seq_id_buffer, region_id_buffer});
             } else {
                 results.emplace_back(polisher::Sample{
                         torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
                         cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                        seq_id_buffer});
+                        seq_id_buffer, region_id_buffer});
             }
             features_buffer = {std::move(sample.features)};
             positions_major_buffer = {std::move(sample.positions_major)};
             positions_minor_buffer = {std::move(sample.positions_minor)};
             depth_buffer = {std::move(sample.depth)};
             seq_id_buffer = sample.seq_id;
+            region_id_buffer = sample.region_id;
         }
     }
 
     if (!features_buffer.empty()) {
         // The torch::cat is slow, so just move if there is nothing to concatenate.
         if (std::size(features_buffer) == 1) {
-            results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
-                                                  std::move(positions_major_buffer.front()),
-                                                  std::move(positions_minor_buffer.front()),
-                                                  std::move(depth_buffer.front()), seq_id_buffer});
+            results.emplace_back(polisher::Sample{
+                    std::move(features_buffer.front()), std::move(positions_major_buffer.front()),
+                    std::move(positions_minor_buffer.front()), std::move(depth_buffer.front()),
+                    seq_id_buffer, region_id_buffer});
         } else {
             results.emplace_back(polisher::Sample{
                     torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
                     cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                    seq_id_buffer});
+                    seq_id_buffer, region_id_buffer});
         }
     }
 
@@ -915,7 +926,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& sampl
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
         return polisher::Sample{std::move(new_features), std::move(new_major), std::move(new_minor),
-                                std::move(new_depth), sample.seq_id};
+                                std::move(new_depth),    sample.seq_id,        sample.region_id};
     };
 
     std::vector<polisher::Sample> results;
@@ -1014,26 +1025,26 @@ std::vector<polisher::Sample> create_samples(
     // Create individual windows, most of which are non-overlapping.
     // To mimic Medaka, the non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
-    std::vector<Interval> merge_intervals;
+    std::vector<Interval> bam_region_intervals;
     for (size_t i = 0; i < std::size(bam_regions); ++i) {
         const Window& bw = bam_regions[i];
         // std::cerr << "[bam_window i = " << i << "] " << bam_regions[i] << "\n";
-        std::vector<Window> sub_windows =
-                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, window_len, 0);
-        if (std::empty(sub_windows)) {
+        std::vector<Window> new_windows =
+                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, window_len, 0, i);
+        if (std::empty(new_windows)) {
             continue;
         }
-        // Update the specific info.
-        for (size_t j = 0; j < std::size(sub_windows); ++j) {
-            auto& w = sub_windows[j];
-            w.seq_length = bw.seq_length;
-            // std::cerr << "    [sub_window j = " << j << "] " << sub_windows[j] << "\n";
-        }
+        // // Update the specific info.
+        // for (size_t j = 0; j < std::size(new_windows); ++j) {
+        //     auto& w = new_windows[j];
+        //     w.seq_length = bw.seq_length;
+        //     // std::cerr << "    [sub_window j = " << j << "] " << new_windows[j] << "\n";
+        // }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
-        const int32_t num_sub_windows = static_cast<int32_t>(std::size(sub_windows));
-        merge_intervals.emplace_back(Interval{num_windows, num_windows + num_sub_windows});
-        windows.reserve(std::size(windows) + std::size(sub_windows));
-        windows.insert(windows.end(), sub_windows.begin(), sub_windows.end());
+        const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
+        bam_region_intervals.emplace_back(Interval{num_windows, num_windows + num_new_windows});
+        windows.reserve(std::size(windows) + std::size(new_windows));
+        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
     // Convert windows to samples in parallel.
@@ -1073,7 +1084,7 @@ std::vector<polisher::Sample> create_samples(
         }
     }
 
-    spdlog::info("Merging the samples into {} BAM chunks.", std::size(merge_intervals));
+    spdlog::info("Merging the samples into {} BAM chunks.", std::size(bam_region_intervals));
 
     // Three tasks for this worker:
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
@@ -1084,7 +1095,7 @@ std::vector<polisher::Sample> create_samples(
         const auto worker = [&](const int32_t start, const int32_t end,
                                 std::vector<std::vector<polisher::Sample>>& results) {
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
-                const Interval interval = merge_intervals[bam_chunk_id];
+                const Interval interval = bam_region_intervals[bam_chunk_id];
 
                 if (bam_chunk_id == 0) {
                     std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
@@ -1132,12 +1143,12 @@ std::vector<polisher::Sample> create_samples(
                 results[bam_chunk_id] = std::move(local_samples);
             }
         };
-        merged_samples.resize(std::size(merge_intervals));
+        merged_samples.resize(std::size(bam_region_intervals));
         // Process BAM windows in parallel.
         const std::vector<std::pair<int32_t, int32_t>> chunks =
-                compute_chunks(static_cast<int32_t>(std::size(merge_intervals)), 1);
+                compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), 1);
         spdlog::info("Starting to merge samples for {} BAM windows using {} threads.",
-                     std::size(merge_intervals), std::size(chunks));
+                     std::size(bam_region_intervals), std::size(chunks));
         cxxpool::thread_pool pool{std::size(chunks)};
         // std::vector<polisher::Sample> parallel_results(std::size(windows));
         std::vector<std::future<void>> futures;
@@ -1331,7 +1342,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
                 const int64_t len = draft_lens[seq_id].second;
                 const std::vector<Window> new_windows =
-                        create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap);
+                        create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap, -1);
                 windows.reserve(std::size(windows) + std::size(new_windows));
                 windows.insert(windows.end(), new_windows.begin(), new_windows.end());
             }
@@ -1367,8 +1378,9 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             }
 
             // Split-up the custom region if it's too long.
-            const std::vector<Window> windows = create_windows(
-                    seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap);
+            const std::vector<Window> windows =
+                    create_windows(seq_id, region_start, region_end, seq_length, bam_chunk_len,
+                                   window_overlap, -1);
 
             return windows;
         }
