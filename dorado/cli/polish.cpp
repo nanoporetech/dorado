@@ -415,10 +415,12 @@ struct Interval {
  * \brief Linearly splits sequence lengths into windows. It also returns the backward mapping of which
  *          windows correspond to which sequences, needed for stitching.
  */
-std::pair<std::vector<Window>, std::vector<Interval>> create_windows(
-        const std::vector<int64_t>& seq_lens,
-        const int32_t window_len,
-        const int32_t window_overlap) {
+std::vector<Window> create_windows(const int32_t seq_id,
+                                   const int64_t seq_start,
+                                   const int64_t seq_end,
+                                   const int64_t seq_len,
+                                   const int32_t window_len,
+                                   const int32_t window_overlap) {
     if (window_overlap >= window_len) {
         spdlog::error(
                 "The window overlap cannot be larger than the window size! window_len = {}, "
@@ -426,30 +428,26 @@ std::pair<std::vector<Window>, std::vector<Interval>> create_windows(
                 window_len, window_overlap);
         return {};
     }
+
     std::vector<Window> ret;
-    std::vector<Interval> window_ranges;
-    for (int32_t seq_id = 0; seq_id < static_cast<int32_t>(std::size(seq_lens)); ++seq_id) {
-        const int64_t length = seq_lens[seq_id];
+    const int64_t length = seq_end - seq_start;
 
-        const int32_t num_windows =
-                static_cast<int32_t>(std::ceil(static_cast<double>(length) / window_len));
+    const int32_t num_windows =
+            static_cast<int32_t>(std::ceil(static_cast<double>(length) / window_len));
 
-        ret.reserve(std::size(ret) + num_windows);
-        const int32_t interval_start = static_cast<int32_t>(std::size(ret));
+    ret.reserve(num_windows);
 
-        int32_t win_id = 0;
-        for (int64_t start = 0; start < length; start += (window_len - window_overlap), ++win_id) {
-            const int64_t end = std::min(length, start + window_len);
-            ret.emplace_back(Window{seq_id, length, start, end});
-            if (end == length) {
-                break;
-            }
+    int32_t win_id = 0;
+    for (int64_t start = seq_start; start < seq_end;
+         start += (window_len - window_overlap), ++win_id) {
+        const int64_t end = std::min(seq_end, start + window_len);
+        ret.emplace_back(Window{seq_id, seq_len, start, end});
+        if (end == seq_end) {
+            break;
         }
-
-        window_ranges.emplace_back(Interval{interval_start, static_cast<int32_t>(std::size(ret))});
     }
 
-    return {ret, window_ranges};
+    return ret;
 }
 
 std::string fetch_seq(const std::filesystem::path& index_fn,
@@ -977,12 +975,11 @@ std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string&
 
 std::vector<polisher::Sample> create_samples(
         const std::filesystem::path& in_aln_bam_fn,
+        const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
-        const int32_t bam_chunk,
         const int32_t window_len,
-        const int32_t window_overlap,
-        const std::string region = "") {
+        const int32_t window_overlap) {
     // Open the BAM file for each thread and spawn encoders.
     spdlog::info("Creating {} encoders.", num_threads);
     std::vector<bam_fset*> bam_sets;
@@ -1007,76 +1004,29 @@ std::vector<polisher::Sample> create_samples(
     //      the tensors have also insertions and can grow significantly.
     // It parallelizes this process on both levels of windowing.
 
-    // Create BAM windows (regions) to create pileup. The features (samples) will
-    // be split further into windows of window_len in size prior to inference.
-    const std::vector<int64_t> only_lens = [&]() {
-        std::vector<int64_t> ret(std::size(draft_lens));
-        for (size_t i = 0; i < std::size(draft_lens); ++i) {
-            ret[i] = draft_lens[i].second;
-        }
-        return ret;
-    }();
-
-    spdlog::info("Creating BAM windows.");
-    const std::vector<Window> bam_windows = [&]() {
-        if (std::empty(region)) {
-            return create_windows(only_lens, bam_chunk, window_overlap).first;
-        } else {
-            auto [region_name, region_start, region_end] = parse_region_string(region);
-            spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
-                         region_end);
-            int32_t seq_id = -1;
-            int64_t seq_length = 0;
-            for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
-                if (draft_lens[i].first == region_name) {
-                    seq_id = i;
-                    seq_length = draft_lens[i].second;
-                    break;
-                }
-            }
-            if (region_start < 0) {
-                region_start = 0;
-            }
-            if (region_end <= 0) {
-                region_end = seq_length;
-            }
-            if (seq_id < 0) {
-                throw std::runtime_error(
-                        "Sequence provided by custom region not found in input! region_name = " +
-                        region_name);
-            }
-            std::vector<Window> windows{
-                    Window{seq_id, seq_length, region_start, region_end},
-            };
-            return windows;
-        }
-    }();
-
-    spdlog::info("Created {} BAM windows from {} sequences.", std::size(bam_windows),
+    spdlog::info("Created {} BAM windows from {} sequences.", std::size(bam_regions),
                  std::size(draft_lens));
 
-    for (size_t i = 0; i < std::size(bam_windows); ++i) {
-        std::cerr << "[bam_windows i = " << i << "] " << bam_windows[i] << "\n";
+    for (size_t i = 0; i < std::size(bam_regions); ++i) {
+        std::cerr << "[bam_regions i = " << i << "] " << bam_regions[i] << "\n";
     }
 
     // Create individual windows, most of which are non-overlapping.
     // To mimic Medaka, the non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
     std::vector<Interval> merge_intervals;
-    for (size_t i = 0; i < std::size(bam_windows); ++i) {
-        const Window& bw = bam_windows[i];
-        // std::cerr << "[bam_window i = " << i << "] " << bam_windows[i] << "\n";
-        std::vector<Window> sub_windows = create_windows({bw.end - bw.start}, window_len, 0).first;
+    for (size_t i = 0; i < std::size(bam_regions); ++i) {
+        const Window& bw = bam_regions[i];
+        // std::cerr << "[bam_window i = " << i << "] " << bam_regions[i] << "\n";
+        std::vector<Window> sub_windows =
+                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, window_len, 0);
         if (std::empty(sub_windows)) {
             continue;
         }
         // Update the specific info.
         for (size_t j = 0; j < std::size(sub_windows); ++j) {
             auto& w = sub_windows[j];
-            w.seq_id = bw.seq_id;
             w.seq_length = bw.seq_length;
-            w.start += bw.start;
-            w.end += bw.start;
             // std::cerr << "    [sub_window j = " << j << "] " << sub_windows[j] << "\n";
         }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
@@ -1371,6 +1321,59 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         }
     };
 
+    const auto create_bam_regions = [](const std::vector<std::pair<std::string, int64_t>>&
+                                               draft_lens,
+                                       const int32_t bam_chunk_len, const int32_t window_overlap,
+                                       const std::string& region_str) {
+        // Canonical case where each sequence is linearly split with an overlap.
+        if (std::empty(region_str)) {
+            std::vector<Window> windows;
+            for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
+                const int64_t len = draft_lens[seq_id].second;
+                const std::vector<Window> new_windows =
+                        create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap);
+                windows.reserve(std::size(windows) + std::size(new_windows));
+                windows.insert(windows.end(), new_windows.begin(), new_windows.end());
+            }
+            return windows;
+        } else {
+            // Create windows for only this one region.
+
+            auto [region_name, region_start, region_end] = parse_region_string(region_str);
+
+            spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
+                         region_end);
+
+            // Find the sequence ID of the region sequence name.
+            int32_t seq_id = -1;
+            int64_t seq_length = 0;
+            for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
+                if (draft_lens[i].first == region_name) {
+                    seq_id = i;
+                    seq_length = draft_lens[i].second;
+                    break;
+                }
+            }
+            if (region_start < 0) {
+                region_start = 0;
+            }
+            if (region_end <= 0) {
+                region_end = seq_length;
+            }
+            if (seq_id < 0) {
+                throw std::runtime_error(
+                        "Sequence provided by custom region not found in input! region_name = " +
+                        region_name);
+            }
+
+            // Split-up the custom region if it's too long.
+            const std::vector<Window> windows = create_windows(
+                    seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap);
+
+            return windows;
+        }
+    };
+
     // Main processing code.
     {
         spdlog::info("Loading draft sequence lengths.");
@@ -1383,10 +1386,16 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         torch::set_num_threads(1);
         at::set_num_interop_threads(opt.threads);
 
+        // Create BAM windows (regions) to create pileup. The features (samples) will
+        // be split further into windows of window_len in size prior to inference.
+        spdlog::info("Creating BAM windows.");
+        const std::vector<Window> bam_regions =
+                create_bam_regions(draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
+
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
         std::vector<polisher::Sample> samples =
-                create_samples(opt.in_aln_bam_fn, draft_lens, opt.threads, opt.bam_chunk,
-                               opt.window_len, opt.window_overlap, opt.region);
+                create_samples(opt.in_aln_bam_fn, bam_regions, draft_lens, opt.threads,
+                               opt.window_len, opt.window_overlap);
 
         const std::vector<polisher::TrimInfo> trims = trim_samples(samples);
 
@@ -1424,20 +1433,26 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         // Stitch the windows.
         for (size_t seq_id = 0; seq_id < std::size(samples_for_seqs); ++seq_id) {
-            auto& data = samples_for_seqs[seq_id];
+            auto& samples_for_seq = samples_for_seqs[seq_id];
 
-            if (std::empty(data)) {
+            // Sort by region start position, for every sequence.
+            std::sort(std::begin(samples_for_seq), std::end(samples_for_seq));
+
+            if (std::empty(samples_for_seq)) {
                 continue;
             }
 
-            // Sort by region start position, for every sequence.
-            std::sort(std::begin(data), std::end(data));
+            std::vector<int32_t> sample_ids;
+            sample_ids.reserve(std::size(samples_for_seq));
+            for (const auto& [sample_start, sample_id] : samples_for_seq) {
+                sample_ids.emplace_back(sample_id);
+            }
 
             std::cerr << "About to stitch.\n";
 
             const polisher::ConsensusResult consensus =
                     stitch_sequence_2(opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples,
-                                      trims, results_samples, data, seq_id);
+                                      trims, results_samples, samples_for_seq, seq_id);
 
             std::cerr << "Done stitching.\n";
 
