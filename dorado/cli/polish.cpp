@@ -920,7 +920,7 @@ std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sampl
  *          In case of a smalle trailing portion (smaller than chunk_len), a potentially large overlap is produced to
  *          cover this region instead of just outputing the small chunk.
  */
-std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& samples,
+std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> samples,
                                             const int64_t chunk_len,
                                             const int64_t chunk_overlap) {
     if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
@@ -948,7 +948,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& sampl
         const int64_t sample_len = static_cast<int64_t>(std::size(sample.positions_major));
 
         if (sample_len <= chunk_len) {
-            return {std::move(sample)};
+            results.emplace_back(std::move(sample));
+            continue;
         }
 
         const int64_t step = chunk_len - chunk_overlap;
@@ -956,7 +957,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& sampl
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
-            // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
+            std::cerr << "[split_sample] (1) sample_len = " << sample_len << ", start = " << start
+                      << ", end = " << end << "\n";
             results.emplace_back(create_chunk(sample, start, end));
         }
 
@@ -964,10 +966,13 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample>& sampl
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
-            // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
+            std::cerr << "[split_sample] (2) sample_len = " << sample_len << ", start = " << start
+                      << ", end = " << end << "\n";
             results.emplace_back(create_chunk(sample, start, end));
         }
     }
+
+    std::cerr << "results.size() = " << results.size() << "\n";
 
     return results;
 }
@@ -1027,7 +1032,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     //      the tensors have also insertions and can grow significantly.
     // It parallelizes this process on both levels of windowing.
 
-    spdlog::info("Created {} BAM windows from {} sequences.", std::size(bam_regions),
+    spdlog::info("Input: {} BAM windows from {} sequences.", std::size(bam_regions),
                  std::size(draft_lens));
 
     for (size_t i = 0; i < std::size(bam_regions); ++i) {
@@ -1111,14 +1116,14 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
-                // if (bam_chunk_id == 0) {
-                //     std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
-                //               << "] interval = [" << interval.start << ", " << interval.end
-                //               << ">:\n";
-                //     std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                //               << "] Input (parallel_results):\n";
-                //     debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
-                // }
+                if (bam_chunk_id == 0) {
+                    std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                              << "] interval = [" << interval.start << ", " << interval.end
+                              << ">:\n";
+                    std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                              << "] Input (parallel_results):\n";
+                    debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
+                }
 
                 std::vector<polisher::Sample> local_samples;
 
@@ -1132,27 +1137,27 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                                          std::make_move_iterator(std::end(split_samples)));
                 }
 
-                // // if (bam_chunk_id == 0) {
-                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                //           << "] After splitting on discontinuities (local_samples):\n";
-                // debug_print_samples(std::cout, local_samples);
-                // // }
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After splitting on discontinuities (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
 
                 local_samples = merge_adjacent_samples(local_samples);
 
-                // // if (bam_chunk_id == 0) {
-                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                //           << "] After merging adjacent (local_samples):\n";
-                // debug_print_samples(std::cout, local_samples);
-                // // }
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After merging adjacent (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
 
-                local_samples = split_samples(local_samples, window_len, window_overlap);
+                local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
-                // // if (bam_chunk_id == 0) {
-                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                //           << "] After splitting samples (local_samples):\n";
-                // debug_print_samples(std::cout, local_samples);
-                // // }
+                // if (bam_chunk_id == 0) {
+                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                          << "] After splitting samples (local_samples):\n";
+                debug_print_samples(std::cout, local_samples);
+                // }
 
                 const Window& reg = bam_regions[bam_chunk_id];
                 results_trims[bam_chunk_id] = polisher::trim_samples(
