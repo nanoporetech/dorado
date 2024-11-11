@@ -1,5 +1,6 @@
 #pragma once
 
+#include "polish/region.h"
 #include "polish/sample.h"
 
 #include <cstdint>
@@ -15,6 +16,10 @@ struct TrimInfo {
     bool heuristic = false;
 };
 
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples);
+/**
+ * \brief Finds the trimming coorindates for each sample, so that they can be spliced.
+ *          Optionally, trims off everything before/after the specified region.
+ */
+std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Region region = {});
 
 }  // namespace dorado::polisher

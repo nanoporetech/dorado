@@ -2,6 +2,7 @@
 
 #include "utils/ssize.h"
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <iostream>
@@ -322,7 +323,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     return {end_1_ind, start_2_ind, heuristic};
 }
 
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples) {
+std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Region region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
@@ -398,6 +399,47 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples) {
     {
         result.back().end = dorado::ssize(samples.back().positions_major);
         result.back().is_last_in_contig = true;
+    }
+
+    // Trim each sample to the region.
+    if ((region.seq_id >= 0) && (region.start >= 0) && (region.end > 0)) {
+        for (size_t i = 0; i < std::size(samples); ++i) {
+            const auto& sample = samples[i];
+            TrimInfo& trim = result[i];
+
+            // Sample not on the specified sequence.
+            if (sample.seq_id != region.seq_id) {
+                trim.start = -1;
+                trim.end = -1;
+                continue;
+            }
+
+            const int64_t num_positions = dorado::ssize(sample.positions_major);
+
+            // Trim left.
+            for (; (region.start > 0) && (trim.start < num_positions); ++trim.start) {
+                if (sample.positions_major[trim.start] >= region.start) {
+                    break;
+                }
+            }
+            trim.start = (trim.start >= num_positions) ? -1 : trim.start;
+
+            // Trim right.
+            for (; (region.end > 0) && (trim.end >= 0); --trim.end) {
+                if (sample.positions_major[trim.end] < region.end) {
+                    break;
+                }
+            }
+            trim.end = (trim.end <= 0) ? -1 : trim.end;
+
+            // Sanity check.
+            if (trim.start >= trim.end) {
+                trim.start = -1;
+                trim.end = -1;
+            }
+        }
+    } else {
+        spdlog::debug("Not trimming to region because region not fully specified.");
     }
 
     assert(std::size(result) == std::size(samples));

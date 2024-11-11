@@ -317,6 +317,7 @@ add_library(dorado_lib
     dorado/polish/medaka_counts.h
     dorado/polish/polish_models.cpp
     dorado/polish/polish_models.h
+    dorado/polish/region.h
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
