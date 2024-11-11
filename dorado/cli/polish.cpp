@@ -397,6 +397,8 @@ struct Window {
     int64_t start = 0;
     int64_t end = 0;
     int32_t region_id = 0;
+    int64_t start_no_overlap = 0;
+    int64_t end_no_overlap = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
@@ -442,8 +444,18 @@ std::vector<Window> create_windows(const int32_t seq_id,
     for (int64_t start = seq_start; start < seq_end;
          start += (window_len - window_overlap), ++win_id) {
         const int64_t end = std::min(seq_end, start + window_len);
+        const int64_t start_no_overlap =
+                (start == seq_start) ? start : std::min<int64_t>(start + window_overlap, seq_end);
 
-        ret.emplace_back(Window{seq_id, seq_len, start, end, region_id});
+        ret.emplace_back(Window{
+                seq_id,
+                seq_len,
+                start,
+                end,
+                region_id,
+                start_no_overlap,
+                end,
+        });
 
         if (end == seq_end) {
             break;
@@ -497,11 +509,11 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
-void debug_print_samples(std::ostream& os,
-                         const std::vector<polisher::Sample>& samples,
-                         int64_t start = 0,
-                         int64_t end = -1,
-                         int64_t debug_id = -1) {
+[[maybe_unused]] void debug_print_samples(std::ostream& os,
+                                          const std::vector<polisher::Sample>& samples,
+                                          int64_t start = 0,
+                                          int64_t end = -1,
+                                          int64_t debug_id = -1) {
     start = std::max<int64_t>(0, start);
     end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
 
@@ -984,7 +996,7 @@ std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string&
     return {std::move(name), start, end};
 }
 
-std::vector<polisher::Sample> create_samples(
+std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
         const std::filesystem::path& in_aln_bam_fn,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -1091,9 +1103,11 @@ std::vector<polisher::Sample> create_samples(
     //  2. Check for discontinuities in any of the samples and split (gap in coverage).
     //  3. Split the merged samples into equally sized pieces which will be used for inference.
     std::vector<std::vector<polisher::Sample>> merged_samples;
+    std::vector<std::vector<polisher::TrimInfo>> merged_trims;
     {
         const auto worker = [&](const int32_t start, const int32_t end,
-                                std::vector<std::vector<polisher::Sample>>& results) {
+                                std::vector<std::vector<polisher::Sample>>& results,
+                                std::vector<std::vector<polisher::TrimInfo>>& results_trims) {
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
@@ -1140,23 +1154,29 @@ std::vector<polisher::Sample> create_samples(
                 // debug_print_samples(std::cout, local_samples);
                 // // }
 
+                const Window& reg = bam_regions[bam_chunk_id];
+                results_trims[bam_chunk_id] = polisher::trim_samples(
+                        local_samples, {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap});
                 results[bam_chunk_id] = std::move(local_samples);
             }
         };
         merged_samples.resize(std::size(bam_region_intervals));
+        merged_trims.resize(std::size(bam_region_intervals));
+
         // Process BAM windows in parallel.
         const std::vector<std::pair<int32_t, int32_t>> chunks =
                 compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), 1);
         spdlog::info("Starting to merge samples for {} BAM windows using {} threads.",
                      std::size(bam_region_intervals), std::size(chunks));
+
         cxxpool::thread_pool pool{std::size(chunks)};
-        // std::vector<polisher::Sample> parallel_results(std::size(windows));
         std::vector<std::future<void>> futures;
         futures.reserve(std::size(chunks));
+
         for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
             const auto [chunk_start, chunk_end] = chunks[tid];
-            futures.emplace_back(
-                    pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples)));
+            futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
+                                           std::ref(merged_trims)));
         }
         for (auto& f : futures) {
             f.wait();
@@ -1176,13 +1196,20 @@ std::vector<polisher::Sample> create_samples(
                        std::make_move_iterator(std::end(vals)));
     }
 
+    std::vector<polisher::TrimInfo> trims;
+    trims.reserve(num_samples);
+    for (auto& vals : merged_trims) {
+        trims.insert(std::end(trims), std::make_move_iterator(std::begin(vals)),
+                     std::make_move_iterator(std::end(vals)));
+    }
+
     for (auto& bam_set : bam_sets) {
         destroy_bam_fset(bam_set);
     }
 
     spdlog::info("Total num samples to infer: {}", std::size(samples));
 
-    return samples;
+    return {std::move(samples), std::move(trims)};
 }
 
 }  // namespace
@@ -1395,8 +1422,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
         //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
-        torch::set_num_threads(1);
         at::set_num_interop_threads(opt.threads);
+        torch::set_num_threads(1);
 
         // Create BAM windows (regions) to create pileup. The features (samples) will
         // be split further into windows of window_len in size prior to inference.
@@ -1405,11 +1432,13 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                 create_bam_regions(draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
 
         // Encode samples (features) in parallel. A window can have multiple samples if there was a gap.
-        std::vector<polisher::Sample> samples =
-                create_samples(opt.in_aln_bam_fn, bam_regions, draft_lens, opt.threads,
-                               opt.window_len, opt.window_overlap);
+        auto [samples, trims] = create_samples(opt.in_aln_bam_fn, bam_regions, draft_lens,
+                                               opt.threads, opt.window_len, opt.window_overlap);
 
-        const std::vector<polisher::TrimInfo> trims = trim_samples(samples);
+        // const std::vector<polisher::TrimInfo> trims = trim_samples(samples);
+
+        std::cerr << "[debug] samples.size() = " << samples.size()
+                  << ", trims.size() = " << trims.size() << "\n";
 
         // Increase the number of threads again for inter-op parallelism.
         torch::set_num_threads(opt.threads);

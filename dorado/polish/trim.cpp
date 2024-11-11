@@ -350,17 +350,10 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
         trim2.end = dorado::ssize(s2.positions_major);
 
         if (rel == Relationship::S2_WITHIN_S1) {
-            if (i == 69) {
-                std::cerr << "[debug i = " << i << "] S2_WITHIN_S1\n";
-            }
             continue;
 
         } else if (rel == Relationship::FORWARD_OVERLAP) {
             std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
-            if (trim2.start < 0) {
-                std::cerr << "[sample i = " << i
-                          << "] (FORWARD_OVERLAP) trim2.start = " << trim2.start << "\n";
-            }
 
         } else if (rel == Relationship::FORWARD_GAPPED) {
             trim2.is_last_in_contig = true;
@@ -371,24 +364,11 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
         } else {
             try {
                 std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
-                if (trim2.start < 0) {
-                    std::cerr << "[sample i = " << i << "] (else) trim2.start = " << trim2.start
-                              << "\n";
-                }
-                if (i == 69) {
-                    std::cerr << "[debug i = " << i << "] else\n";
-                }
             } catch (const std::runtime_error& e) {
                 throw std::runtime_error(
                         "Unhandled overlap type whilst stitching chunks. Message: " +
                         std::string(e.what()));
             }
-        }
-
-        if (trim1.start < 0 || trim2.start < 0) {
-            std::cerr << "(1) [sample i = " << i << "] trim1.start = " << trim1.start
-                      << ", trim2.start = " << trim2.start << "\n    - sample 1: " << s1
-                      << "\n    - sample 2: " << s2 << "\n";
         }
 
         idx_s1 = i;
@@ -403,6 +383,8 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
 
     // Trim each sample to the region.
     if ((region.seq_id >= 0) && (region.start >= 0) && (region.end > 0)) {
+        std::cerr << "Trimming to custom region: seq_id = " << region.seq_id
+                  << ", start = " << region.start << ", end = " << region.end << "\n";
         for (size_t i = 0; i < std::size(samples); ++i) {
             const auto& sample = samples[i];
             TrimInfo& trim = result[i];
@@ -424,12 +406,13 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
             }
             trim.start = (trim.start >= num_positions) ? -1 : trim.start;
 
-            // Trim right.
-            for (; (region.end > 0) && (trim.end >= 0); --trim.end) {
+            // Trim right. End is non-inclusive, so reduce it by 1 first.
+            for (--trim.end; (region.end > 0) && (trim.end >= 0); --trim.end) {
                 if (sample.positions_major[trim.end] < region.end) {
                     break;
                 }
             }
+            ++trim.end;  // Change back to non-inclusive.
             trim.end = (trim.end <= 0) ? -1 : trim.end;
 
             // Sanity check.
