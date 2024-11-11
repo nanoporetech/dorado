@@ -554,8 +554,16 @@ polisher::ConsensusResult stitch_sequence_2(
 
     std::ofstream ofs("debug.seq_id_" + std::to_string(seq_id) + ".fasta");
 
-    int64_t last_end = 0;
-    for (size_t i = 0; i < samples_for_seq.size(); ++i) {
+    // // Add the front draft part.
+    // const int64_t first_start = trims[samples_for_seq.front().second].start;
+    // if (first_start > 0) {
+    //     result.seq += draft.substr(0, first_start);
+    //     result.quals += std::string(first_start, '!');
+    // }
+
+    // This is an inclusive coordinate. If it was 0, then adding front draft chunk would miss 1 base.
+    int64_t last_end = -1;
+    for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
         const polisher::Sample& sample = samples[sample_index];
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
@@ -575,6 +583,7 @@ polisher::ConsensusResult stitch_sequence_2(
         const int64_t end_pos = sample.positions_major.back();
 
         if (start_pos > (last_end + 1)) {
+            std::cerr << "ADDING DRAFT!\n";
             result.seq += draft.substr(last_end + 1, start_pos - last_end - 1);
             result.quals += std::string(start_pos - last_end - 1, '!');
         }
@@ -604,10 +613,11 @@ polisher::ConsensusResult stitch_sequence_2(
         // }
     }
 
-    // if ((last_end + 1) < dorado::ssize(draft)) {
-    //     result.seq += draft.substr(last_end + 1);
-    //     result.quals += std::string(dorado::ssize(draft), '!');
-    // }
+    // Add the back draft part.
+    if ((last_end + 1) < dorado::ssize(draft)) {
+        result.seq += draft.substr(last_end + 1);
+        result.quals += std::string(dorado::ssize(draft), '!');
+    }
 
     return result;
 }
