@@ -957,8 +957,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
-            std::cerr << "[split_sample] (1) sample_len = " << sample_len << ", start = " << start
-                      << ", end = " << end << "\n";
+            // std::cerr << "[split_sample] (1) sample_len = " << sample_len << ", start = " << start
+            //           << ", end = " << end << "\n";
             results.emplace_back(create_chunk(sample, start, end));
         }
 
@@ -966,8 +966,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
-            std::cerr << "[split_sample] (2) sample_len = " << sample_len << ", start = " << start
-                      << ", end = " << end << "\n";
+            // std::cerr << "[split_sample] (2) sample_len = " << sample_len << ", start = " << start
+            //           << ", end = " << end << "\n";
             results.emplace_back(create_chunk(sample, start, end));
         }
     }
@@ -1034,6 +1034,11 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 
     spdlog::info("Input: {} BAM windows from {} sequences.", std::size(bam_regions),
                  std::size(draft_lens));
+
+    for (size_t i = 0; i < std::size(draft_lens); ++i) {
+        std::cerr << "[draft i = " << i << "] name = " << draft_lens[i].first
+                  << ", len = " << draft_lens[i].second << "\n";
+    }
 
     for (size_t i = 0; i < std::size(bam_regions); ++i) {
         std::cerr << "[bam_regions i = " << i << "] " << bam_regions[i] << "\n";
@@ -1116,14 +1121,14 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
-                if (bam_chunk_id == 0) {
-                    std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
-                              << "] interval = [" << interval.start << ", " << interval.end
-                              << ">:\n";
-                    std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                              << "] Input (parallel_results):\n";
-                    debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
-                }
+                // if (bam_chunk_id == 0) {
+                //     std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                //               << "] interval = [" << interval.start << ", " << interval.end
+                //               << ">:\n";
+                //     std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //               << "] Input (parallel_results):\n";
+                //     debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
+                // }
 
                 std::vector<polisher::Sample> local_samples;
 
@@ -1137,27 +1142,21 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                                          std::make_move_iterator(std::end(split_samples)));
                 }
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting on discontinuities (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After splitting on discontinuities (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
 
                 local_samples = merge_adjacent_samples(local_samples);
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After merging adjacent (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After merging adjacent (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
 
                 local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting samples (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After splitting samples (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
 
                 const Window& reg = bam_regions[bam_chunk_id];
                 results_trims[bam_chunk_id] = polisher::trim_samples(
@@ -1248,15 +1247,14 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
     auto batch_infer = [](polisher::TorchModel& model, const std::vector<polisher::Sample>& samples,
-                          const int64_t sample_start, const int64_t sample_end,
-                          std::mutex& gpu_mutex) {
+                          const std::vector<int64_t> samples_to_process, std::mutex& gpu_mutex) {
         utils::ScopedProfileRange infer("infer", 1);
 
         // debug_print_samples(std::cout, samples, sample_start, sample_end);
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
-        for (int64_t i = sample_start; i < sample_end; ++i) {
+        for (const int64_t i : samples_to_process) {
             batch_features.emplace_back(samples[i].features);
         }
         // torch::Tensor batch_features_tensor = torch::stack(batch_features);
@@ -1288,18 +1286,26 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                                          polisher::TorchModel& model,
                                          const polisher::CountsFeatureDecoder& decoder,
                                          const std::vector<polisher::Sample>& in_samples,
-                                         const int32_t batch_size, const bool gen_qual) {
+                                         const std::vector<int64_t> samples_to_process,
+                                         const int32_t batch_size, const bool gen_qual,
+                                         std::vector<polisher::ConsensusResult>& results) {
         /**
          * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
          */
         // std::vector<torch::Tensor> outputs;
-        std::vector<polisher::ConsensusResult> results;
-        const int64_t num_samples = static_cast<int64_t>(std::size(in_samples));
+
+        // std::vector<polisher::ConsensusResult> results;
+        results.resize(std::size(in_samples));
+
+        const int64_t num_samples = dorado::ssize(samples_to_process);
+
         for (int64_t start = 0; start < num_samples; start += batch_size) {
             const int64_t end = std::min((start + batch_size), num_samples);
 
             // Inference.
-            torch::Tensor output = batch_infer(model, in_samples, start, end, gpu_mutexes[0]);
+            const std::vector<int64_t> ids(std::begin(samples_to_process) + start,
+                                           std::begin(samples_to_process) + end);
+            torch::Tensor output = batch_infer(model, in_samples, ids, gpu_mutexes[0]);
 
             // Convert to sequences and qualities.
             std::vector<polisher::ConsensusResult> new_results =
@@ -1307,28 +1313,26 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
             assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
-            // Trim the padding from the back of each sequence, and append.
-            // Batch tensor has been padded so that all sequences (of potentially varying
-            // length) can fit, but the original samples still have the actual length.
-            // Use that to clip off the padding from the consensus result.
-            for (int64_t j = 0; j < static_cast<int64_t>(std::size(new_results)); ++j) {
+            // Trim the overlapping sequences.
+            for (int64_t j = 0; j < dorado::ssize(new_results); ++j) {
                 auto& result = new_results[j];
-                const int64_t actual_size =
-                        static_cast<int64_t>(std::size(in_samples[start + j].positions_major));
-                result.seq.resize(actual_size);
-                result.quals.resize(actual_size);
-                results.emplace_back(std::move(result));
+                const int64_t sample_id = ids[j];
+                results[sample_id] = std::move(result);
+                // const int64_t actual_size =
+                //         static_cast<int64_t>(std::size(in_samples[start + j].positions_major));
+                // if (in_samples[j].seq_id == 1) {
+                //     std::cerr << "[process_samples] j = " << j << ", actual_size = " << actual_size << ", in_samples[j] = " << in_samples[j] << "\n";
+                // }
+                // result.seq.resize(actual_size);
+                // result.quals.resize(actual_size);
+                // results.emplace_back(std::move(result));
             }
 
             spdlog::info(
-                    "Processed another batch of {} samples. Total samples processed: {}, "
+                    "Processed a batch of {} samples. Total samples processed: {}, "
                     "num_samples = {}.",
                     (end - start), end, num_samples);
         }
-
-        assert(std::size(results) == std::size(in_samples));
-
-        return results;
     };
 
     const auto write_seq = [](std::ostream& os, const std::string& seq_name,
@@ -1457,8 +1461,25 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         const polisher::CountsFeatureDecoder decoder;
 
-        const std::vector<polisher::ConsensusResult> results_samples =
-                process_samples(*model, decoder, samples, opt.batch_size, with_quals);
+        // Find samples which will not fit into the batch tensor.
+        std::vector<int64_t> regular;
+        std::vector<int64_t> remainders;
+        for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
+            const auto& sample = samples[i];
+            if (dorado::ssize(sample.positions_major) != opt.window_len) {
+                remainders.emplace_back(i);
+            }
+            regular.emplace_back(i);
+        }
+
+        std::vector<polisher::ConsensusResult> results_samples;
+
+        // Infer samples which can fully fit into a Nx10x10000 tensor.
+        process_samples(*model, decoder, samples, regular, opt.batch_size, with_quals,
+                        results_samples);
+
+        // Process samples which are of varying size.
+        process_samples(*model, decoder, samples, remainders, 1, with_quals, results_samples);
 
         if (std::size(results_samples) != std::size(samples)) {
             throw std::runtime_error{
