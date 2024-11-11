@@ -1097,14 +1097,14 @@ std::vector<polisher::Sample> create_samples(
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
-                if (bam_chunk_id == 0) {
-                    std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
-                              << "] interval = [" << interval.start << ", " << interval.end
-                              << ">:\n";
-                    std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                              << "] Input (parallel_results):\n";
-                    debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
-                }
+                // if (bam_chunk_id == 0) {
+                //     std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                //               << "] interval = [" << interval.start << ", " << interval.end
+                //               << ">:\n";
+                //     std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //               << "] Input (parallel_results):\n";
+                //     debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
+                // }
 
                 std::vector<polisher::Sample> local_samples;
 
@@ -1118,27 +1118,27 @@ std::vector<polisher::Sample> create_samples(
                                          std::make_move_iterator(std::end(split_samples)));
                 }
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting on discontinuities (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // // if (bam_chunk_id == 0) {
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After splitting on discontinuities (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
+                // // }
 
                 local_samples = merge_adjacent_samples(local_samples);
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After merging adjacent (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // // if (bam_chunk_id == 0) {
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After merging adjacent (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
+                // // }
 
                 local_samples = split_samples(local_samples, window_len, window_overlap);
 
-                // if (bam_chunk_id == 0) {
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting samples (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
-                // }
+                // // if (bam_chunk_id == 0) {
+                // std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                //           << "] After splitting samples (local_samples):\n";
+                // debug_print_samples(std::cout, local_samples);
+                // // }
 
                 results[bam_chunk_id] = std::move(local_samples);
             }
