@@ -2,6 +2,14 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.8.3] (11 Nov 2024)
+
+This release of Dorado includes fixes and improvements to the Dorado 0.8.2 release, including a fix to SUP basecalling on Apple Silicon.
+
+* 03e5eecd22f48ea13ce3fc8f65269fab96fa1c27 - Fix incorrect basecalls being emitted from SUP models on Apple Silicon
+* 987a237e192f28dc474baaea8d2aca81b2f5d57b - Improve error messaging when unable to run basecalling kernels on Apple GPU
+
+
 # [0.8.2] (21 Oct 2024)
 
 This release of Dorado includes fixes and improvements to the Dorado 0.8.1 release.
