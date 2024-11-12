@@ -10,6 +10,7 @@
 #include <cctype>
 #include <csignal>
 #include <filesystem>
+#include <string_view>
 
 namespace {
 
@@ -37,27 +38,44 @@ volatile sig_atomic_t SigIntHandler::interrupt{};
 
 namespace dorado {
 
-std::vector<std::string> SummaryData::s_required_fields = {"filename", "read_id"};
+namespace {
 
-std::vector<std::string> SummaryData::s_general_fields = {"run_id",
-                                                          "channel",
-                                                          "mux",
-                                                          "start_time",
-                                                          "duration",
-                                                          "template_start",
-                                                          "template_duration",
-                                                          "sequence_length_template",
-                                                          "mean_qscore_template"};
+using namespace std::string_view_literals;
 
-std::vector<std::string> SummaryData::s_barcoding_fields = {"barcode"};
+const std::array s_required_fields = {
+        "filename"sv,
+        "read_id"sv,
+};
 
-std::vector<std::string> SummaryData::s_alignment_fields = {
-        "alignment_genome",         "alignment_genome_start",    "alignment_genome_end",
-        "alignment_strand_start",   "alignment_strand_end",      "alignment_direction",
-        "alignment_length",         "alignment_num_aligned",     "alignment_num_correct",
-        "alignment_num_insertions", "alignment_num_deletions",   "alignment_num_substitutions",
-        "alignment_mapq",           "alignment_strand_coverage", "alignment_identity",
-        "alignment_accuracy",       "alignment_bed_hits"};
+const std::array s_general_fields = {
+        "run_id"sv,
+        "channel"sv,
+        "mux"sv,
+        "start_time"sv,
+        "duration"sv,
+        "template_start"sv,
+        "template_duration"sv,
+        "sequence_length_template"sv,
+        "mean_qscore_template"sv,
+};
+
+const std::array s_barcoding_fields = {
+        "barcode"sv,
+};
+
+const std::array s_alignment_fields = {
+        "alignment_genome"sv,        "alignment_genome_start"sv,
+        "alignment_genome_end"sv,    "alignment_strand_start"sv,
+        "alignment_strand_end"sv,    "alignment_direction"sv,
+        "alignment_length"sv,        "alignment_num_aligned"sv,
+        "alignment_num_correct"sv,   "alignment_num_insertions"sv,
+        "alignment_num_deletions"sv, "alignment_num_substitutions"sv,
+        "alignment_mapq"sv,          "alignment_strand_coverage"sv,
+        "alignment_identity"sv,      "alignment_accuracy"sv,
+        "alignment_bed_hits"sv,
+};
+
+}  // namespace
 
 SummaryData::SummaryData() = default;
 

@@ -29,11 +29,6 @@ public:
     bool process_tree(const std::string& folder, std::ostream& writer);
 
 private:
-    static std::vector<std::string> s_required_fields;
-    static std::vector<std::string> s_general_fields;
-    static std::vector<std::string> s_barcoding_fields;
-    static std::vector<std::string> s_alignment_fields;
-
     char m_separator{'\t'};
     FieldFlags m_field_flags{};
 
