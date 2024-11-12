@@ -117,9 +117,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     const Relationship rel = relative_position(s1, s2);
 
     if (rel == Relationship::FORWARD_ABUTTED) {
-        if (s2.start() == 595554) {
-            std::cerr << "Tu sam 1!\n";
-        }
         return {dorado::ssize(s1.positions_major), 0, false};
     }
 
@@ -208,10 +205,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
         const int64_t pad_2 = overlap_len - pad_1;
         end_1_ind = ovl_start_ind1 + pad_1;
         start_2_ind = ovl_end_ind2 - pad_2;
-
-        if (s2.start() == 595554) {
-            std::cerr << "Tu sam 2!\n";
-        }
 
         if (((end_1_ind - ovl_start_ind1) + (ovl_end_ind2 - start_2_ind)) != overlap_len) {
             end_1_ind = -1;
@@ -427,7 +420,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
 
     assert(std::size(result) == std::size(samples));
 
-    std::cerr << "num_heuristic = " << num_heuristic << "\n";
+    spdlog::debug("num_heuristic = {}", num_heuristic);
 
     return result;
 }

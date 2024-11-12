@@ -91,6 +91,21 @@ struct Options {
     std::string region;
 };
 
+struct Window {
+    int32_t seq_id = -1;
+    int64_t seq_length = 0;
+    int64_t start = 0;
+    int64_t end = 0;
+    int32_t region_id = 0;
+    int64_t start_no_overlap = 0;
+    int64_t end_no_overlap = 0;
+};
+
+struct Interval {
+    int32_t start = 0;
+    int32_t end = 0;
+};
+
 /// \brief Define the CLI options.
 ParserPtr create_cli(int& verbosity) {
     ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado consensus");
@@ -173,9 +188,13 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     std::vector<DeviceInfo> devices;
 
     if (devices_str == "cpu") {
-        // infer_threads = 1;
         torch::Device torch_device = torch::Device(devices_str);
         devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
+        // infer_threads = 1;
+        // for (int32_t i = 0; i < num_cpu_threads; ++i) {
+        //     torch::Device torch_device = torch::Device(devices_str);
+        //     devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
+        // }
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
@@ -296,9 +315,8 @@ void validate_options(const Options& opt) {
     }
 }
 
-const std::vector<std::pair<int32_t, int32_t>> compute_chunks(const int32_t num_items,
-                                                              const int32_t num_chunks) {
-    std::vector<std::pair<int32_t, int32_t>> chunks;
+std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_chunks) {
+    std::vector<Interval> chunks;
     const int32_t chunk_size = num_items / num_chunks;
     std::vector<int32_t> chunk_sizes(num_chunks, chunk_size);
     for (int32_t i = 0; i < (num_items % num_chunks); ++i) {
@@ -309,7 +327,7 @@ const std::vector<std::pair<int32_t, int32_t>> compute_chunks(const int32_t num_
         if (v == 0) {
             continue;
         }
-        chunks.emplace_back(sum, sum + v);
+        chunks.emplace_back(Interval{sum, sum + v});
         sum += v;
     }
     if (sum != num_items) {
@@ -395,27 +413,12 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     return ret;
 }
 
-struct Window {
-    int32_t seq_id = -1;
-    int64_t seq_length = 0;
-    int64_t start = 0;
-    int64_t end = 0;
-    int32_t region_id = 0;
-    int64_t start_no_overlap = 0;
-    int64_t end_no_overlap = 0;
-};
-
 [[maybe_unused]] std::ostream& operator<<(std::ostream& os, const Window& w) {
     os << "seq_id = " << w.seq_id << ", start = " << w.start << ", end = " << w.end
        << ", seq_length = " << w.seq_length
        << ", region_id = " << w.region_id;  // << ", window_id = " << w.window_id;
     return os;
 }
-
-struct Interval {
-    int32_t start = 0;
-    int32_t end = 0;
-};
 
 /**
  * \brief Linearly splits sequence lengths into windows. It also returns the backward mapping of which
@@ -913,7 +916,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             }
         };
         parallel_results.resize(std::size(windows));
-        const std::vector<std::pair<int32_t, int32_t>> chunks =
+        const std::vector<Interval> chunks =
                 compute_chunks(static_cast<int32_t>(std::size(windows)), num_threads);
         spdlog::info("Starting to encode regions for {} windows using {} threads.",
                      std::size(windows), std::size(chunks));
@@ -998,7 +1001,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         merged_trims.resize(std::size(bam_region_intervals));
 
         // Process BAM windows in parallel.
-        const std::vector<std::pair<int32_t, int32_t>> chunks =
+        const std::vector<Interval> chunks =
                 compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), 1);
         spdlog::info("Starting to merge samples for {} BAM windows using {} threads.",
                      std::size(bam_region_intervals), std::size(chunks));
@@ -1080,6 +1083,7 @@ void process_samples(polisher::TorchModel& model,
         try {
             output = model.predict_on_batch(std::move(batch_features_tensor));
         } catch (std::exception& e) {
+            std::cerr << "ERROR! Exception caught: " << e.what() << "\n";
             throw e;
         }
 
@@ -1115,6 +1119,76 @@ void process_samples(polisher::TorchModel& model,
                 "num_samples = {}.",
                 (end - start), end, num_samples);
     }
+}
+
+std::vector<polisher::ConsensusResult> process_samples_in_parallel(
+        const std::vector<polisher::Sample>& in_samples,
+        const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
+        const polisher::CountsFeatureDecoder& decoder,
+        const int32_t window_len,
+        const int32_t batch_size,
+        const bool gen_qual) {
+    if (std::empty(models)) {
+        throw std::runtime_error("No models have been initialized, cannot run inference.");
+    }
+
+    const auto worker = [&models, &decoder, &in_samples, &batch_size, &gen_qual, &window_len](
+                                const int32_t thread_id, const int32_t chunk_start,
+                                const int32_t chunk_end,
+                                std::vector<polisher::ConsensusResult>& results) {
+        assert(chunk_end <= dorado::ssize(in_samples));
+
+        at::InferenceMode infer_guard;
+
+        // Find samples which will not fit into the batch tensor.
+        std::vector<int64_t> regular;
+        std::vector<int64_t> remainders;
+        for (int64_t i = chunk_start; i < chunk_end; ++i) {
+            const auto& sample = in_samples[i];
+            if (dorado::ssize(sample.positions_major) != window_len) {
+                remainders.emplace_back(i);
+                continue;
+            }
+            regular.emplace_back(i);
+        }
+
+        std::cerr << "[thread_id = " << thread_id << "] chunk_start = " << chunk_start
+                  << ", chunk_end = " << chunk_end << ", regular.size() = " << regular.size()
+                  << ", remainders.size() = " << remainders.size() << "\n";
+
+        // Infer samples which can fully fit into a Nx10x10000 tensor.
+        process_samples(*models[thread_id], decoder, in_samples, regular, batch_size, gen_qual,
+                        results);
+
+        // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
+        process_samples(*models[thread_id], decoder, in_samples, remainders, 1, gen_qual, results);
+    };
+
+    std::vector<polisher::ConsensusResult> results(std::size(in_samples));
+
+    const int32_t num_items = dorado::ssize(in_samples);
+    const int32_t num_threads = dorado::ssize(models);
+    const std::vector<Interval> chunks = compute_chunks(num_items, num_threads);
+
+    spdlog::info("Starting to call consensus for {} samples using {} devices.", num_items,
+                 num_threads);
+
+    cxxpool::thread_pool pool{std::size(chunks)};
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(chunks));
+
+    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
+        const auto [chunk_start, chunk_end] = chunks[tid];
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results)));
+    }
+    for (auto& f : futures) {
+        f.wait();
+    }
+
+    spdlog::info("Finished calling consensus.");
+
+    return results;
 }
 
 std::vector<Window> create_bam_regions(
@@ -1202,9 +1276,11 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
     const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
-    const DeviceInfo& device_info = devices.front();
+    spdlog::info("Number of devices: {}", std::size(devices));
 
-    spdlog::info("Using: device_str = {}", device_info.name);
+    // const DeviceInfo& device_info = devices.front();
+
+    // spdlog::info("Using: device_str = {}", device_info.name);
 
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
@@ -1246,40 +1322,28 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         // Construct the model.
         spdlog::info("Loading the model.");
-        const std::unique_ptr<polisher::TorchModel> model =
-                create_model(opt.model_path / "model.pt", device_info);
+        const std::vector<std::shared_ptr<polisher::TorchModel>> models = [&]() {
+            std::vector<std::shared_ptr<polisher::TorchModel>> ret;
+            for (int32_t device_id = 0; device_id < dorado::ssize(devices); ++device_id) {
+                ret.emplace_back(create_model(opt.model_path / "model.pt", devices[device_id]));
+                spdlog::info("Loaded model to device {}: {}", device_id, devices[device_id].name);
+                std::cerr << "devices[device_id].device = " << devices[device_id].device << "\n";
+            }
+            if ((std::size(devices) == 1) && (devices.front().type == DeviceType::CPU)) {
+                for (int32_t i = 1; i < opt.threads; ++i) {
+                    ret.emplace_back(models.front());
+                    // ret.emplace_back(models.front()->clone_model());
+                    // ret.back()->eval();
+                }
+            }
+            return ret;
+        }();
 
         spdlog::info("Processing samples in batches. Num samples: {}.", std::size(samples));
 
         const polisher::CountsFeatureDecoder decoder;
-
-        // Find samples which will not fit into the batch tensor.
-        std::vector<int64_t> regular;
-        std::vector<int64_t> remainders;
-        for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
-            const auto& sample = samples[i];
-            if (dorado::ssize(sample.positions_major) != opt.window_len) {
-                remainders.emplace_back(i);
-                continue;
-            }
-            regular.emplace_back(i);
-        }
-
-        std::vector<polisher::ConsensusResult> results_samples;
-
-        // Infer samples which can fully fit into a Nx10x10000 tensor.
-        process_samples(*model, decoder, samples, regular, opt.batch_size, with_quals,
-                        results_samples);
-
-        // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
-        process_samples(*model, decoder, samples, remainders, 1, with_quals, results_samples);
-
-        if (std::size(results_samples) != std::size(samples)) {
-            throw std::runtime_error{
-                    "Wrong number of results for input samples! std::size(results_samples) = " +
-                    std::to_string(std::size(results_samples)) +
-                    ", std::size(samples) = " + std::to_string(std::size(samples))};
-        }
+        std::vector<polisher::ConsensusResult> results_samples = process_samples_in_parallel(
+                samples, models, decoder, opt.window_len, opt.batch_size, with_quals);
 
         // Stitching information, collect all samples for each sequence.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> samples_for_seqs(
@@ -1357,6 +1421,7 @@ int polish(int argc, char* argv[]) {
     [[maybe_unused]] polisher::ModelConfig config =
             polisher::parse_model_config(opt.model_path / "config.toml");
 
+    // Create either opt.threads CPU devices, or the number of other devices specified in the opt.device_str.
     const std::vector<DeviceInfo> devices = init_devices(opt.device_str);
 
     if (std::empty(devices)) {
