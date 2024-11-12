@@ -26,9 +26,11 @@ struct Attributes {
     int32_t channel_number{-1};  //Channel ID
     std::string start_time{};    //Read acquisition start time
     std::string fast5_filename{};
-    uint64_t num_samples;
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
+
+    // Only used by tests, and only valid for POD5 data.
+    uint64_t num_samples{};
 };
 
 }  // namespace details
