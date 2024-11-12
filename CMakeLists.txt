@@ -305,6 +305,7 @@ add_library(dorado_lib
     dorado/correct/infer.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
+    dorado/polish/consensus_result.h
     dorado/polish/features.cpp
     dorado/polish/features.h
     dorado/polish/model.cpp
@@ -315,6 +316,8 @@ add_library(dorado_lib
     dorado/polish/medaka_common.h
     dorado/polish/medaka_counts.cpp
     dorado/polish/medaka_counts.h
+    dorado/polish/polish_impl.cpp
+    dorado/polish/polish_impl.h
     dorado/polish/polish_models.cpp
     dorado/polish/polish_models.h
     dorado/polish/region.h

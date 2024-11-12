@@ -1,5 +1,6 @@
 #pragma once
 
+#include "polish/consensus_result.h"
 #include "polish/medaka_bamiter.h"
 #include "polish/sample.h"
 
@@ -28,15 +29,6 @@ struct CountsResult {
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
 };
-
-struct ConsensusResult {
-    std::string seq;
-    std::string quals;
-};
-
-// struct CountsFeatureEncoderResults {
-// };
-
 struct KeyHash {
     template <typename T1, typename T2>
     std::size_t operator()(const std::pair<T1, T2>& key) const {
