@@ -546,7 +546,7 @@ polisher::ConsensusResult stitch_sequence_2(
         const std::vector<polisher::Sample>& samples,
         const std::vector<polisher::TrimInfo>& trims,
         const std::vector<polisher::ConsensusResult>& sample_results,
-        const std::vector<std::pair<int32_t, int32_t>>& samples_for_seq,
+        const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const int32_t seq_id) {
     if (std::size(samples) != std::size(trims)) {
         throw std::runtime_error("Number of samples and trims differs! std::size(samples) = " +
@@ -1423,8 +1423,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         auto [samples, trims] = create_samples(opt.in_aln_bam_fn, bam_regions, draft_lens,
                                                opt.threads, opt.window_len, opt.window_overlap);
 
-        // const std::vector<polisher::TrimInfo> trims = trim_samples(samples);
-
         std::cerr << "[debug] samples.size() = " << samples.size()
                   << ", trims.size() = " << trims.size() << "\n";
 
@@ -1458,7 +1456,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         process_samples(*model, decoder, samples, regular, opt.batch_size, with_quals,
                         results_samples);
 
-        // Process samples which are of varying size.
+        // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
         process_samples(*model, decoder, samples, remainders, 1, with_quals, results_samples);
 
         if (std::size(results_samples) != std::size(samples)) {
@@ -1469,7 +1467,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         }
 
         // Stitching information, collect all samples for each sequence.
-        std::vector<std::vector<std::pair<int32_t, int32_t>>> samples_for_seqs(
+        std::vector<std::vector<std::pair<int64_t, int32_t>>> samples_for_seqs(
                 std::size(draft_lens));
         for (int32_t i = 0; i < static_cast<int32_t>(std::size(samples)); ++i) {
             const polisher::Sample& sample = samples[i];
@@ -1492,7 +1490,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
             std::vector<int32_t> sample_ids;
             sample_ids.reserve(std::size(samples_for_seq));
-            for (const auto& [sample_start, sample_id] : samples_for_seq) {
+            for (const auto& [_, sample_id] : samples_for_seq) {
                 sample_ids.emplace_back(sample_id);
             }
 
