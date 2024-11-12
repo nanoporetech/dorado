@@ -1064,6 +1064,8 @@ void process_samples(polisher::TorchModel& model,
                                 const std::vector<int64_t>& samples_to_process) {
         utils::ScopedProfileRange infer("infer", 1);
 
+        at::InferenceMode infer_guard;
+
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
         for (const int64_t i : samples_to_process) {
@@ -1137,8 +1139,6 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
                                 const int32_t chunk_end,
                                 std::vector<polisher::ConsensusResult>& results) {
         assert(chunk_end <= dorado::ssize(in_samples));
-
-        at::InferenceMode infer_guard;
 
         // Find samples which will not fit into the batch tensor.
         std::vector<int64_t> regular;
