@@ -69,7 +69,8 @@ T HtsReader::get_tag(const char* tagname) {
     } else if constexpr (std::is_floating_point_v<T>) {
         tag_value = static_cast<T>(bam_aux2f(tag));
     } else {
-        tag_value = static_cast<T>(bam_aux2Z(tag));
+        const char* val = bam_aux2Z(tag);
+        tag_value = val ? val : T{};
     }
 
     return tag_value;

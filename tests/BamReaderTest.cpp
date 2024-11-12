@@ -87,7 +87,12 @@ TEST_CASE("HtsReaderTest: get_tag", TEST_GROUP) {
         // All records in small.sam have this set to 0.
         CHECK(reader.get_tag<int>("rl") == 0);
         // Intentionally bad tag to test that missing tags don't return garbage.
+        CHECK(reader.get_tag<int>("##") == 0);
         CHECK(reader.get_tag<float>("##") == 0);
+        CHECK(reader.get_tag<std::string>("##") == "");
+        // Type mismatch doesn't crash.
+        CHECK(reader.get_tag<float>("rl") == 0);
+        CHECK(reader.get_tag<std::string>("rl") == "");
     }
 }
 
