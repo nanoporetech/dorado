@@ -25,7 +25,7 @@ struct Attributes {
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
     int32_t channel_number{-1};  //Channel ID
     std::string start_time{};    //Read acquisition start time
-    std::string fast5_filename{};
+    std::string filename{};
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
 
