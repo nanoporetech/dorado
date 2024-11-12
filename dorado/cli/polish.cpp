@@ -1247,7 +1247,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     std::array<std::mutex, 32> gpu_mutexes;  // One per GPU.
 
     auto batch_infer = [](polisher::TorchModel& model, const std::vector<polisher::Sample>& samples,
-                          const std::vector<int64_t> samples_to_process, std::mutex& gpu_mutex) {
+                          const std::vector<int64_t>& samples_to_process, std::mutex& gpu_mutex) {
         utils::ScopedProfileRange infer("infer", 1);
 
         // debug_print_samples(std::cout, samples, sample_start, sample_end);
@@ -1257,9 +1257,9 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         for (const int64_t i : samples_to_process) {
             batch_features.emplace_back(samples[i].features);
         }
-        // torch::Tensor batch_features_tensor = torch::stack(batch_features);
-        torch::Tensor batch_features_tensor =
-                correction::collate<float>(batch_features, 0.0f, polisher::FeatureTensorType);
+        torch::Tensor batch_features_tensor = torch::stack(batch_features);
+        // torch::Tensor batch_features_tensor =
+        //         correction::collate<float>(batch_features, 0.0f, polisher::FeatureTensorType);
 
         spdlog::info(
                 "About to call forward(): batch_features_tensor.size() = ({}, {}, {}), approx "
@@ -1282,58 +1282,49 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         return output;
     };
 
-    const auto process_samples = [&batch_infer, &gpu_mutexes](
-                                         polisher::TorchModel& model,
-                                         const polisher::CountsFeatureDecoder& decoder,
-                                         const std::vector<polisher::Sample>& in_samples,
-                                         const std::vector<int64_t> samples_to_process,
-                                         const int32_t batch_size, const bool gen_qual,
-                                         std::vector<polisher::ConsensusResult>& results) {
-        /**
+    const auto process_samples =
+            [&batch_infer, &gpu_mutexes](
+                    polisher::TorchModel& model, const polisher::CountsFeatureDecoder& decoder,
+                    const std::vector<polisher::Sample>& in_samples,
+                    const std::vector<int64_t>& samples_to_process, const int32_t batch_size,
+                    const bool gen_qual, std::vector<polisher::ConsensusResult>& results) {
+                /**
          * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
          */
-        // std::vector<torch::Tensor> outputs;
+                // std::vector<torch::Tensor> outputs;
 
-        // std::vector<polisher::ConsensusResult> results;
-        results.resize(std::size(in_samples));
+                // std::vector<polisher::ConsensusResult> results;
+                results.resize(std::size(in_samples));
 
-        const int64_t num_samples = dorado::ssize(samples_to_process);
+                const int64_t num_samples = dorado::ssize(samples_to_process);
 
-        for (int64_t start = 0; start < num_samples; start += batch_size) {
-            const int64_t end = std::min((start + batch_size), num_samples);
+                for (int64_t start = 0; start < num_samples; start += batch_size) {
+                    const int64_t end = std::min((start + batch_size), num_samples);
 
-            // Inference.
-            const std::vector<int64_t> ids(std::begin(samples_to_process) + start,
-                                           std::begin(samples_to_process) + end);
-            torch::Tensor output = batch_infer(model, in_samples, ids, gpu_mutexes[0]);
+                    const std::vector<int64_t> ids(std::begin(samples_to_process) + start,
+                                                   std::begin(samples_to_process) + end);
 
-            // Convert to sequences and qualities.
-            std::vector<polisher::ConsensusResult> new_results =
-                    decoder.decode_bases(output, gen_qual);
+                    torch::Tensor output = batch_infer(model, in_samples, ids, gpu_mutexes[0]);
 
-            assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
+                    // Convert to sequences and qualities.
+                    std::vector<polisher::ConsensusResult> new_results =
+                            decoder.decode_bases(output, gen_qual);
 
-            // Trim the overlapping sequences.
-            for (int64_t j = 0; j < dorado::ssize(new_results); ++j) {
-                auto& result = new_results[j];
-                const int64_t sample_id = ids[j];
-                results[sample_id] = std::move(result);
-                // const int64_t actual_size =
-                //         static_cast<int64_t>(std::size(in_samples[start + j].positions_major));
-                // if (in_samples[j].seq_id == 1) {
-                //     std::cerr << "[process_samples] j = " << j << ", actual_size = " << actual_size << ", in_samples[j] = " << in_samples[j] << "\n";
-                // }
-                // result.seq.resize(actual_size);
-                // result.quals.resize(actual_size);
-                // results.emplace_back(std::move(result));
-            }
+                    assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
-            spdlog::info(
-                    "Processed a batch of {} samples. Total samples processed: {}, "
-                    "num_samples = {}.",
-                    (end - start), end, num_samples);
-        }
-    };
+                    // Trim the overlapping sequences.
+                    for (int64_t j = 0; j < dorado::ssize(new_results); ++j) {
+                        auto& result = new_results[j];
+                        const int64_t sample_id = ids[j];
+                        results[sample_id] = std::move(result);
+                    }
+
+                    spdlog::info(
+                            "Processed a batch of {} samples. Total samples processed: {}, "
+                            "num_samples = {}.",
+                            (end - start), end, num_samples);
+                }
+            };
 
     const auto write_seq = [](std::ostream& os, const std::string& seq_name,
                               const polisher::ConsensusResult& result, const bool write_quals) {
@@ -1354,9 +1345,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                 quals[n] = result.quals[j];
             }
             ++n;
-            if (n == 626427) {
-                std::cerr << "[compacted] n = " << n << ", j = " << j << "\n";
-            }
         }
         seq.resize(n);
         quals.resize(n);
@@ -1468,6 +1456,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             const auto& sample = samples[i];
             if (dorado::ssize(sample.positions_major) != opt.window_len) {
                 remainders.emplace_back(i);
+                continue;
             }
             regular.emplace_back(i);
         }
@@ -1506,6 +1495,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             std::sort(std::begin(samples_for_seq), std::end(samples_for_seq));
 
             if (std::empty(samples_for_seq)) {
+                spdlog::warn("Sequence {} has zero inferred windows.", draft_lens[seq_id].first);
                 continue;
             }
 
