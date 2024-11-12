@@ -273,11 +273,6 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     if (devices_str == "cpu") {
         torch::Device torch_device = torch::Device(devices_str);
         devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
-        // infer_threads = 1;
-        // for (int32_t i = 0; i < num_cpu_threads; ++i) {
-        //     torch::Device torch_device = torch::Device(devices_str);
-        //     devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
-        // }
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
@@ -402,16 +397,11 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         std::exit(EXIT_FAILURE);
     }
 
-    // Check the output extension to determine if we need
-    // to compute the QVs too.
+    // Check the output extension to determine if we need to compute the QVs too.
     const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
     const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
     spdlog::info("Number of devices: {}", std::size(devices));
-
-    // const DeviceInfo& device_info = devices.front();
-
-    // spdlog::info("Using: device_str = {}", device_info.name);
 
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
@@ -421,8 +411,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     }
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
 #endif
-
-    at::InferenceMode infer_guard;
 
     // Main processing code.
     {
@@ -464,8 +452,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             if ((std::size(devices) == 1) && (devices.front().type == DeviceType::CPU)) {
                 for (int32_t i = 1; i < opt.threads; ++i) {
                     ret.emplace_back(models.front());
-                    // ret.emplace_back(models.front()->clone_model());
-                    // ret.back()->eval();
                 }
             }
             return ret;
@@ -534,14 +520,14 @@ int polish(int argc, char* argv[]) {
     // Initialize the options from the CLI.
     const Options opt = set_options(*parser, verbosity);
 
+    spdlog::set_level(spdlog::level::info);
+
     // Initialize the log level.
     if (opt.verbosity) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
     }
 
-    spdlog::set_level(spdlog::level::info);
-
-    spdlog::flush_every(std::chrono::seconds(1));  // flush every 3 seconds
+    spdlog::flush_every(std::chrono::seconds(1));
 
     // Check if input options are good.
     validate_options(opt);
@@ -554,7 +540,6 @@ int polish(int argc, char* argv[]) {
     [[maybe_unused]] polisher::ModelConfig config =
             polisher::parse_model_config(opt.model_path / "config.toml");
 
-    // Create either opt.threads CPU devices, or the number of other devices specified in the opt.device_str.
     const std::vector<DeviceInfo> devices = init_devices(opt.device_str);
 
     if (std::empty(devices)) {
