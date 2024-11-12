@@ -91,7 +91,7 @@ void SummaryData::set_fields(FieldFlags flags) {
     m_field_flags = flags;
 }
 
-bool SummaryData::process_file(const std::string& filename, std::ostream& writer) {
+void SummaryData::process_file(const std::string& filename, std::ostream& writer) {
     SigIntHandler sig_handler;
     HtsReader reader(filename, std::nullopt);
     m_field_flags = GENERAL_FIELDS | BARCODING_FIELDS;
@@ -100,7 +100,7 @@ bool SummaryData::process_file(const std::string& filename, std::ostream& writer
     }
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
     write_header(writer);
-    return write_rows_from_reader(reader, writer, read_group_exp_start_time);
+    write_rows_from_reader(reader, writer, read_group_exp_start_time);
 }
 
 bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) {
@@ -122,10 +122,7 @@ bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) 
     for (const auto& read_file : files) {
         HtsReader reader(read_file, std::nullopt);
         auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
-        bool ok = write_rows_from_reader(reader, writer, read_group_exp_start_time);
-        if (!ok) {
-            spdlog::error("File {} could not be processed. Skipping file.", read_file);
-        }
+        write_rows_from_reader(reader, writer, read_group_exp_start_time);
     }
     return true;
 }
@@ -155,7 +152,7 @@ void SummaryData::write_header(std::ostream& writer) {
     writer << '\n';
 }
 
-bool SummaryData::write_rows_from_reader(
+void SummaryData::write_rows_from_reader(
         HtsReader& reader,
         std::ostream& writer,
         const std::map<std::string, std::string>& read_group_exp_start_time) {
@@ -284,7 +281,6 @@ bool SummaryData::write_rows_from_reader(
         }
         writer << '\n';
     }
-    return true;
 }
 
 }  // namespace dorado
