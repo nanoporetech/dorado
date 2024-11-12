@@ -160,16 +160,28 @@ HtsReader::HtsReader(const std::string& filename,
 }
 
 template <typename T>
-bool HtsReader::try_initialise_generator(const std::string& filename) {
-    auto generator = std::make_shared<T>(filename);  // shared to allow copy assignment
+bool HtsReader::try_initialise_generator(const std::string& filepath) {
+    auto generator = std::make_shared<T>(filepath);  // shared to allow copy assignment
     if (!generator->is_valid()) {
         return false;
     }
     m_header = generator->header();
     m_format = generator->format();
-    m_bam_record_generator = [generator_ = std::move(generator)](bam1_t& bam_record) {
-        return generator_->try_get_next_record(bam_record);
-    };
+    m_bam_record_generator =
+            [generator_ = std::move(generator),
+             filename = std::filesystem::path(filepath).filename().string()](bam1_t& bam_record) {
+                if (!generator_->try_get_next_record(bam_record)) {
+                    return false;
+                }
+
+                // If the record doesn't have a filename set then say that it came from the currently processing file.
+                if (!bam_aux_get(&bam_record, "fn")) {
+                    bam_aux_append(&bam_record, "fn", 'Z', filename.size() + 1,
+                                   reinterpret_cast<const uint8_t*>(filename.c_str()));
+                }
+
+                return true;
+            };
     return true;
 }
 
