@@ -1287,6 +1287,92 @@ void process_samples(polisher::TorchModel& model,
     }
 }
 
+std::vector<Window> create_bam_regions(
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const int32_t bam_chunk_len,
+        const int32_t window_overlap,
+        const std::string& region_str) {
+    // Canonical case where each sequence is linearly split with an overlap.
+    if (std::empty(region_str)) {
+        std::vector<Window> windows;
+        for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
+            const int64_t len = draft_lens[seq_id].second;
+            const std::vector<Window> new_windows =
+                    create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap, -1);
+            windows.reserve(std::size(windows) + std::size(new_windows));
+            windows.insert(windows.end(), new_windows.begin(), new_windows.end());
+        }
+        return windows;
+    } else {
+        // Create windows for only this one region.
+
+        auto [region_name, region_start, region_end] = parse_region_string(region_str);
+
+        spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
+                     region_end);
+
+        // Find the sequence ID of the region sequence name.
+        int32_t seq_id = -1;
+        int64_t seq_length = 0;
+        for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
+            if (draft_lens[i].first == region_name) {
+                seq_id = i;
+                seq_length = draft_lens[i].second;
+                break;
+            }
+        }
+        if (region_start < 0) {
+            region_start = 0;
+        }
+        if (region_end <= 0) {
+            region_end = seq_length;
+        }
+        if (seq_id < 0) {
+            throw std::runtime_error(
+                    "Sequence provided by custom region not found in input! region_name = " +
+                    region_name);
+        }
+
+        // Split-up the custom region if it's too long.
+        const std::vector<Window> windows = create_windows(
+                seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap, -1);
+
+        return windows;
+    }
+}
+
+void write_consensus_result(std::ostream& os,
+                            const std::string& seq_name,
+                            const polisher::ConsensusResult& result,
+                            const bool write_quals) {
+    if (std::empty(result.seq)) {
+        return;
+    }
+
+    std::string seq(std::size(result.seq), '\0');
+    std::string quals(std::size(result.seq), '!');
+
+    size_t n = 0;
+    for (size_t j = 0; j < std::size(result.seq); ++j) {
+        if (result.seq[j] == '*') {
+            continue;
+        }
+        seq[n] = result.seq[j];
+        if (!std::empty(result.quals)) {
+            quals[n] = result.quals[j];
+        }
+        ++n;
+    }
+    seq.resize(n);
+    quals.resize(n);
+
+    if (write_quals) {
+        os << '@' << seq_name << '\n' << seq << "\n+\n" << quals << '\n';
+    } else {
+        os << '>' << seq_name << '\n' << seq << '\n';
+    }
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
@@ -1314,90 +1400,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 #endif
 
     at::InferenceMode infer_guard;
-
-    const auto write_seq = [](std::ostream& os, const std::string& seq_name,
-                              const polisher::ConsensusResult& result, const bool write_quals) {
-        if (std::empty(result.seq)) {
-            return;
-        }
-
-        std::string seq(std::size(result.seq), '\0');
-        std::string quals(std::size(result.seq), '!');
-
-        size_t n = 0;
-        for (size_t j = 0; j < std::size(result.seq); ++j) {
-            if (result.seq[j] == '*') {
-                continue;
-            }
-            seq[n] = result.seq[j];
-            if (!std::empty(result.quals)) {
-                quals[n] = result.quals[j];
-            }
-            ++n;
-        }
-        seq.resize(n);
-        quals.resize(n);
-
-        if (write_quals) {
-            os << '@' << seq_name << '\n' << seq << "\n+\n" << quals << '\n';
-        } else {
-            os << '>' << seq_name << '\n' << seq << '\n';
-        }
-    };
-
-    const auto create_bam_regions = [](const std::vector<std::pair<std::string, int64_t>>&
-                                               draft_lens,
-                                       const int32_t bam_chunk_len, const int32_t window_overlap,
-                                       const std::string& region_str) {
-        // Canonical case where each sequence is linearly split with an overlap.
-        if (std::empty(region_str)) {
-            std::vector<Window> windows;
-            for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-                const int64_t len = draft_lens[seq_id].second;
-                const std::vector<Window> new_windows =
-                        create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap, -1);
-                windows.reserve(std::size(windows) + std::size(new_windows));
-                windows.insert(windows.end(), new_windows.begin(), new_windows.end());
-            }
-            return windows;
-        } else {
-            // Create windows for only this one region.
-
-            auto [region_name, region_start, region_end] = parse_region_string(region_str);
-
-            spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
-                         region_end);
-
-            // Find the sequence ID of the region sequence name.
-            int32_t seq_id = -1;
-            int64_t seq_length = 0;
-            for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
-                if (draft_lens[i].first == region_name) {
-                    seq_id = i;
-                    seq_length = draft_lens[i].second;
-                    break;
-                }
-            }
-            if (region_start < 0) {
-                region_start = 0;
-            }
-            if (region_end <= 0) {
-                region_end = seq_length;
-            }
-            if (seq_id < 0) {
-                throw std::runtime_error(
-                        "Sequence provided by custom region not found in input! region_name = " +
-                        region_name);
-            }
-
-            // Split-up the custom region if it's too long.
-            const std::vector<Window> windows =
-                    create_windows(seq_id, region_start, region_end, seq_length, bam_chunk_len,
-                                   window_overlap, -1);
-
-            return windows;
-        }
-    };
 
     // Main processing code.
     {
@@ -1503,7 +1505,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             std::cerr << "Done stitching.\n";
 
             const std::string header = std::string("consensus") + "-" + draft_lens[seq_id].first;
-            write_seq(ofs, header, consensus, with_quals);
+            write_consensus_result(ofs, header, consensus, with_quals);
         }
     }
 
