@@ -38,7 +38,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_1->read_common.attributes.filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
@@ -53,7 +53,7 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_2->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_2->read_common.attributes.filename = "batch_0.fast5";
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
@@ -82,7 +82,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_1->read_common.attributes.filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
@@ -97,7 +97,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_2->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_2->read_common.attributes.filename = "batch_0.fast5";
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
@@ -126,7 +126,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_1->read_common.attributes.read_number = 18501;
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_1->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_1->read_common.attributes.filename = "batch_0.fast5";
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
@@ -141,7 +141,7 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
         read_2->read_common.attributes.read_number = 18501;
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read_2->read_common.attributes.fast5_filename = "batch_0.fast5";
+        read_2->read_common.attributes.filename = "batch_0.fast5";
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
