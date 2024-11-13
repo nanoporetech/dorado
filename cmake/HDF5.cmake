@@ -3,7 +3,7 @@ option(DYNAMIC_HDF "Link HDF as dynamic libs" OFF)
 if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"))
     # download the pacakge for arm, we want to package this due to hdf5's dependencies
     set(DYNAMIC_HDF ON)
-    set(HDF_VER hdf5-1.10.0-aarch64)
+    set(HDF_VER hdf5-1.10.0-1-aarch64)
     download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip ${HDF_VER})
     list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY_DOWNLOAD}/${HDF_VER}/${HDF_VER})
 
