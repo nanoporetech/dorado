@@ -84,15 +84,17 @@ TEST_CASE("HtsReaderTest: get_tag", TEST_GROUP) {
 
     dorado::HtsReader reader(sam.string(), std::nullopt);
     while (reader.read()) {
-        // All records in small.sam have this set to 0.
-        CHECK(reader.get_tag<int>("rl") == 0);
+        // All records in small.sam have these set.
+        CHECK(reader.get_tag<int>("XA") == 42);
+        CHECK(reader.get_tag<std::string>("XB") == "test");
         // Intentionally bad tag to test that missing tags don't return garbage.
         CHECK(reader.get_tag<int>("##") == 0);
         CHECK(reader.get_tag<float>("##") == 0);
         CHECK(reader.get_tag<std::string>("##") == "");
         // Type mismatch doesn't crash.
-        CHECK(reader.get_tag<float>("rl") == 0);
-        CHECK(reader.get_tag<std::string>("rl") == "");
+        CHECK(reader.get_tag<int>("XB") == 0);
+        CHECK(reader.get_tag<float>("XB") == 0);
+        CHECK(reader.get_tag<std::string>("XA") == "");
     }
 }
 
