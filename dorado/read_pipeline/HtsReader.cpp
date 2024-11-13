@@ -176,7 +176,7 @@ bool HtsReader::try_initialise_generator(const std::string& filepath) {
 
         // If the record doesn't have a filename set then say that it came from the currently processing file.
         if (m_add_filename_tag && !bam_aux_get(&bam_record, "fn")) {
-            bam_aux_append(&bam_record, "fn", 'Z', filename.size() + 1,
+            bam_aux_append(&bam_record, "fn", 'Z', static_cast<int>(filename.size() + 1),
                            reinterpret_cast<const uint8_t*>(filename.c_str()));
         }
 
