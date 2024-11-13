@@ -134,4 +134,16 @@ TEST_CASE(
             "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");
 }
 
+TEST_CASE("HtsReaderTest: filename tag added if missing", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("bam_reader"));
+    auto filename = GENERATE("input.fa", "fastq_with_tags.fq");
+    auto fasta = aligner_test_dir / filename;
+
+    dorado::HtsReader reader(fasta.string(), std::nullopt);
+    while (reader.read()) {
+        // All should be given the name of input file.
+        CHECK(reader.get_tag<std::string>("fn") == filename);
+    }
+}
+
 }  // namespace dorado::hts_reader::test
