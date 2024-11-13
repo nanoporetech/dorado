@@ -41,7 +41,7 @@ public:
     void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
     bool is_aligned{false};
-    BamPtr record{nullptr};
+    BamPtr record;
 
     sam_hdr_t* header();
     const sam_hdr_t* header() const;
@@ -49,13 +49,13 @@ public:
 
 private:
     sam_hdr_t* m_header{nullptr};  // non-owning
-    std::string m_format{};
+    std::string m_format;
     std::shared_ptr<ClientInfo> m_client_info;
 
-    std::function<void(BamPtr&)> m_record_mutator{};
+    std::function<void(BamPtr&)> m_record_mutator;
     std::optional<std::unordered_set<std::string>> m_read_list;
 
-    std::function<bool(bam1_t&)> m_bam_record_generator{};
+    std::function<bool(bam1_t&)> m_bam_record_generator;
     bool m_add_filename_tag{true};
 
     template <typename T>
