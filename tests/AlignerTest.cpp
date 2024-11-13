@@ -544,6 +544,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Get the sam line from BAM pipeline
     dorado::HtsReader bam_reader(query, std::nullopt);
+    bam_reader.set_add_filename_tag(false);
     auto bam_records = RunPipelineWithBamMessages(bam_reader, ref, "", options, 2);
     CHECK(bam_records.size() == 1);
     auto sam_line_from_bam_ptr = get_sam_line_from_bam(std::move(bam_records[0]));

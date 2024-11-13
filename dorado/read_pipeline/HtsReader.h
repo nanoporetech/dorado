@@ -25,6 +25,11 @@ class HtsReader {
 public:
     HtsReader(const std::string& filename,
               std::optional<std::unordered_set<std::string>> read_list);
+
+    // By default we'll add a filename tag to each record to match the current file
+    // if one isn't included in the data, but that can be disabled with this method.
+    void set_add_filename_tag(bool should) { m_add_filename_tag = should; }
+
     bool read();
 
     // If reading directly into a pipeline need to set the client info on the messages
@@ -51,6 +56,7 @@ private:
     std::optional<std::unordered_set<std::string>> m_read_list;
 
     std::function<bool(bam1_t&)> m_bam_record_generator{};
+    bool m_add_filename_tag{true};
 
     template <typename T>
     bool try_initialise_generator(const std::string& filename);
