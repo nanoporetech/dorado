@@ -99,8 +99,8 @@ protected:
     MessageTypePtr RunPipelineForRead(
             const std::shared_ptr<dorado::alignment::AlignmentInfo>& loaded_align_info,
             const std::shared_ptr<dorado::alignment::AlignmentInfo>& client_align_info,
-            std::string read_id,
-            std::string sequence) {
+            const std::string& read_id,
+            const std::string& sequence) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
         auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
         CHECK(index_file_access->load_index(loaded_align_info->reference_file,
@@ -116,8 +116,8 @@ protected:
 
         auto read = std::make_unique<MessageType>();
         read->read_common.client_info = std::move(client_info);
-        read->read_common.read_id = std::move(read_id);
-        read->read_common.seq = std::move(sequence);
+        read->read_common.read_id = read_id;
+        read->read_common.seq = sequence;
 
         pipeline->push_message(std::move(read));
         pipeline->terminate({});
@@ -552,8 +552,8 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto align_info = std::make_shared<dorado::alignment::AlignmentInfo>();
     align_info->minimap_options = options;
     align_info->reference_file = ref;
-    auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
-            align_info, align_info, std::move(read_id), std::move(sequence));
+    auto simplex_read =
+            RunPipelineForRead<dorado::SimplexRead>(align_info, align_info, read_id, sequence);
     auto sam_line_from_read_common =
             std::move(simplex_read->read_common.alignment_results[0].sam_string);
 
