@@ -412,6 +412,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
 #endif
 
+    at::InferenceMode infer_guard;
+
     // Main processing code.
     {
         spdlog::info("Loading draft sequence lengths.");
