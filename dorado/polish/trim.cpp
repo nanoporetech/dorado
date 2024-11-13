@@ -376,8 +376,8 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
 
     // Trim each sample to the region.
     if ((region.seq_id >= 0) && (region.start >= 0) && (region.end > 0)) {
-        std::cerr << "Trimming to custom region: seq_id = " << region.seq_id
-                  << ", start = " << region.start << ", end = " << region.end << "\n";
+        // std::cerr << "Trimming to custom region: seq_id = " << region.seq_id
+        //           << ", start = " << region.start << ", end = " << region.end << "\n";
         for (size_t i = 0; i < std::size(samples); ++i) {
             const auto& sample = samples[i];
             TrimInfo& trim = result[i];
