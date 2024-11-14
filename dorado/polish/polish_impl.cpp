@@ -8,6 +8,13 @@
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#endif
+
 namespace dorado::polisher {
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
@@ -683,6 +690,16 @@ void process_samples(polisher::TorchModel& model,
 
         return output;
     };
+
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Stream> stream;
+    const auto& device = model.get_device();
+    if (device.is_cuda()) {
+        spdlog::info("Acquiring a CUDA stream.");
+        stream = c10::cuda::getStreamFromPool(false, device.index());
+    }
+    c10::cuda::OptionalCUDAStreamGuard guard(stream);
+#endif
 
     results.resize(std::size(in_samples));
 

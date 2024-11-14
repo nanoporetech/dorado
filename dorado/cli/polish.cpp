@@ -309,11 +309,10 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
             devices.emplace_back(DeviceInfo{val, DeviceType::CUDA, std::move(torch_device)});
         }
     }
-#else
+#endif
     else {
         throw std::runtime_error("Unsupported device: " + devices_str);
     }
-#endif
 
     return devices;
 }
@@ -385,10 +384,10 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     return ret;
 }
 
-[[maybe_unused]] void write_consensus_result(std::ostream& os,
-                                             const std::string& seq_name,
-                                             const polisher::ConsensusResult& result,
-                                             const bool write_quals) {
+void write_consensus_result(std::ostream& os,
+                            const std::string& seq_name,
+                            const polisher::ConsensusResult& result,
+                            const bool write_quals) {
     if (std::empty(result.seq)) {
         return;
     }
@@ -440,15 +439,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
     spdlog::info("Number of devices: {}", std::size(devices));
 
-#if DORADO_CUDA_BUILD
-    c10::optional<c10::Stream> stream;
-    if (device.is_cuda()) {
-        spdlog::info("Acquiring a CUDA stream.");
-        stream = c10::cuda::getStreamFromPool(false, device.index());
-    }
-    c10::cuda::OptionalCUDAStreamGuard guard(stream);
-#endif
-
     at::InferenceMode infer_guard;
 
     const bool rv_fai = utils::create_fai_index(opt.in_draft_fastx_fn);
@@ -495,8 +485,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const std::vector<polisher::Interval> draft_batches =
             create_batches(draft_lens, opt.draft_batch_size,
                            [](const std::pair<std::string, int64_t>& val) { return val.second; });
-
-    const int64_t sample_batch_size = opt.batch_size * opt.threads * 2;
 
     std::ofstream ofs(opt.out_consensus_fn);
 
