@@ -60,7 +60,7 @@ std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files
         const std::string& input_root_folder,
         bool recursive,
         const std::string& output_folder) {
-    auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
+    const auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
     dorado::utils::SuppressStderr stderr_suppressed{};
     const fs::path input_root(input_root_folder);
     const fs::path output_root(output_folder);
@@ -69,8 +69,8 @@ std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files
         if (!is_valid_input_file(dir_entry.path())) {
             continue;
         }
-        auto relative_path = fs::relative(dir_entry.path(), input_root);
-        auto output = replace_extension(output_root / relative_path);
+        const auto relative_path = fs::relative(dir_entry.path(), input_root);
+        const auto output = replace_extension(output_root / relative_path);
         result[output.string()].push_back(relative_path);
     }
 
