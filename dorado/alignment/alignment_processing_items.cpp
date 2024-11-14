@@ -56,44 +56,26 @@ fs::path replace_extension(fs::path output_path) {
     return output_path.replace_extension("bam");
 }
 
-class WorkingFileLut {
-    std::unordered_map<std::string, std::vector<fs::path>> m_working_paths{};
-    const std::string& m_output_folder;
-
-    void add_to_working_files(const fs::path& input_relative_path) {
-        auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
-
-        m_working_paths[output.string()].push_back(input_relative_path);
-    }
-
-    bool try_add_to_working_files(const fs::path& input_root, const fs::path& input_relative_path) {
-        if (!is_valid_input_file(input_root / input_relative_path)) {
-            return false;
+std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files_lut(
+        const std::string& input_root_folder,
+        bool recursive,
+        const std::string& output_folder) {
+    auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
+    dorado::utils::SuppressStderr stderr_suppressed{};
+    const fs::path input_root(input_root_folder);
+    const fs::path output_root(output_folder);
+    std::unordered_map<std::string, std::vector<fs::path>> result{};
+    for (const fs::directory_entry& dir_entry : all_files) {
+        if (!is_valid_input_file(dir_entry.path())) {
+            continue;
         }
-
-        add_to_working_files(input_relative_path);
-        return true;
+        auto relative_path = fs::relative(dir_entry.path(), input_root);
+        auto output = replace_extension(output_root / relative_path);
+        result[output.string()].push_back(relative_path);
     }
 
-public:
-    WorkingFileLut(const std::string& input_root_folder,
-                   bool recursive,
-                   const std::string& output_folder)
-            : m_output_folder(output_folder) {
-        auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
-        dorado::utils::SuppressStderr stderr_suppressed{};
-        const fs::path input_root(input_root_folder);
-        for (const fs::directory_entry& dir_entry : all_files) {
-            const auto& input_path = dir_entry.path();
-            auto relative_path = fs::relative(input_path, input_root);
-            try_add_to_working_files(input_root, relative_path);
-        }
-    }
-
-    const std::unordered_map<std::string, std::vector<fs::path>>& get() const {
-        return m_working_paths;
-    }
-};
+    return result;
+}
 
 }  // namespace
 
@@ -176,11 +158,12 @@ bool AlignmentProcessingItems::initialise_for_file() {
 }
 
 void AlignmentProcessingItems::add_all_valid_files() {
-    WorkingFileLut working_file_lut{m_input_path, m_recursive_input, m_output_folder};
+    const auto output_to_input_files_lut =
+            get_output_to_input_files_lut(m_input_path, m_recursive_input, m_output_folder);
 
     const fs::path input_root(m_input_path);
     const fs::path output_root(m_output_folder);
-    for (const auto& output_to_inputs_pair : working_file_lut.get()) {
+    for (const auto& output_to_inputs_pair : output_to_input_files_lut) {
         const auto& input_files = output_to_inputs_pair.second;
         if (input_files.size() == 1) {
             // single unique output file name
