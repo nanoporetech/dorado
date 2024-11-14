@@ -501,7 +501,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                     opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples, trims,
                     results_samples, samples_for_seq, seq_id);
 
-            const std::string header = std::string("consensus") + "-" + draft_lens[seq_id].first;
+            const std::string& header = draft_lens[seq_id].first;
             write_consensus_result(ofs, header, consensus, with_quals);
         }
     }
