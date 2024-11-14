@@ -232,8 +232,11 @@ std::tuple<std::string, int64_t> find_furthest_skipped_read(
         return std::tuple(std::string(), -1);
     }
 
-    if (!utils::check_fai_exists(in_fastx_fn)) {
-        utils::create_fai_index(in_fastx_fn);
+    const bool rv_fai = utils::create_fai_index(in_fastx_fn);
+    if (!rv_fai) {
+        spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
+                      in_fastx_fn.string());
+        std::exit(EXIT_FAILURE);
     }
 
     const std::filesystem::path in_reads_fai_fn = utils::get_fai_path(in_fastx_fn);

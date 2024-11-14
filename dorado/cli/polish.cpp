@@ -349,10 +349,6 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
 
 std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
         const std::filesystem::path& in_fastx_fn) {
-    if (!utils::check_fai_exists(in_fastx_fn)) {
-        utils::create_fai_index(in_fastx_fn);
-    }
-
     const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
 
     std::vector<std::pair<std::string, int64_t>> ret;
@@ -417,6 +413,13 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     // Main processing code.
     {
         spdlog::info("Loading draft sequence lengths.");
+
+        const bool rv_fai = utils::create_fai_index(opt.in_draft_fastx_fn);
+        if (!rv_fai) {
+            spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
+                          opt.in_draft_fastx_fn.string());
+            std::exit(EXIT_FAILURE);
+        }
 
         const std::vector<std::pair<std::string, int64_t>> draft_lens =
                 load_seq_lengths(opt.in_draft_fastx_fn);
