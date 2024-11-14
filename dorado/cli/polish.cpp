@@ -86,9 +86,10 @@ struct Options {
     int32_t infer_threads = 1;
     std::string device_str;
     int32_t batch_size = 128;
+    int64_t draft_batch_size = 200'000'000;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
-    int32_t bam_chunk = 1000000;
+    int32_t bam_chunk = 1'000'000;
     std::string region;
 };
 
@@ -136,6 +137,9 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
                 .default_value(100)
                 .scan<'i', int>();
+        parser->visible.add_argument("--draft-batch-size")
+                .help("Input draft sequences will be process in batches of roughly this size.")
+                .default_value(std::string{"200M"});
         parser->visible.add_argument("-w", "--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
@@ -198,6 +202,9 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
 
     opt.batch_size = parser.visible.get<int>("batch-size");
+    opt.draft_batch_size =
+            std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
+                                         parser.visible.get<std::string>("draft-batch-size")));
     opt.window_len = parser.visible.get<int>("window-len");
     opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
@@ -232,8 +239,12 @@ void validate_options(const Options& opt) {
         spdlog::error("Output path matches one of the input paths!");
         std::exit(EXIT_FAILURE);
     }
-    if (opt.batch_size < 0) {
+    if (opt.batch_size <= 0) {
         spdlog::error("Batch size should be > 0. Given: {}.", opt.batch_size);
+        std::exit(EXIT_FAILURE);
+    }
+    if (opt.draft_batch_size <= 0) {
+        spdlog::error("Draft batch size should be > 0. Given: {}.", opt.draft_batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.window_len <= 0) {
@@ -313,7 +324,7 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
     torch::jit::script::Module module;
 
     try {
-        spdlog::info("Loading weights from file: {}", model_path.string());
+        spdlog::debug("Loading weights from file: {}", model_path.string());
         module = torch::jit::load(model_path.string());
     } catch (const c10::Error& e) {
         throw std::runtime_error("Error loading model from " + model_path.string() +
@@ -321,10 +332,10 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
     }
 
     // Construct the model.
-    spdlog::info("Creating the GRU model.");
+    spdlog::debug("Creating the GRU model.");
     std::unique_ptr<polisher::GRUModel> model = std::make_unique<polisher::GRUModel>(10, 5, 128);
 
-    spdlog::info("Setting the weights.");
+    spdlog::debug("Setting the weights.");
     auto state_dict = module.named_parameters();
     for (const auto& p : state_dict) {
         auto* param = model->named_parameters().find(p.name);
@@ -335,16 +346,12 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
                     "Some loaded parameters cannot be found in the C++ model! name = " + p.name);
         }
     }
-    spdlog::info("Moving the model to the device: {}", device_info.name);
     model->to(device_info.device);
-    spdlog::info("Moved the model to the device: {}. Converting to half.", device_info.name);
     if (device_info.type == DeviceType::CUDA) {
         model->to_half();
         spdlog::info("Converted the model to half.");
     }
-    spdlog::info("Calling model->eval().");
     model->eval();
-    spdlog::info("Model ready.");
 
     size_t total_params = 0;
     size_t total_bytes = 0;
@@ -352,8 +359,8 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
         total_params += param.numel();
         total_bytes += param.numel() * param.element_size();
     }
-    spdlog::info("Total parameters: {}", total_params);
-    spdlog::info("Total size (in MB): {} MB", (total_bytes / (1024.0 * 1024.0)));
+    spdlog::info("Model: total parameters: {}, size: {} MB", total_params,
+                 (total_bytes / (1024.0 * 1024.0)));
 
     return model;
 }
@@ -394,6 +401,29 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     } else {
         os << '>' << seq_name << '\n' << out.seq << '\n';
     }
+}
+
+template <typename T, typename F>
+std::vector<polisher::Interval> create_batches(const T& data,
+                                               const int64_t batch_size,
+                                               const F& functor_data_size) {
+    std::vector<polisher::Interval> ret;
+    polisher::Interval interval{0, 0};
+    int64_t sum = 0;
+    for (const auto& val : data) {
+        const int64_t s = functor_data_size(val);
+        sum += s;
+        ++interval.end;
+        if (sum >= batch_size) {
+            ret.emplace_back(interval);
+            interval.start = interval.end;
+            sum = 0;
+        }
+    }
+    if (interval.end > interval.start) {
+        ret.emplace_back(interval);
+    }
+    return ret;
 }
 
 }  // namespace
@@ -445,13 +475,12 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     torch::set_num_threads(1);
 
     // Construct the model.
-    spdlog::info("Loading the model.");
+    spdlog::debug("Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<polisher::TorchModel>> ret;
         for (int32_t device_id = 0; device_id < dorado::ssize(devices); ++device_id) {
             ret.emplace_back(create_model(opt.model_path / "model.pt", devices[device_id]));
             spdlog::info("Loaded model to device {}: {}", device_id, devices[device_id].name);
-            std::cerr << "devices[device_id].device = " << devices[device_id].device << "\n";
         }
         if ((std::size(devices) == 1) && (devices.front().type == DeviceType::CPU)) {
             for (int32_t i = 1; i < opt.threads; ++i) {
@@ -462,86 +491,66 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     };
     const std::vector<std::shared_ptr<polisher::TorchModel>> models = create_models();
 
-    // Create BAM windows (regions) to create pileup. The features (samples) will
-    // be split further into windows of window_len in size prior to inference.
-    spdlog::info("Creating BAM windows.");
-    const std::vector<polisher::Window> bam_regions =
-            polisher::create_bam_regions(draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
+    // Divide draft sequences into groups of specified size, as sort of a barrier.
+    const std::vector<polisher::Interval> draft_batches =
+            create_batches(draft_lens, opt.draft_batch_size,
+                           [](const std::pair<std::string, int64_t>& val) { return val.second; });
 
     const int64_t sample_batch_size = opt.batch_size * opt.threads * 2;
 
-    // Main processing code.
-    int64_t curr_bam_region = 0;
-    while (curr_bam_region < dorado::ssize(bam_regions)) {
-        // IMPORTANT: The intra-thread parallelism was killing performance when multiple threads were used.
-        //              Remember to reset this at the inference stage so that the CPU-only runs don't suffer.
+    std::ofstream ofs(opt.out_consensus_fn);
 
-        spdlog::info("Starting to produce a new batch of samples.");
+    for (const auto& draft_batch : draft_batches) {
+        spdlog::info("=============================");
+        spdlog::info("Starting to produce consensus for draft sequences: {}-{}/{}.",
+                     draft_batch.start, draft_batch.end, std::size(draft_lens));
 
-        // Producer.
-        std::vector<polisher::Sample> samples;
-        std::vector<polisher::TrimInfo> trims;
-        for (; curr_bam_region < dorado::ssize(bam_regions); ++curr_bam_region) {
-            auto [new_samples, new_trims] =
-                    polisher::create_samples(encoders, {bam_regions[curr_bam_region]}, draft_lens,
-                                             opt.threads, opt.window_len, opt.window_overlap);
-            samples.insert(std::end(samples), std::make_move_iterator(std::begin(new_samples)),
-                           std::make_move_iterator(std::end(new_samples)));
-            trims.insert(std::end(trims), std::make_move_iterator(std::begin(new_trims)),
-                         std::make_move_iterator(std::end(new_trims)));
-            if (dorado::ssize(samples) >= sample_batch_size) {
-                break;
-            }
-        }
+        spdlog::debug("Creating BAM windows.");
+        const std::vector<std::pair<std::string, int64_t>> draft_lens_batch(
+                std::begin(draft_lens) + draft_batch.start,
+                std::begin(draft_lens) + draft_batch.end);
+        const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
+                draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
 
-        // Increase the number of threads again for inter-op parallelism.
-        // torch::set_num_threads(opt.threads);
+        // std::vector<std::vector<polisher::ConsensusResult>> pieces(std::size(draft_lens_batch));
+
+        auto [samples, trims] =
+                polisher::create_samples(encoders, bam_regions, draft_lens_batch, opt.threads,
+                                         opt.window_len, opt.window_overlap);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
-        (void)with_quals;
+        const polisher::CountsFeatureDecoder decoder;
+        std::vector<polisher::ConsensusResult> results_samples =
+                polisher::process_samples_in_parallel(samples, trims, models, decoder,
+                                                      opt.window_len, opt.batch_size);
 
-        // spdlog::info("Inferring samples in batches. Num samples: {}.", std::size(samples));
+        // Group samples by sequence ID.
+        std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
+        for (int32_t i = 0; i < dorado::ssize(results_samples); ++i) {
+            const polisher::ConsensusResult& r = results_samples[i];
+            groups[r.draft_id].emplace_back(r.draft_start, i);
+        }
+        // Stitch the windows.
+        for (size_t seq_id = 0; seq_id < std::size(groups); ++seq_id) {
+            auto& group = groups[seq_id];
 
-        // const polisher::CountsFeatureDecoder decoder;
-        // std::vector<polisher::ConsensusResult> results_samples =
-        //         polisher::process_samples_in_parallel(samples, models, decoder, opt.window_len,
-        //                                               opt.batch_size);
+            // Sort by region start position, for every sequence.
+            std::sort(std::begin(group), std::end(group));
 
-        // // Stitching information, collect all samples for each sequence.
-        // std::vector<std::vector<std::pair<int64_t, int32_t>>> samples_for_seqs(
-        //         std::size(draft_lens));
-        // for (int32_t i = 0; i < static_cast<int32_t>(std::size(samples)); ++i) {
-        //     const polisher::Sample& sample = samples[i];
-        //     samples_for_seqs[sample.seq_id].emplace_back(sample.start(), i);
-        // }
+            if (std::empty(group)) {
+                spdlog::warn("Sequence {} has zero inferred windows.",
+                             draft_lens_batch[seq_id].first);
+                continue;
+            }
 
-        // // Stitch the windows.
-        // std::ofstream ofs(opt.out_consensus_fn);
-        // for (size_t seq_id = 0; seq_id < std::size(samples_for_seqs); ++seq_id) {
-        //     auto& samples_for_seq = samples_for_seqs[seq_id];
+            const polisher::ConsensusResult consensus =
+                    polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
+                                              results_samples, group, seq_id);
 
-        //     // Sort by region start position, for every sequence.
-        //     std::sort(std::begin(samples_for_seq), std::end(samples_for_seq));
-
-        //     if (std::empty(samples_for_seq)) {
-        //         spdlog::warn("Sequence {} has zero inferred windows.", draft_lens[seq_id].first);
-        //         continue;
-        //     }
-
-        //     std::vector<int32_t> sample_ids;
-        //     sample_ids.reserve(std::size(samples_for_seq));
-        //     for (const auto& [_, sample_id] : samples_for_seq) {
-        //         sample_ids.emplace_back(sample_id);
-        //     }
-
-        //     const polisher::ConsensusResult consensus = polisher::stitch_sequence(
-        //             opt.in_draft_fastx_fn, draft_lens[seq_id].first, samples, trims,
-        //             results_samples, samples_for_seq, seq_id);
-
-        //     const std::string& header = draft_lens[seq_id].first;
-        //     write_consensus_result(ofs, header, consensus, with_quals);
-        // }
+            const std::string& header = draft_lens_batch[seq_id].first;
+            write_consensus_result(ofs, header, consensus, with_quals);
+        }
     }
 
     for (auto& bam_set : bam_sets) {

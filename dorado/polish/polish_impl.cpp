@@ -152,20 +152,13 @@ void remove_deletions(polisher::ConsensusResult& cons) {
 polisher::ConsensusResult stitch_sequence(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
-        const std::vector<polisher::Sample>& samples,
-        const std::vector<polisher::TrimInfo>& trims,
         const std::vector<polisher::ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         [[maybe_unused]] const int32_t seq_id) {
-    if (std::size(samples) != std::size(trims)) {
-        throw std::runtime_error("Number of samples and trims differs! std::size(samples) = " +
-                                 std::to_string(std::size(samples)) +
-                                 ", std::size(trims) = " + std::to_string(std::size(trims)));
-    }
-
     const std::string draft = fetch_seq(in_draft_fn, header);
 
     if (std::empty(samples_for_seq)) {
+        spdlog::warn("Sequence '{}' has zero samples. Copying the draft.", header);
         std::string dummy_quals(std::size(draft), '!');
         return polisher::ConsensusResult{draft, std::move(dummy_quals)};
     }
@@ -177,40 +170,26 @@ polisher::ConsensusResult stitch_sequence(
 #endif
 
     // This is an inclusive coordinate. If it was 0, then adding front draft chunk would miss 1 base.
-    int64_t last_end = -1;
+    int64_t last_end = 0;
     for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
-        const polisher::Sample& sample = samples[sample_index];
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
-        const polisher::TrimInfo& trim = trims[sample_index];
 
-        const int64_t start_pos = sample.positions_major[trim.start];
-        const int64_t end_pos = sample.positions_major.back();
-
-        if (start_pos > (last_end + 1)) {
-            result.seq += draft.substr(last_end + 1, start_pos - last_end - 1);
-            result.quals += std::string(start_pos - last_end - 1, '!');
+        if (sample_result.draft_start > last_end) {
+            result.seq += draft.substr(last_end, sample_result.draft_start - last_end);
+            result.quals += std::string(sample_result.draft_start - last_end, '!');
         }
 
-#ifdef DEBUG_POLISH_DUMP_SEQ_PIECES
-        {
-            polisher::ConsensusResult tmp{
-                    sample_result.seq.substr(trim.start, trim.end - trim.start), {}};
-            remove_deletions(tmp);
-            ofs << ">seq_id_" << seq_id << "_part_" << i << '\n' << tmp.seq << '\n';
-        }
-#endif
+        result.seq += sample_result.seq;
+        result.quals += sample_result.quals;
 
-        result.seq += sample_result.seq.substr(trim.start, trim.end - trim.start);
-        result.quals += sample_result.quals.substr(trim.start, trim.end - trim.start);
-
-        last_end = end_pos;
+        last_end = sample_result.draft_end;
     }
 
     // Add the back draft part.
-    if ((last_end + 1) < dorado::ssize(draft)) {
-        result.seq += draft.substr(last_end + 1);
-        result.quals += std::string(dorado::ssize(draft) - last_end - 1, '!');
+    if (last_end < dorado::ssize(draft)) {
+        result.seq += draft.substr(last_end);
+        result.quals += std::string(dorado::ssize(draft) - last_end, '!');
     }
 
     return result;
@@ -481,8 +460,8 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     //      the tensors have also insertions and can grow significantly.
     // It parallelizes this process on both levels of windowing.
 
-    spdlog::info("Input: {} BAM windows from {} sequences.", std::size(bam_regions),
-                 std::size(draft_lens));
+    spdlog::debug("[create_samples] Input: {} BAM windows from {} sequences.",
+                  std::size(bam_regions), std::size(draft_lens));
 
 #ifdef DEBUG_POLISH_REGIONS
     for (size_t i = 0; i < std::size(draft_lens); ++i) {
@@ -549,7 +528,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         }
     }
 
-    spdlog::info("Merging the samples into {} BAM chunks.", std::size(bam_region_intervals));
+    spdlog::debug("Merging the samples into {} BAM chunks.", std::size(bam_region_intervals));
 
     // Three tasks for this worker:
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
@@ -619,8 +598,9 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         // Process BAM windows in parallel.
         const std::vector<Interval> chunks =
                 compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), 1);
-        spdlog::info("Starting to merge samples for {} BAM windows using {} threads.",
-                     std::size(bam_region_intervals), std::size(chunks));
+
+        spdlog::debug("Starting to merge samples for {} BAM windows using {} threads.",
+                      std::size(bam_region_intervals), std::size(chunks));
 
         cxxpool::thread_pool pool{std::size(chunks)};
         std::vector<std::future<void>> futures;
@@ -664,6 +644,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 void process_samples(polisher::TorchModel& model,
                      const polisher::CountsFeatureDecoder& decoder,
                      const std::vector<polisher::Sample>& in_samples,
+                     const std::vector<polisher::TrimInfo>& in_trims,
                      const std::vector<int64_t>& in_samples_to_process,
                      const int32_t batch_size,
                      std::vector<polisher::ConsensusResult>& results) {
@@ -724,6 +705,16 @@ void process_samples(polisher::TorchModel& model,
         for (int64_t j = 0; j < dorado::ssize(new_results); ++j) {
             auto& result = new_results[j];
             const int64_t sample_id = ids[j];
+            const Sample& sample = in_samples[sample_id];
+            const TrimInfo& trim = in_trims[sample_id];
+
+            // Trim and mark the region.
+            result.draft_id = sample.seq_id;
+            result.draft_start = sample.positions_major[trim.start];
+            result.draft_end = sample.positions_major[trim.end - 1] + 1;
+            result.seq = result.seq.substr(trim.start, trim.end - trim.start);
+            result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+
             results[sample_id] = std::move(result);
         }
 
@@ -736,6 +727,7 @@ void process_samples(polisher::TorchModel& model,
 
 std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const std::vector<polisher::Sample>& in_samples,
+        const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
         const polisher::CountsFeatureDecoder& decoder,
         const int32_t window_len,
@@ -744,7 +736,7 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    const auto worker = [&models, &decoder, &in_samples, &batch_size, &window_len](
+    const auto worker = [&models, &decoder, &in_samples, &in_trims, &batch_size, &window_len](
                                 const int32_t thread_id, const int32_t chunk_start,
                                 const int32_t chunk_end,
                                 std::vector<polisher::ConsensusResult>& results) {
@@ -767,10 +759,11 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         //           << ", remainders.size() = " << remainders.size() << "\n";
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
-        process_samples(*models[thread_id], decoder, in_samples, regular, batch_size, results);
+        process_samples(*models[thread_id], decoder, in_samples, in_trims, regular, batch_size,
+                        results);
 
         // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
-        process_samples(*models[thread_id], decoder, in_samples, remainders, 1, results);
+        process_samples(*models[thread_id], decoder, in_samples, in_trims, remainders, 1, results);
     };
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));

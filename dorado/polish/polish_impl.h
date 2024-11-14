@@ -42,8 +42,6 @@ std::vector<Window> create_windows(const int32_t seq_id,
 
 ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
                                 const std::string& header,
-                                const std::vector<Sample>& samples,
-                                const std::vector<TrimInfo>& trims,
                                 const std::vector<ConsensusResult>& sample_results,
                                 const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
                                 [[maybe_unused]] const int32_t seq_id);
@@ -58,6 +56,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
 
 std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<Sample>& in_samples,
+        const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<TorchModel>>& models,
         const CountsFeatureDecoder& decoder,
         const int32_t window_len,
