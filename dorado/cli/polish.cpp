@@ -464,7 +464,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         const polisher::CountsFeatureDecoder decoder;
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, models, decoder, opt.window_len,
-                                                      opt.batch_size, with_quals);
+                                                      opt.batch_size);
 
         // Stitching information, collect all samples for each sequence.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> samples_for_seqs(

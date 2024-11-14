@@ -77,8 +77,7 @@ private:
 
 class CountsFeatureDecoder {
 public:
-    static std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits,
-                                                     const bool with_probs);
+    static std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits);
 };
 
 // CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region);

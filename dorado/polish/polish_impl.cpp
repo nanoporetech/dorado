@@ -129,15 +129,20 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
 }
 
 void remove_deletions(polisher::ConsensusResult& cons) {
+    if (std::size(cons.seq) != std::size(cons.quals)) {
+        spdlog::error(
+                "[remove_deletions] Sequence and quality string length mismatch! Not removing "
+                "anything. seq.size = {}, quals.size = {}",
+                std::size(cons.seq), std::size(cons.quals));
+        return;
+    }
     size_t n = 0;
     for (size_t j = 0; j < std::size(cons.seq); ++j) {
         if (cons.seq[j] == '*') {
             continue;
         }
         cons.seq[n] = cons.seq[j];
-        if (!std::empty(cons.quals)) {
-            cons.quals[n] = cons.quals[j];
-        }
+        cons.quals[n] = cons.quals[j];
         ++n;
     }
     cons.seq.resize(n);
@@ -674,7 +679,6 @@ void process_samples(polisher::TorchModel& model,
                      const std::vector<polisher::Sample>& in_samples,
                      const std::vector<int64_t>& in_samples_to_process,
                      const int32_t batch_size,
-                     const bool gen_qual,
                      std::vector<polisher::ConsensusResult>& results) {
     /**
      * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
@@ -725,7 +729,7 @@ void process_samples(polisher::TorchModel& model,
         torch::Tensor output = batch_infer(in_samples, ids);
 
         // Convert to sequences and qualities.
-        std::vector<polisher::ConsensusResult> new_results = decoder.decode_bases(output, gen_qual);
+        std::vector<polisher::ConsensusResult> new_results = decoder.decode_bases(output);
 
         assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
@@ -748,13 +752,12 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
         const polisher::CountsFeatureDecoder& decoder,
         const int32_t window_len,
-        const int32_t batch_size,
-        const bool gen_qual) {
+        const int32_t batch_size) {
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    const auto worker = [&models, &decoder, &in_samples, &batch_size, &gen_qual, &window_len](
+    const auto worker = [&models, &decoder, &in_samples, &batch_size, &window_len](
                                 const int32_t thread_id, const int32_t chunk_start,
                                 const int32_t chunk_end,
                                 std::vector<polisher::ConsensusResult>& results) {
@@ -777,11 +780,10 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
                   << ", remainders.size() = " << remainders.size() << "\n";
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
-        process_samples(*models[thread_id], decoder, in_samples, regular, batch_size, gen_qual,
-                        results);
+        process_samples(*models[thread_id], decoder, in_samples, regular, batch_size, results);
 
         // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
-        process_samples(*models[thread_id], decoder, in_samples, remainders, 1, gen_qual, results);
+        process_samples(*models[thread_id], decoder, in_samples, remainders, 1, results);
     };
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));

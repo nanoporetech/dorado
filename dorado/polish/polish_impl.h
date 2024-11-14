@@ -61,8 +61,7 @@ std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<std::shared_ptr<TorchModel>>& models,
         const CountsFeatureDecoder& decoder,
         const int32_t window_len,
-        const int32_t batch_size,
-        const bool gen_qual);
+        const int32_t batch_size);
 
 std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,

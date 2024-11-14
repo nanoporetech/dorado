@@ -465,8 +465,7 @@ Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
                               m_normalise_type);
 }
 
-std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits,
-                                                                const bool with_probs) {
+std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits) {
     static constexpr std::string_view label_scheme{"*ACGT"};
 
     const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
@@ -486,23 +485,20 @@ std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Ten
         }
     }
 
-    if (with_probs) {
-        const torch::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
+    const torch::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
 
-        // std::cerr << "probs: " << probs << "\n";
+    // std::cerr << "probs: " << probs << "\n";
 
-        for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
-            std::string& quals = results[sample_id].quals;
-            quals.clear();
+    for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
+        std::string& quals = results[sample_id].quals;
+        quals.clear();
 
-            const auto phred_scores =
-                    (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0, 40).to(torch::kUInt8) +
-                    33;
+        const auto phred_scores =
+                (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0, 40).to(torch::kUInt8) + 33;
 
-            quals.resize(phred_scores.size(0), '!');
-            for (int64_t j = 0; j < phred_scores.size(0); ++j) {
-                quals[j] = static_cast<char>(phred_scores[j].item<uint8_t>());
-            }
+        quals.resize(phred_scores.size(0), '!');
+        for (int64_t j = 0; j < phred_scores.size(0); ++j) {
+            quals[j] = static_cast<char>(phred_scores[j].item<uint8_t>());
         }
     }
 
