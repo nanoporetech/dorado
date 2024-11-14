@@ -265,6 +265,17 @@ void validate_options(const Options& opt) {
         spdlog::error("Input model directory {} does not exist!", opt.model_path.string());
         std::exit(EXIT_FAILURE);
     }
+
+    if (!std::filesystem::exists(opt.in_aln_bam_fn) ||
+        std::filesystem::is_empty(opt.in_aln_bam_fn)) {
+        spdlog::error("Input file {} does not exist or is empty.", opt.in_aln_bam_fn.string());
+        std::exit(EXIT_FAILURE);
+    }
+    if (!std::filesystem::exists(opt.in_draft_fastx_fn) ||
+        std::filesystem::is_empty(opt.in_draft_fastx_fn)) {
+        spdlog::error("Input file {} does not exist or is empty.", opt.in_draft_fastx_fn.string());
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
