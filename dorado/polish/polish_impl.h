@@ -49,7 +49,7 @@ ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
                                 [[maybe_unused]] const int32_t seq_id);
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
-        const std::filesystem::path& in_aln_bam_fn,
+        const std::vector<polisher::CountsFeatureEncoder>& encoders,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,

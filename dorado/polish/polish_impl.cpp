@@ -460,21 +460,12 @@ std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_
 }
 
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
-        const std::filesystem::path& in_aln_bam_fn,
+        const std::vector<polisher::CountsFeatureEncoder>& encoders,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap) {
-    // Open the BAM file for each thread and spawn encoders.
-    spdlog::info("Creating {} encoders.", num_threads);
-    std::vector<bam_fset*> bam_sets;
-    std::vector<polisher::CountsFeatureEncoder> encoders;
-    for (int32_t i = 0; i < num_threads; ++i) {
-        bam_sets.emplace_back(create_bam_fset(in_aln_bam_fn.c_str()));
-        encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
-    }
-
     /// Medaka has a slightly strange window construction:
     //  1. It splits BAM references into 100kbp overlapping BAM windows.
     //  2. Each BAM window is processed separately.
@@ -665,10 +656,6 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                      std::make_move_iterator(std::end(vals)));
     }
 
-    for (auto& bam_set : bam_sets) {
-        destroy_bam_fset(bam_set);
-    }
-
     spdlog::info("Total num samples to infer: {}", std::size(samples));
 
     return {std::move(samples), std::move(trims)};
@@ -775,9 +762,9 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
             regular.emplace_back(i);
         }
 
-        std::cerr << "[thread_id = " << thread_id << "] chunk_start = " << chunk_start
-                  << ", chunk_end = " << chunk_end << ", regular.size() = " << regular.size()
-                  << ", remainders.size() = " << remainders.size() << "\n";
+        // std::cerr << "[thread_id = " << thread_id << "] chunk_start = " << chunk_start
+        //           << ", chunk_end = " << chunk_end << ", regular.size() = " << regular.size()
+        //           << ", remainders.size() = " << remainders.size() << "\n";
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
         process_samples(*models[thread_id], decoder, in_samples, regular, batch_size, results);
