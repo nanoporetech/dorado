@@ -57,17 +57,19 @@ protected:
                                              float samples_per_base) const = 0;
 
     // Determine the outer boundary of the signal space to consider based on the anchor.
-    virtual std::pair<int, int> signal_range(int signal_anchor,
-                                             int signal_len,
-                                             float samples_per_base) const = 0;
+    std::pair<int, int> signal_range(int signal_anchor,
+                                     int signal_len,
+                                     float samples_per_base,
+                                     bool fwd) const;
 
-    float estimate_samples_per_base(const dorado::SimplexRead& read) const;
+    std::pair<float, float> estimate_samples_per_base(const dorado::SimplexRead& read) const;
 
     // Find the signal range near the provided anchor that corresponds to the polyA/T tail
     std::pair<int, int> determine_signal_bounds(int signal_anchor,
                                                 bool fwd,
                                                 const SimplexRead& read,
-                                                float num_samples_per_base) const;
+                                                float num_samples_per_base,
+                                                float std_samples_per_base) const;
 
     const PolyTailConfig m_config;
 };

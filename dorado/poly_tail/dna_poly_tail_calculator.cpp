@@ -16,13 +16,16 @@ namespace dorado::poly_tail {
 
 SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
         const SimplexRead& read) const {
-    const std::string& front_primer = m_config.front_primer;
-    const std::string& front_primer_rc = m_config.rc_front_primer;
-    const std::string& rear_primer = m_config.rear_primer;
-    const std::string& rear_primer_rc = m_config.rc_rear_primer;
+    int trailing_Ts =
+            static_cast<int>(dorado::utils::count_trailing_chars(m_config.rear_primer, 'T'));
+    const std::string_view front_primer = m_config.front_primer;
+    const std::string_view front_primer_rc = m_config.rc_front_primer;
+    const std::string_view rear_primer = std::string_view(
+            m_config.rear_primer.data(), m_config.rear_primer.size() - trailing_Ts);
+    const std::string_view rear_primer_rc =
+            std::string_view(m_config.rc_rear_primer.data() + trailing_Ts);
     const float threshold = m_config.flank_threshold;
     const int primer_window = m_config.primer_window;
-    int trailing_Ts = static_cast<int>(dorado::utils::count_trailing_chars(rear_primer, 'T'));
 
     const int kMinSeparation = 10;
     std::string_view seq_view = std::string_view(read.read_common.seq);
@@ -96,13 +99,6 @@ float DNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
 int DNAPolyTailCalculator::signal_length_adjustment(const SimplexRead& read, int signal_len) const {
     bool is_prom = read.read_common.flow_cell_product_code.find("PRO") != std::string::npos;
     return is_prom ? 0 : static_cast<int>(std::round(signal_len * 0.063f));
-}
-
-std::pair<int, int> DNAPolyTailCalculator::signal_range(int signal_anchor,
-                                                        int signal_len,
-                                                        float samples_per_base) const {
-    const int kSpread = int(std::round(samples_per_base * max_tail_length()));
-    return {std::max(0, signal_anchor - kSpread), std::min(signal_len, signal_anchor + kSpread)};
 }
 
 }  // namespace dorado::poly_tail

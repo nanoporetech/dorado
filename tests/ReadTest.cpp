@@ -24,7 +24,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.attributes.read_number = 18501;
     read_common.attributes.channel_number = 5;
     read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-    read_common.attributes.fast5_filename = "batch_0.fast5";
+    read_common.attributes.filename = "batch_0.fast5";
     read_common.run_id = "xyz";
     read_common.model_name = "test_model";
     read_common.is_duplex = false;
@@ -178,7 +178,7 @@ TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.read_common.attributes.read_number = 18501;
         test_read.read_common.attributes.channel_number = 5;
         test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        test_read.read_common.attributes.fast5_filename = "batch_0.fast5";
+        test_read.read_common.attributes.filename = "batch_0.fast5";
 
         auto lines = test_read.read_common.extract_sam_lines(false, 0, false);
         REQUIRE(!lines.empty());
@@ -350,7 +350,7 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     read_common.attributes.read_number = 18501;
     read_common.attributes.channel_number = 5;
     read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-    read_common.attributes.fast5_filename = "batch_0.fast5";
+    read_common.attributes.filename = "batch_0.fast5";
     read_common.run_id = "xyz";
     read_common.model_name = "test_model";
     read_common.is_duplex = false;

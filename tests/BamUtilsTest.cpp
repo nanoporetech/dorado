@@ -294,6 +294,7 @@ TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
     auto sam = bam_utils_test_dir / "aligned_record.bam";
 
     HtsReader reader(sam.string(), std::nullopt);
+    reader.set_add_filename_tag(false);
     REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 

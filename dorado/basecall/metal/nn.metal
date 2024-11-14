@@ -434,12 +434,12 @@ kernel void conv(
 */
 
 struct RowMajor {
-    static int inner(int /* r */, int c) { return c; }
-    static int outer(int r, int /* c */) { return r; }
+    static ulong inner(int /* r */, int c) { return c; }
+    static ulong outer(int r, int /* c */) { return r; }
 };
 struct ColMajor {
-    static int inner(int r, int /* c */) { return r; }
-    static int outer(int /* r */, int c) { return c; }
+    static ulong inner(int r, int /* c */) { return r; }
+    static ulong outer(int /* r */, int c) { return c; }
 };
 // 2D matrix layouts using 8x8 tiles. Note that RowMajor/ColMajor apply to the order of tiles, *NOT* within tiles
 // RC == RowMajor: layout RrCc, where: R = row / 8; r = row % 8; C = col / 8; c = col % 8

@@ -177,8 +177,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.read_id = std::move(read_id_str);
     new_read->read_common.num_trimmed_samples = 0;
     new_read->read_common.attributes.read_number = read_data.read_number;
-    new_read->read_common.attributes.fast5_filename =
-            std::filesystem::path(path.c_str()).filename().string();
+    new_read->read_common.attributes.filename = std::filesystem::path(path).filename().string();
     new_read->read_common.attributes.mux = read_data.well;
     new_read->read_common.attributes.num_samples = read_data.num_samples;
     new_read->read_common.attributes.channel_number = read_data.channel;
@@ -646,7 +645,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         start_time_attr.read(start_time);
         string_reader(read_id_attr, read_id);
 
-        std::string fast5_filename = std::filesystem::path(path).filename().string();
+        std::string filename = std::filesystem::path(path).filename().string();
 
         HighFive::Group tracking_id_group = read.getGroup("tracking_id");
         std::string exp_start_time = get_string_attribute(tracking_id_group, "exp_start_time");
@@ -673,7 +672,7 @@ void DataLoader::load_fast5_reads_from_file(const std::string& path) {
         new_read->read_common.attributes.read_number = read_number;
         new_read->read_common.attributes.channel_number = channel_number;
         new_read->read_common.attributes.start_time = start_time_str;
-        new_read->read_common.attributes.fast5_filename = fast5_filename;
+        new_read->read_common.attributes.filename = filename;
         new_read->read_common.flowcell_id = flow_cell_id;
         new_read->read_common.flow_cell_product_code = flow_cell_product_code;
         new_read->read_common.position_id = device_id;

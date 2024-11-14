@@ -15,9 +15,6 @@ protected:
     float min_avg_val() const override { return -0.5f; }
     std::pair<int, int> buffer_range(const std::pair<int, int>& interval,
                                      float samples_per_base) const override;
-    std::pair<int, int> signal_range(int signal_anchor,
-                                     int signal_len,
-                                     float samples_per_base) const override;
 
 private:
     bool m_rna_adapter;
