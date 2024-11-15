@@ -11,44 +11,44 @@
 
 namespace dorado::polisher {
 
-void print_toml(const toml::value& val, int indent = 0) {
-    // Add indentation based on the level
-    std::string indent_str(indent, ' ');
+// void print_toml(const toml::value& val, int indent = 0) {
+//     // Add indentation based on the level
+//     std::string indent_str(indent, ' ');
 
-    if (val.is_table()) {
-        const auto& table = val.as_table();
-        for (const auto& [key, value] : table) {
-            std::cout << indent_str << key << " = ";
-            if (value.is_table() || value.is_array()) {
-                std::cout << "\n";
-            }
-            print_toml(value, indent + 2);  // Increase indentation for nested tables/arrays
-        }
-    } else if (val.is_array()) {
-        const auto& arr = val.as_array();
-        std::cout << "[";
-        for (size_t i = 0; i < arr.size(); ++i) {
-            print_toml(arr[i], 0);
-            if (i < arr.size() - 1) {
-                std::cout << ", ";
-            }
-        }
-        std::cout << "]\n";
-    } else {
-        // For primitive types (strings, ints, etc.)
-        if (val.is_string()) {
-            std::cout << "\"" << val.as_string() << "\"\n";
-        } else if (val.is_integer()) {
-            std::cout << val.as_integer() << "\n";
-        } else if (val.is_floating()) {
-            std::cout << val.as_floating() << "\n";
-        } else if (val.is_boolean()) {
-            std::cout << (val.as_boolean() ? "true" : "false") << "\n";
-            // } else if (val.is_none()) {
-            //     std::cout << "null\n";
-        }
-    }
-}
+//     if (val.is_table()) {
+//         const auto& table = val.as_table();
+//         for (const auto& [key, value] : table) {
+//             std::cout << indent_str << key << " = ";
+//             if (value.is_table() || value.is_array()) {
+//                 std::cout << "\n";
+//             }
+//             print_toml(value, indent + 2);  // Increase indentation for nested tables/arrays
+//         }
+//     } else if (val.is_array()) {
+//         const auto& arr = val.as_array();
+//         std::cout << "[";
+//         for (size_t i = 0; i < arr.size(); ++i) {
+//             print_toml(arr[i], 0);
+//             if (i < arr.size() - 1) {
+//                 std::cout << ", ";
+//             }
+//         }
+//         std::cout << "]\n";
+//     } else {
+//         // For primitive types (strings, ints, etc.)
+//         if (val.is_string()) {
+//             std::cout << "\"" << val.as_string() << "\"\n";
+//         } else if (val.is_integer()) {
+//             std::cout << val.as_integer() << "\n";
+//         } else if (val.is_floating()) {
+//             std::cout << val.as_floating() << "\n";
+//         } else if (val.is_boolean()) {
+//             std::cout << (val.as_boolean() ? "true" : "false") << "\n";
+//             // } else if (val.is_none()) {
+//             //     std::cout << "null\n";
+//         }
+//     }
+// }
 
 ModelConfig parse_model_config(const std::filesystem::path& config_path) {
     const toml::value config_toml = toml::parse(config_path.string());

@@ -131,9 +131,9 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     float scale = wtag_vals[0];  //wl
     float shape = wtag_vals[1];  //wk
     for (int64_t x = 1; x < num_homop + 1; ++x) {
-        float a = pow((x - 1) / scale, shape);
-        float b = pow(x / scale, shape);
-        fraction_counts[x - 1] = fmax(0.0, -exp(-a) * expm1(a - b));
+        float a = std::pow((x - 1) / scale, shape);
+        float b = std::pow(x / scale, shape);
+        fraction_counts[x - 1] = fmax(0.0, -std::exp(-a) * std::expm1(a - b));
     }
     return fraction_counts;
 }
