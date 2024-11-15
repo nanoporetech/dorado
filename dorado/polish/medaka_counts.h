@@ -2,6 +2,7 @@
 
 #include "medaka_bamiter.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
