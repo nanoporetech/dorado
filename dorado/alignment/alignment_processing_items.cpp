@@ -2,6 +2,7 @@
 
 #include "utils/PostCondition.h"
 #include "utils/fastq_reader.h"
+#include "utils/fs_utils.h"
 #include "utils/scoped_trace_log.h"
 #include "utils/stream_utils.h"
 #include "utils/tty_utils.h"
@@ -11,7 +12,9 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <set>
+#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -32,7 +35,7 @@ std::set<std::string>& get_supported_compression_extensions() {
     return supported_compression_extensions;
 };
 
-bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
+bool is_loadable_by_htslib(const fs::path& input_path) {
     dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
     if (!hts_file) {
         return false;
@@ -42,7 +45,7 @@ bool is_loadable_by_htslib(const std::filesystem::path& input_path) {
     return header != nullptr;
 }
 
-bool is_valid_input_file(const std::filesystem::path& input_path) {
+bool is_valid_input_file(const fs::path& input_path) {
     return is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string());
 }
 
@@ -51,6 +54,27 @@ fs::path replace_extension(fs::path output_path) {
         output_path.replace_extension();
     }
     return output_path.replace_extension("bam");
+}
+
+std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files_lut(
+        const std::string& input_root_folder,
+        bool recursive,
+        const std::string& output_folder) {
+    const auto all_files = dorado::utils::fetch_directory_entries(input_root_folder, recursive);
+    dorado::utils::SuppressStderr stderr_suppressed{};
+    const fs::path input_root(input_root_folder);
+    const fs::path output_root(output_folder);
+    std::unordered_map<std::string, std::vector<fs::path>> result{};
+    for (const fs::directory_entry& dir_entry : all_files) {
+        if (!is_valid_input_file(dir_entry.path())) {
+            continue;
+        }
+        const auto relative_path = fs::relative(dir_entry.path(), input_root);
+        const auto output = replace_extension(output_root / relative_path);
+        result[output.string()].push_back(relative_path);
+    }
+
+    return result;
 }
 
 }  // namespace
@@ -103,23 +127,6 @@ bool AlignmentProcessingItems::check_output_folder_for_input_folder(
     return true;
 }
 
-void AlignmentProcessingItems::add_to_working_files(
-        const std::filesystem::path& input_relative_path) {
-    auto output = replace_extension(fs::path(m_output_folder) / input_relative_path);
-
-    m_working_paths[output.string()].push_back(input_relative_path);
-}
-
-bool AlignmentProcessingItems::try_add_to_working_files(const fs::path& input_root,
-                                                        const fs::path& input_relative_path) {
-    if (!is_valid_input_file(input_root / input_relative_path)) {
-        return false;
-    }
-
-    add_to_working_files(input_relative_path);
-    return true;
-}
-
 bool AlignmentProcessingItems::initialise_for_file() {
     if (!check_recursive_arg_false()) {
         return false;
@@ -150,24 +157,13 @@ bool AlignmentProcessingItems::initialise_for_file() {
     return true;
 }
 
-template <class ITER>
-void AlignmentProcessingItems::create_working_file_map() {
-    utils::SuppressStderr stderr_suppressed{};
-    const fs::path input_root(m_input_path);
-    for (const fs::directory_entry& dir_entry : ITER(input_root)) {
-        const auto& input_path = dir_entry.path();
-        auto relative_path = fs::relative(input_path, input_root);
-        try_add_to_working_files(input_root, relative_path);
-    }
-}
-
-template <class ITER>
 void AlignmentProcessingItems::add_all_valid_files() {
-    create_working_file_map<ITER>();
+    const auto output_to_input_files_lut =
+            get_output_to_input_files_lut(m_input_path, m_recursive_input, m_output_folder);
 
     const fs::path input_root(m_input_path);
     const fs::path output_root(m_output_folder);
-    for (const auto& output_to_inputs_pair : m_working_paths) {
+    for (const auto& output_to_inputs_pair : output_to_input_files_lut) {
         const auto& input_files = output_to_inputs_pair.second;
         if (input_files.size() == 1) {
             // single unique output file name
@@ -194,11 +190,7 @@ bool AlignmentProcessingItems::initialise_for_folder() {
         return false;
     }
 
-    if (m_recursive_input) {
-        add_all_valid_files<fs::recursive_directory_iterator>();
-    } else {
-        add_all_valid_files<fs::directory_iterator>();
-    }
+    add_all_valid_files();
 
     return true;
 }

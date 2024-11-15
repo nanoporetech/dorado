@@ -2,6 +2,7 @@
 
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
+#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/time_utils.h"
 
@@ -105,12 +106,10 @@ void SummaryData::process_file(const std::string& filename, std::ostream& writer
 
 bool SummaryData::process_tree(const std::string& folder, std::ostream& writer) {
     std::vector<std::string> files;
-    for (const auto& p : std::filesystem::recursive_directory_iterator(folder)) {
-        if (!std::filesystem::is_directory(p)) {
-            auto ext = std::filesystem::path(p).extension().string();
-            if (ext == ".fastq" || ext == ".fq" || ext == ".sam" || ext == ".bam") {
-                files.push_back(std::filesystem::absolute(p).string());
-            }
+    for (const auto& p : utils::fetch_directory_entries(folder, true)) {
+        auto ext = std::filesystem::path(p).extension().string();
+        if (ext == ".fastq" || ext == ".fq" || ext == ".sam" || ext == ".bam") {
+            files.push_back(std::filesystem::absolute(p).string());
         }
     }
     if (files.empty()) {

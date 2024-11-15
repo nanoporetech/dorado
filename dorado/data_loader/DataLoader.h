@@ -1,5 +1,6 @@
 #pragma once
 
+#include "file_info/file_info.h"
 #include "models/kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -36,9 +37,20 @@ public:
                std::optional<std::unordered_set<std::string>> read_list,
                std::unordered_set<std::string> read_ignore_list);
     ~DataLoader() = default;
-    void load_reads(const std::filesystem::path& path,
-                    bool recursive_file_loading,
-                    ReadOrder traversal_order);
+
+    // Holds the directory entries for the pod5 or fast5 files from the input path.
+    // If there are both fast5 and pod5 only the pod5 will be held.
+    // Used as input to loading reads to ensure any mixed input files types has been
+    // correctly filtered to either pod5 or fast5 only.
+    class InputFiles final {
+        std::vector<std::filesystem::directory_entry> m_entries;
+
+    public:
+        InputFiles(const std::filesystem::path& path, bool recursive);
+        const std::vector<std::filesystem::directory_entry>& get() const;
+    };
+
+    void load_reads(const InputFiles& input_files, ReadOrder traversal_order);
 
     std::string get_name() const { return "Dataloader"; }
     stats::NamedStats sample_stats() const;
@@ -54,12 +66,21 @@ public:
         m_read_initialisers.push_back(std::move(func));
     }
 
+    // Retrieves the pod5 or fast5 entries from the input path.
+    // If there are both fast5 and pod5 only the pod5 will be returned.
+    static std::vector<std::filesystem::directory_entry> get_directory_entries(
+            const std::filesystem::path& path,
+            bool recursive_file_loading);
+
 private:
     void load_fast5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file(const std::string& path);
     void load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                const std::vector<ReadID>& read_ids);
-    void load_read_channels(const std::filesystem::path& data_path, bool recursive_file_loading);
+    void load_read_channels(const std::vector<std::filesystem::directory_entry>& files);
+
+    void load_reads_by_channel(const std::vector<std::filesystem::directory_entry>& files);
+    void load_reads_unrestricted(const std::vector<std::filesystem::directory_entry>& files);
 
     void initialise_read(ReadCommon& read) const;
 

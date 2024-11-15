@@ -1,7 +1,6 @@
 #include "file_info.h"
 
 #include "utils/PostCondition.h"
-#include "utils/fs_utils.h"
 #include "utils/time_utils.h"
 
 #include <highfive/H5Easy.hpp>
@@ -10,13 +9,12 @@
 
 namespace dorado::file_info {
 
-std::unordered_map<std::string, ReadGroup> load_read_groups(const std::filesystem::path& data_path,
-                                                            const std::string& model_name,
-                                                            const std::string& modbase_model_names,
-                                                            bool recursive_file_loading) {
+std::unordered_map<std::string, ReadGroup> load_read_groups(
+        const std::vector<std::filesystem::directory_entry>& dir_files,
+        const std::string& model_name,
+        const std::string& modbase_model_names) {
     std::unordered_map<std::string, ReadGroup> read_groups;
-    const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
-    for (const auto& entry : dirs) {
+    for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -72,13 +70,11 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(const std::filesyste
     return read_groups;
 }
 
-int get_num_reads(const std::filesystem::path& data_path,
+int get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_files,
                   std::optional<std::unordered_set<std::string>> read_list,
-                  const std::unordered_set<std::string>& ignore_read_list,
-                  bool recursive_file_loading) {
+                  const std::unordered_set<std::string>& ignore_read_list) {
     size_t num_reads = 0;
-    const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
-    for (const auto& entry : dirs) {
+    for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -122,9 +118,8 @@ int get_num_reads(const std::filesystem::path& data_path,
     return int(num_reads);
 }
 
-bool is_read_data_present(const std::filesystem::path& data_path, bool recursive_file_loading) {
-    const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
-    for (const auto& entry : dirs) {
+bool is_read_data_present(const std::vector<std::filesystem::directory_entry>& dir_files) {
+    for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -135,11 +130,10 @@ bool is_read_data_present(const std::filesystem::path& data_path, bool recursive
     return false;
 }
 
-uint16_t get_sample_rate(const std::filesystem::path& data_path, bool recursive_file_loading) {
+uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::optional<uint16_t> sample_rate = std::nullopt;
 
-    const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
-    for (const auto& entry : dirs) {
+    for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
@@ -220,20 +214,18 @@ uint16_t get_sample_rate(const std::filesystem::path& data_path, bool recursive_
     }
 }
 
-std::set<models::ChemistryKey> get_sequencing_chemistries(const std::filesystem::path& data_path,
-                                                          bool recursive_file_loading) {
+std::set<models::ChemistryKey> get_sequencing_chemistries(
+        const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::set<models::ChemistryKey> chemistries;
-
-    const auto dirs = utils::fetch_directory_entries(data_path, recursive_file_loading);
-    for (const auto& entry : dirs) {
+    bool fast5_found{false};
+    for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         auto file_path = entry.path().string();
         if (ext == ".fast5") {
-            throw std::runtime_error("Cannot automate model selection using fast5 files");
+            fast5_found = true;
         }
-
         if (ext != ".pod5") {
             continue;
         }
@@ -286,13 +278,15 @@ std::set<models::ChemistryKey> get_sequencing_chemistries(const std::filesystem:
             }
         };
     }
+    if (fast5_found) {
+        spdlog::warn("Cannot automate model selection using fast5 files");
+    }
     return chemistries;
 }
 
-models::Chemistry get_unique_sequencing_chemisty(const std::string& data,
-                                                 bool recursive_file_loading) {
-    std::set<models::ChemistryKey> data_chemistries =
-            get_sequencing_chemistries(data, recursive_file_loading);
+models::Chemistry get_unique_sequencing_chemistry(
+        const std::vector<std::filesystem::directory_entry>& dir_files) {
+    std::set<models::ChemistryKey> data_chemistries = get_sequencing_chemistries(dir_files);
 
     if (data_chemistries.empty()) {
         throw std::runtime_error(

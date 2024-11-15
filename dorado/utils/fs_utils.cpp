@@ -92,17 +92,23 @@ std::vector<std::filesystem::directory_entry> fetch_directory_entries(
         bool recursive) {
     std::vector<std::filesystem::directory_entry> entries;
 
+    auto try_add_entry = [&entries](const std::filesystem::directory_entry& entry) {
+        if (!entry.is_directory()) {
+            entries.push_back(entry);
+        }
+    };
+
     if (std::filesystem::is_directory(path)) {
         try {
             if (recursive) {
                 for (const auto& entry : std::filesystem::recursive_directory_iterator(
                              path, std::filesystem::directory_options::skip_permission_denied)) {
-                    entries.push_back(entry);
+                    try_add_entry(entry);
                 }
             } else {
                 for (const auto& entry : std::filesystem::directory_iterator(
                              path, std::filesystem::directory_options::skip_permission_denied)) {
-                    entries.push_back(entry);
+                    try_add_entry(entry);
                 }
             }
         } catch (const std::filesystem::filesystem_error& fex) {

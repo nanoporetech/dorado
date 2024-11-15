@@ -3,30 +3,36 @@
 #include "data_loader/DataLoader.h"
 #include "models/models.h"
 #include "read_pipeline/ReadPipeline.h"
+#include "utils/fs_utils.h"
 
 #include <catch2/catch.hpp>
 
-#define TEST_GROUP "Pod5DataLoaderTest: "
+#define TEST_GROUP "[dorado::DataLoader::pod5]"
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, empty read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from data dir, empty read list",
+          TEST_GROUP) {
     auto read_list = std::unordered_set<std::string>();
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list, {}) == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from single file path, empty read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from single file path, empty read list",
+          TEST_GROUP) {
     auto read_list = std::unordered_set<std::string>();
     CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list, {}) == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, no read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from data dir, no read list",
+          TEST_GROUP) {
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, std::nullopt, {}) == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from single file path, no read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from single file path, no read list",
+          TEST_GROUP) {
     CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, std::nullopt, {}) == 1);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, mismatched read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from data dir, mismatched read list",
+          TEST_GROUP) {
     auto read_list = std::unordered_set<std::string>{"read_1"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list, {}) == 0);
 }
@@ -37,7 +43,8 @@ TEST_CASE(TEST_GROUP
     CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list, {}) == 0);
 }
 
-TEST_CASE(TEST_GROUP "Test loading single-read POD5 file from data dir, matched read list") {
+TEST_CASE(TEST_GROUP " Test loading single-read POD5 file from data dir, matched read list",
+          TEST_GROUP) {
     auto read_list = std::unordered_set<std::string>{"002bd127-db82-436f-b828-28567c3d505d"};
     CHECK(CountSinkReads(get_pod5_data_dir(), "cpu", 1, 0, read_list, {}) == 1);
 }
@@ -48,7 +55,7 @@ TEST_CASE(TEST_GROUP
     CHECK(CountSinkReads(get_single_pod5_file_path(), "cpu", 1, 0, read_list, {}) == 1);
 }
 
-TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
+TEST_CASE(TEST_GROUP " Load data sorted by channel id.", TEST_GROUP) {
     auto data_path = get_data_dir("multi_read_pod5");
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -57,7 +64,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0, std::nullopt, {});
-    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
+    loader.load_reads({data_path, true}, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
@@ -68,7 +75,7 @@ TEST_CASE(TEST_GROUP "Load data sorted by channel id.") {
     }
 }
 
-TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
+TEST_CASE(TEST_GROUP " Test loading POD5 file with read ignore list", TEST_GROUP) {
     auto data_path = get_data_dir("multi_read_pod5");
 
     SECTION("read ignore list with 1 read") {
@@ -86,7 +93,8 @@ TEST_CASE(TEST_GROUP "Test loading POD5 file with read ignore list") {
     }
 }
 
-TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by channel order.") {
+TEST_CASE(TEST_GROUP " Test correct previous and next read ids when loaded by channel order.",
+          TEST_GROUP) {
     auto data_path = get_data_dir("single_channel_multi_read_pod5");
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -95,7 +103,7 @@ TEST_CASE(TEST_GROUP "Test correct previous and next read ids when loaded by cha
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::DataLoader loader(*pipeline, "cpu", 1, 0, std::nullopt, {});
-    loader.load_reads(data_path, true, dorado::ReadOrder::BY_CHANNEL);
+    loader.load_reads({data_path, true}, dorado::ReadOrder::BY_CHANNEL);
     pipeline.reset();
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     std::sort(reads.begin(), reads.end(), [](auto& a, auto& b) {
