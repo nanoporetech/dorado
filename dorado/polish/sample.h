@@ -48,13 +48,13 @@ inline void debug_print_sample(std::ostream& os,
     os << "sample.positions = " << sample.start() << " - " << sample.end()
        << " , dist = " << (sample.end() - sample.start()) << " , tensor = [";
     os.flush();
-    for (int32_t k = start; k < std::min(start + 3, len); ++k) {
+    for (int32_t k = start; k < std::min<int32_t>(start + 3, len); ++k) {
         os << "(" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ") ";
         os.flush();
     }
     os << " ...";
     os.flush();
-    for (int32_t k = std::max<int64_t>(0, end - 3); k < end; ++k) {
+    for (int32_t k = std::max<int32_t>(0, end - 3); k < end; ++k) {
         os << " (" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ")";
         os.flush();
     }
