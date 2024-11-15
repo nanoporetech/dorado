@@ -4,7 +4,6 @@
 #include "khash.h"
 #include "kvec.h"
 #include "medaka_bamiter.h"
-#include "medaka_common.h"
 
 #include <spdlog/spdlog.h>
 

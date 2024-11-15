@@ -312,8 +312,6 @@ add_library(dorado_lib
     dorado/polish/model.h
     dorado/polish/medaka_bamiter.cpp
     dorado/polish/medaka_bamiter.h
-    dorado/polish/medaka_common.cpp
-    dorado/polish/medaka_common.h
     dorado/polish/medaka_counts.cpp
     dorado/polish/medaka_counts.h
     dorado/polish/polish_impl.cpp

@@ -1,7 +1,5 @@
 #include "medaka_bamiter.h"
 
-#include "medaka_common.h"
-
 #include <errno.h>
 #include <string.h>
 
@@ -67,7 +65,12 @@ int read_bam(void *data, bam1_t *b) {
 
 // Initialise BAM file, index and header structures
 bam_fset *create_bam_fset(const char *fname) {
-    bam_fset *fset = (bam_fset *)xalloc(1, sizeof(bam_fset), "bam fileset");
+    bam_fset *fset = (bam_fset *)calloc(1, sizeof(bam_fset));
+    if (fset == NULL) {
+        fprintf(stderr, "Failed to allocate mem for bam fileset.\n");
+        exit(1);
+    }
+
     fset->fp = hts_open(fname, "rb");
     fset->idx = sam_index_load(fset->fp, fname);
     fset->hdr = sam_hdr_read(fset->fp);
