@@ -78,8 +78,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
 
 std::string fetch_seq(const std::filesystem::path& index_fn,
                       const std::string& seq_name,
-                      int32_t start = 0,
-                      int32_t end = -1) {
+                      int32_t start,
+                      int32_t end) {
     faidx_t* fai = fai_load(index_fn.c_str());
     if (!fai) {
         spdlog::error("Failed to load index for file: '{}'.", index_fn.string());
@@ -120,11 +120,12 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
-[[maybe_unused]] void debug_print_samples(std::ostream& os,
-                                          const std::vector<polisher::Sample>& samples,
-                                          int64_t start = 0,
-                                          int64_t end = -1,
-                                          int64_t debug_id = -1) {
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+void debug_print_samples(std::ostream& os,
+                         const std::vector<polisher::Sample>& samples,
+                         int64_t start /* = 0*/,
+                         int64_t end /* = -1 */,
+                         int64_t debug_id /* = -1 */) {
     start = std::max<int64_t>(0, start);
     end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
 
@@ -134,6 +135,7 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
         os << '\n';
     }
 }
+#endif
 
 void remove_deletions(polisher::ConsensusResult& cons) {
     if (std::size(cons.seq) != std::size(cons.quals)) {
@@ -162,7 +164,7 @@ polisher::ConsensusResult stitch_sequence(
         const std::vector<polisher::ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         [[maybe_unused]] const int32_t seq_id) {
-    const std::string draft = fetch_seq(in_draft_fn, header);
+    const std::string draft = fetch_seq(in_draft_fn, header, 0, -1);
 
     if (std::empty(samples_for_seq)) {
         spdlog::warn("Sequence '{}' has zero inferred samples. Copying contig verbatim from input.",
@@ -207,7 +209,7 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
     std::vector<polisher::Sample> results;
 
     const auto find_gaps = [](const std::vector<int64_t>& positions,
-                              int64_t threshold = 1) -> std::vector<int64_t> {
+                              int64_t threshold) -> std::vector<int64_t> {
         std::vector<int64_t> ret;
         for (size_t i = 1; i < std::size(positions); ++i) {
             if ((positions[i] - positions[i - 1]) > threshold) {
@@ -218,7 +220,7 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
     };
 
     // for (auto& data : pileups) {
-    const std::vector<int64_t> gaps = find_gaps(sample.positions_major);
+    const std::vector<int64_t> gaps = find_gaps(sample.positions_major, 1);
 
     if (std::empty(gaps)) {
         return {sample};
@@ -557,7 +559,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                           << interval.end << ">:\n";
                 std::cout << "- [bam_chunk_id = " << bam_chunk_id
                           << "] Input (parallel_results):\n";
-                debug_print_samples(std::cout, parallel_results, interval.start, interval.end);
+                debug_print_samples(std::cout, parallel_results, interval.start, interval.end, -1);
 #endif
 
                 std::vector<polisher::Sample> local_samples;
@@ -575,7 +577,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cout << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting on discontinuities (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
+                debug_print_samples(std::cout, local_samples, 0, -1, -1);
 #endif
 
                 local_samples = merge_adjacent_samples(local_samples);
@@ -583,7 +585,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cout << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After merging adjacent (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
+                debug_print_samples(std::cout, local_samples, 0, -1, -1);
 #endif
 
                 local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
@@ -591,7 +593,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cout << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting samples (local_samples):\n";
-                debug_print_samples(std::cout, local_samples);
+                debug_print_samples(std::cout, local_samples, 0, -1, -1);
 #endif
 
                 const Window& reg = bam_regions[bam_chunk_id];
@@ -668,6 +670,7 @@ void process_samples(polisher::TorchModel& model,
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         std::vector<torch::Tensor> batch_features;
+        batch_features.reserve(std::size(samples_to_process));
         for (const int64_t i : samples_to_process) {
             batch_features.emplace_back(samples[i].features);
         }
