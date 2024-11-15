@@ -861,8 +861,8 @@ std::vector<Window> create_bam_regions(
         }
 
         // Split-up the custom region if it's too long.
-        const std::vector<Window> windows = create_windows(
-                seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap, -1);
+        std::vector<Window> windows = create_windows(seq_id, region_start, region_end, seq_length,
+                                                     bam_chunk_len, window_overlap, -1);
 
         return windows;
     }

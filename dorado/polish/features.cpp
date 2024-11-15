@@ -35,7 +35,7 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
  * \return Lookup of the form: key = (dtype, strand) -> vector of indices
  */
 FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dtypes,
-                                              const size_t num_qstrat = 1) {
+                                              const size_t num_qstrat) {
     // Create a map to store the indices.
     FeatureIndicesType indices;
 
@@ -87,15 +87,15 @@ CountsResult construct_pileup_counts(bam_fset& bam_set,
                                      const std::string& ref_name,
                                      const int32_t ref_start,
                                      const int32_t ref_end,
-                                     size_t num_qstrat = 1,
-                                     size_t num_dtypes = 1,
-                                     const std::vector<std::string>& dtypes = {},
-                                     const std::string tag_name = {},
-                                     int tag_value = 0,
-                                     bool keep_missing = false,
-                                     bool weibull_summation = false,
-                                     const char* read_group = NULL,
-                                     const int min_mapq = 1) {
+                                     size_t num_qstrat /*= 1*/,
+                                     size_t num_dtypes /*= 1*/,
+                                     const std::vector<std::string>& dtypes /*= {}*/,
+                                     const std::string tag_name /*= {}*/,
+                                     int tag_value /*= 0*/,
+                                     bool keep_missing /*= false*/,
+                                     bool weibull_summation /*= false*/,
+                                     const char* read_group /*= NULL*/,
+                                     const int min_mapq /*= 1*/) {
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     // NOTE 2: the from_blob expects non-const data, so can't define the pileup as const here.
@@ -437,7 +437,7 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
           m_read_group{read_group},
           m_min_mapq{min_mapq},
           m_symmetric_indels{symmetric_indels},
-          m_feature_indices{pileup_counts_norm_indices(dtypes)} {}
+          m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
 Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
                                            const int64_t ref_start,
