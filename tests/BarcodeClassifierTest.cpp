@@ -32,15 +32,14 @@ namespace {
 std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
         const std::string& kit_name,
         bool barcode_both_ends,
-        bool disallow_inferior_barcodes,
         bool trim_barcode,
         BarcodeFilterSet allowed_barcodes) {
     if (kit_name.empty()) {
         return {};
     }
 
-    auto result = demux::BarcodingInfo{kit_name, barcode_both_ends, disallow_inferior_barcodes,
-                                       trim_barcode, std::move(allowed_barcodes)};
+    auto result = demux::BarcodingInfo{kit_name, barcode_both_ends, trim_barcode,
+                                       std::move(allowed_barcodes)};
     return std::make_shared<demux::BarcodingInfo>(std::move(result));
 }
 
@@ -82,7 +81,7 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
-            auto res = classifier.barcode(seq, false, false, std::nullopt);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == "unclassified") {
                 CHECK(bc == res.barcode_name);
             } else {
@@ -109,7 +108,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
-            auto res = classifier.barcode(seq, false, false, std::nullopt);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == "unclassified") {
                 CHECK(bc == res.barcode_name);
             } else {
@@ -138,7 +137,7 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
-            auto res = classifier.barcode(seq, false, false, std::nullopt);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == "unclassified") {
                 CHECK(bc == res.barcode_name);
             } else {
@@ -165,8 +164,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
     HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
-        auto single_end_res = classifier.barcode(seq, false, false, std::nullopt);
-        auto double_end_res = classifier.barcode(seq, true, false, std::nullopt);
+        auto single_end_res = classifier.barcode(seq, false, std::nullopt);
+        auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.barcode_name == "unclassified");
         CHECK(single_end_res.barcode_name == "BC01");
     }
@@ -182,8 +181,8 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
     HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
-        auto single_end_res = classifier.barcode(seq, false, false, std::nullopt);
-        auto double_end_res = classifier.barcode(seq, true, false, std::nullopt);
+        auto single_end_res = classifier.barcode(seq, false, std::nullopt);
+        auto double_end_res = classifier.barcode(seq, true, std::nullopt);
         CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
         CHECK(single_end_res.barcode_name == "BC01");
     }
@@ -199,7 +198,7 @@ TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended k
     HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
-        auto res = classifier.barcode(seq, false, false, std::nullopt);
+        auto res = classifier.barcode(seq, false, std::nullopt);
         CHECK(res.barcode_name == "unclassified");
         CHECK(res.found_midstrand);
     }
@@ -215,7 +214,7 @@ TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended k
     HtsReader reader(bc_file.string(), std::nullopt);
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
-        auto res = classifier.barcode(seq, false, false, std::nullopt);
+        auto res = classifier.barcode(seq, false, std::nullopt);
         CHECK(res.barcode_name == "unclassified");
         CHECK(res.found_midstrand);
     }
@@ -255,8 +254,7 @@ TEST_CASE(
     read->read_common.model_stride = stride;
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info =
-            create_barcoding_info(kit, barcode_both_ends, false, !no_trim, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
     read->read_common.client_info = client_info;
 
@@ -404,8 +402,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
     reader.read();
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
-    auto barcoding_info =
-            create_barcoding_info(kit, barcode_both_ends, false, !no_trim, std::nullopt);
+    auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
     client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
 
     BamPtr read1(bam_dup1(reader.record.get()));
@@ -512,7 +509,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
         while (reader.read()) {
             auto seqlen = reader.record->core.l_qseq;
             std::string seq = utils::extract_sequence(reader.record.get());
-            auto res = classifier.barcode(seq, false, false, std::nullopt);
+            auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == "unclassified") {
                 CHECK(bc == res.barcode_name);
             } else {

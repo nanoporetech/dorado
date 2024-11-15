@@ -62,7 +62,6 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
         return nullptr;
     }
     result->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
-    result->disallow_inferior_barcodes = parser.visible.get<bool>("--disallow-inferior-barcodes");
     result->trim = !parser.visible.get<bool>("--no-trim");
     if (sample_sheet) {
         result->allowed_barcodes = sample_sheet->get_barcode_values();
@@ -153,11 +152,6 @@ int demuxer(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.visible.add_argument("--barcode-both-ends")
             .help("Require both ends of a read to be barcoded for a double ended barcode.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--disallow-inferior-barcodes")
-            .help("Declassify reads if a better barcode match over the threshold exists at either "
-                  "end of the read for double ended kits.")
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("--no-trim")

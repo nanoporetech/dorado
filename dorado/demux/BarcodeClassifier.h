@@ -25,7 +25,6 @@ public:
 
     BarcodeScoreResult barcode(const std::string& seq,
                                bool barcode_both_ends,
-                               bool disallow_inferior_barcodes,
                                const BarcodeFilterSet& allowed_barcodes) const;
 
 private:
@@ -57,7 +56,6 @@ private:
     BarcodeScoreResult find_best_barcode(const std::string& read_seq,
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
-                                         bool disallow_inferior_barcodes,
                                          const BarcodeFilterSet& allowed_barcodes) const;
 };
 

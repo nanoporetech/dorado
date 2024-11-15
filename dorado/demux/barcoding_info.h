@@ -9,7 +9,6 @@ namespace dorado::demux {
 struct BarcodingInfo {
     std::string kit_name;
     bool barcode_both_ends{false};
-    bool disallow_inferior_barcodes{false};
     bool trim{false};
     BarcodeFilterSet allowed_barcodes;
 };

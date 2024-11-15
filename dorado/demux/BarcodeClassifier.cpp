@@ -188,10 +188,9 @@ BarcodeClassifier::~BarcodeClassifier() = default;
 
 BarcodeScoreResult BarcodeClassifier::barcode(const std::string& seq,
                                               bool barcode_both_ends,
-                                              bool disallow_inferior_barcodes,
                                               const BarcodeFilterSet& allowed_barcodes) const {
-    auto best_barcode = find_best_barcode(seq, m_barcode_candidates, barcode_both_ends,
-                                          disallow_inferior_barcodes, allowed_barcodes);
+    auto best_barcode =
+            find_best_barcode(seq, m_barcode_candidates, barcode_both_ends, allowed_barcodes);
     return best_barcode;
 }
 
@@ -822,7 +821,6 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const std::string& read_seq,
         const std::vector<BarcodeCandidateKit>& candidates,
         bool barcode_both_ends,
-        bool disallow_inferior_barcodes,
         const BarcodeFilterSet& allowed_barcodes) const {
     if (read_seq.length() == 0) {
         return UNCLASSIFIED;
@@ -961,7 +959,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         }
     }
 
-    if (kit.double_ends && disallow_inferior_barcodes) {
+    if (kit.double_ends) {
         // For more stringent classification, ensure that neither end of a read has a higher scoring
         //  barcode, if any of the barcodes at that end are better than the threshold.
         auto best_top_result = std::min_element(
