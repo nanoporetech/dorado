@@ -526,12 +526,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             // Sort by region start position, for every sequence.
             std::sort(std::begin(group), std::end(group));
 
-            if (std::empty(group)) {
-                spdlog::warn("Sequence {} has zero inferred windows.",
-                             draft_lens_batch[seq_id].first);
-                continue;
-            }
-
             const polisher::ConsensusResult consensus =
                     polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
                                               results_samples, group, seq_id);
