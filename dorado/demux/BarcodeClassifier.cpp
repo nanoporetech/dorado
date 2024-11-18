@@ -1046,6 +1046,28 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         }
     }
 
+    if (kit.double_ends) {
+        // For more stringent classification, ensure that neither end of a read has a higher scoring
+        //  barcode, if any of the barcodes at that end are better than the threshold.
+        auto best_top_result = std::min_element(
+                results.begin(), results.end(),
+                [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
+        auto best_bottom_result = std::min_element(
+                results.begin(), results.end(),
+                [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
+
+        if (((out.barcode_name != best_top_result->barcode_name) &&
+             (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
+            ((out.barcode_name != best_bottom_result->barcode_name) &&
+             (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty))) {
+            spdlog::trace(
+                    "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
+                    out.barcode_name, best_top_result->barcode_name,
+                    best_bottom_result->barcode_name);
+            return UNCLASSIFIED;
+        }
+    }
+
     // If nothing is found, report as unclassified.
     return out;
 }
