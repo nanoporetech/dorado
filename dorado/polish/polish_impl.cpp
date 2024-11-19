@@ -676,7 +676,7 @@ void process_samples(polisher::TorchModel& model,
         }
         torch::Tensor batch_features_tensor = torch::stack(batch_features);
 
-        spdlog::info(
+        spdlog::debug(
                 "About to call forward(): batch_features_tensor.size() = ({}, {}, {}), approx "
                 "size: {} MB.",
                 batch_features_tensor.size(0), batch_features_tensor.size(1),
