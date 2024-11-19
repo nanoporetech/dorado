@@ -498,7 +498,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     torch::set_num_threads(1);
 
     // Construct the model.
-    spdlog::debug("Loading the model.");
+    spdlog::info("Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<polisher::TorchModel>> ret;
         for (int32_t device_id = 0; device_id < dorado::ssize(devices); ++device_id) {
