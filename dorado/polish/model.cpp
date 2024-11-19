@@ -68,7 +68,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
     cfg.version = toml::find<int>(model, "version");
     cfg.model_type = toml::find<std::string>(model, "type");
     cfg.model_file = toml::find<std::string>(model, "model_file");
-    cfg.model_dir = config_path.parent_path();
+    cfg.model_dir = config_path.parent_path().string();
 
     const auto& feature_encoder = toml::find(config_toml, "feature_encoder");
     cfg.feature_encoder_type = toml::find<std::string>(feature_encoder, "type");

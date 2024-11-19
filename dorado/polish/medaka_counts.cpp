@@ -124,16 +124,16 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
                          bam_get_qname(p->b), p->qpos + indel, taglen);
             return fraction_counts;
         }
-        wtag_vals[i] = bam_auxB2f(tag, p->qpos + indel);
+        wtag_vals[i] = bam_auxB2f(tag, p->qpos + static_cast<int32_t>(indel));
     }
 
     // found tags, fill in values
-    float scale = wtag_vals[0];  //wl
-    float shape = wtag_vals[1];  //wk
+    float scale = static_cast<float>(wtag_vals[0]);  //wl
+    float shape = static_cast<float>(wtag_vals[1]);  //wk
     for (int64_t x = 1; x < num_homop + 1; ++x) {
         float a = std::pow((x - 1) / scale, shape);
         float b = std::pow(x / scale, shape);
-        fraction_counts[x - 1] = fmax(0.0, -std::exp(-a) * std::expm1(a - b));
+        fraction_counts[x - 1] = fmax(0.0f, -std::exp(-a) * std::expm1(a - b));
     }
     return fraction_counts;
 }
@@ -342,14 +342,14 @@ PileupData calculate_pileup(const std::string &chr_name,
                         for (int64_t qstrat = 0; qstrat < num_homop; ++qstrat) {
                             static const int32_t scale = 10000;
                             pileup_matrix[partial_index + PILEUP_BASES_SIZE * qstrat] +=
-                                    scale * fraction_counts[qstrat];
+                                    static_cast<int64_t>(scale * fraction_counts[qstrat]);
                         }
                     } else {
                         int32_t qstrat = 0;
                         if (num_homop > 1) {
                             // want something in [0, num_homop-1]
-                            qstrat = std::min<int64_t>(
-                                    bam_get_qual(p->b)[p->qpos + query_pos_offset], num_homop);
+                            qstrat = static_cast<int32_t>(std::min<int64_t>(
+                                    bam_get_qual(p->b)[p->qpos + query_pos_offset], num_homop));
                             qstrat = std::max(0, qstrat - 1);
                         }
                         pileup_matrix[partial_index + PILEUP_BASES_SIZE * qstrat] += 1;
