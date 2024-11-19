@@ -97,6 +97,7 @@ struct Options {
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
     std::string region;
+    bool full_precision = false;
     int32_t min_mapq = 0;
     // int32_t min_depth = 0;
 };
@@ -172,6 +173,11 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Minimum mapping quality of alignment used for polishing.")
                 .default_value(0)
                 .scan<'i', int>();
+        parser->visible.add_argument("--full-precision")
+                .help("Always use full precision for inference.")
+                .default_value(false)
+                .implicit_value(true);
+
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than min_depth will not be polished.")
         //         .default_value(0)
@@ -238,6 +244,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
 
+    opt.full_precision = parser.visible.get<bool>("full-precision");
     opt.min_mapq = parser.visible.get<int>("min-mapq");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
@@ -332,7 +339,8 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 }
 
 std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& model_path,
-                                                   const DeviceInfo& device_info) {
+                                                   const DeviceInfo& device_info,
+                                                   const bool full_precision) {
     // Load weights from the model file.
     torch::jit::script::Module module;
 
@@ -360,9 +368,11 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
         }
     }
     model->to(device_info.device);
-    if (device_info.type == DeviceType::CUDA) {
+    if ((device_info.type == DeviceType::CUDA) && !full_precision) {
         model->to_half();
         spdlog::info("Converted the model to half.");
+    } else {
+        spdlog::info("Using full precision.");
     }
     model->eval();
 
@@ -492,7 +502,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<polisher::TorchModel>> ret;
         for (int32_t device_id = 0; device_id < dorado::ssize(devices); ++device_id) {
-            ret.emplace_back(create_model(opt.model_path / "model.pt", devices[device_id]));
+            ret.emplace_back(create_model(opt.model_path / "model.pt", devices[device_id],
+                                          opt.full_precision));
             spdlog::info("Loaded model to device {}: {}", device_id, devices[device_id].name);
         }
         if ((std::size(devices) == 1) && (devices.front().type == DeviceType::CPU)) {
