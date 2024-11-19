@@ -437,6 +437,9 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
+CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set, const int32_t min_mapq)
+        : m_bam_set{bam_set}, m_min_mapq{min_mapq} {}
+
 Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
                                            const int64_t ref_start,
                                            const int64_t ref_end,

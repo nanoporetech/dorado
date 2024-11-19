@@ -97,6 +97,8 @@ struct Options {
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
     std::string region;
+    int32_t min_mapq = 0;
+    // int32_t min_depth = 0;
 };
 
 /// \brief Define the CLI options.
@@ -166,6 +168,14 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--region")
                 .help("Process only this region of the input. Htslib format (start is 1-based, end "
                       "is inclusive).");
+        parser->visible.add_argument("--min-mapq")
+                .help("Minimum mapping quality of alignment used for polishing.")
+                .default_value(0)
+                .scan<'i', int>();
+        // parser->visible.add_argument("--min-depth")
+        //         .help("Sites with depth lower than min_depth will not be polished.")
+        //         .default_value(0)
+        //         .scan<'i', int>();
     }
 
     return parser;
@@ -227,6 +237,10 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.verbosity = verbosity;
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
+
+    opt.min_mapq = parser.visible.get<int>("min-mapq");
+    // opt.min_depth = parser.visible.get<int>("min-depth");
+
     return opt;
 }
 
@@ -467,7 +481,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     std::vector<polisher::CountsFeatureEncoder> encoders;
     for (int32_t i = 0; i < opt.threads; ++i) {
         bam_sets.emplace_back(create_bam_fset(opt.in_aln_bam_fn.c_str()));
-        encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back()));
+        encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back(), opt.min_mapq));
     }
 
     at::set_num_interop_threads(opt.threads);

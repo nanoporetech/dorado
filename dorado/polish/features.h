@@ -46,6 +46,8 @@ class CountsFeatureEncoder {
 public:
     CountsFeatureEncoder(bam_fset* bam_set);
 
+    CountsFeatureEncoder(bam_fset* bam_set, const int32_t min_mapq);
+
     CountsFeatureEncoder(bam_fset* bam_set,
                          const NormaliseType normalise_type,
                          const std::vector<std::string>& dtypes,
