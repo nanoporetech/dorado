@@ -1,8 +1,9 @@
 #pragma once
 
 #if DORADO_CUDA_BUILD
-#include <torch/cuda.h>
 #include "torch_utils/gpu_monitor.h"
+
+#include <torch/cuda.h>
 #endif
 
 #include <string>
