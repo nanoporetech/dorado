@@ -487,7 +487,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     // The non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
     std::vector<Interval> bam_region_intervals;
-    for (size_t i = 0; i < std::size(bam_regions); ++i) {
+    for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const Window& bw = bam_regions[i];
         std::vector<Window> new_windows =
                 create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, window_len, 0, i);
@@ -789,8 +789,8 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));
 
-    const int32_t num_items = dorado::ssize(in_samples);
-    const int32_t num_threads = dorado::ssize(models);
+    const int32_t num_items = static_cast<int32_t>(dorado::ssize(in_samples));
+    const int32_t num_threads = static_cast<int32_t>(dorado::ssize(models));
     const std::vector<Interval> chunks = compute_chunks(num_items, num_threads);
 
     spdlog::info("Starting to call consensus for {} samples using {} devices.", num_items,
