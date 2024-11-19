@@ -1,8 +1,6 @@
 #include "medaka_counts.h"
 
 #include "htslib/sam.h"
-#include "khash.h"
-#include "kvec.h"
 #include "medaka_bamiter.h"
 
 #include <spdlog/spdlog.h>
@@ -13,15 +11,10 @@
 #include <cstring>
 #include <memory>
 #include <ostream>
-// #include <errno.h>
+#include <unordered_set>
 
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
 #define bam1_seqi(s, i) (bam_seqi((s), (i)))
-#define bam_nt16_rev_table seq_nt16_str
-#define bam_nt16_table seq_nt16_table
-
-// For recording bad reads and skipping processing
-KHASH_SET_INIT_STR(BADREADS)
 
 namespace dorado::polisher {
 
@@ -98,7 +91,7 @@ void print_pileup_data(std::ostream &os,
 std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
                                        const int64_t indel,
                                        const int64_t num_homop,
-                                       khash_t(BADREADS) * bad_reads) {
+                                       std::unordered_set<std::string> &bad_reads) {
     // Create homopolymer scores using Weibull shape and scale parameters.
     // If prerequisite sam tags are not present an array of zero counts is returned.
     std::vector<float> fraction_counts(num_homop);
@@ -107,12 +100,10 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     for (int64_t i = 0; i < 2; ++i) {
         uint8_t *tag = bam_aux_get(p->b, wtags[i]);
         if (tag == NULL) {
-            char *read_id = bam_get_qname(p->b);
-            khiter_t k;
-            k = kh_get(BADREADS, bad_reads, read_id);
-            if (k == kh_end(bad_reads)) {  // a new bad read
-                int putret;
-                k = kh_put(BADREADS, bad_reads, read_id, &putret);
+            const std::string read_id(bam_get_qname(p->b));
+            const auto it = bad_reads.find(read_id);
+            if (it == std::end(bad_reads)) {  // a new bad read
+                bad_reads.emplace(read_id);
                 spdlog::warn("Failed to retrieve Weibull parameter tag '{}' for read {}.\n",
                              wtags[i], read_id);
             }
@@ -229,7 +220,7 @@ PileupData calculate_pileup(const std::string &chr_name,
     // get counts
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
     n_cols = 0;             // number of processed columns (including insertions)
-    khash_t(BADREADS) *no_rle_tags = kh_init(BADREADS);  // maintain set of reads without rle tags
+    std::unordered_set<std::string> no_rle_tags;
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
                                 const_cast<const bam_pileup1_t **>(plp.data()))) > 0) {
@@ -360,7 +351,6 @@ PileupData calculate_pileup(const std::string &chr_name,
         major_col += (dtype_featlen * (max_ins + 1));
         n_cols += max_ins;
     }
-    kh_destroy(BADREADS, no_rle_tags);
 
     pileup.n_cols(n_cols);
     pileup.get_major().resize(n_cols);

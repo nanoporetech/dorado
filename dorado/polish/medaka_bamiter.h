@@ -1,5 +1,4 @@
-#ifndef _MEDAKA_BAMITER_H
-#define _MEDAKA_BAMITER_H
+#pragma once
 
 #include "htslib/sam.h"
 
@@ -31,5 +30,3 @@ void destroy_bam_fset(bam_fset *fset);
 
 // iterator for reading bam
 int read_bam(void *data, bam1_t *b);
-
-#endif
