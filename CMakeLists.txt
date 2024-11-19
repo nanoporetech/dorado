@@ -306,8 +306,6 @@ add_library(dorado_lib
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
     dorado/polish/consensus_result.h
-    dorado/polish/features.cpp
-    dorado/polish/features.h
     dorado/polish/model.cpp
     dorado/polish/model.h
     dorado/polish/medaka_bamiter.cpp
@@ -322,6 +320,8 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
+    dorado/polish/architectures/counts_feature_encoder.cpp
+    dorado/polish/architectures/counts_feature_encoder.h
     dorado/utils/ssize.h
 )
 

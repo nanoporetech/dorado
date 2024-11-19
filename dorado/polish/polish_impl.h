@@ -1,7 +1,7 @@
 #pragma once
 
+#include "polish/architectures/counts_feature_encoder.h"
 #include "polish/consensus_result.h"
-#include "polish/features.h"
 #include "polish/polish_models.h"
 #include "polish/sample.h"
 #include "polish/trim.h"

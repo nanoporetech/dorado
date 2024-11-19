@@ -2,7 +2,7 @@
 #include "correct/infer.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
-#include "polish/features.h"
+#include "polish/architectures/counts_feature_encoder.h"
 #include "polish/medaka_bamiter.h"
 #include "polish/medaka_counts.h"
 #include "polish/model.h"
