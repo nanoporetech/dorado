@@ -60,199 +60,11 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
     return indices;
 }
 
-/**
- * \brief Creates pileup counts for feature array for a given region.
- * \param bam_set File stream for the open BAM file for random access lookup.
- * \param region Htslib-style region string. Start is 1-based, and end is inclusive.
- * \param
- * \param
- * \param
- * \param
- * \param
- * \param
- * \param
- * \param
- * \param
- * \returns Vector of CountsResult objects. More than 1 object can be returned if the region
- *          was split internally. This can happen if there are discontinuities in positions
- *          caused e.g. by gaps in coverage.
- *
- * NOTE: The original implementation had another parameter here: `region_split=100000` which
- *          chunked the regions for parallel processing and returned these chunks separately in the end as well.
- *          Here, we move this responsibility onto the caller of the function.
- */
-CountsResult construct_pileup_counts(bam_fset& bam_set,
-                                     const std::string& ref_name,
-                                     const int32_t ref_start,
-                                     const int32_t ref_end,
-                                     size_t num_qstrat /*= 1*/,
-                                     size_t num_dtypes /*= 1*/,
-                                     const std::vector<std::string>& dtypes /*= {}*/,
-                                     const std::string& tag_name /*= {}*/,
-                                     int tag_value /*= 0*/,
-                                     bool keep_missing /*= false*/,
-                                     bool weibull_summation /*= false*/,
-                                     const char* read_group /*= NULL*/,
-                                     const int min_mapq /*= 1*/) {
-    // Compute the pileup.
-    // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
-    // NOTE 2: the from_blob expects non-const data, so can't define the pileup as const here.
-    PileupData pileup = calculate_pileup(ref_name, ref_start, ref_end, bam_set, num_dtypes, dtypes,
-                                         num_qstrat, tag_name, tag_value, keep_missing,
-                                         weibull_summation, read_group, min_mapq);
-    // Create Torch tensors from the pileup.
-    const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
-    CountsResult counts_result = plp_data_to_tensors(pileup, n_rows);
-
-    return counts_result;
-
-    // const auto find_gaps = [](const std::vector<int64_t>& positions,
-    //                           int64_t threshold = 1) -> std::vector<int64_t> {
-    //     std::vector<int64_t> ret;
-    //     for (size_t i = 1; i < std::size(positions); ++i) {
-    //         if ((positions[i] - positions[i - 1]) > threshold) {
-    //             ret.emplace_back(i);
-    //         }
-    //     }
-    //     return ret;
-    // };
-
-    // const auto split_on_discontinuities = [&find_gaps](std::vector<CountsResult>& pileups) {
-    //     std::vector<CountsResult> split_results;
-
-    //     // TODO: Reimplement this with iteration over data instead of so much tensor slicing.
-    //     for (auto& data : pileups) {
-    //         const std::vector<int64_t> gaps = find_gaps(data.positions_major);
-
-    //         if (std::empty(gaps)) {
-    //             split_results.emplace_back(std::move(data));
-    //         } else {
-    //             int64_t start = 0;
-    //             for (const int64_t i : gaps) {
-    //                 std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
-    //                                                    data.positions_major.begin() + i);
-    //                 std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
-    //                                                    data.positions_minor.begin() + i);
-    //                 split_results.emplace_back(CountsResult{data.counts.slice(0, start, i),
-    //                                                         std::move(new_major_pos),
-    //                                                         std::move(new_minor_pos)});
-    //                 start = i;
-    //             }
-    //             if (start < static_cast<int64_t>(std::size(data.positions_major))) {
-    //                 std::vector<int64_t> new_major_pos(data.positions_major.begin() + start,
-    //                                                    data.positions_major.end());
-    //                 std::vector<int64_t> new_minor_pos(data.positions_minor.begin() + start,
-    //                                                    data.positions_minor.end());
-    //                 split_results.emplace_back(CountsResult{data.counts.slice(0, start),
-    //                                                         std::move(new_major_pos),
-    //                                                         std::move(new_minor_pos)});
-    //             }
-    //         }
-    //     }
-
-    //     return split_results;
-    // };
-
-    // const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
-    //     size_t size = 0;
-    //     for (const auto& vec : vecs) {
-    //         size += std::size(vec);
-    //     }
-    //     std::vector<int64_t> ret;
-    //     ret.reserve(size);
-    //     for (const auto& vec : vecs) {
-    //         ret.insert(ret.end(), vec.cbegin(), vec.cend());
-    //     }
-    //     return ret;
-    // };
-
-    // const auto merge_chunks = [&cat_vectors](std::vector<CountsResult>& pileups) {
-    //     std::vector<torch::Tensor> counts_buffer;
-    //     std::vector<std::vector<int64_t>> positions_major_buffer;
-    //     std::vector<std::vector<int64_t>> positions_minor_buffer;
-    //     int64_t last_major = -1;
-
-    //     std::vector<CountsResult> results;
-
-    //     for (auto& data : pileups) {
-    //         if (std::empty(data.positions_major)) {
-    //             continue;
-    //         }
-    //         const int64_t first_major = data.positions_major.front();
-    //         if (counts_buffer.empty() || (first_major - last_major) == 1) {
-    //             // New or contiguous chunk.
-    //             last_major = data.positions_major.back();
-    //             counts_buffer.emplace_back(std::move(data.counts));
-    //             positions_major_buffer.emplace_back(std::move(data.positions_major));
-    //             positions_minor_buffer.emplace_back(std::move(data.positions_minor));
-
-    //         } else {
-    //             // Discontinuity found, finalize the current chunk
-    //             last_major = data.positions_major.back();
-
-    //             // The torch::cat is slow, so just move if there is nothing to concatenate.
-    //             if (std::size(counts_buffer) == 1) {
-    //                 results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-    //                                                   std::move(positions_major_buffer.front()),
-    //                                                   std::move(positions_minor_buffer.front())});
-    //             } else {
-    //                 results.emplace_back(CountsResult{
-    //                         torch::cat(std::move(counts_buffer)),
-    //                         cat_vectors(positions_major_buffer),
-    //                         cat_vectors(positions_minor_buffer),
-    //                 });
-    //             }
-    //             counts_buffer = {std::move(data.counts)};
-    //             positions_major_buffer = {std::move(data.positions_major)};
-    //             positions_minor_buffer = {std::move(data.positions_minor)};
-    //         }
-    //     }
-
-    //     if (!counts_buffer.empty()) {
-    //         // The torch::cat is slow, so just move if there is nothing to concatenate.
-    //         if (std::size(counts_buffer) == 1) {
-    //             results.emplace_back(CountsResult{std::move(counts_buffer.front()),
-    //                                               std::move(positions_major_buffer.front()),
-    //                                               std::move(positions_minor_buffer.front())});
-    //         } else {
-    //             results.emplace_back(CountsResult{
-    //                     torch::cat(std::move(counts_buffer)),
-    //                     cat_vectors(positions_major_buffer),
-    //                     cat_vectors(positions_minor_buffer),
-    //             });
-    //         }
-    //     }
-
-    //     return results;
-    // };
-
-    // // First pass: split at discontinuities within each chunk.
-    // std::vector<CountsResult> results;
-    // results.emplace_back(std::move(counts_result));
-
-    // results = split_on_discontinuities(results);
-
-    // // Second pass: merge neighboring chunks if they have no distance between them.
-    // results = merge_chunks(results);
-
-    // return results;
-}
-
 Sample counts_to_features(CountsResult& pileup,
                           const int32_t seq_id,
                           const bool sym_indels,
                           const FeatureIndicesType& feature_indices,
                           const NormaliseType normalise_type) {
-    // const int64_t start = pileup.positions_major.front();
-    // const int64_t end = pileup.positions_major.back();
-
-    // if ((start != ref_start) || ((end + 1) != ref_end)) {
-    //     spdlog::warn(
-    //             "Pileup counts do not span requested region, requested {}:{}-{}, received {}-{}, "
-    //             "pileup.positions_major.size() = {}",
-    //             ref_name, ref_start, ref_end, start, end, std::size(pileup.positions_major));
-    // }
-
     // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
     // on a very high level with lots of redundancy in computation.
     const int64_t num_rows = static_cast<int64_t>(std::size(pileup.positions_major));
@@ -356,63 +168,6 @@ Sample counts_to_features(CountsResult& pileup,
     return sample;
 }
 
-// /**
-//  * \brief Takes an input sample and splits it bluntly if it has too many positions. This can happen when
-//  *          there are many long insertions in an input window, and can easily cause out-of-memory issues on the GPU
-//  *          if the sample is not split.
-//  *          Splitting is implemented to match Medaka, where a simple sliding window is used to create smaller samples.
-//  *          In case of a smalle trailing portion (smaller than chunk_len), a potentially large overlap is produced to
-//  *          cover this region instead of just outputing the small chunk.
-//  */
-// std::vector<Sample> split_sample(const Sample& sample,
-//                                  const int64_t chunk_len,
-//                                  const int64_t chunk_overlap) {
-//     if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
-//         throw std::runtime_error(
-//                 "Wrong chunk_overlap length. chunk_len = " + std::to_string(chunk_len) +
-//                 ", chunk_overlap = " + std::to_string(chunk_overlap));
-//     }
-
-//     const int64_t sample_len = static_cast<int64_t>(std::size(sample.positions_major));
-
-//     if (sample_len <= chunk_len) {
-//         return {sample};
-//     }
-
-//     const auto create_chunk = [&](const int64_t start, const int64_t end) {
-//         torch::Tensor new_features = sample.features.slice(0, start, start + chunk_len);
-//         std::vector<int64_t> new_major(sample.positions_major.begin() + start,
-//                                        sample.positions_major.begin() + end);
-//         std::vector<int64_t> new_minor(sample.positions_minor.begin() + start,
-//                                        sample.positions_minor.begin() + end);
-//         torch::Tensor new_depth = sample.depth.slice(0, start, start + chunk_len);
-//         return Sample{sample.ref_name,      std::move(new_features), std::move(new_major),
-//                       std::move(new_minor), std::move(new_depth),    sample.region_start,
-//                       sample.region_end,    sample.seq_id,           sample.window_id};
-//     };
-
-//     std::vector<Sample> result;
-
-//     const int64_t step = chunk_len - chunk_overlap;
-
-//     int64_t end = 0;
-//     for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
-//         end = start + chunk_len;
-//         // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
-//         result.emplace_back(create_chunk(start, end));
-//     }
-
-//     // This will create a chunk with potentially large overlap.
-//     if (end < sample_len) {
-//         const int64_t start = sample_len - chunk_len;
-//         end = sample_len;
-//         // std::cerr << "[split_sample] sample_len = " << sample_len << ", start = " << start << ", end = " << end << "\n";
-//         result.emplace_back(create_chunk(start, end));
-//     }
-
-//     return result;
-// }
-
 }  // namespace
 
 CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set) : m_bam_set{bam_set} {}
@@ -450,11 +205,17 @@ Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
     const int32_t num_dtypes = static_cast<int32_t>(std::size(m_dtypes)) + 1;
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
 
-    CountsResult pileup = construct_pileup_counts(
-            *m_bam_set, ref_name, ref_start, ref_end, num_qstrat, num_dtypes, m_dtypes, m_tag_name,
+    // Compute the pileup.
+    // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
+    PileupData pileup = calculate_pileup(
+            ref_name, ref_start, ref_end, *m_bam_set, num_dtypes, m_dtypes, num_qstrat, m_tag_name,
             m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
-    if (!pileup.counts.numel()) {
+    // Create Torch tensors from the pileup.
+    const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
+    CountsResult pileup_tensors = plp_data_to_tensors(pileup, n_rows);
+
+    if (!pileup_tensors.counts.numel()) {
         const std::string region =
                 ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
         spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
@@ -462,7 +223,7 @@ Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
         return {};
     }
 
-    return counts_to_features(pileup, seq_id, m_symmetric_indels, m_feature_indices,
+    return counts_to_features(pileup_tensors, seq_id, m_symmetric_indels, m_feature_indices,
                               m_normalise_type);
 }
 
