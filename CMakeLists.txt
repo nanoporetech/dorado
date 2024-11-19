@@ -306,22 +306,25 @@ add_library(dorado_lib
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
     dorado/polish/consensus_result.h
-    dorado/polish/model.cpp
-    dorado/polish/model.h
     dorado/polish/medaka_bamiter.cpp
     dorado/polish/medaka_bamiter.h
     dorado/polish/medaka_counts.cpp
     dorado/polish/medaka_counts.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
-    dorado/polish/polish_models.cpp
-    dorado/polish/polish_models.h
     dorado/polish/region.h
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
+    dorado/polish/architectures/architecture_factory.h
     dorado/polish/architectures/counts_feature_encoder.cpp
     dorado/polish/architectures/counts_feature_encoder.h
+    dorado/polish/architectures/gru_model.cpp
+    dorado/polish/architectures/gru_model.h
+    dorado/polish/architectures/model_config.cpp
+    dorado/polish/architectures/model_config.h
+    dorado/polish/architectures/torch_model_base.cpp
+    dorado/polish/architectures/torch_model_base.h
     dorado/utils/ssize.h
 )
 

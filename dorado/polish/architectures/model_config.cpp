@@ -1,4 +1,4 @@
-#include "model.h"
+#include "model_config.h"
 
 #include "utils/memory_utils.h"
 #include "utils/string_utils.h"
