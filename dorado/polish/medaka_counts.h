@@ -57,13 +57,18 @@ public:
     int64_t num_homop() const { return m_num_homop; }
     int64_t n_cols() const { return m_n_cols; }
 
-    const std::vector<int64_t>& matrix() const { return m_matrix; }
-    const std::vector<int64_t>& major() const { return m_major; }
-    const std::vector<int64_t>& minor() const { return m_minor; }
+    // Can't call thse getters and setters just `major()` or `minor` because:
+    //  "error: In the GNU C Library, "major" is defined"
+    const std::vector<int64_t>& get_matrix() const { return m_matrix; }
+    const std::vector<int64_t>& get_major() const { return m_major; }
+    const std::vector<int64_t>& get_minor() const { return m_minor; }
 
-    std::vector<int64_t>& matrix() { return m_matrix; }
-    std::vector<int64_t>& major() { return m_major; }
-    std::vector<int64_t>& minor() { return m_minor; }
+    std::vector<int64_t>& get_matrix() { return m_matrix; }
+    std::vector<int64_t>& get_major() { return m_major; }
+    std::vector<int64_t>& get_minor() { return m_minor; }
+
+    void set_major(std::vector<int64_t> data) { std::swap(m_major, data); }
+    void set_minor(std::vector<int64_t> data) { std::swap(m_minor, data); }
 
     void n_cols(const int64_t val) { m_n_cols = val; }
 

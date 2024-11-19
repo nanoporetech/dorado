@@ -17,13 +17,11 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
                                  torch::kInt64);
 
     // Copy the data from `data.matrix()` into `result.counts`
-    std::memcpy(result.counts.data_ptr<int64_t>(), data.matrix().data(),
+    std::memcpy(result.counts.data_ptr<int64_t>(), data.get_matrix().data(),
                 data.n_cols() * n_rows * sizeof(int64_t));
 
-    std::swap(result.positions_major, data.major());
-    std::swap(result.positions_minor, data.minor());
-
-    // std::cerr << "data.n_cols() = " << data.n_cols() << "\n";
+    result.positions_major = std::move(data.get_major());
+    result.positions_minor = std::move(data.get_minor());
 
     return result;
 }

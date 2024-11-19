@@ -83,11 +83,11 @@ void print_pileup_data(std::ostream &os,
     os << "depth\n";
     for (int64_t j = 0; j < static_cast<int64_t>(pileup.n_cols()); ++j) {
         int64_t s = 0;
-        os << pileup.major()[j] << '\t' << pileup.minor()[j] << '\t';
+        os << pileup.get_major()[j] << '\t' << pileup.get_minor()[j] << '\t';
         for (int64_t i = 0; i < static_cast<int64_t>(num_dtypes * PILEUP_BASES_SIZE * num_homop);
              ++i) {
             const int64_t c =
-                    pileup.matrix().at(j * num_dtypes * PILEUP_BASES_SIZE * num_homop + i);
+                    pileup.get_matrix().at(j * num_dtypes * PILEUP_BASES_SIZE * num_homop + i);
             s += c;
             os << c << '\t';
         }
@@ -222,9 +222,9 @@ PileupData calculate_pileup(const std::string &chr_name,
     const int64_t buffer_cols = 2 * (end - start);
     PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
 
-    int64_t *pileup_matrix = pileup.matrix().data();
-    int64_t *pileup_major = pileup.major().data();
-    int64_t *pileup_minor = pileup.minor().data();
+    int64_t *pileup_matrix = pileup.get_matrix().data();
+    int64_t *pileup_major = pileup.get_major().data();
+    int64_t *pileup_minor = pileup.get_minor().data();
 
     // get counts
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
@@ -262,9 +262,9 @@ PileupData calculate_pileup(const std::string &chr_name,
                     max_ins + std::max(2 * pileup.buffer_cols(),
                                        static_cast<int64_t>(cols_per_pos * (end - start)));
             pileup.resize_cols(new_buffer_cols);
-            pileup_matrix = pileup.matrix().data();
-            pileup_major = pileup.major().data();
-            pileup_minor = pileup.minor().data();
+            pileup_matrix = pileup.get_matrix().data();
+            pileup_major = pileup.get_major().data();
+            pileup_minor = pileup.get_minor().data();
         }
 
         // set major/minor position indexes, minors hold ins
@@ -363,8 +363,8 @@ PileupData calculate_pileup(const std::string &chr_name,
     kh_destroy(BADREADS, no_rle_tags);
 
     pileup.n_cols(n_cols);
-    pileup.major().resize(n_cols);
-    pileup.minor().resize(n_cols);
+    pileup.get_major().resize(n_cols);
+    pileup.get_minor().resize(n_cols);
 
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);
