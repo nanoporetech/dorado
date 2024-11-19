@@ -172,9 +172,19 @@ class NvmlApi final {
 
         // Fall back to the original nvmlInit() if _v2 doesn't exist.
         auto *do_init = m_Init_v2 ? m_Init_v2 : m_Init;
+
+        // We retry initialisation for a certain amount of time, to allow the driver to load on system startup
+        auto start = std::chrono::system_clock::now();
         nvmlReturn_t result = do_init();
+        int64_t wait_seconds = 180;
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start).count();
+        while (result != NVML_SUCCESS && duration < wait_seconds) {
+            spdlog::warn("Failed to initialize NVML: {}, retrying in 1s...", m_ErrorString(result));
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            result = do_init();
+        }
         if (result != NVML_SUCCESS) {
-            spdlog::warn("Failed to initialize NVML: {}", m_ErrorString(result));
+            spdlog::warn("Failed to initialize NVML after {} seconds: {}", wait_seconds, m_ErrorString(result));
             clear_symbols();
             platform_close();
         }
