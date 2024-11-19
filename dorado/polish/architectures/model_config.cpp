@@ -105,7 +105,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
     // Parse the label scheme section.
     {
         const auto& section = toml::find(config_toml, "label_scheme");
-        cfg.label_scheme = toml::find<std::string>(section, "type");
+        cfg.label_scheme_type = toml::find<std::string>(section, "type");
     }
 
     return cfg;

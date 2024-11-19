@@ -13,17 +13,18 @@ public:
     GRUModel(const int32_t num_features,
              const int32_t num_classes,
              const int32_t gru_size,
-             const bool normalise = true);
+             const int32_t num_layers,
+             const bool bidirectional,
+             const bool normalise);
 
-    /**
-     * \brief Implementes the forward function for inference.
-     */
     torch::Tensor forward(torch::Tensor x) override;
 
 private:
     int32_t m_num_features = 10;
     int32_t m_num_classes = 5;
     int32_t m_gru_size = 128;
+    int32_t m_num_layers = 2;
+    bool m_bidirectional = true;
     bool m_normalise = true;
     torch::nn::GRU m_gru{nullptr};
     torch::nn::Linear m_linear{nullptr};

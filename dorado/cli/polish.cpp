@@ -3,6 +3,7 @@
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
 #include "polish/architectures/architecture_factory.h"
+#include "polish/architectures/gru_model.h"
 #include "polish/architectures/model_config.h"
 #include "polish/medaka_bamiter.h"
 #include "polish/medaka_counts.h"
@@ -353,7 +354,8 @@ std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& 
 
     // Construct the model.
     spdlog::debug("Creating the GRU model.");
-    std::unique_ptr<polisher::GRUModel> model = std::make_unique<polisher::GRUModel>(10, 5, 128);
+    std::unique_ptr<polisher::GRUModel> model =
+            std::make_unique<polisher::GRUModel>(10, 5, 128, 2, true, true);
 
     spdlog::debug("Setting the weights.");
     auto state_dict = module.named_parameters();

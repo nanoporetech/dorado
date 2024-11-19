@@ -21,7 +21,7 @@ struct ModelConfig {
     std::unordered_map<std::string, std::string> feature_encoder_kwargs;
 
     // Label scheme section.
-    std::string label_scheme;
+    std::string label_scheme_type;
 };
 
 ModelConfig parse_model_config(const std::filesystem::path& config_path);

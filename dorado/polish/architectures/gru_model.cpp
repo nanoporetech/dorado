@@ -5,16 +5,20 @@ namespace dorado::polisher {
 GRUModel::GRUModel(const int32_t num_features,
                    const int32_t num_classes,
                    const int32_t gru_size,
+                   const int32_t num_layers,
+                   const bool bidirectional,
                    const bool normalise)
         : m_num_features(num_features),
           m_num_classes(num_classes),
           m_gru_size(gru_size),
+          m_num_layers(num_layers),
+          m_bidirectional(bidirectional),
           m_normalise(normalise),
-          m_gru(torch::nn::GRUOptions(m_num_features, gru_size)
-                        .num_layers(2)
-                        .bidirectional(true)
+          m_gru(torch::nn::GRUOptions(m_num_features, m_gru_size)
+                        .num_layers(m_num_layers)
+                        .bidirectional(m_bidirectional)
                         .batch_first(true)),
-          m_linear(2 * m_gru_size, m_num_classes) {
+          m_linear(m_num_layers * m_gru_size, m_num_classes) {
     register_module("gru", m_gru);
     register_module("linear", m_linear);
 }
