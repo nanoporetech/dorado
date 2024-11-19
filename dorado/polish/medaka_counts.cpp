@@ -155,8 +155,8 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
  *
  */
 PileupData calculate_pileup(const std::string &chr_name,
-                            const int32_t start,  // Zero-based.
-                            const int32_t end,    // Non-inclusive.
+                            const int64_t start,  // Zero-based.
+                            const int64_t end,    // Non-inclusive.
                             const bam_fset &bam_file,
                             const int64_t num_dtypes,
                             const std::vector<std::string> &dtypes,

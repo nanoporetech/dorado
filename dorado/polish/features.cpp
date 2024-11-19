@@ -262,7 +262,7 @@ Sample counts_to_features(CountsResult& pileup,
     minor_inds.reserve(num_rows);
     major_pos_at_minor_inds.reserve(num_rows);
     major_ind_at_minor_inds.reserve(num_rows);
-    int32_t last_non_minor_index = -1;
+    int64_t last_non_minor_index = -1;
     for (int64_t i = 0; i < num_rows; ++i) {
         if (pileup.positions_minor[i] > 0) {
             minor_inds.emplace_back(i);

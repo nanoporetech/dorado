@@ -125,8 +125,8 @@ void print_pileup_data(std::ostream& os,
  *
  */
 PileupData calculate_pileup(const std::string& seq_name,
-                            const int32_t region_start,
-                            const int32_t region_end,
+                            const int64_t region_start,
+                            const int64_t region_end,
                             const bam_fset& bam_file,
                             const int64_t num_dtypes,
                             const std::vector<std::string>& dtypes,
