@@ -316,13 +316,18 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
-    dorado/polish/architectures/architecture_factory.h
+    dorado/polish/architectures/encoder_factory.cpp
+    dorado/polish/architectures/encoder_factory.h
+    dorado/polish/architectures/model_factory.cpp
+    dorado/polish/architectures/model_factory.h
     dorado/polish/architectures/counts_feature_encoder.cpp
     dorado/polish/architectures/counts_feature_encoder.h
     dorado/polish/architectures/gru_model.cpp
     dorado/polish/architectures/gru_model.h
     dorado/polish/architectures/model_config.cpp
     dorado/polish/architectures/model_config.h
+    dorado/polish/architectures/model_factory.cpp
+    dorado/polish/architectures/model_factory.h
     dorado/polish/architectures/torch_model_base.cpp
     dorado/polish/architectures/torch_model_base.h
     dorado/polish/architectures/torch_script_model.cpp

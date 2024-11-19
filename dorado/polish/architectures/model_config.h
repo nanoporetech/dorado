@@ -12,8 +12,8 @@ struct ModelConfig {
 
     // Model section.
     std::string model_type;
-    std::string model_file;
-    std::string model_dir;
+    std::filesystem::path model_file;
+    std::filesystem::path model_dir;
     std::unordered_map<std::string, std::string> model_kwargs;
 
     // Feature encoder section.

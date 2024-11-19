@@ -1,5 +1,6 @@
 #pragma once
 
+#include "polish/architectures/base_feature_encoder.h"
 #include "polish/consensus_result.h"
 #include "polish/medaka_bamiter.h"
 #include "polish/sample.h"
@@ -19,11 +20,6 @@
 
 namespace dorado::polisher {
 
-enum class NormaliseType {
-    TOTAL,
-    FWD_REV,
-};
-
 struct CountsResult {
     torch::Tensor counts;
     std::vector<int64_t> positions_major;
@@ -35,14 +31,11 @@ struct KeyHash {
         return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
     }
 };
-
-// struct CountsFeatureEncoderResults;
-
 using FeatureIndicesType =
         std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
 constexpr auto FeatureTensorType = torch::kFloat32;
 
-class CountsFeatureEncoder {
+class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:
     CountsFeatureEncoder(bam_fset* bam_set);
 
@@ -58,10 +51,12 @@ public:
                          const int32_t min_mapq,
                          const bool symmetric_indels);
 
+    ~CountsFeatureEncoder() = default;
+
     Sample encode_region(const std::string& ref_name,
                          const int64_t ref_start,
                          const int64_t ref_end,
-                         const int32_t seq_id) const;
+                         const int32_t seq_id) const override;
 
 private:
     bam_fset* m_bam_set = nullptr;
@@ -77,11 +72,11 @@ private:
     FeatureIndicesType m_feature_indices;
 };
 
-class CountsFeatureDecoder {
+class CountsFeatureDecoder : public BaseFeatureDecoder {
 public:
-    static std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits);
-};
+    ~CountsFeatureDecoder() = default;
 
-// CountsResult counts_feature_encoder(bam_fset* bam_set, const std::string_view region);
+    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
+};
 
 }  // namespace dorado::polisher

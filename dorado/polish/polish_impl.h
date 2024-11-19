@@ -1,7 +1,8 @@
 #pragma once
 
-#include "polish/architectures/architecture_factory.h"
 #include "polish/architectures/counts_feature_encoder.h"
+#include "polish/architectures/encoder_factory.h"
+#include "polish/architectures/model_factory.h"
 #include "polish/consensus_result.h"
 #include "polish/sample.h"
 #include "polish/trim.h"
