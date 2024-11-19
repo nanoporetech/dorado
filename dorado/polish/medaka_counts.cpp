@@ -124,7 +124,7 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     for (int64_t x = 1; x < num_homop + 1; ++x) {
         float a = std::pow((x - 1) / scale, shape);
         float b = std::pow(x / scale, shape);
-        fraction_counts[x - 1] = fmax(0.0f, -std::exp(-a) * std::expm1(a - b));
+        fraction_counts[x - 1] = std::fmax(0.0f, -std::exp(-a) * std::expm1(a - b));
     }
     return fraction_counts;
 }
