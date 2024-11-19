@@ -10,5 +10,7 @@ Process the input in multiple overlapping windows. Compare with reference via al
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
+  > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   NM:i:0
   10012
+  0
