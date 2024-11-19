@@ -36,7 +36,7 @@ int read_bam(void *data, bam1_t *b) {
                     continue;
                 }
             }
-            int tag_value = bam_aux2i(tag);
+            int tag_value = static_cast<int32_t>(bam_aux2i(tag));
             if (errno == EINVAL) {
                 continue;  // tag was not integer
             }
