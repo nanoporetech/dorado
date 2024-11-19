@@ -72,15 +72,21 @@ struct DeviceInfo {
     torch::Device device;
 };
 
+enum class OutputFormat {
+    FASTA,
+    FASTQ,
+};
+
 /// \brief All options for this tool.
 struct Options {
     // Positional parameters.
     std::filesystem::path in_aln_bam_fn;
     std::filesystem::path in_draft_fastx_fn;
-    std::filesystem::path out_consensus_fn;
 
     // Optional parameters.
+    std::filesystem::path out_consensus_fn;
     std::filesystem::path model_path;
+    OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
     int32_t threads = 1;
     int32_t infer_threads = 1;
@@ -103,7 +109,6 @@ ParserPtr create_cli(int& verbosity) {
         // Positional arguments group
         parser->visible.add_argument("in_aln_bam").help("Aligned reads in BAM format");
         parser->visible.add_argument("in_draft_fastx").help("Draft assembly for polishing");
-        parser->visible.add_argument("out_consensus").help("Output consensus FASTA/FASTQ file.");
     }
     {
         // Default "Optional arguments" group
@@ -129,7 +134,13 @@ ParserPtr create_cli(int& verbosity) {
     }
     {
         parser->visible.add_group("Input/output arguments");
+        parser->visible.add_argument("-o", "--out-path")
+                .help("Output to a file instead of stdout.");
         parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
+        parser->visible.add_argument("-q", "--qualities")
+                .help("Output with per-base quality scores (FASTQ).")
+                .default_value(false)
+                .implicit_value(true);
     }
     {
         parser->visible.add_group("Advanced arguments");
@@ -180,12 +191,17 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.in_aln_bam_fn = parser.visible.get<std::string>("in_aln_bam");
     opt.in_draft_fastx_fn = parser.visible.get<std::string>("in_draft_fastx");
-    opt.out_consensus_fn = parser.visible.get<std::string>("out_consensus");
+
+    opt.out_consensus_fn = (parser.visible.is_used("--out-path"))
+                                   ? parser.visible.get<std::string>("out-path")
+                                   : "";
 
     opt.model_path = (parser.visible.is_used("--model-path"))
                              ? parser.visible.get<std::string>("model-path")
                              : "";
 
+    opt.out_format =
+            parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
     opt.threads = parser.visible.get<int>("threads");
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : opt.threads;
 
@@ -212,13 +228,6 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
     return opt;
-}
-
-std::string get_lowercase_extension(const std::filesystem::path& path) {
-    std::string ext = path.extension().string();
-    std::transform(std::begin(ext), std::end(ext), std::begin(ext),
-                   [](unsigned char c) { return std::tolower(c); });
-    return ext;
 }
 
 void validate_options(const Options& opt) {
@@ -261,15 +270,6 @@ void validate_options(const Options& opt) {
                 "window_len = {}.",
                 opt.window_overlap, opt.window_len);
         std::exit(EXIT_FAILURE);
-    }
-    {
-        const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
-        if ((ext != ".fasta") && (ext != ".fastq") && (ext != ".fa") && (ext != ".fq")) {
-            spdlog::error(
-                    "Unknown extension of output file: {}. Supported: .fasta, .fastq, .fa, .fq.",
-                    opt.out_consensus_fn.string());
-            std::exit(EXIT_FAILURE);
-        }
     }
 
     if (!std::empty(opt.model_path) && !std::filesystem::exists(opt.model_path)) {
@@ -425,6 +425,19 @@ std::vector<polisher::Interval> create_batches(const T& data,
     return ret;
 }
 
+std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
+        const std::string& out_fn) {
+    if (std::empty(out_fn)) {
+        return {&std::cout, [](std::ostream*) {}};
+    }
+    std::unique_ptr<std::ofstream, void (*)(std::ostream*)> ofs(
+            new std::ofstream(out_fn), [](std::ostream* ptr) { delete ptr; });
+    if (!ofs->is_open()) {
+        throw std::runtime_error("Failed to open file: " + out_fn);
+    }
+    return ofs;
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
@@ -432,10 +445,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         spdlog::error("Zero devices initialized! Need at least one device to run.");
         std::exit(EXIT_FAILURE);
     }
-
-    // Check the output extension to determine if we need to compute the QVs too.
-    const std::string ext = get_lowercase_extension(opt.out_consensus_fn);
-    const bool with_quals = ((ext == ".fastq") && (ext != ".fq")) ? true : false;
 
     spdlog::info("Number of devices: {}", std::size(devices));
 
@@ -486,7 +495,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             create_batches(draft_lens, opt.draft_batch_size,
                            [](const std::pair<std::string, int64_t>& val) { return val.second; });
 
-    std::ofstream ofs(opt.out_consensus_fn);
+    // Open the output stream, to std::cout if the path is empty, otherwise to the file.
+    auto ofs = get_output_stream(opt.out_consensus_fn);
 
     for (const auto& draft_batch : draft_batches) {
         spdlog::info("=============================");
@@ -531,7 +541,8 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
                                               results_samples, group, seq_id);
 
             const std::string& header = draft_lens_batch[seq_id].first;
-            write_consensus_result(ofs, header, consensus, with_quals);
+            write_consensus_result(*ofs, header, consensus,
+                                   (opt.out_format == OutputFormat::FASTQ));
         }
     }
 
