@@ -450,8 +450,9 @@ class DeviceInfoCache final {
         }
 #if defined(DORADO_ORIN) || defined(DORADO_TX2)
         if (m_device_count == 0) {
-            // TX2/Orin may not have NVML, in which case just report that we have 1.
-            m_device_count = 1;
+            // TX2/Orin may not have NVML, in which case ask torch how many devices it thinks there are.
+            m_device_count = torch::cuda::device_count();
+            spdlog::warn("Setting device count to {} as reported from torch", m_device_count);
         }
 #endif
     }
