@@ -82,6 +82,7 @@ struct PolisherResources {
     std::unique_ptr<polisher::BaseFeatureDecoder> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
+    std::vector<std::shared_ptr<polisher::TorchModel>> models;
 };
 
 /// \brief All options for this tool.
@@ -345,57 +346,6 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     return devices;
 }
 
-std::unique_ptr<polisher::TorchModel> create_model(const std::filesystem::path& model_path,
-                                                   const DeviceInfo& device_info,
-                                                   const bool full_precision) {
-    // Load weights from the model file.
-    torch::jit::script::Module module;
-
-    try {
-        spdlog::debug("Loading weights from file: {}", model_path.string());
-        module = torch::jit::load(model_path.string());
-    } catch (const c10::Error& e) {
-        throw std::runtime_error("Error loading model from " + model_path.string() +
-                                 " with error: " + e.what());
-    }
-
-    // Construct the model.
-    spdlog::debug("Creating the GRU model.");
-    std::unique_ptr<polisher::GRUModel> model =
-            std::make_unique<polisher::GRUModel>(10, 5, 128, 2, true, true);
-
-    spdlog::debug("Setting the weights.");
-    auto state_dict = module.named_parameters();
-    for (const auto& p : state_dict) {
-        auto* param = model->named_parameters().find(p.name);
-        if (param != nullptr) {
-            param->copy_(p.value);
-        } else {
-            throw std::runtime_error(
-                    "Some loaded parameters cannot be found in the C++ model! name = " + p.name);
-        }
-    }
-    model->to(device_info.device);
-    if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-        model->to_half();
-        spdlog::info("Converted the model to half.");
-    } else {
-        spdlog::info("Using full precision.");
-    }
-    model->eval();
-
-    size_t total_params = 0;
-    size_t total_bytes = 0;
-    for (const auto& param : model->parameters()) {
-        total_params += param.numel();
-        total_bytes += param.numel() * param.element_size();
-    }
-    spdlog::info("Model: total parameters: {}, size: {} MB", total_params,
-                 (total_bytes / (1024.0 * 1024.0)));
-
-    return model;
-}
-
 std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
         const std::filesystem::path& in_fastx_fn) {
     const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
@@ -473,7 +423,9 @@ std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
 PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
-                                   const int32_t num_bam_threads) {
+                                   const int32_t num_bam_threads,
+                                   const int32_t num_inference_cpu_threads,
+                                   const bool full_precision) {
     PolisherResources resources;
 
     spdlog::info("Creating the encoder and the decoder.");
@@ -486,11 +438,49 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
         resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
     }
 
+    spdlog::info("Initializing the devices.");
     resources.devices = init_devices(device_str);
-
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
     }
+
+    // Construct the model.
+    spdlog::info("Loading the model.");
+    const auto create_models = [&]() {
+        std::vector<std::shared_ptr<polisher::TorchModel>> ret;
+
+        for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
+            const auto& device_info = resources.devices[device_id];
+
+            spdlog::info("About to load model to device {}: {}", device_id, device_info.name);
+
+            auto model = polisher::model_factory(model_config);
+
+            model->to(device_info.device);
+
+            // Half-precision if needed.
+            if ((device_info.type == DeviceType::CUDA) && !full_precision) {
+                model->to_half();
+                spdlog::info("Converted the model to half.");
+            } else {
+                spdlog::info("Using full precision.");
+            }
+
+            model->eval();
+
+            ret.emplace_back(std::move(model));
+
+            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+        }
+        if ((std::size(resources.devices) == 1) &&
+            (resources.devices.front().type == DeviceType::CPU)) {
+            for (int32_t i = 1; i < num_inference_cpu_threads; ++i) {
+                ret.emplace_back(ret.front());
+            }
+        }
+        return ret;
+    };
+    resources.models = create_models();
 
     return resources;
 }
@@ -515,26 +505,6 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
     at::set_num_interop_threads(opt.threads);
     torch::set_num_threads(1);
-
-    // Construct the model.
-    spdlog::info("Loading the model.");
-    const auto create_models = [&]() {
-        std::vector<std::shared_ptr<polisher::TorchModel>> ret;
-        for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
-            ret.emplace_back(create_model(opt.model_path / "model.pt", resources.devices[device_id],
-                                          opt.full_precision));
-            spdlog::info("Loaded model to device {}: {}", device_id,
-                         resources.devices[device_id].name);
-        }
-        if ((std::size(resources.devices) == 1) &&
-            (resources.devices.front().type == DeviceType::CPU)) {
-            for (int32_t i = 1; i < opt.threads; ++i) {
-                ret.emplace_back(ret.front());
-            }
-        }
-        return ret;
-    };
-    const std::vector<std::shared_ptr<polisher::TorchModel>> models = create_models();
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<polisher::Interval> draft_batches =
@@ -565,8 +535,9 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         spdlog::info("Produced num samples: {}", std::size(samples));
 
         std::vector<polisher::ConsensusResult> results_samples =
-                polisher::process_samples_in_parallel(samples, trims, models, *resources.decoder,
-                                                      opt.window_len, opt.batch_size);
+                polisher::process_samples_in_parallel(samples, trims, resources.models,
+                                                      *resources.decoder, opt.window_len,
+                                                      opt.batch_size);
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
@@ -632,8 +603,8 @@ int polish(int argc, char* argv[]) {
             polisher::parse_model_config(opt.model_path / "config.toml", "weights.pt");
 
     // Create the models, encoders, decoders and BAM handles.
-    PolisherResources resources =
-            create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads);
+    PolisherResources resources = create_resources(model_config, opt.in_aln_bam_fn, opt.device_str,
+                                                   opt.threads, opt.threads, opt.full_precision);
 
     run_polishing(opt, resources);
 
