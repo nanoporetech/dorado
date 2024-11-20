@@ -168,7 +168,7 @@ class NvmlApi final {
 
     void init() {
         if (!platform_open() || !load_symbols()) {
-            spdlog::warn("Failed to load NVML");
+            spdlog::info("Failed to load NVML");
             clear_symbols();
             platform_close();
             return;
@@ -455,7 +455,7 @@ class DeviceInfoCache final {
         if (m_device_count == 0) {
             // TX2/Orin may not have NVML, in which case ask torch how many devices it thinks there are.
             m_device_count = torch::cuda::device_count();
-            spdlog::warn("Setting device count to {} as reported from torch", m_device_count);
+            spdlog::info("Setting device count to {} as reported from torch", m_device_count);
         }
 #endif
     }
