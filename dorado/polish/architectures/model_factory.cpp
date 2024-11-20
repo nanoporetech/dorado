@@ -33,12 +33,6 @@ void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
         return bytes;
     };
 
-    torch::NoGradGuard no_grad;
-
-    const std::vector<char> bytes = get_bytes(in_pt);
-
-    const c10::Dict<c10::IValue, c10::IValue> weights = torch::pickle_load(bytes).toGenericDict();
-
     if (spdlog::default_logger()->level() == spdlog::level::debug) {
         const torch::OrderedDict<std::string, at::Tensor> model_params = model.named_parameters();
         for (const auto& w : model_params) {
@@ -46,17 +40,29 @@ void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
         }
     }
 
-    // auto state_dict = model.named_parameters();
-    for (const auto& w : weights) {
-        const std::string name = w.key().toStringRef();
-        const at::Tensor value = w.value().toTensor();
-        auto* param = model.named_parameters().find(name);
-        if (param != nullptr) {
-            param->copy_(value);
-        } else {
-            throw std::runtime_error(
-                    "Some loaded parameters cannot be found in the libtorch model! name = " + name);
+    torch::NoGradGuard no_grad;
+
+    const std::vector<char> bytes = get_bytes(in_pt);
+
+    try {
+        const c10::Dict<c10::IValue, c10::IValue> weights =
+                torch::pickle_load(bytes).toGenericDict();
+
+        for (const auto& w : weights) {
+            const std::string name = w.key().toStringRef();
+            const at::Tensor value = w.value().toTensor();
+            auto* param = model.named_parameters().find(name);
+            if (param != nullptr) {
+                param->copy_(value);
+            } else {
+                throw std::runtime_error(
+                        "Some loaded parameters cannot be found in the libtorch model! name = " +
+                        name);
+            }
         }
+
+    } catch (const c10::Error& e) {
+        throw std::runtime_error{"Error: Pickled data is not a dictionary or is None!"};
     }
 }
 
