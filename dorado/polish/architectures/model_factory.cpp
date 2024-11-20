@@ -18,8 +18,6 @@ ModelType parse_model_type(const std::string& type) {
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
 
-// Model class is inherited from public nn::Module
-
 /**
  * \brief This function is a workaround around missing features in torchlib. There
  *          is currently no way to load only the state dict without the model either
@@ -80,12 +78,20 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
 
     std::shared_ptr<TorchModel> model;
 
+    if ((config.model_file != "model.pt") && (config.model_file != "weights.pt")) {
+        throw std::runtime_error{"Unexpected weights/model file name! model_file = '" +
+                                 config.model_file.string() +
+                                 "', expected either 'model.pt' or 'weights.pt'."};
+    }
+
     if (config.model_file == "model.pt") {
         // Load a TorchScript model. Parameters are not important here.
         spdlog::debug("Loading a TorchScript model.");
         model = std::make_unique<TorchScriptModel>(config.model_dir / config.model_file);
 
     } else if (model_type == ModelType::GRU) {
+        spdlog::debug("Constructing a GRU model.");
+
         const int32_t num_features = std::stoi(get_value(config.model_kwargs, "num_features"));
         const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
         const int32_t gru_size = std::stoi(get_value(config.model_kwargs, "gru_size"));
@@ -98,46 +104,11 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
         model = std::make_unique<GRUModel>(num_features, num_classes, gru_size, n_layers,
                                            bidirectional, NORMALISE);
 
+        // Set the weights of the internally constructed model.
+        load_parameters(*model, config.model_dir / config.model_file);
+
     } else {
         throw std::runtime_error("Unsupported model type!");
-    }
-
-    // Set the weights of the internally constructed model.
-    if (config.model_file == "weights.pt") {
-        // Load the state_dict
-        const std::filesystem::path weights_path = config.model_dir / config.model_file;
-        load_parameters(*model, weights_path);
-
-        // const std::filesystem::path weights_path = config.model_dir / config.model_file;
-        // try {
-        //     torch::load(model, weights_path);
-        // } catch (const c10::Error& e) {
-        //     throw std::runtime_error("Error loading model weights from " + weights_path.string() +
-        //                              " with error: " + e.what());
-        // }
-
-        // // const std::filesystem::path weights_path = config.model_dir / config.model_file;
-        // torch::jit::script::Module module;
-        // try {
-        //     spdlog::debug("Loading weights from file: {}", weights_path.string());
-        //     module = torch::jit::load(weights_path.string());
-        // } catch (const c10::Error& e) {
-        //     throw std::runtime_error("(2) Error loading model weights from " + weights_path.string() +
-        //                              " with error: " + e.what());
-        // }
-
-        // spdlog::debug("Setting the weights.");
-        // auto state_dict = module.named_parameters();
-        // for (const auto& p : state_dict) {
-        //     auto* param = model->named_parameters().find(p.name);
-        //     if (param != nullptr) {
-        //         param->copy_(p.value);
-        //     } else {
-        //         throw std::runtime_error(
-        //                 "Some loaded parameters cannot be found in the libtorch model! name = " +
-        //                 p.name);
-        //     }
-        // }
     }
 
     return model;
