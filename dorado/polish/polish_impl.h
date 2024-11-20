@@ -1,6 +1,5 @@
 #pragma once
 
-#include "polish/architectures/counts_feature_encoder.h"
 #include "polish/architectures/encoder_factory.h"
 #include "polish/architectures/model_factory.h"
 #include "polish/consensus_result.h"
@@ -48,7 +47,8 @@ ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
                                 [[maybe_unused]] const int32_t seq_id);
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
-        const std::vector<polisher::CountsFeatureEncoder>& encoders,
+        std::vector<BamFile>& bam_handles,
+        const polisher::CountsFeatureEncoder& encoder,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,

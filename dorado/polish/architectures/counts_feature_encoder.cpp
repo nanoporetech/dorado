@@ -170,10 +170,9 @@ Sample counts_to_features(CountsResult& pileup,
 
 }  // namespace
 
-CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set) : m_bam_set{bam_set} {}
+CountsFeatureEncoder::CountsFeatureEncoder(const int32_t min_mapq) : m_min_mapq{min_mapq} {}
 
-CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
-                                           const NormaliseType normalise_type,
+CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
                                            const std::vector<std::string>& dtypes,
                                            const std::string_view tag_name,
                                            const int32_t tag_value,
@@ -181,8 +180,7 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
                                            const std::string_view read_group,
                                            const int32_t min_mapq,
                                            const bool symmetric_indels)
-        : m_bam_set{bam_set},
-          m_normalise_type{normalise_type},
+        : m_normalise_type{normalise_type},
           m_dtypes{dtypes},
           m_tag_name{tag_name},
           m_tag_value{tag_value},
@@ -192,10 +190,8 @@ CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
-CountsFeatureEncoder::CountsFeatureEncoder(bam_fset* bam_set, const int32_t min_mapq)
-        : m_bam_set{bam_set}, m_min_mapq{min_mapq} {}
-
-Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
+Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
+                                           const std::string& ref_name,
                                            const int64_t ref_start,
                                            const int64_t ref_end,
                                            const int32_t seq_id) const {
@@ -208,7 +204,7 @@ Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     PileupData pileup = calculate_pileup(
-            ref_name, ref_start, ref_end, *m_bam_set, num_dtypes, m_dtypes, num_qstrat, m_tag_name,
+            bam_file, ref_name, ref_start, ref_end, num_dtypes, m_dtypes, num_qstrat, m_tag_name,
             m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
     // Create Torch tensors from the pileup.

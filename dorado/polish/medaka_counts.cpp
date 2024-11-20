@@ -154,10 +154,11 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
  *  determined by keep_missing.
  *
  */
-PileupData calculate_pileup(const std::string &chr_name,
+PileupData calculate_pileup(BamFile &bam_file,
+                            const std::string &chr_name,
                             const int64_t start,  // Zero-based.
                             const int64_t end,    // Non-inclusive.
-                            const bam_fset &bam_file,
+
                             const int64_t num_dtypes,
                             const std::vector<std::string> &dtypes,
                             const int64_t num_homop,
@@ -180,9 +181,9 @@ PileupData calculate_pileup(const std::string &chr_name,
 
     // open bam etc.
     // this is all now deferred to the caller
-    htsFile *fp = bam_file.fp;
-    hts_idx_t *idx = bam_file.idx;
-    sam_hdr_t *hdr = bam_file.hdr;
+    htsFile *fp = bam_file.fp();
+    hts_idx_t *idx = bam_file.idx();
+    sam_hdr_t *hdr = bam_file.hdr();
 
     const std::string region =
             chr_name + ':' + std::to_string(start + 1) + '-' + std::to_string(end);

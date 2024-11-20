@@ -1,6 +1,7 @@
 #pragma once
 
 #include "polish/consensus_result.h"
+#include "polish/medaka_bamiter.h"
 #include "polish/sample.h"
 
 #include <torch/torch.h>
@@ -38,7 +39,8 @@ class BaseFeatureEncoder {
 public:
     virtual ~BaseFeatureEncoder() = default;
 
-    virtual Sample encode_region(const std::string& ref_name,
+    virtual Sample encode_region(BamFile& bam_file,
+                                 const std::string& ref_name,
                                  const int64_t ref_start,
                                  const int64_t ref_end,
                                  const int32_t seq_id) const = 0;

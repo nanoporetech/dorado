@@ -486,13 +486,16 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
-    // Open the BAM file for each thread and spawn encoders.
-    spdlog::info("Creating {} encoders.", opt.threads);
-    std::vector<bam_fset*> bam_sets;
-    std::vector<polisher::CountsFeatureEncoder> encoders;
+    // One encoder is enough since it has no state.
+    spdlog::info("Creating the encoder and the decoder.", opt.threads);
+    const polisher::CountsFeatureEncoder encoder(opt.min_mapq);
+    const polisher::CountsFeatureDecoder decoder(polisher::LabelSchemeType::HAPLOID);
+
+    // Open the BAM file for each thread.
+    spdlog::info("Creating {} BAM handles.", opt.threads);
+    std::vector<BamFile> bam_handles;
     for (int32_t i = 0; i < opt.threads; ++i) {
-        bam_sets.emplace_back(create_bam_fset(opt.in_aln_bam_fn.c_str()));
-        encoders.emplace_back(polisher::CountsFeatureEncoder(bam_sets.back(), opt.min_mapq));
+        bam_handles.emplace_back(BamFile(opt.in_aln_bam_fn));
     }
 
     at::set_num_interop_threads(opt.threads);
@@ -539,12 +542,11 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         // std::vector<std::vector<polisher::ConsensusResult>> pieces(std::size(draft_lens_batch));
 
         auto [samples, trims] =
-                polisher::create_samples(encoders, bam_regions, draft_lens_batch, opt.threads,
-                                         opt.window_len, opt.window_overlap);
+                polisher::create_samples(bam_handles, encoder, bam_regions, draft_lens_batch,
+                                         opt.threads, opt.window_len, opt.window_overlap);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
-        const polisher::CountsFeatureDecoder decoder(polisher::LabelSchemeType::HAPLOID);
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, models, decoder,
                                                       opt.window_len, opt.batch_size);
@@ -570,10 +572,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
             write_consensus_result(*ofs, header, consensus,
                                    (opt.out_format == OutputFormat::FASTQ));
         }
-    }
-
-    for (auto& bam_set : bam_sets) {
-        destroy_bam_fset(bam_set);
     }
 
     spdlog::info("Done!");

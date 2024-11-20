@@ -16,7 +16,7 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     throw std::runtime_error{"Unknown feature encoder type: '" + type + "'!"};
 }
 
-std::unique_ptr<CountsFeatureEncoder> encoder_factory(const ModelConfig& config) {
+std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -42,7 +42,7 @@ std::unique_ptr<CountsFeatureEncoder> encoder_factory(const ModelConfig& config)
         const std::string read_group;
 
         std::unique_ptr<CountsFeatureEncoder> ret = std::make_unique<CountsFeatureEncoder>(
-                nullptr, normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
+                normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
                 tag_keep_missing, read_group, min_mapq, sym_indels);
 
         return ret;
@@ -51,7 +51,7 @@ std::unique_ptr<CountsFeatureEncoder> encoder_factory(const ModelConfig& config)
     throw std::runtime_error{"Unsupported feature encoder type: " + config.feature_encoder_type};
 }
 
-std::unique_ptr<CountsFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
+std::unique_ptr<BaseFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
     const FeatureEncoderType feature_encoder_type =
             parse_feature_encoder_type(config.feature_encoder_type);
     const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);

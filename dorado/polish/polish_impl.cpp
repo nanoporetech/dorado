@@ -449,7 +449,8 @@ std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_
 }
 
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
-        const std::vector<polisher::CountsFeatureEncoder>& encoders,
+        std::vector<BamFile>& bam_handles,
+        const polisher::CountsFeatureEncoder& encoder,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
@@ -516,13 +517,14 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                             i, start, end, name, window.start, window.end,
                             100.0 * static_cast<double>(i - start) / (end - start));
                 }
-                results[i] = encoders[thread_id].encode_region(name, window.start, window.end,
-                                                               window.seq_id);
+                results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
+                                                   window.end, window.seq_id);
             }
         };
         parallel_results.resize(std::size(windows));
         const std::vector<Interval> chunks =
-                compute_chunks(static_cast<int32_t>(std::size(windows)), num_threads);
+                compute_chunks(static_cast<int32_t>(std::size(windows)),
+                               std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
         spdlog::info("Starting to encode regions for {} windows using {} threads.",
                      std::size(windows), std::size(chunks));
         cxxpool::thread_pool pool{std::size(chunks)};

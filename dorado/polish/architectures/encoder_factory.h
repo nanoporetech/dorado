@@ -19,8 +19,8 @@ LabelSchemeType parse_label_scheme_type(const std::string& type);
 
 FeatureEncoderType parse_feature_encoder_type(const std::string& type);
 
-std::unique_ptr<CountsFeatureEncoder> encoder_factory(const ModelConfig& config);
+std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config);
 
-std::unique_ptr<CountsFeatureDecoder> decoder_factory(const ModelConfig& config);
+std::unique_ptr<BaseFeatureDecoder> decoder_factory(const ModelConfig& config);
 
 }  // namespace dorado::polisher

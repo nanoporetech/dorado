@@ -42,12 +42,11 @@ enum class LabelSchemeType {
 
 class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:
-    CountsFeatureEncoder(bam_fset* bam_set);
+    CountsFeatureEncoder() = default;
 
-    CountsFeatureEncoder(bam_fset* bam_set, const int32_t min_mapq);
+    CountsFeatureEncoder(const int32_t min_mapq);
 
-    CountsFeatureEncoder(bam_fset* bam_set,
-                         const NormaliseType normalise_type,
+    CountsFeatureEncoder(const NormaliseType normalise_type,
                          const std::vector<std::string>& dtypes,
                          const std::string_view tag_name,
                          const int32_t tag_value,
@@ -58,13 +57,13 @@ public:
 
     ~CountsFeatureEncoder() = default;
 
-    Sample encode_region(const std::string& ref_name,
+    Sample encode_region(BamFile& bam_file,
+                         const std::string& ref_name,
                          const int64_t ref_start,
                          const int64_t ref_end,
                          const int32_t seq_id) const override;
 
 private:
-    bam_fset* m_bam_set = nullptr;
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     std::vector<std::string> m_dtypes;
     std::string m_tag_name;
