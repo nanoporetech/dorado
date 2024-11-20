@@ -5,7 +5,9 @@
 #include <torch/torch.h>
 
 #include <filesystem>
+#include <fstream>
 #include <unordered_map>
+#include <vector>
 
 namespace dorado::polisher {
 
@@ -14,6 +16,50 @@ ModelType parse_model_type(const std::string& type) {
         return ModelType::GRU;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
+}
+
+// Model class is inherited from public nn::Module
+
+/**
+ * \brief This function is a workaround around missing features in torchlib. There
+ *          is currently no way to load only the state dict without the model either
+ *          being traced of scripted.
+ *          Issue: "PytorchStreamReader failed locating file constants.pkl: file not found"
+ *          Source: https://github.com/pytorch/pytorch/issues/36577#issuecomment-1279666295
+ */
+void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
+    const auto get_bytes = [](const std::filesystem::path& filename) {
+        std::ifstream input(filename, std::ios::binary);
+        std::vector<char> bytes((std::istreambuf_iterator<char>(input)),
+                                (std::istreambuf_iterator<char>()));
+        return bytes;
+    };
+
+    torch::NoGradGuard no_grad;
+
+    const std::vector<char> bytes = get_bytes(in_pt);
+
+    const c10::Dict<c10::IValue, c10::IValue> weights = torch::pickle_load(bytes).toGenericDict();
+
+    if (spdlog::default_logger()->level() == spdlog::level::debug) {
+        const torch::OrderedDict<std::string, at::Tensor> model_params = model.named_parameters();
+        for (const auto& w : model_params) {
+            spdlog::debug("[model_params] w.key() = {}", w.key());
+        }
+    }
+
+    // auto state_dict = model.named_parameters();
+    for (const auto& w : weights) {
+        const std::string name = w.key().toStringRef();
+        const at::Tensor value = w.value().toTensor();
+        auto* param = model.named_parameters().find(name);
+        if (param != nullptr) {
+            param->copy_(value);
+        } else {
+            throw std::runtime_error(
+                    "Some loaded parameters cannot be found in the libtorch model! name = " + name);
+        }
+    }
 }
 
 std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
@@ -43,7 +89,7 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
         const int32_t num_features = std::stoi(get_value(config.model_kwargs, "num_features"));
         const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
         const int32_t gru_size = std::stoi(get_value(config.model_kwargs, "gru_size"));
-        const bool n_layers = std::stoi(get_value(config.model_kwargs, "n_layers"));
+        const int32_t n_layers = std::stoi(get_value(config.model_kwargs, "n_layers"));
         const bool bidirectional =
                 (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
         constexpr bool NORMALISE = true;
@@ -59,24 +105,27 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
     // Set the weights of the internally constructed model.
     if (config.model_file == "weights.pt") {
         // Load the state_dict
-
         const std::filesystem::path weights_path = config.model_dir / config.model_file;
-        try {
-            torch::load(model, weights_path);
-        } catch (const c10::Error& e) {
-            throw std::runtime_error("Error loading model weights from " + weights_path.string() +
-                                     " with error: " + e.what());
-        }
+        load_parameters(*model, weights_path);
 
         // const std::filesystem::path weights_path = config.model_dir / config.model_file;
+        // try {
+        //     torch::load(model, weights_path);
+        // } catch (const c10::Error& e) {
+        //     throw std::runtime_error("Error loading model weights from " + weights_path.string() +
+        //                              " with error: " + e.what());
+        // }
+
+        // // const std::filesystem::path weights_path = config.model_dir / config.model_file;
         // torch::jit::script::Module module;
         // try {
         //     spdlog::debug("Loading weights from file: {}", weights_path.string());
         //     module = torch::jit::load(weights_path.string());
         // } catch (const c10::Error& e) {
-        //     throw std::runtime_error("Error loading model weights from " + weights_path.string() +
+        //     throw std::runtime_error("(2) Error loading model weights from " + weights_path.string() +
         //                              " with error: " + e.what());
         // }
+
         // spdlog::debug("Setting the weights.");
         // auto state_dict = module.named_parameters();
         // for (const auto& p : state_dict) {
