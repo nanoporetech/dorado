@@ -1,7 +1,7 @@
 #include "medaka_bamiter.h"
 
-#include <errno.h>
-#include <string.h>
+#include <cerrno>
+#include <cstring>
 
 // iterator for reading bam
 int read_bam(void *data, bam1_t *b) {
@@ -62,50 +62,3 @@ int read_bam(void *data, bam1_t *b) {
     }
     return ret;
 }
-
-BamFile::BamFile(const std::filesystem::path &in_fn)
-        : m_fp{hts_open(in_fn.c_str(), "rb"), hts_close},
-          m_idx{nullptr, hts_idx_destroy},
-          m_hdr{nullptr, sam_hdr_destroy} {
-    if (!m_fp) {
-        throw std::runtime_error{"Could not open BAM file: '" + in_fn.string() + "'!"};
-    }
-
-    m_idx = std::unique_ptr<hts_idx_t, decltype(&hts_idx_destroy)>(
-            sam_index_load(m_fp.get(), in_fn.c_str()), hts_idx_destroy);
-
-    if (!m_idx) {
-        throw std::runtime_error{"Could not open index for BAM file: '" + in_fn.string() + "'!"};
-    }
-
-    m_hdr = std::unique_ptr<sam_hdr_t, decltype(&sam_hdr_destroy)>(sam_hdr_read(m_fp.get()),
-                                                                   sam_hdr_destroy);
-
-    if (!m_hdr) {
-        throw std::runtime_error{"Could not load header from BAM file: '" + in_fn.string() + "'!"};
-    }
-
-    // Create a unique_ptr with a custom deleter
-
-    // m_fp = std::unique_ptr<htsFile, decltype(&hts_close)>(
-    //     hts_open(in_fn.c_str(), "rb"), hts_close
-    // );
-
-    // htsFile *m_fp = hts_open(in_fn.c_str(), "rb");
-
-    // m_fp = hts_open(in_fn.c_str(), "rb");
-    // m_idx = sam_index_load(m_fp, in_fn.c_str());
-    // m_hdr = sam_hdr_read(m_fp);
-    // if ((m_hdr == nullptr) || (m_idx == nullptr) || (m_fp == nullptr)) {
-    //     throw std::runtime_error
-    //     destroy_bam_fset(fset);
-    //     fprintf(stderr, "Failed to read .bam file '%s'.", fname);
-    //     exit(1);
-    // }
-}
-
-// BamFile::~BamFile() {
-//     hts_close(m_fp);
-//     hts_idx_destroy(m_idx);
-//     sam_hdr_destroy(m_hdr);
-// }

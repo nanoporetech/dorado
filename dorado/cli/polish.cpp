@@ -5,7 +5,7 @@
 #include "polish/architectures/encoder_factory.h"
 #include "polish/architectures/model_config.h"
 #include "polish/architectures/model_factory.h"
-#include "polish/medaka_bamiter.h"
+#include "polish/bam_file.h"
 #include "polish/medaka_counts.h"
 #include "polish/polish_impl.h"
 #include "polish/sample.h"

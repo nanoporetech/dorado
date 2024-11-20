@@ -1,6 +1,7 @@
 #pragma once
 
 #include "polish/architectures/base_feature_encoder.h"
+#include "polish/bam_file.h"
 #include "polish/consensus_result.h"
 #include "polish/medaka_bamiter.h"
 #include "polish/sample.h"

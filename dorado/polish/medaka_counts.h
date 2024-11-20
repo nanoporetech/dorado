@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bam_file.h"
 #include "medaka_bamiter.h"
 
 #include <array>
