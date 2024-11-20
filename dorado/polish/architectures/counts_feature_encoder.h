@@ -86,7 +86,7 @@ public:
     std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
 
 private:
-    [[maybe_unused]] const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
+    const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
     std::string m_label_scheme{"*ACGT"};
 };
 

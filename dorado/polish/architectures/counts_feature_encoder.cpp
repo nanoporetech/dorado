@@ -225,7 +225,7 @@ Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
 
 CountsFeatureDecoder::CountsFeatureDecoder(const LabelSchemeType label_scheme_type)
         : m_label_scheme_type{label_scheme_type} {
-    if (label_scheme_type == LabelSchemeType::HAPLOID) {
+    if (m_label_scheme_type == LabelSchemeType::HAPLOID) {
         m_label_scheme = "*ACGT";
     } else {
         throw std::runtime_error("Unsupported label scheme type!");
