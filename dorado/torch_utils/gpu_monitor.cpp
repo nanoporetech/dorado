@@ -15,6 +15,9 @@
 #else  // _WIN32
 #include <dlfcn.h>
 #endif  // _WIN32
+#if defined(DORADO_ORIN) || defined(DORADO_TX2)
+#include <torch/torch.h>
+#endif  // defined(DORADO_ORIN) || defined(DORADO_TX2)
 #endif  // HAS_NVML
 
 #include <spdlog/spdlog.h>
