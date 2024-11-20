@@ -107,6 +107,7 @@ struct Options {
     std::string region;
     bool full_precision = false;
     int32_t min_mapq = 0;
+    bool load_scripted_model = false;
     // int32_t min_depth = 0;
 };
 
@@ -185,6 +186,10 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Always use full precision for inference.")
                 .default_value(false)
                 .implicit_value(true);
+        parser->visible.add_argument("--scripted")
+                .help("Load the scripted Torch model instead of building one internally.")
+                .default_value(false)
+                .implicit_value(true);
 
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than min_depth will not be polished.")
@@ -254,6 +259,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.full_precision = parser.visible.get<bool>("full-precision");
     opt.min_mapq = parser.visible.get<int>("min-mapq");
+    opt.load_scripted_model = parser.visible.get<bool>("scripted");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
     return opt;
@@ -605,8 +611,9 @@ int polish(int argc, char* argv[]) {
         }
 
         spdlog::info("Parsing the model config.", opt.threads);
+        const std::string model_file = opt.load_scripted_model ? "model.pt" : "weights.pt";
         const polisher::ModelConfig model_config =
-                polisher::parse_model_config(opt.model_path / "config.toml", "weights.pt");
+                polisher::parse_model_config(opt.model_path / "config.toml", model_file);
 
         // Create the models, encoders, decoders and BAM handles.
         PolisherResources resources =
