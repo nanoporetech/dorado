@@ -20,6 +20,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
