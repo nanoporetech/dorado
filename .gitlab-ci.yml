@@ -33,6 +33,7 @@ variables:
   CUDA: "11.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
   MTL_DEBUG_LAYER: 1
+  FF_TIMESTAMPS: true
 
 # Build stage components
 
