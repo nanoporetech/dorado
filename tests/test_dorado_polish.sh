@@ -52,7 +52,8 @@ popd
 # if [[ ! -d "${MODEL_DIR}" ]]; then
 #     ${DORADO_BIN} download --model "herro-v1" --models-directory ${output_dir}
 # fi
-MODEL_DIR="${HOME}/work/gitlab/medaka/model-dump/r1041_e82_400bps_hac_v5.0.0"
+# MODEL_DIR="${HOME}/work/gitlab/medaka/model-dump/r1041_e82_400bps_hac_v5.0.0"
+MODEL_DIR="${HOME}/work/data/testing/dorado-polish/models-rw/v01/r1041_e82_400bps_hac_v5.0.0_model_gru_export/model"
 
 # mkdir -p ${output_dir}/models
 # pushd ${output_dir}/models
