@@ -184,8 +184,7 @@ class NvmlApi final {
             }
             spdlog::warn("Failed to initialize NVML: {}, retrying in 1s...", m_ErrorString(result));
             std::this_thread::sleep_for(std::chrono::seconds(1));
-        } while (std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() -
-                                                                  start) < wait_seconds);
+        } while ((std::chrono::system_clock::now() - start) < wait_seconds);
 
         if (result != NVML_SUCCESS) {
             spdlog::warn("Failed to initialize NVML after {} seconds: {}", wait_seconds.count(),
