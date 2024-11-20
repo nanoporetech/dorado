@@ -570,47 +570,57 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 }
 
 int polish(int argc, char* argv[]) {
-    // Initialize CLI options. The parse_args below requires a non-const reference.
-    // Verbosity is passed into a callback, so we need it here.
-    int verbosity = 0;
-    ParserPtr parser = create_cli(verbosity);
+    try {
+        // Initialize CLI options. The parse_args below requires a non-const reference.
+        // Verbosity is passed into a callback, so we need it here.
+        int verbosity = 0;
+        ParserPtr parser = create_cli(verbosity);
 
-    // Parse the arguments.
-    const int rv_parse = parse_args(argc, argv, *parser);
+        // Parse the arguments.
+        const int rv_parse = parse_args(argc, argv, *parser);
 
-    if (rv_parse != EXIT_SUCCESS) {
-        return rv_parse;
+        if (rv_parse != EXIT_SUCCESS) {
+            return rv_parse;
+        }
+
+        // Initialize the options from the CLI.
+        const Options opt = set_options(*parser, verbosity);
+
+        spdlog::set_level(spdlog::level::info);
+
+        // Initialize the log level.
+        if (opt.verbosity) {
+            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
+        }
+
+        spdlog::flush_every(std::chrono::seconds(1));
+
+        // Check if input options are good.
+        validate_options(opt);
+
+        if (std::empty(opt.model_path)) {
+            throw std::runtime_error(
+                    "WIP. Currently can only load a model. Not yet fetching a model "
+                    "automatically.");
+        }
+
+        spdlog::info("Parsing the model config.", opt.threads);
+        const polisher::ModelConfig model_config =
+                polisher::parse_model_config(opt.model_path / "config.toml", "weights.pt");
+
+        // Create the models, encoders, decoders and BAM handles.
+        PolisherResources resources =
+                create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
+                                 opt.threads, opt.full_precision);
+
+        run_polishing(opt, resources);
+    } catch (const std::exception& e) {
+        spdlog::error("Caught exception: {}", e.what());
+        return EXIT_FAILURE;
+    } catch (...) {
+        spdlog::error("Caught an unknown exception!");
+        return EXIT_FAILURE;
     }
-
-    // Initialize the options from the CLI.
-    const Options opt = set_options(*parser, verbosity);
-
-    spdlog::set_level(spdlog::level::info);
-
-    // Initialize the log level.
-    if (opt.verbosity) {
-        utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
-    }
-
-    spdlog::flush_every(std::chrono::seconds(1));
-
-    // Check if input options are good.
-    validate_options(opt);
-
-    if (std::empty(opt.model_path)) {
-        throw std::runtime_error(
-                "WIP. Currently can only load a model. Not yet fetching a model automatically.");
-    }
-
-    spdlog::info("Parsing the model config.", opt.threads);
-    const polisher::ModelConfig model_config =
-            polisher::parse_model_config(opt.model_path / "config.toml", "weights.pt");
-
-    // Create the models, encoders, decoders and BAM handles.
-    PolisherResources resources = create_resources(model_config, opt.in_aln_bam_fn, opt.device_str,
-                                                   opt.threads, opt.threads, opt.full_precision);
-
-    run_polishing(opt, resources);
 
     return 0;
 }
