@@ -227,9 +227,16 @@ Sample CountsFeatureEncoder::encode_region(const std::string& ref_name,
                               m_normalise_type);
 }
 
-std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits) const {
-    static constexpr std::string_view label_scheme{"*ACGT"};
+CountsFeatureDecoder::CountsFeatureDecoder(const LabelSchemeType label_scheme_type)
+        : m_label_scheme_type{label_scheme_type} {
+    if (label_scheme_type == LabelSchemeType::HAPLOID) {
+        m_label_scheme = "*ACGT";
+    } else {
+        throw std::runtime_error("Unsupported label scheme type!");
+    }
+}
 
+std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Tensor& logits) const {
     const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
 
     std::vector<ConsensusResult> results(indices.size(0));
@@ -242,8 +249,8 @@ std::vector<ConsensusResult> CountsFeatureDecoder::decode_bases(const torch::Ten
 
         for (int64_t j = 0; j < positions.size(0); ++j) {
             const int64_t class_index = positions[j].item<int64_t>();
-            assert(class_index < static_cast<int64_t>(std::size(label_scheme)));
-            seq[j] = label_scheme[class_index];
+            assert(class_index < static_cast<int64_t>(std::size(m_label_scheme)));
+            seq[j] = m_label_scheme[class_index];
         }
     }
 

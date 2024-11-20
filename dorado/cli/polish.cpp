@@ -544,7 +544,7 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
-        const polisher::CountsFeatureDecoder decoder;
+        const polisher::CountsFeatureDecoder decoder(polisher::LabelSchemeType::HAPLOID);
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, models, decoder,
                                                       opt.window_len, opt.batch_size);

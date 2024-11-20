@@ -100,6 +100,15 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
         // Parse kwargs for the feature extractor.
         const auto& model_kwargs = toml::find(section, "kwargs");
         cfg.feature_encoder_kwargs = parse_kwargs(model_kwargs);
+
+        // Parse dtypes separately and optionally. Perhaps some encoders won't have it.
+        // It's easier to parse here than from a string later.
+        if (toml::find_or<bool>(section, "kwargs", "dtypes", false)) {
+            const auto dtypes_toml =
+                    toml::find<std::vector<std::string>>(section, "kwargs", "dtypes");
+            cfg.feature_encoder_dtypes =
+                    std::vector<std::string>(std::begin(dtypes_toml), std::end(dtypes_toml));
+        }
     }
 
     // Parse the label scheme section.

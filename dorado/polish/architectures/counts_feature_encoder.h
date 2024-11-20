@@ -33,7 +33,12 @@ struct KeyHash {
 };
 using FeatureIndicesType =
         std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
+
 constexpr auto FeatureTensorType = torch::kFloat32;
+
+enum class LabelSchemeType {
+    HAPLOID,
+};
 
 class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:
@@ -74,9 +79,15 @@ private:
 
 class CountsFeatureDecoder : public BaseFeatureDecoder {
 public:
+    CountsFeatureDecoder(const LabelSchemeType label_scheme_type);
+
     ~CountsFeatureDecoder() = default;
 
     std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
+
+private:
+    [[maybe_unused]] const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
+    std::string m_label_scheme{"*ACGT"};
 };
 
 }  // namespace dorado::polisher

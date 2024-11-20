@@ -11,10 +11,6 @@
 
 namespace dorado::polisher {
 
-enum class LabelSchemeType {
-    HAPLOID,
-};
-
 enum class FeatureEncoderType {
     COUNTS_FEATURE_ENCODER,
 };

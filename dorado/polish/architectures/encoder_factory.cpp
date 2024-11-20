@@ -37,27 +37,31 @@ std::unique_ptr<CountsFeatureEncoder> encoder_factory(const ModelConfig& config)
         const bool sym_indels = std::stoi(get_value(config.feature_encoder_kwargs, "sym_indels"));
 
         NormaliseType normalise_type = parse_normalise_type(normalise);
-        std::vector<std::string> dtypes;
         const std::string tag_name;
         constexpr int32_t TAG_VALUE = 0;
         const std::string read_group;
 
         std::unique_ptr<CountsFeatureEncoder> ret = std::make_unique<CountsFeatureEncoder>(
-                nullptr, normalise_type, dtypes, tag_name, TAG_VALUE, tag_keep_missing, read_group,
-                min_mapq, sym_indels);
+                nullptr, normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
+                tag_keep_missing, read_group, min_mapq, sym_indels);
 
         return ret;
     }
 
-    throw std::runtime_error{"Unsupported feature encoder type: '" + config.feature_encoder_type +
-                             "'!"};
+    throw std::runtime_error{"Unsupported feature encoder type: " + config.feature_encoder_type};
 }
 
 std::unique_ptr<CountsFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
-    // const FeatureEncoderType feature_encoder_type = parse_feature_encoder_type(config.feature_encoder_type);
-    // const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
-    std::unique_ptr<CountsFeatureDecoder> ret = std::make_unique<CountsFeatureDecoder>();
-    return ret;
+    const FeatureEncoderType feature_encoder_type =
+            parse_feature_encoder_type(config.feature_encoder_type);
+    const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
+
+    if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
+        return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
+    }
+
+    throw std::runtime_error{"No decoder available for the feature encoder type: " +
+                             config.feature_encoder_type};
 }
 
 }  // namespace dorado::polisher

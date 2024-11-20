@@ -19,6 +19,7 @@ struct ModelConfig {
     // Feature encoder section.
     std::string feature_encoder_type;
     std::unordered_map<std::string, std::string> feature_encoder_kwargs;
+    std::vector<std::string> feature_encoder_dtypes;
 
     // Label scheme section.
     std::string label_scheme_type;
