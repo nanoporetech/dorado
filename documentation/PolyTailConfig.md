@@ -1,6 +1,6 @@
 # Custom Poly Tail Configuration
 
-Dorado supports estimation of Poly(A/T) tails for DNA (PCS AND PCB) and RNA samples. The default settings are optimized for non-interrupted Poly(A/T) sequences that occur at read ends.
+Dorado supports estimation of Poly(A/T) tails for DNA (PCS and PCB) and RNA samples. The default settings are optimized for non-interrupted Poly(A/T) sequences that occur at read ends.
 
 Dorado also supports additional features that can be customized through a configuration file (described below):
 * Custom primer sequence for cDNA tail estimation

@@ -31,13 +31,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         if(NOT EXISTS ${KOI_DIR})
             if(DEFINED GITLAB_CI_TOKEN)
                 message("Cloning Koi using CI token")
-                execute_process(COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR})
+                execute_process(
+                    COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR}
+                    COMMAND_ERROR_IS_FATAL ANY
+                )
             else()
                 message("Cloning Koi using ssh")
-                execute_process(COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR})
+                execute_process(
+                    COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR}
+                    COMMAND_ERROR_IS_FATAL ANY
+                )
             endif()
-            execute_process(COMMAND git checkout v${KOI_VERSION} WORKING_DIRECTORY ${KOI_DIR})
-            execute_process(COMMAND git submodule update --init --checkout WORKING_DIRECTORY ${KOI_DIR})
+            execute_process(
+                COMMAND git checkout v${KOI_VERSION}
+                WORKING_DIRECTORY ${KOI_DIR}
+                COMMAND_ERROR_IS_FATAL ANY
+            )
+            execute_process(
+                COMMAND git submodule update --init --checkout
+                WORKING_DIRECTORY ${KOI_DIR}
+                COMMAND_ERROR_IS_FATAL ANY
+            )
         endif()
         add_subdirectory(${KOI_DIR}/koi/lib)
 

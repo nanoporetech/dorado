@@ -53,6 +53,8 @@ private:
 
     size_t get_chunk_queue_idx(size_t read_raw_size);
 
+    // Override for batch timeout to use for low-latency pipelines. Zero means use the normal timeout.
+    int m_low_latency_batch_timeout_ms;
     // Vector of model runners (each with their own GPU access etc)
     std::vector<basecall::RunnerPtr> m_model_runners;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.

@@ -23,7 +23,6 @@ BamPtr generate_bam_entry(const std::string& read_id,
 TEST_CASE("Check if read can be loaded correctly.", "FastxRandomReader") {
     auto temp_dir = tests::make_temp_dir("fastx_random_reader_test");
     auto temp_input_file = temp_dir.m_path / "input.fq";
-    spdlog::info("{}", temp_dir.m_path.string());
 
     const std::string seq = "ACTGATCG";
     const std::vector<uint8_t> qscore = {20, 20, 30, 30, 20, 20, 40, 40};

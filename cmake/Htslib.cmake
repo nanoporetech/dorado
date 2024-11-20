@@ -18,8 +18,11 @@ if(NOT TARGET htslib) # lazy include guard
         find_program(MAKE_COMMAND make REQUIRED)
         find_program(AUTOCONF_COMMAND autoconf REQUIRED)
         find_program(AUTOHEADER_COMMAND autoheader REQUIRED)
-        execute_process(COMMAND bash -c "${AUTOCONF_COMMAND} -V | sed 's/.* //; q'"
-            OUTPUT_VARIABLE AUTOCONF_VERS)
+        execute_process(
+            COMMAND bash -c "${AUTOCONF_COMMAND} -V | sed 's/.* //; q'"
+            OUTPUT_VARIABLE AUTOCONF_VERS
+            COMMAND_ERROR_IS_FATAL ANY
+        )
         if (AUTOCONF_VERS VERSION_GREATER_EQUAL 2.70 AND NOT CMAKE_GENERATOR STREQUAL "Xcode")
             set(AUTOCONF_COMMAND autoreconf --install)
         endif()
@@ -45,7 +48,7 @@ if(NOT TARGET htslib) # lazy include guard
                 BUILD_IN_SOURCE 1
                 CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
                 COMMAND ${AUTOCONF_COMMAND}
-                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs ${CONFIGURE_FLAGS}
+                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${CONFIGURE_FLAGS}
                 BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
                 COMMAND ${INSTALL_NAME}
                 INSTALL_COMMAND ""

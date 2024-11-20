@@ -25,6 +25,11 @@ class HtsReader {
 public:
     HtsReader(const std::string& filename,
               std::optional<std::unordered_set<std::string>> read_list);
+
+    // By default we'll add a filename tag to each record to match the current file
+    // if one isn't included in the data, but that can be disabled with this method.
+    void set_add_filename_tag(bool should) { m_add_filename_tag = should; }
+
     bool read();
 
     // If reading directly into a pipeline need to set the client info on the messages
@@ -36,7 +41,7 @@ public:
     void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
     bool is_aligned{false};
-    BamPtr record{nullptr};
+    BamPtr record;
 
     sam_hdr_t* header();
     const sam_hdr_t* header() const;
@@ -44,13 +49,14 @@ public:
 
 private:
     sam_hdr_t* m_header{nullptr};  // non-owning
-    std::string m_format{};
+    std::string m_format;
     std::shared_ptr<ClientInfo> m_client_info;
 
-    std::function<void(BamPtr&)> m_record_mutator{};
+    std::function<void(BamPtr&)> m_record_mutator;
     std::optional<std::unordered_set<std::string>> m_read_list;
 
-    std::function<bool(bam1_t&)> m_bam_record_generator{};
+    std::function<bool(bam1_t&)> m_bam_record_generator;
+    bool m_add_filename_tag{true};
 
     template <typename T>
     bool try_initialise_generator(const std::string& filename);
@@ -69,7 +75,8 @@ T HtsReader::get_tag(const char* tagname) {
     } else if constexpr (std::is_floating_point_v<T>) {
         tag_value = static_cast<T>(bam_aux2f(tag));
     } else {
-        tag_value = static_cast<T>(bam_aux2Z(tag));
+        const char* val = bam_aux2Z(tag);
+        tag_value = val ? val : T{};
     }
 
     return tag_value;

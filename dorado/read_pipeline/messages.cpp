@@ -62,8 +62,8 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     int rn = attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
-    bam_aux_append(aln, "fn", 'Z', int(attributes.fast5_filename.length() + 1),
-                   (uint8_t *)attributes.fast5_filename.c_str());
+    bam_aux_append(aln, "fn", 'Z', int(attributes.filename.length() + 1),
+                   (uint8_t *)attributes.filename.c_str());
 
     float sm = shift;
     bam_aux_append(aln, "sm", 'f', sizeof(sm), (uint8_t *)&sm);

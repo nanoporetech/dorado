@@ -99,8 +99,8 @@ protected:
     MessageTypePtr RunPipelineForRead(
             const std::shared_ptr<dorado::alignment::AlignmentInfo>& loaded_align_info,
             const std::shared_ptr<dorado::alignment::AlignmentInfo>& client_align_info,
-            std::string read_id,
-            std::string sequence) {
+            const std::string& read_id,
+            const std::string& sequence) {
         auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
         auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
         CHECK(index_file_access->load_index(loaded_align_info->reference_file,
@@ -110,16 +110,14 @@ protected:
         create_pipeline(index_file_access, bed_file_access, thread_pool,
                         dorado::utils::concurrency::TaskPriority::normal);
 
-        dorado::ReadCommon read_common{};
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();
         client_info->contexts().register_context<const dorado::alignment::AlignmentInfo>(
                 client_align_info);
-        read_common.client_info = client_info;
-        read_common.read_id = std::move(read_id);
-        read_common.seq = std::move(sequence);
 
         auto read = std::make_unique<MessageType>();
-        read->read_common = std::move(read_common);
+        read->read_common.client_info = std::move(client_info);
+        read->read_common.read_id = read_id;
+        read->read_common.seq = sequence;
 
         pipeline->push_message(std::move(read));
         pipeline->terminate({});
@@ -544,6 +542,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 
     // Get the sam line from BAM pipeline
     dorado::HtsReader bam_reader(query, std::nullopt);
+    bam_reader.set_add_filename_tag(false);
     auto bam_records = RunPipelineWithBamMessages(bam_reader, ref, "", options, 2);
     CHECK(bam_records.size() == 1);
     auto sam_line_from_bam_ptr = get_sam_line_from_bam(std::move(bam_records[0]));
@@ -553,23 +552,21 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto align_info = std::make_shared<dorado::alignment::AlignmentInfo>();
     align_info->minimap_options = options;
     align_info->reference_file = ref;
-    auto simplex_read = RunPipelineForRead<dorado::SimplexRead>(
-            align_info, align_info, std::move(read_id), std::move(sequence));
+    auto simplex_read =
+            RunPipelineForRead<dorado::SimplexRead>(align_info, align_info, read_id, sequence);
     auto sam_line_from_read_common =
             std::move(simplex_read->read_common.alignment_results[0].sam_string);
 
     // Do the comparison checks
-    CHECK_FALSE(sam_line_from_read_common.empty());
-
-    if (sam_line_from_read_common.at(sam_line_from_read_common.size() - 1) == '\n') {
-        sam_line_from_read_common =
-                sam_line_from_read_common.substr(0, sam_line_from_read_common.size() - 1);
+    REQUIRE_FALSE(sam_line_from_read_common.empty());
+    if (sam_line_from_read_common.back() == '\n') {
+        sam_line_from_read_common.resize(sam_line_from_read_common.size() - 1);
     }
 
     const auto bam_fields = dorado::utils::split(sam_line_from_bam_ptr, '\t');
     const auto read_common_fields = dorado::utils::split(sam_line_from_read_common, '\t');
-    CHECK(bam_fields.size() == read_common_fields.size());
-    CHECK(bam_fields.size() >= 11);
+    REQUIRE(bam_fields.size() == read_common_fields.size());
+    REQUIRE(bam_fields.size() >= 11);
     // first 11 mandatory fields should be identical
     for (std::size_t field_index{0}; field_index < 11; ++field_index) {
         CAPTURE(field_index);

@@ -100,13 +100,6 @@ int RNAPolyTailCalculator::signal_length_adjustment([[maybe_unused]] const Simpl
             std::min(100.f, std::exp(5.6838f - 0.0021f * static_cast<float>(signal_len)))));
 }
 
-std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
-                                                        int signal_len,
-                                                        float samples_per_base) const {
-    const int kSpread = int(std::round(samples_per_base * max_tail_length()));
-    return {std::max(0, signal_anchor - 50), std::min(signal_len, signal_anchor + kSpread)};
-}
-
 std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int>& interval,
                                                         float samples_per_base) const {
     if (m_rna_adapter) {

@@ -2,6 +2,7 @@
 
 #include "TestUtils.h"
 #include "utils/PostCondition.h"
+#include "utils/stream_utils.h"
 
 #include <catch2/catch.hpp>
 
@@ -30,12 +31,14 @@ TEST_CASE("Constructor with trivial args does not throw", CUT_TAG) {
 }
 
 TEST_CASE("initialise with no input reads and recursive flagged returns false", CUT_TAG) {
+    dorado::utils::SuppressStdout suppress_error_message{};
     AlignmentProcessingItems cut{"", true, "", false};
     CHECK_FALSE(cut.initialise());
 }
 
 TEST_CASE("initialise with no input and output folder specified returns false", CUT_TAG) {
     AlignmentProcessingItems cut{"", false, OUT_FOLDER.string(), false};
+    dorado::utils::SuppressStdout suppress_error_message{};
     CHECK_FALSE(cut.initialise());
 }
 
@@ -120,6 +123,7 @@ TEST_CASE("initialise with input file and output folder returns true", CUT_TAG) 
 TEST_CASE("initialise with input file and same output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / INPUT_SAM).string(), false,
                                  ROOT_IN_FOLDER.string(), false};
+    dorado::utils::SuppressStdout suppress_error_message{};
     CHECK_FALSE(cut.initialise());
 }
 
@@ -165,11 +169,13 @@ TEST_CASE("get() input file with no extension returns output with bam extension"
 
 TEST_CASE("initialise() with input folder and no output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, "", false};
+    dorado::utils::SuppressStdout suppress_error_message{};
     CHECK_FALSE(cut.initialise());
 }
 
 TEST_CASE("initialise() with input folder and same output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{ROOT_IN_FOLDER.string(), false, ROOT_IN_FOLDER.string(), false};
+    dorado::utils::SuppressStdout suppress_error_message{};
     CHECK_FALSE(cut.initialise());
 }
 

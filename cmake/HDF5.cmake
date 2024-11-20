@@ -19,15 +19,20 @@ elseif(WIN32)
         # Need a zlib build for HDF to use
         download_and_extract(https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VER}.tar.gz zlib-${ZLIB_VER})
         set(HDF5_ZLIB_BUILD_DIR ${CMAKE_BINARY_DIR}/zlib-${ZLIB_VER}/build)
-        execute_process(COMMAND
-            cmake
-                -S ${DORADO_3RD_PARTY_DOWNLOAD}/zlib-${ZLIB_VER}/zlib-${ZLIB_VER}
-                -B ${HDF5_ZLIB_BUILD_DIR}
-                -A x64
-                -D CMAKE_INSTALL_PREFIX=${HDF5_ZLIB_INSTALL_DIR}
-                -D CMAKE_CONFIGURATION_TYPES=Release
+        execute_process(
+            COMMAND
+                cmake
+                    -S ${DORADO_3RD_PARTY_DOWNLOAD}/zlib-${ZLIB_VER}/zlib-${ZLIB_VER}
+                    -B ${HDF5_ZLIB_BUILD_DIR}
+                    -A x64
+                    -D CMAKE_INSTALL_PREFIX=${HDF5_ZLIB_INSTALL_DIR}
+                    -D CMAKE_CONFIGURATION_TYPES=Release
+            COMMAND_ERROR_IS_FATAL ANY
         )
-        execute_process(COMMAND cmake --build ${HDF5_ZLIB_BUILD_DIR} --config Release --target install)
+        execute_process(
+            COMMAND cmake --build ${HDF5_ZLIB_BUILD_DIR} --config Release --target install
+            COMMAND_ERROR_IS_FATAL ANY
+        )
 
         # HDF5 itself
         download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}-win.zip ${HDF_VER})
