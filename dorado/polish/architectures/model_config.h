@@ -25,6 +25,7 @@ struct ModelConfig {
     std::string label_scheme_type;
 };
 
-ModelConfig parse_model_config(const std::filesystem::path& config_path);
+ModelConfig parse_model_config(const std::filesystem::path& config_path,
+                               const std::string& model_file);
 
 }  // namespace dorado::polisher

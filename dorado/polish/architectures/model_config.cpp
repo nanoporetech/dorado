@@ -59,7 +59,8 @@ std::unordered_map<std::string, std::string> parse_kwargs(const toml::value& tab
     return kwargs;
 }
 
-ModelConfig parse_model_config(const std::filesystem::path& config_path) {
+ModelConfig parse_model_config(const std::filesystem::path& config_path,
+                               const std::string& model_file) {
     const toml::value config_toml = toml::parse(config_path.string());
 
     if (!config_toml.contains("model")) {
@@ -84,7 +85,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
         const auto& section = toml::find(config_toml, "model");
         cfg.model_type = toml::find<std::string>(section, "type");
         // cfg.model_file = toml::find<std::string>(section, "model_file");
-        cfg.model_file = "model.pt";
+        cfg.model_file = model_file;
         cfg.model_dir = config_path.parent_path().string();
 
         // Parse kwargs for the model.

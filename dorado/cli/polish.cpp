@@ -77,6 +77,13 @@ enum class OutputFormat {
     FASTQ,
 };
 
+struct PolisherResources {
+    std::unique_ptr<polisher::BaseFeatureEncoder> encoder;
+    std::unique_ptr<polisher::BaseFeatureDecoder> decoder;
+    std::vector<BamFile> bam_handles;
+    std::vector<DeviceInfo> devices;
+};
+
 /// \brief All options for this tool.
 struct Options {
     // Positional parameters.
@@ -463,15 +470,35 @@ std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
     return ofs;
 }
 
-}  // namespace
+PolisherResources create_resources(const polisher::ModelConfig& model_config,
+                                   const std::filesystem::path& in_aln_bam_fn,
+                                   const std::string& device_str,
+                                   const int32_t num_bam_threads) {
+    PolisherResources resources;
 
-void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
-    if (std::empty(devices)) {
-        spdlog::error("Zero devices initialized! Need at least one device to run.");
-        std::exit(EXIT_FAILURE);
+    spdlog::info("Creating the encoder and the decoder.");
+    resources.encoder = polisher::encoder_factory(model_config);
+    resources.decoder = polisher::decoder_factory(model_config);
+
+    // Open the BAM file for each thread.
+    spdlog::info("Creating {} BAM handles.", num_bam_threads);
+    for (int32_t i = 0; i < num_bam_threads; ++i) {
+        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
     }
 
-    spdlog::info("Number of devices: {}", std::size(devices));
+    resources.devices = init_devices(device_str);
+
+    if (std::empty(resources.devices)) {
+        throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
+    }
+
+    return resources;
+}
+
+}  // namespace
+
+void run_polishing(const Options& opt, PolisherResources& resources) {
+    spdlog::info("Number of devices: {}", std::size(resources.devices));
 
     at::InferenceMode infer_guard;
 
@@ -486,21 +513,6 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
-    spdlog::info("Parsing the model config.", opt.threads);
-    const polisher::ModelConfig model_config =
-            polisher::parse_model_config(opt.model_path / "config.toml");
-
-    spdlog::info("Creating the encoder and the decoder.", opt.threads);
-    const auto encoder = polisher::encoder_factory(model_config);
-    const auto decoder = polisher::decoder_factory(model_config);
-
-    // Open the BAM file for each thread.
-    spdlog::info("Creating {} BAM handles.", opt.threads);
-    std::vector<BamFile> bam_handles;
-    for (int32_t i = 0; i < opt.threads; ++i) {
-        bam_handles.emplace_back(BamFile(opt.in_aln_bam_fn));
-    }
-
     at::set_num_interop_threads(opt.threads);
     torch::set_num_threads(1);
 
@@ -508,12 +520,14 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     spdlog::info("Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<polisher::TorchModel>> ret;
-        for (int32_t device_id = 0; device_id < dorado::ssize(devices); ++device_id) {
-            ret.emplace_back(create_model(opt.model_path / "model.pt", devices[device_id],
+        for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
+            ret.emplace_back(create_model(opt.model_path / "model.pt", resources.devices[device_id],
                                           opt.full_precision));
-            spdlog::info("Loaded model to device {}: {}", device_id, devices[device_id].name);
+            spdlog::info("Loaded model to device {}: {}", device_id,
+                         resources.devices[device_id].name);
         }
-        if ((std::size(devices) == 1) && (devices.front().type == DeviceType::CPU)) {
+        if ((std::size(resources.devices) == 1) &&
+            (resources.devices.front().type == DeviceType::CPU)) {
             for (int32_t i = 1; i < opt.threads; ++i) {
                 ret.emplace_back(ret.front());
             }
@@ -544,14 +558,14 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
 
         // std::vector<std::vector<polisher::ConsensusResult>> pieces(std::size(draft_lens_batch));
 
-        auto [samples, trims] =
-                polisher::create_samples(bam_handles, *encoder, bam_regions, draft_lens_batch,
-                                         opt.threads, opt.window_len, opt.window_overlap);
+        auto [samples, trims] = polisher::create_samples(resources.bam_handles, *resources.encoder,
+                                                         bam_regions, draft_lens_batch, opt.threads,
+                                                         opt.window_len, opt.window_overlap);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
         std::vector<polisher::ConsensusResult> results_samples =
-                polisher::process_samples_in_parallel(samples, trims, models, *decoder,
+                polisher::process_samples_in_parallel(samples, trims, models, *resources.decoder,
                                                       opt.window_len, opt.batch_size);
 
         // Group samples by sequence ID.
@@ -613,13 +627,15 @@ int polish(int argc, char* argv[]) {
                 "WIP. Currently can only load a model. Not yet fetching a model automatically.");
     }
 
-    const std::vector<DeviceInfo> devices = init_devices(opt.device_str);
+    spdlog::info("Parsing the model config.", opt.threads);
+    const polisher::ModelConfig model_config =
+            polisher::parse_model_config(opt.model_path / "config.toml", "weights.pt");
 
-    if (std::empty(devices)) {
-        throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
-    }
+    // Create the models, encoders, decoders and BAM handles.
+    PolisherResources resources =
+            create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads);
 
-    run_polishing(opt, devices);
+    run_polishing(opt, resources);
 
     return 0;
 }
