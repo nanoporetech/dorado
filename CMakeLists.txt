@@ -122,9 +122,11 @@ else()
     set(DORADO_ENABLE_PCH TRUE)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    if((CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*") AND (${CUDAToolkit_VERSION} VERSION_LESS 11.0))
+if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*"))
+    if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
         add_compile_definitions(DORADO_TX2)
+    else()
+        add_compile_definitions(DORADO_ORIN)
     endif()
 endif()
 

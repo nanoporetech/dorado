@@ -448,7 +448,7 @@ class DeviceInfoCache final {
                 spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
-#if defined(ARM_BUILD)
+#if defined(DORADO_ORIN) || defined(DORADO_TX2)
         if (m_device_count == 0) {
             // TX2/Orin may not have NVML, in which case just report that we have 1.
             m_device_count = 1;
