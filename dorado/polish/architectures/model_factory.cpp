@@ -44,7 +44,8 @@ std::unique_ptr<TorchModel> model_factory(const ModelConfig& config) {
         const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
         const int32_t gru_size = std::stoi(get_value(config.model_kwargs, "gru_size"));
         const bool n_layers = std::stoi(get_value(config.model_kwargs, "n_layers"));
-        const bool bidirectional = std::stoi(get_value(config.model_kwargs, "bidirectional"));
+        const bool bidirectional =
+                (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
         constexpr bool NORMALISE = true;
         // const double read_majority_threshold = std::stod(get_value(config.model_kwargs, "read_majority_threshold"));
 
