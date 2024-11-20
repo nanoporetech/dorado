@@ -14,6 +14,8 @@ namespace dorado::polisher {
 ModelType parse_model_type(const std::string& type) {
     if (type == "GRUModel") {
         return ModelType::GRU;
+    } else if (type == "LatentSpaceGRU") {
+        return ModelType::LATENT_SPACE_GRU;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }

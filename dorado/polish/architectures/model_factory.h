@@ -17,6 +17,7 @@ namespace dorado::polisher {
 
 enum class ModelType {
     GRU,
+    LATENT_SPACE_GRU,
 };
 
 ModelType parse_model_type(const std::string& type);

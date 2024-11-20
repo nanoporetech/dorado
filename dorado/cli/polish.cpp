@@ -434,16 +434,6 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const bool full_precision) {
     PolisherResources resources;
 
-    spdlog::info("Creating the encoder and the decoder.");
-    resources.encoder = polisher::encoder_factory(model_config);
-    resources.decoder = polisher::decoder_factory(model_config);
-
-    // Open the BAM file for each thread.
-    spdlog::info("Creating {} BAM handles.", num_bam_threads);
-    for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
-    }
-
     spdlog::info("Initializing the devices.");
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
@@ -487,6 +477,16 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
         return ret;
     };
     resources.models = create_models();
+
+    spdlog::info("Creating the encoder and the decoder.");
+    resources.encoder = polisher::encoder_factory(model_config);
+    resources.decoder = polisher::decoder_factory(model_config);
+
+    // Open the BAM file for each thread.
+    spdlog::info("Creating {} BAM handles.", num_bam_threads);
+    for (int32_t i = 0; i < num_bam_threads; ++i) {
+        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
+    }
 
     return resources;
 }
