@@ -48,7 +48,7 @@ ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,
-        const polisher::CountsFeatureEncoder& encoder,
+        const polisher::BaseFeatureEncoder& encoder,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
@@ -59,7 +59,7 @@ std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<TorchModel>>& models,
-        const CountsFeatureDecoder& decoder,
+        const BaseFeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size);
 

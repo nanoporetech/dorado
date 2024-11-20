@@ -23,6 +23,10 @@ std::unique_ptr<TorchModel> model_factory(const ModelConfig& config) {
         if (it == std::cend(dict)) {
             throw std::runtime_error{"Cannot find key '" + key + "' in kwargs!"};
         }
+        if ((std::size(it->second) >= 2) && (it->second.front() == '"') &&
+            (it->second.back() == '"')) {
+            return it->second.substr(1, std::size(it->second) - 2);
+        }
         return it->second;
     };
 

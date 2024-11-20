@@ -23,6 +23,10 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
         if (it == std::cend(dict)) {
             throw std::runtime_error{"Cannot find key '" + key + "' in kwargs!"};
         }
+        if ((std::size(it->second) >= 2) && (it->second.front() == '"') &&
+            (it->second.back() == '"')) {
+            return it->second.substr(1, std::size(it->second) - 2);
+        }
         return it->second;
     };
 
@@ -32,9 +36,11 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
         const std::string normalise = get_value(config.feature_encoder_kwargs, "normalise");
         const bool tag_keep_missing =
-                std::stoi(get_value(config.feature_encoder_kwargs, "tag_keep_missing"));
+                (get_value(config.feature_encoder_kwargs, "tag_keep_missing") == "true") ? true
+                                                                                         : false;
         const int32_t min_mapq = std::stoi(get_value(config.feature_encoder_kwargs, "min_mapq"));
-        const bool sym_indels = std::stoi(get_value(config.feature_encoder_kwargs, "sym_indels"));
+        const bool sym_indels =
+                (get_value(config.feature_encoder_kwargs, "sym_indels") == "true") ? true : false;
 
         NormaliseType normalise_type = parse_normalise_type(normalise);
         const std::string tag_name;
@@ -54,6 +60,7 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
 std::unique_ptr<BaseFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
     const FeatureEncoderType feature_encoder_type =
             parse_feature_encoder_type(config.feature_encoder_type);
+
     const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
 
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {

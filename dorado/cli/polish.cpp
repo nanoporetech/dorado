@@ -486,10 +486,13 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
-    // One encoder is enough since it has no state.
+    spdlog::info("Parsing the model config.", opt.threads);
+    const polisher::ModelConfig model_config =
+            polisher::parse_model_config(opt.model_path / "config.toml");
+
     spdlog::info("Creating the encoder and the decoder.", opt.threads);
-    const polisher::CountsFeatureEncoder encoder(opt.min_mapq);
-    const polisher::CountsFeatureDecoder decoder(polisher::LabelSchemeType::HAPLOID);
+    const auto encoder = polisher::encoder_factory(model_config);
+    const auto decoder = polisher::decoder_factory(model_config);
 
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", opt.threads);
@@ -542,13 +545,13 @@ void run_polishing(const Options& opt, const std::vector<DeviceInfo>& devices) {
         // std::vector<std::vector<polisher::ConsensusResult>> pieces(std::size(draft_lens_batch));
 
         auto [samples, trims] =
-                polisher::create_samples(bam_handles, encoder, bam_regions, draft_lens_batch,
+                polisher::create_samples(bam_handles, *encoder, bam_regions, draft_lens_batch,
                                          opt.threads, opt.window_len, opt.window_overlap);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
         std::vector<polisher::ConsensusResult> results_samples =
-                polisher::process_samples_in_parallel(samples, trims, models, decoder,
+                polisher::process_samples_in_parallel(samples, trims, models, *decoder,
                                                       opt.window_len, opt.batch_size);
 
         // Group samples by sequence ID.
@@ -609,9 +612,6 @@ int polish(int argc, char* argv[]) {
         throw std::runtime_error(
                 "WIP. Currently can only load a model. Not yet fetching a model automatically.");
     }
-
-    [[maybe_unused]] polisher::ModelConfig config =
-            polisher::parse_model_config(opt.model_path / "config.toml");
 
     const std::vector<DeviceInfo> devices = init_devices(opt.device_str);
 
