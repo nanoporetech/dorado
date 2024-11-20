@@ -492,6 +492,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
     at::InferenceMode infer_guard;
 
+    // Create a .fai index if it doesn't exist.
     const bool rv_fai = utils::create_fai_index(opt.in_draft_fastx_fn);
     if (!rv_fai) {
         spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
@@ -499,26 +500,30 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         std::exit(EXIT_FAILURE);
     }
 
+    // Load sequence lengths.
     spdlog::info("Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
+    // Set the number of threads so that libtorch doesn't cause a thread bomb.
     at::set_num_interop_threads(opt.threads);
     torch::set_num_threads(1);
+
+    // Open the output stream, to std::cout if the path is empty, otherwise to the file.
+    auto ofs = get_output_stream(opt.out_consensus_fn);
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<polisher::Interval> draft_batches =
             create_batches(draft_lens, opt.draft_batch_size,
                            [](const std::pair<std::string, int64_t>& val) { return val.second; });
 
-    // Open the output stream, to std::cout if the path is empty, otherwise to the file.
-    auto ofs = get_output_stream(opt.out_consensus_fn);
-
+    // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
         spdlog::info("=============================");
         spdlog::info("Starting to produce consensus for draft sequences: {}-{}/{}.",
                      draft_batch.start, draft_batch.end, std::size(draft_lens));
 
+        // Split the sequences into larger BAM windows, like Medaka.
         spdlog::debug("Creating BAM windows.");
         const std::vector<std::pair<std::string, int64_t>> draft_lens_batch(
                 std::begin(draft_lens) + draft_batch.start,
@@ -526,14 +531,14 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
                 draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
 
-        // std::vector<std::vector<polisher::ConsensusResult>> pieces(std::size(draft_lens_batch));
-
+        // Produce samples (tensors) for inference.
         auto [samples, trims] = polisher::create_samples(resources.bam_handles, *resources.encoder,
                                                          bam_regions, draft_lens_batch, opt.threads,
                                                          opt.window_len, opt.window_overlap);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
+        // Inference.
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, resources.models,
                                                       *resources.decoder, opt.window_len,
@@ -545,12 +550,11 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             const polisher::ConsensusResult& r = results_samples[i];
             groups[r.draft_id].emplace_back(r.draft_start, i);
         }
-        // Stitch the windows.
+
+        // Stitch the windows and write output.
         for (size_t seq_id = 0; seq_id < std::size(groups); ++seq_id) {
             auto& group = groups[seq_id];
-
-            // Sort by region start position, for every sequence.
-            std::sort(std::begin(group), std::end(group));
+            std::sort(std::begin(group), std::end(group));  // Sort by start pos.
 
             const polisher::ConsensusResult consensus =
                     polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
