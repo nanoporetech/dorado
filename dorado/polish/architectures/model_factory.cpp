@@ -63,7 +63,7 @@ void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
             }
         }
 
-    } catch (const c10::Error& e) {
+    } catch (const c10::Error& /*e*/) {
         throw std::runtime_error{"Error: Pickled data is not a dictionary or is None!"};
     }
 }
