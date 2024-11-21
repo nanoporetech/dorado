@@ -1,96 +1,43 @@
-#ifndef _MEDAKA_READ_ALN_H
-#define _MEDAKA_READ_ALN_H
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
 
 // medaka-style feature data
-typedef struct _read_aln_data {
-    size_t buffer_pos;
-    size_t buffer_reads;
-    size_t num_dtypes;
-    size_t n_pos;
-    size_t n_reads;
-    size_t featlen;
-    int8_t *matrix;
-    size_t *major;
-    size_t *minor;
-    char **read_ids_left;
-    char **read_ids_right;
-} _read_aln_data;
-typedef _read_aln_data *read_aln_data;
+struct ReadAlignmentData {
+public:
+    ReadAlignmentData(int32_t n_pos_,
+                      int32_t n_reads_,
+                      int32_t buffer_pos_,
+                      int32_t buffer_reads_,
+                      int32_t extra_featlen_,
+                      int32_t fixed_size_);
 
-typedef struct Read {
-    size_t ref_start;
-    char *qname;
-    uint8_t *seqi;
-    uint8_t *qual;
-    int8_t mq;
-    size_t haplotype;
-    int8_t strand;
-    int8_t dtype;
-    uint32_t ref_end;
-    int8_t *dwells;
-} Read;
+    void resize_cols(const int64_t new_buffer_cols);
 
-// medaka-style base encoding
-static const size_t base_featlen = 4;  // minimal number of feature channels
-static const size_t del_val = 5;       // value representing deletion in base channel
+    void resize_num_reads(const int64_t new_buffer_reads);
 
-// convert 16bit IUPAC (+16 for strand) to plp_bases index
-static const int num2countbase_symm[32] = {
-        -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
-        -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
+    int32_t buffer_pos;
+    int32_t buffer_reads;
+    int32_t num_dtypes;
+    int32_t n_pos;
+    int32_t n_reads;
+    int32_t featlen;
+    std::vector<int8_t> matrix;
+    std::vector<int64_t> major;
+    std::vector<int64_t> minor;
+    std::vector<std::string> read_ids_left;
+    std::vector<std::string> read_ids_right;
 };
 
-/** Constructs a pileup data structure.
- *
- *  @param n_pos number of pileup columns.
- *  @param n_reads number of pileup rows.
- *  @param buffer_pos number of pileup columns.
- *  @param buffer_reads number of pileup rows.
- *  @param extra_featlen number of extra feature channels.
- *  @param fixed_size if not zero data matrix is allocated as fixed_size * n_reads * n_pos, ignoring other arguments
- *  @see destroy_read_aln_data
- *  @returns a read_aln_data pointer.
- *
- *  The return value can be freed with destroy_read_aln_data.
- *
- */
-read_aln_data create_read_aln_data(size_t n_pos,
-                                   size_t n_reads,
-                                   size_t buffer_pos,
-                                   size_t buffer_reads,
-                                   size_t extra_featlen,
-                                   size_t fixed_size);
-
-/** Enlarge the internal buffers of a pileup data structure.
- *
- *  @param pileup a read_aln_data pointer.
- *  @param buffer_pos number of pileup columns for which to allocate memory
- *
- */
-void enlarge_read_aln_data_pos(read_aln_data pileup, size_t buffer_pos);
-/** Enlarge the internal buffers of a pileup data structure.
- *
- *  @param pileup a read_aln_data pointer.
- *  @param buffer_reads number of pileup rows for which to allocate memory
- *
- */
-void enlarge_read_aln_data_reads(read_aln_data pileup, size_t buffer_reads);
-
-/** Destroys a pileup data structure.
- *
- *  @param data the object to cleanup.
- *  @returns void.
- *
- */
-void destroy_read_aln_data(read_aln_data data);
-
-/** Prints a pileup data structure.
- *
- *  @param pileup a pileup counts structure.
- *  @returns void
- *
- */
-void print_read_aln_data(read_aln_data pileup);
+// /** Prints a pileup data structure.
+//  *
+//  *  @param pileup a pileup counts structure.
+//  *  @returns void
+//  *
+//  */
+// void print_read_aln_data(const ReadAlignmentData& pileup);
 
 /** Generates medaka-style feature data in a region of a bam.
  *
@@ -120,21 +67,21 @@ void print_read_aln_data(read_aln_data pileup);
  *  When tag_name is given the behaviour for alignments without the tag is
  *  determined by keep_missing.
  *
- *  If row_per_read is False, new reads will be placed in the first row where 
+ *  If row_per_read is False, new reads will be placed in the first row where
  *  there previous read has terminated, if one exists.
  */
-read_aln_data calculate_read_alignment(const char *region,
-                                       const bam_fset *bam_set,
-                                       size_t num_dtypes,
-                                       char *dtypes[],
-                                       const char tag_name[2],
-                                       const int tag_value,
-                                       const _Bool keep_missing,
-                                       const char *read_group,
-                                       const int min_mapQ,
-                                       const _Bool row_per_read,
-                                       const _Bool include_dwells,
-                                       const _Bool include_haplotype,
-                                       const unsigned int max_reads);
-
-#endif
+ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
+                                           const std::string &chr_name,
+                                           const int64_t start,  // Zero-based.
+                                           const int64_t end,    // Non-inclusive.
+                                           const int64_t num_dtypes,
+                                           const std::vector<std::string> &dtypes,
+                                           const std::string &tag_name,
+                                           const int32_t tag_value,
+                                           const bool keep_missing,
+                                           const char *read_group,
+                                           const int32_t min_mapq,
+                                           const bool row_per_read,
+                                           const bool include_dwells,
+                                           const bool include_haplotype,
+                                           const int32_t max_reads);
