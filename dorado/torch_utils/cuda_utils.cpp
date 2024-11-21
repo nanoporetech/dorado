@@ -1,5 +1,6 @@
 #include "cuda_utils.h"
 
+#include "torch_utils/gpu_monitor.h"
 #include "utils/PostCondition.h"
 #include "utils/math_utils.h"
 
@@ -220,8 +221,9 @@ bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> &devices,
                                   std::string &error_message) {
     std::vector<int> device_ids{};
-    if (!details::try_parse_device_ids(device_string, torch::cuda::device_count(), device_ids,
-                                       error_message)) {
+
+    if (!details::try_parse_device_ids(device_string, utils::gpu_monitor::get_device_count(),
+                                       device_ids, error_message)) {
         return false;
     }
 
@@ -243,7 +245,7 @@ std::vector<std::string> parse_cuda_device_string(const std::string &device_stri
 
 std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_string,
                                                  bool include_unused) {
-    const auto num_devices = torch::cuda::device_count();
+    const auto num_devices = utils::gpu_monitor::get_device_count();
     std::string error_message{};
     std::vector<int> requested_device_ids{};
     if (!details::try_parse_device_ids(device_string, num_devices, requested_device_ids,
