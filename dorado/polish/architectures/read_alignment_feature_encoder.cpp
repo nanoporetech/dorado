@@ -7,6 +7,28 @@
 
 namespace dorado::polisher {
 
+namespace {
+
+ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
+    ReadAlignmentTensors result;
+
+    // Allocate a tensor of the appropriate size directly for `result.counts` on the CPU
+    result.counts = torch::empty({data.n_pos, data.buffer_reads, data.featlen}, torch::kInt8);
+
+    // Copy the data from `data.matrix` into `result.counts`
+    std::memcpy(result.counts.data_ptr<int8_t>(), data.matrix.data(),
+                data.n_pos * data.buffer_reads * data.featlen * sizeof(int8_t));
+
+    result.positions_major = std::move(data.major);
+    result.positions_minor = std::move(data.minor);
+    result.read_ids_left = std::move(data.read_ids_left);
+    result.read_ids_right = std::move(data.read_ids_right);
+
+    return result;
+}
+
+}  // namespace
+
 ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const int32_t min_mapq)
         : m_min_mapq{min_mapq} {}
 
@@ -48,11 +70,12 @@ Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
     (void)counts;
     (void)seq_id;
 
-    return {};
+    // Create Torch tensors from the pileup.
+    ReadAlignmentTensors tensors = read_matrix_data_to_tensors(counts);
 
-    // // Create Torch tensors from the pileup.
-    // const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes;
-    // CountsResult tensors = read_matrix_data_to_tensors(counts, n_rows);
+    (void)tensors;
+
+    return {};
 
     // if (!pileup_tensors.counts.numel()) {
     //     const std::string region =

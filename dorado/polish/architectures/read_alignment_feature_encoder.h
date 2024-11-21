@@ -22,6 +22,14 @@
 
 namespace dorado::polisher {
 
+struct ReadAlignmentTensors {
+    torch::Tensor counts;
+    std::vector<int64_t> positions_major;
+    std::vector<int64_t> positions_minor;
+    std::vector<std::string> read_ids_left;
+    std::vector<std::string> read_ids_right;
+};
+
 class ReadAlignmentFeatureEncoder : public BaseFeatureEncoder {
 public:
     ReadAlignmentFeatureEncoder() = default;
