@@ -92,6 +92,9 @@ std::unique_ptr<BaseFeatureDecoder> decoder_factory([[maybe_unused]] const Model
 
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
         return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
+
+    } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
+        return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
     }
 
     throw std::runtime_error{"No decoder available for the feature encoder type: " +

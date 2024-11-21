@@ -61,4 +61,17 @@ private:
     bool m_include_haplotype = false;
 };
 
+class ReadAlignmentFeatureDecoder : public BaseFeatureDecoder {
+public:
+    ReadAlignmentFeatureDecoder(const LabelSchemeType label_scheme_type);
+
+    ~ReadAlignmentFeatureDecoder() = default;
+
+    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
+
+private:
+    const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
+    std::string m_label_scheme{"*ACGT"};
+};
+
 }  // namespace dorado::polisher
