@@ -67,26 +67,23 @@ Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
             m_tag_keep_missing, read_group_ptr, m_min_mapq, m_row_per_read, m_include_dwells,
             m_include_haplotype, m_max_reads);
 
-    (void)counts;
-    (void)seq_id;
-
     // Create Torch tensors from the pileup.
     ReadAlignmentTensors tensors = read_matrix_data_to_tensors(counts);
 
-    (void)tensors;
+    if (!tensors.counts.numel()) {
+        const std::string region =
+                ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
+        spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
+                     region);
+        return {};
+    }
 
-    return {};
+    torch::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
-    // if (!pileup_tensors.counts.numel()) {
-    //     const std::string region =
-    //             ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
-    //     spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
-    //                  region);
-    //     return {};
-    // }
+    Sample sample{std::move(tensors.counts), std::move(tensors.positions_major),
+                  std::move(tensors.positions_minor), std::move(depth), seq_id};
 
-    // return counts_to_features(pileup_tensors, seq_id, m_symmetric_indels, m_feature_indices,
-    //                           m_normalise_type);
+    return sample;
 }
 
 std::vector<ConsensusResult> ReadAlignmentFeatureDecoder::decode_bases(

@@ -15,6 +15,8 @@
 #include <c10/cuda/CUDAGuard.h>
 #endif
 
+// #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
+
 namespace dorado::polisher {
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
@@ -556,12 +558,12 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cout << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                std::cerr << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
                           << "] Before merging. interval = [" << interval.start << ", "
                           << interval.end << ">:\n";
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] Input (parallel_results):\n";
-                debug_print_samples(std::cout, parallel_results, interval.start, interval.end, -1);
+                debug_print_samples(std::cerr, parallel_results, interval.start, interval.end, -1);
 #endif
 
                 std::vector<polisher::Sample> local_samples;
@@ -577,25 +579,25 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                 }
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting on discontinuities (local_samples):\n";
-                debug_print_samples(std::cout, local_samples, 0, -1, -1);
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
                 local_samples = merge_adjacent_samples(local_samples);
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After merging adjacent (local_samples):\n";
-                debug_print_samples(std::cout, local_samples, 0, -1, -1);
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
                 local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cout << "- [bam_chunk_id = " << bam_chunk_id
+                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting samples (local_samples):\n";
-                debug_print_samples(std::cout, local_samples, 0, -1, -1);
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
                 const Window& reg = bam_regions[bam_chunk_id];
@@ -796,7 +798,7 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
     const std::vector<Interval> chunks = compute_chunks(num_items, num_threads);
 
     spdlog::info("Starting to call consensus for {} samples using {} devices.", num_items,
-                 num_threads);
+                 std::size(chunks));
 
     cxxpool::thread_pool pool{std::size(chunks)};
 

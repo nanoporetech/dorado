@@ -558,6 +558,9 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     }
     pileup.n_reads = std::min(max_reads, pileup.n_reads);
 
+    pileup.major.resize(n_pos);
+    pileup.minor.resize(n_pos);
+
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);
 
