@@ -181,6 +181,7 @@ CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
                                            const int32_t min_mapq,
                                            const bool symmetric_indels)
         : m_normalise_type{normalise_type},
+          m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_dtypes{dtypes},
           m_tag_name{tag_name},
           m_tag_value{tag_value},
@@ -198,17 +199,16 @@ Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
-    const int32_t num_dtypes = static_cast<int32_t>(std::size(m_dtypes)) + 1;
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
 
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     PileupData pileup = calculate_pileup(
-            bam_file, ref_name, ref_start, ref_end, num_dtypes, m_dtypes, num_qstrat, m_tag_name,
+            bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, num_qstrat, m_tag_name,
             m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
 
     // Create Torch tensors from the pileup.
-    const size_t n_rows = std::size(PILEUP_BASES) * num_dtypes * num_qstrat;
+    const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes * num_qstrat;
     CountsResult pileup_tensors = plp_data_to_tensors(pileup, n_rows);
 
     if (!pileup_tensors.counts.numel()) {

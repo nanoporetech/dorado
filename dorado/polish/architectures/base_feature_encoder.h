@@ -24,6 +24,15 @@ enum class NormaliseType {
     FWD_REV,
 };
 
+enum class LabelSchemeType {
+    HAPLOID,
+};
+
+using FeatureIndicesType =
+        std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
+
+constexpr auto FeatureTensorType = torch::kFloat32;
+
 inline NormaliseType parse_normalise_type(std::string type) {
     std::transform(std::begin(type), std::end(type), std::begin(type),
                    [](unsigned char c) { return std::tolower(c); });

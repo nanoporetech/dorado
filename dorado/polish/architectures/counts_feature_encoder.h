@@ -32,14 +32,6 @@ struct KeyHash {
         return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
     }
 };
-using FeatureIndicesType =
-        std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
-
-constexpr auto FeatureTensorType = torch::kFloat32;
-
-enum class LabelSchemeType {
-    HAPLOID,
-};
 
 class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:
@@ -66,6 +58,7 @@ public:
 
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
+    int32_t m_num_dtypes = 1;
     std::vector<std::string> m_dtypes;
     std::string m_tag_name;
     int32_t m_tag_value = 0;
