@@ -291,8 +291,11 @@ int demuxer(int argc, char* argv[]) {
             barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
         }
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
-        auto trimmer = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
-        pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, demux_threads);
+        auto current_node = demux_writer;
+        if (!no_trim) {
+            current_node = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
+        }
+        pipeline_desc.add_node<BarcodeClassifierNode>({current_node}, demux_threads);
     }
 
     // Create the Pipeline from our description.
