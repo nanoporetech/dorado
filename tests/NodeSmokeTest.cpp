@@ -168,8 +168,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
         auto adapter_info = std::make_shared<dorado::demux::AdapterInfo>();
         adapter_info->trim_adapters = trim_adapter;
         adapter_info->trim_adapters = rna_adapter;
-        client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
-                std::move(adapter_info));
+        client_info->contexts().register_context<const dorado::demux::AdapterInfo>(adapter_info);
     }
 
     set_pipeline_restart(pipeline_restart);
@@ -380,8 +379,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
     barcoding_info->kit_name = kit_inputs.kit_name;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
-            std::move(barcoding_info));
+    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(barcoding_info);
 
     set_pipeline_restart(pipeline_restart);
 
@@ -398,8 +396,7 @@ DEFINE_TEST(NodeSmokeTestRead, "AdapterDetectorNode") {
     CAPTURE(adapter_info->trim_primers);
     CAPTURE(pipeline_restart);
 
-    client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
-            std::move(adapter_info));
+    client_info->contexts().register_context<const dorado::demux::AdapterInfo>(adapter_info);
 
     set_pipeline_restart(pipeline_restart);
     run_smoke_test<dorado::AdapterDetectorNode>(2);
@@ -423,8 +420,7 @@ TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam files"
     barcoding_info->kit_name = kit;
     barcoding_info->barcode_both_ends = barcode_both_ends;
     barcoding_info->trim = !no_trim;
-    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(
-            std::move(barcoding_info));
+    client_info->contexts().register_context<const dorado::demux::BarcodingInfo>(barcoding_info);
     for (auto& test_file : {data1, data2}) {
         dorado::HtsReader reader(test_file.string(), std::nullopt);
         reader.set_client_info(client_info);

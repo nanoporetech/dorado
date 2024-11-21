@@ -30,7 +30,7 @@ TEST_CASE(CUT_TAG " test parse", CUT_TAG) {
     auto results = parse_sam_lines(fasta, "", "");
     REQUIRE(results.size() == 1);
 
-    AlignmentResult alres = results[0];
+    const AlignmentResult& alres = results[0];
 
     CHECK(std::string("ref1") == alres.genome);
     CHECK(50 == alres.genome_start);
@@ -66,7 +66,7 @@ TEST_CASE(CUT_TAG " test parse coverage", CUT_TAG) {
     auto results = parse_sam_lines(fasta, "", "");
     REQUIRE(results.size() == 1);
 
-    AlignmentResult alres = results[0];
+    const AlignmentResult& alres = results[0];
     CHECK(alres.coverage < 0.8f);
 }
 
@@ -79,7 +79,7 @@ TEST_CASE(CUT_TAG " test parse empty field", CUT_TAG) {
     auto results = parse_sam_lines(fasta, "", "");
     REQUIRE(results.size() == 1);
 
-    AlignmentResult alres = results[0];
+    const AlignmentResult& alres = results[0];
 
     CHECK(std::string("ref1") == alres.genome);
     CHECK(50 == alres.genome_start);
@@ -103,7 +103,7 @@ TEST_CASE(CUT_TAG " test parse not aligned reference", CUT_TAG) {
     auto results = parse_sam_lines(fasta, "", "");
     REQUIRE(results.size() == 1);
 
-    AlignmentResult alres = results[0];
+    const AlignmentResult& alres = results[0];
 
     CHECK(std::string("*") == alres.genome);
     CHECK(0 == alres.genome_start);

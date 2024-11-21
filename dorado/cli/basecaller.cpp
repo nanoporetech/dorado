@@ -325,8 +325,8 @@ void setup(const std::vector<std::string>& args,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelComplex& model_complex,
-           std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
-           std::shared_ptr<const dorado::demux::AdapterInfo> adapter_info,
+           const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
+           const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::debug(model_config.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
@@ -496,20 +496,19 @@ void setup(const std::vector<std::string>& args,
             (adapter_info->rna_adapters || (barcoding_info && !barcoding_info->kit_name.empty()));
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
+    client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
 
     if (estimate_poly_a) {
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
                         polya_config, is_rna_model(model_config), is_rna_adapter);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
-                std::move(poly_tail_calc_selector));
+                poly_tail_calc_selector);
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (barcoding_info) {
-        client_info->contexts().register_context<const demux::BarcodingInfo>(
-                std::move(barcoding_info));
+        client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }

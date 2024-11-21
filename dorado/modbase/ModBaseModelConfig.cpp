@@ -162,6 +162,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     }
 
     std::vector<std::string> long_names;
+    long_names.reserve(codes.size());
     for (size_t i = 0; i < codes.size(); ++i) {
         long_names.push_back(
                 toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
@@ -171,7 +172,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto motif_offset = static_cast<size_t>(
             get_int_in_range(params, "motif_offset", 0, int(motif.size()), REQUIRED));
 
-    return ModificationParams{codes, long_names, motif, motif_offset};
+    return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
 }
 
 ContextParams parse_context_params(const toml::value& config_toml) {
@@ -222,7 +223,7 @@ RefinementParams parse_refinement_params(const toml::value& config_toml,
     const int center_index =
             get_int_in_range(segment, "refine_kmer_center_idx", 0, kmer_len - 1, REQUIRED);
 
-    return RefinementParams(kmer_len, center_index, kmer_levels);
+    return RefinementParams(kmer_len, center_index, std::move(kmer_levels));
 }
 
 ModBaseModelConfig load_modbase_model_config_impl(const std::filesystem::path& model_path,
