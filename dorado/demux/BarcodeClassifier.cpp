@@ -894,8 +894,10 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         auto best_bottom_result = std::min_element(
                 results.begin(), results.end(),
                 [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
-        auto max_penalty = std::max(best_top_result->penalty, best_bottom_result->penalty);
-        auto penalty_dist = std::abs(best_top_result->penalty - best_bottom_result->penalty);
+        auto max_penalty =
+                std::max(best_top_result->top_penalty, best_bottom_result->bottom_penalty);
+        auto penalty_dist =
+                std::abs(best_top_result->top_penalty - best_bottom_result->bottom_penalty);
         if ((max_penalty <= m_scoring_params.max_barcode_penalty) &&
             (penalty_dist <= m_scoring_params.min_barcode_penalty_dist) &&
             (best_top_result->barcode_name != best_bottom_result->barcode_name)) {
