@@ -2,8 +2,7 @@
 
 #include "htslib/sam.h"
 
-// parameters for bam iteration
-typedef struct {
+struct HtslibMpileupData {
     htsFile* fp;
     sam_hdr_t* hdr;
     hts_itr_t* iter;
@@ -12,7 +11,7 @@ typedef struct {
     int tag_value;
     bool keep_missing;
     const char* read_group;
-} mplp_data;
+};
 
 // iterator for reading bam
 int read_bam(void* data, bam1_t* b);

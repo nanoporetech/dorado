@@ -188,8 +188,8 @@ PileupData calculate_pileup(BamFile &bam_file,
     const std::string region =
             chr_name + ':' + std::to_string(start + 1) + '-' + std::to_string(end);
 
-    std::unique_ptr<mplp_data> data = std::make_unique<mplp_data>();
-    mplp_data *raw_data_ptr = data.get();
+    std::unique_ptr<HtslibMpileupData> data = std::make_unique<HtslibMpileupData>();
+    HtslibMpileupData *raw_data_ptr = data.get();
 
     data->fp = fp;
     data->hdr = hdr;
