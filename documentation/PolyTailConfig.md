@@ -92,4 +92,5 @@ This creates three configurations:
 | plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
 | flank_threshold  | Threshold to use for detection of the flank/primer sequences. Equates to `(1 - edit distance / flank_sequence)` |
 | primer_window | Window of bases at the front and rear of the rear within which to look for primer sequences |
+| min_primer_separation | Minimum difference in edit distance between the forward and reverse alignments of the primers required in order to proceed with estimation |
 | tail_interrupt_length | Combine tails that are within this distance of each other (default is 0, i.e. don't combine any) |
