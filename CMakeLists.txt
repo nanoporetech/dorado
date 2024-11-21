@@ -326,6 +326,8 @@ add_library(dorado_lib
     dorado/polish/architectures/model_factory.h
     dorado/polish/architectures/counts_feature_encoder.cpp
     dorado/polish/architectures/counts_feature_encoder.h
+    dorado/polish/architectures/read_alignment_feature_encoder.cpp
+    dorado/polish/architectures/read_alignment_feature_encoder.h
     dorado/polish/architectures/gru_model.cpp
     dorado/polish/architectures/gru_model.h
     dorado/polish/architectures/model_config.cpp

@@ -28,8 +28,7 @@ public:
 
     ReadAlignmentFeatureEncoder(const int32_t min_mapq);
 
-    ReadAlignmentFeatureEncoder(const NormaliseType normalise_type,
-                                const std::vector<std::string>& dtypes,
+    ReadAlignmentFeatureEncoder(const std::vector<std::string>& dtypes,
                                 const std::string_view tag_name,
                                 const int32_t tag_value,
                                 const bool tag_keep_missing,
@@ -49,7 +48,6 @@ public:
                          const int32_t seq_id) const override;
 
 private:
-    NormaliseType m_normalise_type{NormaliseType::TOTAL};
     int32_t m_num_dtypes = 1;
     std::vector<std::string> m_dtypes;
     std::string m_tag_name;
