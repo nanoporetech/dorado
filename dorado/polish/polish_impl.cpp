@@ -80,7 +80,7 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
                       const std::string& seq_name,
                       int32_t start,
                       int32_t end) {
-    faidx_t* fai = fai_load(index_fn.c_str());
+    faidx_t* fai = fai_load(index_fn.string().c_str());
     if (!fai) {
         spdlog::error("Failed to load index for file: '{}'.", index_fn.string());
         return {};
