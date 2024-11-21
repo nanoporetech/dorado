@@ -7,7 +7,7 @@
 
 namespace dorado::polisher {
 
-inline void print_toml(const toml::value& val, int indent = 0) {
+inline void print_toml(const toml::value& val, int indent) {
     const std::string indent_str(indent, ' ');
 
     if (val.is_table()) {
@@ -73,7 +73,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
         throw std::runtime_error("Model config must contain 'config_version' attribute.");
     }
 
-    // print_toml(config_toml);
+    // print_toml(config_toml, 0);
 
     ModelConfig cfg;
 
