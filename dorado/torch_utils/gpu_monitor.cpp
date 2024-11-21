@@ -15,11 +15,15 @@
 #else  // _WIN32
 #include <dlfcn.h>
 #endif  // _WIN32
+#if defined(DORADO_ORIN) || defined(DORADO_TX2)
+#include <torch/torch.h>
+#endif  // defined(DORADO_ORIN) || defined(DORADO_TX2)
 #endif  // HAS_NVML
 
 #include <spdlog/spdlog.h>
 
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
@@ -164,7 +168,7 @@ class NvmlApi final {
 
     void init() {
         if (!platform_open() || !load_symbols()) {
-            spdlog::warn("Failed to load NVML");
+            spdlog::info("Failed to load NVML");
             clear_symbols();
             platform_close();
             return;
@@ -172,9 +176,23 @@ class NvmlApi final {
 
         // Fall back to the original nvmlInit() if _v2 doesn't exist.
         auto *do_init = m_Init_v2 ? m_Init_v2 : m_Init;
-        nvmlReturn_t result = do_init();
+
+        // We retry initialisation for a certain amount of time, to allow the driver to load on system startup
+        auto start = std::chrono::system_clock::now();
+        auto wait_seconds = std::chrono::seconds(10);
+        nvmlReturn_t result;
+        do {
+            result = do_init();
+            if (result == NVML_SUCCESS) {
+                break;
+            }
+            spdlog::warn("Failed to initialize NVML: {}, retrying in 1s...", m_ErrorString(result));
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        } while ((std::chrono::system_clock::now() - start) < wait_seconds);
+
         if (result != NVML_SUCCESS) {
-            spdlog::warn("Failed to initialize NVML: {}", m_ErrorString(result));
+            spdlog::warn("Failed to initialize NVML after {} seconds: {}", wait_seconds.count(),
+                         m_ErrorString(result));
             clear_symbols();
             platform_close();
         }
@@ -433,10 +451,11 @@ class DeviceInfoCache final {
                 spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
-#if defined(DORADO_TX2)
+#if defined(DORADO_ORIN) || defined(DORADO_TX2)
         if (m_device_count == 0) {
-            // TX2 may not have NVML, in which case just report that we have 1.
-            m_device_count = 1;
+            // TX2/Orin may not have NVML, in which case ask torch how many devices it thinks there are.
+            m_device_count = torch::cuda::device_count();
+            spdlog::info("Setting device count to {} as reported from torch", m_device_count);
         }
 #endif
     }
