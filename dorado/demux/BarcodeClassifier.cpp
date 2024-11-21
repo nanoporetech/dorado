@@ -889,10 +889,10 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // are the same. If they suggest different barcodes confidently, then
         // consider the read unclassified.
         const auto best_top_result = std::min_element(
-                results.begin(), results.end(),
+                results.cbegin(), results.cend(),
                 [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
         const auto best_bottom_result = std::min_element(
-                results.begin(), results.end(),
+                results.cbegin(), results.cend(),
                 [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
         const auto max_penalty =
                 std::max(best_top_result->top_penalty, best_bottom_result->bottom_penalty);
