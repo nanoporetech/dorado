@@ -448,20 +448,21 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];
 
-            spdlog::info("About to load model to device {}: {}", device_id, device_info.name);
-
+            spdlog::info("Creating a model from the config.");
             auto model = polisher::model_factory(model_config);
 
+            spdlog::info("About to load model to device {}: {}", device_id, device_info.name);
             model->to(device_info.device);
 
             // Half-precision if needed.
             if ((device_info.type == DeviceType::CUDA) && !full_precision) {
+                spdlog::info("Converting the model to half.");
                 model->to_half();
-                spdlog::info("Converted the model to half.");
             } else {
                 spdlog::info("Using full precision.");
             }
 
+            spdlog::info("Switching model to eval mode.");
             model->eval();
 
             ret.emplace_back(std::move(model));
