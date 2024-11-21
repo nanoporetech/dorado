@@ -28,6 +28,13 @@ enum class LabelSchemeType {
     HAPLOID,
 };
 
+struct KeyHash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& key) const {
+        return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
+    }
+};
+
 using FeatureIndicesType =
         std::unordered_map<std::pair<std::string, bool>, std::vector<int64_t>, KeyHash>;
 

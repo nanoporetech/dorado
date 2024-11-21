@@ -158,7 +158,6 @@ PileupData calculate_pileup(BamFile &bam_file,
                             const std::string &chr_name,
                             const int64_t start,  // Zero-based.
                             const int64_t end,    // Non-inclusive.
-
                             const int64_t num_dtypes,
                             const std::vector<std::string> &dtypes,
                             const int64_t num_homop,
@@ -190,7 +189,6 @@ PileupData calculate_pileup(BamFile &bam_file,
 
     std::unique_ptr<HtslibMpileupData> data = std::make_unique<HtslibMpileupData>();
     HtslibMpileupData *raw_data_ptr = data.get();
-
     data->fp = fp;
     data->hdr = hdr;
     data->iter = bam_itr_querys(idx, hdr, region.c_str());
@@ -202,8 +200,6 @@ PileupData calculate_pileup(BamFile &bam_file,
     bam_mplp_t mplp = bam_mplp_init(1, read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
-    // const bam_pileup1_t** plp_ptr = &plp.data();
-
     int32_t ret = 0;
     int32_t pos = 0;
     int32_t tid = 0;

@@ -26,12 +26,6 @@ struct CountsResult {
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
 };
-struct KeyHash {
-    template <typename T1, typename T2>
-    std::size_t operator()(const std::pair<T1, T2>& key) const {
-        return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
-    }
-};
 
 class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:

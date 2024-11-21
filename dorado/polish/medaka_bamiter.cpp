@@ -5,7 +5,7 @@
 
 // iterator for reading bam
 int read_bam(void *data, bam1_t *b) {
-    HtslibPileupData *aux = (HtslibMpileupData *)data;
+    HtslibMpileupData *aux = (HtslibMpileupData *)data;
     uint8_t *tag;
     bool check_tag = (strcmp(aux->tag_name, "") != 0);
     bool have_rg = (aux->read_group != NULL);
