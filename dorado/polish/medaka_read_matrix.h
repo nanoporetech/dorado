@@ -16,9 +16,9 @@ public:
                       int32_t extra_featlen_,
                       int32_t fixed_size_);
 
-    void resize_cols(const int64_t new_buffer_cols);
+    void resize_cols(const int32_t new_buffer_cols);
 
-    void resize_num_reads(const int64_t new_buffer_reads);
+    void resize_num_reads(const int32_t new_buffer_reads);
 
     int32_t buffer_pos;
     int32_t buffer_reads;

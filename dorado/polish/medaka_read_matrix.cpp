@@ -11,10 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <cstdint>
-#include <string>
+#include <array>
 #include <unordered_map>
-#include <vector>
 
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
 #define bam1_seqi(s, i) (bam_seqi((s), (i)))
@@ -142,17 +140,17 @@ ReadAlignmentData::ReadAlignmentData(int32_t n_pos_,
     read_ids_right.resize(buffer_reads);
 }
 
-void ReadAlignmentData::resize_cols(const int64_t new_buffer_cols) {
-    const size_t new_size = new_buffer_cols * buffer_reads * featlen;
+void ReadAlignmentData::resize_cols(const int32_t new_buffer_cols) {
+    const int64_t new_size = static_cast<int64_t>(new_buffer_cols) * buffer_reads * featlen;
     matrix.resize(new_size, 0);
     major.resize(new_buffer_cols, 0);
     minor.resize(new_buffer_cols, 0);
     buffer_pos = new_buffer_cols;
 }
 
-void ReadAlignmentData::resize_num_reads(const int64_t new_buffer_reads) {
-    const int64_t old_size = buffer_pos * this->buffer_reads * featlen;
-    const int64_t new_size = buffer_pos * new_buffer_reads * featlen;
+void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
+    const int64_t old_size = static_cast<int64_t>(buffer_pos) * this->buffer_reads * featlen;
+    const int64_t new_size = static_cast<int64_t>(buffer_pos) * new_buffer_reads * featlen;
 
     matrix.resize(new_size, 0);
     read_ids_left.resize(new_buffer_reads);
