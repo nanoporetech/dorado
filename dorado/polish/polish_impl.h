@@ -53,7 +53,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
         const int32_t window_len,
-        const int32_t window_overlap);
+        const int32_t window_overlap,
+        const int32_t bam_subchunk_len);
 
 std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<Sample>& in_samples,

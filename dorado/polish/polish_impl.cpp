@@ -457,7 +457,8 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
         const int32_t window_len,
-        const int32_t window_overlap) {
+        const int32_t window_overlap,
+        const int32_t bam_subchunk_len) {
     /// Medaka has a slightly strange window construction:
     //  1. It splits BAM references into 100kbp overlapping BAM windows.
     //  2. Each BAM window is processed separately.
@@ -486,14 +487,14 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     }
 #endif
 
-    // Split BAM regions into non-overlapping windows for parallel processing.
+    // Split large BAM regions into non-overlapping windows for parallel processing.
     // The non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
     std::vector<Interval> bam_region_intervals;
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const Window& bw = bam_regions[i];
         std::vector<Window> new_windows =
-                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, window_len, 0, i);
+                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
         if (std::empty(new_windows)) {
             continue;
         }

@@ -103,6 +103,7 @@ struct Options {
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
+    int32_t bam_subchunk = 100'000;
     std::string region;
     bool full_precision = false;
     int32_t min_mapq = 0;
@@ -173,6 +174,11 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--bam-chunk")
                 .help("Size of draft chunks to parse from the input BAM at a time.")
                 .default_value(1000000)
+                .scan<'i', int>();
+        parser->visible.add_argument("--bam-subchunk")
+                .help("Each BAM region of bam_chunk length will be split into non-overlapping "
+                      "regions of this size for parallel processing.")
+                .default_value(100000)
                 .scan<'i', int>();
         parser->visible.add_argument("--region")
                 .help("Process only this region of the input. Htslib format (start is 1-based, end "
@@ -252,6 +258,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.window_len = parser.visible.get<int>("window-len");
     opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
+    opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
@@ -296,6 +303,11 @@ void validate_options(const Options& opt) {
     }
     if (opt.bam_chunk <= 0) {
         spdlog::error("BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
+        std::exit(EXIT_FAILURE);
+    }
+    if ((opt.bam_subchunk <= 0) || (opt.bam_subchunk > opt.bam_chunk)) {
+        spdlog::error("BAM sub-chunk size should be > 0 and < bam_chunk size ({}). Given: {}.",
+                      opt.bam_chunk, opt.bam_subchunk);
         std::exit(EXIT_FAILURE);
     }
     if ((opt.window_overlap < 0) || (opt.window_overlap >= opt.window_len)) {
@@ -538,9 +550,9 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
 
         // Produce samples (tensors) for inference.
-        auto [samples, trims] = polisher::create_samples(resources.bam_handles, *resources.encoder,
-                                                         bam_regions, draft_lens_batch, opt.threads,
-                                                         opt.window_len, opt.window_overlap);
+        auto [samples, trims] = polisher::create_samples(
+                resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
+                opt.threads, opt.window_len, opt.window_overlap, opt.bam_subchunk);
 
         spdlog::info("Produced num samples: {}", std::size(samples));
 
