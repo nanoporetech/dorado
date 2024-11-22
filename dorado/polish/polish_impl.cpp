@@ -655,6 +655,17 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     return {std::move(samples), std::move(trims)};
 }
 
+void print_tensor_shape(std::ostream& os, const torch::Tensor& tensor) {
+    os << "[";
+    for (size_t i = 0; i < tensor.sizes().size(); ++i) {
+        os << tensor.size(i);
+        if ((i + 1) < tensor.sizes().size()) {
+            os << ", ";
+        }
+    }
+    os << "]";
+}
+
 void process_samples(polisher::TorchModel& model,
                      const polisher::BaseFeatureDecoder& decoder,
                      const std::vector<polisher::Sample>& in_samples,
@@ -680,13 +691,16 @@ void process_samples(polisher::TorchModel& model,
         }
         torch::Tensor batch_features_tensor = torch::stack(batch_features);
 
-        spdlog::debug(
-                "About to call forward(): batch_features_tensor.size() = ({}, {}, {}), approx "
-                "size: {} MB.",
-                batch_features_tensor.size(0), batch_features_tensor.size(1),
-                batch_features_tensor.size(2),
-                batch_features_tensor.numel() * batch_features_tensor.element_size() /
-                        (1024.0 * 1024.0));
+        {
+            std::ostringstream oss;
+            print_tensor_shape(oss, batch_features_tensor);
+            spdlog::debug(
+                    "About to call forward(): batch_features_tensor.size() = {}, approx "
+                    "size: {} MB.",
+                    oss.str(),
+                    batch_features_tensor.numel() * batch_features_tensor.element_size() /
+                            (1024.0 * 1024.0));
+        }
 
         torch::Tensor output;
         try {
