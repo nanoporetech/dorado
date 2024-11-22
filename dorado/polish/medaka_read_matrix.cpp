@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
@@ -291,7 +292,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     // allocate output assuming one insertion per ref position
     int32_t n_pos = 0;
     int32_t max_n_reads = 0;
-    const int64_t buffer_pos = 2 * (end - start);
+    const int32_t buffer_pos = 2 * (end - start);
     const int32_t buffer_reads = std::min(max_reads, 100);
     const int32_t extra_featlen =
             (include_dwells ? 1 : 0) + (include_haplotype ? 1 : 0) + (num_dtypes > 1 ? 1 : 0);
