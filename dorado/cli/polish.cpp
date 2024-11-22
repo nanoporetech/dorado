@@ -19,7 +19,6 @@
 #include "utils/parameters.h"
 #include "utils/ssize.h"
 
-#include <cxxpool.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
