@@ -4,14 +4,11 @@
 #include "htslib/sam.h"
 #include "medaka_bamiter.h"
 
-#include <assert.h>
-#include <errno.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <array>
+#include <cassert>
+#include <cmath>
+#include <iostream>
+#include <stdexcept>
 #include <unordered_map>
 
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
@@ -391,8 +388,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                         failed = !found;
                     }
                     if (failed) {
-                        fprintf(stderr, "Datatype not found for %s.\n", qname.c_str());
-                        exit(1);
+                        throw std::runtime_error{"Datatype not found for qname: '" + qname + "'."};
                     }
                 }
                 // get haplotype tag
