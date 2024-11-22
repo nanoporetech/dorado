@@ -38,7 +38,7 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_len,
                                    const int32_t window_len,
                                    const int32_t window_overlap,
-                                   const int32_t region_id = -1);
+                                   const int32_t region_id);
 
 ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
                                 const std::string& header,

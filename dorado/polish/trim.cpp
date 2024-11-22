@@ -316,7 +316,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     return {end_1_ind, start_2_ind, heuristic};
 }
 
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Region region) {
+std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Region& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
