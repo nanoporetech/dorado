@@ -24,7 +24,7 @@ static constexpr int8_t DEL_VAL = 5;        // value representing deletion in ba
 static const char DATATYPE_TAG[] = "DT";
 
 // convert 16bit IUPAC (+16 for strand) to plp_bases index
-static const int num2countbase_symm[32] = {
+static const int8_t num2countbase_symm[32] = {
         -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
         -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
 };
@@ -35,7 +35,7 @@ struct Read {
     uint8_t *seqi;
     uint8_t *qual;
     uint8_t mapq;
-    int32_t haplotype;
+    int8_t haplotype;
     int8_t strand;
     int8_t dtype;
     int64_t ref_end;
@@ -396,13 +396,13 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                     }
                 }
                 // get haplotype tag
-                uint8_t haplotype = 0;
+                int8_t haplotype = 0;
                 failed = false;
                 tag = bam_aux_get(alignment, "HP");
                 if (tag == NULL) {  // tag isn't present
                     failed = true;
                 } else {
-                    haplotype = bam_aux2i(tag);
+                    haplotype = static_cast<int8_t>(bam_aux2i(tag));
                     failed = errno == EINVAL;
                 }
 
@@ -458,9 +458,8 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 pileup.read_ids_left[read_i] = read.qname;
             }
 
-            int32_t base_i = 0;
             int32_t min_minor = 0;
-            int32_t max_minor = (p->indel > 0) ? p->indel : 0;
+            const int32_t max_minor = (p->indel > 0) ? p->indel : 0;
             if (p->is_del) {
                 pileup.matrix[major_col + pileup.featlen * read_i + 0] = DEL_VAL;      //base
                 pileup.matrix[major_col + pileup.featlen * read_i + 1] = -1;           //qual
@@ -485,7 +484,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
             int32_t minor = min_minor;
             for (; minor <= max_minor; ++minor, ++query_pos_offset) {
                 const int32_t base_j = bam1_seqi(read.seqi, p->qpos + query_pos_offset);
-                base_i = num2countbase_symm[base_j];
+                const int8_t base_i = num2countbase_symm[base_j];
                 const size_t partial_index =
                         major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
                         + pileup.featlen * read_i;  // skip to read row
