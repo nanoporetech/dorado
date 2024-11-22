@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include "medaka_read_matrix.h"
 
 #include "bam_file.h"
