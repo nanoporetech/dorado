@@ -42,7 +42,7 @@ ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::
                                                          const bool row_per_read,
                                                          const bool include_dwells,
                                                          const bool include_haplotype)
-        : m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
+        : m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
           m_dtypes{dtypes},
           m_tag_name{tag_name},
           m_tag_value{tag_value},
