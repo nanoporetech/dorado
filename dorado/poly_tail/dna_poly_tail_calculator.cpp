@@ -26,8 +26,8 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
             std::string_view(m_config.rc_rear_primer.data() + trailing_Ts);
     const float threshold = m_config.flank_threshold;
     const int primer_window = m_config.primer_window;
+    const int min_separation = m_config.min_primer_separation;
 
-    const int kMinSeparation = 10;
     std::string_view seq_view = std::string_view(read.read_common.seq);
     std::string_view read_top = seq_view.substr(0, primer_window);
     auto bottom_start = std::max(0, (int)seq_view.length() - primer_window);
@@ -59,7 +59,7 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
     const bool fwd = dist_v1 < dist_v2;
     const float flank_score = 1.f - static_cast<float>(std::min(dist_v1, dist_v2)) /
                                             (front_primer.length() + rear_primer.length());
-    const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > kMinSeparation;
+    const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > min_separation;
 
     SignalAnchorInfo result = {false, -1, trailing_Ts, false};
 
