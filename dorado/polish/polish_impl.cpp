@@ -537,8 +537,13 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             futures.emplace_back(
                     pool.push(worker, tid, chunk_start, chunk_end, std::ref(parallel_results)));
         }
-        for (auto& f : futures) {
-            f.wait();
+        try {
+            for (auto& f : futures) {
+                f.get();
+            }
+        } catch (const std::exception& e) {
+            throw std::runtime_error{std::string("Caught exception from encoding task: ") +
+                                     e.what()};
         }
     }
 
@@ -625,8 +630,13 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
                                            std::ref(merged_trims)));
         }
-        for (auto& f : futures) {
-            f.wait();
+        try {
+            for (auto& f : futures) {
+                f.get();
+            }
+        } catch (const std::exception& e) {
+            throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
+                                     e.what()};
         }
     }
 
@@ -823,8 +833,12 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const auto [chunk_start, chunk_end] = chunks[tid];
         futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results)));
     }
-    for (auto& f : futures) {
-        f.wait();
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception from consensus task: ") + e.what()};
     }
 
     spdlog::info("Finished calling consensus.");
