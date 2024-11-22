@@ -52,10 +52,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
 
     auto scores = {fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score};
 
-    if (std::none_of(std::begin(scores), std::end(scores),
-                     [threshold](auto val) { return val >= threshold; })) {
-        spdlog::trace("{} flank score too high {}", read.read_common.read_id,
-                      *std::min_element(std::begin(scores), std::end(scores)));
+    if (std::all_of(std::begin(scores), std::end(scores),
+                    [threshold](auto val) { return val < threshold; })) {
+        spdlog::trace("{} flank scores too low - best score {}", read.read_common.read_id,
+                      *std::max_element(std::begin(scores), std::end(scores)));
         return {false, -1, 0, false};
     }
 
