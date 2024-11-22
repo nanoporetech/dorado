@@ -104,11 +104,17 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
 
         // Parse dtypes separately and optionally. Perhaps some encoders won't have it.
         // It's easier to parse here than from a string later.
-        if (toml::find_or<bool>(section, "kwargs", "dtypes", false)) {
-            const auto dtypes_toml =
-                    toml::find<std::vector<std::string>>(section, "kwargs", "dtypes");
+        if (cfg.feature_encoder_kwargs.find("dtypes") != std::end(cfg.feature_encoder_kwargs)) {
+            const auto dtypes_toml = toml::find<std::vector<std::string>>(model_kwargs, "dtypes");
             cfg.feature_encoder_dtypes =
                     std::vector<std::string>(std::begin(dtypes_toml), std::end(dtypes_toml));
+
+            // The convention in Medaka is that when num_dtypes == 1, then the dtypes array is empty.
+            // However, it is represented as actually an array of one element consisting of an empty string.
+            // In Dorado, we simply use an empty vector for no custom data types.
+            if (cfg.feature_encoder_dtypes == std::vector<std::string>{""}) {
+                cfg.feature_encoder_dtypes.clear();
+            }
         }
     }
 
