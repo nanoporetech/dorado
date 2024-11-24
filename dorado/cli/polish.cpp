@@ -268,6 +268,14 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.load_scripted_model = parser.visible.get<bool>("scripted");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
+    if (opt.bam_subchunk > opt.bam_chunk) {
+        spdlog::warn(
+                "BAM sub-chunk size is larger than bam_chunk size. Limiting to bam_chunk size. "
+                "bam_subchunk = {}, bam_chunk = {}",
+                opt.bam_chunk, opt.bam_subchunk);
+        opt.bam_subchunk = opt.bam_chunk;
+    }
+
     return opt;
 }
 
@@ -305,9 +313,8 @@ void validate_options(const Options& opt) {
         spdlog::error("BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
-    if ((opt.bam_subchunk <= 0) || (opt.bam_subchunk > opt.bam_chunk)) {
-        spdlog::error("BAM sub-chunk size should be > 0 and < bam_chunk size ({}). Given: {}.",
-                      opt.bam_chunk, opt.bam_subchunk);
+    if (opt.bam_subchunk <= 0) {
+        spdlog::error("BAM sub-chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
     if ((opt.window_overlap < 0) || (opt.window_overlap >= opt.window_len)) {
