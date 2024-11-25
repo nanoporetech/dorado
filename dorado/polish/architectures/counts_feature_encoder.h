@@ -40,7 +40,8 @@ public:
                          const bool tag_keep_missing,
                          const std::string_view read_group,
                          const int32_t min_mapq,
-                         const bool symmetric_indels);
+                         const bool symmetric_indels,
+                         const LabelSchemeType label_scheme_type);
 
     ~CountsFeatureEncoder() = default;
 
@@ -52,6 +53,11 @@ public:
 
     torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
 
+    std::vector<polisher::Sample> merge_adjacent_samples(
+            std::vector<Sample> samples) const override;
+
+    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
+
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     int32_t m_num_dtypes = 1;
@@ -62,21 +68,8 @@ private:
     std::string m_read_group;
     int32_t m_min_mapq = 1;
     bool m_symmetric_indels = false;
-
     FeatureIndicesType m_feature_indices;
-};
-
-class CountsFeatureDecoder : public BaseFeatureDecoder {
-public:
-    CountsFeatureDecoder(const LabelSchemeType label_scheme_type);
-
-    ~CountsFeatureDecoder() = default;
-
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
-
-private:
-    const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
-    std::string m_label_scheme{"*ACGT"};
+    LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
 };
 
 }  // namespace dorado::polisher

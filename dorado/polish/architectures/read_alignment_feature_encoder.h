@@ -45,7 +45,8 @@ public:
                                 const int32_t max_reads,
                                 const bool row_per_read,
                                 const bool include_dwells,
-                                const bool include_haplotype);
+                                const bool include_haplotype,
+                                const LabelSchemeType label_scheme_type);
 
     ~ReadAlignmentFeatureEncoder() = default;
 
@@ -56,6 +57,11 @@ public:
                          const int32_t seq_id) const override;
 
     torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
+
+    std::vector<polisher::Sample> merge_adjacent_samples(
+            std::vector<Sample> samples) const override;
+
+    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
 
 private:
     int32_t m_num_dtypes = 1;
@@ -69,19 +75,7 @@ private:
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype = false;
-};
-
-class ReadAlignmentFeatureDecoder : public BaseFeatureDecoder {
-public:
-    ReadAlignmentFeatureDecoder(const LabelSchemeType label_scheme_type);
-
-    ~ReadAlignmentFeatureDecoder() = default;
-
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
-
-private:
-    const LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
-    std::string m_label_scheme{"*ACGT"};
+    LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
 };
 
 }  // namespace dorado::polisher

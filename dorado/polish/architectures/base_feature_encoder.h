@@ -8,6 +8,7 @@
 #include <torch/types.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -63,14 +64,15 @@ public:
 
     virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
 
-    virtual std::vector<polisher::Sample> merge_adjacent_samples(std::vector<Sample> samples) const;
-};
-
-class BaseFeatureDecoder {
-public:
-    virtual ~BaseFeatureDecoder() = default;
+    virtual std::vector<polisher::Sample> merge_adjacent_samples(
+            std::vector<Sample> samples) const = 0;
 
     virtual std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const = 0;
 };
+
+std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples);
+
+std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
+                                               const torch::Tensor& logits);
 
 }  // namespace dorado::polisher

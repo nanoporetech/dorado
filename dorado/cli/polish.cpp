@@ -78,7 +78,6 @@ enum class OutputFormat {
 
 struct PolisherResources {
     std::unique_ptr<polisher::BaseFeatureEncoder> encoder;
-    std::unique_ptr<polisher::BaseFeatureDecoder> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<polisher::TorchModel>> models;
@@ -497,9 +496,8 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     };
     resources.models = create_models();
 
-    spdlog::info("Creating the encoder and the decoder.");
+    spdlog::info("Creating the encoder.");
     resources.encoder = polisher::encoder_factory(model_config);
-    resources.decoder = polisher::decoder_factory(model_config);
 
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", num_bam_threads);
@@ -566,8 +564,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         // Inference.
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, resources.models,
-                                                      *resources.encoder, *resources.decoder,
-                                                      opt.window_len, opt.batch_size);
+                                                      *resources.encoder, opt.window_len,
+                                                      opt.batch_size);
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
@@ -634,7 +632,7 @@ int polish(int argc, char* argv[]) {
         const polisher::ModelConfig model_config =
                 polisher::parse_model_config(opt.model_path / "config.toml", model_file);
 
-        // Create the models, encoders, decoders and BAM handles.
+        // Create the models, encoders and BAM handles.
         PolisherResources resources =
                 create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
                                  opt.threads, opt.full_precision);

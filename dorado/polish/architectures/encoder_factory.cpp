@@ -41,6 +41,8 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
     const FeatureEncoderType feature_encoder_type =
             parse_feature_encoder_type(config.feature_encoder_type);
 
+    const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
+
     const auto& kwargs = config.feature_encoder_kwargs;
 
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
@@ -56,7 +58,7 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
 
         std::unique_ptr<CountsFeatureEncoder> ret = std::make_unique<CountsFeatureEncoder>(
                 normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
-                tag_keep_missing, read_group, min_mapq, sym_indels);
+                tag_keep_missing, read_group, min_mapq, sym_indels, label_scheme_type);
 
         return ret;
 
@@ -76,7 +78,7 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
                 std::make_unique<ReadAlignmentFeatureEncoder>(
                         config.feature_encoder_dtypes, tag_name, TAG_VALUE, tag_keep_missing,
                         read_group, min_mapq, max_reads, row_per_read, include_dwells,
-                        include_haplotype);
+                        include_haplotype, label_scheme_type);
 
         return ret;
     }
@@ -84,21 +86,21 @@ std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
     throw std::runtime_error{"Unsupported feature encoder type: " + config.feature_encoder_type};
 }
 
-std::unique_ptr<BaseFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
-    const FeatureEncoderType feature_encoder_type =
-            parse_feature_encoder_type(config.feature_encoder_type);
+// std::unique_ptr<BaseFeatureDecoder> decoder_factory([[maybe_unused]] const ModelConfig& config) {
+//     const FeatureEncoderType feature_encoder_type =
+//             parse_feature_encoder_type(config.feature_encoder_type);
 
-    const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
+//     const LabelSchemeType label_scheme_type = parse_label_scheme_type(config.label_scheme_type);
 
-    if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
-        return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
+//     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
+//         return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
 
-    } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
-        return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
-    }
+//     } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
+//         return std::make_unique<CountsFeatureDecoder>(label_scheme_type);
+//     }
 
-    throw std::runtime_error{"No decoder available for the feature encoder type: " +
-                             config.feature_encoder_type};
-}
+//     throw std::runtime_error{"No decoder available for the feature encoder type: " +
+//                              config.feature_encoder_type};
+// }
 
 }  // namespace dorado::polisher
