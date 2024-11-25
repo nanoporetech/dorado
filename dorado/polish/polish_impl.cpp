@@ -236,10 +236,14 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.begin() + i);
 
-            results.emplace_back(
-                    polisher::Sample{sample.features.slice(0, start, i), std::move(new_major_pos),
-                                     std::move(new_minor_pos), sample.depth.slice(0, start, i),
-                                     sample.seq_id, sample.region_id});
+            results.emplace_back(polisher::Sample{sample.features.slice(0, start, i),
+                                                  std::move(new_major_pos),
+                                                  std::move(new_minor_pos),
+                                                  sample.depth.slice(0, start, i),
+                                                  sample.seq_id,
+                                                  sample.region_id,
+                                                  {},
+                                                  {}});
             start = i;
         }
 
@@ -248,10 +252,14 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
                                                sample.positions_major.end());
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.end());
-            results.emplace_back(
-                    polisher::Sample{sample.features.slice(0, start), std::move(new_major_pos),
-                                     std::move(new_minor_pos), sample.depth.slice(0, start),
-                                     sample.seq_id, sample.region_id});
+            results.emplace_back(polisher::Sample{sample.features.slice(0, start),
+                                                  std::move(new_major_pos),
+                                                  std::move(new_minor_pos),
+                                                  sample.depth.slice(0, start),
+                                                  sample.seq_id,
+                                                  sample.region_id,
+                                                  {},
+                                                  {}});
         }
     }
     // }
@@ -284,8 +292,14 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        return polisher::Sample{std::move(new_features), std::move(new_major), std::move(new_minor),
-                                std::move(new_depth),    sample.seq_id,        sample.region_id};
+        return polisher::Sample{std::move(new_features),
+                                std::move(new_major),
+                                std::move(new_minor),
+                                std::move(new_depth),
+                                sample.seq_id,
+                                sample.region_id,
+                                {},
+                                {}};
     };
 
     std::vector<polisher::Sample> results;

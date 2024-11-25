@@ -102,12 +102,19 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
                                                       std::move(positions_major_buffer.front()),
                                                       std::move(positions_minor_buffer.front()),
                                                       std::move(depth_buffer.front()),
-                                                      seq_id_buffer, region_id_buffer});
+                                                      seq_id_buffer,
+                                                      region_id_buffer,
+                                                      {},
+                                                      {}});
             } else {
-                results.emplace_back(polisher::Sample{
-                        torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
-                        cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                        seq_id_buffer, region_id_buffer});
+                results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
+                                                      cat_vectors(positions_major_buffer),
+                                                      cat_vectors(positions_minor_buffer),
+                                                      torch::cat(std::move(depth_buffer)),
+                                                      seq_id_buffer,
+                                                      region_id_buffer,
+                                                      {},
+                                                      {}});
             }
             features_buffer = {std::move(sample.features)};
             positions_major_buffer = {std::move(sample.positions_major)};
@@ -121,15 +128,23 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
     if (!features_buffer.empty()) {
         // The torch::cat is slow, so just move if there is nothing to concatenate.
         if (std::size(features_buffer) == 1) {
-            results.emplace_back(polisher::Sample{
-                    std::move(features_buffer.front()), std::move(positions_major_buffer.front()),
-                    std::move(positions_minor_buffer.front()), std::move(depth_buffer.front()),
-                    seq_id_buffer, region_id_buffer});
+            results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
+                                                  std::move(positions_major_buffer.front()),
+                                                  std::move(positions_minor_buffer.front()),
+                                                  std::move(depth_buffer.front()),
+                                                  seq_id_buffer,
+                                                  region_id_buffer,
+                                                  {},
+                                                  {}});
         } else {
-            results.emplace_back(polisher::Sample{
-                    torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
-                    cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                    seq_id_buffer, region_id_buffer});
+            results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
+                                                  cat_vectors(positions_major_buffer),
+                                                  cat_vectors(positions_minor_buffer),
+                                                  torch::cat(std::move(depth_buffer)),
+                                                  seq_id_buffer,
+                                                  region_id_buffer,
+                                                  {},
+                                                  {}});
         }
     }
 

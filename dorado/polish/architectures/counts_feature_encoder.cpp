@@ -162,8 +162,14 @@ Sample counts_to_features(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
-    Sample sample{std::move(feature_array), std::move(pileup.positions_major),
-                  std::move(pileup.positions_minor), std::move(depth), seq_id};
+    Sample sample{std::move(feature_array),
+                  std::move(pileup.positions_major),
+                  std::move(pileup.positions_minor),
+                  std::move(depth),
+                  seq_id,
+                  -1,
+                  {},
+                  {}};
 
     return sample;
 }

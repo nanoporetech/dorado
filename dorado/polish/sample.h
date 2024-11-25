@@ -17,6 +17,8 @@ struct Sample {
     torch::Tensor depth;
     int32_t seq_id = -1;
     int32_t region_id = -1;
+    std::vector<std::string> read_ids_left;
+    std::vector<std::string> read_ids_right;
 
     int64_t start() const { return (std::empty(positions_major) ? -1 : (positions_major.front())); }
 
