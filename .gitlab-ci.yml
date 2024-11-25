@@ -51,6 +51,11 @@ variables:
   variables:
     MACOSX_DEPLOYMENT_TARGET: "10.15"
 
+.ios_arm_runner:
+  tags:
+    - osx_arm64
+    - xcode-15.0.1
+
 .linux_runner:
   tags:
     - ubuntu-20.04
@@ -415,7 +420,7 @@ build:ios:m1:
     SDK_NAME: "iphoneos"
     DORADO_RUN_TESTS: "OFF"
   extends:
-    - .macos_arm_runner
+    - .ios_arm_runner
     - .build_and_test_dorado
   script:
     # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
