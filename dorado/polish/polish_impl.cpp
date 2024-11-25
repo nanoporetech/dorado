@@ -222,28 +222,40 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
         return ret;
     };
 
+    // Helper function to generate placeholder read IDs
+    const auto placeholder_read_ids = [](const int64_t n) {
+        std::vector<std::string> placeholder_ids(n);
+        for (int64_t i = 0; i < n; ++i) {
+            placeholder_ids[i] = "__placeholder_" + std::to_string(i);
+        }
+        return placeholder_ids;
+    };
+
     // for (auto& data : pileups) {
     const std::vector<int64_t> gaps = find_gaps(sample.positions_major, 1);
+
+    const std::vector<std::string> placeholder_ids =
+            placeholder_read_ids(dorado::ssize(sample.read_ids_left));
 
     if (std::empty(gaps)) {
         return {sample};
 
     } else {
         int64_t start = 0;
-        for (const int64_t i : gaps) {
+        for (int64_t n = 0; n < dorado::ssize(gaps); ++n) {
+            const int64_t i = gaps[n];
             std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
                                                sample.positions_major.begin() + i);
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.begin() + i);
 
-            results.emplace_back(polisher::Sample{sample.features.slice(0, start, i),
-                                                  std::move(new_major_pos),
-                                                  std::move(new_minor_pos),
-                                                  sample.depth.slice(0, start, i),
-                                                  sample.seq_id,
-                                                  sample.region_id,
-                                                  {},
-                                                  {}});
+            std::vector<std::string> read_ids_left =
+                    (n == 0) ? sample.read_ids_left : placeholder_ids;
+
+            results.emplace_back(polisher::Sample{
+                    sample.features.slice(0, start, i), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
+                    sample.region_id, std::move(read_ids_left), placeholder_ids});
             start = i;
         }
 
@@ -252,14 +264,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
                                                sample.positions_major.end());
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.end());
-            results.emplace_back(polisher::Sample{sample.features.slice(0, start),
-                                                  std::move(new_major_pos),
-                                                  std::move(new_minor_pos),
-                                                  sample.depth.slice(0, start),
-                                                  sample.seq_id,
-                                                  sample.region_id,
-                                                  {},
-                                                  {}});
+            results.emplace_back(polisher::Sample{
+                    sample.features.slice(0, start), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id,
+                    sample.region_id, placeholder_ids, sample.read_ids_right});
         }
     }
     // }

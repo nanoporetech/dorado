@@ -2,9 +2,12 @@
 
 #include "polish/medaka_read_matrix.h"
 #include "polish/polish_utils.h"
+#include "utils/ssize.h"
 
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
+
+#include <unordered_map>
 
 namespace dorado::polisher {
 
@@ -31,6 +34,212 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     result.read_ids_right = std::move(data.read_ids_right);
 
     return result;
+}
+
+std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> samples) {
+    std::vector<int64_t> buffer_ids;
+    int64_t last_end = -1;
+
+    std::vector<polisher::Sample> results;
+
+    const auto pad_reads = [](std::vector<torch::Tensor> chunks, int64_t target_depth = -1) {
+        // Determine the target depth if not provided
+        if (target_depth == -1) {
+            target_depth = 0;
+            for (const auto& chunk : chunks) {
+                target_depth = std::max(target_depth, chunk.size(1));
+            }
+        }
+
+        // Pad each chunk to match the target depth
+        std::vector<torch::Tensor> padded_chunks;
+        for (const auto& chunk : chunks) {
+            int64_t pad_depth = target_depth - chunk.size(1);
+            if (pad_depth > 0) {
+                auto padding =
+                        torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
+                padded_chunks.emplace_back(torch::cat({std::move(chunk), std::move(padding)}, 1));
+            } else {
+                padded_chunks.emplace_back(std::move(chunk));
+            }
+        }
+
+        return padded_chunks;
+    };
+
+    const auto reorder_reads = [](std::vector<torch::Tensor> chunks,
+                                  const std::vector<std::vector<std::string>>& read_ids_in,
+                                  const std::vector<std::vector<std::string>>& read_ids_out) {
+        if (std::size(chunks) < 2) {
+            return chunks;
+        }
+
+        std::vector<torch::Tensor> reordered_chunks{chunks[0]};
+
+        std::vector<std::string> rids_out = read_ids_out[0];
+
+        for (int64_t n = 1; n < dorado::ssize(chunks); ++n) {
+            auto& chunk = chunks[n];
+            // const auto& rids_out = read_ids_out[n - 1];
+            const auto& rids_in = read_ids_in[n];
+
+            // Create a lookup.
+            std::unordered_map<std::string, int64_t> rids_in_map;
+            for (int64_t i = 0; i < dorado::ssize(rids_in); ++i) {
+                rids_in_map[rids_in[i]] = i;
+            }
+
+            // Find the indices of the out reads in the in reads.
+            std::vector<int64_t> new_indices(std::size(rids_out), -1);
+            for (int64_t i = 0; i < dorado::ssize(rids_out); ++i) {
+                const auto& rid = rids_out[i];
+                const auto it = rids_in_map.find(rid);
+                new_indices[i] = (it != std::end(rids_in_map)) ? it->second : -1;
+            }
+
+            // Find missing indices.
+            std::vector<int64_t> missing_out_indices;
+            for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
+                if (new_indices[i] == -1) {
+                    missing_out_indices.emplace_back(i);
+                }
+            }
+            std::vector<int64_t> missing_in_indices;
+            std::unordered_set<int64_t> new_indices_set(std::begin(new_indices),
+                                                        std::end(new_indices));
+            for (int64_t i = 0; i < dorado::ssize(rids_in); ++i) {
+                if (new_indices_set.count(i) == 0) {
+                    missing_in_indices.emplace_back(i);
+                }
+            }
+
+            // Fill out the gaps in the array with some of the extra indices.
+            for (size_t i = 0;
+                 i < std::min(std::size(missing_out_indices), std::size(missing_in_indices)); ++i) {
+                new_indices[missing_out_indices[i]] = missing_in_indices[i];
+            }
+
+            // Add remaining missing in-indices.
+            if (std::size(missing_in_indices) > std::size(missing_out_indices)) {
+                new_indices.insert(std::end(new_indices),
+                                   std::begin(missing_in_indices) + std::size(missing_out_indices),
+                                   std::end(missing_in_indices));
+            }
+
+            // Permute.
+            auto reordered_chunk = torch::zeros(
+                    {chunk.size(0),
+                     static_cast<int64_t>(std::max(std::size(rids_out), std::size(rids_in))),
+                     chunk.size(2)},
+                    chunk.options());
+            for (size_t i = 0; i < std::size(new_indices); ++i) {
+                if (new_indices[i] == -1) {
+                    continue;
+                }
+                reordered_chunk.index_put_({torch::indexing::Slice(), static_cast<int64_t>(i),
+                                            torch::indexing::Slice()},
+                                           chunk.index({torch::indexing::Slice(), new_indices[i],
+                                                        torch::indexing::Slice()}));
+            }
+
+            reordered_chunks.emplace_back(std::move(reordered_chunk));
+
+            // Update read_ids_out for the next chunk.
+            if ((n + 1) < dorado::ssize(chunks)) {
+                rids_out.clear();
+                rids_out.resize(std::size(new_indices));
+                // auto& tmp_next_rids_out = read_ids_out[n - 1];
+                for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
+                    const int64_t idx = new_indices[i];
+                    rids_out[i] = (idx == -1) ? ("__inserted_" + std::to_string(i))
+                                              : read_ids_out[n][idx];
+                }
+            }
+        }
+
+        return reordered_chunks;
+    };
+
+    const auto merge_samples = [&samples, &pad_reads,
+                                &reorder_reads](const std::vector<int64_t> sample_ids) {
+        // The torch::cat is slow, so just move if there is nothing to concatenate.
+        if (std::size(sample_ids)) {
+            return std::move(samples[sample_ids.front()]);
+        }
+
+        std::vector<torch::Tensor> features;
+        std::vector<std::vector<int64_t>> positions_major;
+        std::vector<std::vector<int64_t>> positions_minor;
+        std::vector<torch::Tensor> depth;
+        std::vector<std::vector<std::string>> read_ids_left;
+        std::vector<std::vector<std::string>> read_ids_right;
+
+        // Make buffers.
+        int64_t num_positions = 0;
+        for (const int64_t id : sample_ids) {
+            Sample& sample = samples[id];
+            num_positions += dorado::ssize(sample.positions_major);
+            features.emplace_back(std::move(sample.features));
+            depth.emplace_back(std::move(sample.depth));
+            positions_major.emplace_back(std::move(sample.positions_major));
+            positions_minor.emplace_back(std::move(sample.positions_minor));
+            read_ids_left.emplace_back(std::move(sample.read_ids_left));
+            read_ids_right.emplace_back(std::move(sample.read_ids_right));
+        }
+
+        Sample ret;
+
+        // Merge positions.
+        ret.positions_major.reserve(num_positions);
+        for (size_t i = 0; i < std::size(positions_major); ++i) {
+            ret.positions_major.insert(std::end(ret.positions_major),
+                                       std::begin(positions_major[i]),
+                                       std::end(positions_major[i]));
+            ret.positions_minor.insert(std::end(ret.positions_minor),
+                                       std::begin(positions_minor[i]),
+                                       std::end(positions_minor[i]));
+        }
+
+        ret.features =
+                torch::cat(pad_reads(reorder_reads(features, read_ids_left, read_ids_right)));
+
+        // NOTE: It appears that the read IDs are not being merged. After this stage it seems they are no longer needed.
+
+        return ret;
+    };
+
+    for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
+        auto& sample = samples[i];
+
+        if (std::empty(sample.positions_major)) {
+            continue;
+        }
+
+        const int64_t start = sample.start();
+
+        const int64_t first_id = std::empty(buffer_ids) ? -1 : buffer_ids.front();
+
+        if (std::empty(buffer_ids) ||
+            ((sample.seq_id == samples[first_id].seq_id) &&
+             (sample.region_id == samples[first_id].region_id) && ((start - last_end) == 0))) {
+            // New or contiguous chunk.
+            last_end = sample.end();
+            buffer_ids.emplace_back(i);
+
+        } else {
+            // Discontinuity found, finalize the current chunk
+            last_end = sample.end();
+            results.emplace_back(merge_samples(buffer_ids));
+            buffer_ids = {i};
+        }
+    }
+
+    if (!buffer_ids.empty()) {
+        // The torch::cat is slow, so just move if there is nothing to concatenate.
+        results.emplace_back(merge_samples(buffer_ids));
+    }
+
+    return results;
 }
 
 }  // namespace
@@ -88,8 +297,14 @@ Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
 
     torch::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
-    Sample sample{std::move(tensors.counts), std::move(tensors.positions_major),
-                  std::move(tensors.positions_minor), std::move(depth), seq_id};
+    Sample sample{std::move(tensors.counts),
+                  std::move(tensors.positions_major),
+                  std::move(tensors.positions_minor),
+                  std::move(depth),
+                  seq_id,
+                  -1,
+                  std::move(tensors.read_ids_left),
+                  std::move(tensors.read_ids_right)};
 
     return sample;
 }
@@ -111,7 +326,7 @@ torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> ba
 
     // Process read-level features if the shape indicates a 3D tensor.
     if (std::size(feature_shape) == 3) {
-        spdlog::info("About to merge tensors.");
+        // spdlog::info("About to merge tensors.");
 
         const int64_t npos = feature_shape[0];
         const int64_t nfeats = feature_shape[2];
@@ -167,7 +382,7 @@ torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> ba
 
 std::vector<polisher::Sample> ReadAlignmentFeatureEncoder::merge_adjacent_samples(
         std::vector<Sample> samples) const {
-    return merge_adjacent_samples_impl(std::move(samples));
+    return merge_adjacent_samples_read_matrix(std::move(samples));
 }
 
 std::vector<ConsensusResult> ReadAlignmentFeatureEncoder::decode_bases(
