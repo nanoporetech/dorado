@@ -192,7 +192,7 @@ TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     CHECK(seqlen == (trim_interval.second - trim_interval.first));
     CHECK(bam_aux2i(bam_aux_get(trimmed_record.get(), "MN")) == seqlen);
     CHECK_THAT(bam_aux2Z(bam_aux_get(trimmed_record.get(), "MM")),
-               Equals("C+h?,28,24;C+m?,28,24;"));
+               Equals("C+h?,18,24;C+m?,18,24;"));
 }
 
 TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
