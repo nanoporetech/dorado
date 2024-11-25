@@ -566,8 +566,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         // Inference.
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, resources.models,
-                                                      *resources.decoder, opt.window_len,
-                                                      opt.batch_size);
+                                                      *resources.encoder, *resources.decoder,
+                                                      opt.window_len, opt.batch_size);
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));

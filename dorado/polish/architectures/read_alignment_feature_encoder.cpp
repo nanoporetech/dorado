@@ -1,6 +1,7 @@
 #include "polish/architectures/read_alignment_feature_encoder.h"
 
 #include "polish/medaka_read_matrix.h"
+#include "polish/polish_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
@@ -18,6 +19,11 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     // Copy the data from `data.matrix` into `result.counts`
     std::memcpy(result.counts.data_ptr<int8_t>(), data.matrix.data(),
                 data.n_pos * data.buffer_reads * data.featlen * sizeof(int8_t));
+
+    result.counts =
+            result.counts.index({torch::indexing::Slice(),
+                                 torch::indexing::Slice(0, static_cast<int64_t>(data.n_reads)),
+                                 torch::indexing::Slice()});
 
     result.positions_major = std::move(data.major);
     result.positions_minor = std::move(data.minor);
@@ -84,6 +90,77 @@ Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
                   std::move(tensors.positions_minor), std::move(depth), seq_id};
 
     return sample;
+}
+
+torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> batch) const {
+    if (std::empty(batch)) {
+        return {};
+    }
+
+    const int64_t batch_size = static_cast<int64_t>(std::size(batch));
+    const auto feature_shape = batch.front().sizes();
+
+    // Adjust negative values in features to 0.
+    for (auto& data : batch) {
+        data = torch::clamp_min(data, 0);
+    }
+
+    torch::Tensor features;
+
+    // Process read-level features if the shape indicates a 3D tensor.
+    if (std::size(feature_shape) == 3) {
+        spdlog::info("About to merge tensors.");
+
+        const int64_t npos = feature_shape[0];
+        const int64_t nfeats = feature_shape[2];
+
+        // Compute max depth across samples.
+        std::vector<int64_t> depths;
+        depths.reserve(batch_size);
+        for (const auto& data : batch) {
+            depths.push_back(data.sizes()[1]);
+        }
+        const int64_t max_depth = *std::max_element(std::begin(depths), std::end(depths));
+
+        // Initialize a zero-filled feature tensor.
+        features = torch::zeros({batch_size, npos, max_depth, nfeats}, torch::kUInt8);
+
+        // for (size_t i = 0; i < std::size(batch); ++i) {
+        //     std::ostringstream oss;
+        //     print_tensor_shape(oss, batch[i]);
+        //     std::cerr << "[i = " << i << "] batch[i].shape = " << oss.str() << "\n";
+        //     // spdlog::info("[i = {}] batch[i].shape = {}", i, oss.str());
+        // }
+
+        // Fill the tensor with sample data, padding as necessary.
+        for (size_t i = 0; i < std::size(batch); ++i) {
+            features.index_put_({static_cast<int64_t>(i), torch::indexing::Slice(),
+                                 torch::indexing::Slice(0, depths[i]), torch::indexing::Slice()},
+                                batch[i]);
+        }
+    }
+
+    // // Calculate masks if requested.
+    // std::unordered_map<std::string, torch::Tensor> masks;
+    // if (calculate_masks) {
+    //     // Assuming `medaka::common::get_sample_masks` is implemented elsewhere.
+    //     std::vector<std::unordered_map<std::string, torch::Tensor>> masks_per_sample;
+    //     for (const auto& sample : samples) {
+    //         masks_per_sample.push_back(medaka::common::get_sample_masks(sample));
+    //     }
+
+    //     // Extract mask keys and stack the masks for each key.
+    //     const auto& mask_keys = masks_per_sample[0];
+    //     for (const auto& [key, _] : mask_keys) {
+    //         std::vector<torch::Tensor> stacked_masks;
+    //         for (const auto& sample_masks : masks_per_sample) {
+    //             stacked_masks.push_back(sample_masks.at(key));
+    //         }
+    //         masks[key] = torch::stack(stacked_masks);
+    //     }
+    // }
+
+    return features;
 }
 
 std::vector<ConsensusResult> ReadAlignmentFeatureDecoder::decode_bases(

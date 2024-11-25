@@ -316,6 +316,8 @@ add_library(dorado_lib
     dorado/polish/medaka_read_matrix.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
+    dorado/polish/polish_utils.cpp
+    dorado/polish/polish_utils.h
     dorado/polish/region.h
     dorado/polish/sample.h
     dorado/polish/trim.cpp

@@ -50,6 +50,8 @@ public:
                          const int64_t ref_end,
                          const int32_t seq_id) const override;
 
+    torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
+
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     int32_t m_num_dtypes = 1;

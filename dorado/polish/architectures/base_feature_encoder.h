@@ -60,6 +60,8 @@ public:
                                  const int64_t ref_start,
                                  const int64_t ref_end,
                                  const int32_t seq_id) const = 0;
+
+    virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
 };
 
 class BaseFeatureDecoder {

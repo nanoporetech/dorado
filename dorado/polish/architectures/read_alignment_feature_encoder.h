@@ -55,6 +55,8 @@ public:
                          const int64_t ref_end,
                          const int32_t seq_id) const override;
 
+    torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
+
 private:
     int32_t m_num_dtypes = 1;
     std::vector<std::string> m_dtypes;

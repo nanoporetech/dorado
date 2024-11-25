@@ -223,6 +223,10 @@ Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
                               m_normalise_type);
 }
 
+torch::Tensor CountsFeatureEncoder::collate(std::vector<torch::Tensor> batch) const {
+    return torch::stack(std::move(batch));
+}
+
 CountsFeatureDecoder::CountsFeatureDecoder(const LabelSchemeType label_scheme_type)
         : m_label_scheme_type{label_scheme_type} {
     if (m_label_scheme_type == LabelSchemeType::HAPLOID) {

@@ -60,6 +60,7 @@ std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<TorchModel>>& models,
+        const polisher::BaseFeatureEncoder& encoder,
         const BaseFeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size);
