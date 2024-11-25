@@ -16,6 +16,8 @@ ModelType parse_model_type(const std::string& type) {
         return ModelType::GRU;
     } else if (type == "LatentSpaceGRU") {
         return ModelType::LATENT_SPACE_GRU;
+    } else if (type == "LatentSpaceLSTM") {
+        return ModelType::LATENT_SPACE_LSTM;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
