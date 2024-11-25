@@ -62,6 +62,8 @@ public:
                                  const int32_t seq_id) const = 0;
 
     virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
+
+    virtual std::vector<polisher::Sample> merge_adjacent_samples(std::vector<Sample> samples) const;
 };
 
 class BaseFeatureDecoder {

@@ -259,92 +259,6 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
     return results;
 }
 
-std::vector<polisher::Sample> merge_adjacent_samples(std::vector<polisher::Sample>& samples) {
-    std::vector<torch::Tensor> features_buffer;
-    std::vector<std::vector<int64_t>> positions_major_buffer;
-    std::vector<std::vector<int64_t>> positions_minor_buffer;
-    std::vector<torch::Tensor> depth_buffer;
-    int32_t seq_id_buffer = -1;
-    int32_t region_id_buffer = -1;
-    int64_t last_end = -1;
-
-    std::vector<polisher::Sample> results;
-
-    const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
-        size_t size = 0;
-        for (const auto& vec : vecs) {
-            size += std::size(vec);
-        }
-        std::vector<int64_t> ret;
-        ret.reserve(size);
-        for (const auto& vec : vecs) {
-            ret.insert(std::end(ret), std::cbegin(vec), std::cend(vec));
-        }
-        return ret;
-    };
-
-    for (auto& sample : samples) {
-        if (std::empty(sample.positions_major)) {
-            continue;
-        }
-        const int64_t start = sample.start();
-
-        if (std::empty(features_buffer) ||
-            ((sample.seq_id == seq_id_buffer) && (sample.region_id == region_id_buffer) &&
-             ((start - last_end) == 0))) {
-            // New or contiguous chunk.
-            last_end = sample.end();
-            features_buffer.emplace_back(std::move(sample.features));
-            positions_major_buffer.emplace_back(std::move(sample.positions_major));
-            positions_minor_buffer.emplace_back(std::move(sample.positions_minor));
-            depth_buffer.emplace_back(std::move(sample.depth));
-            seq_id_buffer = sample.seq_id;
-            region_id_buffer = sample.region_id;
-
-        } else {
-            // Discontinuity found, finalize the current chunk
-            last_end = sample.end();
-
-            // The torch::cat is slow, so just move if there is nothing to concatenate.
-            if (std::size(features_buffer) == 1) {
-                results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
-                                                      std::move(positions_major_buffer.front()),
-                                                      std::move(positions_minor_buffer.front()),
-                                                      std::move(depth_buffer.front()),
-                                                      seq_id_buffer, region_id_buffer});
-            } else {
-                results.emplace_back(polisher::Sample{
-                        torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
-                        cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                        seq_id_buffer, region_id_buffer});
-            }
-            features_buffer = {std::move(sample.features)};
-            positions_major_buffer = {std::move(sample.positions_major)};
-            positions_minor_buffer = {std::move(sample.positions_minor)};
-            depth_buffer = {std::move(sample.depth)};
-            seq_id_buffer = sample.seq_id;
-            region_id_buffer = sample.region_id;
-        }
-    }
-
-    if (!features_buffer.empty()) {
-        // The torch::cat is slow, so just move if there is nothing to concatenate.
-        if (std::size(features_buffer) == 1) {
-            results.emplace_back(polisher::Sample{
-                    std::move(features_buffer.front()), std::move(positions_major_buffer.front()),
-                    std::move(positions_minor_buffer.front()), std::move(depth_buffer.front()),
-                    seq_id_buffer, region_id_buffer});
-        } else {
-            results.emplace_back(polisher::Sample{
-                    torch::cat(std::move(features_buffer)), cat_vectors(positions_major_buffer),
-                    cat_vectors(positions_minor_buffer), torch::cat(std::move(depth_buffer)),
-                    seq_id_buffer, region_id_buffer});
-        }
-    }
-
-    return results;
-}
-
 /**
  * \brief Takes an input sample and splits it bluntly if it has too many positions. This can happen when
  *          there are many long insertions in an input window, and can easily cause out-of-memory issues on the GPU
@@ -591,7 +505,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                 debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
-                local_samples = merge_adjacent_samples(local_samples);
+                local_samples = encoder.merge_adjacent_samples(local_samples);
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cerr << "- [bam_chunk_id = " << bam_chunk_id
