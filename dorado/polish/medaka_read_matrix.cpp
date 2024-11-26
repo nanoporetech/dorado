@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -46,6 +47,7 @@ struct Read {
  */
 std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
     const int32_t length = alignment->core.l_qseq;
+    constexpr int32_t MAX_INT8 = std::numeric_limits<int8_t>::max();
 
     std::vector<int8_t> dwell_arr(length);
 
@@ -66,7 +68,7 @@ std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
         for (int32_t i = (mv_len - 1); i > 0; --i) {
             ++dwell;
             if (bam_auxB2i(mv_tag, i) == 1) {
-                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, __INT8_MAX__));
+                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
                 ++qpos;
                 dwell = 0;
             }
@@ -78,13 +80,13 @@ std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
         // add the dwell since the last move afterwards
         for (int32_t i = 2; i < mv_len; ++i) {
             if (bam_auxB2i(mv_tag, i) == 1) {
-                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, __INT8_MAX__));
+                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
                 ++qpos;
                 dwell = 0;
             }
             ++dwell;
         }
-        dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, __INT8_MAX__));
+        dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
     }
     return dwell_arr;
 }
