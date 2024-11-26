@@ -37,10 +37,18 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
 }
 
 std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> samples) {
-    std::vector<int64_t> buffer_ids;
-    int64_t last_end = -1;
-
-    std::vector<polisher::Sample> results;
+    const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
+        size_t size = 0;
+        for (const auto& vec : vecs) {
+            size += std::size(vec);
+        }
+        std::vector<int64_t> ret;
+        ret.reserve(size);
+        for (const auto& vec : vecs) {
+            ret.insert(std::end(ret), std::cbegin(vec), std::cend(vec));
+        }
+        return ret;
+    };
 
     const auto pad_reads = [](std::vector<torch::Tensor> chunks, int64_t target_depth = -1) {
         // Determine the target depth if not provided
@@ -53,13 +61,20 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
         // Pad each chunk to match the target depth
         std::vector<torch::Tensor> padded_chunks;
-        for (const auto& chunk : chunks) {
+        for (auto& chunk : chunks) {
             int64_t pad_depth = target_depth - chunk.size(1);
             if (pad_depth > 0) {
                 auto padding =
                         torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
-                padded_chunks.emplace_back(torch::cat({std::move(chunk), std::move(padding)}, 1));
+                spdlog::debug("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
+                              tensor_shape_as_string(chunk), tensor_shape_as_string(padding));
+                auto concated = torch::cat({std::move(chunk), std::move(padding)}, 1);
+                spdlog::debug("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
+                              tensor_shape_as_string(concated));
+                padded_chunks.emplace_back(std::move(concated));
             } else {
+                spdlog::debug("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
+                              tensor_shape_as_string(chunk));
                 padded_chunks.emplace_back(std::move(chunk));
             }
         }
@@ -70,6 +85,8 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
     const auto reorder_reads = [](std::vector<torch::Tensor> chunks,
                                   const std::vector<std::vector<std::string>>& read_ids_in,
                                   const std::vector<std::vector<std::string>>& read_ids_out) {
+        spdlog::debug("[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
+
         if (std::size(chunks) < 2) {
             return chunks;
         }
@@ -82,6 +99,11 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
             auto& chunk = chunks[n];
             // const auto& rids_out = read_ids_out[n - 1];
             const auto& rids_in = read_ids_in[n];
+
+            spdlog::debug(
+                    "[reorder_reads] n = {}, rids_out.size() = {}, rids_in.size() = {}, "
+                    "chunk.shape = {}",
+                    n, std::size(rids_out), std::size(rids_in), tensor_shape_as_string(chunk));
 
             // Create a lookup.
             std::unordered_map<std::string, int64_t> rids_in_map;
@@ -113,6 +135,17 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                 }
             }
 
+            spdlog::debug(
+                    "[reorder_reads] n = {}, missing_in_indices.size() = {}, "
+                    "missing_out_indices.size() = {}",
+                    n, std::size(missing_in_indices), std::size(missing_out_indices));
+
+            spdlog::debug("[reorder_reads] n = {}, missing_in_indices: {}", n,
+                          print_container_as_string(missing_in_indices, ", "));
+
+            spdlog::debug("[reorder_reads] n = {}, missing_out_indices: {}", n,
+                          print_container_as_string(missing_out_indices, ", "));
+
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;
                  i < std::min(std::size(missing_out_indices), std::size(missing_in_indices)); ++i) {
@@ -126,12 +159,18 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                                    std::end(missing_in_indices));
             }
 
+            spdlog::debug("[reorder_reads] n = {}, creating an empty reordered_chunk.", n);
+
             // Permute.
             auto reordered_chunk = torch::zeros(
                     {chunk.size(0),
                      static_cast<int64_t>(std::max(std::size(rids_out), std::size(rids_in))),
                      chunk.size(2)},
                     chunk.options());
+            spdlog::debug(
+                    "[reorder_reads] n = {}, before permute. reordered_chunk.shape = {}, "
+                    "new_indices.size() = {}",
+                    n, tensor_shape_as_string(reordered_chunk), std::size(new_indices));
             for (size_t i = 0; i < std::size(new_indices); ++i) {
                 if (new_indices[i] == -1) {
                     continue;
@@ -144,6 +183,8 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
             reordered_chunks.emplace_back(std::move(reordered_chunk));
 
+            spdlog::debug("[reorder_reads] n = {}, updating the previous out column.", n);
+
             // Update read_ids_out for the next chunk.
             if ((n + 1) < dorado::ssize(chunks)) {
                 rids_out.clear();
@@ -155,15 +196,20 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                                               : read_ids_out[n][idx];
                 }
             }
+
+            spdlog::debug("[reorder_reads] n = {}, done.", n);
         }
 
         return reordered_chunks;
     };
 
-    const auto merge_samples = [&samples, &pad_reads,
-                                &reorder_reads](const std::vector<int64_t> sample_ids) {
+    const auto merge_samples = [&samples, &cat_vectors, &pad_reads,
+                                &reorder_reads](const std::vector<int64_t>& sample_ids) {
         // The torch::cat is slow, so just move if there is nothing to concatenate.
-        if (std::size(sample_ids)) {
+        if (std::empty(sample_ids)) {
+            return Sample{};
+        }
+        if (std::size(sample_ids) == 1) {
             return std::move(samples[sample_ids.front()]);
         }
 
@@ -174,11 +220,12 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
         std::vector<std::vector<std::string>> read_ids_left;
         std::vector<std::vector<std::string>> read_ids_right;
 
+        const int32_t seq_id = samples[sample_ids.front()].seq_id;
+        const int32_t region_id = samples[sample_ids.front()].region_id;
+
         // Make buffers.
-        int64_t num_positions = 0;
         for (const int64_t id : sample_ids) {
             Sample& sample = samples[id];
-            num_positions += dorado::ssize(sample.positions_major);
             features.emplace_back(std::move(sample.features));
             depth.emplace_back(std::move(sample.depth));
             positions_major.emplace_back(std::move(sample.positions_major));
@@ -187,31 +234,30 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
             read_ids_right.emplace_back(std::move(sample.read_ids_right));
         }
 
+        // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
         Sample ret;
 
-        // Merge positions.
-        ret.positions_major.reserve(num_positions);
-        for (size_t i = 0; i < std::size(positions_major); ++i) {
-            ret.positions_major.insert(std::end(ret.positions_major),
-                                       std::begin(positions_major[i]),
-                                       std::end(positions_major[i]));
-            ret.positions_minor.insert(std::end(ret.positions_minor),
-                                       std::begin(positions_minor[i]),
-                                       std::end(positions_minor[i]));
-        }
-
-        ret.features =
-                torch::cat(pad_reads(reorder_reads(features, read_ids_left, read_ids_right)));
-
-        // NOTE: It appears that the read IDs are not being merged. After this stage it seems they are no longer needed.
+        ret.features = torch::cat(
+                pad_reads(reorder_reads(std::move(features), read_ids_left, read_ids_right)));
+        ret.positions_major = cat_vectors(positions_major);
+        ret.positions_minor = cat_vectors(positions_minor);
+        ret.depth = torch::cat(std::move(depth));
+        ret.seq_id = seq_id;
+        ret.region_id = region_id;
 
         return ret;
     };
+
+    std::vector<int64_t> buffer_ids;
+    int64_t last_end = -1;
+
+    std::vector<polisher::Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
         auto& sample = samples[i];
 
         if (std::empty(sample.positions_major)) {
+            spdlog::debug("[merge_adjacent_samples_read_matrix] Empty sample: i = {}", i);
             continue;
         }
 
@@ -225,18 +271,29 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
             // New or contiguous chunk.
             last_end = sample.end();
             buffer_ids.emplace_back(i);
+            spdlog::debug("[merge_adjacent_samples_read_matrix] Emplacing to buffer_ids, i = {}",
+                          i);
 
         } else {
-            // Discontinuity found, finalize the current chunk
+            // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
             results.emplace_back(merge_samples(buffer_ids));
             buffer_ids = {i};
+            spdlog::debug(
+                    "[merge_adjacent_samples_read_matrix] Merging samples in buffer, resetting the "
+                    "buffer. i = {}",
+                    i);
+            spdlog::debug("[merge_adjacent_samples_read_matrix] Merged.");
         }
     }
 
     if (!buffer_ids.empty()) {
-        // The torch::cat is slow, so just move if there is nothing to concatenate.
+        spdlog::debug(
+                "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
+                "the buffer. buffer_ids.size() = {}",
+                std::size(buffer_ids));
         results.emplace_back(merge_samples(buffer_ids));
+        spdlog::debug("[merge_adjacent_samples_read_matrix] Merged.");
     }
 
     return results;
