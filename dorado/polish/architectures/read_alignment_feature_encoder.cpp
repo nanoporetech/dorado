@@ -238,7 +238,7 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
         Sample ret;
 
         ret.features = torch::cat(
-                pad_reads(reorder_reads(std::move(features), read_ids_left, read_ids_right)), -1);
+                pad_reads(reorder_reads(std::move(features), read_ids_left, read_ids_right), -1));
         ret.positions_major = cat_vectors(positions_major);
         ret.positions_minor = cat_vectors(positions_minor);
         ret.depth = torch::cat(std::move(depth));
