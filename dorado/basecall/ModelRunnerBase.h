@@ -23,8 +23,13 @@ public:
     virtual const CRFModelConfig &config() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
-    // Timeout is short for simplex, longer for duplex which gets a subset of reads
-    virtual int batch_timeout_ms() const { return is_duplex_model(config()) ? 5000 : 100; }
+
+    // Timeout is short for simplex, longer for duplex which gets a subset of reads.
+    // Note that these values are overridden for CUDA basecalling.
+    virtual std::pair<int, int> batch_timeouts_ms() const {
+        return is_duplex_model(config()) ? std::make_pair(5000, 5000) : std::make_pair(100, 100);
+    }
+
     virtual bool is_low_latency() const { return false; }
     virtual void terminate() = 0;
     virtual void restart() = 0;

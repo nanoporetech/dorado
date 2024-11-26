@@ -39,7 +39,7 @@ public:
     bool is_low_latency() const { return m_low_latency; }
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
     stats::NamedStats sample_stats() const;
-    int batch_timeout_ms() const;
+    std::pair<int, int> batch_timeouts_ms() const;
 
 private:
     struct NNTask;

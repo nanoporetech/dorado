@@ -249,25 +249,30 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 #endif
     at::InferenceMode inference_mode_guard;
 
-    auto chunk_reserve_time = std::chrono::system_clock::now();
+    auto first_chunk_reserve_time = std::chrono::system_clock::now();
+    auto last_chunk_reserve_time = first_chunk_reserve_time;
+    spdlog::trace("Setting initial value for both chunk reserve times for worker {}.", worker_id);
+
     const size_t batch_size = m_model_runners[worker_id]->batch_size();
     const size_t chunk_size = m_model_runners[worker_id]->chunk_size();
     const bool is_low_latency = m_model_runners[worker_id]->is_low_latency();
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     auto &worker_chunks = m_batched_chunks[worker_id];
 
-    spdlog::trace("Setting initial value for chunk_reserve_time for worker {}.", worker_id);
-    const int batch_timeout_ms = (is_low_latency && m_low_latency_batch_timeout_ms != 0)
-                                         ? m_low_latency_batch_timeout_ms
-                                         : m_model_runners[worker_id]->batch_timeout_ms();
+    auto [from_first_timeout, from_last_timeout] = m_model_runners[worker_id]->batch_timeouts_ms();
+    if (is_low_latency && m_low_latency_batch_timeout_ms != 0) {
+        from_first_timeout = m_low_latency_batch_timeout_ms;
+    }
 
     while (true) {
 #if DORADO_METAL_BUILD
         utils::ScopedAutoReleasePool inner_pool;
 #endif
         std::unique_ptr<BasecallingChunk> chunk;
-        const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(
-                chunk, chunk_reserve_time + std::chrono::milliseconds(batch_timeout_ms));
+        auto timeout1 = first_chunk_reserve_time + std::chrono::milliseconds(from_first_timeout);
+        auto timeout2 = last_chunk_reserve_time + std::chrono::milliseconds(from_last_timeout);
+        auto timeout = std::min(timeout1, timeout2);
+        const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(chunk, timeout);
 
         if (pop_status == utils::AsyncQueueStatus::Terminate) {
             break;
@@ -281,16 +286,17 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                               worker_id, worker_chunks.size());
                 basecall_current_batch(worker_id);
                 spdlog::trace(
-                        "Resetting chunk_reserve_time for worker {} after processing incomplete "
-                        "batch.",
+                        "Resetting both chunk reserve times for worker {} after processing "
+                        "incomplete batch.",
                         worker_id);
             } else {
                 spdlog::trace(
-                        "Resetting chunk_reserve_time for worker {} after timing out with empty "
-                        "batch.",
+                        "Resetting both chunk reserve times for worker {} after timing out with "
+                        "empty batch.",
                         worker_id);
             }
-            chunk_reserve_time = std::chrono::system_clock::now();
+            first_chunk_reserve_time = std::chrono::system_clock::now();
+            last_chunk_reserve_time = first_chunk_reserve_time;
             continue;
         }
 
@@ -325,22 +331,28 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             worker_chunks.push_back(std::move(chunk));
 
             if (worker_chunks.size() == 1) {
-                // If this is the first chunk to be added to the buffer, reset the timer.
                 spdlog::trace(
-                        "Resetting chunk_reserve_time for worker {} after adding first chunk to "
+                        "Resetting first_chunk_reserve_time for worker {} after adding first chunk "
+                        "to "
                         "batch.",
                         worker_id);
-                chunk_reserve_time = std::chrono::system_clock::now();
+                first_chunk_reserve_time = std::chrono::system_clock::now();
             }
+            spdlog::trace(
+                    "Resetting last_chunk_reserve_time for worker {} after adding chunk to batch.",
+                    worker_id);
+            last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
         if (worker_chunks.size() == batch_size) {
             // Input tensor is full, let's get_scores.
             spdlog::trace("Submitting full batch for worker {}.", worker_id);
             basecall_current_batch(worker_id);
-            spdlog::trace("Resetting chunk_reserve_time for worker {} after processing full batch.",
-                          worker_id);
-            chunk_reserve_time = std::chrono::system_clock::now();
+            spdlog::trace(
+                    "Resetting both chunk reserve times for worker {} after processing full batch.",
+                    worker_id);
+            first_chunk_reserve_time = std::chrono::system_clock::now();
+            last_chunk_reserve_time = first_chunk_reserve_time;
         }
     }
 
