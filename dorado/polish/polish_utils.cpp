@@ -15,4 +15,10 @@ void print_tensor_shape(std::ostream& os, const torch::Tensor& tensor) {
     os << "]";
 }
 
+std::string tensor_shape_as_string(const torch::Tensor& tensor) {
+    std::ostringstream oss;
+    print_tensor_shape(oss, tensor);
+    return oss.str();
+}
+
 }  // namespace dorado::polisher
