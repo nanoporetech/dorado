@@ -230,7 +230,7 @@ Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
 }
 
 torch::Tensor CountsFeatureEncoder::collate(std::vector<torch::Tensor> batch) const {
-    return torch::stack(std::move(batch));
+    return torch::stack(batch);
 }
 
 std::vector<polisher::Sample> CountsFeatureEncoder::merge_adjacent_samples(
