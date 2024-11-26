@@ -26,9 +26,10 @@ namespace dorado::basecall {
 
 static constexpr float GB = 1.0e9f;
 
-// Default value for timeout for incomplete batches. Large value of 30 seconds is
-// found to give good results with mixtures of short and long reads.
-static constexpr int DEFAULT_BATCH_TIMEOUT_MS = 30000;
+// Default value for timeout for incomplete batches. Large value of 120 seconds is
+// needed to avoid issues with performance benchmarking. A better solution is being
+// worked on in DOR-968.
+static constexpr int DEFAULT_BATCH_TIMEOUT_MS = 120000;
 
 // Default value for timeout of incomplete batches for low-latency pipelines. The
 // value of 350 ms has been found to give good adaptive-sampling performance on all
