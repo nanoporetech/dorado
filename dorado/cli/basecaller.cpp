@@ -386,7 +386,6 @@ void setup(const std::vector<std::string>& args,
 
     const int num_modbase_runners =
             utils::get_dev_opt("modbase_runners", default_parameters.mod_base_runners_per_caller);
-    spdlog::warn("Set modbase runners: {}", num_modbase_runners);
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto modbase_runners = api::create_modbase_runners(modbase_models, device, num_modbase_runners,
                                                        modbase_batch_size);

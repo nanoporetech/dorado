@@ -74,7 +74,7 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
                   utils::get_dev_opt<int64_t>("modbase_processed_chunks",
                                               m_runners.size() * 3 * m_batch_size)),
           m_processed_chunks(m_processed_chunks_max_size),
-          m_pad_tile(utils::get_dev_opt<bool>("modbase_pad_tile", 0)),
+          m_pad_tile(utils::get_dev_opt<bool>("modbase_pad_tile", 1)),
           m_pad_end_align(utils::get_dev_opt<bool>("modbase_pad_end_align", 0)) {
     init_modbase_info();
     validate_runners();
@@ -83,6 +83,7 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
         m_chunk_queues.push_back(std::make_unique<utils::AsyncQueue<std::unique_ptr<ModBaseChunk>>>(
                 m_batch_size * 10));
     }
+    // FIXME: Remove
     spdlog::info("ModBaseChunkCallerNode::processed_chunks.size()={}", m_processed_chunks_max_size);
     spdlog::info("ModBaseChunkCallerNode padding - modbase_pad_tile:{}, modbase_pad_end_align:{}",
                  m_pad_tile, m_pad_end_align);

@@ -6,6 +6,10 @@
 #include "torch_utils/tensor_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <spdlog/spdlog.h>
+
+#include <stdexcept>
+
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
 #endif
@@ -53,15 +57,29 @@ void ModBaseRunner::accept_chunk(int model_id,
 
     auto& input_sigs = m_input_sigs[model_id];
     auto& input_seqs = m_input_seqs[model_id];
-    assert(signal.size(0) == input_sigs.size(2));
+    if (signal.size(0) != input_sigs.size(2)) {
+        throw std::logic_error(
+                "ModBaseRunner received signal and sequence chunks with different lengths.");
+    }
+    if (!input_sigs.is_contiguous()) {
+        spdlog::warn(
+                "ModBaseRunner::accept_chunk received non-contiguous signal tensor which will "
+                "impact performance.");
+        input_sigs = input_sigs.contiguous();
+    }
+    if (!input_seqs.is_contiguous()) {
+        spdlog::warn(
+                "ModBaseRunner::accept_chunk received non-contiguous sequence tensor which will "
+                "impact performance.");
+        input_seqs = input_seqs.contiguous();
+    }
 
     const auto sig_len = signal.size(0);
     dorado::utils::copy_tensor_elems(input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
-    assert(input_seqs.is_contiguous());
     const auto kmer_elem_count = input_seqs.size(1) * input_seqs.size(2);
     if (input_seqs.dtype() != torch::kInt8) {
-        throw std::runtime_error("Unsupported input dtype");
+        throw std::runtime_error("ModBaseRunner has unsupported input sequence dtype");
     }
     using SeqInputType = int8_t;
     SeqInputType* const input_seqs_ptr = input_seqs.data_ptr<SeqInputType>();

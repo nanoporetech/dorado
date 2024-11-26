@@ -77,12 +77,11 @@ void ProgressTracker::summarize() const {
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
             samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Samples/s: {} ({:.6e})", samples_sec.str(),
+            spdlog::info("> Basecalled @ Samples/s: {} Samples: {:.6e}", samples_sec.str(),
                          double(m_num_samples_processed));
-            spdlog::info("> Including Padding @ Samples/s: {:.6e} ({:.2f}%) ({:.6e})",
-                         m_num_samples_incl_padding / (duration / 1000.0),
-                         100.f * m_num_samples_processed / m_num_samples_incl_padding,
-                         double(m_num_samples_incl_padding));
+            spdlog::debug("> Including Padding @ Samples/s: {:.6e} Samples: {:.6e}",
+                          m_num_samples_incl_padding / (duration / 1000.0),
+                          double(m_num_samples_incl_padding));
         }
     }
     if (m_num_mods_samples_processed > 0) {
@@ -96,12 +95,10 @@ void ProgressTracker::summarize() const {
 
         const auto call_rate = m_num_mods_samples_processed / (duration / 1000.0);
         const auto pad_call_rate = m_num_mods_samples_incl_padding / (duration / 1000.0);
-        const auto pad_pct = 100.f * m_num_mods_samples_processed / m_num_mods_samples_incl_padding;
-
-        spdlog::info("> Modbasecalled @ Samples/s: {:.3e} - ({:.6e})", call_rate,
+        spdlog::info("> Modbasecalled @ Samples/s: {:.6e} Samples: {:.6e}", call_rate,
                      double(m_num_mods_samples_processed));
-        spdlog::info("> Modbasecalled Including Padding @ Samples/s: {:.6e} ({:.2f}%) - ({:.6e})",
-                     pad_call_rate, pad_pct, double(m_num_mods_samples_incl_padding));
+        spdlog::debug("> Modbasecalled Including Padding @ Samples/s: {:.6e} Samples: {:.6e}",
+                      pad_call_rate, double(m_num_mods_samples_incl_padding));
         // }
     }
 

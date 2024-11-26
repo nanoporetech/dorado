@@ -157,9 +157,9 @@ ContextParams ContextParams::normalised(const int stride) const {
     const int64_t cs = normalise(chunk_size, stride);
 
     spdlog::debug(
-            "Normalised modbase context params for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
+            "Normalised modbase context for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
             "[samples_before, samples_after, chunk_size]",
-            stride, samples_before, sb, samples_after, sa, chunk_size, cs);
+            stride, samples_before, samples_after, chunk_size, sb, sa, cs);
     return ContextParams(sb, sa, cs, bases_before, bases_after, reverse, base_start_justify);
 }
 

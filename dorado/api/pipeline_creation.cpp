@@ -38,11 +38,11 @@ dorado::NodeHandle insert_modbase_node(dorado::PipelineDescriptor& pipeline_desc
 
     constexpr int kMaxReads = 1000;
     if (takes_chunked_inputs) {
-        spdlog::debug("Using Modbase Chunk Caller");
+        spdlog::trace("Using Modbase Chunk Caller");
         return pipeline_desc.add_node<dorado::ModBaseChunkCallerNode>(
                 {}, std::move(modbase_runners), modbase_node_threads, stride, kMaxReads);
     } else {
-        spdlog::debug("Using Modbase Context Caller");
+        spdlog::trace("Using Modbase Context Caller");
         return pipeline_desc.add_node<dorado::ModBaseCallerNode>(
                 {}, std::move(modbase_runners), modbase_node_threads, stride, kMaxReads);
     }
