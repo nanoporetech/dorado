@@ -51,7 +51,7 @@ public:
     };
 
     ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
-                  int batch_size,
+                  const int batch_size,
                   const std::string& device);
     ~ModBaseCaller();
 
@@ -73,10 +73,10 @@ public:
 
     stats::NamedStats sample_stats() const;
 
-    const std::unique_ptr<ModBaseData>& caller_data(size_t caller_id) {
-        return m_caller_data[caller_id];
+    const std::unique_ptr<ModBaseData>& modbase_model_data(size_t model_idx) {
+        return m_model_data[model_idx];
     }
-    size_t num_model_callers() const { return m_caller_data.size(); }
+    size_t num_models() const { return m_model_data.size(); }
 
 private:
     void start_threads();
@@ -86,7 +86,7 @@ private:
 
     at::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};
-    std::vector<std::unique_ptr<ModBaseData>> m_caller_data;
+    std::vector<std::unique_ptr<ModBaseData>> m_model_data;
     std::vector<std::thread> m_task_threads;
 
     // Performance monitoring stats.

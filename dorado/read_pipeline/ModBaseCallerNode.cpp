@@ -63,7 +63,7 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
-    for (size_t i = 0; i < m_runners[0]->num_callers(); i++) {
+    for (size_t i = 0; i < m_runners[0]->num_models(); i++) {
         m_chunk_queues.emplace_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
                                                                                   5));
@@ -76,7 +76,7 @@ void ModBaseCallerNode::start_threads() {
     m_output_worker = std::thread([this] { output_worker_thread(); });
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
-        for (size_t model_id = 0; model_id < m_runners[worker_id]->num_callers(); ++model_id) {
+        for (size_t model_id = 0; model_id < m_runners[worker_id]->num_models(); ++model_id) {
             m_runner_workers.emplace_back([=] { modbasecall_worker_thread(worker_id, model_id); });
             ++m_num_active_runner_workers;
         }
@@ -117,23 +117,19 @@ void ModBaseCallerNode::init_modbase_info() {
     std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
     modbase::ModBaseContext context_handler;
-    for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
-        const auto& params = runner->caller_params(caller_id).mods;
+    for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
+        const auto& params = runner->model_params(caller_id).mods;
         if (!params.motif.empty()) {
             context_handler.set_context(params.motif, size_t(params.motif_offset));
         }
-        base_mod_params.emplace_back(runner->caller_params(caller_id));
+        base_mod_params.emplace_back(runner->model_params(caller_id));
         m_num_states += params.count;
     }
 
-    auto result = modbase::get_modbase_info(base_mod_params);
+    auto mod_info = modbase::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
-            std::move(result.alphabet), std::move(result.long_names), context_handler.encode());
-
-    m_base_prob_offsets[0] = 0;
-    m_base_prob_offsets[1] = result.base_counts[0];
-    m_base_prob_offsets[2] = m_base_prob_offsets[1] + result.base_counts[1];
-    m_base_prob_offsets[3] = m_base_prob_offsets[2] + result.base_counts[2];
+            std::move(mod_info.alphabet), std::move(mod_info.long_names), context_handler.encode());
+    m_base_prob_offsets = mod_info.base_probs_offsets();
 }
 
 void ModBaseCallerNode::duplex_mod_call(Message&& message) {
@@ -166,7 +162,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
         // all runners have the same set of callers, so we only need to use the first one
         auto& runner = m_runners[0];
         std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
-                runner->num_callers());
+                runner->num_models());
 
         std::vector<unsigned long> all_context_hits;
 
@@ -209,10 +205,10 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             std::vector<uint64_t> seq_to_sig_map =
                     utils::moves_to_map(new_move_table, m_block_stride, signal_len, num_moves + 1);
 
-            for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+            for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-                auto& params = runner->caller_params(caller_id);
+                auto& params = runner->model_params(caller_id);
                 auto signal = simplex_signal.slice(0, moves_offset * m_block_stride,
                                                    moves_offset * m_block_stride + signal_len);
 
@@ -278,7 +274,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
             // push the chunks to the chunk queues
             // needs to be done after working_read->read is set as chunks could be processed
             // before we set that value otherwise
-            for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+            for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
                 auto& chunk_queue = m_chunk_queues.at(caller_id);
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
                 for (auto& chunk : chunks_to_enqueue) {
@@ -322,8 +318,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
     // all runners have the same set of callers, so we only need to use the first one
     auto& runner = m_runners[0];
     std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
-            runner->num_callers());
-    for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+            runner->num_models());
+    for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
         nvtx3::scoped_range range{"generate_chunks"};
 
         auto signal_len = read->read_common.get_raw_data_samples();
@@ -332,7 +328,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
                                     read->read_common.seq.size() + 1);
 
         auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-        auto& params = runner->caller_params(caller_id);
+        auto& params = runner->model_params(caller_id);
         auto signal = read->read_common.raw_data;
         if (params.context.reverse) {
             signal = at::flip(signal, 0);
@@ -387,7 +383,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         // push the chunks to the chunk queues
         // needs to be done after working_read->read is set as chunks could be processed
         // before we set that value otherwise
-        for (size_t caller_id = 0; caller_id < runner->num_callers(); ++caller_id) {
+        for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
             auto& chunk_queue = m_chunk_queues.at(caller_id);
             auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
             for (auto& chunk : chunks_to_enqueue) {
@@ -460,6 +456,9 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // then call what we have.
         if (batched_chunks.size() == m_batch_size ||
             (status == utils::AsyncQueueStatus::Timeout && !batched_chunks.empty())) {
+if (batched_chunks.size() != m_batch_size) {
+                ++m_num_partial_batches_called;
+            }
             // Input tensor is full, let's get scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }

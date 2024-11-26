@@ -17,7 +17,7 @@ namespace {
 std::vector<c10::optional<c10::Stream>> get_streams_from_caller(
         const std::shared_ptr<dorado::modbase::ModBaseCaller>& caller) {
     std::vector<c10::optional<c10::Stream>> streams;
-    for (size_t i = 0; i < caller->num_model_callers(); ++i) {
+    for (size_t i = 0; i < caller->num_models(); ++i) {
         if (caller->device().is_cuda()) {
             streams.push_back(c10::cuda::getStreamFromPool(false, caller->device().index()));
         } else {
@@ -76,26 +76,27 @@ at::Tensor ModBaseRunner::call_chunks(int model_id, int num_chunks) {
                                  num_chunks);
 }
 
-at::Tensor ModBaseRunner::scale_signal(size_t caller_id,
+at::Tensor ModBaseRunner::scale_signal(size_t model_id,
                                        at::Tensor signal,
                                        const std::vector<int>& seq_ints,
                                        const std::vector<uint64_t>& seq_to_sig_map) const {
-    auto& scaler = m_caller->caller_data(caller_id)->scaler;
+    auto& scaler = m_caller->modbase_model_data(model_id)->scaler;
     if (scaler) {
         return scaler->scale_signal(signal, seq_ints, seq_to_sig_map);
     }
     return signal;
 }
 
-std::vector<size_t> ModBaseRunner::get_motif_hits(size_t caller_id, const std::string& seq) const {
-    return m_caller->caller_data(caller_id)->get_motif_hits(seq);
+std::vector<size_t> ModBaseRunner::get_motif_hits(size_t model_id, const std::string& seq) const {
+    return m_caller->modbase_model_data(model_id)->get_motif_hits(seq);
 }
 
-const ModBaseModelConfig& ModBaseRunner::caller_params(size_t caller_id) const {
-    return m_caller->caller_data(caller_id)->params;
+const ModBaseModelConfig& ModBaseRunner::model_params(size_t model_id) const {
+    return m_caller->modbase_model_data(model_id)->params;
 }
 
-size_t ModBaseRunner::num_callers() const { return m_caller->num_model_callers(); }
+size_t ModBaseRunner::num_models() const { return m_caller->num_models(); }
+
 void ModBaseRunner::terminate() { m_caller->terminate(); }
 void ModBaseRunner::restart() { m_caller->restart(); }
 

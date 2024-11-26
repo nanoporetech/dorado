@@ -34,6 +34,7 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#include "utils/dev_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/string_utils.h"
 
@@ -227,6 +228,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .scan<'f', float>()
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");
+        parser.visible.add_argument("--modified-bases-batchsize")
+                .default_value(default_parameters.remora_batchsize)
+                .scan<'i', int>()
+                .help("The modbase model batch size.");
     }
     {
         parser.visible.add_group("Barcoding arguments");
@@ -302,13 +307,13 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
-           const std::vector<fs::path>& remora_models,
+           const std::vector<fs::path>& modbase_models,
            const std::string& device,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           size_t remora_batch_size,
-           size_t num_remora_threads,
+           size_t modbase_batch_size,
+           size_t num_modbase_threads,
            float methylation_threshold_pct,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
@@ -330,7 +335,7 @@ void setup(const std::vector<std::string>& args,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::debug(model_config.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
-    const std::string modbase_model_names = models::extract_model_names_from_paths(remora_models);
+    const std::string modbase_model_names = models::extract_model_names_from_paths(modbase_models);
 
     if (!file_info::is_read_data_present(input_folder_info.files().get())) {
         std::string err =
@@ -379,10 +384,12 @@ void setup(const std::vector<std::string>& args,
     auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
 
+    const int num_modbase_runners =
+            utils::get_dev_opt("modbase_runners", default_parameters.mod_base_runners_per_caller);
+    spdlog::warn("Set modbase runners: {}", num_modbase_runners);
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto remora_runners = api::create_modbase_runners(
-            remora_models, device, default_parameters.mod_base_runners_per_caller,
-            remora_batch_size);
+    auto modbase_runners = api::create_modbase_runners(modbase_models, device, num_modbase_runners,
+                                                       modbase_batch_size);
 
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
@@ -447,8 +454,8 @@ void setup(const std::vector<std::string>& args,
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
     const auto thread_allocations = utils::default_thread_allocations(
-            int(num_devices), !remora_runners.empty() ? int(num_remora_threads) : 0, enable_aligner,
-            barcoding_info != nullptr, adapter_trimming_enabled);
+            int(num_devices), !modbase_runners.empty() ? int(num_modbase_threads) : 0,
+            enable_aligner, barcoding_info != nullptr, adapter_trimming_enabled);
 
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
@@ -524,7 +531,7 @@ void setup(const std::vector<std::string>& args,
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
 
     api::create_simplex_pipeline(
-            pipeline_desc, std::move(runners), std::move(remora_runners), mean_qscore_start_pos,
+            pipeline_desc, std::move(runners), std::move(modbase_runners), mean_qscore_start_pos,
             thread_allocations.scaler_node_threads, true /* Enable read splitting */,
             thread_allocations.splitter_node_threads, thread_allocations.remora_threads,
             current_sink_node, PipelineDescriptor::InvalidNodeHandle);
@@ -841,17 +848,23 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    const size_t modbase_batchsize =
+            static_cast<size_t>(parser.visible.get<int>("modified-bases-batchsize"));
+
     // Force on running of batchsize benchmarks if emission is on
     bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
                                     parser.hidden.get<bool>("--run-batchsize-benchmarks");
+
+    const int remora_threads =
+            utils::get_dev_opt<int>("modbase_threads", default_parameters.remora_threads);
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
-              default_parameters.remora_batchsize, default_parameters.remora_threads,
-              methylation_threshold, std::move(hts_file), parser.visible.get<bool>("--emit-moves"),
-              parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
+              modbase_batchsize, remora_threads, methylation_threshold, std::move(hts_file),
+              parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
+              parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
               parser.hidden.get<std::string>("--dump_stats_file"),

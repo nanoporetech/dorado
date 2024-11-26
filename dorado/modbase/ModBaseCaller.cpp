@@ -7,6 +7,10 @@
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <stdexcept>
+
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
@@ -74,7 +78,7 @@ std::vector<size_t> ModBaseCaller::ModBaseData::get_motif_hits(const std::string
 }
 
 ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
-                             int batch_size,
+                             const int batch_size,
                              const std::string& device)
         : m_num_models(model_paths.size()) {
     if (device == "cpu") {
@@ -96,17 +100,17 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
         m_options = at::TensorOptions().device(device).dtype(torch::kFloat16);
     }
 
-    // Allocate enough elements up-front so that m_caller_data.push_back() doesn't reallocate while
+    // Allocate enough elements up-front so that m_caller_data.emplace_back() doesn't reallocate while
     // other threads can be referencing elements that it's holding.
-    m_caller_data.reserve(m_num_models);
+    m_model_data.reserve(m_num_models);
     m_task_threads.reserve(m_num_models);
 
-    for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
-        const auto& config = load_modbase_model_config(model_paths[model_id]);
+    for (size_t i = 0; i < m_num_models; ++i) {
+        const auto& config = load_modbase_model_config(model_paths[i]);
 
         at::InferenceMode guard;
         auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
-        m_caller_data.push_back(std::move(caller_data));
+        m_model_data.emplace_back(std::move(caller_data));
     }
 
     start_threads();
@@ -119,12 +123,11 @@ std::vector<at::Tensor> ModBaseCaller::create_input_sig_tensors() const {
                         .device(torch::kCPU)
                         .pinned_memory(m_options.device().is_cuda())
                         .dtype(m_options.dtype());
-
     std::vector<at::Tensor> input_sigs;
-    input_sigs.reserve(m_caller_data.size());
-    for (auto& caller_data : m_caller_data) {
-        auto sig_len = static_cast<int64_t>(caller_data->params.context.samples);
-        input_sigs.push_back(torch::empty({caller_data->batch_size, 1, sig_len}, opts));
+    input_sigs.reserve(m_model_data.size());
+    for (auto& caller_data : m_model_data) {
+        input_sigs.emplace_back(
+                torch::empty({caller_data->batch_size, 1, caller_data->get_sig_len()}, opts));
     }
     return input_sigs;
 }
@@ -134,15 +137,12 @@ std::vector<at::Tensor> ModBaseCaller::create_input_seq_tensors() const {
                         .device(torch::kCPU)
                         .pinned_memory(m_options.device().is_cuda())
                         .dtype(torch::kInt8);
-
     std::vector<at::Tensor> input_seqs;
-    input_seqs.reserve(m_caller_data.size());
-    for (auto& caller_data : m_caller_data) {
-        const auto& context = caller_data->params.context;
-        auto sig_len = static_cast<int64_t>(context.samples);
-        input_seqs.push_back(torch::empty(
-                {caller_data->batch_size, sig_len, utils::BaseInfo::NUM_BASES * context.kmer_len},
-                opts));
+    input_seqs.reserve(m_model_data.size());
+    for (auto& model_data : m_model_data) {
+        const int channels = model_data->params.context.kmer_len * utils::BaseInfo::NUM_BASES;
+        const auto seq_len = model_data->get_seq_len();
+        input_seqs.emplace_back(torch::empty({model_data->batch_size, seq_len, channels}, opts));
     }
     return input_seqs;
 }
@@ -152,14 +152,14 @@ at::Tensor ModBaseCaller::call_chunks(size_t model_id,
                                       at::Tensor& input_seqs,
                                       int num_chunks) {
     NVTX3_FUNC_RANGE();
-    auto& caller_data = m_caller_data[model_id];
+    auto& model_data = m_model_data[model_id];
     auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                               input_seqs.to(m_options.device()), num_chunks);
     {
-        std::lock_guard<std::mutex> lock(caller_data->input_lock);
-        caller_data->input_queue.push_front(task);
+        std::lock_guard<std::mutex> lock(model_data->input_lock);
+        model_data->input_queue.push_front(task);
     }
-    caller_data->input_cv.notify_one();
+    model_data->input_cv.notify_one();
 
     std::unique_lock lock(task->mut);
     while (!task->done) {
@@ -171,8 +171,8 @@ at::Tensor ModBaseCaller::call_chunks(size_t model_id,
 
 void ModBaseCaller::terminate() {
     m_terminate.store(true);
-    for (auto& caller_data : m_caller_data) {
-        caller_data->input_cv.notify_one();
+    for (auto& model_data : m_model_data) {
+        model_data->input_cv.notify_one();
     }
     for (auto& task_thread : m_task_threads) {
         task_thread.join();
@@ -203,26 +203,26 @@ void ModBaseCaller::start_threads() {
 
 void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
     utils::set_thread_name("modbase_thread");
-    auto& caller_data = m_caller_data[model_id];
+    auto& model_data = m_model_data[model_id];
 #if DORADO_CUDA_BUILD
     static std::vector<std::mutex> gpu_mutexes(torch::cuda::device_count());
-    c10::cuda::OptionalCUDAStreamGuard stream_guard(caller_data->stream);
+    c10::cuda::OptionalCUDAStreamGuard stream_guard(model_data->stream);
 #endif
     while (true) {
         nvtx3::scoped_range loop{"modbase_task_thread_fn"};
         at::InferenceMode guard;
 
-        std::unique_lock<std::mutex> input_lock(caller_data->input_lock);
-        while (caller_data->input_queue.empty() && !m_terminate.load()) {
-            caller_data->input_cv.wait_for(input_lock, 100ms);
+        std::unique_lock<std::mutex> input_lock(model_data->input_lock);
+        while (model_data->input_queue.empty() && !m_terminate.load()) {
+            model_data->input_cv.wait_for(input_lock, 100ms);
         }
 
-        if (caller_data->input_queue.empty() && m_terminate.load()) {
+        if (model_data->input_queue.empty() && m_terminate.load()) {
             return;
         }
 
-        auto task = caller_data->input_queue.back();
-        caller_data->input_queue.pop_back();
+        auto task = model_data->input_queue.back();
+        model_data->input_queue.pop_back();
         input_lock.unlock();
 
 #if DORADO_CUDA_BUILD
@@ -235,10 +235,10 @@ void ModBaseCaller::modbase_task_thread_fn(size_t model_id) {
 #endif
         std::unique_lock<std::mutex> task_lock(task->mut);
         stats::Timer timer;
-        task->out = caller_data->module_holder->forward(task->input_sigs, task->input_seqs);
+        task->out = model_data->module_holder.forward(task->input_sigs, task->input_seqs);
 #if DORADO_CUDA_BUILD
-        if (caller_data->stream.has_value()) {
-            caller_data->stream->synchronize();
+        if (model_data->stream.has_value()) {
+            model_data->stream->synchronize();
         }
 #endif
         // Only meaningful if we're syncing the stream.

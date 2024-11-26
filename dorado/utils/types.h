@@ -218,6 +218,20 @@ struct ModBaseInfo {
     std::string long_names;
     std::string context;
     std::array<size_t, 4> base_counts{};
+
+    // Generate the modbase probability array offsets for the 4 canonical bases
+    std::array<size_t, 4> base_probs_offsets() const {
+        // Example Mods := 6mA, 5mC, 5hmC
+        // base_counts  := [2, 3, 1, 1]
+        // probs vector := [A, 6mA, C, 5mC, 5hmC, G, T]
+        // offsets      := [0,      2,            5, 6]
+        std::array<size_t, 4> offsets;
+        offsets[0] = 0;
+        offsets[1] = base_counts[0];
+        offsets[2] = offsets[1] + base_counts[1];
+        offsets[3] = offsets[2] + base_counts[2];
+        return offsets;
+    }
 };
 
 }  // namespace dorado
