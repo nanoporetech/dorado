@@ -20,33 +20,34 @@ namespace {
 class GzipStreamBuf : public std::streambuf {
     GzipReader m_gzip_reader;
 
+    void throw_if_gzip_reader_invalid() {
+        if (m_gzip_reader.is_valid()) {
+            return;
+        }
+        spdlog::error(m_gzip_reader.error_message());
+        throw std::runtime_error(m_gzip_reader.error_message());
+    }
+
+    void read_next_chunk_into_get_area() {
+        while (m_gzip_reader.read_next() && m_gzip_reader.is_valid() &&
+               m_gzip_reader.num_bytes_read() == 0) {
+        }
+        throw_if_gzip_reader_invalid();
+        setg(m_gzip_reader.decompressed_buffer().data(), m_gzip_reader.decompressed_buffer().data(),
+             m_gzip_reader.decompressed_buffer().data() + m_gzip_reader.num_bytes_read());
+    }
+
 public:
     GzipStreamBuf(const std::string& gzip_file, std::size_t buffer_size)
             : m_gzip_reader(gzip_file, buffer_size) {}
 
     int underflow() {
-        if (!m_gzip_reader.is_valid()) {
-            // throwing an exception will set the bad bit on the stream
-            spdlog::error(m_gzip_reader.error_message());
-            throw std::runtime_error(m_gzip_reader.error_message());
-        }
+        throw_if_gzip_reader_invalid();
         if (gptr() == egptr()) {
-            while (m_gzip_reader.read_next() && m_gzip_reader.is_valid()) {
-                if (m_gzip_reader.num_bytes_read() > 0) {
-                    break;
-                }
-            }
-            if (!m_gzip_reader.is_valid()) {
-                spdlog::error(m_gzip_reader.error_message());
-                throw std::runtime_error(m_gzip_reader.error_message());
-            }
-            setg(m_gzip_reader.decompressed_buffer().data(),
-                 m_gzip_reader.decompressed_buffer().data(),
-                 m_gzip_reader.decompressed_buffer().data() + m_gzip_reader.num_bytes_read());
+            read_next_chunk_into_get_area();
         }
-
-        return this->gptr() == this->egptr() ? std::char_traits<char>::eof()
-                                             : std::char_traits<char>::to_int_type(*this->gptr());
+        return gptr() == egptr() ? std::char_traits<char>::eof()
+                                 : std::char_traits<char>::to_int_type(*gptr());
     }
 };
 
@@ -64,7 +65,19 @@ public:
     }
 };
 
+bool check_file_can_be_opened_for_reading(const std::string& input_file) {
+    std::ifstream check_normal_file(input_file);
+    return check_normal_file.is_open();
+}
+
 std::unique_ptr<std::istream> create_input_stream(const std::string& input_file) {
+    // check for a normal file that can be opened for reading before calling hopen
+    // as hopen has special semantics and does not do this check, e.g. calling with
+    // "-" would block waiting on the stdin stream.
+    if (!check_file_can_be_opened_for_reading(input_file)) {
+        return {};
+    }
+
     auto hfile = hopen(input_file.c_str(), "r");
     if (!hfile) {
         return {};
