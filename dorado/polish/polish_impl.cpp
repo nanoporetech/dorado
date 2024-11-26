@@ -189,9 +189,19 @@ polisher::ConsensusResult stitch_sequence(
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
 
         if (sample_result.draft_start > last_end) {
+            spdlog::debug(
+                    "[stitch_sequence] header = '{}', result.seq.size() = {}, adding draft region: "
+                    "[{}, {}]",
+                    header, std::size(result.seq), last_end, sample_result.draft_start);
+
             result.seq += draft.substr(last_end, sample_result.draft_start - last_end);
             result.quals += std::string(sample_result.draft_start - last_end, '!');
         }
+
+        spdlog::debug(
+                "[stitch_sequence] header = '{}', result.seq.size() = {}, adding consensus chunk "
+                "sample_result.seq.size() = {}",
+                header, std::size(result.seq), std::size(sample_result.seq));
 
         result.seq += sample_result.seq;
         result.quals += sample_result.quals;
@@ -201,9 +211,16 @@ polisher::ConsensusResult stitch_sequence(
 
     // Add the back draft part.
     if (last_end < dorado::ssize(draft)) {
+        spdlog::debug(
+                "[stitch_sequence] header = '{}', result.seq.size() = {}, adding trailing draft "
+                "region: [{}, {}]",
+                header, std::size(result.seq), last_end, std::size(draft));
         result.seq += draft.substr(last_end);
         result.quals += std::string(dorado::ssize(draft) - last_end, '!');
     }
+
+    spdlog::debug("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
+                  std::size(result.seq));
 
     return result;
 }
@@ -294,17 +311,12 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
 
     const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
                                  const int64_t end) {
-        spdlog::debug("[create_chunk] new_features");
         torch::Tensor new_features = sample.features.slice(0, start, end);
-        spdlog::debug("[create_chunk] new_major");
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
-        spdlog::debug("[create_chunk] new_minor");
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
-        spdlog::debug("[create_chunk] new_depth");
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        spdlog::debug("[create_chunk] Creating new Sample.");
         return polisher::Sample{std::move(new_features),
                                 std::move(new_major),
                                 std::move(new_minor),
