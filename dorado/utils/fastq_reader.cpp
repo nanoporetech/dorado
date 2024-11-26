@@ -1,5 +1,10 @@
 #include "fastq_reader.h"
 
+#include "gzip_reader.h"
+#include "types.h"
+
+#include <htslib/hfile.h>
+#include <htslib/hts.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -11,6 +16,76 @@
 namespace dorado::utils {
 
 namespace {
+
+class GzipStreamBuf : public std::streambuf {
+    GzipReader m_gzip_reader;
+
+public:
+    GzipStreamBuf(const std::string& gzip_file, std::size_t buffer_size)
+            : m_gzip_reader(gzip_file, buffer_size) {}
+
+    int underflow() {
+        if (!m_gzip_reader.is_valid()) {
+            // throwing an exception will set the bad bit on the stream
+            spdlog::error(m_gzip_reader.error_message());
+            throw std::runtime_error(m_gzip_reader.error_message());
+        }
+        if (gptr() == egptr()) {
+            while (m_gzip_reader.read_next() && m_gzip_reader.is_valid()) {
+                if (m_gzip_reader.num_bytes_read() > 0) {
+                    break;
+                }
+            }
+            if (!m_gzip_reader.is_valid()) {
+                spdlog::error(m_gzip_reader.error_message());
+                throw std::runtime_error(m_gzip_reader.error_message());
+            }
+            setg(m_gzip_reader.decompressed_buffer().data(),
+                 m_gzip_reader.decompressed_buffer().data(),
+                 m_gzip_reader.decompressed_buffer().data() + m_gzip_reader.num_bytes_read());
+        }
+
+        return this->gptr() == this->egptr() ? std::char_traits<char>::eof()
+                                             : std::char_traits<char>::to_int_type(*this->gptr());
+    }
+};
+
+class GzipInputStream : public std::istream {
+    std::unique_ptr<GzipStreamBuf> m_gzip_stream_buf{};
+
+public:
+    GzipInputStream(const std::string& gzip_file, std::size_t buffer_size)
+            : m_gzip_stream_buf(std::make_unique<GzipStreamBuf>(gzip_file, buffer_size)),
+              std::istream(nullptr) {
+        rdbuf(m_gzip_stream_buf.get());
+    }
+};
+
+std::unique_ptr<std::istream> create_input_stream(const std::string& input_file) {
+    dorado::HtsFilePtr hts_file(hts_open(input_file.c_str(), "r"));
+    if (!hts_file) {
+        return {};
+    }
+
+    auto hfile = hopen(input_file.c_str(), "r");
+    htsFormat format_check;
+    auto fmt_detect_result = hts_detect_format(hfile, &format_check);
+    // Note the format check does not detect fastq if Ts are replaced with Us
+    // So treat a text file as a potential fastq
+    if (fmt_detect_result < 0 || (format_check.format != htsExactFormat::fastq_format &&
+                                  format_check.format != htsExactFormat::text_format)) {
+        return {};
+    }
+
+    static constexpr std::size_t DECOMPRESSION_BUFFER_SIZE{65536};
+    if (format_check.compression == htsCompression::no_compression) {
+        return std::make_unique<std::ifstream>(input_file);
+    } else if (format_check.compression == htsCompression::gzip) {
+        return std::make_unique<GzipInputStream>(input_file, DECOMPRESSION_BUFFER_SIZE);
+    }
+
+    return {};
+}
 
 bool is_valid_id_field(const std::string& field) {
     if (field.size() < 2 || field.at(0) != '@') {
@@ -214,11 +289,19 @@ std::optional<FastqRecord> FastqRecord::try_create(std::istream& input_stream,
     return result;
 }
 
+bool operator==(const FastqRecord& lhs, const FastqRecord& rhs) {
+    return std::tie(lhs.header(), lhs.sequence(), lhs.qstring()) ==
+           std::tie(rhs.header(), rhs.sequence(), rhs.qstring());
+}
+
+bool operator!=(const FastqRecord& lhs, const FastqRecord& rhs) { return !(lhs == rhs); }
+
 FastqReader::FastqReader(std::string input_file) : m_input_file(std::move(input_file)) {
     if (!is_fastq(m_input_file)) {
         return;
     }
-    m_input_stream = std::make_unique<std::ifstream>(m_input_file);
+
+    m_input_stream = create_input_stream(m_input_file);
 }
 
 FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream)
@@ -250,8 +333,8 @@ std::optional<FastqRecord> FastqReader::try_get_next_record() {
 }
 
 bool is_fastq(const std::string& input_file) {
-    std::ifstream input_stream{input_file};
-    return is_fastq(input_stream);
+    auto input_stream = create_input_stream(input_file);
+    return input_stream ? is_fastq(*input_stream) : false;
 }
 
 bool is_fastq(std::istream& input_stream) {

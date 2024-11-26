@@ -52,6 +52,9 @@ private:
     std::size_t token_len(std::size_t token_start_pos) const;
 };
 
+bool operator==(const FastqRecord& lhs, const FastqRecord& rhs);
+bool operator!=(const FastqRecord& lhs, const FastqRecord& rhs);
+
 class FastqReader {
 public:
     FastqReader(const std::string input_file);
