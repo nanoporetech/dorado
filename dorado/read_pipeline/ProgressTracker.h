@@ -55,6 +55,9 @@ private:
     int m_num_poly_a_not_called{0};
     int m_avg_poly_a_tail_lengths{0};
 
+    int64_t m_num_mods_samples_processed{0};
+    int64_t m_num_mods_samples_incl_padding{0};
+
     const int m_num_reads_expected;
 
     std::map<std::string, size_t> m_barcode_count;

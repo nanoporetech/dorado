@@ -50,6 +50,8 @@ void ProgressTracker::summarize() const {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
+
+    spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
         spdlog::info("> Simplex reads basecalled: {}", m_num_simplex_reads_written);
     }
@@ -75,11 +77,32 @@ void ProgressTracker::summarize() const {
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
             samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
-            spdlog::debug("> Including Padding @ Samples/s: {:.3e} ({:.2f}%)",
-                          m_num_samples_incl_padding / (duration / 1000.0),
-                          100.f * m_num_samples_processed / m_num_samples_incl_padding);
+            spdlog::info("> Basecalled @ Samples/s: {} ({:.6e})", samples_sec.str(),
+                         double(m_num_samples_processed));
+            spdlog::info("> Including Padding @ Samples/s: {:.6e} ({:.2f}%) ({:.6e})",
+                         m_num_samples_incl_padding / (duration / 1000.0),
+                         100.f * m_num_samples_processed / m_num_samples_incl_padding,
+                         double(m_num_samples_incl_padding));
         }
+    }
+    if (m_num_mods_samples_processed > 0) {
+        std::ostringstream samples_sec;
+        // if (m_duplex) {
+        //     samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
+        //     spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
+        // } else {
+        // samples_sec << std::scientific << m_num_mods_samples_processed / (duration / 1000.0);
+        // spdlog::info("> Modbasecalled @ Samples/s: {}", samples_sec.str());
+
+        const auto call_rate = m_num_mods_samples_processed / (duration / 1000.0);
+        const auto pad_call_rate = m_num_mods_samples_incl_padding / (duration / 1000.0);
+        const auto pad_pct = 100.f * m_num_mods_samples_processed / m_num_mods_samples_incl_padding;
+
+        spdlog::info("> Modbasecalled @ Samples/s: {:.3e} - ({:.6e})", call_rate,
+                     double(m_num_mods_samples_processed));
+        spdlog::info("> Modbasecalled Including Padding @ Samples/s: {:.6e} ({:.2f}%) - ({:.6e})",
+                     pad_call_rate, pad_pct, double(m_num_mods_samples_incl_padding));
+        // }
     }
 
     if (m_num_barcodes_demuxed > 0) {
@@ -157,6 +180,11 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
+
+    // Modbase
+    m_num_mods_samples_processed = int64_t(fetch_stat("ModBaseChunkCallerNode.samples_processed"));
+    m_num_mods_samples_incl_padding =
+            int64_t(fetch_stat("ModBaseChunkCallerNode.samples_incl_padding"));
 
     // Barcode demuxing stats.
     m_num_barcodes_demuxed = int(fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed"));
