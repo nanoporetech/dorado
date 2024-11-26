@@ -20,11 +20,12 @@ namespace {
 class GzipStreamBuf : public std::streambuf {
     GzipReader m_gzip_reader;
 
-    void throw_if_gzip_reader_invalid() {
+    void throw_and_set_bad_bit_if_gzip_reader_invalid() {
         if (m_gzip_reader.is_valid()) {
             return;
         }
         spdlog::error(m_gzip_reader.error_message());
+        // throwing during a call to underflow will cause the stream bad bit to be set
         throw std::runtime_error(m_gzip_reader.error_message());
     }
 
@@ -32,7 +33,7 @@ class GzipStreamBuf : public std::streambuf {
         while (m_gzip_reader.read_next() && m_gzip_reader.is_valid() &&
                m_gzip_reader.num_bytes_read() == 0) {
         }
-        throw_if_gzip_reader_invalid();
+        throw_and_set_bad_bit_if_gzip_reader_invalid();
         setg(m_gzip_reader.decompressed_buffer().data(), m_gzip_reader.decompressed_buffer().data(),
              m_gzip_reader.decompressed_buffer().data() + m_gzip_reader.num_bytes_read());
     }
@@ -42,7 +43,7 @@ public:
             : m_gzip_reader(gzip_file, buffer_size) {}
 
     int underflow() {
-        throw_if_gzip_reader_invalid();
+        throw_and_set_bad_bit_if_gzip_reader_invalid();
         if (gptr() == egptr()) {
             read_next_chunk_into_get_area();
         }
