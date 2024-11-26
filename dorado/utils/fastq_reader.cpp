@@ -55,8 +55,11 @@ class GzipInputStream : public std::istream {
 
 public:
     GzipInputStream(const std::string& gzip_file, std::size_t buffer_size)
-            : m_gzip_stream_buf(std::make_unique<GzipStreamBuf>(gzip_file, buffer_size)),
-              std::istream(nullptr) {
+            : std::istream(nullptr),
+              m_gzip_stream_buf(std::make_unique<GzipStreamBuf>(gzip_file, buffer_size)) {
+        // The base class (istream) will be constructed first so can't pass
+        // the buffer as part of the member initalisation list, instead set
+        // the buffer here after the base class has been constructed.
         rdbuf(m_gzip_stream_buf.get());
     }
 };
