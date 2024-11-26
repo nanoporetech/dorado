@@ -176,8 +176,6 @@ Sample counts_to_features(CountsResult& pileup,
 
 }  // namespace
 
-CountsFeatureEncoder::CountsFeatureEncoder(const int32_t min_mapq) : m_min_mapq{min_mapq} {}
-
 CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
                                            const std::vector<std::string>& dtypes,
                                            const std::string_view tag_name,

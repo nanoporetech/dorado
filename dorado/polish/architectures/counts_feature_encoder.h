@@ -31,8 +31,6 @@ class CountsFeatureEncoder : public BaseFeatureEncoder {
 public:
     CountsFeatureEncoder() = default;
 
-    CountsFeatureEncoder(const int32_t min_mapq);
-
     CountsFeatureEncoder(const NormaliseType normalise_type,
                          const std::vector<std::string>& dtypes,
                          const std::string_view tag_name,

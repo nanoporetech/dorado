@@ -34,8 +34,6 @@ class ReadAlignmentFeatureEncoder : public BaseFeatureEncoder {
 public:
     ReadAlignmentFeatureEncoder() = default;
 
-    ReadAlignmentFeatureEncoder(const int32_t min_mapq);
-
     ReadAlignmentFeatureEncoder(const std::vector<std::string>& dtypes,
                                 const std::string_view tag_name,
                                 const int32_t tag_value,

@@ -301,9 +301,6 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
 }  // namespace
 
-ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const int32_t min_mapq)
-        : m_min_mapq{min_mapq} {}
-
 ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::string>& dtypes,
                                                          const std::string_view tag_name,
                                                          const int32_t tag_value,
