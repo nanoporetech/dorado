@@ -552,6 +552,8 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
 
     pileup.major.resize(n_pos);
     pileup.minor.resize(n_pos);
+    pileup.read_ids_left.resize(pileup.n_reads);
+    pileup.read_ids_right.resize(pileup.n_reads);
 
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);
