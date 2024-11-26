@@ -314,7 +314,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
         if (pos >= end) {
             break;
         }
-        n_pos++;
+        ++n_pos;
 
         // find maximum insert and number of reads
         int32_t max_ins = 0;
@@ -367,10 +367,9 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 // get dtype tag
                 int32_t dtype = 0;
                 bool failed = false;
-                char *tag_val;
-                uint8_t *tag;
                 if (num_dtypes > 1) {
-                    tag = bam_aux_get(alignment, DATATYPE_TAG);
+                    char *tag_val = nullptr;
+                    const uint8_t *tag = bam_aux_get(alignment, DATATYPE_TAG);
                     if (tag == NULL) {  // tag isn't present
                         failed = true;
                     } else {
@@ -394,7 +393,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 // get haplotype tag
                 int8_t haplotype = 0;
                 failed = false;
-                tag = bam_aux_get(alignment, "HP");
+                const uint8_t *tag = bam_aux_get(alignment, "HP");
                 if (tag == NULL) {  // tag isn't present
                     failed = true;
                 } else {
