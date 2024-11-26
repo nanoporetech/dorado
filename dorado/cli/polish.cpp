@@ -105,7 +105,6 @@ struct Options {
     int32_t bam_subchunk = 100'000;
     std::string region;
     bool full_precision = false;
-    int32_t min_mapq = 0;
     bool load_scripted_model = false;
     // int32_t min_depth = 0;
 };
@@ -263,7 +262,6 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
 
     opt.full_precision = parser.visible.get<bool>("full-precision");
-    opt.min_mapq = parser.visible.get<int>("min-mapq");
     opt.load_scripted_model = parser.visible.get<bool>("scripted");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
