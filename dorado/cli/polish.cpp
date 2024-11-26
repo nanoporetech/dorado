@@ -543,8 +543,6 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
     // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
         spdlog::info("=============================");
-        spdlog::info("Starting to produce consensus for draft sequences: {}-{}/{}.",
-                     draft_batch.start, draft_batch.end, std::size(draft_lens));
 
         // Split the sequences into larger BAM windows, like Medaka.
         spdlog::debug("Creating BAM windows.");
@@ -553,6 +551,15 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 std::begin(draft_lens) + draft_batch.end);
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
                 draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
+
+        const int64_t total_bases =
+                std::accumulate(std::begin(draft_lens_batch), std::end(draft_lens_batch), 0,
+                                [](const int64_t a, const auto& b) { return a + b.second; });
+        spdlog::info(
+                "Starting to produce consensus for draft sequences: {}-{}/{} (number: {}, total "
+                "length: {:.2f} Mbp)",
+                draft_batch.start, draft_batch.end, std::size(draft_lens),
+                std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
         // Produce samples (tensors) for inference.
         auto [samples, trims] = polisher::create_samples(
@@ -609,11 +616,14 @@ int polish(int argc, char* argv[]) {
         // Initialize the options from the CLI.
         const Options opt = set_options(*parser, verbosity);
 
-        spdlog::set_level(spdlog::level::info);
-
-        // Initialize the log level.
-        if (opt.verbosity) {
-            utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(opt.verbosity));
+        if (opt.verbosity >= 3) {
+            spdlog::set_level(spdlog::level::trace);
+        } else if (opt.verbosity == 2) {
+            spdlog::set_level(spdlog::level::debug);
+        } else if (opt.verbosity == 1) {
+            spdlog::set_level(spdlog::level::info);
+        } else {
+            // Pass. No log.
         }
 
         spdlog::flush_every(std::chrono::seconds(1));
