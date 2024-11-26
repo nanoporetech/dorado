@@ -59,7 +59,7 @@ void GzipReader::set_failure(std::string error_message) {
 }
 
 bool GzipReader::try_initialise_zlib_stream(z_stream& zlib_stream) {
-    zlib_stream.zalloc = Z_NULL;  // B
+    zlib_stream.zalloc = Z_NULL;
     zlib_stream.zfree = Z_NULL;
     zlib_stream.opaque = Z_NULL;
     zlib_stream.avail_in = 0;
