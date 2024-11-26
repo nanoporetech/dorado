@@ -1,5 +1,7 @@
 #pragma once
 
+#include "polish/polish_utils.h"
+
 #include <torch/torch.h>
 
 #include <cstdint>
@@ -60,7 +62,8 @@ inline void debug_print_sample(std::ostream& os,
         os << " (" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ")";
         os.flush();
     }
-    os << "] , size = " << std::size(sample.positions_major);
+    os << "], size = " << std::size(sample.positions_major);
+    os << ", depth.shape = " << tensor_shape_as_string(sample.depth);
     os.flush();
 
     if (debug) {
