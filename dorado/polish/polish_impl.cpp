@@ -294,12 +294,17 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
 
     const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
                                  const int64_t end) {
+        spdlog::debug("[create_chunk] new_features");
         torch::Tensor new_features = sample.features.slice(0, start, end);
+        spdlog::debug("[create_chunk] new_major");
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
+        spdlog::debug("[create_chunk] new_minor");
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
+        spdlog::debug("[create_chunk] new_depth");
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
+        spdlog::debug("[create_chunk] Creating new Sample.");
         return polisher::Sample{std::move(new_features),
                                 std::move(new_major),
                                 std::move(new_minor),
@@ -323,9 +328,13 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
 
         const int64_t step = chunk_len - chunk_overlap;
 
+        spdlog::debug("[split_samples] sample_len = {}, features.shape = {}, step = {}", sample_len,
+                      tensor_shape_as_string(sample.features), step);
+
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
+            spdlog::debug("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
             results.emplace_back(create_chunk(sample, start, end));
         }
 
@@ -333,9 +342,13 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
+            spdlog::debug("[split_samples]     - creating end chunk: start = {}, end = {}", start,
+                          end);
             results.emplace_back(create_chunk(sample, start, end));
         }
     }
+
+    spdlog::debug("[split_samples]     - done, results.size() = {}", std::size(results));
 
     return results;
 }
@@ -452,7 +465,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                 const std::string& name = draft_lens[window.seq_id].first;
                 if (thread_id == 0) {
                     spdlog::debug(
-                            "Processing i = {}, start = {}, end = {}, region = "
+                            "Encoding i = {}, start = {}, end = {}, region = "
                             "{}:{}-{} ({} %).",
                             i, start, end, name, window.start, window.end,
                             100.0 * static_cast<double>(i - start) / (end - start));
@@ -485,7 +498,8 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         }
     }
 
-    spdlog::debug("Merging the samples into {} BAM chunks.", std::size(bam_region_intervals));
+    spdlog::debug("Merging the samples into {} BAM chunks. parallel_results.size() = {}",
+                  std::size(bam_region_intervals), std::size(parallel_results));
 
     // Three tasks for this worker:
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
@@ -500,6 +514,8 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
                 const Interval interval = bam_region_intervals[bam_chunk_id];
 
+                spdlog::debug("- [bam_chunk_id = {}] (0) Before merging: interval = [{}, {}]",
+                              bam_chunk_id, interval.start, interval.end);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cerr << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
                           << "] Before merging. interval = [" << interval.start << ", "
@@ -514,13 +530,17 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
                 // Split all samples on discontinuities.
                 for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
                     auto& sample = parallel_results[sample_id];
-                    std::vector<polisher::Sample> split_samples =
+                    std::vector<polisher::Sample> disc_samples =
                             split_sample_on_discontinuities(sample);
                     local_samples.insert(std::end(local_samples),
-                                         std::make_move_iterator(std::begin(split_samples)),
-                                         std::make_move_iterator(std::end(split_samples)));
+                                         std::make_move_iterator(std::begin(disc_samples)),
+                                         std::make_move_iterator(std::end(disc_samples)));
                 }
 
+                spdlog::debug(
+                        "- [bam_chunk_id = {}] (1) After splitting on discontinuities: "
+                        "local_samples = {}",
+                        bam_chunk_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting on discontinuities (local_samples):\n";
@@ -529,6 +549,9 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 
                 local_samples = encoder.merge_adjacent_samples(local_samples);
 
+                spdlog::debug(
+                        "- [bam_chunk_id = {}] (2) After merging adjacent: local_samples = {}",
+                        bam_chunk_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After merging adjacent (local_samples):\n";
@@ -537,6 +560,10 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 
                 local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
+                spdlog::debug(
+                        "- [bam_chunk_id = {}] (3) After splitting samples: local_samples = {}, "
+                        "window_len = {}, window_overlap = {}",
+                        bam_chunk_id, std::size(local_samples), window_len, window_overlap);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 std::cerr << "- [bam_chunk_id = " << bam_chunk_id
                           << "] After splitting samples (local_samples):\n";
