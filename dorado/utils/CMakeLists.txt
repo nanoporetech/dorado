@@ -27,6 +27,8 @@ add_library(dorado_utils
     fastq_reader.h
     fs_utils.cpp
     fs_utils.h
+    gzip_reader.cpp
+    gzip_reader.h
     hts_file.cpp
     hts_file.h
     locale_utils.cpp
