@@ -38,7 +38,7 @@ using HalfRegister = float16x4_t;
 #define simd_convert_16_32(reg) vcvt_f32_f16(reg)
 #define simd_add_16(regA, regB) vadd_f16(regA, regB)
 #define simd_store_16(ptr, reg) vst1_f16(reinterpret_cast<float16_t *>(ptr), reg)
-#define simd_store1_16(ptr, reg) *ptr = vget_lane_f16(reg, 0)
+#define simd_store1_16(ptr, reg) *ptr = c10::Half(vget_lane_u16(reg, 0), c10::Half::from_bits())
 
 #elif ENABLE_AVX2_IMPL
 
