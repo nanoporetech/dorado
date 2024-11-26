@@ -463,7 +463,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
     {
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, "convolutions", "try_count=%i", try_count);
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, convolutions, "try_count=%i", try_count);
         auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
         if (in.dtype() != torch::kF16) {
@@ -480,8 +480,8 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, "lstm", "id=%s, try_count=%i", lstm_label.c_str(),
-                                try_count);
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, lstm_layer, "id=%s, try_count=%i",
+                                lstm_label.c_str(), try_count);
 
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
         auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
@@ -578,7 +578,7 @@ MTL::CommandBuffer *MetalCRFModelImpl::forward_async(at::Tensor &in,
                                                      uint64_t linear_hold_off_id,
                                                      int try_count,
                                                      std::vector<at::Tensor> &out) {
-    POINT_OF_INTEREST_SCOPE(MetalCRFModel, "forward_async", "try_count=%i", try_count);
+    POINT_OF_INTEREST_SCOPE(MetalCRFModel, forward_async, "try_count=%i", try_count);
     return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count, out);
 }
 

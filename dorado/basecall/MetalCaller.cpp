@@ -424,7 +424,7 @@ int MetalLSTMCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
 }
 
 bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
-    POINT_OF_INTEREST_SCOPE(MetalCaller, "run_scan_kernels", "try_count=%i", try_count);
+    POINT_OF_INTEREST_SCOPE(MetalCaller, run_scan_kernels, "try_count=%i", try_count);
 
     // This stage is operating on the split outputs of the linear layer, so
     // the effective batch size is m_out_batch_size.
@@ -463,7 +463,7 @@ bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, in
 }
 
 DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
-    POINT_OF_INTEREST_SCOPE(MetalCaller, "decode", "chunk_idx=%i", chunk_idx);
+    POINT_OF_INTEREST_SCOPE(MetalCaller, decode, "chunk_idx=%i", chunk_idx);
 
     // Model outputs are split across m_out_split buffers.
     assert(m_scores_TNC.size() == static_cast<size_t>(m_out_split));
@@ -551,7 +551,7 @@ void MetalTxCaller::load_tx_model(const CRFModelConfig &model_config) {
 }
 
 bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
-    POINT_OF_INTEREST_SCOPE(MetalCaller, "run_scan_kernels", "try_count=%i", try_count);
+    POINT_OF_INTEREST_SCOPE(MetalCaller, run_scan_kernels, "try_count=%i", try_count);
 
     // ScanArgs expects scores TNC tensor sizes
     std::vector<int32_t> scan_args_{m_out_chunk_size, m_batch_size, m_states};
@@ -592,7 +592,7 @@ bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int 
 }
 
 DecodedData MetalTxCaller::decode(int chunk_idx) const {
-    POINT_OF_INTEREST_SCOPE(MetalCaller, "decode", "chunk_idx=%i", chunk_idx);
+    POINT_OF_INTEREST_SCOPE(MetalCaller, decode, "chunk_idx=%i", chunk_idx);
 
     // Not splitting batches in Tx impl so chunk idx should be in [0, N)
     assert(chunk_idx < m_batch_size);

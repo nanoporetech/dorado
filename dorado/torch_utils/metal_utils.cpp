@@ -251,7 +251,7 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
 }
 
 bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
-    POINT_OF_INTEREST_SCOPE(metal_utils, "run_command_buffer", "label=%s", label);
+    POINT_OF_INTEREST_SCOPE(metal_utils, run_command_buffer, "label=%s", label);
 
     name_mtl_object(cb, label);
     cb->commit();

@@ -20,15 +20,29 @@
 #include <variant>
 #include <vector>
 
+// Helper to capture "points" (ranges) of interest to help visualise bottlenecks.
+// Usage:
+//   // Create a global ID for what you want to track.
+//   CREATE_POINT_OF_INTEREST_ID(my_id);
+//   void function(int i) {
+//     // Use the ID inside a scope to measure how long it takes.
+//     POINT_OF_INTEREST_SCOPE(my_id, whole_scope);
+//     do_thing();
+//     {
+//       // You can provide printf-style args to a scope too to help diagnose issues.
+//       POINT_OF_INTEREST_SCOPE(my_id, whole_scope, "calling expensive_function(%i)", i);
+//       expensive_function(i);
+//     }
+//   }
 // Not technically metal, but only usable with Instruments.
 #define CREATE_POINT_OF_INTEREST_ID(id)                                                        \
     static os_log_t _s_##id##_os_log = os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
     static_assert(true, "Force semicolon")
-#define POINT_OF_INTEREST_SCOPE(id, name, ...)                                   \
-    os_signpost_id_t _poi_id = os_signpost_id_generate(_s_##id##_os_log);        \
-    os_signpost_interval_begin(_s_##id##_os_log, _poi_id, name, "" __VA_ARGS__); \
-    auto _poi_scope = dorado::utils::PostCondition(                              \
-            [&] { os_signpost_interval_end(_s_##id##_os_log, _poi_id, name); }); \
+#define POINT_OF_INTEREST_SCOPE(id, name, ...)                                           \
+    os_signpost_id_t _poi_id_##name = os_signpost_id_generate(_s_##id##_os_log);         \
+    os_signpost_interval_begin(_s_##id##_os_log, _poi_id_##name, #name, "" __VA_ARGS__); \
+    auto _poi_scope_##name = dorado::utils::PostCondition(                               \
+            [&] { os_signpost_interval_end(_s_##id##_os_log, _poi_id_##name, #name); }); \
     static_assert(true, "Force semicolon")
 
 namespace dorado::utils {
