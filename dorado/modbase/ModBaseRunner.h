@@ -42,6 +42,9 @@ public:
     // FIXME: This might need to be independent of the runner
     // The number of chunks in a batch
     size_t batch_size() const { return m_input_sigs[0].size(0); }
+    // Only meaningful for models accepting chunked inputs
+    bool takes_chunk_inputs() const;
+
     void terminate();
     void restart();
     std::string get_name() const;

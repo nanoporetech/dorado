@@ -59,15 +59,13 @@ ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
     if (opts.device().is_cuda()) {
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
-        const auto& context = params.context;
-        const auto sig_len = static_cast<int64_t>(context.samples);
+        const int channels = utils::BaseInfo::NUM_BASES * params.general.kmer_len;
 
         // Warmup
         c10::cuda::OptionalCUDAStreamGuard guard(stream);
-        auto input_sigs = torch::empty({batch_size, 1, sig_len}, opts);
-        auto input_seqs = torch::empty(
-                {batch_size, sig_len, utils::BaseInfo::NUM_BASES * context.kmer_len}, opts);
-        module_holder->forward(input_sigs, input_seqs);
+        auto input_sigs = torch::empty({batch_size, 1, get_sig_len()}, opts);
+        auto input_seqs = torch::empty({batch_size, get_seq_len(), channels}, opts);
+        module_holder.forward(input_sigs, input_seqs);
         stream->synchronize();
     }
 #endif
@@ -75,6 +73,30 @@ ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
 
 std::vector<size_t> ModBaseCaller::ModBaseData::get_motif_hits(const std::string& seq) const {
     return matcher.get_motif_hits(seq);
+}
+
+int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
+    // Depending on the model type, the signal/encoded sequence length either directly
+    // defined in the model config, or determined by a chunk size a la canonical base calling.
+
+    const size_t cs_ = params.is_chunked_input_model()
+                               ? static_cast<int64_t>(params.context.chunk_size)
+                               : static_cast<int64_t>(params.context.samples);
+    const int64_t cs = static_cast<int64_t>(cs_);
+    if (cs < 0) {
+        throw std::runtime_error("Integer conversion error in ModBaseData::get_sig_len value: '" +
+                                 std::to_string(cs_) + "'.");
+    }
+    return cs;
+}
+
+int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
+    // Depending on the model type, the signal/encoded sequence length either directly
+    // defined in the model config, or determined by a chunk size a la canonical base calling.
+
+    const int64_t stride = params.general.sig_stride / params.general.seq_stride;
+    const int64_t chunk_size = get_sig_len() / stride;
+    return chunk_size;
 }
 
 ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,

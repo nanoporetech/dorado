@@ -1,5 +1,6 @@
 #include "ModBaseModelConfig.h"
 
+#include "spdlog/spdlog.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
@@ -41,12 +42,12 @@ namespace dorado::modbase {
 
 std::string to_string(const ModelType& model_type) {
     switch (model_type) {
-    case CONV_LSTM:
+    case CONV_LSTM_V1:
         return std::string("conv_lstm");
+    case CONV_LSTM_V2:
+        return std::string("conv_lstm_v2");
     case CONV_V1:
         return std::string("conv_v1");
-    case CONV_V2:
-        return std::string("conv_v2");
     default:
         throw std::runtime_error("Unknown modbase ModelType");
     }
@@ -54,13 +55,13 @@ std::string to_string(const ModelType& model_type) {
 
 ModelType model_type_from_string(const std::string& model_type) {
     if (model_type == "conv_lstm") {
-        return ModelType::CONV_LSTM;
+        return ModelType::CONV_LSTM_V1;
+    }
+    if (model_type == "conv_lstm_v2") {
+        return ModelType::CONV_LSTM_V2;
     }
     if (model_type == "conv_only" || model_type == "conv_v1") {
         return ModelType::CONV_V1;
-    }
-    if (model_type == "conv_v2") {
-        return ModelType::CONV_V2;
     }
     throw std::runtime_error("Unknown modbase model type: `" + model_type + "`");
 }
@@ -75,10 +76,16 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     constexpr int MAX_SIZE = 4096;
     constexpr int MAX_KMER = 19;
     constexpr int MAX_FEATURES = 10;
-    ModelGeneralParams params{parse_model_type(config_toml),
-                              get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
-                              get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
-                              get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED)};
+    constexpr int MAX_STRIDE = 12;
+    ModelGeneralParams params{
+            parse_model_type(config_toml),
+            get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
+            get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
+            get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED),
+            get_int_in_range(segment, "signal_stride", 1, MAX_STRIDE, 3),
+            get_int_in_range(segment, "sequence_stride", 1, MAX_STRIDE, 3),
+            get_int_in_range(segment, "encoded_kmer_stride", 1, MAX_STRIDE, 1),
+    };
     return params;
 }
 
@@ -87,58 +94,6 @@ LinearParams parse_linear_params(const toml::value& segment) {
     LinearParams params{get_int_in_range(segment, "in", 1, MAX_SIZE, REQUIRED),
                         get_int_in_range(segment, "out", 1, MAX_SIZE, REQUIRED)};
     return params;
-}
-
-ConvParams parse_conv_params(const toml::value& segment) {
-    constexpr int MAX_SIZE = 4096;
-    constexpr int MAX_WINLEN = 1024;
-    constexpr int MAX_STRIDE = 128;
-    constexpr int MAX_DEPTH = 64;
-    constexpr int MAX_PADDING = 4096;
-
-    constexpr int DEFAULT_STRIDE = 1;
-    constexpr int DEFAULT_DEPTH = 1;
-    constexpr int DEFAULT_PADDING = 0;
-
-    ConvParams params{get_int_in_range(segment, "insize", 1, MAX_SIZE, REQUIRED),
-                      get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
-                      get_int_in_range(segment, "winlen", 1, MAX_WINLEN, REQUIRED),
-                      get_int_in_range(segment, "stride", 1, MAX_STRIDE, DEFAULT_STRIDE),
-                      get_int_in_range(segment, "depth", 1, MAX_DEPTH, DEFAULT_DEPTH),
-                      get_int_in_range(segment, "padding", 0, MAX_PADDING, DEFAULT_PADDING)};
-    return params;
-}
-
-std::vector<ConvParams> parse_convs(const toml::value& segment) {
-    const auto& sublayers = toml::find(segment, "sublayers").as_array();
-
-    std::vector<ConvParams> convs;
-    convs.reserve(sublayers.size());
-
-    for (const auto& sublayer : sublayers) {
-        const auto type = toml::find<std::string>(sublayer, "type");
-        if (type != "convolution") {
-            throw std::runtime_error(
-                    "Unexpected sublayer type in modbase model config expected "
-                    "'convolution' but found :'" +
-                    type + "'.");
-        }
-        convs.push_back(parse_conv_params(sublayer));
-    }
-    return convs;
-}
-
-std::optional<ConvEncoder> parse_conv_encoder(const toml::value& config_toml) {
-    const auto model_type = parse_model_type(config_toml);
-    if (model_type != ModelType::CONV_V2) {
-        return std::nullopt;
-    }
-    const auto segment = toml::find(config_toml, "encoder");
-    ConvEncoder encoder{parse_convs(toml::find(segment, "stem")),
-                        parse_convs(toml::find(segment, "downsample")),
-                        parse_convs(toml::find(segment, "stages")),
-                        parse_linear_params(toml::find(segment, "head"))};
-    return encoder;
 }
 
 ModificationParams parse_modification_params(const toml::value& config_toml) {
@@ -178,10 +133,13 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
 ContextParams parse_context_params(const toml::value& config_toml) {
     const auto& params = toml::find(config_toml, "modbases");
 
-    const auto context_before =
-            static_cast<size_t>(get_int_in_range(params, "chunk_context_0", 1, 4096, REQUIRED));
-    const auto context_after =
-            static_cast<size_t>(get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED));
+    const int context_before = get_int_in_range(params, "chunk_context_0", 0, 4096, REQUIRED);
+    const int context_after = get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED);
+
+    constexpr int MAX_CHUNK_SIZE = 102400;
+    const int min_chunk_size = context_before + context_after;
+    const int chunk_size =
+            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size);
 
     const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
     const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
@@ -189,8 +147,20 @@ ContextParams parse_context_params(const toml::value& config_toml) {
     const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
     const bool base_start_justify = toml::find_or<bool>(params, "base_start_justify", false);
 
-    return ContextParams(context_before, context_after, bases_before, bases_after, reverse,
-                         base_start_justify);
+    return ContextParams(context_before, context_after, chunk_size, bases_before, bases_after,
+                         reverse, base_start_justify);
+}
+
+ContextParams ContextParams::normalised(const int stride) const {
+    const int64_t sb = normalise(samples_before, stride);
+    const int64_t sa = normalise(samples_after, stride);
+    const int64_t cs = normalise(chunk_size, stride);
+
+    spdlog::debug(
+            "Normalised modbase context params for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
+            "[samples_before, samples_after, chunk_size]",
+            stride, samples_before, sb, samples_after, sa, chunk_size, cs);
+    return ContextParams(sb, sa, cs, bases_before, bases_after, reverse, base_start_justify);
 }
 
 RefinementParams parse_refinement_params(const toml::value& config_toml,

@@ -58,6 +58,7 @@ void ModBaseRunner::accept_chunk(int model_id,
     const auto sig_len = signal.size(0);
     dorado::utils::copy_tensor_elems(input_sigs, chunk_idx * sig_len, signal, 0, sig_len);
 
+    assert(input_seqs.is_contiguous());
     const auto kmer_elem_count = input_seqs.size(1) * input_seqs.size(2);
     if (input_seqs.dtype() != torch::kInt8) {
         throw std::runtime_error("Unsupported input dtype");
@@ -99,6 +100,8 @@ size_t ModBaseRunner::num_models() const { return m_caller->num_models(); }
 
 void ModBaseRunner::terminate() { m_caller->terminate(); }
 void ModBaseRunner::restart() { m_caller->restart(); }
+
+bool ModBaseRunner::takes_chunk_inputs() const { return model_params(0).is_chunked_input_model(); }
 
 std::string ModBaseRunner::get_name() const {
     std::ostringstream name_stream;

@@ -456,7 +456,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // then call what we have.
         if (batched_chunks.size() == m_batch_size ||
             (status == utils::AsyncQueueStatus::Timeout && !batched_chunks.empty())) {
-if (batched_chunks.size() != m_batch_size) {
+            if (batched_chunks.size() != m_batch_size) {
                 ++m_num_partial_batches_called;
             }
             // Input tensor is full, let's get scores.

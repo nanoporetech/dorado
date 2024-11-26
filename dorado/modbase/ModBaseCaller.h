@@ -2,6 +2,7 @@
 
 #include "ModBaseModelConfig.h"
 #include "MotifMatcher.h"
+#include "torch_utils/module_utils.h"
 #include "utils/stats.h"
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
@@ -34,12 +35,14 @@ public:
                     const at::TensorOptions& opts,
                     const int batch_size_);
         std::vector<size_t> get_motif_hits(const std::string& seq) const;
+        int64_t get_sig_len() const;
+        int64_t get_seq_len() const;
 
         const ModBaseModelConfig params;
         std::unique_ptr<ModBaseScaler> scaler;
 
     private:
-        torch::nn::ModuleHolder<torch::nn::AnyModule> module_holder;
+        utils::ModuleWrapper module_holder;
         const MotifMatcher matcher;
         std::deque<std::shared_ptr<ModBaseTask>> input_queue;
         std::mutex input_lock;
@@ -81,6 +84,8 @@ public:
 private:
     void start_threads();
     void modbase_task_thread_fn(size_t model_id);
+
+    int64_t get_sig_len() const;
 
     const size_t m_num_models;
 

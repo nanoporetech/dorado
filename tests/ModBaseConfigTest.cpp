@@ -28,35 +28,37 @@ TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     // For _5mCG_5hmCG kmer center index 6 to pass tests need: Log(X)/Log(4) > 7
     // -> Log(X) > 7*1.387 -> X := Exp(9.71) = 16482
     std::vector<float> refined_kmer_levels(16482, 0);
+    constexpr int stride = 3;
+    constexpr int encoding_stride = 1;
     auto [path, general, mods, context, refine] =
             // clang-format off
             GENERATE_COPY(table<fs::path, Gen, Mod, Ctx, Rmt>({
             std::make_tuple(
                 _5mCG, 
-                Gen{ModelType::CONV_V1, 64, 9, 2}, 
+                Gen{ModelType::CONV_V1, 64, 9, 2, stride, stride, encoding_stride}, 
                 Mod{{"m"}, {"5mC"}, "CG", 0},
-                Ctx{50, 50, 4, 4, false, false}, 
+                Ctx{50, 50, 100, 4, 4, false, false}, 
                 Rmt{}
             ),
             std::make_tuple(
                 _5mCG_5hmCG, 
-                Gen{ModelType::CONV_LSTM, 256, 9, 3}, 
+                Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, stride, stride, encoding_stride},
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0,},                
-                Ctx{50, 50, 4, 4, false, false}, 
+                Ctx{50, 50, 100, 4, 4, false, false}, 
                 Rmt{7, 6, refined_kmer_levels}
             ),
             std::make_tuple(
                 _pseU,
-                Gen{ModelType::CONV_LSTM, 128, 9, 2},
+                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, stride, stride, encoding_stride},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
-                Ctx{150, 150, 4, 4, true, false},
+                Ctx{150, 150, 300, 4, 4, true, false},
                 Rmt{7, 3, refined_kmer_levels}
             ),
             std::make_tuple(
                 _pseU_j,
-                Gen{ModelType::CONV_LSTM, 128, 9, 2},
+                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, stride, stride, encoding_stride},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
-                Ctx{150, 150, 4, 4, true, true},
+                Ctx{150, 150, 300, 4, 4, true, true},
                 Rmt{7, 3, refined_kmer_levels}
             ),
             }));

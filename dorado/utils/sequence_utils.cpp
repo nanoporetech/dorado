@@ -446,6 +446,33 @@ std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {
     return ans;
 }
 
+// Reverse sequence to signal map inplace
+void reverse_seq_to_sig_map(std::vector<uint64_t>& seq_to_sig_map, size_t signal_len) {
+    // This function performs the following in 1 iteration instead of 2
+    // std::reverse(v.begin(), v.end());
+    // std::transform(v.begin(), v.end(), v.begin(), [](auto a) { return L - a; });
+
+    const size_t end_idx = seq_to_sig_map.size();
+    const size_t mid_idx = end_idx / 2;
+    for (size_t left_idx = 0; left_idx < mid_idx; ++left_idx) {
+        const size_t right_idx = end_idx - left_idx - 1;
+        auto& left = seq_to_sig_map[left_idx];
+        auto& right = seq_to_sig_map[right_idx];
+        assert(signal_len >= left);
+        assert(signal_len >= right);
+        left = signal_len - left;
+        right = signal_len - right;
+        std::swap(left, right);
+    }
+
+    // Handle the middle element for odd sized containers
+    if (end_idx % 2 != 0) {
+        auto& mid = seq_to_sig_map[mid_idx];
+        assert(signal_len >= mid);
+        mid = signal_len - mid;
+    }
+}
+
 // Multiversioned function dispatch doesn't work across the dorado_lib linking
 // boundary.  Without this wrapper, AVX machines still only execute the default
 // version.
