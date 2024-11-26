@@ -65,12 +65,10 @@ public:
 };
 
 std::unique_ptr<std::istream> create_input_stream(const std::string& input_file) {
-    dorado::HtsFilePtr hts_file(hts_open(input_file.c_str(), "r"));
-    if (!hts_file) {
+    auto hfile = hopen(input_file.c_str(), "r");
+    if (!hfile) {
         return {};
     }
-
-    auto hfile = hopen(input_file.c_str(), "r");
     htsFormat format_check;
     auto fmt_detect_result = hts_detect_format(hfile, &format_check);
     // Note the format check does not detect fastq if Ts are replaced with Us
