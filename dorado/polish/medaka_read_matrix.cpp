@@ -404,20 +404,18 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 }
 
                 Read read = {
-                        .ref_start = alignment->core.pos,
-                        .qname = qname,
-                        .seqi = bam_get_seq(alignment),
-                        .qual = bam_get_qual(alignment),
-                        .mapq = alignment->core.qual,
-                        .haplotype = haplotype,
-                        .strand = static_cast<int8_t>(bam_is_rev(alignment) ? -1 : 1),
-                        .dtype = static_cast<int8_t>(dtype),
-                        .ref_end = static_cast<int64_t>(
-                                alignment->core.pos +
-                                aligned_ref_pos_from_cigar(bam_get_cigar(alignment),
-                                                           alignment->core.n_cigar)),
-                        .dwells = (include_dwells ? calculate_dwells(alignment)
-                                                  : std::vector<int8_t>()),
+                        alignment->core.pos,
+                        qname,
+                        bam_get_seq(alignment),
+                        bam_get_qual(alignment),
+                        alignment->core.qual,
+                        haplotype,
+                        static_cast<int8_t>(bam_is_rev(alignment) ? -1 : 1),
+                        static_cast<int8_t>(dtype),
+                        static_cast<int64_t>(alignment->core.pos +
+                                             aligned_ref_pos_from_cigar(bam_get_cigar(alignment),
+                                                                        alignment->core.n_cigar)),
+                        (include_dwells ? calculate_dwells(alignment) : std::vector<int8_t>()),
                 };
 
                 // insert read into read_array in place of a read that's already completed
@@ -426,7 +424,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                     for (read_i = 0; read_i < array_size; ++read_i) {
                         const Read &current_read = read_array[read_i];
                         if (pos >= (current_read.ref_end + min_gap)) {
-                            read_array[read_i] = read;
+                            read_array[read_i] = std::move(read);
                             read_map[qname] = read_i;
                             break;
                         }
@@ -440,7 +438,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 // no completed reads, append instead
                 if (read_i == array_size) {
                     if (read_i < pileup.buffer_reads) {
-                        read_array.emplace_back(read);
+                        read_array.emplace_back(std::move(read));
                     }
                     read_map[qname] = read_i;
                 }
