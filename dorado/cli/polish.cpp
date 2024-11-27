@@ -95,8 +95,9 @@ struct Options {
     std::filesystem::path model_path;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
-    int32_t threads = 1;
+    int32_t threads = 0;
     int32_t infer_threads = 1;
+    bool infer_threads_is_set = false;
     std::string device_str;
     int32_t batch_size = 128;
     int64_t draft_batch_size = 200'000'000;
@@ -236,9 +237,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
     opt.threads = parser.visible.get<int>("threads");
-    opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : opt.threads;
+    opt.threads = (opt.threads == 0) ? std::max(1U, std::thread::hardware_concurrency() / 2)
+                                     : opt.threads;
 
     opt.infer_threads = parser.visible.get<int>("infer-threads");
+    opt.infer_threads_is_set = parser.visible.is_used("--infer-threads");
 
     opt.device_str = parser.visible.get<std::string>("device");
 
@@ -336,6 +339,13 @@ void validate_options(const Options& opt) {
     if (!std::filesystem::exists(opt.in_draft_fastx_fn) ||
         std::filesystem::is_empty(opt.in_draft_fastx_fn)) {
         spdlog::error("Input file {} does not exist or is empty.", opt.in_draft_fastx_fn.string());
+        std::exit(EXIT_FAILURE);
+    }
+
+    if ((opt.device_str != "cpu") && opt.infer_threads_is_set) {
+        spdlog::error(
+                "Specifying the number of CPU inference threads is only allowed when the device is "
+                "set to 'cpu'.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -485,6 +495,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
 
             spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
         }
+        // In case the device is set to CPU, we add up to inference_threads models.
         if ((std::size(resources.devices) == 1) &&
             (resources.devices.front().type == DeviceType::CPU)) {
             for (int32_t i = 1; i < num_inference_cpu_threads; ++i) {
@@ -510,6 +521,8 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
 }  // namespace
 
 void run_polishing(const Options& opt, PolisherResources& resources) {
+    spdlog::info("Threads: {}", opt.threads);
+    spdlog::info("Inference threads: {}", opt.infer_threads);
     spdlog::info("Number of devices: {}", std::size(resources.devices));
 
     at::InferenceMode infer_guard;
@@ -644,9 +657,10 @@ int polish(int argc, char* argv[]) {
         // Create the models, encoders and BAM handles.
         PolisherResources resources =
                 create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
-                                 opt.threads, opt.full_precision);
+                                 opt.infer_threads, opt.full_precision);
 
         run_polishing(opt, resources);
+
     } catch (const std::exception& e) {
         spdlog::error("Caught exception: {}", e.what());
         return EXIT_FAILURE;
