@@ -27,7 +27,7 @@ struct CountsResult {
     std::vector<int64_t> positions_minor;
 };
 
-class CountsFeatureEncoder : public BaseFeatureEncoder {
+class CountsFeatureEncoder : public EncoderBase {
 public:
     CountsFeatureEncoder() = default;
 

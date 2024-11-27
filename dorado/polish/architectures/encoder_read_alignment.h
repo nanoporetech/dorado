@@ -29,7 +29,7 @@ struct ReadAlignmentTensors {
     std::vector<std::string> read_ids_right;
 };
 
-class ReadAlignmentFeatureEncoder : public BaseFeatureEncoder {
+class ReadAlignmentFeatureEncoder : public EncoderBase {
 public:
     ReadAlignmentFeatureEncoder() = default;
 

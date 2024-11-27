@@ -11,7 +11,7 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     throw std::runtime_error{"Unknown feature encoder type: '" + type + "'!"};
 }
 
-std::unique_ptr<BaseFeatureEncoder> encoder_factory(const ModelConfig& config) {
+std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);

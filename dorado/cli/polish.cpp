@@ -79,7 +79,7 @@ enum class OutputFormat {
 };
 
 struct PolisherResources {
-    std::unique_ptr<polisher::BaseFeatureEncoder> encoder;
+    std::unique_ptr<polisher::EncoderBase> encoder;
     std::unique_ptr<polisher::FeatureDecoder> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;

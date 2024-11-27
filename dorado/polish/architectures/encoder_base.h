@@ -42,9 +42,9 @@ inline NormaliseType parse_normalise_type(std::string type) {
     throw std::runtime_error{"Unknown normalise type: '" + type + "'!"};
 }
 
-class BaseFeatureEncoder {
+class EncoderBase {
 public:
-    virtual ~BaseFeatureEncoder() = default;
+    virtual ~EncoderBase() = default;
 
     virtual Sample encode_region(BamFile& bam_file,
                                  const std::string& ref_name,

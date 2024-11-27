@@ -414,7 +414,7 @@ std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_
 
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,
-        const polisher::BaseFeatureEncoder& encoder,
+        const polisher::EncoderBase& encoder,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
@@ -643,7 +643,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 }
 
 void process_samples(polisher::TorchModel& model,
-                     const polisher::BaseFeatureEncoder& encoder,
+                     const polisher::EncoderBase& encoder,
                      const polisher::FeatureDecoder& decoder,
                      const std::vector<polisher::Sample>& in_samples,
                      const std::vector<polisher::TrimInfo>& in_trims,
@@ -745,7 +745,7 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const std::vector<polisher::Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
-        const polisher::BaseFeatureEncoder& encoder,
+        const polisher::EncoderBase& encoder,
         const polisher::FeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size) {
