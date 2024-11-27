@@ -26,14 +26,21 @@ namespace dorado::basecall {
 
 static constexpr float GB = 1.0e9f;
 
-// Default value for timeout for incomplete batches. Large value of 120 seconds is
-// needed to avoid issues with performance benchmarking. A better solution is being
-// worked on in DOR-968.
-static constexpr int DEFAULT_BATCH_TIMEOUT_MS = 120000;
+// If 5 minutes has passed since the first chunk was added to a batch, we will
+// dispatch the batch even if it is not full. This is to prevent issues with
+// MinKNOW clients disconnecting because they think the server has timed out.
+static constexpr int DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 300000;
+
+// If 30 seconds has passed since the most recent chunk was added to a batch,
+// we will dispatch the batch even if it is not full. Benchmarking indicates
+// that this gives good results when some pipelines have very low throughput
+// and others have very high throughput.
+static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
 
 // Default value for timeout of incomplete batches for low-latency pipelines. The
 // value of 350 ms has been found to give good adaptive-sampling performance on all
-// platforms.
+// platforms. For low-latency pipelines the timeout is always from when the first
+// chunk was added to the batch.
 static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
 
 struct CudaCaller::NNTask {
@@ -92,8 +99,12 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
 
 CudaCaller::~CudaCaller() { terminate(); }
 
-int CudaCaller::batch_timeout_ms() const {
-    return m_low_latency ? DEFAULT_LOW_LATENCY_TIMEOUT_MS : DEFAULT_BATCH_TIMEOUT_MS;
+std::pair<int, int> CudaCaller::batch_timeouts_ms() const {
+    // For low-latency pipelines we set both timeouts to the same value. This means that we
+    // will always timeout based on the time from the first chunk being added to the batch.
+    return m_low_latency
+                   ? std::make_pair(DEFAULT_LOW_LATENCY_TIMEOUT_MS, DEFAULT_LOW_LATENCY_TIMEOUT_MS)
+                   : std::make_pair(DEFAULT_FIRST_CHUNK_TIMEOUT_MS, DEFAULT_LAST_CHUNK_TIMEOUT_MS);
 }
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
