@@ -70,8 +70,6 @@ public:
     virtual std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const = 0;
 };
 
-std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples);
-
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
                                                const torch::Tensor& logits);
 
