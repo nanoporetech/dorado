@@ -174,9 +174,9 @@ TEST_CASE("Test trim mod base info", TEST_GROUP) {
     }
 }
 
-// This test case is useful because trimming of reverse strand requires
-// the modbase tags to be treated differently since they are written
-// relative to the original sequence that was basecalled.
+// This test case is useful because trimming of the reverse strand requires
+// the sequence to be reversed, but the modbase tags are stored in the
+// original sequencing direction
 TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     const auto data_dir = fs::path(get_data_dir("trimmer"));
     const auto bam_file = data_dir / "reverse_strand_record.bam";
