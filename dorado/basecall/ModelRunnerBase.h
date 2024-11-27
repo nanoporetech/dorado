@@ -4,6 +4,7 @@
 #include "utils/stats.h"
 
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace at {

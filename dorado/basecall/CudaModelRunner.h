@@ -8,6 +8,7 @@
 #include <atomic>
 #include <filesystem>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 namespace dorado::basecall {

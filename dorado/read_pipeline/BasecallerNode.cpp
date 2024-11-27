@@ -269,9 +269,11 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         utils::ScopedAutoReleasePool inner_pool;
 #endif
         std::unique_ptr<BasecallingChunk> chunk;
-        auto timeout1 = first_chunk_reserve_time + std::chrono::milliseconds(from_first_timeout);
-        auto timeout2 = last_chunk_reserve_time + std::chrono::milliseconds(from_last_timeout);
-        auto timeout = std::min(timeout1, timeout2);
+        const auto timeout1 =
+                first_chunk_reserve_time + std::chrono::milliseconds(from_first_timeout);
+        const auto timeout2 =
+                last_chunk_reserve_time + std::chrono::milliseconds(from_last_timeout);
+        const auto timeout = std::min(timeout1, timeout2);
         const auto pop_status = m_chunk_in_queues[chunk_queue_idx]->try_pop_until(chunk, timeout);
 
         if (pop_status == utils::AsyncQueueStatus::Terminate) {
