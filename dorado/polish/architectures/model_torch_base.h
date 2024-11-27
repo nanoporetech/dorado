@@ -6,9 +6,9 @@
 
 namespace dorado::polisher {
 
-class TorchModel : public torch::nn::Module {
+class ModelTorchBase : public torch::nn::Module {
 public:
-    virtual ~TorchModel() = default;
+    virtual ~ModelTorchBase() = default;
 
     /**
      * \brief This function is virtual and must be overridden by derived classes.

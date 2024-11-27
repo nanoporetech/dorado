@@ -2,7 +2,7 @@
 
 namespace dorado::polisher {
 
-GRUModel::GRUModel(const int32_t num_features,
+ModelGRU::ModelGRU(const int32_t num_features,
                    const int32_t num_classes,
                    const int32_t gru_size,
                    const int32_t num_layers,
@@ -23,7 +23,7 @@ GRUModel::GRUModel(const int32_t num_features,
     register_module("linear", m_linear);
 }
 
-torch::Tensor GRUModel::forward(torch::Tensor x) {
+torch::Tensor ModelGRU::forward(torch::Tensor x) {
     x = std::move(std::get<0>(m_gru->forward(x)));
     x = m_linear->forward(x);
     if (m_normalise) {

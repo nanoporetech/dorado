@@ -8,9 +8,9 @@
 
 namespace dorado::polisher {
 
-class GRUModel : public TorchModel {
+class ModelGRU : public ModelTorchBase {
 public:
-    GRUModel(const int32_t num_features,
+    ModelGRU(const int32_t num_features,
              const int32_t num_classes,
              const int32_t gru_size,
              const int32_t num_layers,

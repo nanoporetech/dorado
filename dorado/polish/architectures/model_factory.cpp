@@ -29,7 +29,7 @@ ModelType parse_model_type(const std::string& type) {
  *          Issue: "PytorchStreamReader failed locating file constants.pkl: file not found"
  *          Source: https://github.com/pytorch/pytorch/issues/36577#issuecomment-1279666295
  */
-void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
+void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) {
     const auto get_bytes = [](const std::filesystem::path& filename) {
         std::ifstream input(filename, std::ios::binary);
         std::vector<char> bytes((std::istreambuf_iterator<char>(input)),
@@ -70,7 +70,7 @@ void load_parameters(TorchModel& model, const std::filesystem::path& in_pt) {
     }
 }
 
-std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -86,7 +86,7 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
 
     const ModelType model_type = parse_model_type(config.model_type);
 
-    std::shared_ptr<TorchModel> model;
+    std::shared_ptr<ModelTorchBase> model;
 
     if ((config.model_file != "model.pt") && (config.model_file != "weights.pt")) {
         throw std::runtime_error{"Unexpected weights/model file name! model_file = '" +
@@ -97,7 +97,7 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
     if (config.model_file == "model.pt") {
         // Load a TorchScript model. Parameters are not important here.
         spdlog::debug("Loading a TorchScript model.");
-        model = std::make_unique<TorchScriptModel>(config.model_dir / config.model_file);
+        model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
 
     } else if (model_type == ModelType::GRU) {
         spdlog::debug("Constructing a GRU model.");
@@ -111,7 +111,7 @@ std::shared_ptr<TorchModel> model_factory(const ModelConfig& config) {
         constexpr bool NORMALISE = true;
         // const double read_majority_threshold = std::stod(get_value(config.model_kwargs, "read_majority_threshold"));
 
-        model = std::make_unique<GRUModel>(num_features, num_classes, gru_size, n_layers,
+        model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
                                            bidirectional, NORMALISE);
 
         // Set the weights of the internally constructed model.

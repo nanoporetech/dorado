@@ -2,7 +2,7 @@
 
 namespace dorado::polisher {
 
-torch::Device TorchModel::get_device() const {
+torch::Device ModelTorchBase::get_device() const {
     // Get the device of the first parameter as a representative.
     for (const auto& param : this->parameters()) {
         if (param.defined()) {
@@ -13,18 +13,18 @@ torch::Device TorchModel::get_device() const {
 }
 
 // Convert the model to half precision
-void TorchModel::to_half() {
+void ModelTorchBase::to_half() {
     this->to(torch::kHalf);
     m_half_precision = true;
 }
 
 // Sets the eval mode.
-void TorchModel::set_eval() { this->eval(); }
+void ModelTorchBase::set_eval() { this->eval(); }
 
-void TorchModel::to_device(torch::Device device) { this->to(device); }
+void ModelTorchBase::to_device(torch::Device device) { this->to(device); }
 
 // Predict on a batch with device and precision handling.
-torch::Tensor TorchModel::predict_on_batch(torch::Tensor x) {
+torch::Tensor ModelTorchBase::predict_on_batch(torch::Tensor x) {
     x = x.to(get_device());
     if (m_half_precision) {
         x = x.to(torch::kHalf);

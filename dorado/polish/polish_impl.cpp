@@ -642,7 +642,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     return {std::move(samples), std::move(trims)};
 }
 
-void process_samples(polisher::TorchModel& model,
+void process_samples(polisher::ModelTorchBase& model,
                      const polisher::EncoderBase& encoder,
                      const polisher::FeatureDecoder& decoder,
                      const std::vector<polisher::Sample>& in_samples,
@@ -744,7 +744,7 @@ void process_samples(polisher::TorchModel& model,
 std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const std::vector<polisher::Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
-        const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
+        const std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
         const polisher::EncoderBase& encoder,
         const polisher::FeatureDecoder& decoder,
         const int32_t window_len,

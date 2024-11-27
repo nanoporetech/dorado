@@ -23,6 +23,6 @@ enum class ModelType {
 
 ModelType parse_model_type(const std::string& type);
 
-std::shared_ptr<TorchModel> model_factory(const ModelConfig& config);
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config);
 
 }  // namespace dorado::polisher

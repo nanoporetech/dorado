@@ -7,7 +7,7 @@
 
 namespace dorado::polisher {
 
-TorchScriptModel::TorchScriptModel(const std::filesystem::path& model_path) {
+ModelTorchScript::ModelTorchScript(const std::filesystem::path& model_path) {
     try {
         spdlog::debug("Loading model from file: {}", model_path.string());
         m_module = torch::jit::load(model_path.string());
@@ -17,7 +17,7 @@ TorchScriptModel::TorchScriptModel(const std::filesystem::path& model_path) {
     }
 }
 
-torch::Device TorchScriptModel::get_device() const {
+torch::Device ModelTorchScript::get_device() const {
     // Get the device of the first parameter as a representative.
     for (const auto& param : m_module.parameters()) {
         if (param.defined()) {
@@ -27,22 +27,22 @@ torch::Device TorchScriptModel::get_device() const {
     return torch::Device(torch::kCPU);
 }
 
-torch::Tensor TorchScriptModel::forward(torch::Tensor x) {
+torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
     return m_module.forward({std::move(x)}).toTensor();
 }
 
-void TorchScriptModel::to_half() {
+void ModelTorchScript::to_half() {
     this->to(torch::kHalf);
     m_module.to(torch::kHalf);
     m_half_precision = true;
 }
 
-void TorchScriptModel::set_eval() {
+void ModelTorchScript::set_eval() {
     this->eval();
     m_module.eval();
 }
 
-void TorchScriptModel::to_device(torch::Device device) {
+void ModelTorchScript::to_device(torch::Device device) {
     this->to(device);
     m_module.to(device);
 }

@@ -83,7 +83,7 @@ struct PolisherResources {
     std::unique_ptr<polisher::FeatureDecoder> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
-    std::vector<std::shared_ptr<polisher::TorchModel>> models;
+    std::vector<std::shared_ptr<polisher::ModelTorchBase>> models;
 };
 
 /// \brief All options for this tool.
@@ -471,7 +471,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     // Construct the model.
     spdlog::info("Loading the model.");
     const auto create_models = [&]() {
-        std::vector<std::shared_ptr<polisher::TorchModel>> ret;
+        std::vector<std::shared_ptr<polisher::ModelTorchBase>> ret;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];

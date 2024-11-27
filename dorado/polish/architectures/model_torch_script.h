@@ -8,9 +8,9 @@
 
 namespace dorado::polisher {
 
-class TorchScriptModel : public TorchModel {
+class ModelTorchScript : public ModelTorchBase {
 public:
-    TorchScriptModel(const std::filesystem::path& model_path);
+    ModelTorchScript(const std::filesystem::path& model_path);
 
     torch::Device get_device() const override;
 
