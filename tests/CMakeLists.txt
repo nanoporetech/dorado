@@ -272,4 +272,7 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # that we use.
     add_library(dorado_symbol_test SHARED symbol_test.cpp)
     target_link_libraries(dorado_symbol_test PUBLIC dorado_lib dorado_models_lib)
+    if(MSVC)
+        set_property(TARGET dorado_symbol_test APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
+    endif()
 endif()
