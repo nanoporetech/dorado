@@ -71,6 +71,15 @@ bool check_file_can_be_opened_for_reading(const std::string& input_file) {
     return check_normal_file.is_open();
 }
 
+struct HfileDestructor {
+    void operator()(hFILE* fp) {
+        if (fp) {
+            hclose(fp);
+        }
+    }
+};
+using HfilePtr = std::unique_ptr<hFILE, HfileDestructor>;
+
 std::unique_ptr<std::istream> create_input_stream(const std::string& input_file) {
     // check for a normal file that can be opened for reading before calling hopen
     // as hopen has special semantics and does not do this check, e.g. calling with
@@ -78,13 +87,12 @@ std::unique_ptr<std::istream> create_input_stream(const std::string& input_file)
     if (!check_file_can_be_opened_for_reading(input_file)) {
         return {};
     }
-
-    auto hfile = hopen(input_file.c_str(), "r");
+    HfilePtr hfile(hopen(input_file.c_str(), "r"));
     if (!hfile) {
         return {};
     }
     htsFormat format_check;
-    auto fmt_detect_result = hts_detect_format(hfile, &format_check);
+    auto fmt_detect_result = hts_detect_format(hfile.get(), &format_check);
     // Note the format check does not detect fastq if Ts are replaced with Us
     // So treat a text file as a potential fastq
     if (fmt_detect_result < 0 || (format_check.format != htsExactFormat::fastq_format &&
