@@ -415,12 +415,12 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
             }
         }
     } else {
-        spdlog::debug("Not trimming to region because region not fully specified.");
+        spdlog::debug("[trim_samples] Not trimming to region because region not fully specified.");
     }
 
     assert(std::size(result) == std::size(samples));
 
-    spdlog::debug("num_heuristic = {}", num_heuristic);
+    spdlog::trace("[trim_samples] num_heuristic = {}", num_heuristic);
 
     return result;
 }

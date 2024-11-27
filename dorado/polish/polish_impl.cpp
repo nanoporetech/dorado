@@ -340,13 +340,13 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
 
         const int64_t step = chunk_len - chunk_overlap;
 
-        spdlog::debug("[split_samples] sample_len = {}, features.shape = {}, step = {}", sample_len,
+        spdlog::trace("[split_samples] sample_len = {}, features.shape = {}, step = {}", sample_len,
                       tensor_shape_as_string(sample.features), step);
 
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
-            spdlog::debug("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
+            spdlog::trace("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
             results.emplace_back(create_chunk(sample, start, end));
         }
 
@@ -354,13 +354,13 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
-            spdlog::debug("[split_samples]     - creating end chunk: start = {}, end = {}", start,
+            spdlog::trace("[split_samples]     - creating end chunk: start = {}, end = {}", start,
                           end);
             results.emplace_back(create_chunk(sample, start, end));
         }
     }
 
-    spdlog::debug("[split_samples]     - done, results.size() = {}", std::size(results));
+    spdlog::trace("[split_samples]     - done, results.size() = {}", std::size(results));
 
     return results;
 }
