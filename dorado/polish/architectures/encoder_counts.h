@@ -27,20 +27,20 @@ struct CountsResult {
     std::vector<int64_t> positions_minor;
 };
 
-class CountsFeatureEncoder : public EncoderBase {
+class EncoderCounts : public EncoderBase {
 public:
-    CountsFeatureEncoder() = default;
+    EncoderCounts() = default;
 
-    CountsFeatureEncoder(const NormaliseType normalise_type,
-                         const std::vector<std::string>& dtypes,
-                         const std::string_view tag_name,
-                         const int32_t tag_value,
-                         const bool tag_keep_missing,
-                         const std::string_view read_group,
-                         const int32_t min_mapq,
-                         const bool symmetric_indels);
+    EncoderCounts(const NormaliseType normalise_type,
+                  const std::vector<std::string>& dtypes,
+                  const std::string_view tag_name,
+                  const int32_t tag_value,
+                  const bool tag_keep_missing,
+                  const std::string_view read_group,
+                  const int32_t min_mapq,
+                  const bool symmetric_indels);
 
-    ~CountsFeatureEncoder() = default;
+    ~EncoderCounts() = default;
 
     Sample encode_region(BamFile& bam_file,
                          const std::string& ref_name,

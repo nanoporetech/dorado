@@ -29,22 +29,22 @@ struct ReadAlignmentTensors {
     std::vector<std::string> read_ids_right;
 };
 
-class ReadAlignmentFeatureEncoder : public EncoderBase {
+class EncoderReadAlignment : public EncoderBase {
 public:
-    ReadAlignmentFeatureEncoder() = default;
+    EncoderReadAlignment() = default;
 
-    ReadAlignmentFeatureEncoder(const std::vector<std::string>& dtypes,
-                                const std::string_view tag_name,
-                                const int32_t tag_value,
-                                const bool tag_keep_missing,
-                                const std::string_view read_group,
-                                const int32_t min_mapq,
-                                const int32_t max_reads,
-                                const bool row_per_read,
-                                const bool include_dwells,
-                                const bool include_haplotype);
+    EncoderReadAlignment(const std::vector<std::string>& dtypes,
+                         const std::string_view tag_name,
+                         const int32_t tag_value,
+                         const bool tag_keep_missing,
+                         const std::string_view read_group,
+                         const int32_t min_mapq,
+                         const int32_t max_reads,
+                         const bool row_per_read,
+                         const bool include_dwells,
+                         const bool include_haplotype);
 
-    ~ReadAlignmentFeatureEncoder() = default;
+    ~EncoderReadAlignment() = default;
 
     Sample encode_region(BamFile& bam_file,
                          const std::string& ref_name,

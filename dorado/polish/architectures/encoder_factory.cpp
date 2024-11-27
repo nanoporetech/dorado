@@ -47,7 +47,7 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
         constexpr int32_t TAG_VALUE = 0;
         const std::string read_group;
 
-        std::unique_ptr<CountsFeatureEncoder> ret = std::make_unique<CountsFeatureEncoder>(
+        std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
                 normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
                 tag_keep_missing, read_group, min_mapq, sym_indels);
 
@@ -65,11 +65,9 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
         constexpr int32_t TAG_VALUE = 0;
         const std::string read_group;
 
-        std::unique_ptr<ReadAlignmentFeatureEncoder> ret =
-                std::make_unique<ReadAlignmentFeatureEncoder>(
-                        config.feature_encoder_dtypes, tag_name, TAG_VALUE, tag_keep_missing,
-                        read_group, min_mapq, max_reads, row_per_read, include_dwells,
-                        include_haplotype);
+        std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
+                config.feature_encoder_dtypes, tag_name, TAG_VALUE, tag_keep_missing, read_group,
+                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype);
 
         return ret;
     }

@@ -277,14 +277,14 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
 
 }  // namespace
 
-CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
-                                           const std::vector<std::string>& dtypes,
-                                           const std::string_view tag_name,
-                                           const int32_t tag_value,
-                                           const bool tag_keep_missing,
-                                           const std::string_view read_group,
-                                           const int32_t min_mapq,
-                                           const bool symmetric_indels)
+EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
+                             const std::vector<std::string>& dtypes,
+                             const std::string_view tag_name,
+                             const int32_t tag_value,
+                             const bool tag_keep_missing,
+                             const std::string_view read_group,
+                             const int32_t min_mapq,
+                             const bool symmetric_indels)
         : m_normalise_type{normalise_type},
           m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_dtypes{dtypes},
@@ -296,11 +296,11 @@ CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
-Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
-                                           const std::string& ref_name,
-                                           const int64_t ref_start,
-                                           const int64_t ref_end,
-                                           const int32_t seq_id) const {
+Sample EncoderCounts::encode_region(BamFile& bam_file,
+                                    const std::string& ref_name,
+                                    const int64_t ref_start,
+                                    const int64_t ref_end,
+                                    const int32_t seq_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -328,11 +328,11 @@ Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
                               m_normalise_type);
 }
 
-torch::Tensor CountsFeatureEncoder::collate(std::vector<torch::Tensor> batch) const {
+torch::Tensor EncoderCounts::collate(std::vector<torch::Tensor> batch) const {
     return torch::stack(batch);
 }
 
-std::vector<polisher::Sample> CountsFeatureEncoder::merge_adjacent_samples(
+std::vector<polisher::Sample> EncoderCounts::merge_adjacent_samples(
         std::vector<Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
 }

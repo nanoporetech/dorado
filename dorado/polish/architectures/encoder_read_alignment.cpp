@@ -301,16 +301,16 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
 }  // namespace
 
-ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::string>& dtypes,
-                                                         const std::string_view tag_name,
-                                                         const int32_t tag_value,
-                                                         const bool tag_keep_missing,
-                                                         const std::string_view read_group,
-                                                         const int32_t min_mapq,
-                                                         const int32_t max_reads,
-                                                         const bool row_per_read,
-                                                         const bool include_dwells,
-                                                         const bool include_haplotype)
+EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtypes,
+                                           const std::string_view tag_name,
+                                           const int32_t tag_value,
+                                           const bool tag_keep_missing,
+                                           const std::string_view read_group,
+                                           const int32_t min_mapq,
+                                           const int32_t max_reads,
+                                           const bool row_per_read,
+                                           const bool include_dwells,
+                                           const bool include_haplotype)
         : m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
           m_dtypes{dtypes},
           m_tag_name{tag_name},
@@ -323,11 +323,11 @@ ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype} {}
 
-Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
-                                                  const std::string& ref_name,
-                                                  const int64_t ref_start,
-                                                  const int64_t ref_end,
-                                                  const int32_t seq_id) const {
+Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
+                                           const std::string& ref_name,
+                                           const int64_t ref_start,
+                                           const int64_t ref_end,
+                                           const int32_t seq_id) const {
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
 
     // Compute the counts and data.
@@ -361,7 +361,7 @@ Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
     return sample;
 }
 
-torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> batch) const {
+torch::Tensor EncoderReadAlignment::collate(std::vector<torch::Tensor> batch) const {
     if (std::empty(batch)) {
         return {};
     }
@@ -432,7 +432,7 @@ torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> ba
     return features;
 }
 
-std::vector<polisher::Sample> ReadAlignmentFeatureEncoder::merge_adjacent_samples(
+std::vector<polisher::Sample> EncoderReadAlignment::merge_adjacent_samples(
         std::vector<Sample> samples) const {
     return merge_adjacent_samples_read_matrix(std::move(samples));
 }
