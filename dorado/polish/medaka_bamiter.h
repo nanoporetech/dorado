@@ -1,6 +1,6 @@
 #pragma once
 
-#include "htslib/sam.h"
+#include <htslib/sam.h>
 
 struct HtslibMpileupData {
     htsFile* fp;

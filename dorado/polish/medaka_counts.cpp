@@ -1,8 +1,8 @@
 #include "medaka_counts.h"
 
-#include "htslib/sam.h"
 #include "medaka_bamiter.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>
