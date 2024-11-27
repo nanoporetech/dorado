@@ -55,4 +55,49 @@ public:
 
     std::vector<char>& decompressed_buffer();
 };
+
 }  // namespace dorado::utils
+
+#ifdef ZLIB_GZ_FUNCTIONS_MAY_BE_USED_WITHOUT_LINKER_ERROR
+struct gzFile_s;
+typedef gzFile_s* gzFile;
+
+namespace dorado::utils {
+
+struct gzFileDestructor {
+    void operator()(gzFile file);
+};
+using gzFilePtr = std::unique_ptr<gzFile_s, gzFileDestructor>;
+
+class GzipReader {
+    const std::string m_gzip_file;
+    const std::size_t m_buffer_size;
+    std::vector<char> m_decompressed_buffer;
+    gzFilePtr m_gzfile;
+    std::string m_error_message{};
+    bool m_is_valid{true};
+    std::size_t m_num_bytes_read{};
+
+    void set_failure(std::string error_message);
+
+public:
+    GzipReader(std::string gzip_file, std::size_t buffer_size);
+
+    bool is_valid() const;
+
+    const std::string& error_message() const;
+
+    std::size_t num_bytes_read() const;
+
+    // Returns false if reached end of file or an error has occurred.
+    // If returns false there will be zero bytes read.
+    // N.B. It is possible there are zero bytes read even if returns true,
+    // in which case should just continue calling.
+    bool read_next();
+
+    std::vector<char>& decompressed_buffer();
+};
+
+}  // namespace dorado::utils
+
+#endif

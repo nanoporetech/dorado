@@ -119,4 +119,50 @@ bool GzipReader::fetch_next_compressed_chunk() {
     return true;
 }
 
+#ifdef ZLIB_GZ_FUNCTIONS_MAY_BE_USED_WITHOUT_LINKER_ERROR
+void gzFileDestructor::operator()(gzFile file) {
+    if (file) {
+        gzclose(file);
+    }
+}
+
+GzipReader::GzipReader(std::string gzip_file, std::size_t buffer_size)
+        : m_gzip_file(std::move(gzip_file)),
+          m_buffer_size(buffer_size),
+          m_decompressed_buffer(buffer_size) {
+    m_gzfile.reset(gzopen(m_gzip_file.c_str(), "rb"));
+    if (!m_gzfile) {
+        set_failure("Cannot open file for gzip reading.");
+        return;
+    }
+    if (gzbuffer(m_gzfile.get(), static_cast<unsigned>(buffer_size)) != 0) {
+        set_failure("Cannot set buffer size gzip reading.");
+    }
+}
+
+void GzipReader::set_failure(std::string error_message) {
+    m_is_valid = false;
+    m_error_message = std::move(error_message) + " [" + m_gzip_file + "]";
+}
+
+bool GzipReader::is_valid() const { return m_is_valid; }
+
+const std::string& GzipReader::error_message() const { return m_error_message; }
+
+bool GzipReader::read_next() {
+    auto bytes_read = gzread(m_gzfile.get(), m_decompressed_buffer.data(),
+                             static_cast<unsigned int>(m_buffer_size));
+    if (bytes_read < 0) {
+        set_failure("Error reading gzip stream.");
+        return false;
+    }
+    m_num_bytes_read = static_cast<std::size_t>(bytes_read);
+    return true;
+}
+
+std::size_t GzipReader::num_bytes_read() const { return m_num_bytes_read; }
+
+std::vector<char>& GzipReader::decompressed_buffer() { return m_decompressed_buffer; }
+#endif
+
 }  // namespace dorado::utils
