@@ -1,4 +1,4 @@
-#include "polish/architectures/read_alignment_feature_encoder.h"
+#include "polish/architectures/encoder_read_alignment.h"
 
 #include "polish/medaka_read_matrix.h"
 #include "polish/polish_utils.h"

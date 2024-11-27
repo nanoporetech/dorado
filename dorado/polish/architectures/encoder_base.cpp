@@ -1,4 +1,4 @@
-#include "polish/architectures/base_feature_encoder.h"
+#include "polish/architectures/encoder_base.h"
 
 #include <spdlog/spdlog.h>
 

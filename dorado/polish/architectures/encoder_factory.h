@@ -1,8 +1,8 @@
 #pragma once
 
-#include "counts_feature_encoder.h"
+#include "encoder_counts.h"
+#include "encoder_read_alignment.h"
 #include "model_config.h"
-#include "read_alignment_feature_encoder.h"
 
 #include <memory>
 #include <string>

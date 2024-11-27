@@ -322,20 +322,20 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
-    dorado/polish/architectures/base_feature_encoder.cpp
-    dorado/polish/architectures/base_feature_encoder.h
     dorado/polish/architectures/decoder_factory.cpp
     dorado/polish/architectures/decoder_factory.h
+    dorado/polish/architectures/encoder_base.cpp
+    dorado/polish/architectures/encoder_base.h
+    dorado/polish/architectures/encoder_counts.cpp
+    dorado/polish/architectures/encoder_counts.h
     dorado/polish/architectures/encoder_factory.cpp
     dorado/polish/architectures/encoder_factory.h
+    dorado/polish/architectures/encoder_read_alignment.cpp
+    dorado/polish/architectures/encoder_read_alignment.h
     dorado/polish/architectures/feature_decoder.cpp
     dorado/polish/architectures/feature_decoder.h
     dorado/polish/architectures/model_factory.cpp
     dorado/polish/architectures/model_factory.h
-    dorado/polish/architectures/counts_feature_encoder.cpp
-    dorado/polish/architectures/counts_feature_encoder.h
-    dorado/polish/architectures/read_alignment_feature_encoder.cpp
-    dorado/polish/architectures/read_alignment_feature_encoder.h
     dorado/polish/architectures/gru_model.cpp
     dorado/polish/architectures/gru_model.h
     dorado/polish/architectures/model_config.cpp

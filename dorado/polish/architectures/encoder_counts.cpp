@@ -1,4 +1,4 @@
-#include "polish/architectures/counts_feature_encoder.h"
+#include "polish/architectures/encoder_counts.h"
 
 #include "polish/medaka_counts.h"
 
