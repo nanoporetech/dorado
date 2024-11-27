@@ -13,12 +13,6 @@
 #include <string_view>
 #include <vector>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
-
 namespace dorado::polisher {
 
 struct ReadAlignmentTensors {
