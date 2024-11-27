@@ -189,7 +189,7 @@ polisher::ConsensusResult stitch_sequence(
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
 
         if (sample_result.draft_start > last_end) {
-            spdlog::debug(
+            spdlog::trace(
                     "[stitch_sequence] header = '{}', result.seq.size() = {}, adding draft region: "
                     "[{}, {}]",
                     header, std::size(result.seq), last_end, sample_result.draft_start);
@@ -198,7 +198,7 @@ polisher::ConsensusResult stitch_sequence(
             result.quals += std::string(sample_result.draft_start - last_end, '!');
         }
 
-        spdlog::debug(
+        spdlog::trace(
                 "[stitch_sequence] header = '{}', result.seq.size() = {}, adding consensus chunk "
                 "sample_result.seq.size() = {}",
                 header, std::size(result.seq), std::size(sample_result.seq));
@@ -211,7 +211,7 @@ polisher::ConsensusResult stitch_sequence(
 
     // Add the back draft part.
     if (last_end < dorado::ssize(draft)) {
-        spdlog::debug(
+        spdlog::trace(
                 "[stitch_sequence] header = '{}', result.seq.size() = {}, adding trailing draft "
                 "region: [{}, {}]",
                 header, std::size(result.seq), last_end, std::size(draft));
@@ -219,7 +219,7 @@ polisher::ConsensusResult stitch_sequence(
         result.quals += std::string(dorado::ssize(draft) - last_end, '!');
     }
 
-    spdlog::debug("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
+    spdlog::trace("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
                   std::size(result.seq));
 
     return result;
