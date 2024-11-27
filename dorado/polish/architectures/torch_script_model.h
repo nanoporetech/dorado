@@ -12,6 +12,8 @@ class TorchScriptModel : public TorchModel {
 public:
     TorchScriptModel(const std::filesystem::path& model_path);
 
+    torch::Device get_device() const override;
+
     torch::Tensor forward(torch::Tensor x) override;
 
     void to_half() override;

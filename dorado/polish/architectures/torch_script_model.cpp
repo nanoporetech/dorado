@@ -17,6 +17,16 @@ TorchScriptModel::TorchScriptModel(const std::filesystem::path& model_path) {
     }
 }
 
+torch::Device TorchScriptModel::get_device() const {
+    // Get the device of the first parameter as a representative.
+    for (const auto& param : m_module.parameters()) {
+        if (param.defined()) {
+            return param.device();
+        }
+    }
+    return torch::Device(torch::kCPU);
+}
+
 torch::Tensor TorchScriptModel::forward(torch::Tensor x) {
     return m_module.forward({std::move(x)}).toTensor();
 }
