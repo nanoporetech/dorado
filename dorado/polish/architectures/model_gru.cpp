@@ -1,4 +1,4 @@
-#include "gru_model.h"
+#include "model_gru.h"
 
 namespace dorado::polisher {
 

@@ -1,4 +1,4 @@
-#include "torch_model_base.h"
+#include "model_torch_base.h"
 
 namespace dorado::polisher {
 

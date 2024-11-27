@@ -1,9 +1,9 @@
 #pragma once
 
-#include "gru_model.h"
 #include "model_config.h"
-#include "torch_model_base.h"
-#include "torch_script_model.h"
+#include "model_gru.h"
+#include "model_torch_base.h"
+#include "model_torch_script.h"
 
 #include <string>
 

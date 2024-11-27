@@ -1,4 +1,4 @@
-#include "torch_script_model.h"
+#include "model_torch_script.h"
 
 #include <spdlog/spdlog.h>
 #include <torch/script.h>

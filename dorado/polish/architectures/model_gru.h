@@ -1,6 +1,6 @@
 #pragma once
 
-#include "torch_model_base.h"
+#include "model_torch_base.h"
 
 #include <torch/torch.h>
 

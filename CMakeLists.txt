@@ -335,16 +335,16 @@ add_library(dorado_lib
     dorado/polish/architectures/feature_decoder.h
     dorado/polish/architectures/model_factory.cpp
     dorado/polish/architectures/model_factory.h
-    dorado/polish/architectures/gru_model.cpp
-    dorado/polish/architectures/gru_model.h
+    dorado/polish/architectures/model_gru.cpp
+    dorado/polish/architectures/model_gru.h
     dorado/polish/architectures/model_config.cpp
     dorado/polish/architectures/model_config.h
     dorado/polish/architectures/model_factory.cpp
     dorado/polish/architectures/model_factory.h
-    dorado/polish/architectures/torch_model_base.cpp
-    dorado/polish/architectures/torch_model_base.h
-    dorado/polish/architectures/torch_script_model.cpp
-    dorado/polish/architectures/torch_script_model.h
+    dorado/polish/architectures/model_torch_base.cpp
+    dorado/polish/architectures/model_torch_base.h
+    dorado/polish/architectures/model_torch_script.cpp
+    dorado/polish/architectures/model_torch_script.h
     dorado/utils/ssize.h
 )
 
