@@ -320,11 +320,10 @@ bool operator==(const FastqRecord& lhs, const FastqRecord& rhs) {
 bool operator!=(const FastqRecord& lhs, const FastqRecord& rhs) { return !(lhs == rhs); }
 
 FastqReader::FastqReader(std::string input_file) : m_input_file(std::move(input_file)) {
-    if (!is_fastq(m_input_file)) {
-        return;
+    auto input_stream = create_input_stream(m_input_file);
+    if (input_stream && is_fastq(*input_stream)) {
+        m_input_stream = std::move(input_stream);
     }
-
-    m_input_stream = create_input_stream(m_input_file);
 }
 
 FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream)
