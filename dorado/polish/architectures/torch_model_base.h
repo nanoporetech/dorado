@@ -26,6 +26,18 @@ public:
     virtual void to_half();
 
     /**
+     * \brief Runs the eval() function, but also allows to abstract the functionality
+     *          for derived types, in case they utilize composition.
+     */
+    virtual void set_eval();
+
+    /**
+     * \brief Runs the "to()" function but also allows to abstract the functionality
+     *          for derived types, in case they utilize composition.
+     */
+    virtual void to_device(torch::Device device, bool non_blocking = false);
+
+    /**
      * \brief Predict on a batch with device and precision handling.
      */
     torch::Tensor predict_on_batch(torch::Tensor x);

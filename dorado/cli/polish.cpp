@@ -467,7 +467,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
             auto model = polisher::model_factory(model_config);
 
             spdlog::info("About to load model to device {}: {}", device_id, device_info.name);
-            model->to(device_info.device);
+            model->to_device(device_info.device);
 
             // Half-precision if needed.
             if ((device_info.type == DeviceType::CUDA) && !full_precision) {
@@ -478,7 +478,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
             }
 
             spdlog::info("Switching model to eval mode.");
-            model->eval();
+            model->set_eval();
 
             ret.emplace_back(std::move(model));
 

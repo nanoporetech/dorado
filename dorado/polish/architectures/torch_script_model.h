@@ -14,6 +14,12 @@ public:
 
     torch::Tensor forward(torch::Tensor x) override;
 
+    void to_half() override;
+
+    void set_eval() override;
+
+    void to_device(torch::Device device, bool non_blocking = false) override;
+
 private:
     torch::jit::script::Module m_module;
 };

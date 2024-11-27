@@ -21,4 +21,19 @@ torch::Tensor TorchScriptModel::forward(torch::Tensor x) {
     return m_module.forward({std::move(x)}).toTensor();
 }
 
+void TorchScriptModel::to_half() {
+    this->to(torch::kHalf);
+    m_module.to(torch::kHalf);
+}
+
+void TorchScriptModel::set_eval() {
+    this->eval();
+    m_module.eval();
+}
+
+void TorchScriptModel::to_device(torch::Device device, bool non_blocking) {
+    this->to(device, non_blocking);
+    m_module.to(device, non_blocking);
+}
+
 }  // namespace dorado::polisher
