@@ -551,9 +551,9 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
                 draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
 
-        const int64_t total_bases =
-                std::accumulate(std::begin(draft_lens_batch), std::end(draft_lens_batch), 0,
-                                [](const int64_t a, const auto& b) { return a + b.second; });
+        const int64_t total_bases = std::accumulate(
+                std::begin(draft_lens_batch), std::end(draft_lens_batch), static_cast<int64_t>(0),
+                [](const int64_t a, const auto& b) { return a + b.second; });
         spdlog::info(
                 "Starting to produce consensus for draft sequences: {}-{}/{} (number: {}, total "
                 "length: {:.2f} Mbp)",
