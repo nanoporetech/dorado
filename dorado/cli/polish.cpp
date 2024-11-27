@@ -429,14 +429,14 @@ std::vector<polisher::Interval> create_batches(const T& data,
 }
 
 std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
-        const std::string& out_fn) {
+        const std::filesystem::path& out_fn) {
     if (std::empty(out_fn)) {
         return {&std::cout, [](std::ostream*) {}};
     }
     std::unique_ptr<std::ofstream, void (*)(std::ostream*)> ofs(
             new std::ofstream(out_fn), [](std::ostream* ptr) { delete ptr; });
     if (!ofs->is_open()) {
-        throw std::runtime_error("Failed to open file: " + out_fn);
+        throw std::runtime_error("Failed to open file: " + out_fn.string());
     }
     return ofs;
 }
@@ -580,7 +580,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         }
 
         // Stitch the windows and write output.
-        for (size_t seq_id = 0; seq_id < std::size(groups); ++seq_id) {
+        for (int32_t seq_id = 0; seq_id < static_cast<int32_t>(std::size(groups)); ++seq_id) {
             auto& group = groups[seq_id];
             std::sort(std::begin(group), std::end(group));  // Sort by start pos.
 
