@@ -162,14 +162,14 @@ TEST_CASE("Test trim mod base info", TEST_GROUP) {
         // the second mod is eliminated
         // in the third mod, first base position changes and the last is dropped
         auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {3, 18});
-        CHECK(str == "A+a?,0,0;C+m?,;T+x?,1;");
+        CHECK(str == "A+a?,0,0;C+m?;T+x?,1;");
         const std::vector<uint8_t> expected = {2, 3, 20};
         CHECK_THAT(probs, Equals(expected));
     }
 
     SECTION("Trim whole sequence") {
         auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {8, 8});
-        CHECK(str == "A+a?,;C+m?,;T+x?,;");
+        CHECK(str == "A+a?;C+m?;T+x?;");
         CHECK(probs.size() == 0);
     }
 }
