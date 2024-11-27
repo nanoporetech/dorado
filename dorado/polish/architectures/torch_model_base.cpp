@@ -21,9 +21,7 @@ void TorchModel::to_half() {
 // Sets the eval mode.
 void TorchModel::set_eval() { this->eval(); }
 
-void TorchModel::to_device(torch::Device device, bool non_blocking) {
-    this->to(device, non_blocking);
-}
+void TorchModel::to_device(torch::Device device) { this->to(device); }
 
 // Predict on a batch with device and precision handling.
 torch::Tensor TorchModel::predict_on_batch(torch::Tensor x) {

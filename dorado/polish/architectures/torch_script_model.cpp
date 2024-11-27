@@ -31,9 +31,9 @@ void TorchScriptModel::set_eval() {
     m_module.eval();
 }
 
-void TorchScriptModel::to_device(torch::Device device, bool non_blocking) {
-    this->to(device, non_blocking);
-    m_module.to(device, non_blocking);
+void TorchScriptModel::to_device(torch::Device device) {
+    this->to(device);
+    m_module.to(device);
 }
 
 }  // namespace dorado::polisher

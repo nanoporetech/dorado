@@ -18,7 +18,7 @@ public:
     /**
      * \brief Helper function to get the device where the model is located.
      */
-    torch::Device get_device() const;
+    virtual torch::Device get_device() const;
 
     /**
      * \brief Convert the model to half precision.
@@ -35,12 +35,12 @@ public:
      * \brief Runs the "to()" function but also allows to abstract the functionality
      *          for derived types, in case they utilize composition.
      */
-    virtual void to_device(torch::Device device, bool non_blocking = false);
+    virtual void to_device(torch::Device device);
 
     /**
      * \brief Predict on a batch with device and precision handling.
      */
-    torch::Tensor predict_on_batch(torch::Tensor x);
+    virtual torch::Tensor predict_on_batch(torch::Tensor x);
 
 protected:
     bool m_half_precision = false;

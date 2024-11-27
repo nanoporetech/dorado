@@ -18,7 +18,7 @@ public:
 
     void set_eval() override;
 
-    void to_device(torch::Device device, bool non_blocking = false) override;
+    void to_device(torch::Device device) override;
 
 private:
     torch::jit::script::Module m_module;
