@@ -642,14 +642,14 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     return {std::move(samples), std::move(trims)};
 }
 
-void process_samples(polisher::ModelTorchBase& model,
-                     const polisher::EncoderBase& encoder,
-                     const polisher::FeatureDecoder& decoder,
-                     const std::vector<polisher::Sample>& in_samples,
-                     const std::vector<polisher::TrimInfo>& in_trims,
-                     const std::vector<int64_t>& in_samples_to_process,
-                     const int32_t batch_size,
-                     std::vector<polisher::ConsensusResult>& results) {
+void infer_samples(polisher::ModelTorchBase& model,
+                   const polisher::EncoderBase& encoder,
+                   const polisher::FeatureDecoder& decoder,
+                   const std::vector<polisher::Sample>& in_samples,
+                   const std::vector<polisher::TrimInfo>& in_trims,
+                   const std::vector<int64_t>& in_samples_to_process,
+                   const int32_t batch_size,
+                   std::vector<polisher::ConsensusResult>& results) {
     /**
      * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
      */
@@ -741,7 +741,7 @@ void process_samples(polisher::ModelTorchBase& model,
     }
 }
 
-std::vector<polisher::ConsensusResult> process_samples_in_parallel(
+std::vector<polisher::ConsensusResult> infer_samples_in_parallel(
         const std::vector<polisher::Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
@@ -776,12 +776,12 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         //           << ", remainders.size() = " << remainders.size() << "\n";
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
-        process_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, regular,
-                        batch_size, results);
+        infer_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, regular,
+                      batch_size, results);
 
         // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
-        process_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, remainders, 1,
-                        results);
+        infer_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, remainders, 1,
+                      results);
     };
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));

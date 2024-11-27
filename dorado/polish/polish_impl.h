@@ -57,7 +57,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
         const int32_t window_overlap,
         const int32_t bam_subchunk_len);
 
-std::vector<ConsensusResult> process_samples_in_parallel(
+std::vector<ConsensusResult> infer_samples_in_parallel(
         const std::vector<Sample>& in_samples,
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<ModelTorchBase>>& models,
