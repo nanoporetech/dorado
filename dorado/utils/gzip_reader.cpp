@@ -5,9 +5,11 @@
 namespace dorado::utils {
 
 void ZstreamDestructor::operator()(z_stream* zlib_stream) {
-    if (zlib_stream) {
-        inflateEnd(zlib_stream);
+    if (!zlib_stream) {
+        return;
     }
+    inflateEnd(zlib_stream);
+    free(zlib_stream);
 }
 
 GzipReader::GzipReader(std::string gzip_file, std::size_t buffer_size)
