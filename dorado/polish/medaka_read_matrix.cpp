@@ -382,7 +382,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                     if (!failed) {
                         bool found = false;
                         for (dtype = 0; dtype < num_dtypes; ++dtype) {
-                            if (dtypes[dtype] == tag_val) {
+                            if (tag_val && (dtypes[dtype] == tag_val)) {
                                 found = true;
                                 break;
                             }

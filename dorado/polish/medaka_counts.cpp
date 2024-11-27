@@ -272,7 +272,7 @@ PileupData calculate_pileup(BamFile &bam_file,
             int32_t dtype = 0;
             if (num_dtypes > 1) {
                 bool failed = false;
-                char *tag_val;
+                char *tag_val = nullptr;
                 uint8_t *tag = bam_aux_get(p->b, DATATYPE_TAG.data());
                 if (tag == NULL) {  // tag isn't present
                     failed = true;
@@ -283,7 +283,7 @@ PileupData calculate_pileup(BamFile &bam_file,
                 if (!failed) {
                     bool found = false;
                     for (dtype = 0; dtype < static_cast<int32_t>(num_dtypes); ++dtype) {
-                        if (strcmp(dtypes[dtype].c_str(), tag_val) == 0) {
+                        if (tag_val && (dtypes[dtype] == tag_val)) {
                             found = true;
                             break;
                         }
