@@ -15,6 +15,7 @@ function(add_hdf_vbz_plugin)
                 -B ${ZSTD_BUILD_DIR}
                 -A x64
                 -D CMAKE_CONFIGURATION_TYPES=Release
+                -G ${CMAKE_GENERATOR}
             COMMAND_ERROR_IS_FATAL ANY
         )
         execute_process(
