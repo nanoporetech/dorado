@@ -2,6 +2,7 @@
 #include "correct/infer.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
+#include "polish/architectures/decoder_factory.h"
 #include "polish/architectures/encoder_factory.h"
 #include "polish/architectures/model_config.h"
 #include "polish/architectures/model_factory.h"
@@ -79,6 +80,7 @@ enum class OutputFormat {
 
 struct PolisherResources {
     std::unique_ptr<polisher::BaseFeatureEncoder> encoder;
+    std::unique_ptr<polisher::FeatureDecoder> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<polisher::TorchModel>> models;
@@ -509,6 +511,9 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     spdlog::info("Creating the encoder.");
     resources.encoder = polisher::encoder_factory(model_config);
 
+    spdlog::info("Creating the decoder.");
+    resources.decoder = polisher::decoder_factory(model_config);
+
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
@@ -583,8 +588,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         // Inference.
         std::vector<polisher::ConsensusResult> results_samples =
                 polisher::process_samples_in_parallel(samples, trims, resources.models,
-                                                      *resources.encoder, opt.window_len,
-                                                      opt.batch_size);
+                                                      *resources.encoder, *resources.decoder,
+                                                      opt.window_len, opt.batch_size);
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));

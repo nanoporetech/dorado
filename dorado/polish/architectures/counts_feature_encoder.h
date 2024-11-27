@@ -38,8 +38,7 @@ public:
                          const bool tag_keep_missing,
                          const std::string_view read_group,
                          const int32_t min_mapq,
-                         const bool symmetric_indels,
-                         const LabelSchemeType label_scheme_type);
+                         const bool symmetric_indels);
 
     ~CountsFeatureEncoder() = default;
 
@@ -54,8 +53,6 @@ public:
     std::vector<polisher::Sample> merge_adjacent_samples(
             std::vector<Sample> samples) const override;
 
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
-
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     int32_t m_num_dtypes = 1;
@@ -67,7 +64,6 @@ private:
     int32_t m_min_mapq = 1;
     bool m_symmetric_indels = false;
     FeatureIndicesType m_feature_indices;
-    LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
 };
 
 }  // namespace dorado::polisher

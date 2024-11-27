@@ -12,21 +12,11 @@
 #include <string>
 #include <vector>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
-
 namespace dorado::polisher {
 
 enum class NormaliseType {
     TOTAL,
     FWD_REV,
-};
-
-enum class LabelSchemeType {
-    HAPLOID,
 };
 
 struct KeyHash {
@@ -66,11 +56,6 @@ public:
 
     virtual std::vector<polisher::Sample> merge_adjacent_samples(
             std::vector<Sample> samples) const = 0;
-
-    virtual std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const = 0;
 };
-
-std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
-                                               const torch::Tensor& logits);
 
 }  // namespace dorado::polisher

@@ -644,6 +644,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
 
 void process_samples(polisher::TorchModel& model,
                      const polisher::BaseFeatureEncoder& encoder,
+                     const polisher::FeatureDecoder& decoder,
                      const std::vector<polisher::Sample>& in_samples,
                      const std::vector<polisher::TrimInfo>& in_trims,
                      const std::vector<int64_t>& in_samples_to_process,
@@ -712,7 +713,7 @@ void process_samples(polisher::TorchModel& model,
         torch::Tensor output = batch_infer(in_samples, ids);
 
         // Convert to sequences and qualities.
-        std::vector<polisher::ConsensusResult> new_results = encoder.decode_bases(output);
+        std::vector<polisher::ConsensusResult> new_results = decoder.decode_bases(output);
 
         assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
@@ -745,16 +746,17 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<polisher::TorchModel>>& models,
         const polisher::BaseFeatureEncoder& encoder,
+        const polisher::FeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size) {
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    const auto worker = [&models, &encoder, &in_samples, &in_trims, &batch_size, &window_len](
-                                const int32_t thread_id, const int32_t chunk_start,
-                                const int32_t chunk_end,
-                                std::vector<polisher::ConsensusResult>& results) {
+    const auto worker = [&models, &encoder, &decoder, &in_samples, &in_trims, &batch_size,
+                         &window_len](const int32_t thread_id, const int32_t chunk_start,
+                                      const int32_t chunk_end,
+                                      std::vector<polisher::ConsensusResult>& results) {
         assert(chunk_end <= dorado::ssize(in_samples));
 
         // Find samples which will not fit into the batch tensor.
@@ -774,11 +776,12 @@ std::vector<polisher::ConsensusResult> process_samples_in_parallel(
         //           << ", remainders.size() = " << remainders.size() << "\n";
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
-        process_samples(*models[thread_id], encoder, in_samples, in_trims, regular, batch_size,
-                        results);
+        process_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, regular,
+                        batch_size, results);
 
         // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
-        process_samples(*models[thread_id], encoder, in_samples, in_trims, remainders, 1, results);
+        process_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, remainders, 1,
+                        results);
     };
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));

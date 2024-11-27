@@ -43,8 +43,7 @@ public:
                                 const int32_t max_reads,
                                 const bool row_per_read,
                                 const bool include_dwells,
-                                const bool include_haplotype,
-                                const LabelSchemeType label_scheme_type);
+                                const bool include_haplotype);
 
     ~ReadAlignmentFeatureEncoder() = default;
 
@@ -59,8 +58,6 @@ public:
     std::vector<polisher::Sample> merge_adjacent_samples(
             std::vector<Sample> samples) const override;
 
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const override;
-
 private:
     int32_t m_num_dtypes = 1;
     std::vector<std::string> m_dtypes;
@@ -73,7 +70,6 @@ private:
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype = false;
-    LabelSchemeType m_label_scheme_type = LabelSchemeType::HAPLOID;
 };
 
 }  // namespace dorado::polisher

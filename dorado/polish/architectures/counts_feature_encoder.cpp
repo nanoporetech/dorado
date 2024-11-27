@@ -284,8 +284,7 @@ CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
                                            const bool tag_keep_missing,
                                            const std::string_view read_group,
                                            const int32_t min_mapq,
-                                           const bool symmetric_indels,
-                                           const LabelSchemeType label_scheme_type)
+                                           const bool symmetric_indels)
         : m_normalise_type{normalise_type},
           m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_dtypes{dtypes},
@@ -295,8 +294,7 @@ CountsFeatureEncoder::CountsFeatureEncoder(const NormaliseType normalise_type,
           m_read_group{read_group},
           m_min_mapq{min_mapq},
           m_symmetric_indels{symmetric_indels},
-          m_feature_indices{pileup_counts_norm_indices(dtypes, 1)},
-          m_label_scheme_type{label_scheme_type} {}
+          m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
 Sample CountsFeatureEncoder::encode_region(BamFile& bam_file,
                                            const std::string& ref_name,
@@ -337,10 +335,6 @@ torch::Tensor CountsFeatureEncoder::collate(std::vector<torch::Tensor> batch) co
 std::vector<polisher::Sample> CountsFeatureEncoder::merge_adjacent_samples(
         std::vector<Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
-}
-
-std::vector<ConsensusResult> CountsFeatureEncoder::decode_bases(const torch::Tensor& logits) const {
-    return decode_bases_impl(m_label_scheme_type, logits);
 }
 
 }  // namespace dorado::polisher

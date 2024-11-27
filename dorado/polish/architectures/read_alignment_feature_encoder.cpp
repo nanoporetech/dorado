@@ -310,8 +310,7 @@ ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::
                                                          const int32_t max_reads,
                                                          const bool row_per_read,
                                                          const bool include_dwells,
-                                                         const bool include_haplotype,
-                                                         const LabelSchemeType label_scheme_type)
+                                                         const bool include_haplotype)
         : m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
           m_dtypes{dtypes},
           m_tag_name{tag_name},
@@ -322,8 +321,7 @@ ReadAlignmentFeatureEncoder::ReadAlignmentFeatureEncoder(const std::vector<std::
           m_max_reads{max_reads},
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
-          m_include_haplotype{include_haplotype},
-          m_label_scheme_type{label_scheme_type} {}
+          m_include_haplotype{include_haplotype} {}
 
 Sample ReadAlignmentFeatureEncoder::encode_region(BamFile& bam_file,
                                                   const std::string& ref_name,
@@ -437,11 +435,6 @@ torch::Tensor ReadAlignmentFeatureEncoder::collate(std::vector<torch::Tensor> ba
 std::vector<polisher::Sample> ReadAlignmentFeatureEncoder::merge_adjacent_samples(
         std::vector<Sample> samples) const {
     return merge_adjacent_samples_read_matrix(std::move(samples));
-}
-
-std::vector<ConsensusResult> ReadAlignmentFeatureEncoder::decode_bases(
-        const torch::Tensor& logits) const {
-    return decode_bases_impl(m_label_scheme_type, logits);
 }
 
 }  // namespace dorado::polisher

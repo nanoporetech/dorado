@@ -1,5 +1,6 @@
 #pragma once
 
+#include "polish/architectures/decoder_factory.h"
 #include "polish/architectures/encoder_factory.h"
 #include "polish/architectures/model_factory.h"
 #include "polish/consensus_result.h"
@@ -61,6 +62,7 @@ std::vector<ConsensusResult> process_samples_in_parallel(
         const std::vector<polisher::TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<TorchModel>>& models,
         const polisher::BaseFeatureEncoder& encoder,
+        const polisher::FeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size);
 
