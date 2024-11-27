@@ -34,6 +34,7 @@ torch::Tensor TorchScriptModel::forward(torch::Tensor x) {
 void TorchScriptModel::to_half() {
     this->to(torch::kHalf);
     m_module.to(torch::kHalf);
+    m_half_precision = true;
 }
 
 void TorchScriptModel::set_eval() {
