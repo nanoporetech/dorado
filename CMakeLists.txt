@@ -324,7 +324,6 @@ add_library(dorado_lib
     dorado/polish/trim.h
     dorado/polish/architectures/decoder_factory.cpp
     dorado/polish/architectures/decoder_factory.h
-    dorado/polish/architectures/encoder_base.cpp
     dorado/polish/architectures/encoder_base.h
     dorado/polish/architectures/encoder_counts.cpp
     dorado/polish/architectures/encoder_counts.h
