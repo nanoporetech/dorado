@@ -425,7 +425,7 @@ std::vector<Sample> encode_regions_in_parallel(
             const auto& window = windows[i];
             const std::string& name = draft_lens[window.seq_id].first;
             if (thread_id == 0) {
-                spdlog::debug(
+                spdlog::trace(
                         "[start = {}, end = {}] Encoding i = {}, region = "
                         "{}:{}-{} ({} %).",
                         start, end, i, name, window.start, window.end,
@@ -490,7 +490,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             interval.start -= window_interval_offset;
             interval.end -= window_interval_offset;
 
-            spdlog::debug("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
+            spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
                           bam_region_id, interval.start, interval.end);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
             std::cerr << "[merged_samples worker bam_region_id = " << bam_region_id
@@ -512,7 +512,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
                                      std::make_move_iterator(std::end(disc_samples)));
             }
 
-            spdlog::debug(
+            spdlog::trace(
                     "- [bam_region_id = {}] (1) After splitting on discontinuities: "
                     "local_samples = {}",
                     bam_region_id, std::size(local_samples));
@@ -524,7 +524,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
             local_samples = encoder.merge_adjacent_samples(local_samples);
 
-            spdlog::debug("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
+            spdlog::trace("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
                           bam_region_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
             std::cerr << "- [bam_region_id = " << bam_region_id
@@ -534,7 +534,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
             local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
-            spdlog::debug(
+            spdlog::trace(
                     "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
                     "window_len = {}, window_overlap = {}",
                     bam_region_id, std::size(local_samples), window_len, window_overlap);
@@ -561,7 +561,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     const std::vector<Interval> thread_chunks =
             compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
 
-    spdlog::debug("Starting to merge samples for {} BAM windows using {} threads.",
+    spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
                   std::size(bam_region_intervals), std::size(thread_chunks));
 
     cxxpool::thread_pool pool{std::size(thread_chunks)};

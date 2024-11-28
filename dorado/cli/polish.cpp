@@ -748,7 +748,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             thread_sample_producer.join();
         }
 
-        spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
+        // spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
 
         // Produce samples (tensors) for inference.
         // auto [samples, trims] = polisher::create_samples(
@@ -762,6 +762,12 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         //         polisher::infer_samples_in_parallel(samples, trims, resources.models,
         //                                             *resources.encoder, *resources.decoder,
         //                                             opt.window_len, opt.batch_size);
+
+        spdlog::info(
+                "Stitching sequences: {}-{}/{} (number: {}, total "
+                "length: {:.2f} Mbp)",
+                draft_batch.start, draft_batch.end, std::size(draft_lens),
+                std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
