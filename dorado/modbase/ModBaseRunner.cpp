@@ -38,7 +38,8 @@ namespace dorado::modbase {
 ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller)
         : m_caller(std::move(caller)),
           m_input_sigs(m_caller->create_input_sig_tensors()),
-          m_input_seqs(m_caller->create_input_seq_tensors())
+          m_input_seqs(m_caller->create_input_seq_tensors()),
+          m_is_chunked_model_type(get_homogenous_model_type())
 #if DORADO_CUDA_BUILD
           ,
           m_streams(get_streams_from_caller(m_caller))
@@ -119,7 +120,26 @@ size_t ModBaseRunner::num_models() const { return m_caller->num_models(); }
 void ModBaseRunner::terminate() { m_caller->terminate(); }
 void ModBaseRunner::restart() { m_caller->restart(); }
 
-bool ModBaseRunner::takes_chunk_inputs() const { return model_params(0).is_chunked_input_model(); }
+bool ModBaseRunner::get_homogenous_model_type() const {
+    // Assert all models are either chunked or context-centered.
+    const bool is_chunked_model = model_params(0).is_chunked_input_model();
+    for (size_t i = 1; i < num_models(); i++) {
+        if (is_chunked_model != model_params(i).is_chunked_input_model()) {
+            const auto base_0 = std::string(1, model_params(0).mods.base);
+            const auto base_i = std::string(1, model_params(i).mods.base);
+
+            const auto type_0 = to_string(model_params(0).general.model_type);
+            const auto type_i = to_string(model_params(i).general.model_type);
+
+            spdlog::error("Modbase models have different types {}:{} {}:{}.", base_0, type_0,
+                          base_i, type_i);
+            throw std::runtime_error("Cannot mix the types of modified bases models");
+        }
+    }
+    return is_chunked_model;
+}
+
+bool ModBaseRunner::takes_chunk_inputs() const { return m_is_chunked_model_type; }
 
 std::string ModBaseRunner::get_name() const {
     std::ostringstream name_stream;

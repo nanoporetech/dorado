@@ -7,7 +7,6 @@
 #include <c10/cuda/CUDAStream.h>
 #endif
 #include <atomic>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -42,6 +41,9 @@ public:
     // FIXME: This might need to be independent of the runner
     // The number of chunks in a batch
     size_t batch_size() const { return m_input_sigs[0].size(0); }
+
+    // Asserts all modbase models are either chunked or context-centered
+    bool get_homogenous_model_type() const;
     // Only meaningful for models accepting chunked inputs
     bool takes_chunk_inputs() const;
 
@@ -56,6 +58,9 @@ private:
     std::vector<at::Tensor> m_input_sigs;
     // Contains encoded Kmers: N(batch_size) T(chunk_size), C(Kmer*Bases)
     std::vector<at::Tensor> m_input_seqs;
+
+    const bool m_is_chunked_model_type;
+
 #if DORADO_CUDA_BUILD
     std::vector<c10::optional<c10::Stream>> m_streams;
 #endif
