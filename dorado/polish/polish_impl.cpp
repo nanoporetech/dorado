@@ -467,18 +467,14 @@ std::vector<Sample> encode_regions_in_parallel(
     return results;
 }
 
-struct InferenceInputs {
-    std::vector<std::vector<polisher::Sample>> samples;
-    std::vector<std::vector<polisher::TrimInfo>> trims;
-};
-
-InferenceInputs merge_and_split_bam_regions(std::vector<Sample>& window_samples,
-                                            const polisher::EncoderBase& encoder,
-                                            const Span<const Window> bam_regions,
-                                            const Span<const Interval> bam_region_intervals,
-                                            const int32_t num_threads,
-                                            const int32_t window_len,
-                                            const int32_t window_overlap) {
+std::pair<std::vector<std::vector<polisher::Sample>>, std::vector<std::vector<polisher::TrimInfo>>>
+merge_and_split_bam_regions_in_parallel(std::vector<Sample>& window_samples,
+                                        const polisher::EncoderBase& encoder,
+                                        const Span<const Window> bam_regions,
+                                        const Span<const Interval> bam_region_intervals,
+                                        const int32_t num_threads,
+                                        const int32_t window_len,
+                                        const int32_t window_overlap) {
     // Three tasks for this worker:
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
     //  2. Check for discontinuities in any of the samples and split (gap in coverage).
@@ -551,9 +547,11 @@ InferenceInputs merge_and_split_bam_regions(std::vector<Sample>& window_samples,
         }
     };
 
-    InferenceInputs results;
-    results.samples.resize(std::size(bam_region_intervals));
-    results.trims.resize(std::size(bam_region_intervals));
+    // InferenceInputs results;
+    // results.samples.resize(std::size(bam_region_intervals));
+    // results.trims.resize(std::size(bam_region_intervals));
+    std::vector<std::vector<polisher::Sample>> results_samples(std::size(bam_region_intervals));
+    std::vector<std::vector<polisher::TrimInfo>> results_trims(std::size(bam_region_intervals));
 
     // Process BAM windows in parallel.
     const std::vector<Interval> thread_chunks =
@@ -568,8 +566,8 @@ InferenceInputs merge_and_split_bam_regions(std::vector<Sample>& window_samples,
 
     for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(results.samples),
-                                       std::ref(results.trims)));
+        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(results_samples),
+                                       std::ref(results_trims)));
     }
 
     try {
@@ -581,7 +579,7 @@ InferenceInputs merge_and_split_bam_regions(std::vector<Sample>& window_samples,
                                  e.what()};
     }
 
-    return results;
+    return {results_samples, results_trims};
 }
 
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
@@ -647,28 +645,28 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     spdlog::debug("Merging the samples into {} BAM chunks. parallel_results.size() = {}",
                   std::size(bam_region_intervals), std::size(parallel_results));
 
-    InferenceInputs merged = merge_and_split_bam_regions(
+    auto [merged_samples, merged_trims] = merge_and_split_bam_regions_in_parallel(
             parallel_results, encoder,
             Span<const Window>(std::data(bam_regions), std::size(bam_regions)),
-            Span<const Interval>(std::data(bam_region_intervals), std::data(bam_region_intervals)),
+            Span<const Interval>(std::data(bam_region_intervals), std::size(bam_region_intervals)),
             num_threads, window_len, window_overlap);
 
     // Flatten the samples.
     size_t num_samples = 0;
-    for (const auto& vals : merged.samples) {
+    for (const auto& vals : merged_samples) {
         num_samples += std::size(vals);
     }
 
     std::vector<polisher::Sample> samples;
     samples.reserve(num_samples);
-    for (auto& vals : merged.samples) {
+    for (auto& vals : merged_samples) {
         samples.insert(std::end(samples), std::make_move_iterator(std::begin(vals)),
                        std::make_move_iterator(std::end(vals)));
     }
 
     std::vector<polisher::TrimInfo> trims;
     trims.reserve(num_samples);
-    for (auto& vals : merged.trims) {
+    for (auto& vals : merged_trims) {
         trims.insert(std::end(trims), std::make_move_iterator(std::begin(vals)),
                      std::make_move_iterator(std::end(vals)));
     }
@@ -685,6 +683,7 @@ void infer_samples(polisher::ModelTorchBase& model,
                    const std::vector<polisher::TrimInfo>& in_trims,
                    const std::vector<int64_t>& in_samples_to_process,
                    const int32_t batch_size,
+                   const int32_t inference_thread_id,
                    std::vector<polisher::ConsensusResult>& results) {
     /**
      * \brief This creates a copy of the features from samples, so we have the original ones for trimming.
@@ -771,9 +770,9 @@ void infer_samples(polisher::ModelTorchBase& model,
         }
 
         spdlog::info(
-                "Processed a batch of {} samples. Total samples processed: {}, "
+                "[infer_tid = {}] Processed a batch of {} samples. Total samples processed: {}, "
                 "num_samples = {}.",
-                (end - start), end, num_samples);
+                inference_thread_id, (end - start), end, num_samples);
     }
 }
 
@@ -813,11 +812,11 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel(
 
         // Infer samples which can fully fit into a Nx10x10000 tensor.
         infer_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, regular,
-                      batch_size, results);
+                      batch_size, thread_id, results);
 
         // Infer samples which are of varying size. Cannot use padding in case of bidirectional GRU.
         infer_samples(*models[thread_id], encoder, decoder, in_samples, in_trims, remainders, 1,
-                      results);
+                      thread_id, results);
     };
 
     std::vector<polisher::ConsensusResult> results(std::size(in_samples));
