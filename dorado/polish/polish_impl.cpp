@@ -1,5 +1,6 @@
 #include "polish_impl.h"
 
+#include "polish/interval.h"
 #include "polish/polish_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"

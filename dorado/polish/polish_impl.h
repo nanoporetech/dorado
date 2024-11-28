@@ -26,11 +26,6 @@ struct Window {
     int64_t end_no_overlap = 0;
 };
 
-struct Interval {
-    int32_t start = 0;
-    int32_t end = 0;
-};
-
 std::ostream& operator<<(std::ostream& os, const Window& w);
 
 std::vector<Window> create_windows(const int32_t seq_id,

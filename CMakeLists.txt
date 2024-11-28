@@ -308,6 +308,7 @@ add_library(dorado_lib
     dorado/polish/consensus_result.h
     dorado/polish/bam_file.cpp
     dorado/polish/bam_file.h
+    dorado/polish/interval.h
     dorado/polish/medaka_bamiter.cpp
     dorado/polish/medaka_bamiter.h
     dorado/polish/medaka_counts.cpp
