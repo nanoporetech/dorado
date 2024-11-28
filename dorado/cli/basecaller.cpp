@@ -231,7 +231,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--modified-bases-batchsize")
                 .default_value(default_parameters.remora_batchsize)
                 .scan<'i', int>()
-                .help("The modbase model batch size.");
+                .help("The modified base models batch size.");
     }
     {
         parser.visible.add_group("Barcoding arguments");
@@ -389,6 +389,14 @@ void setup(const std::vector<std::string>& args,
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto modbase_runners = api::create_modbase_runners(modbase_models, device, num_modbase_runners,
                                                        modbase_batch_size);
+
+    // Disable chunked modbase models for RNA until we have RNA models - See DOR-972 for details
+    if (!modbase_runners.empty() && is_rna_model(model_config) &&
+        modbase_runners.at(0)->takes_chunk_inputs()) {
+        throw std::runtime_error(
+                "`conv_lstm_v2` modified base models are not supported for RNA data in this "
+                "version of dorado.");
+    }
 
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
