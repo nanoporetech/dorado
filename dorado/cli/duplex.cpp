@@ -367,6 +367,10 @@ int duplex(int argc, char* argv[]) {
                       "emitted in an all-context model, [0, 1].")
                 .default_value(default_parameters.methylation_threshold)
                 .scan<'f', float>();
+        parser.visible.add_argument("--modified-bases-batchsize")
+                .default_value(default_parameters.remora_batchsize)
+                .scan<'i', int>()
+                .help("The modified base models batch size.");
     }
     {
         parser.visible.add_group("Advanced arguments");
@@ -595,10 +599,13 @@ int duplex(int argc, char* argv[]) {
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
+
+            const size_t mod_base_batchsize =
+                    static_cast<size_t>(parser.visible.get<int>("modified-bases-batchsize"));
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(
                     models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
-                    default_parameters.remora_batchsize);
+                    mod_base_batchsize);
 
             if (!mod_base_runners.empty() && output_mode == OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
