@@ -52,8 +52,11 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
         std::string& quals = results[sample_id].quals;
         quals.clear();
 
+        constexpr double cap = 70.0;
+
         const auto phred_scores =
-                (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0, 40).to(torch::kUInt8) + 33;
+                (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0.0, cap).to(torch::kUInt8) +
+                33;
 
         quals.resize(phred_scores.size(0), '!');
         for (int64_t j = 0; j < phred_scores.size(0); ++j) {
