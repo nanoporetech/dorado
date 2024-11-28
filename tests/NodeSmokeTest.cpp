@@ -362,8 +362,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
 
     if (!kit_inputs.custom_kit.empty()) {
         auto kit_info = dorado::demux::parse_custom_arrangement(kit_inputs.custom_kit);
-        REQUIRE(kit_info.has_value());
-        dorado::barcode_kits::add_custom_barcode_kit(kit_info->first, kit_info->second);
+        dorado::barcode_kits::add_custom_barcode_kit(kit_info.first, kit_info.second);
     }
     auto kit_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
