@@ -26,7 +26,7 @@ class GzipReader {
     ZstreamPtr m_zlib_stream;
     std::size_t m_num_bytes_read{};
 
-    void set_failure(std::string error_message);
+    void set_failure(const std::string& error_message);
 
     bool try_initialise_zlib_stream(z_stream& zlib_stream);
 

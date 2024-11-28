@@ -2,6 +2,8 @@
 
 #include <zlib.h>
 
+#include <sstream>
+
 namespace dorado::utils {
 
 void ZstreamDestructor::operator()(z_stream* zlib_stream) {
@@ -25,9 +27,11 @@ GzipReader::GzipReader(std::string gzip_file, std::size_t buffer_size)
     m_zlib_stream = create_zlib_stream();
 }
 
-void GzipReader::set_failure(std::string error_message) {
+void GzipReader::set_failure(const std::string& error_message) {
     m_is_valid = false;
-    m_error_message = std::move(error_message) + " [" + m_gzip_file + "]";
+    std::ostringstream oss;
+    oss << "Gzip reading error [" << m_gzip_file << "]. " << error_message;
+    m_error_message = oss.str();
 }
 
 bool GzipReader::is_valid() const { return m_is_valid; }
@@ -150,8 +154,8 @@ bool GzipReader::is_valid() const { return m_is_valid; }
 const std::string& GzipReader::error_message() const { return m_error_message; }
 
 bool GzipReader::read_next() {
-    auto bytes_read = gzread(m_gzfile.get(), m_decompressed_buffer.data(),
-                             static_cast<unsigned int>(m_buffer_size));
+    const int bytes_read = gzread(m_gzfile.get(), m_decompressed_buffer.data(),
+                                  static_cast<unsigned int>(m_buffer_size));
     if (bytes_read < 0) {
         set_failure("Error reading gzip stream.");
         return false;

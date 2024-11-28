@@ -74,7 +74,7 @@ bool check_file_can_be_opened_for_reading(const std::string& input_file) {
 struct HfileDestructor {
     void operator()(hFILE* fp) {
         if (fp && hclose(fp) == EOF) {
-            spdlog::warn("Error closing hFILE. ErrNo: {}.", errno);
+            spdlog::warn("Problem closing hFILE. return code: {}.", errno);
         }
     }
 };
