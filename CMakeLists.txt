@@ -346,6 +346,7 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
     dorado/utils/ssize.h
+    dorado/utils/span.h
 )
 
 enable_warnings_as_errors(dorado_lib)
