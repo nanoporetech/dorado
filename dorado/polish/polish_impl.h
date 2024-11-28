@@ -45,7 +45,7 @@ ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,
-        const polisher::EncoderBase& encoder,
+        const EncoderBase& encoder,
         const std::vector<Window>& bam_regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t num_threads,
@@ -55,10 +55,10 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
 
 std::vector<ConsensusResult> infer_samples_in_parallel(
         const std::vector<Sample>& in_samples,
-        const std::vector<polisher::TrimInfo>& in_trims,
+        const std::vector<TrimInfo>& in_trims,
         const std::vector<std::shared_ptr<ModelTorchBase>>& models,
-        const polisher::EncoderBase& encoder,
-        const polisher::FeatureDecoder& decoder,
+        const EncoderBase& encoder,
+        const FeatureDecoder& decoder,
         const int32_t window_len,
         const int32_t batch_size);
 
@@ -70,11 +70,20 @@ std::vector<Window> create_bam_regions(
 
 std::vector<Sample> encode_regions_in_parallel(
         std::vector<BamFile>& bam_handles,
-        const polisher::EncoderBase& encoder,
+        const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads);
 
-void remove_deletions(polisher::ConsensusResult& cons);
+std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
+        std::vector<Sample>& window_samples,
+        const EncoderBase& encoder,
+        const Span<const Window> bam_regions,
+        const Span<const Interval> bam_region_intervals,
+        const int32_t num_threads,
+        const int32_t window_len,
+        const int32_t window_overlap);
+
+void remove_deletions(ConsensusResult& cons);
 
 }  // namespace dorado::polisher
