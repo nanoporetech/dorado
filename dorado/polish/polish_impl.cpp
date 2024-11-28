@@ -413,6 +413,60 @@ std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_
     return chunks;
 }
 
+std::vector<Sample> encode_regions_in_parallel(
+        std::vector<BamFile>& bam_handles,
+        const polisher::EncoderBase& encoder,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const dorado::Span<const Window> windows,
+        const int32_t num_threads) {
+    const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
+                            std::vector<Sample>& results) {
+        for (int32_t i = start; i < end; ++i) {
+            const auto& window = windows[i];
+            const std::string& name = draft_lens[window.seq_id].first;
+            if (thread_id == 0) {
+                spdlog::debug(
+                        "Encoding i = {}, start = {}, end = {}, region = "
+                        "{}:{}-{} ({} %).",
+                        i, start, end, name, window.start, window.end,
+                        100.0 * static_cast<double>(i - start) / (end - start));
+            }
+            results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
+                                               window.end, window.seq_id);
+        }
+    };
+
+    const std::vector<Interval> thread_chunks =
+            compute_chunks(static_cast<int32_t>(std::size(windows)),
+                           std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
+
+    spdlog::info("Starting to encode regions for {} windows using {} threads.", std::size(windows),
+                 std::size(thread_chunks));
+
+    // Create the thread pool, futures and results.
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+    std::vector<Sample> results(std::size(windows));
+
+    // Add jobs to the pool.
+    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results)));
+    }
+
+    // Join and catch errors.
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception from encoding task: ") + e.what()};
+    }
+
+    return results;
+}
+
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,
         const polisher::EncoderBase& encoder,
@@ -468,48 +522,10 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
-    // Convert windows to samples in parallel.
-    std::vector<polisher::Sample> parallel_results;
-    {
-        const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
-                                std::vector<polisher::Sample>& results) {
-            for (int32_t i = start; i < end; ++i) {
-                const auto& window = windows[i];
-                const std::string& name = draft_lens[window.seq_id].first;
-                if (thread_id == 0) {
-                    spdlog::debug(
-                            "Encoding i = {}, start = {}, end = {}, region = "
-                            "{}:{}-{} ({} %).",
-                            i, start, end, name, window.start, window.end,
-                            100.0 * static_cast<double>(i - start) / (end - start));
-                }
-                results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
-                                                   window.end, window.seq_id);
-            }
-        };
-        parallel_results.resize(std::size(windows));
-        const std::vector<Interval> chunks =
-                compute_chunks(static_cast<int32_t>(std::size(windows)),
-                               std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
-        spdlog::info("Starting to encode regions for {} windows using {} threads.",
-                     std::size(windows), std::size(chunks));
-        cxxpool::thread_pool pool{std::size(chunks)};
-        std::vector<std::future<void>> futures;
-        futures.reserve(std::size(chunks));
-        for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
-            const auto [chunk_start, chunk_end] = chunks[tid];
-            futures.emplace_back(
-                    pool.push(worker, tid, chunk_start, chunk_end, std::ref(parallel_results)));
-        }
-        try {
-            for (auto& f : futures) {
-                f.get();
-            }
-        } catch (const std::exception& e) {
-            throw std::runtime_error{std::string("Caught exception from encoding task: ") +
-                                     e.what()};
-        }
-    }
+    // Encode windows to samples in parallel. Non-const by design, data will be moved.
+    std::vector<Sample> parallel_results = encode_regions_in_parallel(
+            bam_handles, encoder, draft_lens,
+            Span<const Window>(std::data(windows), std::size(windows)), num_threads);
 
     spdlog::debug("Merging the samples into {} BAM chunks. parallel_results.size() = {}",
                   std::size(bam_region_intervals), std::size(parallel_results));

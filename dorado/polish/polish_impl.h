@@ -6,6 +6,7 @@
 #include "polish/consensus_result.h"
 #include "polish/sample.h"
 #include "polish/trim.h"
+#include "utils/span.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -66,6 +67,13 @@ std::vector<Window> create_bam_regions(
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
         const std::string& region_str);
+
+std::vector<Sample> encode_regions_in_parallel(
+        std::vector<BamFile>& bam_handles,
+        const polisher::EncoderBase& encoder,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const dorado::Span<const Window> windows,
+        const int32_t num_threads);
 
 void remove_deletions(polisher::ConsensusResult& cons);
 
