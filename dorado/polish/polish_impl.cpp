@@ -467,6 +467,123 @@ std::vector<Sample> encode_regions_in_parallel(
     return results;
 }
 
+struct InferenceInputs {
+    std::vector<std::vector<polisher::Sample>> samples;
+    std::vector<std::vector<polisher::TrimInfo>> trims;
+};
+
+InferenceInputs merge_and_split_bam_regions(std::vector<Sample>& window_samples,
+                                            const polisher::EncoderBase& encoder,
+                                            const Span<const Window> bam_regions,
+                                            const Span<const Interval> bam_region_intervals,
+                                            const int32_t num_threads,
+                                            const int32_t window_len,
+                                            const int32_t window_overlap) {
+    // Three tasks for this worker:
+    //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
+    //  2. Check for discontinuities in any of the samples and split (gap in coverage).
+    //  3. Split the merged samples into equally sized pieces which will be used for inference.
+
+    const auto worker = [&](const int32_t start, const int32_t end,
+                            std::vector<std::vector<polisher::Sample>>& results_samples,
+                            std::vector<std::vector<polisher::TrimInfo>>& results_trims) {
+        for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
+            const Interval interval = bam_region_intervals[bam_chunk_id];
+
+            spdlog::debug("- [bam_chunk_id = {}] (0) Before merging: interval = [{}, {}]",
+                          bam_chunk_id, interval.start, interval.end);
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            std::cerr << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+                      << "] Before merging. interval = [" << interval.start << ", " << interval.end
+                      << ">:\n";
+            std::cerr << "- [bam_chunk_id = " << bam_chunk_id << "] Input (window_samples):\n";
+            debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
+#endif
+
+            std::vector<polisher::Sample> local_samples;
+
+            // Split all samples on discontinuities.
+            for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
+                auto& sample = window_samples[sample_id];
+                std::vector<polisher::Sample> disc_samples =
+                        split_sample_on_discontinuities(sample);
+                local_samples.insert(std::end(local_samples),
+                                     std::make_move_iterator(std::begin(disc_samples)),
+                                     std::make_move_iterator(std::end(disc_samples)));
+            }
+
+            spdlog::debug(
+                    "- [bam_chunk_id = {}] (1) After splitting on discontinuities: "
+                    "local_samples = {}",
+                    bam_chunk_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+                      << "] After splitting on discontinuities (local_samples):\n";
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            local_samples = encoder.merge_adjacent_samples(local_samples);
+
+            spdlog::debug("- [bam_chunk_id = {}] (2) After merging adjacent: local_samples = {}",
+                          bam_chunk_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+                      << "] After merging adjacent (local_samples):\n";
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
+
+            spdlog::debug(
+                    "- [bam_chunk_id = {}] (3) After splitting samples: local_samples = {}, "
+                    "window_len = {}, window_overlap = {}",
+                    bam_chunk_id, std::size(local_samples), window_len, window_overlap);
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+                      << "] After splitting samples (local_samples):\n";
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            const Window& reg = bam_regions[bam_chunk_id];
+            results_trims[bam_chunk_id] = polisher::trim_samples(
+                    local_samples, {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap});
+            results_samples[bam_chunk_id] = std::move(local_samples);
+        }
+    };
+
+    InferenceInputs results;
+    results.samples.resize(std::size(bam_region_intervals));
+    results.trims.resize(std::size(bam_region_intervals));
+
+    // Process BAM windows in parallel.
+    const std::vector<Interval> thread_chunks =
+            compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+
+    spdlog::debug("Starting to merge samples for {} BAM windows using {} threads.",
+                  std::size(bam_region_intervals), std::size(thread_chunks));
+
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+
+    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(results.samples),
+                                       std::ref(results.trims)));
+    }
+
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
+                                 e.what()};
+    }
+
+    return results;
+}
+
 std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,
         const polisher::EncoderBase& encoder,
@@ -530,126 +647,28 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
     spdlog::debug("Merging the samples into {} BAM chunks. parallel_results.size() = {}",
                   std::size(bam_region_intervals), std::size(parallel_results));
 
-    // Three tasks for this worker:
-    //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
-    //  2. Check for discontinuities in any of the samples and split (gap in coverage).
-    //  3. Split the merged samples into equally sized pieces which will be used for inference.
-    std::vector<std::vector<polisher::Sample>> merged_samples;
-    std::vector<std::vector<polisher::TrimInfo>> merged_trims;
-    {
-        const auto worker = [&](const int32_t start, const int32_t end,
-                                std::vector<std::vector<polisher::Sample>>& results,
-                                std::vector<std::vector<polisher::TrimInfo>>& results_trims) {
-            for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
-                const Interval interval = bam_region_intervals[bam_chunk_id];
-
-                spdlog::debug("- [bam_chunk_id = {}] (0) Before merging: interval = [{}, {}]",
-                              bam_chunk_id, interval.start, interval.end);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cerr << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
-                          << "] Before merging. interval = [" << interval.start << ", "
-                          << interval.end << ">:\n";
-                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] Input (parallel_results):\n";
-                debug_print_samples(std::cerr, parallel_results, interval.start, interval.end, -1);
-#endif
-
-                std::vector<polisher::Sample> local_samples;
-
-                // Split all samples on discontinuities.
-                for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
-                    auto& sample = parallel_results[sample_id];
-                    std::vector<polisher::Sample> disc_samples =
-                            split_sample_on_discontinuities(sample);
-                    local_samples.insert(std::end(local_samples),
-                                         std::make_move_iterator(std::begin(disc_samples)),
-                                         std::make_move_iterator(std::end(disc_samples)));
-                }
-
-                spdlog::debug(
-                        "- [bam_chunk_id = {}] (1) After splitting on discontinuities: "
-                        "local_samples = {}",
-                        bam_chunk_id, std::size(local_samples));
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting on discontinuities (local_samples):\n";
-                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-                local_samples = encoder.merge_adjacent_samples(local_samples);
-
-                spdlog::debug(
-                        "- [bam_chunk_id = {}] (2) After merging adjacent: local_samples = {}",
-                        bam_chunk_id, std::size(local_samples));
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After merging adjacent (local_samples):\n";
-                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-                local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
-
-                spdlog::debug(
-                        "- [bam_chunk_id = {}] (3) After splitting samples: local_samples = {}, "
-                        "window_len = {}, window_overlap = {}",
-                        bam_chunk_id, std::size(local_samples), window_len, window_overlap);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-                std::cerr << "- [bam_chunk_id = " << bam_chunk_id
-                          << "] After splitting samples (local_samples):\n";
-                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-                const Window& reg = bam_regions[bam_chunk_id];
-                results_trims[bam_chunk_id] = polisher::trim_samples(
-                        local_samples, {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap});
-                results[bam_chunk_id] = std::move(local_samples);
-            }
-        };
-        merged_samples.resize(std::size(bam_region_intervals));
-        merged_trims.resize(std::size(bam_region_intervals));
-
-        // Process BAM windows in parallel.
-        const std::vector<Interval> chunks =
-                compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), 1);
-
-        spdlog::debug("Starting to merge samples for {} BAM windows using {} threads.",
-                      std::size(bam_region_intervals), std::size(chunks));
-
-        cxxpool::thread_pool pool{std::size(chunks)};
-        std::vector<std::future<void>> futures;
-        futures.reserve(std::size(chunks));
-
-        for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(chunks)); ++tid) {
-            const auto [chunk_start, chunk_end] = chunks[tid];
-            futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
-                                           std::ref(merged_trims)));
-        }
-        try {
-            for (auto& f : futures) {
-                f.get();
-            }
-        } catch (const std::exception& e) {
-            throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
-                                     e.what()};
-        }
-    }
+    InferenceInputs merged = merge_and_split_bam_regions(
+            parallel_results, encoder,
+            Span<const Window>(std::data(bam_regions), std::size(bam_regions)),
+            Span<const Interval>(std::data(bam_region_intervals), std::data(bam_region_intervals)),
+            num_threads, window_len, window_overlap);
 
     // Flatten the samples.
     size_t num_samples = 0;
-    for (const auto& vals : merged_samples) {
+    for (const auto& vals : merged.samples) {
         num_samples += std::size(vals);
     }
 
     std::vector<polisher::Sample> samples;
     samples.reserve(num_samples);
-    for (auto& vals : merged_samples) {
+    for (auto& vals : merged.samples) {
         samples.insert(std::end(samples), std::make_move_iterator(std::begin(vals)),
                        std::make_move_iterator(std::end(vals)));
     }
 
     std::vector<polisher::TrimInfo> trims;
     trims.reserve(num_samples);
-    for (auto& vals : merged_trims) {
+    for (auto& vals : merged.trims) {
         trims.insert(std::end(trims), std::make_move_iterator(std::begin(vals)),
                      std::make_move_iterator(std::end(vals)));
     }
