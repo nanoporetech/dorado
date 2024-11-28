@@ -32,13 +32,9 @@ bool check_normalized_id_pattern(const std::string& pattern) {
     return true;
 }
 
-std::optional<std::pair<std::string, barcode_kits::KitInfo>> parse_custom_arrangement(
+std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
         const std::string& arrangement_file) {
     const toml::value config_toml = toml::parse(arrangement_file);
-
-    if (!config_toml.contains("arrangement")) {
-        return std::nullopt;
-    }
 
     barcode_kits::KitInfo new_kit{};
     new_kit.double_ends = false;
@@ -162,6 +158,14 @@ dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
     }
 
     return params;
+}
+
+std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_info(
+        const std::string& custom_kit_file) {
+    auto custom_kit_info = dorado::demux::parse_custom_arrangement(custom_kit_file);
+    custom_kit_info.second.scoring_params =
+            parse_scoring_params(custom_kit_file, dorado::barcode_kits::BarcodeKitScoringParams{});
+    return custom_kit_info;
 }
 
 }  // namespace dorado::demux
