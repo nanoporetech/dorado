@@ -970,6 +970,11 @@ void clear_custom_barcodes() {
     }
 }
 
+bool is_valid_barcode_kit(const std::string& kit_name) {
+    const auto kit_info = barcode_kits::get_kit_info(kit_name);
+    return kit_info != nullptr;
+}
+
 std::string barcode_kits_list_str() {
     std::vector<std::string> kit_names;
     kit_names.reserve(kit_info_map.size());

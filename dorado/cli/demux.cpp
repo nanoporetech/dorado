@@ -70,24 +70,6 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
     return result;
 }
 
-std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_info(
-        const std::string& custom_kit_file) {
-    try {
-        auto custom_kit_info = dorado::demux::parse_custom_arrangement(custom_kit_file);
-        if (!custom_kit_info) {
-            spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
-            std::exit(EXIT_FAILURE);
-        }
-        custom_kit_info->second.scoring_params = dorado::demux::parse_scoring_params(
-                custom_kit_file, dorado::barcode_kits::BarcodeKitScoringParams{});
-        return *custom_kit_info;
-    } catch (const std::exception& e) {
-        spdlog::error(e.what());
-    } catch (...) {
-        spdlog::error("Unable to parse custom barcode arrangement file: {}", custom_kit_file);
-    }
-    std::exit(EXIT_FAILURE);
-}
 }  // anonymous namespace
 
 namespace dorado {
@@ -289,8 +271,11 @@ int demuxer(int argc, char* argv[]) {
                 std::unordered_map<std::string, std::string> custom_barcodes =
                         demux::parse_custom_sequences(*custom_seqs);
                 barcode_kits::add_custom_barcodes(custom_barcodes);
-            } catch (const std::runtime_error& e) {
+            } catch (const std::exception& e) {
                 spdlog::error(e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
                 std::exit(EXIT_FAILURE);
             }
         }
@@ -298,9 +283,27 @@ int demuxer(int argc, char* argv[]) {
         std::optional<std::string> custom_kit =
                 parser.visible.present<std::string>("--barcode-arrangement");
         if (custom_kit.has_value()) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
-            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            try {
+                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
+                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            } catch (const std::exception& e) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
+                              e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
+                std::exit(EXIT_FAILURE);
+            }
         }
+
+        if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
+            spdlog::error(
+                    "{} is not a valid barcode kit name. Please run the help "
+                    "command to find out available barcode kits.",
+                    barcoding_info->kit_name);
+            std::exit(EXIT_FAILURE);
+        }
+
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         auto current_node = demux_writer;
         if (!no_trim) {

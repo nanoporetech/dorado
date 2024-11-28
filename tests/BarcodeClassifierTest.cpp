@@ -490,8 +490,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
                     .string()});
 
     auto kit_info = dorado::demux::parse_custom_arrangement(kit_file);
-    REQUIRE(kit_info.has_value());
-    dorado::barcode_kits::add_custom_barcode_kit(kit_info->first, kit_info->second);
+    dorado::barcode_kits::add_custom_barcode_kit(kit_info.first, kit_info.second);
     auto kit_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
 
@@ -500,7 +499,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
     auto barcode_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });
 
-    demux::BarcodeClassifier classifier(kit_info->first);
+    demux::BarcodeClassifier classifier(kit_info.first);
 
     for (std::string bc : {"CUSTOM-SQK-RPB004_CUSTOM-BC01", "CUSTOM-SQK-RPB004_CUSTOM-BC05",
                            "CUSTOM-SQK-RPB004_CUSTOM-BC11", "unclassified"}) {
