@@ -14,6 +14,7 @@
 #include "polish/trim.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
+#include "utils/AsyncQueue.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
@@ -38,6 +39,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -401,10 +403,10 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     return ret;
 }
 
-void write_consensus_result(std::ostream& os,
-                            const std::string& seq_name,
-                            const polisher::ConsensusResult& result,
-                            const bool write_quals) {
+[[maybe_unused]] void write_consensus_result(std::ostream& os,
+                                             const std::string& seq_name,
+                                             const polisher::ConsensusResult& result,
+                                             const bool write_quals) {
     if (std::empty(result.seq)) {
         return;
     }
@@ -417,29 +419,6 @@ void write_consensus_result(std::ostream& os,
     } else {
         os << '>' << seq_name << '\n' << out.seq << '\n';
     }
-}
-
-template <typename T, typename F>
-std::vector<polisher::Interval> create_batches(const T& data,
-                                               const int64_t batch_size,
-                                               const F& functor_data_size) {
-    std::vector<polisher::Interval> ret;
-    polisher::Interval interval{0, 0};
-    int64_t sum = 0;
-    for (const auto& val : data) {
-        const int64_t s = functor_data_size(val);
-        sum += s;
-        ++interval.end;
-        if (sum >= batch_size) {
-            ret.emplace_back(interval);
-            interval.start = interval.end;
-            sum = 0;
-        }
-    }
-    if (interval.end > interval.start) {
-        ret.emplace_back(interval);
-    }
-    return ret;
 }
 
 std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
@@ -526,6 +505,142 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
 
 }  // namespace
 
+namespace polisher {
+
+void sample_producer(PolisherResources& resources,
+                     const std::vector<polisher::Window>& bam_regions,
+                     const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                     const int32_t num_threads,
+                     const int32_t batch_size,
+                     const int32_t window_len,
+                     const int32_t window_overlap,
+                     const int32_t bam_subchunk_len,
+                     utils::AsyncQueue<InferenceData>& infer_data) {
+    (void)resources;
+    (void)bam_regions;
+    (void)draft_lens;
+    (void)num_threads;
+    (void)window_len;
+    (void)window_overlap;
+    (void)bam_subchunk_len;
+
+    // const int32_t buffer_size = dorado::ssize(resources.devices) * batch_size;
+    // const int32_t approx_max_buffer_size = buffer_size * 2;
+
+    spdlog::debug("[producer] Input: {} BAM windows from {} sequences.", std::size(bam_regions),
+                  std::size(draft_lens));
+
+    // Split large BAM regions into non-overlapping windows for parallel encoding.
+    // The non-overlapping windows will be merged after samples are constructed.
+    std::vector<Window> windows;
+    std::vector<Interval> bam_region_intervals;
+    for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
+        const Window& bw = bam_regions[i];
+        std::vector<Window> new_windows =
+                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
+        if (std::empty(new_windows)) {
+            bam_region_intervals.emplace_back(Interval{0, 0});
+            continue;
+        }
+        const int32_t num_windows = static_cast<int32_t>(std::size(windows));
+        const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
+        bam_region_intervals.emplace_back(Interval{num_windows, num_windows + num_new_windows});
+        windows.reserve(std::size(windows) + std::size(new_windows));
+        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
+    }
+
+    // // A BAM region needs to be processed fully and then split into overlapping samples for inference.
+    // // We cannot predict how many samples there will be in a BAM region due to indels, so we make an approximate
+    // // guess here, and will iteratively fill the buffer until enough samples are added.
+    // const int32_t approx_bam_buffer_size = dorado::ssize(resources.devices) * batch_size * std::max(1, (bam_subchunk_len / window_len));
+
+    // Divide draft sequences into groups of specified size, as sort of a barrier.
+    const std::vector<polisher::Interval> bam_region_batches =
+            create_batches(bam_region_intervals, num_threads,
+                           [](const Interval& val) { return val.end - val.start; });
+
+    // std::cerr << "buffer_size = " << buffer_size << "\n";
+
+    const int64_t notify_buffer_size = dorado::ssize(resources.devices) * batch_size;
+
+    InferenceData buffer;
+
+    // Each iteration of the for loop produces full BAM regions of samples to fit at least num_threads windows.
+    // It is important to process full BAM regions because of splitting/merging/splitting and trimming.
+    for (const auto [region_id_start, region_id_end] : bam_region_batches) {
+        // std::unique_lock<std::mutex> lock_produce(mtx_queue);
+        // mtx_queue.wait(lock_produce, [&] {
+        //     return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
+        // });
+
+        if (region_id_end <= region_id_start) {
+            continue;
+        }
+
+        const int32_t num_regions = region_id_end - region_id_start;
+        const int64_t window_id_start = bam_region_intervals[region_id_start].start;
+        const int64_t window_id_end = bam_region_intervals[region_id_end - 1].end;
+        const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
+
+        // std::cerr << "region_id_start = " << region_id_start << ", region_id_end = " << region_id_end << ", num_regions = " << num_regions << ", num_windows = " << num_windows << "\n";
+
+        // << ", bam_region_intervals.size() = " << bam_region_intervals.size() << "\n";
+        // for (int32_t region_id = first; region_id < last; ++region_id) {
+        //     std::cerr << "    - region_id = " << region_id << ", bam_region_intervals[region_id].start = " << bam_region_intervals[region_id].start << ", bam_region_intervals[region_id].end = " << bam_region_intervals[region_id].end << "\n";
+        // }
+
+        // Encode windows to samples in parallel. Non-const by design, data will be moved.
+        std::vector<Sample> region_samples = encode_regions_in_parallel(
+                resources.bam_handles, *resources.encoder, draft_lens,
+                Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
+
+        spdlog::debug(
+                "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
+                num_regions, std::size(region_samples));
+
+        auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
+                region_samples, *resources.encoder,
+                Span<const Window>(std::data(bam_regions) + region_id_start, num_regions),
+                Span<const Interval>(std::data(bam_region_intervals) + region_id_start,
+                                     num_regions),
+                num_threads, window_len, window_overlap, window_id_start);
+
+        buffer.samples.insert(std::end(buffer.samples),
+                              std::make_move_iterator(std::begin(samples)),
+                              std::make_move_iterator(std::end(samples)));
+
+        buffer.trims.insert(std::end(buffer.trims), std::make_move_iterator(std::begin(trims)),
+                            std::make_move_iterator(std::end(trims)));
+
+        // std::cerr << "samples.size() = " << samples.size() << ", buffer_samples.size() = " << buffer.samples.size() << "\n";
+
+        // Once the buffer is full enough, add to queue.
+        if (dorado::ssize(buffer.samples) >= notify_buffer_size) {
+            // This will block until the queue is empty (because it is set to size 1);
+            // assert(infer_data.capacity() == 1);
+            spdlog::debug("[producer] Pushing data to infer_data queue. buffer.samples.size() = {}",
+                          std::size(buffer.samples));
+            infer_data.try_push(std::move(buffer));
+            buffer = {};
+            spdlog::debug("[producer] Pushed.");
+        }
+    }
+
+    if (!std::empty(buffer.samples)) {
+        // This will block until the queue is empty (because it is set to size 1);
+        // assert(infer_data.capacity() == 1);
+        spdlog::debug(
+                "[producer] Pushing final data to infer_data queue. buffer.samples.size() = {}",
+                std::size(buffer.samples));
+        infer_data.try_push(std::move(buffer));
+        buffer = {};
+        spdlog::debug("[producer] Pushed final.");
+    }
+
+    infer_data.terminate();
+}
+}  // namespace polisher
+
 void run_polishing(const Options& opt, PolisherResources& resources) {
     spdlog::info("Threads: {}", opt.threads);
     spdlog::info("Inference threads: {}", opt.infer_threads);
@@ -554,9 +669,9 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
     auto ofs = get_output_stream(opt.out_consensus_fn);
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
-    const std::vector<polisher::Interval> draft_batches =
-            create_batches(draft_lens, opt.draft_batch_size,
-                           [](const std::pair<std::string, int64_t>& val) { return val.second; });
+    const std::vector<polisher::Interval> draft_batches = polisher::create_batches(
+            draft_lens, opt.draft_batch_size,
+            [](const std::pair<std::string, int64_t>& val) { return val.second; });
 
     // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
@@ -579,23 +694,79 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
+        // Each item in the queue has enough samples for at least one batch per device.
+        // Queue is thus small for memory conservation.
+        utils::AsyncQueue<polisher::InferenceData> infer_data(2);
+
+        std::thread thread_sample_producer = std::thread(
+                &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
+                std::cref(draft_lens_batch), opt.threads, opt.batch_size, opt.window_len,
+                opt.window_overlap, opt.bam_subchunk, std::ref(infer_data));
+
+        auto last_chunk_reserve_time = std::chrono::system_clock::now();
+
+        std::vector<polisher::ConsensusResult> all_results;
+
+        while (true) {
+            polisher::InferenceData item;
+            spdlog::debug("[consumer] Waiting to pop data for inference.");
+            const auto pop_status = infer_data.try_pop_until(
+                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
+
+            spdlog::debug("[consumer] Popped data: item.samples.size() = {}",
+                          std::size(item.samples));
+            // std::cerr << "infer_data.size() = " << infer_data.size() << ", infer_data.capacity() = " << infer_data.capacity() << ", item.samples.size() = " << item.samples.size() << "\n";
+
+            if (pop_status == utils::AsyncQueueStatus::Terminate) {
+                break;
+            }
+
+            if (pop_status == utils::AsyncQueueStatus::Timeout) {
+                spdlog::warn(
+                        "[consumer] Timeout when popping item from infer_data queue! "
+                        "item.samples.size() = {}",
+                        std::size(item.samples));
+            }
+
+            // This should handle the timeout case too.
+            if (std::empty(item.samples)) {
+                continue;
+            }
+
+            // Inference.
+            std::vector<polisher::ConsensusResult> results_samples =
+                    polisher::infer_samples_in_parallel(item.samples, item.trims, resources.models,
+                                                        *resources.encoder, *resources.decoder,
+                                                        opt.window_len, opt.batch_size);
+
+            all_results.insert(std::end(all_results),
+                               std::make_move_iterator(std::begin(results_samples)),
+                               std::make_move_iterator(std::end(results_samples)));
+        }
+
+        if (thread_sample_producer.joinable()) {
+            thread_sample_producer.join();
+        }
+
+        spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
+
         // Produce samples (tensors) for inference.
-        auto [samples, trims] = polisher::create_samples(
-                resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
-                opt.threads, opt.window_len, opt.window_overlap, opt.bam_subchunk);
+        // auto [samples, trims] = polisher::create_samples(
+        //         resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
+        //         opt.threads, opt.window_len, opt.window_overlap, opt.bam_subchunk);
 
-        spdlog::info("Produced num samples: {}", std::size(samples));
+        // spdlog::info("Produced num samples: {}", std::size(samples));
 
-        // Inference.
-        std::vector<polisher::ConsensusResult> results_samples =
-                polisher::infer_samples_in_parallel(samples, trims, resources.models,
-                                                    *resources.encoder, *resources.decoder,
-                                                    opt.window_len, opt.batch_size);
+        // // Inference.
+        // std::vector<polisher::ConsensusResult> results_samples =
+        //         polisher::infer_samples_in_parallel(samples, trims, resources.models,
+        //                                             *resources.encoder, *resources.decoder,
+        //                                             opt.window_len, opt.batch_size);
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
-        for (int32_t i = 0; i < dorado::ssize(results_samples); ++i) {
-            const polisher::ConsensusResult& r = results_samples[i];
+        for (int32_t i = 0; i < dorado::ssize(all_results); ++i) {
+            const polisher::ConsensusResult& r = all_results[i];
             groups[r.draft_id].emplace_back(r.draft_start, i);
         }
 
@@ -606,7 +777,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
             const polisher::ConsensusResult consensus =
                     polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
-                                              results_samples, group, seq_id);
+                                              all_results, group, seq_id);
 
             const std::string& header = draft_lens_batch[seq_id].first;
             write_consensus_result(*ofs, header, consensus,

@@ -27,6 +27,11 @@ struct Window {
     int64_t end_no_overlap = 0;
 };
 
+struct InferenceData {
+    std::vector<Sample> samples;
+    std::vector<TrimInfo> trims;
+};
+
 std::ostream& operator<<(std::ostream& os, const Window& w);
 
 std::vector<Window> create_windows(const int32_t seq_id,
@@ -82,7 +87,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         const Span<const Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
-        const int32_t window_overlap);
+        const int32_t window_overlap,
+        const int32_t window_interval_offset);
 
 void remove_deletions(ConsensusResult& cons);
 

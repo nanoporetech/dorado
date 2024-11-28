@@ -475,7 +475,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         const Span<const Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
-        const int32_t window_overlap) {
+        const int32_t window_overlap,
+        const int32_t window_interval_offset) {
     // Three tasks for this worker:
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
     //  2. Check for discontinuities in any of the samples and split (gap in coverage).
@@ -484,16 +485,18 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     const auto worker = [&](const int32_t start, const int32_t end,
                             std::vector<std::vector<polisher::Sample>>& results_samples,
                             std::vector<std::vector<polisher::TrimInfo>>& results_trims) {
-        for (int32_t bam_chunk_id = start; bam_chunk_id < end; ++bam_chunk_id) {
-            const Interval interval = bam_region_intervals[bam_chunk_id];
+        for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
+            Interval interval = bam_region_intervals[bam_region_id];
+            interval.start -= window_interval_offset;
+            interval.end -= window_interval_offset;
 
-            spdlog::debug("- [bam_chunk_id = {}] (0) Before merging: interval = [{}, {}]",
-                          bam_chunk_id, interval.start, interval.end);
+            spdlog::debug("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
+                          bam_region_id, interval.start, interval.end);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "[merged_samples worker bam_chunk_id = " << bam_chunk_id
+            std::cerr << "[merged_samples worker bam_region_id = " << bam_region_id
                       << "] Before merging. interval = [" << interval.start << ", " << interval.end
                       << ">:\n";
-            std::cerr << "- [bam_chunk_id = " << bam_chunk_id << "] Input (window_samples):\n";
+            std::cerr << "- [bam_region_id = " << bam_region_id << "] Input (window_samples):\n";
             debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
 #endif
 
@@ -510,21 +513,21 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             }
 
             spdlog::debug(
-                    "- [bam_chunk_id = {}] (1) After splitting on discontinuities: "
+                    "- [bam_region_id = {}] (1) After splitting on discontinuities: "
                     "local_samples = {}",
-                    bam_chunk_id, std::size(local_samples));
+                    bam_region_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+            std::cerr << "- [bam_region_id = " << bam_region_id
                       << "] After splitting on discontinuities (local_samples):\n";
             debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
             local_samples = encoder.merge_adjacent_samples(local_samples);
 
-            spdlog::debug("- [bam_chunk_id = {}] (2) After merging adjacent: local_samples = {}",
-                          bam_chunk_id, std::size(local_samples));
+            spdlog::debug("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
+                          bam_region_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+            std::cerr << "- [bam_region_id = " << bam_region_id
                       << "] After merging adjacent (local_samples):\n";
             debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
@@ -532,19 +535,19 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
 
             spdlog::debug(
-                    "- [bam_chunk_id = {}] (3) After splitting samples: local_samples = {}, "
+                    "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
                     "window_len = {}, window_overlap = {}",
-                    bam_chunk_id, std::size(local_samples), window_len, window_overlap);
+                    bam_region_id, std::size(local_samples), window_len, window_overlap);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_chunk_id = " << bam_chunk_id
+            std::cerr << "- [bam_region_id = " << bam_region_id
                       << "] After splitting samples (local_samples):\n";
             debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
 
-            const Window& reg = bam_regions[bam_chunk_id];
-            results_trims[bam_chunk_id] = polisher::trim_samples(
+            const Window& reg = bam_regions[bam_region_id];
+            results_trims[bam_region_id] = polisher::trim_samples(
                     local_samples, {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap});
-            results_samples[bam_chunk_id] = std::move(local_samples);
+            results_samples[bam_region_id] = std::move(local_samples);
         }
     };
 
@@ -649,6 +652,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
         std::vector<Window> new_windows =
                 create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
         if (std::empty(new_windows)) {
+            bam_region_intervals.emplace_back(Interval{0, 0});
             continue;
         }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
@@ -670,7 +674,7 @@ std::pair<std::vector<polisher::Sample>, std::vector<polisher::TrimInfo>> create
             parallel_results, encoder,
             Span<const Window>(std::data(bam_regions), std::size(bam_regions)),
             Span<const Interval>(std::data(bam_region_intervals), std::size(bam_region_intervals)),
-            num_threads, window_len, window_overlap);
+            num_threads, window_len, window_overlap, 0);
 
     spdlog::info("Total num samples to infer: {}", std::size(samples));
 
