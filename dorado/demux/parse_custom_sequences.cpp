@@ -12,6 +12,10 @@ namespace dorado::demux {
 std::unordered_map<std::string, std::string> parse_custom_sequences(
         const std::string& sequences_file) {
     dorado::HtsFilePtr file(hts_open(sequences_file.c_str(), "r"));
+    if (!file) {
+        throw std::runtime_error("Unable to open file " + sequences_file);
+    }
+
     BamPtr record{bam_init1()};
 
     std::unordered_map<std::string, std::string> sequences;

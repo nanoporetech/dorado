@@ -105,15 +105,21 @@ void validate_barcode_kit_info(const std::string& kit_name) {
 
 std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
         const std::string& custom_kit_file) {
-    auto custom_kit_info = demux::parse_custom_arrangement(custom_kit_file);
-    if (!custom_kit_info) {
-        spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
-        std::exit(EXIT_FAILURE);
+    try {
+        auto custom_kit_info = demux::parse_custom_arrangement(custom_kit_file);
+        if (!custom_kit_info) {
+            spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
+            std::exit(EXIT_FAILURE);
+        }
+        custom_kit_info->second.scoring_params = demux::parse_scoring_params(
+                custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
+        return *custom_kit_info;
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+    } catch (...) {
+        spdlog::error("Unable to parse custom barcode arrangement file: {}", custom_kit_file);
     }
-
-    custom_kit_info->second.scoring_params =
-            demux::parse_scoring_params(custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
-    return *custom_kit_info;
+    std::exit(EXIT_FAILURE);
 }
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
@@ -764,9 +770,14 @@ int basecaller(int argc, char* argv[]) {
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");
         if (custom_seqs.has_value()) {
-            std::unordered_map<std::string, std::string> custom_barcodes =
-                    demux::parse_custom_sequences(*custom_seqs);
-            barcode_kits::add_custom_barcodes(custom_barcodes);
+            try {
+                std::unordered_map<std::string, std::string> custom_barcodes =
+                        demux::parse_custom_sequences(*custom_seqs);
+                barcode_kits::add_custom_barcodes(custom_barcodes);
+            } catch (const std::runtime_error& e) {
+                spdlog::error(e.what());
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         std::optional<std::string> custom_kit =
