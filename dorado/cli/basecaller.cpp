@@ -92,36 +92,6 @@ public:
     const DataLoader::InputFiles& files() const { return m_input_files; }
 };
 
-void validate_barcode_kit_info(const std::string& kit_name) {
-    const auto kit_info = barcode_kits::get_kit_info(kit_name);
-    if (!kit_info) {
-        spdlog::error(
-                "{} is not a valid barcode kit name. Please run the help "
-                "command to find out available barcode kits.",
-                kit_name);
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
-        const std::string& custom_kit_file) {
-    try {
-        auto custom_kit_info = demux::parse_custom_arrangement(custom_kit_file);
-        if (!custom_kit_info) {
-            spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
-            std::exit(EXIT_FAILURE);
-        }
-        custom_kit_info->second.scoring_params = demux::parse_scoring_params(
-                custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
-        return *custom_kit_info;
-    } catch (const std::exception& e) {
-        spdlog::error(e.what());
-    } catch (...) {
-        spdlog::error("Unable to parse custom barcode arrangement file: {}", custom_kit_file);
-    }
-    std::exit(EXIT_FAILURE);
-}
-
 void set_basecaller_params(const argparse::ArgumentParser& arg,
                            basecall::CRFModelConfig& model_config,
                            const std::string& device) {
@@ -460,7 +430,6 @@ void setup(const std::vector<std::string>& args,
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
-        validate_barcode_kit_info(barcoding_info->kit_name);
         utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
                                                sample_sheet.get());
     } else {
@@ -774,8 +743,11 @@ int basecaller(int argc, char* argv[]) {
                 std::unordered_map<std::string, std::string> custom_barcodes =
                         demux::parse_custom_sequences(*custom_seqs);
                 barcode_kits::add_custom_barcodes(custom_barcodes);
-            } catch (const std::runtime_error& e) {
+            } catch (const std::exception& e) {
                 spdlog::error(e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
                 std::exit(EXIT_FAILURE);
             }
         }
@@ -783,14 +755,31 @@ int basecaller(int argc, char* argv[]) {
         std::optional<std::string> custom_kit =
                 parser.visible.present<std::string>("--barcode-arrangement");
         if (custom_kit.has_value()) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
-            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            try {
+                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
+                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            } catch (const std::exception& e) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
+                              e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
             sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
             barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
+        }
+
+        if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
+            spdlog::error(
+                    "{} is not a valid barcode kit name. Please run the help "
+                    "command to find out available barcode kits.",
+                    barcoding_info->kit_name);
+            std::exit(EXIT_FAILURE);
         }
     }
 
