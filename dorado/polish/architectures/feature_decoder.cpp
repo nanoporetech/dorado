@@ -46,17 +46,15 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
 
     const torch::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
 
-    // std::cerr << "probs: " << probs << "\n";
-
     for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
         std::string& quals = results[sample_id].quals;
         quals.clear();
 
-        constexpr double cap = 70.0;
-
+        constexpr double QV_CAP = 70.0;
+        const double min_err = std::pow(10.0, -QV_CAP / 10.0);
+        const auto err = (1.0 - probs[sample_id]).clamp(min_err, 1.0);
         const auto phred_scores =
-                (-10.0 * torch::log10(1.0 - probs[sample_id])).clamp(0.0, cap).to(torch::kUInt8) +
-                33;
+                (-10.0 * torch::log10(err)).clamp(0.0, QV_CAP).to(torch::kUInt8) + 33;
 
         quals.resize(phred_scores.size(0), '!');
         for (int64_t j = 0; j < phred_scores.size(0); ++j) {
