@@ -63,8 +63,6 @@ void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
 
 // Returns true on success.
 bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count);
-void commit_command_buffer(const char *label, MTL::CommandBuffer *cb);
-bool wait_on_command_buffer(MTL::CommandBuffer *cb, int try_count);
 
 NS::SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();
