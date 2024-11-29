@@ -4,6 +4,7 @@
 #include "polish/polish_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"
+#include "utils/timer_high_res.h"
 
 #include <cxxpool.h>
 #include <htslib/faidx.h>
@@ -701,12 +702,14 @@ void infer_samples(polisher::ModelTorchBase& model,
         at::InferenceMode infer_guard;
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
+        timer::TimerHighRes timer_collate;
         std::vector<torch::Tensor> batch_features;
         batch_features.reserve(std::size(samples_to_process));
         for (const int64_t i : samples_to_process) {
             batch_features.emplace_back(samples[i].features);
         }
         torch::Tensor batch_features_tensor = encoder.collate(std::move(batch_features));
+        const int64_t time_collate = timer_collate.GetElapsedMilliseconds();
 
         {
             std::ostringstream oss;
@@ -719,6 +722,8 @@ void infer_samples(polisher::ModelTorchBase& model,
                             (1024.0 * 1024.0));
         }
 
+        timer::TimerHighRes timer_forward;
+
         torch::Tensor output;
         try {
             output = model.predict_on_batch(std::move(batch_features_tensor));
@@ -726,37 +731,48 @@ void infer_samples(polisher::ModelTorchBase& model,
             std::cerr << "ERROR! Exception caught: " << e.what() << "\n";
             throw e;
         }
+        const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
+
+        spdlog::debug("Computed forward(). Timings - collate: {} ms, forwad: {} ms", time_collate,
+                      time_forward);
 
         return output;
     };
 
-#if DORADO_CUDA_BUILD
-    c10::optional<c10::Stream> stream;
-    const auto& device = model.get_device();
-    if (device.is_cuda()) {
-        spdlog::info("Acquiring a CUDA stream.");
-        stream = c10::cuda::getStreamFromPool(false, device.index());
-    }
-    c10::cuda::OptionalCUDAStreamGuard guard(stream);
-#endif
+    // #if DORADO_CUDA_BUILD
+    //     c10::optional<c10::Stream> stream;
+    //     const auto& device = model.get_device();
+    //     if (device.is_cuda()) {
+    //         spdlog::info("Acquiring a CUDA stream.");
+    //         stream = c10::cuda::getStreamFromPool(false, device.index());
+    //     }
+    //     c10::cuda::OptionalCUDAStreamGuard guard(stream);
+    // #endif
 
     results.resize(std::size(in_samples));
 
     const int64_t num_samples = dorado::ssize(in_samples_to_process);
 
     for (int64_t start = 0; start < num_samples; start += batch_size) {
+        timer::TimerHighRes timer_total;
+
         const int64_t end = std::min((start + batch_size), num_samples);
 
         const std::vector<int64_t> ids(std::begin(in_samples_to_process) + start,
                                        std::begin(in_samples_to_process) + end);
 
+        timer::TimerHighRes timer_batch_infer;
         torch::Tensor output = batch_infer(in_samples, ids);
+        const int64_t time_batch_infer = timer_batch_infer.GetElapsedMilliseconds();
 
         // Convert to sequences and qualities.
+        timer::TimerHighRes timer_decode;
         std::vector<polisher::ConsensusResult> new_results = decoder.decode_bases(output);
+        const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
 
         assert(static_cast<int64_t>(std::size(new_results)) == (end - start));
 
+        timer::TimerHighRes timer_trim;
         // Trim the overlapping sequences.
         for (int64_t j = 0; j < dorado::ssize(new_results); ++j) {
             auto& result = new_results[j];
@@ -773,11 +789,16 @@ void infer_samples(polisher::ModelTorchBase& model,
 
             results[sample_id] = std::move(result);
         }
+        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
+
+        const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
         spdlog::info(
                 "[infer_tid = {}] Processed a batch of {} samples. Total samples processed: {}, "
-                "num_samples = {}.",
-                inference_thread_id, (end - start), end, num_samples);
+                "num_samples = {}. Timings - infer: {} ms, decode: {} ms, trim: {} ms, total: {} "
+                "ms",
+                inference_thread_id, (end - start), end, num_samples, time_batch_infer, time_decode,
+                time_trim, time_total);
     }
 }
 
