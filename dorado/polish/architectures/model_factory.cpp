@@ -1,4 +1,7 @@
+
 #include "model_factory.h"
+
+#include "polish/polish_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
@@ -42,6 +45,11 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         for (const auto& w : model_params) {
             spdlog::debug("[model_params] w.key() = {}", w.key());
         }
+        for (const auto& buffer : model.named_buffers()) {
+            spdlog::debug("[model_params] Buffer key: {}, shape: {}", buffer.key(),
+                          (buffer.value().defined() ? tensor_shape_as_string(buffer.value())
+                                                    : "undefined"));
+        }
     }
 
     torch::NoGradGuard no_grad;
@@ -56,17 +64,83 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
             const std::string name = w.key().toStringRef();
             const at::Tensor value = w.value().toTensor();
             auto* param = model.named_parameters().find(name);
+            // auto* param_buffer = model.named_buffers().find(name);
+
             if (param != nullptr) {
+                std::cerr << "About to copy param->copy_(value), name = '" << name
+                          << ", param->dtype: " << param->dtype()
+                          << ", value.dtype() = " << value.dtype()
+                          << ", param.shape = " << tensor_shape_as_string(*param)
+                          << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
                 param->copy_(value);
-            } else {
+                std::cerr << "Copied.\n";
+                continue;
+            }
+
+            bool found = false;
+            for (auto& buffer : model.named_buffers()) {
+                if (buffer.key() == name) {
+                    std::cerr << "About to copy buffer.value().copy_(value), name = '" << name
+                              << ", buffer.value().dtype: " << buffer.value().dtype()
+                              << ", value.dtype() = " << value.dtype() << "'"
+                              << ", buffer.value().shape = "
+                              << tensor_shape_as_string(buffer.value())
+                              << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
+                    if (!buffer.value().defined()) {
+                        std::cerr << "!param_buffer->defined()\n";
+                    }
+                    if (!value.defined()) {
+                        std::cerr << "!value.defined()\n";
+                    }
+                    std::cerr << "buffer.value().sizes().size() = " << buffer.value().sizes().size()
+                              << "\n";
+                    buffer.value().copy_(value);
+                    std::cerr << "Copied.\n";
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
                 throw std::runtime_error(
                         "Some loaded parameters cannot be found in the libtorch model! name = " +
                         name);
             }
+
+            // if (param != nullptr) {
+            //     std::cerr << "About to copy param->copy_(value), name = '" << name << ", param->dtype: " << param->dtype() << ", value.dtype() = " << value.dtype()
+            //         << ", param.shape = " << tensor_shape_as_string(*param) << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
+            //     param->copy_(value);
+            //     std::cerr << "Copied.\n";
+            // } else if (param_buffer != nullptr) {
+            //     std::cerr << "About to copy param_buffer->copy_(value), name = '" << name << ", param_buffer->dtype: " << param_buffer->dtype() << ", value.dtype() = " << value.dtype() << "'"
+            //         << ", param_buffer.shape = " << tensor_shape_as_string(*param) << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
+            //     std::cerr << "address of param_buffer = " << reinterpret_cast<uintptr_t>(param_buffer) << "\n";
+            //     std::cerr << "Weight name: " << w.key().toStringRef()
+            //             << ", sizes: " << tensor_shape_as_string(w.value().toTensor())
+            //             << "\n";
+            //     if (!param_buffer->defined()) {
+            //         std::cerr << "!param_buffer->defined()\n";
+            //         // throw std::runtime_error("Undefined tensor for " + name);
+            //     }
+            //     if (!value.defined()) {
+            //         std::cerr << "!value.defined()\n";
+            //         // throw std::runtime_error("Undefined tensor for " + name);
+            //     }
+            //     std::cerr << "param_buffer->sizes().size() = " << param_buffer->sizes().size() << "\n";
+            //     // std::cerr << "param_buffer->shape = " << tensor_shape_as_string(*param_buffer) << "\n";
+            //     param_buffer->copy_(value);
+            //     std::cerr << "Copied.\n";
+            // } else {
+            //     throw std::runtime_error(
+            //             "Some loaded parameters cannot be found in the libtorch model! name = " +
+            //             name);
+            // }
         }
 
-    } catch (const c10::Error& /*e*/) {
-        throw std::runtime_error{"Error: Pickled data is not a dictionary or is None!"};
+    } catch (const c10::Error& e) {
+        throw std::runtime_error{std::string("Error: ") +
+                                 e.what()};  // Pickled data is not a dictionary or is None!"};
     }
 }
 
@@ -115,6 +189,30 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
                                            bidirectional, NORMALISE);
 
         // Set the weights of the internally constructed model.
+        load_parameters(*model, config.model_dir / config.model_file);
+
+    } else if (model_type == ModelType::LATENT_SPACE_LSTM) {
+        spdlog::debug("Constructing a LATENT_SPACE_LSTM model.");
+
+        const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
+        const int32_t lstm_size = std::stoi(get_value(config.model_kwargs, "lstm_size"));
+        const int32_t cnn_size = std::stoi(get_value(config.model_kwargs, "cnn_size"));
+        const std::string pooler_type = get_value(config.model_kwargs, "pooler_type");
+        const int32_t bases_alphabet_size =
+                std::stoi(get_value(config.model_kwargs, "bases_alphabet_size"));
+        const int32_t bases_embedding_size =
+                std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
+        const std::vector<int32_t> kernel_sizes =
+                parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
+        const bool use_dwells =
+                (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
+        const bool bidirectional =
+                (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
+
+        model = std::make_unique<ModelLatentSpaceLSTM>(
+                num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
+                bases_alphabet_size, bases_embedding_size, bidirectional);
+
         load_parameters(*model, config.model_dir / config.model_file);
 
     } else {
