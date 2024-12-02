@@ -206,8 +206,13 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
                 parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
         const bool use_dwells =
                 (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
-        const bool bidirectional =
-                (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
+
+        // Optionally parse the 'bidirectional' option to support older configs.
+        bool bidirectional = true;
+        if (config.model_kwargs.find("bidirectional") != std::cend(config.model_kwargs)) {
+            bidirectional =
+                    (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
+        }
 
         model = std::make_unique<ModelLatentSpaceLSTM>(
                 num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
