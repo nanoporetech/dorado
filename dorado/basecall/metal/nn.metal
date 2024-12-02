@@ -1124,15 +1124,16 @@ kernel void lstm(const device LstmArgs* const args,
                  threadgroup ftype (*const simd_res_buf)[2 * TILE_SIZE * TILE_SIZE],
                  threadgroup ftype (*const simd_out_buf)[TILE_SIZE * TILE_SIZE],
                  KERNEL_INDEX_INPUTS) {
+    constexpr int kLstmGates = 4;
     const int chunk_size = args->chunk_size;
     const int batch_tiles = args->batch_tiles;
     const int time_step_begin = args->time_step_begin;
     const int time_step_end = args->time_step_end;
     const int m_blks = batch_tiles / SIMD_TILES_M;
-    const int n_blks = kLstmLayerSize * 4 / (TILE_SIZE * SIMD_TILES_N);
+    const int n_blks = kLstmLayerSize * kLstmGates / (TILE_SIZE * SIMD_TILES_N);
     const int k_tiles = kLstmLayerSize / TILE_SIZE;
     const int batch_size = batch_tiles * TILE_SIZE;
-    const int w_stride = kLstmLayerSize * 4;
+    const int w_stride = kLstmLayerSize * kLstmGates;
     MatMul<SIMD_TILES_M, SIMD_TILES_N> mm;
     using MatLayoutLSTM = MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, NO_OFFSET>;
     const device ftype* const bias = weights_buf + 3 * kLstmLayerSize * w_stride;
