@@ -113,7 +113,6 @@ public:
 };
 TORCH_MODULE(MeanPooler);
 
-// ReversibleLSTM
 class ReversibleLSTM : public torch::nn::Module {
 public:
     ReversibleLSTM(const int32_t input_size,
@@ -165,24 +164,30 @@ public:
                                 true),
               m_pre_pool_expansion_layer(cnn_size, lstm_size),
               m_pooler(MeanPooler()),  // register_module("pooler", MeanPooler())),
-              m_lstm(torch::nn::LSTMOptions(lstm_size, lstm_size)
-                             .num_layers(2)
-                             .batch_first(true)
-                             .bidirectional(bidirectional)),
+                                       //   m_lstm(),
+              m_lstm_bidir(torch::nn::LSTMOptions(lstm_size, lstm_size)
+                                   .num_layers(2)
+                                   .batch_first(true)
+                                   .bidirectional(bidirectional)),
+              m_lstm_unidir(),
               m_linear((1 + bidirectional) * lstm_size, num_classes),
               m_normalise(true),
               m_lstm_size(lstm_size),
-              m_use_dwells(use_dwells) {
+              m_use_dwells(use_dwells),
+              m_bidirectional(bidirectional) {
         if (bidirectional) {
-            m_lstm = torch::nn::LSTM(torch::nn::LSTMOptions(lstm_size, lstm_size)
-                                             .num_layers(2)
-                                             .batch_first(true)
-                                             .bidirectional(bidirectional));
+            m_lstm_bidir = torch::nn::LSTM(torch::nn::LSTMOptions(lstm_size, lstm_size)
+                                                   .num_layers(2)
+                                                   .batch_first(true)
+                                                   .bidirectional(bidirectional));
+            // m_lstm->push_back(torch::nn::LSTM(torch::nn::LSTMOptions(lstm_size, lstm_size)
+            //                                  .num_layers(2)
+            //                                  .batch_first(true)
+            //                                  .bidirectional(bidirectional)));
         } else {
-            throw std::runtime_error("Unidirectional LSTM not implemented yet!");
-            // for (int32_t i = 0; i < 4; ++i) {
-            //     m_lstm = torch::nn::Sequential ReversibleLSTM(lstm_size, lstm_size, true, );
-            // }
+            for (int32_t i = 0; i < 4; ++i) {
+                m_lstm_unidir->push_back(ReversibleLSTM(lstm_size, lstm_size, true, !(i % 2)));
+            }
         }
 
         if (pooler_type != "mean") {
@@ -194,7 +199,11 @@ public:
         register_module("read_level_conv", m_read_level_conv);
         register_module("pre_pool_expansion_layer", m_pre_pool_expansion_layer);
         register_module("pooler", m_pooler);
-        register_module("lstm", m_lstm);
+        if (bidirectional) {
+            register_module("lstm", m_lstm_bidir);
+        } else {
+            register_module("lstm", m_lstm_unidir);
+        }
         register_module("linear", m_linear);
     }
 
@@ -249,7 +258,7 @@ public:
         x = x.view({b, d, p, m_lstm_size});
         // std::cerr << "[IS] x.shape = " << tensor_shape_as_string(x) << ", non_empty_position_mask.shape = " << tensor_shape_as_string(non_empty_position_mask) << "\n";
         x = m_pooler->forward(x, non_empty_position_mask);
-        x = std::get<0>(m_lstm->forward(x));
+        x = m_bidirectional ? std::get<0>(m_lstm_bidir->forward(x)) : m_lstm_unidir->forward(x);
         x = m_linear->forward(x);
 
         if (m_normalise) {
@@ -265,11 +274,13 @@ private:
     ReadLevelConv m_read_level_conv;
     torch::nn::Linear m_pre_pool_expansion_layer;
     MeanPooler m_pooler{nullptr};
-    torch::nn::LSTM m_lstm;
+    torch::nn::LSTM m_lstm_bidir;
+    torch::nn::Sequential m_lstm_unidir{nullptr};
     torch::nn::Linear m_linear;
     bool m_normalise = false;
     int32_t m_lstm_size = 0;
     bool m_use_dwells = false;
+    bool m_bidirectional = true;
 };
 
 }  // namespace dorado::polisher
