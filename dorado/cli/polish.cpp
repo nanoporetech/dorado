@@ -613,9 +613,21 @@ void sample_producer(PolisherResources& resources,
                                      ", trims.size() = " + std::to_string(std::size(trims)));
         }
 
+        // Add samples to the batches.
         for (size_t i = 0; i < std::size(samples); ++i) {
+            // If any of the samples is of wrong size, create a remainder batch of 1.
+            if (dorado::ssize(samples[i].positions_major) != window_len) {
+                InferenceData remainder_buffer;
+                remainder_buffer.samples = {std::move(samples[i])};
+                remainder_buffer.trims = {std::move(trims[i])};
+                infer_data.try_push(std::move(remainder_buffer));
+                continue;
+            }
+
+            // Expand the current buffer.
             buffer.samples.emplace_back(std::move(samples[i]));
             buffer.trims.emplace_back(std::move(trims[i]));
+
             if (dorado::ssize(buffer.samples) == batch_size) {
                 spdlog::debug(
                         "[producer] Pushing a batch of data to infer_data queue. "
