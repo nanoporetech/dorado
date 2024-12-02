@@ -26,88 +26,6 @@ ModelType parse_model_type(const std::string& type) {
 }
 
 /**
- * \brief DO NOT USE THIS FUNCTION. For some reason, Torch invalidates the object found
- *          by using model.named_buffers().find() function, and this crashes the program.
- */
-[[maybe_unused]] void load_parameters_UB(ModelTorchBase& model,
-                                         const std::filesystem::path& in_pt) {
-    const auto get_bytes = [](const std::filesystem::path& filename) {
-        std::ifstream input(filename, std::ios::binary);
-        std::vector<char> bytes((std::istreambuf_iterator<char>(input)),
-                                (std::istreambuf_iterator<char>()));
-        return bytes;
-    };
-
-    if (spdlog::default_logger()->level() == spdlog::level::debug) {
-        const torch::OrderedDict<std::string, at::Tensor> model_params = model.named_parameters();
-        for (const auto& w : model_params) {
-            spdlog::debug("[model_params] w.key() = {}", w.key());
-        }
-    }
-
-    torch::NoGradGuard no_grad;
-
-    const std::vector<char> bytes = get_bytes(in_pt);
-
-    try {
-        const c10::Dict<c10::IValue, c10::IValue> weights =
-                torch::pickle_load(bytes).toGenericDict();
-
-        for (const auto& w : weights) {
-            const std::string name = w.key().toStringRef();
-            const at::Tensor value = w.value().toTensor();
-            auto* param = model.named_parameters().find(name);
-            if (param != nullptr) {
-                std::cerr << "About to copy param->copy_(value), name = '" << name
-                          << ", param->dtype: " << param->dtype()
-                          << ", value.dtype() = " << value.dtype()
-                          << ", param.shape = " << tensor_shape_as_string(*param)
-                          << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-
-                param->copy_(value);
-
-                std::cerr << "Copied.\n";
-
-                continue;
-            }
-
-            auto* param_buffer = model.named_buffers().find(name);
-            if (param_buffer != nullptr) {
-                std::cerr << "About to copy param_buffer->copy_(value).\n";
-                if (!param_buffer->defined()) {
-                    std::cerr << "!param_buffer->defined()\n";
-                }
-                if (!value.defined()) {
-                    std::cerr << "!value.defined()\n";
-                }
-                std::cerr << "    -> name = '" << name
-                          << ", buffer.value().dtype: " << param_buffer->dtype()
-                          << ", value.dtype() = " << value.dtype() << "'"
-                          << ", buffer.value().shape = " << tensor_shape_as_string(*param_buffer)
-                          << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-                std::cerr << "About to copy param_buffer->copy_(value), name = '" << name
-                          << ", buffer.value().dtype: " << param_buffer->dtype()
-                          << ", value.dtype() = " << value.dtype() << "'"
-                          << ", buffer.value().shape = " << tensor_shape_as_string(*param_buffer)
-                          << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-
-                param_buffer->copy_(value);
-
-                std::cerr << "Copied.\n";
-
-                continue;
-            }
-
-            throw std::runtime_error(
-                    "Some loaded parameters cannot be found in the libtorch model! name = " + name);
-        }
-
-    } catch (const c10::Error& /*e*/) {
-        throw std::runtime_error{"Error: Pickled data is not a dictionary or is None!"};
-    }
-}
-
-/**
  * \brief This function is a workaround around missing features in torchlib. There
  *          is currently no way to load only the state dict without the model either
  *          being traced of scripted.
@@ -186,61 +104,19 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
 
             if (params.contains(name)) {
                 params[name].copy_(value);
+
             } else if (buffers.contains(name)) {
                 buffers[name].copy_(value);
+
             } else {
                 throw std::runtime_error(
                         "Some loaded parameters cannot be found in the libtorch model! name = " +
                         name);
             }
-
-            // at::Tensor* param = model.named_parameters().find(name);
-            // if ((param != nullptr)) { //  && (param != model.named_parameters().end()) {
-            //     std::cerr << "About to copy param->copy_(value), name = '" << name
-            //               << ", param->dtype: " << param->dtype()
-            //               << ", value.dtype() = " << value.dtype()
-            //               << ", param.shape = " << tensor_shape_as_string(*param)
-            //               << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-            //     param->copy_(value);
-            //     std::cerr << "Copied.\n";
-            //     continue;
-            // }
-
-            // // at::Tensor* param_buffer = model.named_buffers().find(name);
-            // bool found = false;
-            // for (auto& buffer : model.named_buffers()) {
-            //     if (buffer.key() == name) {
-            //         std::cerr << "About to copy buffer.value().copy_(value), name = '" << name
-            //                   << ", buffer.value().dtype: " << buffer.value().dtype()
-            //                   << ", value.dtype() = " << value.dtype() << "'"
-            //                   << ", buffer.value().shape = "
-            //                   << tensor_shape_as_string(buffer.value())
-            //                   << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-            //         if (!buffer.value().defined()) {
-            //             std::cerr << "!param_buffer->defined()\n";
-            //         }
-            //         if (!value.defined()) {
-            //             std::cerr << "!value.defined()\n";
-            //         }
-            //         std::cerr << "buffer.value().sizes().size() = " << buffer.value().sizes().size()
-            //                   << "\n";
-            //         buffer.value().copy_(value);
-            //         std::cerr << "Copied.\n";
-            //         found = true;
-            //         break;
-            //     }
-            // }
-
-            // if (!found) {
-            //     throw std::runtime_error(
-            //             "Some loaded parameters cannot be found in the libtorch model! name = " +
-            //             name);
-            // }
         }
 
     } catch (const c10::Error& e) {
-        throw std::runtime_error{std::string("Error: ") +
-                                 e.what()};  // Pickled data is not a dictionary or is None!"};
+        throw std::runtime_error{std::string("Error: ") + e.what()};
     }
 }
 
