@@ -6,11 +6,15 @@
 
 namespace dorado::polisher {
 
+enum class ActivationType {
+    RELU,
+};
+
 torch::nn::Sequential make_1d_conv_layers(const std::vector<int32_t>& kernel_sizes,
                                           int32_t num_in_features,
                                           const std::vector<int32_t>& channels,
                                           const bool use_batch_norm,
-                                          const std::string& activation /*= "ReLU"*/) {
+                                          const ActivationType activation) {
     if (std::size(kernel_sizes) != std::size(channels)) {
         throw std::invalid_argument("channels and kernel_sizes must have the same size");
     }
@@ -31,10 +35,10 @@ torch::nn::Sequential make_1d_conv_layers(const std::vector<int32_t>& kernel_siz
         layers->push_back(torch::nn::Conv1d(
                 torch::nn::Conv1dOptions(num_in_features, c, k).padding((k - 1) / 2)));
 
-        if (activation == "ReLU") {
+        if (activation == ActivationType::RELU) {
             layers->push_back(torch::nn::ReLU());
         } else {
-            throw std::invalid_argument("Activation " + activation + " not implemented");
+            throw std::invalid_argument("Unsupported activation function!");
         }
 
         if (use_batch_norm) {
@@ -56,7 +60,7 @@ ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
                                       num_in_features,
                                       channel_dims,
                                       use_batch_norm,
-                                      "ReLU")},
+                                      ActivationType::RELU)},
           m_expansion_layer{torch::nn::Linear(channel_dims.back(), out_dim)}
 
 {
@@ -190,7 +194,7 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     if (m_use_dwells) {
         if (x.sizes().back() != 5) {
             throw std::runtime_error(
-                    "if using dwells, x must have 5 features/read/position. Shape of x: " +
+                    "If using dwells, x must have 5 features/read/position. Shape of x: " +
                     tensor_shape_as_string(x));
         }
         auto dwells = x.index({torch::indexing::Slice(), torch::indexing::Slice(),
