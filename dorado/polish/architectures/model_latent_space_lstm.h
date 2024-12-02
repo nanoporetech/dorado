@@ -32,7 +32,7 @@ TORCH_MODULE(ReadLevelConv);
 
 class MeanPoolerImpl : public torch::nn::Module {
 public:
-    torch::Tensor forward(torch::Tensor x, torch::Tensor non_empty_position_mask);
+    torch::Tensor forward(const torch::Tensor& x, const torch::Tensor& non_empty_position_mask);
 };
 TORCH_MODULE(MeanPooler);
 
@@ -56,7 +56,7 @@ public:
     ModelLatentSpaceLSTM(const int32_t num_classes,
                          const int32_t lstm_size,
                          const int32_t cnn_size,
-                         const std::vector<int32_t> kernel_sizes,
+                         const std::vector<int32_t>& kernel_sizes,
                          const std::string& pooler_type,
                          const bool use_dwells,
                          const int32_t bases_alphabet_size,

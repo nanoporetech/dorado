@@ -78,13 +78,11 @@ ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
 
 torch::Tensor ReadLevelConvImpl::forward(torch::Tensor x) { return m_convs->forward(std::move(x)); }
 
-torch::Tensor MeanPoolerImpl::forward(torch::Tensor x, torch::Tensor non_empty_position_mask) {
+torch::Tensor MeanPoolerImpl::forward(const torch::Tensor& x,
+                                      const torch::Tensor& non_empty_position_mask) {
     const auto read_depths = non_empty_position_mask.sum(-1).unsqueeze(-1).unsqueeze(-1);
     const auto mask = non_empty_position_mask.unsqueeze(-1).unsqueeze(-1);
-    x = x * mask;
-    x = x.sum(1);
-    x = x / read_depths;
-    return x;
+    return (x * mask).sum(1) / read_depths;
 }
 
 ReversibleLSTM::ReversibleLSTM(const int32_t input_size,
@@ -112,7 +110,7 @@ torch::Tensor ReversibleLSTM::forward(torch::Tensor x) {
 ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
                                            const int32_t lstm_size,
                                            const int32_t cnn_size,
-                                           const std::vector<int32_t> kernel_sizes,
+                                           const std::vector<int32_t>& kernel_sizes,
                                            const std::string& pooler_type,
                                            const bool use_dwells,
                                            const int32_t bases_alphabet_size,
@@ -219,7 +217,7 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     x = x.permute({0, 2, 1});
     x = m_pre_pool_expansion_layer->forward(x);
     x = x.view({b, d, p, m_lstm_size});
-    x = m_pooler->forward(std::move(x), std::move(non_empty_position_mask));
+    x = m_pooler->forward(x, non_empty_position_mask);
     x = m_bidirectional ? std::get<0>(m_lstm_bidir->forward(x)) : m_lstm_unidir->forward(x);
     x = m_linear->forward(x);
 
