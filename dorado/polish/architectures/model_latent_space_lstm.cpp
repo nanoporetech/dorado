@@ -1,9 +1,8 @@
 #include "model_latent_space_lstm.h"
 
+#include <cmath>
 #include <stdexcept>
 #include <unordered_map>
-// #include <iostream>
-#include <cmath>
 
 namespace dorado::polisher {
 
@@ -48,12 +47,11 @@ torch::nn::Sequential make_1d_conv_layers(const std::vector<int32_t>& kernel_siz
     return layers;
 }
 
-ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,             // 5
-                                     const int32_t out_dim,                     // 128
-                                     const std::vector<int32_t>& kernel_sizes,  // [1, 17]
+ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
+                                     const int32_t out_dim,
+                                     const std::vector<int32_t>& kernel_sizes,
                                      const std::vector<int32_t>& channel_dims,
-                                     bool use_batch_norm  // True
-                                     )
+                                     bool use_batch_norm)
         : m_convs{make_1d_conv_layers(kernel_sizes,
                                       num_in_features,
                                       channel_dims,
@@ -77,18 +75,11 @@ ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,             
 torch::Tensor ReadLevelConvImpl::forward(torch::Tensor x) { return m_convs->forward(std::move(x)); }
 
 torch::Tensor MeanPoolerImpl::forward(torch::Tensor x, torch::Tensor non_empty_position_mask) {
-    // const auto read_depths = non_empty_position_mask.sum(-1, true);
     const auto read_depths = non_empty_position_mask.sum(-1).unsqueeze(-1).unsqueeze(-1);
-
     const auto mask = non_empty_position_mask.unsqueeze(-1).unsqueeze(-1);
-    // std::cerr << "[IS] MeanPoolerImpl: x.shape = " << tensor_shape_as_string(x) << ", read_depths.shape = " << tensor_shape_as_string(read_depths)
-    //     << ", mask.shape = " << tensor_shape_as_string(mask) << ", read_depths.shape = " << tensor_shape_as_string(read_depths) << "\n";
     x = x * mask;
-    // std::cerr << "[IS] After: x = x * mask, x.shape = " << tensor_shape_as_string(x) << "\n";
     x = x.sum(1);
-    // std::cerr << "[IS] After: x = x.sum(1), x.shape = " << tensor_shape_as_string(x) << "\n";
-    x = x / read_depths;  // TODO: Does the read_depths need to be unsqueezed?
-    // std::cerr << "[IS] After: x = x / read_depths, x.shape = " << tensor_shape_as_string(x) << "\n";
+    x = x / read_depths;
     return x;
 }
 
@@ -105,9 +96,9 @@ ReversibleLSTM::ReversibleLSTM(const int32_t input_size,
 torch::Tensor ReversibleLSTM::forward(torch::Tensor x) {
     const int32_t flip_dim = m_batch_first ? 1 : 0;
     if (m_reverse) {
-        x = x.flip(flip_dim);  // Flip along the sequence dimension
+        x = x.flip(flip_dim);
     }
-    auto output = std::get<0>(m_lstm->forward(x));  // .output;
+    auto output = std::get<0>(m_lstm->forward(x));
     if (m_reverse) {
         output = output.flip(flip_dim);
     }
@@ -217,7 +208,6 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     // The sizes() returns a torch::IntArrayRef
     const auto b = x.sizes()[0];
     const auto d = x.sizes()[1];
-    // const auto f = x.sizes()[2];
     const auto p = x.sizes()[3];
 
     x = x.flatten(0, 1);
@@ -225,7 +215,6 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     x = x.permute({0, 2, 1});
     x = m_pre_pool_expansion_layer->forward(x);
     x = x.view({b, d, p, m_lstm_size});
-    // std::cerr << "[IS] x.shape = " << tensor_shape_as_string(x) << ", non_empty_position_mask.shape = " << tensor_shape_as_string(non_empty_position_mask) << "\n";
     x = m_pooler->forward(std::move(x), std::move(non_empty_position_mask));
     x = m_bidirectional ? std::get<0>(m_lstm_bidir->forward(x)) : m_lstm_unidir->forward(x);
     x = m_linear->forward(x);
