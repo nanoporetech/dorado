@@ -342,6 +342,7 @@ add_library(dorado_lib
     dorado/polish/architectures/model_config.h
     dorado/polish/architectures/model_factory.cpp
     dorado/polish/architectures/model_factory.h
+    dorado/polish/architectures/model_latent_space_lstm.cpp
     dorado/polish/architectures/model_latent_space_lstm.h
     dorado/polish/architectures/model_torch_base.cpp
     dorado/polish/architectures/model_torch_base.h
