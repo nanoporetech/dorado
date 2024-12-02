@@ -20,7 +20,7 @@ inline torch::nn::Sequential make_1d_conv_layers(const std::vector<int32_t>& ker
                                                  int32_t num_in_features,
                                                  const std::vector<int32_t>& channels,
                                                  const bool use_batch_norm,
-                                                 const std::string& activation = "ReLU") {
+                                                 const std::string& activation /*= "ReLU"*/) {
     if (std::size(kernel_sizes) != std::size(channels)) {
         throw std::invalid_argument("channels and kernel_sizes must have the same size");
     }
@@ -69,7 +69,8 @@ public:
             : m_convs{make_1d_conv_layers(kernel_sizes,
                                           num_in_features,
                                           channel_dims,
-                                          use_batch_norm)},
+                                          use_batch_norm,
+                                          "ReLU")},
               m_expansion_layer{torch::nn::Linear(channel_dims.back(), out_dim)}
 
     {
@@ -85,7 +86,7 @@ public:
         register_module("expansion_layer", m_expansion_layer);
     }
 
-    torch::Tensor forward(torch::Tensor x) { return m_convs->forward(x); }
+    torch::Tensor forward(torch::Tensor x) { return m_convs->forward(std::move(x)); }
 
 private:
     torch::nn::Sequential m_convs;
@@ -145,61 +146,62 @@ private:
 
 class ModelLatentSpaceLSTM : public ModelTorchBase {
 public:
-    ModelLatentSpaceLSTM(const int32_t num_classes = 5,
-                         const int32_t lstm_size = 128,
-                         const int32_t cnn_size = 128,
-                         const std::vector<int32_t> kernel_sizes = {1, 17},
-                         const std::string& pooler_type = "mean",
-                         const bool use_dwells = false,
-                         const int32_t bases_alphabet_size = 6,
-                         const int32_t bases_embedding_size = 6,
-                         const bool bidirectional = true)
-            : m_base_embedder(
-                      torch::nn::EmbeddingOptions(bases_alphabet_size, bases_embedding_size)),
-              strand_embedder(torch::nn::EmbeddingOptions(3, bases_embedding_size)),
-              m_read_level_conv(bases_embedding_size + (use_dwells ? 2 : 1),
-                                lstm_size,
-                                kernel_sizes,
-                                std::vector<int32_t>(std::size(kernel_sizes), cnn_size),
+    ModelLatentSpaceLSTM(const int32_t num_classes,
+                         const int32_t lstm_size,
+                         const int32_t cnn_size,
+                         const std::vector<int32_t> kernel_sizes,
+                         const std::string& pooler_type,
+                         const bool use_dwells,
+                         const int32_t bases_alphabet_size,
+                         const int32_t bases_embedding_size,
+                         const bool bidirectional)
+            : m_num_classes{num_classes},
+              m_lstm_size{lstm_size},
+              m_cnn_size{cnn_size},
+              m_kernel_sizes{kernel_sizes},
+              m_pooler_type{pooler_type},
+              m_use_dwells{use_dwells},
+              m_bases_alphabet_size{bases_alphabet_size},
+              m_bases_embedding_size{bases_embedding_size},
+              m_bidirectional{bidirectional},
+
+              m_base_embedder(
+                      torch::nn::EmbeddingOptions(m_bases_alphabet_size, m_bases_embedding_size)),
+              m_strand_embedder(torch::nn::EmbeddingOptions(3, m_bases_embedding_size)),
+              m_read_level_conv(m_bases_embedding_size + (m_use_dwells ? 2 : 1),
+                                m_lstm_size,
+                                m_kernel_sizes,
+                                std::vector<int32_t>(std::size(m_kernel_sizes), m_cnn_size),
                                 true),
-              m_pre_pool_expansion_layer(cnn_size, lstm_size),
-              m_pooler(MeanPooler()),  // register_module("pooler", MeanPooler())),
-                                       //   m_lstm(),
-              m_lstm_bidir(torch::nn::LSTMOptions(lstm_size, lstm_size)
+              m_pre_pool_expansion_layer(m_cnn_size, m_lstm_size),
+              m_pooler(MeanPooler()),
+              m_lstm_bidir(torch::nn::LSTMOptions(m_lstm_size, m_lstm_size)
                                    .num_layers(2)
                                    .batch_first(true)
-                                   .bidirectional(bidirectional)),
+                                   .bidirectional(m_bidirectional)),
               m_lstm_unidir(),
-              m_linear((1 + bidirectional) * lstm_size, num_classes),
-              m_normalise(true),
-              m_lstm_size(lstm_size),
-              m_use_dwells(use_dwells),
-              m_bidirectional(bidirectional) {
-        if (bidirectional) {
-            m_lstm_bidir = torch::nn::LSTM(torch::nn::LSTMOptions(lstm_size, lstm_size)
+              m_linear((1 + m_bidirectional) * m_lstm_size, m_num_classes) {
+        if (m_bidirectional) {
+            m_lstm_bidir = torch::nn::LSTM(torch::nn::LSTMOptions(m_lstm_size, m_lstm_size)
                                                    .num_layers(2)
                                                    .batch_first(true)
-                                                   .bidirectional(bidirectional));
-            // m_lstm->push_back(torch::nn::LSTM(torch::nn::LSTMOptions(lstm_size, lstm_size)
-            //                                  .num_layers(2)
-            //                                  .batch_first(true)
-            //                                  .bidirectional(bidirectional)));
+                                                   .bidirectional(m_bidirectional));
         } else {
             for (int32_t i = 0; i < 4; ++i) {
-                m_lstm_unidir->push_back(ReversibleLSTM(lstm_size, lstm_size, true, !(i % 2)));
+                m_lstm_unidir->push_back(ReversibleLSTM(m_lstm_size, m_lstm_size, true, !(i % 2)));
             }
         }
 
-        if (pooler_type != "mean") {
-            throw std::runtime_error("Pooler " + pooler_type + " not implemented yet.");
+        if (m_pooler_type != "mean") {
+            throw std::runtime_error("Pooler " + m_pooler_type + " not implemented yet.");
         }
 
         register_module("base_embedder", m_base_embedder);
-        register_module("strand_embedder", strand_embedder);
+        register_module("strand_embedder", m_strand_embedder);
         register_module("read_level_conv", m_read_level_conv);
         register_module("pre_pool_expansion_layer", m_pre_pool_expansion_layer);
         register_module("pooler", m_pooler);
-        if (bidirectional) {
+        if (m_bidirectional) {
             register_module("lstm", m_lstm_bidir);
         } else {
             register_module("lstm", m_lstm_unidir);
@@ -208,13 +210,14 @@ public:
     }
 
     torch::Tensor forward(torch::Tensor x) {
-        const auto non_empty_position_mask = (x.sum({1, -1}) != 0);
+        // Non-const because it will be moved later. Needs to be placed here because x changes.
+        auto non_empty_position_mask = (x.sum({1, -1}) != 0);
 
         auto bases_embedding = m_base_embedder->forward(
                 x.index({torch::indexing::Slice(), torch::indexing::Slice(),
                          torch::indexing::Slice(), 0})
                         .to(torch::kLong));
-        auto strand_embedding = strand_embedder->forward(
+        auto strand_embedding = m_strand_embedder->forward(
                 x.index({torch::indexing::Slice(), torch::indexing::Slice(),
                          torch::indexing::Slice(), 2})
                         .to(torch::kLong) +
@@ -234,13 +237,11 @@ public:
             auto dwells = x.index({torch::indexing::Slice(), torch::indexing::Slice(),
                                    torch::indexing::Slice(), 4})
                                   .unsqueeze(-1);
-            x = torch::cat({std::move(bases_embedding) + std::move(strand_embedding),
-                            std::move(scaled_q_scores), std::move(dwells)},
+            x = torch::cat({bases_embedding + strand_embedding, std::move(scaled_q_scores),
+                            std::move(dwells)},
                            -1);
         } else {
-            x = torch::cat({std::move(bases_embedding) + std::move(strand_embedding),
-                            std::move(scaled_q_scores)},
-                           -1);
+            x = torch::cat({bases_embedding + strand_embedding, std::move(scaled_q_scores)}, -1);
         }
 
         x = x.permute({0, 2, 3, 1});
@@ -252,12 +253,12 @@ public:
         const auto p = x.sizes()[3];
 
         x = x.flatten(0, 1);
-        x = m_read_level_conv->forward(x);
+        x = m_read_level_conv->forward(std::move(x));
         x = x.permute({0, 2, 1});
         x = m_pre_pool_expansion_layer->forward(x);
         x = x.view({b, d, p, m_lstm_size});
         // std::cerr << "[IS] x.shape = " << tensor_shape_as_string(x) << ", non_empty_position_mask.shape = " << tensor_shape_as_string(non_empty_position_mask) << "\n";
-        x = m_pooler->forward(x, non_empty_position_mask);
+        x = m_pooler->forward(std::move(x), std::move(non_empty_position_mask));
         x = m_bidirectional ? std::get<0>(m_lstm_bidir->forward(x)) : m_lstm_unidir->forward(x);
         x = m_linear->forward(x);
 
@@ -269,18 +270,27 @@ public:
     }
 
 private:
+    // Model parameters.
+    int32_t m_num_classes = 5;
+    int32_t m_lstm_size = 128;
+    int32_t m_cnn_size = 128;
+    std::vector<int32_t> m_kernel_sizes = {1, 17};
+    std::string m_pooler_type = "mean";
+    bool m_use_dwells = false;
+    int32_t m_bases_alphabet_size = 6;
+    int32_t m_bases_embedding_size = 6;
+    bool m_bidirectional = true;
+    bool m_normalise = true;
+
+    // Layers.
     torch::nn::Embedding m_base_embedder;
-    torch::nn::Embedding strand_embedder;
+    torch::nn::Embedding m_strand_embedder;
     ReadLevelConv m_read_level_conv;
     torch::nn::Linear m_pre_pool_expansion_layer;
     MeanPooler m_pooler{nullptr};
     torch::nn::LSTM m_lstm_bidir;
     torch::nn::Sequential m_lstm_unidir{nullptr};
     torch::nn::Linear m_linear;
-    bool m_normalise = false;
-    int32_t m_lstm_size = 0;
-    bool m_use_dwells = false;
-    bool m_bidirectional = true;
 };
 
 }  // namespace dorado::polisher
