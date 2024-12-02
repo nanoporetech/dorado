@@ -115,6 +115,7 @@ struct Options {
     std::string region;
     bool full_precision = false;
     bool load_scripted_model = false;
+    int32_t num_preloaded_batches = 1000;
     // int32_t min_depth = 0;
 };
 
@@ -202,6 +203,10 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Load the scripted Torch model instead of building one internally.")
                 .default_value(false)
                 .implicit_value(true);
+        parser->visible.add_argument("--preloaded-batches")
+                .help("Maximum number of preloaded batches for inference.")
+                .default_value(1000)
+                .scan<'i', int>();
 
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than min_depth will not be polished.")
@@ -275,6 +280,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.full_precision = parser.visible.get<bool>("full-precision");
     opt.load_scripted_model = parser.visible.get<bool>("scripted");
     // opt.min_depth = parser.visible.get<int>("min-depth");
+
+    opt.num_preloaded_batches = parser.visible.get<int>("preloaded-batches");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -353,6 +360,12 @@ void validate_options(const Options& opt) {
         spdlog::error(
                 "Specifying the number of CPU inference threads is only allowed when the device is "
                 "set to 'cpu'.");
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (opt.num_preloaded_batches <= 0) {
+        spdlog::error("Number of preloaded batches needs to be > 0, given: {}.",
+                      opt.num_preloaded_batches);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -897,8 +910,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
-        // Each item is one batch. Make 5 batches per model (parallel thread).
-        utils::AsyncQueue<polisher::InferenceData> batch_queue(std::size(resources.models) * 5);
+        // Each item is one batch for inference.
+        utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.num_preloaded_batches);
 
         std::thread thread_sample_producer = std::thread(
                 &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
