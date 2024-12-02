@@ -1,0 +1,52 @@
+---
+# Note: All the dependencies in this file are for pod5_file_format.
+# They need to be in their own file as (e.g.) zstd duplicates an entry in
+# software_versions.yml but with a different version number.
+arrow:
+    description: >
+        The universal columnar format.
+    version: "12.0.0"
+    url: https://arrow.apache.org/
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+flatbuffers:
+    description: >
+        Efficient cross platform serialization library.
+    version: "2.0.0"
+    url: http://google.github.io/flatbuffers
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+jemalloc:
+    description: >
+        A general purpose malloc(3) implementation that emphasizes fragmentation avoidance and scalable concurrency support.
+    version: "5.2.1"
+    url: http://jemalloc.net/
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+xsimd:
+    description: >
+        A unified means for using SIMD features for library authors.
+    version: "9.0.1"
+    url: https://github.com/xtensor-stack/xsimd
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+zstd:
+    description: >
+        Fast lossless compression algorithm.
+    version: "1.5.5"
+    url: https://github.com/facebook/zstd
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+re2:
+    description: >
+        A regular expression library.
+    version: "20220601"
+    url: https://github.com/google/re2
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE

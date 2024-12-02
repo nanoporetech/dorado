@@ -148,7 +148,7 @@ zlib-ng:
         - ont-minimap2/src/3rdparty/zlib-ng
 zstd:
     description: >
-        fast lossless compression algorithm.
+        Fast lossless compression algorithm.
     version: "97a3da1df009d4dc67251de0c4b1c9d7fe286fc1"
     url: https://github.com/facebook/zstd
     license: zstd/LICENSE
