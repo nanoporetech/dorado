@@ -578,8 +578,8 @@ void sample_producer(PolisherResources& resources,
         }
 
         const int32_t num_regions = region_id_end - region_id_start;
-        const int64_t window_id_start = bam_region_intervals[region_id_start].start;
-        const int64_t window_id_end = bam_region_intervals[region_id_end - 1].end;
+        const int32_t window_id_start = bam_region_intervals[region_id_start].start;
+        const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
         const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
 
         // std::cerr << "region_id_start = " << region_id_start << ", region_id_end = " << region_id_end << ", num_regions = " << num_regions << ", num_windows = " << num_windows << "\n";
