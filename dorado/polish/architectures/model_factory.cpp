@@ -142,78 +142,96 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         const c10::Dict<c10::IValue, c10::IValue> weights =
                 torch::pickle_load(bytes).toGenericDict();
 
+        auto params = model.named_parameters(true /*recurse*/);
+        auto buffers = model.named_buffers(true /*recurse*/);
+
+        // Create a set of model parameters.
+        std::unordered_set<std::string> set_model_params;
+        for (const auto& param : params) {
+            set_model_params.emplace(param.key());
+        }
+        for (const auto& param : buffers) {
+            set_model_params.emplace(param.key());
+        }
+
+        // Create a set of loaded parameters.
+        std::unordered_set<std::string> set_loaded_params;
         for (const auto& w : weights) {
-            const std::string name = w.key().toStringRef();
-            const at::Tensor value = w.value().toTensor();
-            auto* param = model.named_parameters().find(name);
-            // auto* param_buffer = model.named_buffers().find(name);
+            const std::string& name = w.key().toStringRef();
+            set_loaded_params.emplace(name);
+        }
 
-            if (param != nullptr) {
-                std::cerr << "About to copy param->copy_(value), name = '" << name
-                          << ", param->dtype: " << param->dtype()
-                          << ", value.dtype() = " << value.dtype()
-                          << ", param.shape = " << tensor_shape_as_string(*param)
-                          << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-                param->copy_(value);
-                std::cerr << "Copied.\n";
-                continue;
+        // Validate that all parameters exist.
+        for (const auto& name : set_model_params) {
+            if (set_loaded_params.count(name) == 0) {
+                throw std::runtime_error(
+                        "Cannot load weights into the model: model contains parameters which are "
+                        "not present in the weights file. name = " +
+                        name);
             }
-
-            bool found = false;
-            for (auto& buffer : model.named_buffers()) {
-                if (buffer.key() == name) {
-                    std::cerr << "About to copy buffer.value().copy_(value), name = '" << name
-                              << ", buffer.value().dtype: " << buffer.value().dtype()
-                              << ", value.dtype() = " << value.dtype() << "'"
-                              << ", buffer.value().shape = "
-                              << tensor_shape_as_string(buffer.value())
-                              << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-                    if (!buffer.value().defined()) {
-                        std::cerr << "!param_buffer->defined()\n";
-                    }
-                    if (!value.defined()) {
-                        std::cerr << "!value.defined()\n";
-                    }
-                    std::cerr << "buffer.value().sizes().size() = " << buffer.value().sizes().size()
-                              << "\n";
-                    buffer.value().copy_(value);
-                    std::cerr << "Copied.\n";
-                    found = true;
-                    break;
-                }
+        }
+        for (const auto& name : set_loaded_params) {
+            if (set_model_params.count(name) == 0) {
+                throw std::runtime_error(
+                        "Cannot load weights into the model: weights file contains parameters "
+                        "which are not present in the model. name = " +
+                        name);
             }
+        }
 
-            if (!found) {
+        // Set the model weights.
+        for (const auto& w : weights) {
+            const std::string& name = w.key().toStringRef();
+            const at::Tensor& value = w.value().toTensor();
+
+            if (params.contains(name)) {
+                params[name].copy_(value);
+            } else if (buffers.contains(name)) {
+                buffers[name].copy_(value);
+            } else {
                 throw std::runtime_error(
                         "Some loaded parameters cannot be found in the libtorch model! name = " +
                         name);
             }
 
-            // if (param != nullptr) {
-            //     std::cerr << "About to copy param->copy_(value), name = '" << name << ", param->dtype: " << param->dtype() << ", value.dtype() = " << value.dtype()
-            //         << ", param.shape = " << tensor_shape_as_string(*param) << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
+            // at::Tensor* param = model.named_parameters().find(name);
+            // if ((param != nullptr)) { //  && (param != model.named_parameters().end()) {
+            //     std::cerr << "About to copy param->copy_(value), name = '" << name
+            //               << ", param->dtype: " << param->dtype()
+            //               << ", value.dtype() = " << value.dtype()
+            //               << ", param.shape = " << tensor_shape_as_string(*param)
+            //               << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
             //     param->copy_(value);
             //     std::cerr << "Copied.\n";
-            // } else if (param_buffer != nullptr) {
-            //     std::cerr << "About to copy param_buffer->copy_(value), name = '" << name << ", param_buffer->dtype: " << param_buffer->dtype() << ", value.dtype() = " << value.dtype() << "'"
-            //         << ", param_buffer.shape = " << tensor_shape_as_string(*param) << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
-            //     std::cerr << "address of param_buffer = " << reinterpret_cast<uintptr_t>(param_buffer) << "\n";
-            //     std::cerr << "Weight name: " << w.key().toStringRef()
-            //             << ", sizes: " << tensor_shape_as_string(w.value().toTensor())
-            //             << "\n";
-            //     if (!param_buffer->defined()) {
-            //         std::cerr << "!param_buffer->defined()\n";
-            //         // throw std::runtime_error("Undefined tensor for " + name);
+            //     continue;
+            // }
+
+            // // at::Tensor* param_buffer = model.named_buffers().find(name);
+            // bool found = false;
+            // for (auto& buffer : model.named_buffers()) {
+            //     if (buffer.key() == name) {
+            //         std::cerr << "About to copy buffer.value().copy_(value), name = '" << name
+            //                   << ", buffer.value().dtype: " << buffer.value().dtype()
+            //                   << ", value.dtype() = " << value.dtype() << "'"
+            //                   << ", buffer.value().shape = "
+            //                   << tensor_shape_as_string(buffer.value())
+            //                   << ", value.shape = " << tensor_shape_as_string(value) << "'\n";
+            //         if (!buffer.value().defined()) {
+            //             std::cerr << "!param_buffer->defined()\n";
+            //         }
+            //         if (!value.defined()) {
+            //             std::cerr << "!value.defined()\n";
+            //         }
+            //         std::cerr << "buffer.value().sizes().size() = " << buffer.value().sizes().size()
+            //                   << "\n";
+            //         buffer.value().copy_(value);
+            //         std::cerr << "Copied.\n";
+            //         found = true;
+            //         break;
             //     }
-            //     if (!value.defined()) {
-            //         std::cerr << "!value.defined()\n";
-            //         // throw std::runtime_error("Undefined tensor for " + name);
-            //     }
-            //     std::cerr << "param_buffer->sizes().size() = " << param_buffer->sizes().size() << "\n";
-            //     // std::cerr << "param_buffer->shape = " << tensor_shape_as_string(*param_buffer) << "\n";
-            //     param_buffer->copy_(value);
-            //     std::cerr << "Copied.\n";
-            // } else {
+            // }
+
+            // if (!found) {
             //     throw std::runtime_error(
             //             "Some loaded parameters cannot be found in the libtorch model! name = " +
             //             name);
