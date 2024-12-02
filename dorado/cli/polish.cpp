@@ -516,13 +516,13 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data) {
-    (void)resources;
-    (void)bam_regions;
-    (void)draft_lens;
-    (void)num_threads;
-    (void)window_len;
-    (void)window_overlap;
-    (void)bam_subchunk_len;
+    // (void)resources;
+    // (void)bam_regions;
+    // (void)draft_lens;
+    // (void)num_threads;
+    // (void)window_len;
+    // (void)window_overlap;
+    // (void)bam_subchunk_len;
 
     // const int32_t buffer_size = dorado::ssize(resources.devices) * batch_size;
     // const int32_t approx_max_buffer_size = buffer_size * 2;
@@ -561,7 +561,7 @@ void sample_producer(PolisherResources& resources,
 
     // std::cerr << "buffer_size = " << buffer_size << "\n";
 
-    const int64_t notify_buffer_size = dorado::ssize(resources.devices) * batch_size;
+    // const int64_t notify_buffer_size = dorado::ssize(resources.devices) * batch_size;
 
     InferenceData buffer;
 
@@ -605,33 +605,51 @@ void sample_producer(PolisherResources& resources,
                                      num_regions),
                 num_threads, window_len, window_overlap, window_id_start);
 
-        buffer.samples.insert(std::end(buffer.samples),
-                              std::make_move_iterator(std::begin(samples)),
-                              std::make_move_iterator(std::end(samples)));
+        if (std::size(samples) != std::size(trims)) {
+            throw std::runtime_error("Size of samples and trims does not match! samples.size() = " +
+                                     std::to_string(std::size(samples)) +
+                                     ", trims.size() = " + std::to_string(std::size(trims)));
+        }
 
-        buffer.trims.insert(std::end(buffer.trims), std::make_move_iterator(std::begin(trims)),
-                            std::make_move_iterator(std::end(trims)));
+        for (size_t i = 0; i < std::size(samples); ++i) {
+            buffer.samples.emplace_back(std::move(samples[i]));
+            buffer.trims.emplace_back(std::move(trims[i]));
+            if (dorado::ssize(buffer.samples) == batch_size) {
+                spdlog::debug(
+                        "[producer] Pushing a batch of data to infer_data queue. "
+                        "buffer.samples.size() = {}",
+                        std::size(buffer.samples));
+                infer_data.try_push(std::move(buffer));
+                buffer = {};
+            }
+        }
+
+        // buffer.samples.insert(std::end(buffer.samples),
+        //                       std::make_move_iterator(std::begin(samples)),
+        //                       std::make_move_iterator(std::end(samples)));
+
+        // buffer.trims.insert(std::end(buffer.trims), std::make_move_iterator(std::begin(trims)),
+        //                     std::make_move_iterator(std::end(trims)));
 
         // std::cerr << "samples.size() = " << samples.size() << ", buffer_samples.size() = " << buffer.samples.size() << "\n";
 
-        // Once the buffer is full enough, add to queue.
-        if (dorado::ssize(buffer.samples) >= notify_buffer_size) {
-            // This will block until the queue is empty (because it is set to size 1);
-            // assert(infer_data.capacity() == 1);
-            spdlog::debug("[producer] Pushing data to infer_data queue. buffer.samples.size() = {}",
-                          std::size(buffer.samples));
-            infer_data.try_push(std::move(buffer));
-            buffer = {};
-            spdlog::debug("[producer] Pushed.");
-        }
+        // // Once the buffer is full enough, add to queue.
+        // if (dorado::ssize(buffer.samples) >= notify_buffer_size) {
+        //     // This will block until the queue is empty (because it is set to size 1);
+        //     // assert(infer_data.capacity() == 1);
+        //     spdlog::debug("[producer] Pushing data to infer_data queue. size = {}",
+        //                   std::size(buffer.samples));
+        //     infer_data.try_push(std::move(buffer));
+        //     buffer = {};
+        //     spdlog::debug("[producer] Pushed.");
+        // }
     }
 
     if (!std::empty(buffer.samples)) {
         // This will block until the queue is empty (because it is set to size 1);
         // assert(infer_data.capacity() == 1);
-        spdlog::debug(
-                "[producer] Pushing final data to infer_data queue. buffer.samples.size() = {}",
-                std::size(buffer.samples));
+        spdlog::debug("[producer] Pushing final batch data to infer_data queue. size = {}",
+                      std::size(buffer.samples));
         infer_data.try_push(std::move(buffer));
         buffer = {};
         spdlog::debug("[producer] Pushed final.");
@@ -639,6 +657,7 @@ void sample_producer(PolisherResources& resources,
 
     infer_data.terminate();
 }
+
 }  // namespace polisher
 
 void run_polishing(const Options& opt, PolisherResources& resources) {
@@ -694,9 +713,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
-        // Each item in the queue has enough samples for at least one batch per device.
-        // Queue is thus small for memory conservation.
-        utils::AsyncQueue<polisher::InferenceData> infer_data(2);
+        // Each item is one batch. Make 5 batches per model (parallel thread).
+        utils::AsyncQueue<polisher::InferenceData> infer_data(std::size(resources.models) * 5);
 
         std::thread thread_sample_producer = std::thread(
                 &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
@@ -709,12 +727,13 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
         while (true) {
             polisher::InferenceData item;
-            spdlog::debug("[consumer] Waiting to pop data for inference.");
+            spdlog::debug("[consumer] Waiting to pop data for inference. Queue size: {}",
+                          infer_data.size());
             const auto pop_status = infer_data.try_pop_until(
                     item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
 
-            spdlog::debug("[consumer] Popped data: item.samples.size() = {}",
-                          std::size(item.samples));
+            spdlog::debug("[consumer] Popped data: item.samples.size() = {}, queue size: {}",
+                          std::size(item.samples), infer_data.size());
             // std::cerr << "infer_data.size() = " << infer_data.size() << ", infer_data.capacity() = " << infer_data.capacity() << ", item.samples.size() = " << item.samples.size() << "\n";
 
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
