@@ -536,6 +536,11 @@ public:
         m_stats[name] += 1.0;
     }
 
+    void add(const std::string& name, const double value) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_stats[name] += value;
+    }
+
     stats::NamedStats get_stats() const { return m_stats; }
 
 private:
@@ -871,10 +876,7 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
             result.seq = result.seq.substr(trim.start, trim.end - trim.start);
             result.quals = result.quals.substr(trim.start, trim.end - trim.start);
 
-            if (sample.is_last) {
-                // std::cerr << "sampl.is_last == true\n";
-                polish_stats.increment("processed");
-            }
+            polish_stats.add("processed", result.draft_end - result.draft_start);
         }
         const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
 
@@ -999,6 +1001,10 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
+    const int64_t total_input_bases =
+            std::accumulate(std::begin(draft_lens), std::end(draft_lens), static_cast<int64_t>(0),
+                            [](const int64_t a, const auto& b) { return a + b.second; });
+
     // Set the number of threads so that libtorch doesn't cause a thread bomb.
     at::set_num_interop_threads(opt.threads);
     torch::set_num_threads(1);
@@ -1030,7 +1036,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
                 draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
 
-        polish_stats.update("num_items", static_cast<double>(std::size(bam_regions)));
+        polish_stats.update("total", static_cast<double>(total_input_bases));
         polish_stats.update("processed", 0.0);
     }
 
