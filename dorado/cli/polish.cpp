@@ -1094,12 +1094,12 @@ int polish(int argc, char* argv[]) {
         // Initialize the options from the CLI.
         const Options opt = set_options(*parser, verbosity);
 
-        if (opt.verbosity >= 3) {
-            spdlog::set_level(spdlog::level::trace);
-        } else if (opt.verbosity == 2) {
-            spdlog::set_level(spdlog::level::debug);
-        } else if (opt.verbosity == 1) {
+        if (opt.verbosity == 0) {
             spdlog::set_level(spdlog::level::info);
+        } else if (opt.verbosity == 1) {
+            spdlog::set_level(spdlog::level::debug);
+        } else if (opt.verbosity == 2) {
+            spdlog::set_level(spdlog::level::trace);
         } else {
             // Pass. No log.
         }
