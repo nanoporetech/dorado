@@ -818,7 +818,7 @@ void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& bat
     spdlog::info("Finished running inference.");
 }
 
-void decode_samples_in_parallel(std::vector<polisher::ConsensusResult> results,
+void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
                                 utils::AsyncQueue<polisher::DecodeData>& decode_queue,
                                 const polisher::FeatureDecoder& decoder,
                                 const int32_t num_threads) {
@@ -1032,8 +1032,6 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             thread_sample_decoder.join();
         }
 
-        spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
-
         // Produce samples (tensors) for inference.
         // auto [samples, trims] = polisher::create_samples(
         //         resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
@@ -1049,9 +1047,10 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
         spdlog::info(
                 "Stitching sequences: {}-{}/{} (number: {}, total "
-                "length: {:.2f} Mbp)",
+                "length: {:.2f} Mbp), parts: {}",
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
-                std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
+                std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0),
+                std::size(all_results));
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
