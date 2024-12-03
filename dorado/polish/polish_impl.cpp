@@ -71,11 +71,16 @@ std::vector<Window> create_windows(const int32_t seq_id,
                 region_id,
                 start_no_overlap,
                 end,
+                false,
         });
 
         if (end == seq_end) {
             break;
         }
+    }
+
+    if (!std::empty(ret)) {
+        ret.back().is_last_in_region = true;
     }
 
     return ret;
@@ -260,6 +265,8 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
         return {sample};
 
     } else {
+        const int64_t num_positions = dorado::ssize(sample.positions_major);
+
         int64_t start = 0;
         for (int64_t n = 0; n < dorado::ssize(gaps); ++n) {
             const int64_t i = gaps[n];
@@ -271,14 +278,16 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
+            const bool is_last = (sample.is_last && (i >= num_positions));
+
             results.emplace_back(polisher::Sample{
                     sample.features.slice(0, start, i), std::move(new_major_pos),
                     std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
-                    sample.region_id, std::move(read_ids_left), placeholder_ids});
+                    sample.region_id, std::move(read_ids_left), placeholder_ids, is_last});
             start = i;
         }
 
-        if (start < static_cast<int64_t>(std::size(sample.positions_major))) {
+        if (start < num_positions) {
             std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
                                                sample.positions_major.end());
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
@@ -286,7 +295,7 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             results.emplace_back(polisher::Sample{
                     sample.features.slice(0, start), std::move(new_major_pos),
                     std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id,
-                    sample.region_id, placeholder_ids, sample.read_ids_right});
+                    sample.region_id, placeholder_ids, sample.read_ids_right, sample.is_last});
         }
     }
     // }
@@ -312,7 +321,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
     }
 
     const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
-                                 const int64_t end) {
+                                 const int64_t end, const bool is_last) {
         torch::Tensor new_features = sample.features.slice(0, start, end);
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
@@ -326,7 +335,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
                                 sample.seq_id,
                                 sample.region_id,
                                 {},
-                                {}};
+                                {},
+                                is_last};
     };
 
     std::vector<polisher::Sample> results;
@@ -349,7 +359,8 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
             spdlog::trace("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
-            results.emplace_back(create_chunk(sample, start, end));
+            const bool is_last = (sample.is_last && (end >= sample_len));
+            results.emplace_back(create_chunk(sample, start, end, is_last));
         }
 
         // This will create a chunk with potentially large overlap.
@@ -358,7 +369,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
             end = sample_len;
             spdlog::trace("[split_samples]     - creating end chunk: start = {}, end = {}", start,
                           end);
-            results.emplace_back(create_chunk(sample, start, end));
+            results.emplace_back(create_chunk(sample, start, end, sample.is_last));
         }
     }
 
@@ -433,7 +444,7 @@ std::vector<Sample> encode_regions_in_parallel(
                         100.0 * static_cast<double>(i - start) / (end - start));
             }
             results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
-                                               window.end, window.seq_id);
+                                               window.end, window.seq_id, window.is_last_in_region);
         }
     };
 

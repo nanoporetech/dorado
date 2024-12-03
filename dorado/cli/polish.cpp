@@ -525,6 +525,24 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
 
 namespace polisher {
 
+class PolishStats {
+public:
+    PolishStats() = default;
+
+    void update(const std::string& name, const double value) { m_stats[name] = value; }
+
+    void increment(const std::string& name) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_stats[name] += 1.0;
+    }
+
+    stats::NamedStats get_stats() const { return m_stats; }
+
+private:
+    stats::NamedStats m_stats;
+    std::mutex m_mtx;
+};
+
 void sample_producer(PolisherResources& resources,
                      const std::vector<polisher::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -823,9 +841,10 @@ void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& bat
 
 void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
                                 utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+                                PolishStats& polish_stats,
                                 const polisher::FeatureDecoder& decoder,
                                 const int32_t num_threads) {
-    auto batch_decode = [&decoder](const DecodeData& item, const int32_t tid) {
+    auto batch_decode = [&decoder, &polish_stats](const DecodeData& item, const int32_t tid) {
         utils::ScopedProfileRange scope_decode("decode", 1);
         timer::TimerHighRes timer_total;
 
@@ -851,6 +870,11 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
             result.draft_end = sample.positions_major[trim.end - 1] + 1;
             result.seq = result.seq.substr(trim.start, trim.end - trim.start);
             result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+
+            if (sample.is_last) {
+                // std::cerr << "sampl.is_last == true\n";
+                polish_stats.increment("processed");
+            }
         }
         const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
 
@@ -953,32 +977,6 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
     spdlog::debug("[run_polishing] Finished decoding the output.");
 }
 
-class PolishStats {
-public:
-    PolishStats() = default;
-
-    void update(const std::string& name, const double value) { m_stats[name] = value; }
-
-    stats::NamedStats get_stats() const { return m_stats; }
-
-    // stats::NamedStats PolishStats::sample_stats() const {
-    //     return m_stats;
-    //     stats::NamedStats stats;
-    //     stats["num_items"] = static_cast<double>(num_items);
-    //     stats["processed_items"] = static_cast<double>(processed_items);
-
-    //     // stats::NamedStats stats = stats::from_obj(m_work_queue);
-    //     // stats["num_reads_aligned"] = m_alignments_processed.load();
-    //     // stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());
-    //     // stats["index_seqs"] = m_index_seqs;
-    //     // stats["current_idx"] = m_current_index;
-    //     return stats;
-    // }
-
-private:
-    stats::NamedStats m_stats;
-};
-
 }  // namespace polisher
 
 void run_polishing(const Options& opt, PolisherResources& resources) {
@@ -1027,8 +1025,14 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
 
-    polish_stats.update("num_items", static_cast<double>(std::size(draft_lens)));
-    polish_stats.update("processed_items", 0.0);
+    // Compute the total number of BAM regions over the entire input file.
+    {
+        const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
+                draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
+
+        polish_stats.update("num_items", static_cast<double>(std::size(bam_regions)));
+        polish_stats.update("processed", 0.0);
+    }
 
     // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
@@ -1052,9 +1056,11 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
 
+        // Update the tracker title.
         {
             std::ostringstream oss;
-            oss << draft_batch.start << "-" << draft_batch.end << "/" << std::size(draft_lens);
+            oss << draft_batch.start << "-" << draft_batch.end << "/" << std::size(draft_lens)
+                << ", bases: " << total_bases;
             tracker.set_description("Polishing draft sequences: " + oss.str());
         }
 
@@ -1070,7 +1076,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
         std::thread thread_sample_decoder =
                 std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results),
-                            std::ref(decode_queue), std::cref(*resources.decoder), opt.threads);
+                            std::ref(decode_queue), std::ref(polish_stats),
+                            std::cref(*resources.decoder), opt.threads);
 
         polisher::infer_samples_in_parallel_2(batch_queue, decode_queue, resources.models,
                                               *resources.encoder);
@@ -1126,7 +1133,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
                                    (opt.out_format == OutputFormat::FASTQ));
         }
 
-        polish_stats.update("processed_items", static_cast<double>(std::size(draft_lens)));
+        // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
 
     spdlog::debug("Done!");

@@ -21,6 +21,28 @@ struct Sample {
     int32_t region_id = -1;
     std::vector<std::string> read_ids_left;
     std::vector<std::string> read_ids_right;
+    bool is_last = false;
+
+    Sample() = default;
+
+    Sample(torch::Tensor features_,
+           std::vector<int64_t> positions_major_,
+           std::vector<int64_t> positions_minor_,
+           torch::Tensor depth_,
+           const int32_t seq_id_,
+           const int32_t region_id_,
+           std::vector<std::string> read_ids_left_,
+           std::vector<std::string> read_ids_right_,
+           const bool is_last_)
+            : features{std::move(features_)},
+              positions_major{std::move(positions_major_)},
+              positions_minor{std::move(positions_minor_)},
+              depth{std::move(depth_)},
+              seq_id{seq_id_},
+              region_id{region_id_},
+              read_ids_left{std::move(read_ids_left_)},
+              read_ids_right{std::move(read_ids_right_)},
+              is_last{is_last_} {}
 
     int64_t start() const { return (std::empty(positions_major) ? -1 : (positions_major.front())); }
 

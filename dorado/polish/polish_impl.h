@@ -25,6 +25,7 @@ struct Window {
     int32_t region_id = 0;
     int64_t start_no_overlap = 0;
     int64_t end_no_overlap = 0;
+    bool is_last_in_region = false;
 };
 
 struct InferenceData {

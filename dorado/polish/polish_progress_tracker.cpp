@@ -53,7 +53,7 @@ void PolishProgressTracker::update_progress_bar(const stats::NamedStats& stats) 
     };
 
     const double num_items = fetch_stat("num_items");
-    const double processed_items = fetch_stat("processed_items");
+    const double processed_items = fetch_stat("processed");
     const double progress = 100.0 * processed_items / num_items;
 
     if (progress > m_last_progress_written) {

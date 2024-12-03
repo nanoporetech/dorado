@@ -222,6 +222,7 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
         const int32_t seq_id = samples[sample_ids.front()].seq_id;
         const int32_t region_id = samples[sample_ids.front()].region_id;
+        bool is_last = false;
 
         // Make buffers.
         for (const int64_t id : sample_ids) {
@@ -232,18 +233,22 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
             positions_minor.emplace_back(std::move(sample.positions_minor));
             read_ids_left.emplace_back(std::move(sample.read_ids_left));
             read_ids_right.emplace_back(std::move(sample.read_ids_right));
+            is_last = std::max(is_last, sample.is_last);
         }
 
         // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
-        Sample ret;
-
-        ret.features = torch::cat(
-                pad_reads(reorder_reads(std::move(features), read_ids_left, read_ids_right), -1));
-        ret.positions_major = cat_vectors(positions_major);
-        ret.positions_minor = cat_vectors(positions_minor);
-        ret.depth = torch::cat(std::move(depth));
-        ret.seq_id = seq_id;
-        ret.region_id = region_id;
+        Sample ret{
+                torch::cat(pad_reads(
+                        reorder_reads(std::move(features), read_ids_left, read_ids_right), -1)),
+                cat_vectors(positions_major),
+                cat_vectors(positions_minor),
+                torch::cat(std::move(depth)),
+                seq_id,
+                region_id,
+                {},
+                {},
+                is_last,
+        };
 
         return ret;
     };
@@ -327,7 +332,8 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
                                            const std::string& ref_name,
                                            const int64_t ref_start,
                                            const int64_t ref_end,
-                                           const int32_t seq_id) const {
+                                           const int32_t seq_id,
+                                           const bool is_last) const {
     const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
 
     // Compute the counts and data.
@@ -356,7 +362,8 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
                   seq_id,
                   -1,
                   std::move(tensors.read_ids_left),
-                  std::move(tensors.read_ids_right)};
+                  std::move(tensors.read_ids_right),
+                  is_last};
 
     return sample;
 }
