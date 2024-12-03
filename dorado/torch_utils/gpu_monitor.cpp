@@ -23,12 +23,14 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <numeric>
 #include <regex>
 #include <sstream>
 #include <unordered_map>
@@ -436,6 +438,7 @@ class DeviceInfoCache final {
     // Includes devices which cannot be accessed via NVML so need to check return codes
     // on individual device specific NVML function calls.
     unsigned int m_device_count = 0;
+    std::vector<unsigned int> m_visible_device_indices;
 
     DeviceInfoCache() {
         set_device_count();
@@ -444,39 +447,47 @@ class DeviceInfoCache final {
         }
     }
 
-    void set_device_count() {
-        if (m_nvml.is_loaded()) {
-            unsigned int nvml_device_count = 0;
-            auto result = m_nvml.DeviceGetCount(&nvml_device_count);
-            if (result != NVML_SUCCESS) {
-                nvml_device_count = 0;
-                spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
-            }
+    void map_visible_devices(unsigned int device_count) {
+        // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
+        const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
+        if (cuda_visible_devices_env != nullptr) {
+            auto device_ids = utils::split(cuda_visible_devices_env, ',');
+            std::transform(std::begin(device_ids), std::end(device_ids),
+                           std::back_inserter(m_visible_device_indices),
+                           [](const std::string &device_id) { return std::stoi(device_id); });
+        } else {
+            m_visible_device_indices.resize(device_count);
+            std::iota(std::begin(m_visible_device_indices), std::end(m_visible_device_indices), 0);
+        }
+    }
 
-            // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
-            const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
-            if (cuda_visible_devices_env != nullptr) {
-                auto device_ids = utils::split(cuda_visible_devices_env, ',');
-                unsigned int cuda_visible_devices_count =
-                        static_cast<unsigned int>(device_ids.size());
-                if (cuda_visible_devices_count > nvml_device_count) {
-                    spdlog::warn(
-                            "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found "
-                            "by NVML ({}).",
-                            cuda_visible_devices_count, nvml_device_count);
-                }
-                m_device_count = std::min(cuda_visible_devices_count, nvml_device_count);
-            } else {
-                m_device_count = nvml_device_count;
+    void set_device_count() {
+        unsigned int device_count = 0;
+        if (m_nvml.is_loaded()) {
+            auto result = m_nvml.DeviceGetCount(&device_count);
+            if (result != NVML_SUCCESS) {
+                device_count = 0;
+                spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
 #if defined(DORADO_ORIN) || defined(DORADO_TX2)
-        if (m_device_count == 0) {
+        if (device_count == 0) {
             // TX2/Orin may not have NVML, in which case ask torch how many devices it thinks there are.
-            m_device_count = torch::cuda::device_count();
-            spdlog::info("Setting device count to {} as reported from torch", m_device_count);
+            device_count = torch::cuda::device_count();
+            spdlog::info("Setting device count to {} as reported from torch", device_count);
         }
 #endif
+        map_visible_devices(device_count);
+        unsigned int cuda_visible_devices_count =
+                static_cast<unsigned int>(m_visible_device_indices.size());
+
+        if (cuda_visible_devices_count > device_count) {
+            spdlog::warn(
+                    "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found by NVML "
+                    "({}).",
+                    cuda_visible_devices_count, device_count);
+        }
+        m_device_count = std::min(cuda_visible_devices_count, device_count);
     }
 
     std::optional<DeviceStatusInfo> create_new_device_entry(unsigned int device_index,
@@ -492,7 +503,7 @@ class DeviceInfoCache final {
     std::pair<std::optional<DeviceStatusInfo>, nvmlDevice_t> get_cached_device_info(
             unsigned int device_index) {
         std::lock_guard<std::mutex> lock(m_mutex);
-        auto device = m_device_handles->get_handle(device_index);
+        auto device = m_device_handles->get_handle(m_visible_device_indices[device_index]);
         if (!device) {
             return {std::nullopt, nullptr};
         }
@@ -516,7 +527,7 @@ public:
             return std::nullopt;
         }
         std::lock_guard<std::mutex> lock(m_mutex);
-        return m_device_handles->get_handle(device_index);
+        return m_device_handles->get_handle(m_visible_device_indices[device_index]);
     }
 
     NvmlApi &nvml() { return m_nvml; }
@@ -729,11 +740,10 @@ std::optional<std::string> parse_nvidia_tegra_line(const std::string &line) {
     return match[1].str() + "." + match[2].str() + "." + match[3].str();
 }
 
-bool is_accessible_device(unsigned int device_index) {
+bool is_accessible_device([[maybe_unused]] unsigned int device_index) {
 #if HAS_NVML
     return DeviceInfoCache::instance().get_device_handle(device_index).has_value();
 #else
-    (void)device_index;
     return false;
 #endif  // HAS_NVML
 }
