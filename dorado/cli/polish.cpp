@@ -875,7 +875,8 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
             result.seq = result.seq.substr(trim.start, trim.end - trim.start);
             result.quals = result.quals.substr(trim.start, trim.end - trim.start);
 
-            polish_stats.add("processed", result.draft_end - result.draft_start);
+            polish_stats.add("processed",
+                             static_cast<double>(result.draft_end - result.draft_start));
         }
         const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
 
@@ -1125,7 +1126,7 @@ void run_polishing(const Options& opt,
         // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
 
-    polish_stats.update("processed", total_input_bases);
+    polish_stats.update("processed", static_cast<double>(total_input_bases));
 
     spdlog::debug("Done!");
 }
