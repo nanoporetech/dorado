@@ -1142,6 +1142,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
 
+    polish_stats.update("processed", total_input_bases);
+
     spdlog::debug("Done!");
 }
 
