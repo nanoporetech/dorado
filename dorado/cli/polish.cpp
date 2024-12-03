@@ -116,7 +116,7 @@ struct Options {
     std::string region;
     bool full_precision = false;
     bool load_scripted_model = false;
-    int32_t num_preloaded_batches = 1000;
+    int32_t queue_size = 1000;
     // int32_t min_depth = 0;
 };
 
@@ -172,11 +172,11 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--draft-batch-size")
                 .help("Input draft sequences will be process in batches of roughly this size.")
                 .default_value(std::string{"200M"});
-        parser->visible.add_argument("-w", "--window-len")
+        parser->visible.add_argument("--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
                 .scan<'i', int>();
-        parser->visible.add_argument("-w", "--window-overlap")
+        parser->visible.add_argument("--window-overlap")
                 .help("Overlap length between windows.")
                 .default_value(1000)
                 .scan<'i', int>();
@@ -192,27 +192,28 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--region")
                 .help("Process only this region of the input. Htslib format (start is 1-based, end "
                       "is inclusive).");
-        parser->visible.add_argument("--min-mapq")
-                .help("Minimum mapping quality of alignment used for polishing.")
-                .default_value(0)
-                .scan<'i', int>();
-        parser->visible.add_argument("--full-precision")
-                .help("Always use full precision for inference.")
-                .default_value(false)
-                .implicit_value(true);
-        parser->visible.add_argument("--scripted")
-                .help("Load the scripted Torch model instead of building one internally.")
-                .default_value(false)
-                .implicit_value(true);
-        parser->visible.add_argument("--preloaded-batches")
-                .help("Maximum number of preloaded batches for inference.")
-                .default_value(1000)
-                .scan<'i', int>();
 
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than min_depth will not be polished.")
         //         .default_value(0)
         //         .scan<'i', int>();
+    }
+
+    // Hidden advanced arguments.
+    {
+        parser->hidden.add_argument("--full-precision")
+                .help("Always use full precision for inference.")
+                .default_value(false)
+                .implicit_value(true);
+
+        parser->hidden.add_argument("--queue-size")
+                .help("Queue size for processing.")
+                .default_value(1000)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--scripted")
+                .help("Load the scripted Torch model instead of building one internally.")
+                .default_value(false)
+                .implicit_value(true);
     }
 
     return parser;
@@ -278,11 +279,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
 
-    opt.full_precision = parser.visible.get<bool>("full-precision");
-    opt.load_scripted_model = parser.visible.get<bool>("scripted");
+    opt.full_precision = parser.hidden.get<bool>("full-precision");
+    opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
-    opt.num_preloaded_batches = parser.visible.get<int>("preloaded-batches");
+    opt.queue_size = parser.hidden.get<int>("queue-size");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -364,9 +365,8 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
 
-    if (opt.num_preloaded_batches <= 0) {
-        spdlog::error("Number of preloaded batches needs to be > 0, given: {}.",
-                      opt.num_preloaded_batches);
+    if (opt.queue_size <= 0) {
+        spdlog::error("Queue size needs o be > 0, given: {}.", opt.queue_size);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -1055,8 +1055,8 @@ void run_polishing(const Options& opt,
         }
 
         // Each item is one batch for inference.
-        utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.num_preloaded_batches);
-        utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.num_preloaded_batches);
+        utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
+        utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
         std::vector<polisher::ConsensusResult> all_results;
 
         std::thread thread_sample_producer = std::thread(
