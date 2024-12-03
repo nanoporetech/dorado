@@ -458,7 +458,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const bool full_precision) {
     PolisherResources resources;
 
-    spdlog::debug("[create_resources] Initializing the devices.");
+    spdlog::info("Initializing the devices.");
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
@@ -492,8 +492,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
 
             ret.emplace_back(std::move(model));
 
-            spdlog::debug("[create_resources] Loaded model to device {}: {}", device_id,
-                          device_info.name);
+            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
         }
         // In case the device is set to CPU, we add up to inference_threads models.
         if ((std::size(resources.devices) == 1) &&
@@ -506,14 +505,14 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     };
     resources.models = create_models();
 
-    spdlog::debug("[create_resources] Creating the encoder.");
+    spdlog::info("Creating the encoder.");
     resources.encoder = polisher::encoder_factory(model_config);
 
-    spdlog::debug("[create_resources] Creating the decoder.");
+    spdlog::info("Creating the decoder.");
     resources.decoder = polisher::decoder_factory(model_config);
 
     // Open the BAM file for each thread.
-    spdlog::debug("[create_resources] Creating {} BAM handles.", num_bam_threads);
+    spdlog::info("Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
         resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
     }
@@ -981,10 +980,12 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
 
 }  // namespace polisher
 
-void run_polishing(const Options& opt, PolisherResources& resources) {
-    spdlog::debug("[run_polishing] Threads: {}", opt.threads);
-    spdlog::debug("[run_polishing] Inference threads: {}", opt.infer_threads);
-    spdlog::debug("[run_polishing] Number of devices: {}", std::size(resources.devices));
+void run_polishing(const Options& opt,
+                   PolisherResources& resources,
+                   polisher::PolishProgressTracker& tracker,
+                   polisher::PolishStats& polish_stats) {
+    spdlog::info("Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
+                 opt.infer_threads, std::size(resources.devices));
 
     at::InferenceMode infer_guard;
 
@@ -1005,10 +1006,6 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             std::accumulate(std::begin(draft_lens), std::end(draft_lens), static_cast<int64_t>(0),
                             [](const int64_t a, const auto& b) { return a + b.second; });
 
-    // Set the number of threads so that libtorch doesn't cause a thread bomb.
-    at::set_num_interop_threads(opt.threads);
-    torch::set_num_threads(1);
-
     // Open the output stream, to std::cout if the path is empty, otherwise to the file.
     auto ofs = get_output_stream(opt.out_consensus_fn);
 
@@ -1016,20 +1013,6 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
     const std::vector<polisher::Interval> draft_batches = polisher::create_batches(
             draft_lens, opt.draft_batch_size,
             [](const std::pair<std::string, int64_t>& val) { return val.second; });
-
-    // Set up stats counting.
-    // Create the Pipeline from our description.
-    std::vector<dorado::stats::StatsReporter> stats_reporters;
-    polisher::PolishStats polish_stats;
-    polisher::PolishProgressTracker tracker;
-    std::vector<dorado::stats::StatsCallable> stats_callables;
-    stats_callables.push_back([&tracker, &polish_stats](const stats::NamedStats& /*stats*/) {
-        tracker.update_progress_bar(polish_stats.get_stats());
-    });
-    constexpr auto kStatsPeriod = 1000ms;
-    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
-    // End stats counting setup.
 
     // Compute the total number of BAM regions over the entire input file.
     {
@@ -1171,7 +1154,8 @@ int polish(int argc, char* argv[]) {
         } else if (opt.verbosity == 2) {
             spdlog::set_level(spdlog::level::trace);
         } else {
-            // Pass. No log.
+            // Disable everything but warnings and errors.
+            spdlog::set_level(spdlog::level::warn);
         }
 
         spdlog::flush_every(std::chrono::seconds(1));
@@ -1185,6 +1169,10 @@ int polish(int argc, char* argv[]) {
                     "automatically.");
         }
 
+        // Set the number of threads so that libtorch doesn't cause a thread bomb.
+        // at::set_num_interop_threads(opt.threads);
+        torch::set_num_threads(1);
+
         spdlog::debug("Parsing the model config.", opt.threads);
         const std::string model_file = opt.load_scripted_model ? "model.pt" : "weights.pt";
         const polisher::ModelConfig model_config =
@@ -1195,7 +1183,19 @@ int polish(int argc, char* argv[]) {
                 create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
                                  opt.infer_threads, opt.full_precision);
 
-        run_polishing(opt, resources);
+        // Progress bar.
+        polisher::PolishStats polish_stats;
+        std::vector<dorado::stats::StatsReporter> stats_reporters;
+        polisher::PolishProgressTracker tracker;
+        std::vector<dorado::stats::StatsCallable> stats_callables;
+        stats_callables.push_back([&tracker, &polish_stats](const stats::NamedStats& /*stats*/) {
+            tracker.update_progress_bar(polish_stats.get_stats());
+        });
+        constexpr auto kStatsPeriod = 1000ms;
+        auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+                kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
+
+        run_polishing(opt, resources, tracker, polish_stats);
 
     } catch (const std::exception& e) {
         spdlog::error("Caught exception: {}", e.what());
