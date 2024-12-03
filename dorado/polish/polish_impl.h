@@ -32,6 +32,12 @@ struct InferenceData {
     std::vector<TrimInfo> trims;
 };
 
+struct DecodeData {
+    std::vector<Sample> samples;
+    torch::Tensor logits;
+    std::vector<TrimInfo> trims;
+};
+
 std::ostream& operator<<(std::ostream& os, const Window& w);
 
 std::vector<Window> create_windows(const int32_t seq_id,

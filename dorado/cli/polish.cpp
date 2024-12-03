@@ -633,6 +633,10 @@ void sample_producer(PolisherResources& resources,
                 InferenceData remainder_buffer;
                 remainder_buffer.samples = {std::move(samples[i])};
                 remainder_buffer.trims = {std::move(trims[i])};
+                spdlog::debug(
+                        "[producer] Pushing a batch of data to infer_data queue. "
+                        "remainder_buffer.samples.size() = {}",
+                        std::size(remainder_buffer.samples));
                 infer_data.try_push(std::move(remainder_buffer));
                 continue;
             }
@@ -673,29 +677,28 @@ void sample_producer(PolisherResources& resources,
     }
 
     if (!std::empty(buffer.samples)) {
-        // This will block until the queue is empty (because it is set to size 1);
-        // assert(infer_data.capacity() == 1);
-        spdlog::debug("[producer] Pushing final batch data to infer_data queue. size = {}",
-                      std::size(buffer.samples));
+        spdlog::debug(
+                "[producer] Pushing a batch of data to infer_data queue. "
+                "buffer.samples.size() = {} (final)",
+                std::size(buffer.samples));
         infer_data.try_push(std::move(buffer));
         buffer = {};
-        spdlog::debug("[producer] Pushed final.");
+        spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
     }
 
     infer_data.terminate();
 }
 
-std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
-        utils::AsyncQueue<polisher::InferenceData>& batch_queue,
-        std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
-        const polisher::EncoderBase& encoder,
-        const polisher::FeatureDecoder& decoder) {
+void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& batch_queue,
+                                 utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+                                 std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
+                                 const polisher::EncoderBase& encoder) {
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    auto batch_infer = [&encoder, &decoder](polisher::ModelTorchBase& model,
-                                            const InferenceData& batch) {
+    auto batch_infer = [&encoder](polisher::ModelTorchBase& model, const InferenceData& batch,
+                                  const int32_t tid) {
         utils::ScopedProfileRange infer("infer", 1);
         timer::TimerHighRes timer_total;
 
@@ -714,9 +717,10 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
             std::ostringstream oss;
             print_tensor_shape(oss, batch_features_tensor);
             spdlog::debug(
-                    "About to call forward(): batch_features_tensor.size() = {}, approx "
+                    "[consumer {}] About to call forward(): batch_features_tensor.size() = {}, "
+                    "approx "
                     "size: {} MB.",
-                    oss.str(),
+                    tid, oss.str(),
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
@@ -732,40 +736,17 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
         }
         const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
 
-        // Decode output to bases and qualities.
-        // Convert to sequences and qualities.
-        timer::TimerHighRes timer_decode;
-        std::vector<polisher::ConsensusResult> results = decoder.decode_bases(output);
-        const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
-        assert(std::size(results) == std::size(batch.samples));
-
-        // Trim the overlapping sequences.
-        timer::TimerHighRes timer_trim;
-        for (int64_t j = 0; j < dorado::ssize(results); ++j) {
-            auto& result = results[j];
-            const Sample& sample = batch.samples[j];
-            const TrimInfo& trim = batch.trims[j];
-
-            // Trim and mark the region.
-            result.draft_id = sample.seq_id;
-            result.draft_start = sample.positions_major[trim.start];
-            result.draft_end = sample.positions_major[trim.end - 1] + 1;
-            result.seq = result.seq.substr(trim.start, trim.end - trim.start);
-            result.quals = result.quals.substr(trim.start, trim.end - trim.start);
-        }
-        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
-
         const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
         spdlog::debug(
-                "Computed batch inference. Timings - collate: {} ms, forward: {} ms, decode = {} "
-                "ms, trim = {} ms, total = {}",
-                time_collate, time_forward, time_decode, time_trim, time_total);
+                "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} ms, "
+                "total = {}",
+                tid, time_collate, time_forward, time_total);
 
-        return results;
+        return output;
     };
 
-    const auto worker = [&](const int32_t tid, std::vector<polisher::ConsensusResult>& results) {
+    const auto worker = [&](const int32_t tid) {
         at::InferenceMode infer_guard;
 
         while (true) {
@@ -797,28 +778,22 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
                 continue;
             }
 
-            // // Inference.
-            std::vector<polisher::ConsensusResult> results_samples =
-                    batch_infer(*models[tid], item);
+            // Inference.
+            torch::Tensor logits = batch_infer(*models[tid], item, tid);
 
-            //         polisher::infer_samples_in_parallel(item.samples, item.trims, resources.models,
-            //                                             *resources.encoder, *resources.decoder,
-            //                                             opt.window_len, opt.batch_size);
+            polisher::DecodeData out_item;
+            out_item.samples = std::move(item.samples);
+            out_item.logits = std::move(logits);
+            out_item.trims = std::move(item.trims);
 
-            results.insert(std::end(results), std::make_move_iterator(std::begin(results_samples)),
-                           std::make_move_iterator(std::end(results_samples)));
+            spdlog::debug(
+                    "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
+                    "out_item.samples.size() = {}, decode queue size: {}",
+                    tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
+                    decode_queue.size());
+            decode_queue.try_push(std::move(out_item));
         }
     };
-
-    std::vector<std::vector<polisher::ConsensusResult>> results(std::size(models));
-
-    // const int32_t num_items = static_cast<int32_t>(dorado::ssize(in_samples));
-    // One thread per model.
-    // const int32_t num_threads = static_cast<int32_t>(dorado::ssize(models));
-    // const std::vector<Interval> chunks = compute_chunks(num_items, num_threads);
-
-    // spdlog::info("Starting to call consensus for {} samples using {} devices.", num_items,
-    //              std::size(chunks));
 
     const size_t num_threads = std::size(models);
     cxxpool::thread_pool pool{num_threads};
@@ -827,7 +802,129 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid, std::ref(results[tid])));
+        futures.emplace_back(pool.push(worker, tid));
+    }
+
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception from inferencetask: ") + e.what()};
+    }
+
+    decode_queue.terminate();
+
+    spdlog::info("Finished running inference.");
+}
+
+void decode_samples_in_parallel(std::vector<polisher::ConsensusResult> results,
+                                utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+                                const polisher::FeatureDecoder& decoder,
+                                const int32_t num_threads) {
+    auto batch_decode = [&decoder](const DecodeData& item, const int32_t tid) {
+        utils::ScopedProfileRange scope_decode("decode", 1);
+        timer::TimerHighRes timer_total;
+
+        // Decode output to bases and qualities.
+        // Convert to sequences and qualities.
+        timer::TimerHighRes timer_decode;
+        std::vector<polisher::ConsensusResult> local_results = decoder.decode_bases(item.logits);
+        const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
+
+        assert(std::size(local_results) == std::size(item.samples));
+        assert(std::size(local_results) == std::size(item.trims));
+
+        // Trim the overlapping sequences.
+        timer::TimerHighRes timer_trim;
+        for (int64_t j = 0; j < dorado::ssize(local_results); ++j) {
+            auto& result = local_results[j];
+            const Sample& sample = item.samples[j];
+            const TrimInfo& trim = item.trims[j];
+
+            // Trim and mark the region.
+            result.draft_id = sample.seq_id;
+            result.draft_start = sample.positions_major[trim.start];
+            result.draft_end = sample.positions_major[trim.end - 1] + 1;
+            result.seq = result.seq.substr(trim.start, trim.end - trim.start);
+            result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+        }
+        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
+
+        const int64_t time_total = timer_total.GetElapsedMilliseconds();
+
+        spdlog::debug(
+                "[decoder {}] Computed batch decode. Timings - decode = {} "
+                "ms, trim = {} ms, total = {}",
+                tid, time_decode, time_trim, time_total);
+
+        return local_results;
+    };
+
+    const auto worker = [&](const int32_t tid,
+                            std::vector<polisher::ConsensusResult>& thread_results) {
+        at::InferenceMode infer_guard;
+
+        while (true) {
+            // spdlog::debug("[decoder {}] Waiting to pop data for decoding Queue size: {}", tid,
+            //               std::size(decode_queue));
+
+            const auto last_chunk_reserve_time = std::chrono::system_clock::now();
+
+            polisher::DecodeData item;
+            const auto pop_status = decode_queue.try_pop_until(
+                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
+
+            if (pop_status == utils::AsyncQueueStatus::Terminate) {
+                break;
+            }
+
+            if (pop_status == utils::AsyncQueueStatus::Timeout) {
+                spdlog::trace(
+                        "[decoder {}] Timeout when popping item from infer_data queue! "
+                        "item.samples.size() = {}",
+                        tid, tensor_shape_as_string(item.logits));
+                continue;
+            }
+
+            const int64_t tensor_batch_size =
+                    (item.logits.sizes().size() == 0) ? 0 : item.logits.size(0);
+
+            assert(tensor_batch_size == dorado::ssize(item.trims));
+
+            spdlog::debug(
+                    "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
+                    "tensor_batch_size = {}, queue size: {}",
+                    tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
+                    tensor_batch_size, decode_queue.size());
+
+            // This should handle the timeout case too.
+            if (tensor_batch_size == 0) {
+                continue;
+            }
+
+            // Inference.
+            std::vector<polisher::ConsensusResult> results_samples = batch_decode(item, tid);
+
+            //         polisher::infer_samples_in_parallel(item.samples, item.trims, resources.models,
+            //                                             *resources.encoder, *resources.decoder,
+            //                                             opt.window_len, opt.batch_size);
+
+            thread_results.insert(std::end(thread_results),
+                                  std::make_move_iterator(std::begin(results_samples)),
+                                  std::make_move_iterator(std::end(results_samples)));
+        }
+    };
+
+    std::vector<std::vector<polisher::ConsensusResult>> thread_results(num_threads);
+
+    cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(num_threads);
+
+    for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
+        futures.emplace_back(pool.push(worker, tid, std::ref(thread_results[tid])));
     }
 
     try {
@@ -840,19 +937,17 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
 
     // Flatten the results.
     size_t total_size = 0;
-    for (const auto& vals : results) {
+    for (const auto& vals : thread_results) {
         total_size += std::size(vals);
     }
-    std::vector<polisher::ConsensusResult> flat_results;
-    flat_results.reserve(total_size);
-    for (auto& vals : results) {
-        flat_results.insert(std::end(flat_results), std::make_move_iterator(std::begin(vals)),
-                            std::make_move_iterator(std::end(vals)));
+    results.clear();
+    results.reserve(total_size);
+    for (auto& vals : thread_results) {
+        results.insert(std::end(results), std::make_move_iterator(std::begin(vals)),
+                       std::make_move_iterator(std::end(vals)));
     }
 
-    spdlog::info("Finished running inference.");
-
-    return flat_results;
+    spdlog::info("Finished decoding the output.");
 }
 
 }  // namespace polisher
@@ -912,14 +1007,20 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
 
         // Each item is one batch for inference.
         utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.num_preloaded_batches);
+        utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.num_preloaded_batches);
+        std::vector<polisher::ConsensusResult> all_results;
 
         std::thread thread_sample_producer = std::thread(
                 &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
                 std::cref(draft_lens_batch), opt.threads, opt.batch_size, opt.window_len,
                 opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
 
-        std::vector<polisher::ConsensusResult> all_results = polisher::infer_samples_in_parallel_2(
-                batch_queue, resources.models, *resources.encoder, *resources.decoder);
+        std::thread thread_sample_decoder =
+                std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results),
+                            std::ref(decode_queue), std::cref(*resources.decoder), opt.threads);
+
+        polisher::infer_samples_in_parallel_2(batch_queue, decode_queue, resources.models,
+                                              *resources.encoder);
 
         // sample_consumer();
 
@@ -927,7 +1028,11 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             thread_sample_producer.join();
         }
 
-        // spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
+        if (thread_sample_decoder.joinable()) {
+            thread_sample_decoder.join();
+        }
+
+        spdlog::debug("[consumer] Consensus results: {}", std::size(all_results));
 
         // Produce samples (tensors) for inference.
         // auto [samples, trims] = polisher::create_samples(
