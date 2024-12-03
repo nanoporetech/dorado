@@ -8,6 +8,7 @@
 
 #if HAS_NVML
 #include "utils/scoped_trace_log.h"
+#include "utils/string_utils.h"
 
 #include <nvml.h>
 #if defined(_WIN32)
@@ -445,10 +446,28 @@ class DeviceInfoCache final {
 
     void set_device_count() {
         if (m_nvml.is_loaded()) {
-            auto result = m_nvml.DeviceGetCount(&m_device_count);
+            unsigned int nvml_device_count = 0;
+            auto result = m_nvml.DeviceGetCount(&nvml_device_count);
             if (result != NVML_SUCCESS) {
-                m_device_count = 0;
+                nvml_device_count = 0;
                 spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
+            }
+
+            // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
+            const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
+            if (cuda_visible_devices_env != nullptr) {
+                auto device_ids = utils::split(cuda_visible_devices_env, ',');
+                unsigned int cuda_visible_devices_count =
+                        static_cast<unsigned int>(device_ids.size());
+                if (cuda_visible_devices_count > nvml_device_count) {
+                    spdlog::warn(
+                            "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found "
+                            "by NVML ({}).",
+                            cuda_visible_devices_count, nvml_device_count);
+                }
+                m_device_count = std::min(cuda_visible_devices_count, nvml_device_count);
+            } else {
+                m_device_count = nvml_device_count;
             }
         }
 #if defined(DORADO_ORIN) || defined(DORADO_TX2)
