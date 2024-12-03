@@ -71,16 +71,11 @@ std::vector<Window> create_windows(const int32_t seq_id,
                 region_id,
                 start_no_overlap,
                 end,
-                false,
         });
 
         if (end == seq_end) {
             break;
         }
-    }
-
-    if (!std::empty(ret)) {
-        ret.back().is_last_in_region = true;
     }
 
     return ret;
@@ -278,12 +273,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            const bool is_last = (sample.is_last && (i >= num_positions));
-
             results.emplace_back(polisher::Sample{
                     sample.features.slice(0, start, i), std::move(new_major_pos),
                     std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
-                    sample.region_id, std::move(read_ids_left), placeholder_ids, is_last});
+                    sample.region_id, std::move(read_ids_left), placeholder_ids});
             start = i;
         }
 
@@ -295,10 +288,9 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             results.emplace_back(polisher::Sample{
                     sample.features.slice(0, start), std::move(new_major_pos),
                     std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id,
-                    sample.region_id, placeholder_ids, sample.read_ids_right, sample.is_last});
+                    sample.region_id, placeholder_ids, sample.read_ids_right});
         }
     }
-    // }
 
     return results;
 }
@@ -321,22 +313,23 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
     }
 
     const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
-                                 const int64_t end, const bool is_last) {
+                                 const int64_t end) {
         torch::Tensor new_features = sample.features.slice(0, start, end);
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        return polisher::Sample{std::move(new_features),
-                                std::move(new_major),
-                                std::move(new_minor),
-                                std::move(new_depth),
-                                sample.seq_id,
-                                sample.region_id,
-                                {},
-                                {},
-                                is_last};
+        return polisher::Sample{
+                std::move(new_features),
+                std::move(new_major),
+                std::move(new_minor),
+                std::move(new_depth),
+                sample.seq_id,
+                sample.region_id,
+                {},
+                {},
+        };
     };
 
     std::vector<polisher::Sample> results;
@@ -359,8 +352,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
             spdlog::trace("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
-            const bool is_last = (sample.is_last && (end >= sample_len));
-            results.emplace_back(create_chunk(sample, start, end, is_last));
+            results.emplace_back(create_chunk(sample, start, end));
         }
 
         // This will create a chunk with potentially large overlap.
@@ -369,7 +361,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
             end = sample_len;
             spdlog::trace("[split_samples]     - creating end chunk: start = {}, end = {}", start,
                           end);
-            results.emplace_back(create_chunk(sample, start, end, sample.is_last));
+            results.emplace_back(create_chunk(sample, start, end));
         }
     }
 
@@ -444,7 +436,7 @@ std::vector<Sample> encode_regions_in_parallel(
                         100.0 * static_cast<double>(i - start) / (end - start));
             }
             results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
-                                               window.end, window.seq_id, window.is_last_in_region);
+                                               window.end, window.seq_id);
         }
     };
 

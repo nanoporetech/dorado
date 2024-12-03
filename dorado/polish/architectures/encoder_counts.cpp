@@ -62,7 +62,6 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
 
 Sample counts_to_features(CountsResult& pileup,
                           const int32_t seq_id,
-                          const bool is_last,
                           const bool sym_indels,
                           const FeatureIndicesType& feature_indices,
                           const NormaliseType normalise_type) {
@@ -170,8 +169,7 @@ Sample counts_to_features(CountsResult& pileup,
                   seq_id,
                   -1,
                   {},
-                  {},
-                  is_last};
+                  {}};
 
     return sample;
 }
@@ -184,7 +182,6 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
     int32_t seq_id_buffer = -1;
     int32_t region_id_buffer = -1;
     int64_t last_end = -1;
-    bool is_last_buffer = false;
 
     std::vector<polisher::Sample> results;
 
@@ -218,7 +215,6 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
             depth_buffer.emplace_back(std::move(sample.depth));
             seq_id_buffer = sample.seq_id;
             region_id_buffer = sample.region_id;
-            is_last_buffer = std::max(is_last_buffer, sample.is_last);
 
         } else {
             // Discontinuity found, finalize the current chunk
@@ -233,8 +229,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
                                                       seq_id_buffer,
                                                       region_id_buffer,
                                                       {},
-                                                      {},
-                                                      is_last_buffer});
+                                                      {}});
             } else {
                 results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
                                                       cat_vectors(positions_major_buffer),
@@ -243,8 +238,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
                                                       seq_id_buffer,
                                                       region_id_buffer,
                                                       {},
-                                                      {},
-                                                      is_last_buffer});
+                                                      {}});
             }
             features_buffer = {std::move(sample.features)};
             positions_major_buffer = {std::move(sample.positions_major)};
@@ -252,7 +246,6 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
             depth_buffer = {std::move(sample.depth)};
             seq_id_buffer = sample.seq_id;
             region_id_buffer = sample.region_id;
-            is_last_buffer = sample.is_last;
         }
     }
 
@@ -266,8 +259,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
                                                   seq_id_buffer,
                                                   region_id_buffer,
                                                   {},
-                                                  {},
-                                                  is_last_buffer});
+                                                  {}});
         } else {
             results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
                                                   cat_vectors(positions_major_buffer),
@@ -276,8 +268,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
                                                   seq_id_buffer,
                                                   region_id_buffer,
                                                   {},
-                                                  {},
-                                                  is_last_buffer});
+                                                  {}});
         }
     }
 
@@ -309,8 +300,7 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
                                     const std::string& ref_name,
                                     const int64_t ref_start,
                                     const int64_t ref_end,
-                                    const int32_t seq_id,
-                                    const bool is_last) const {
+                                    const int32_t seq_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -334,8 +324,8 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
         return {};
     }
 
-    return counts_to_features(pileup_tensors, seq_id, is_last, m_symmetric_indels,
-                              m_feature_indices, m_normalise_type);
+    return counts_to_features(pileup_tensors, seq_id, m_symmetric_indels, m_feature_indices,
+                              m_normalise_type);
 }
 
 torch::Tensor EncoderCounts::collate(std::vector<torch::Tensor> batch) const {

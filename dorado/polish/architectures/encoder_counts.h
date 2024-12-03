@@ -40,8 +40,7 @@ public:
                          const std::string& ref_name,
                          const int64_t ref_start,
                          const int64_t ref_end,
-                         const int32_t seq_id,
-                         const bool is_last) const override;
+                         const int32_t seq_id) const override;
 
     torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
 

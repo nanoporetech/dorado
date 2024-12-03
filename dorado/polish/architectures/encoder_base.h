@@ -50,8 +50,7 @@ public:
                                  const std::string& ref_name,
                                  const int64_t ref_start,
                                  const int64_t ref_end,
-                                 const int32_t seq_id,
-                                 const bool is_last) const = 0;
+                                 const int32_t seq_id) const = 0;
 
     virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
 
