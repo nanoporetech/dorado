@@ -441,8 +441,8 @@ std::vector<Sample> encode_regions_in_parallel(
             compute_chunks(static_cast<int32_t>(std::size(windows)),
                            std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
 
-    spdlog::info("Starting to encode regions for {} windows using {} threads.", std::size(windows),
-                 std::size(thread_chunks));
+    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
+                  std::size(thread_chunks));
 
     // Create the thread pool, futures and results.
     cxxpool::thread_pool pool{std::size(thread_chunks)};

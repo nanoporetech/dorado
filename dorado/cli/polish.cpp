@@ -10,6 +10,7 @@
 #include "polish/interval.h"
 #include "polish/medaka_counts.h"
 #include "polish/polish_impl.h"
+#include "polish/polish_progress_tracker.h"
 #include "polish/sample.h"
 #include "polish/trim.h"
 #include "torch_utils/auto_detect_device.h"
@@ -379,7 +380,7 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
-        spdlog::info("Parsing CUDA device string.");
+        spdlog::debug("Parsing CUDA device string.");
         const std::vector<std::string> parsed_devices =
                 dorado::utils::parse_cuda_device_string(devices_str);
         if (parsed_devices.empty()) {
@@ -457,40 +458,42 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const bool full_precision) {
     PolisherResources resources;
 
-    spdlog::info("Initializing the devices.");
+    spdlog::debug("[create_resources] Initializing the devices.");
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
     }
 
     // Construct the model.
-    spdlog::info("Loading the model.");
+    spdlog::debug("[create_resources] Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<polisher::ModelTorchBase>> ret;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];
 
-            spdlog::info("Creating a model from the config.");
+            spdlog::debug("[create_resources] Creating a model from the config.");
             auto model = polisher::model_factory(model_config);
 
-            spdlog::info("About to load model to device {}: {}", device_id, device_info.name);
+            spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
+                          device_info.name);
             model->to_device(device_info.device);
 
             // Half-precision if needed.
             if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-                spdlog::info("Converting the model to half.");
+                spdlog::debug("[create_resources] Converting the model to half.");
                 model->to_half();
             } else {
-                spdlog::info("Using full precision.");
+                spdlog::debug("[create_resources] Using full precision.");
             }
 
-            spdlog::info("Switching model to eval mode.");
+            spdlog::debug("[create_resources] Switching model to eval mode.");
             model->set_eval();
 
             ret.emplace_back(std::move(model));
 
-            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+            spdlog::debug("[create_resources] Loaded model to device {}: {}", device_id,
+                          device_info.name);
         }
         // In case the device is set to CPU, we add up to inference_threads models.
         if ((std::size(resources.devices) == 1) &&
@@ -503,14 +506,14 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     };
     resources.models = create_models();
 
-    spdlog::info("Creating the encoder.");
+    spdlog::debug("[create_resources] Creating the encoder.");
     resources.encoder = polisher::encoder_factory(model_config);
 
-    spdlog::info("Creating the decoder.");
+    spdlog::debug("[create_resources] Creating the decoder.");
     resources.decoder = polisher::decoder_factory(model_config);
 
     // Open the BAM file for each thread.
-    spdlog::info("Creating {} BAM handles.", num_bam_threads);
+    spdlog::debug("[create_resources] Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
         resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
     }
@@ -815,7 +818,7 @@ void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& bat
 
     decode_queue.terminate();
 
-    spdlog::info("Finished running inference.");
+    spdlog::debug("[run_polishing] Finished running inference.");
 }
 
 void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
@@ -947,15 +950,41 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
                        std::make_move_iterator(std::end(vals)));
     }
 
-    spdlog::info("Finished decoding the output.");
+    spdlog::debug("[run_polishing] Finished decoding the output.");
 }
+
+class PolishStats {
+public:
+    PolishStats() = default;
+
+    void update(const std::string& name, const double value) { m_stats[name] = value; }
+
+    stats::NamedStats get_stats() const { return m_stats; }
+
+    // stats::NamedStats PolishStats::sample_stats() const {
+    //     return m_stats;
+    //     stats::NamedStats stats;
+    //     stats["num_items"] = static_cast<double>(num_items);
+    //     stats["processed_items"] = static_cast<double>(processed_items);
+
+    //     // stats::NamedStats stats = stats::from_obj(m_work_queue);
+    //     // stats["num_reads_aligned"] = m_alignments_processed.load();
+    //     // stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());
+    //     // stats["index_seqs"] = m_index_seqs;
+    //     // stats["current_idx"] = m_current_index;
+    //     return stats;
+    // }
+
+private:
+    stats::NamedStats m_stats;
+};
 
 }  // namespace polisher
 
 void run_polishing(const Options& opt, PolisherResources& resources) {
-    spdlog::info("Threads: {}", opt.threads);
-    spdlog::info("Inference threads: {}", opt.infer_threads);
-    spdlog::info("Number of devices: {}", std::size(resources.devices));
+    spdlog::debug("[run_polishing] Threads: {}", opt.threads);
+    spdlog::debug("[run_polishing] Inference threads: {}", opt.infer_threads);
+    spdlog::debug("[run_polishing] Number of devices: {}", std::size(resources.devices));
 
     at::InferenceMode infer_guard;
 
@@ -968,7 +997,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
     }
 
     // Load sequence lengths.
-    spdlog::info("Loading draft sequence lengths.");
+    spdlog::debug("[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
 
@@ -984,9 +1013,26 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             draft_lens, opt.draft_batch_size,
             [](const std::pair<std::string, int64_t>& val) { return val.second; });
 
+    // Set up stats counting.
+    // Create the Pipeline from our description.
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    polisher::PolishStats polish_stats;
+    polisher::PolishProgressTracker tracker;
+    std::vector<dorado::stats::StatsCallable> stats_callables;
+    stats_callables.push_back([&tracker, &polish_stats](const stats::NamedStats& /*stats*/) {
+        tracker.update_progress_bar(polish_stats.get_stats());
+    });
+    constexpr auto kStatsPeriod = 1000ms;
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
+    // End stats counting setup.
+
+    polish_stats.update("num_items", static_cast<double>(std::size(draft_lens)));
+    polish_stats.update("processed_items", 0.0);
+
     // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
-        spdlog::info("=============================");
+        spdlog::debug("[run_polishing] =============================");
 
         // Split the sequences into larger BAM windows, like Medaka.
         spdlog::debug("Creating BAM windows.");
@@ -999,11 +1045,18 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         const int64_t total_bases = std::accumulate(
                 std::begin(draft_lens_batch), std::end(draft_lens_batch), static_cast<int64_t>(0),
                 [](const int64_t a, const auto& b) { return a + b.second; });
-        spdlog::info(
-                "Starting to produce consensus for draft sequences: {}-{}/{} (number: {}, total "
+        spdlog::debug(
+                "[run_polishing] Starting to produce consensus for draft sequences: {}-{}/{} "
+                "(number: {}, total "
                 "length: {:.2f} Mbp)",
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0));
+
+        {
+            std::ostringstream oss;
+            oss << draft_batch.start << "-" << draft_batch.end << "/" << std::size(draft_lens);
+            tracker.set_description("Polishing draft sequences: " + oss.str());
+        }
 
         // Each item is one batch for inference.
         utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.num_preloaded_batches);
@@ -1037,7 +1090,7 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         //         resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
         //         opt.threads, opt.window_len, opt.window_overlap, opt.bam_subchunk);
 
-        // spdlog::info("Produced num samples: {}", std::size(samples));
+        // spdlog::debug("Produced num samples: {}", std::size(samples));
 
         // // Inference.
         // std::vector<polisher::ConsensusResult> results_samples =
@@ -1045,8 +1098,8 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
         //                                             *resources.encoder, *resources.decoder,
         //                                             opt.window_len, opt.batch_size);
 
-        spdlog::info(
-                "Stitching sequences: {}-{}/{} (number: {}, total "
+        spdlog::debug(
+                "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
                 "length: {:.2f} Mbp), parts: {}",
                 draft_batch.start, draft_batch.end, std::size(draft_lens),
                 std::size(draft_lens_batch), total_bases / (1000.0 * 1000.0),
@@ -1072,9 +1125,11 @@ void run_polishing(const Options& opt, PolisherResources& resources) {
             write_consensus_result(*ofs, header, consensus,
                                    (opt.out_format == OutputFormat::FASTQ));
         }
+
+        polish_stats.update("processed_items", static_cast<double>(std::size(draft_lens)));
     }
 
-    spdlog::info("Done!");
+    spdlog::debug("Done!");
 }
 
 int polish(int argc, char* argv[]) {
@@ -1115,7 +1170,7 @@ int polish(int argc, char* argv[]) {
                     "automatically.");
         }
 
-        spdlog::info("Parsing the model config.", opt.threads);
+        spdlog::debug("Parsing the model config.", opt.threads);
         const std::string model_file = opt.load_scripted_model ? "model.pt" : "weights.pt";
         const polisher::ModelConfig model_config =
                 polisher::parse_model_config(opt.model_path / "config.toml", model_file);
