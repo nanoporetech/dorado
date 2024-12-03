@@ -8,13 +8,42 @@
 #include <Metal/Metal.hpp>
 #pragma clang attribute pop
 
-#include <ATen/core/TensorBody.h>
+#include "utils/PostCondition.h"
 
+#include <ATen/core/TensorBody.h>
+#include <os/signpost.h>
+
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
+
+// Helper to capture "points" (ranges) of interest to help visualise bottlenecks.
+// Usage:
+//   // Create a global ID for what you want to track.
+//   CREATE_POINT_OF_INTEREST_ID(my_id);
+//   void function(int i) {
+//     // Use the ID inside a scope to measure how long it takes.
+//     POINT_OF_INTEREST_SCOPE(my_id, whole_scope);
+//     do_thing();
+//     {
+//       // You can provide printf-style args to a scope too to help diagnose issues.
+//       POINT_OF_INTEREST_SCOPE(my_id, whole_scope, "calling expensive_function(%i)", i);
+//       expensive_function(i);
+//     }
+//   }
+// Not technically metal, but only usable with Instruments.
+#define CREATE_POINT_OF_INTEREST_ID(id)                                                        \
+    static os_log_t _s_##id##_os_log = os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
+    static_assert(true, "Force semicolon")
+#define POINT_OF_INTEREST_SCOPE(id, name, ...)                                           \
+    os_signpost_id_t _poi_id_##name = os_signpost_id_generate(_s_##id##_os_log);         \
+    os_signpost_interval_begin(_s_##id##_os_log, _poi_id_##name, #name, "" __VA_ARGS__); \
+    auto _poi_scope_##name = dorado::utils::PostCondition(                               \
+            [&] { os_signpost_interval_end(_s_##id##_os_log, _poi_id_##name, #name); }); \
+    static_assert(true, "Force semicolon")
 
 namespace dorado::utils {
 
@@ -61,7 +90,7 @@ void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            long threads_per_threadgroup);
 
 // Returns true on success.
-bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count);
+bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count);
 
 NS::SharedPtr<MTL::Device> get_mtl_device();
 int get_mtl_device_core_count();
@@ -73,12 +102,31 @@ NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(at::Tensor &&t);
 // On construction, creates an autorelease pool for the current thread.
 // On destruction, drains the autorelease pool.
 class ScopedAutoReleasePool {
+    id m_autorelease_pool;
+
+    ScopedAutoReleasePool(const ScopedAutoReleasePool &) = delete;
+    ScopedAutoReleasePool &operator=(const ScopedAutoReleasePool &) = delete;
+
 public:
     ScopedAutoReleasePool();
     ~ScopedAutoReleasePool();
+};
 
-private:
-    id m_autorelease_pool;
+// Capture work on a device between 2 points.
+// A path can be provided to dump the capture to a file.
+class ScopedMetalCapture {
+    MTL::Device *m_device = nullptr;
+
+    ScopedMetalCapture(const ScopedMetalCapture &) = delete;
+    ScopedMetalCapture &operator=(const ScopedMetalCapture &) = delete;
+
+public:
+    ScopedMetalCapture(MTL::Device *device, const std::optional<std::filesystem::path> &path);
+    ~ScopedMetalCapture();
+
+    // Traces only show the values in the buffers before the kernel executes,
+    // so use this to insert a marker after a call to inspect values.
+    void inspect_buffer(MTL::Buffer *buffer, MTL::CommandBuffer *cb);
 };
 
 }  // namespace dorado::utils

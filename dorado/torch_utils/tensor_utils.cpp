@@ -11,6 +11,8 @@
 #include <sstream>
 #include <vector>
 
+namespace dorado::utils {
+
 namespace {
 
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
@@ -36,56 +38,27 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     }
 
 #if ENABLE_AVX2_IMPL
-    // AVX registers have 8 floats.
-    static constexpr size_t kFloatsPerRegister = 8;
-
     // There seems to be no improvement by unrolling this (tested on pipelinedev).
     static constexpr size_t kUnrollFactor = 1;
-
-    // Matches torch behaviour.
-    const int kRoundNearestEven = 0;
-
-    using FloatRegister = __m256;
-    using HalfRegister = __m128i;
-
-#define simd_load(ptr) _mm256_loadu_ps(ptr)
-#define simd_load1(ptr) _mm256_broadcast_ss(ptr)
-#define simd_convert(reg) _mm256_cvtps_ph(reg, kRoundNearestEven)
-#define simd_store(ptr, reg) _mm_storeu_si128(reinterpret_cast<HalfRegister*>(ptr), reg)
-#define simd_store1(ptr, reg) *ptr = c10::Half(_mm_extract_epi16(reg, 0), c10::Half::from_bits())
-
 #else
-    // Neon registers have 4 floats.
-    static constexpr size_t kFloatsPerRegister = 4;
-
     // An unroll factor of 2 gives ~30% improvement on Apple Silicon.
     // Any higher unrolling shows no difference.
     static constexpr size_t kUnrollFactor = 2;
-
-    using FloatRegister = float32x4_t;
-    using HalfRegister = float16x4_t;
-
-#define simd_load(ptr) vld1q_f32(ptr)
-#define simd_load1(ptr) vdupq_n_f32(*ptr)
-#define simd_convert(reg) vcvt_f16_f32(reg)
-#define simd_store(ptr, reg) vst1_f16(reinterpret_cast<float16_t*>(ptr), reg)
-#define simd_store1(ptr, reg) *ptr = vget_lane_f16(reg, 0)
-
 #endif
 
     // Outer unroll.
-    static constexpr size_t kUnroll = kFloatsPerRegister * kUnrollFactor;
+    static constexpr size_t kUnroll = simd::kFloatsPerRegister * kUnrollFactor;
 
     // Main vectorised loop.
     const auto* src_ptr = src;
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
         for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
-            const FloatRegister elems_f32 = simd_load(src_ptr);
-            const HalfRegister elems_f16 = simd_convert(elems_f32);
-            simd_store(dest_ptr, elems_f16);
-            src_ptr += kFloatsPerRegister;
-            dest_ptr += kFloatsPerRegister;
+            const simd::FloatRegister elems_f32 = simd_load_32(src_ptr);
+            const simd::HalfRegister elems_f16 = simd_convert_32_16(elems_f32);
+            simd_store_16(dest_ptr, elems_f16);
+            src_ptr += simd::kFloatsPerRegister;
+            dest_ptr += simd::kFloatsPerRegister;
         }
     }
 
@@ -93,9 +66,9 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     // TODO -- probably nicer to use masked loads/stores.
     const size_t remaining_count = count % kUnroll;
     for (size_t i = 0; i < remaining_count; ++i) {
-        const FloatRegister elem_f32 = simd_load1(src_ptr);
-        const HalfRegister elem_f16 = simd_convert(elem_f32);
-        simd_store1(dest_ptr, elem_f16);
+        const simd::FloatRegister elem_f32 = simd_load1_32(src_ptr);
+        const simd::HalfRegister elem_f16 = simd_convert_32_16(elem_f32);
+        simd_store1_16(dest_ptr, elem_f16);
         ++src_ptr;
         ++dest_ptr;
     }
@@ -103,8 +76,6 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 #endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 
 }  // namespace
-
-namespace dorado::utils {
 
 void serialise_tensor(const at::Tensor& t, const std::string& path) {
     auto bytes = torch::jit::pickle_save(t);

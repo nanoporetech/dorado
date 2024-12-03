@@ -26,6 +26,8 @@ using torch::indexing::Slice;
 
 namespace {
 constexpr int MTL_CORE_BATCH_SIZE = 48;
+
+CREATE_POINT_OF_INTEREST_ID(MetalCaller);
 }  // namespace
 
 namespace dorado::basecall {
@@ -422,6 +424,8 @@ int MetalLSTMCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
 }
 
 bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
+    POINT_OF_INTEREST_SCOPE(MetalCaller, run_scan_kernels, "try_count=%i", try_count);
+
     // This stage is operating on the split outputs of the linear layer, so
     // the effective batch size is m_out_batch_size.
     std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
@@ -440,7 +444,7 @@ bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_cou
                                mtl_for_tensor(m_bwd_NTC.at(i)), mtl_for_tensor(m_posts_NTC.at(i))},
                               {}, m_out_batch_size, m_states);
     }
-    return finishCommandBuffer("linear/scan/softmax", cb, try_count);
+    return run_command_buffer("linear/scan/softmax", cb, try_count);
 }
 
 bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
@@ -459,6 +463,8 @@ bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, in
 }
 
 DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
+    POINT_OF_INTEREST_SCOPE(MetalCaller, decode, "chunk_idx=%i", chunk_idx);
+
     // Model outputs are split across m_out_split buffers.
     assert(m_scores_TNC.size() == static_cast<size_t>(m_out_split));
     assert(m_bwd_NTC.size() == static_cast<size_t>(m_out_split));
@@ -545,6 +551,8 @@ void MetalTxCaller::load_tx_model(const CRFModelConfig &model_config) {
 }
 
 bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
+    POINT_OF_INTEREST_SCOPE(MetalCaller, run_scan_kernels, "try_count=%i", try_count);
+
     // ScanArgs expects scores TNC tensor sizes
     std::vector<int32_t> scan_args_{m_out_chunk_size, m_batch_size, m_states};
     auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
@@ -561,7 +569,7 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
                            mtl_for_tensor(m_posts_NTC)},
                           {}, m_batch_size, m_states);
 
-    return finishCommandBuffer("linear/scan/softmax", cb, try_count);
+    return run_command_buffer("linear/scan/softmax", cb, try_count);
 }
 
 bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
@@ -584,6 +592,8 @@ bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int 
 }
 
 DecodedData MetalTxCaller::decode(int chunk_idx) const {
+    POINT_OF_INTEREST_SCOPE(MetalCaller, decode, "chunk_idx=%i", chunk_idx);
+
     // Not splitting batches in Tx impl so chunk idx should be in [0, N)
     assert(chunk_idx < m_batch_size);
     return decode::beam_search_decode(

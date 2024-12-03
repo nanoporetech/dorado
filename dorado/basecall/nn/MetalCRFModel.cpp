@@ -1,6 +1,7 @@
 #include "MetalCRFModel.h"
 
 #include "torch_utils/module_utils.h"
+#include "utils/math_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -18,6 +19,9 @@ constexpr int kSIMDGroupWidth = 32;
 
 constexpr auto torch_dtype = torch::kF16;
 const size_t dtype_bytes = torch::elementSize(torch_dtype);
+
+CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
+
 }  // namespace
 
 using namespace dorado::utils;
@@ -96,7 +100,7 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
         // dividing by stride.
         const int output_time_step_count = chunk_size / stride;
         constexpr int kMaxTimeSteps = 20;
-        const int num_pieces = (output_time_step_count + kMaxTimeSteps - 1) / kMaxTimeSteps;
+        const int num_pieces = utils::div_round_up(output_time_step_count, kMaxTimeSteps);
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, output_time_step_count);
@@ -104,7 +108,7 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
                                             stride,     win_size / 2,    chunk_size,
                                             batch_size, time_step_begin, time_step_end};
             auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
-            name_mtl_object(buffer, "conv_args");
+            name_mtl_object(buffer, fmt::format("conv_args_{}", i).c_str());
         }
         spdlog::debug("conv3 output_time_step_count {} => {} kernel launches",
                       output_time_step_count, num_pieces);
@@ -134,13 +138,16 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     int new_out_size = repeats * out_size;
     int rows = 2 * w_pad_rows + (win_size + (repeats - 1) * stride) * in_size + 1;
     t_weights_bias = torch::zeros({rows, new_out_size}, torch_dtype);
+    name_mtl_object(mtl_for_tensor(t_weights_bias),
+                    fmt::format("conv{}_weights_bias", layer).c_str());
 
     kernel_simd_groups = (layer == 3 || (layer == 2 && in_size == 16)) ? 4 : 16;
     kernel_thread_groups = get_mtl_device_core_count() * 4;
 
     std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
             {"kConvOutputClamp", activation == Activation::SWISH_CLAMP},
-            {"kConvTanhActivation", activation == Activation::TANH}};
+            {"kConvTanhActivation", activation == Activation::TANH},
+    };
     const int kernel_threads = kSIMDGroupWidth * kernel_simd_groups;
     std::string kernel_name = "conv" + std::to_string(layer);
     // Layer 1 and 2 conv kernels are tailored to specific feature sizes.
@@ -203,6 +210,7 @@ MetalLSTMImpl::MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) 
     // For non-obvious reasons the LSTM kernel runs faster if the U (or _hh) and W (or _ih) matrices are
     // spaced such that there is room for one more matrix between them. Thus a factor of 3 instead of 2.
     t_weights_bias = torch::empty({layer_size * 3 + 1, layer_size, kLstmGates}, torch_dtype);
+    name_mtl_object(mtl_for_tensor(t_weights_bias), "lstm_weights_bias");
 }
 
 MetalBlockImpl::MetalBlockImpl(int chunk_size_,
@@ -221,14 +229,14 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         // kernels increase the likelihood of command buffer submission errors, of various
         // types.  Each args buffer here is for a different time step range.
         constexpr int kMaxTimeSteps = 20;
-        const int num_pieces = (lstm_chunk_size + kMaxTimeSteps - 1) / kMaxTimeSteps;
+        const int num_pieces = utils::div_round_up(lstm_chunk_size, kMaxTimeSteps);
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, lstm_chunk_size);
             std::vector<int32_t> args{batch_size / kTileSize, lstm_chunk_size, time_step_begin,
                                       time_step_end};
             auto &buffer = m_args_lstm.emplace_back(create_vec_buffer(m_device, args));
-            name_mtl_object(buffer, "lstm_args");
+            name_mtl_object(buffer, fmt::format("lstm_args_{}", i).c_str());
         }
         spdlog::debug("lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size, num_pieces);
     }
@@ -244,7 +252,7 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
                                              lstm_chunk_size};
         auto &buffer = args_linear.at(i);
         buffer = create_vec_buffer(m_device, args_linear_);
-        name_mtl_object(buffer, "linear_args");
+        name_mtl_object(buffer, fmt::format("linear_args_{}", i).c_str());
     }
     args_linear2 = create_vec_buffer<int32_t>(
             device, {out_batch_tiles, 0, out_batch_tiles, lstm_chunk_size});
@@ -278,10 +286,16 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     kernel_thread_groups = get_mtl_device_core_count();
     const int lstm_threads = kernel_simd_groups * kSIMDGroupWidth;
     lstm_cps[0] = make_cps(m_device, "lstm",
-                           {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", false}},
+                           {
+                                   {"kLstmLayerSize", config.lstm_size},
+                                   {"kLstmReversedInTime", false},
+                           },
                            lstm_threads);
     lstm_cps[1] = make_cps(m_device, "lstm",
-                           {{"kLstmLayerSize", config.lstm_size}, {"kLstmReversedInTime", true}},
+                           {
+                                   {"kLstmLayerSize", config.lstm_size},
+                                   {"kLstmReversedInTime", true},
+                           },
                            lstm_threads);
 
     // The temp buffer used for these purposes (number of elements of `torch_dtype` in []):
@@ -329,23 +343,25 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         const bool kSecondLayerBias = false;
         linear2 = register_module("linear2",
                                   MetalLinear(decomposition, config.outsize, kSecondLayerBias));
-        const auto linear_constants1 = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", config.lstm_size},
-                 {"kLinearOutSize", decomposition},
-                 {"kLinearOutputScale", 1.0f},
-                 {"kLinearOutputClamp", false},
-                 {"kLinearOutputTanh", false},
-                 {"kLinearOutputAsByte", false}});
+        const auto linear_constants1 = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", config.lstm_size},
+                {"kLinearOutSize", decomposition},
+                {"kLinearOutputScale", 1.0f},
+                {"kLinearOutputClamp", false},
+                {"kLinearOutputTanh", false},
+                {"kLinearOutputAsByte", false},
+        });
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants1, linear_threads);
-        const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", decomposition},
-                 {"kLinearOutSize", config.outsize},
-                 // Rescale from clamped [-5.0, 5.0] range to byte range.
-                 {"kLinearOutputScale", 127.0f / 5.0f},
-                 {"kLinearOutputClamp", true},
-                 {"kLinearOutputTanh", false},
-                 {"kLinearOutputAsByte", true}});
+        const auto linear_constants2 = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", decomposition},
+                {"kLinearOutSize", config.outsize},
+                // Rescale from clamped [-5.0, 5.0] range to byte range.
+                {"kLinearOutputScale", 127.0f / 5.0f},
+                {"kLinearOutputClamp", true},
+                {"kLinearOutputTanh", false},
+                {"kLinearOutputAsByte", true},
+        });
         linear_cps[1] = make_cps(m_device, "linear", linear_constants2, linear_threads);
         // We use mat_temp for the output of the first linear layer, so ensure it is large
         // enough for that purpose.
@@ -354,15 +370,16 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     } else {
         const bool is_v3_model = (config.num_features == 1 && cv1.size == 4) ||
                                  (config.num_features == 13 && cv1.size == 16);
-        const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>(
-                {{"kLinearInSize", config.lstm_size},
-                 {"kLinearOutSize", config.outsize},
-                 // If v4, rescale from clamped [-5.0, 5.0] range to byte range.
-                 // If v3, rescale from tanh [-1.0, 1,0] range to byte range.
-                 {"kLinearOutputScale", is_v3_model ? 127.0f : (127.0f / 5.0f)},
-                 {"kLinearOutputClamp", !is_v3_model},
-                 {"kLinearOutputTanh", is_v3_model},
-                 {"kLinearOutputAsByte", true}});
+        const auto linear_constants = std::vector<std::tuple<std::string, MetalConstant>>({
+                {"kLinearInSize", config.lstm_size},
+                {"kLinearOutSize", config.outsize},
+                // If v4, rescale from clamped [-5.0, 5.0] range to byte range.
+                // If v3, rescale from tanh [-1.0, 1,0] range to byte range.
+                {"kLinearOutputScale", is_v3_model ? 127.0f : (127.0f / 5.0f)},
+                {"kLinearOutputClamp", !is_v3_model},
+                {"kLinearOutputTanh", is_v3_model},
+                {"kLinearOutputAsByte", true},
+        });
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants, linear_threads);
         // Single matmul that may or may not have a bias.
@@ -445,23 +462,29 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   uint64_t linear_hold_off_id,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
-    auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+    {
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, convolutions, "try_count=%i", try_count);
+        auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
-    if (in.dtype() != torch::kF16) {
-        throw std::runtime_error("Input tensor must be float16.");
-    }
-    conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
-    conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
-    conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
-    if (!finishCommandBuffer("convolutions", command_buffer, try_count)) {
-        return nullptr;
+        if (in.dtype() != torch::kF16) {
+            throw std::runtime_error("Input tensor must be float16.");
+        }
+        conv1->run(command_buffer, mtl_for_tensor(in), mat_working_mem.get());
+        conv2->run(command_buffer, mat_working_mem.get(), mat_temp.get());
+        conv3->run(command_buffer, mat_temp.get(), mat_working_mem.get());
+        if (!run_command_buffer("convolutions", command_buffer, try_count)) {
+            return nullptr;
+        }
     }
 
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
+        POINT_OF_INTEREST_SCOPE(MetalCRFModel, lstm_layer, "id=%s, try_count=%i",
+                                lstm_label.c_str(), try_count);
+
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
-        command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+        auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
 
         const int kResBufSize =
@@ -474,26 +497,26 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                      mtl_for_tensor(rnn->t_weights_bias),
                                                      mat_state.get()};
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
-            command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+            auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
             launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
                                   tg_buffer_lens, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
-            if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
+            if (!run_command_buffer(lstm_label.c_str(), command_buffer, try_count)) {
                 return nullptr;
             }
 #endif
         }
 
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
-        if (!finishCommandBuffer(lstm_label.c_str(), command_buffer, try_count)) {
+        if (!run_command_buffer(lstm_label.c_str(), command_buffer, try_count)) {
             return nullptr;
         }
 #endif
     }
 
-    command_buffer = next_command_buffer(m_command_queue.get(), try_count);
+    auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
     // The output buffers of conv/LSTM layers are not used by the decoding, so
     // can be overwritten by subsequent batches as soon as they have been consumed by
@@ -555,6 +578,7 @@ MTL::CommandBuffer *MetalCRFModelImpl::forward_async(at::Tensor &in,
                                                      uint64_t linear_hold_off_id,
                                                      int try_count,
                                                      std::vector<at::Tensor> &out) {
+    POINT_OF_INTEREST_SCOPE(MetalCRFModel, forward_async, "try_count=%i", try_count);
     return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count, out);
 }
 

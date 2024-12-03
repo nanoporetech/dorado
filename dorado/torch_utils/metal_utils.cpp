@@ -8,6 +8,8 @@
 #include <sys/syslimits.h>
 #include <torch/version.h>
 
+#include <atomic>
+
 #if !TARGET_OS_IPHONE
 #include <objc/objc-runtime.h>
 #endif
@@ -41,12 +43,15 @@ overloaded(Ts...) -> overloaded<Ts...>;
 // Functions here that create autorelease objects should be called with an autorelease pool set up,
 // which on MacOS isn't the case unless something like ScopedAutoReleasePool is used.
 
+CREATE_POINT_OF_INTEREST_ID(metal_utils);
+
 void report_error(const NS::Error *error, const char *function) {
     if (error == nil) {
         return;
     }
     auto safe_c_str = [](NS::String *str) {
-        return str ? str->cString(NS::ASCIIStringEncoding) : "<none>";
+        const char *c_str = str ? str->cString(NS::ASCIIStringEncoding) : nullptr;
+        return c_str ? c_str : "<none>";
     };
     spdlog::error("function={}, code={}, domain={}, description={}", function, error->code(),
                   safe_c_str(error->domain()), safe_c_str(error->localizedDescription()));
@@ -245,7 +250,9 @@ void launch_kernel_no_wait(ComputePipelineState *const pipeline,
     compute_encoder->endEncoding();
 }
 
-bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count) {
+    POINT_OF_INTEREST_SCOPE(metal_utils, run_command_buffer, "label=%s", label);
+
     name_mtl_object(cb, label);
     cb->commit();
     cb->waitUntilCompleted();
@@ -260,7 +267,7 @@ bool finishCommandBuffer(const char *label, MTL::CommandBuffer *cb, int try_coun
         spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
                      fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
-            report_error(cb->error(), "finishCommandBuffer");
+            report_error(cb->error(), "run_command_buffer");
         }
     }
     return success;
@@ -406,6 +413,63 @@ size_t get_apple_physical_memory_bytes() {
         spdlog::warn("Failed to retrieve physical memory size: defaulting to {} bytes", mem_size);
     }
     return mem_size;
+}
+
+// MTLCaptureManager can only capture one thing at a time, so guard it with a global.
+static std::atomic_bool s_capturing{false};
+
+ScopedMetalCapture::ScopedMetalCapture(MTL::Device *device,
+                                       const std::optional<std::filesystem::path> &path) {
+    if (s_capturing.exchange(true, std::memory_order_relaxed) != false) {
+        spdlog::error("Already performing a GPU capture");
+        std::abort();
+    }
+
+    // Setup descriptor of what to capture.
+    auto descriptor = NS::TransferPtr(MTL::CaptureDescriptor::alloc()->init());
+    descriptor->setCaptureObject(device);
+
+    // Dump to a file if requested.
+    if (path.has_value()) {
+        descriptor->setDestination(MTL::CaptureDestination::CaptureDestinationGPUTraceDocument);
+        // Assume that the path is valid UTF-8.
+        auto pathstr =
+                NS::TransferPtr(NS::String::string(path->string().c_str(), NS::UTF8StringEncoding));
+        auto url = NS::TransferPtr(NS::URL::alloc()->initFileURLWithPath(pathstr.get()));
+        descriptor->setOutputURL(url.get());
+    }
+
+    // Start the capture.
+    auto *manager = MTL::CaptureManager::sharedCaptureManager();
+    const bool active = wrap_func_with_err(manager->startCapture, descriptor.get());
+
+    if (active) {
+        m_device = device;
+    } else if (!getenv("MTL_CAPTURE_ENABLED")) {
+        // Developer probably forgot to set this, so help them out.
+        spdlog::warn("Note that MTL_CAPTURE_ENABLED=1 must be set in order to capture");
+    }
+}
+
+ScopedMetalCapture::~ScopedMetalCapture() {
+    if (m_device) {
+        auto *manager = MTL::CaptureManager::sharedCaptureManager();
+        manager->stopCapture();
+    }
+    s_capturing.store(false, std::memory_order_relaxed);
+}
+
+void ScopedMetalCapture::inspect_buffer(MTL::Buffer *buffer, MTL::CommandBuffer *cb) {
+    if (!m_device) {
+        return;
+    }
+
+    auto inspector = make_cps(m_device, "inspect_buffer", {}, {});
+    launch_kernel_no_wait(inspector.get(), cb, {buffer}, {}, 1, 1);
+    if (!run_command_buffer("inspect_buffer", cb, 0)) {
+        // Only a warning since it should still be visible in the trace
+        spdlog::warn("Buffer inspection failed");
+    }
 }
 
 }  // namespace dorado::utils
