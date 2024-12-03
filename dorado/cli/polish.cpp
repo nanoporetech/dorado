@@ -699,8 +699,6 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
         utils::ScopedProfileRange infer("infer", 1);
         timer::TimerHighRes timer_total;
 
-        at::InferenceMode infer_guard;
-
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         timer::TimerHighRes timer_collate;
         std::vector<torch::Tensor> batch_features;
@@ -768,6 +766,8 @@ std::vector<polisher::ConsensusResult> infer_samples_in_parallel_2(
     };
 
     const auto worker = [&](const int32_t tid, std::vector<polisher::ConsensusResult>& results) {
+        at::InferenceMode infer_guard;
+
         while (true) {
             spdlog::debug("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
                           std::size(batch_queue));
