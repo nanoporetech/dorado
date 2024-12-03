@@ -64,14 +64,14 @@ void PolishProgressTracker::update_progress_bar(const stats::NamedStats& stats) 
     }
 }
 
-void PolishProgressTracker::internal_set_progress(float progress) {
+void PolishProgressTracker::internal_set_progress(double progress) {
     // The progress bar uses escape sequences that only TTYs understand.
     if (!utils::is_fd_tty(stderr)) {
         return;
     }
 
     // Sanity clamp.
-    progress = std::min(progress, 100.f);
+    progress = std::min(progress, 100.);
 
     // Draw it.
 #ifdef _WIN32

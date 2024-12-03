@@ -25,7 +25,7 @@ public:
     void update_progress_bar(const stats::NamedStats& stats);
 
 private:
-    void internal_set_progress(float progress);
+    void internal_set_progress(double progress);
 
 #ifdef _WIN32
     indicators::ProgressBar m_progress_bar {
