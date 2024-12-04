@@ -883,30 +883,6 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         return UNCLASSIFIED;
     }
 
-    if (kit.double_ends) {
-        // For a double ended barcode, ensure that the best barcode according
-        // to the top window and the best barcode according to the bottom window
-        // are the same. If they suggest different barcodes confidently, then
-        // consider the read unclassified.
-        const auto best_top_result = std::min_element(
-                results.cbegin(), results.cend(),
-                [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
-        const auto best_bottom_result = std::min_element(
-                results.cbegin(), results.cend(),
-                [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
-        const auto max_penalty =
-                std::max(best_top_result->top_penalty, best_bottom_result->bottom_penalty);
-        const auto penalty_dist =
-                std::abs(best_top_result->top_penalty - best_bottom_result->bottom_penalty);
-        if ((max_penalty <= m_scoring_params.max_barcode_penalty) &&
-            (penalty_dist <= m_scoring_params.min_barcode_penalty_dist) &&
-            (best_top_result->barcode_name != best_bottom_result->barcode_name)) {
-            spdlog::trace("Two ends confidently predict different BCs: top bc {}, bottom bc {}",
-                          best_top_result->barcode_name, best_bottom_result->barcode_name);
-            return UNCLASSIFIED;
-        }
-    }
-
     // Sort the scores windows by their barcode score.
     std::sort(results.begin(), results.end(),
               [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
