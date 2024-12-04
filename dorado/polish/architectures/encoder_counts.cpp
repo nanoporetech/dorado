@@ -10,15 +10,22 @@ namespace dorado::polisher {
 namespace {
 
 CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
+    const size_t num_bytes = static_cast<size_t>(data.n_cols() * n_rows * sizeof(int64_t));
+
+    if (num_bytes == 0) {
+        return {};
+    }
+
     CountsResult result;
 
     // Allocate a tensor of the appropriate size directly for `result.counts` on the CPU
     result.counts = torch::empty({static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
                                  torch::kInt64);
 
+    assert(result.counts.data_ptr<int64_t>() != nullptr);
+
     // Copy the data from `data.matrix()` into `result.counts`
-    std::memcpy(result.counts.data_ptr<int64_t>(), data.get_matrix().data(),
-                data.n_cols() * n_rows * sizeof(int64_t));
+    std::memcpy(result.counts.data_ptr<int64_t>(), data.get_matrix().data(), num_bytes);
 
     result.positions_major = std::move(data.get_major());
     result.positions_minor = std::move(data.get_minor());
@@ -286,8 +293,8 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
                              const int32_t min_mapq,
                              const bool symmetric_indels)
         : m_normalise_type{normalise_type},
-          m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_dtypes{dtypes},
+          m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_tag_name{tag_name},
           m_tag_value{tag_value},
           m_tag_keep_missing{tag_keep_missing},
@@ -319,8 +326,8 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
     if (!pileup_tensors.counts.numel()) {
         const std::string region =
                 ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
-        spdlog::warn("Pileup-feature is zero-length for {} indicating no reads in this region.",
-                     region);
+        spdlog::debug("Pileup-feature is zero-length for {} indicating no reads in this region.",
+                      region);
         return {};
     }
 

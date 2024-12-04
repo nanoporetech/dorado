@@ -49,8 +49,8 @@ public:
 
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
-    int32_t m_num_dtypes = 1;
     std::vector<std::string> m_dtypes;
+    int32_t m_num_dtypes = 1;
     std::string m_tag_name;
     int32_t m_tag_value = 0;
     bool m_tag_keep_missing = false;
