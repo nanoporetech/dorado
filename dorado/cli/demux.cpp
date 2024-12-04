@@ -279,8 +279,11 @@ int demuxer(int argc, char* argv[]) {
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");
         if (custom_seqs.has_value()) {
-            std::unordered_map<std::string, std::string> custom_barcodes =
-                    demux::parse_custom_sequences(*custom_seqs);
+            std::unordered_map<std::string, std::string> custom_barcodes;
+            auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
+            for (const auto& entry : custom_sequences) {
+                custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+            }
             barcode_kits::add_custom_barcodes(custom_barcodes);
         }
 

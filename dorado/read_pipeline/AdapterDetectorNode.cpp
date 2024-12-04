@@ -46,7 +46,7 @@ void AdapterDetectorNode::input_thread_fn() {
     }
 }
 
-std::shared_ptr<const demux::AdapterDetector> AdapterDetectorNode::get_detector(
+std::shared_ptr<demux::AdapterDetector> AdapterDetectorNode::get_detector(
         const demux::AdapterInfo& adapter_info) {
     if (!adapter_info.trim_adapters && !adapter_info.trim_primers) {
         return nullptr;
@@ -64,6 +64,14 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     }
     int seqlen = irecord->core.l_qseq;
 
+    // If no kit-name has been provided, then only look for adapters and/or
+    // primers that are have been designated as valid targets for any kit.
+    // Normally these will only exist if a custom primer file was used.
+    auto kit_name = bam_message.sequencing_kit;
+    if (kit_name.empty()) {
+        kit_name = "any";
+    }
+
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
 
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
@@ -77,11 +85,11 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
 
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
-        auto adapter_res = detector->find_adapters(seq);
+        auto adapter_res = detector->find_adapters(seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(seq);
+        auto primer_res = detector->find_primers(seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
 
@@ -114,13 +122,22 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     if (!adapter_info) {
         return;
     }
+
+    // If no kit-name has been provided, then only look for adapters and/or
+    // primers that are have been designated as valid targets for any kit.
+    // Normally these will only exist if a custom primer file was used.
+    auto kit_name = read.read_common.sequencing_kit;
+    if (kit_name.empty()) {
+        kit_name = "any";
+    }
+
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
-        auto adapter_res = detector->find_adapters(read.read_common.seq);
+        auto adapter_res = detector->find_adapters(read.read_common.seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(read.read_common.seq);
+        auto primer_res = detector->find_primers(read.read_common.seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {

@@ -1,4 +1,6 @@
 add_library(dorado_utils
+    adapter_primer_kits.cpp
+    adapter_primer_kits.h
     alignment_utils.cpp
     alignment_utils.h
     arg_parse_ext.h
@@ -23,6 +25,10 @@ add_library(dorado_utils
     crypto_utils.cpp
     dev_utils.cpp
     dev_utils.h
+    fasta_fastq_utils.cpp
+    fasta_fastq_utils.h
+    fasta_reader.cpp
+    fasta_reader.h
     fastq_reader.cpp
     fastq_reader.h
     fs_utils.cpp

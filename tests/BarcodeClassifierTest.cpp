@@ -495,7 +495,11 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
     auto kit_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
 
-    auto custom_barcodes = dorado::demux::parse_custom_sequences(seqs_file);
+    std::unordered_map<std::string, std::string> custom_barcodes;
+    auto custom_sequences = demux::parse_custom_sequences(seqs_file);
+    for (const auto& entry : custom_sequences) {
+        custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+    }
     dorado::barcode_kits::add_custom_barcodes(custom_barcodes);
     auto barcode_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });

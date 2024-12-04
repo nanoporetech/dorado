@@ -96,105 +96,6 @@ dorado::SingleEndResult get_best_result(const std::vector<dorado::SingleEndResul
     return {};
 }
 
-// For adapters, we there are specific sequences we look for at the front of the read. We don't look for exactly
-// the reverse complement at the rear of the read, though, because it will generally be truncated. So we list here
-// the specific sequences to look for at the front and rear of the reads.
-// RNA adapters are only looked for at the rear of the read, so don't have a front sequence.
-struct Adapter {
-    std::string name;
-    std::string front_sequence;
-    std::string rear_sequence;
-};
-
-enum class AdapterCode { LSK109, LSK110, RNA004 };
-
-const std::unordered_map<AdapterCode, Adapter> adapters = {
-        {LSK109, {"LSK109", "AATGTACTTCGTTCAGTTACGTATTGCT", "AGCAATACGTAACTGAACGAAGT"}},
-        {LSK110, {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"}},
-        {RNA004, {"RNA004", "", "GGTTGTTTCTGTTGGTGCTG"}}};
-
-const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter_kit_map = {
-        {LSK109, {SQK_CS9109, SQK_DCS109, SQK_LSK109, SQK_LSK109_XL, SQK_PCS109}},
-        {LSK110,
-         {SQK_APK114, SQK_LSK110, SQK_LSK110_XL, SQK_LSK111, SQK_LSK111_XL, SQK_LSK112,
-          SQK_LSK112_XL, SQK_LSK114, SQK_LSK114_260, SQK_LSK114_XL, SQK_LSK114_XL_260, SQK_PCS111,
-          SQK_PCS114, SQK_PCS114_260, SQK_RAD112, SQK_RAD114, SQK_RAD114_260, SQK_ULK114,
-          SQK_ULK114_260}},
-        {RNA004, {SQK_RNA004}}};
-
-// For primers, we look for each primer sequence, and its reverse complement, at both the front and rear of the read.
-struct Primer {
-    std::string name;
-    std::string sequence;
-};
-
-enum class PrimerCode {
-    PCR_PSK_rev1,
-    PCR_PSK_rev2,
-    cDNA_VNP,
-    cDNA_SSP,
-    PCS110_forward,
-    PCS110_reverse,
-    RAD
-};
-
-const std::unordered_map<PrimerCode, Primer> primers = {
-        {PCR_PSK_rev1, {"PCR_PSK_rev1", "ACTTGCCTGTCGCTCTATCTTCGGCGTCTGCTTGGGTGTTTAACC"}},
-        {PCR_PSK_rev2, {"PCR_PSK_rev2", "TTTCTGTTGGTGCTGATATTGCGGCGTCTGCTTGGGTGTTTAACCT"}},
-        {cDNA_VNP, {"cDNA_VNP", "ACTTGCCTGTCGCTCTATCTTC"}},
-        {cDNA_SSP, {"cDNA_SSP", "TTTCTGTTGGTGCTGATATTGCTGGG"}},
-        {PCS110_forward,
-         {"PCS110_forward",
-          "TCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTT"
-          "T"}},
-        {PCS110_reverse,
-         {"PCS110_reverse", "ATCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGTTTCTGTTGGTGCTGATATTGCTTT"}},
-        {RAD, {"RAD", "GCTTGGGTGTTTAACCGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA"}}};
-
-const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_kit_map = {
-
-};
-
-std::vector<Adapter> get_adapters_for_kit(const std::string& kit_name) {
-    auto kit_code = dorado::models::kit_code(kit_name);
-    for (const auto& entry : adapter_kit_map) {
-        if (entry.second.find(kit_code) != entry.second.end()) {
-            return {adapters.at(entry.first)};
-        }
-    }
-    // kit not found in map, so return all known adapters.
-    std::vector<Adapter> all_adapters;
-    for (const auto& entry : adapters) {
-        all_adapters.push_back(entry.second);
-    }
-    return all_adapters;
-}
-
-std::vector<Primer> get_primers_for_kit(const std::string& kit_name) {
-    std::vector<Primer> primer_matches;
-    auto kit_code = dorado::models::kit_code(kit_name);
-    for (const auto& entry : primer_kit_map) {
-        if (entry.second.find(kit_code) != entry.second.end()) {
-            primer_matches.push_back(primers.at(entry.first));
-        }
-    }
-    // kit not found in map, so return all known primers.
-    if (primer_matches.empty()) {
-        for (const auto& entry : primers) {
-            primer_matches.push_back(entry.second);
-        }
-    }
-    return primer_matches;
-}
-
-dorado::demux::AdapterDetector::Query make_adapter_query(const Adapter& adapter) {
-    return {adapter.name, adapter.front_sequence, adapter.rear_sequence};
-}
-
-dorado::demux::AdapterDetector::Query make_primer_query(const Primer& primer) {
-    return {primer.name, primer.sequence, dorado::utils::reverse_complement(primer.sequence)};
-}
-
 }  // namespace
 
 namespace dorado {
@@ -202,23 +103,14 @@ namespace demux {
 
 AdapterDetector::AdapterDetector(const std::optional<std::string>& custom_primer_file) {
     if (custom_primer_file.has_value()) {
-        parse_custom_sequence_file(custom_primer_file.value());
+        m_sequence_manager = std::make_unique<adapter_primer_kits::AdapterPrimerManager>(
+                custom_primer_file.value());
+    } else {
+        m_sequence_manager = std::make_unique<adapter_primer_kits::AdapterPrimerManager>();
     }
 }
 
 AdapterDetector::~AdapterDetector() = default;
-
-void AdapterDetector::parse_custom_sequence_file(const std::string& filename) {
-    auto sequence_map = parse_custom_sequences(filename);
-    for (const auto& item : sequence_map) {
-        Query entry = {item.first, item.second, utils::reverse_complement(item.second)};
-        m_custom_primer_sequences.emplace_back(std::move(entry));
-    }
-    // For testing purposes, we want to make sure the sequences are in a deterministic order.
-    // Note that parse_custom_sequences() returns an unordered_map, so the order may vary by
-    // platform or implementation.
-    std::sort(m_custom_primer_sequences.begin(), m_custom_primer_sequences.end());
-}
 
 AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq,
                                                   const std::string& kit_name) {
@@ -228,9 +120,6 @@ AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq,
 
 AdapterScoreResult AdapterDetector::find_primers(const std::string& seq,
                                                  const std::string& kit_name) {
-    if (!m_custom_primer_sequences.empty()) {
-        return detect(seq, m_custom_primer_sequences, PRIMER);
-    }
     const auto& primer_sequences = get_primer_sequences(kit_name);
     return detect(seq, primer_sequences, PRIMER);
 }
@@ -241,12 +130,8 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences(
     if (it != m_adapter_sequences.end()) {
         return it->second;
     }
-    const auto& adapters = get_adapters_for_kit(kit_name);
-    std::vector<AdapterDetector::Query> adapter_sequences;
-    for (const auto& adapter : adapters) {
-        adapter_sequences.emplace_back(make_adapter_query(adapter));
-    }
-    auto result = m_adapter_sequences.emplace(kit_name, std::move(adapter_sequences));
+    auto adapters = m_sequence_manager->get_adapters(kit_name);
+    auto result = m_adapter_sequences.emplace(kit_name, std::move(adapters));
     return result.first->second;
 }
 
@@ -256,12 +141,20 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences(
     if (it != m_primer_sequences.end()) {
         return it->second;
     }
-    const auto& primers = get_primers_for_kit(kit_name);
-    std::vector<AdapterDetector::Query> primer_sequences;
+    // With primers, we not only look for the front sequence at the start
+    // of the read, and the rear sequence at the end, but we also need to
+    // look for the reverse of the rear sequence at the start of the read,
+    // and the reverse of the front sequence at the end of the read.
+    auto primers = m_sequence_manager->get_primers(kit_name);
+    std::vector<Query> primer_queries;
     for (const auto& primer : primers) {
-        primer_sequences.emplace_back(make_primer_query(primer));
+        primer_queries.push_back(
+                {primer.name + "_FWD", primer.front_sequence, primer.rear_sequence});
+        auto front_rev_seq = utils::reverse_complement(primer.front_sequence);
+        auto rear_rev_seq = utils::reverse_complement(primer.rear_sequence);
+        primer_queries.push_back({primer.name + "_REV", rear_rev_seq, front_rev_seq});
     }
-    auto result = m_primer_sequences.emplace(kit_name, std::move(primer_sequences));
+    auto result = m_primer_sequences.emplace(kit_name, std::move(primer_queries));
     return result.first->second;
 }
 
@@ -281,31 +174,19 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     constexpr int IS_FRONT = -1;
     for (size_t i = 0; i < queries.size(); i++) {
         const auto& name = queries[i].name;
-        std::string_view query_seq = queries[i].sequence;
-        std::string_view query_seq_rev = queries[i].sequence_rev;
+        std::string_view query_seq_front = queries[i].front_sequence;
+        std::string_view query_seq_rear = queries[i].rear_sequence;
         spdlog::trace("Checking adapter/primer {}", name);
 
-        if (!query_seq.empty()) {
-            align(query_seq, read_front, name + "_FWD", front_results, IS_FRONT, placement_config);
-        }
-        if (!query_seq_rev.empty()) {
-            align(query_seq_rev, read_rear, name + "_REV", rear_results, rear_start,
+        if (!query_seq_front.empty()) {
+            align(query_seq_front, read_front, name + "_FRONT", front_results, IS_FRONT,
                   placement_config);
         }
-
-        if (query_type == PRIMER) {
-            // For primers we look for both the forward and reverse sequence at both ends.
-            if (!query_seq_rev.empty()) {
-                align(query_seq_rev, read_front, name + "_REV", front_results, IS_FRONT,
-                      placement_config);
-            }
-            if (!query_seq.empty()) {
-                align(query_seq, read_rear, name + "_FWD", rear_results, rear_start,
-                      placement_config);
-            }
+        if (!query_seq_rear.empty()) {
+            align(query_seq_rear, read_rear, name + "_REAR", rear_results, rear_start,
+                  placement_config);
         }
     }
-
     return {get_best_result(front_results), get_best_result(rear_results)};
 }
 

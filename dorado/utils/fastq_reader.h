@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fasta_fastq_utils.h"
+
 #include <istream>
 #include <memory>
 #include <optional>
@@ -11,6 +13,8 @@ namespace dorado::utils {
 
 class FastqRecord {
 public:
+    FastqRecord() : m_header(FastaFastqHeader::FASTQ) {}
+
     // The header will be at least 2 characters and begin with '@'
     const std::string& header() const;
 
@@ -44,12 +48,9 @@ public:
                                                  std::string& error_message);
 
 private:
-    std::string m_header;
+    FastaFastqHeader m_header;
     std::string m_sequence;
     std::string m_qstring;
-
-    bool m_header_has_bam_tags{};
-    std::size_t token_len(std::size_t token_start_pos) const;
 };
 
 class FastqReader {
