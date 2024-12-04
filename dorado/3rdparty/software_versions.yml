@@ -1,0 +1,156 @@
+---
+argparse:
+    description: >
+        C++ argument parser
+    version: "3.1.0"
+    url: http://github.com/p-ranav/argparse
+    license: argparse/argparse.hpp
+    files:
+        - argparse
+cpp-httplib:
+    description: >
+        A C++11 single-file header-only cross platform HTTP/HTTPS library
+    version: "0.13.3"
+    url: https://github.com/yhirose/cpp-httplib
+    license: cpp-httplib/LICENSE
+    files:
+        - cpp-httplib
+cuda-toolkit:
+    description: >
+        CUDA is a software layer that gives direct access to the GPU's virtual instruction set.
+    version: "11.8.89"
+    url: https://developer.nvidia.com/cuda-11-8-0-download-archive
+    license: PATH_NOT_AVAILABLE
+    files:
+        - /usr/local/cuda/targets/x86_64-linux
+# Note: Cutlass is included via Koi, it's not in the source tree usually
+cutlass:
+    description: >
+         CUDA C++ template abstractions for implementing high-performance matrix-multiplication (GEMM) and related computations.
+    version: "012c62c748bdd5b2badc3ebe83e0891dee7c4e31"
+    url: https://github.com/NVIDIA/cutlass
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+cxxpool:
+    description: >
+        A header-only thread pool for C++
+    version: "4d8526e93771c4728cbdcd238369e434bad58d32"
+    url: https://github.com/bloomen/cxxpool
+    license: cxxpool/LICENSE
+    files:
+        - cxxpool
+date:
+    description: >
+        Date and time handling libraries
+    version: "cc4685a21e4a4fdae707ad1233c61bbaff241f93"
+    url: https://github.com/HowardHinnant/date
+    license: date/LICENSE.txt
+    files:
+        - date
+edlib:
+    description: >
+        C/C++ library for sequence alignment using edit distance
+    version: "18794ae1e74b64ff13975239a96417dfba63997b"
+    url: https://github.com/martinsos/edlib
+    license: edlib/LICENSE
+    files:
+        - edlib
+elzip:
+    description: >
+        Simple zipping / unzipping C++ Lib
+    version: "516e161d5c96aa8f2603fb30b10b7770a87332c2"
+    url: https://github.com/Sygmei/11Zip
+    license: elzip/LICENSE
+    files:
+        - elzip
+HighFive:
+    description: >
+        Header-only C++11 friendly interface for libhdf5.
+    version: "c59464737afb8cc8d0042d2d9e495967860797d1"
+    url: https://github.com/BlueBrain/HighFive
+    license: HighFive/LICENSE
+    files:
+        - HighFive
+htslib:
+    description: >
+        C library for accessing common file formats, such as SAM, CRAM and VCF
+    version: "3c6f83f11e6e99cdcbed3541ae7d8d5f7786578d"
+    url: https://github.com/samtools/htslib
+    license: htslib/LICENSE
+    files:
+        - htslib
+indicators:
+    description: >
+        Thread-safe progress bars and spinners.
+    version: "88544847c51397004a31cf2817c334624c6350cf"
+    url: https://github.com/p-ranav/indicators
+    license: indicators/LICENSE
+    files:
+        - indicators
+minimap2:
+    description: >
+        Sequence alignment program
+    version: "5279377544a36f690e8aa34fec856c6106d259e5"
+    url: https://github.com/lh3/minimap2
+    license: ont-minimap2/src/3rdparty/minimap2/LICENSE.txt
+    files:
+        - ont-minimap2/src/3rdparty/minimap2
+NVTX:
+    description: >
+        API for annotating source code to provide contextual information to developer tools.
+    version: "61372b7a4cf1da41e9df4a1cb5a7a6e2c62113a8"
+    url: https://github.com/NVIDIA/NVTX
+    license: NVTX/LICENSE.txt
+    files:
+        - NVTX
+pthread-win32:
+    description: >
+        Combined pthread-win32 fork of RedFox20 + Oktonion + WinBuild.
+    version: "a89bf2154a28113a7373e25fe2729dee4e004385"
+    url: https://github.com/GerHobbelt/pthread-win32
+    license: ont-minimap2/src/3rdparty/pthread-win32/docs/LICENSE.md
+    files:
+        - ont-minimap2/src/3rdparty/pthread-win32
+# For pytorch builds see https://git.oxfordnanolabs.local/blawrence/pytorch-build-scripts/-/blob/master/setup.linux.sh
+# pytorch is not in the source tree as it's downloaded from the CDN
+pytorch:
+    description: >
+        Tensor computation (like NumPy) with strong GPU acceleration and Deep neural networks.
+    version: "v2.0.0"
+    url: https://github.com/pytorch/pytorch
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+spdlog:
+    description: >
+        C++ logging library.
+    version: "7e635fca68d014934b4af8a1cf874f63989352b7"
+    url: https://github.com/gabime/spdlog
+    license: spdlog/LICENSE
+    files:
+        - spdlog
+streamvbyte:
+    description: >
+          integer compression technique that applies SIMD instructions (vectorization) to Google's Group Varint approach.
+    version: "1813d4ec3d732f3f615821fd8d1f725204c15ecc"
+    url: https://github.com/lemire/streamvbyte
+    license: hdf_plugins/third_party/streamvbyte/LICENSE
+    files:
+        - hdf_plugins/third_party/streamvbyte
+zlib-ng:
+    description: >
+        zlib data compression library for the next generation systems.
+    version: "c255e58dd5e0ec3b2febb29c0905e89032419bcd"
+    url: https://github.com/zlib-ng/zlib-ng
+    license: ont-minimap2/src/3rdparty/zlib-ng/LICENSE.md
+    files:
+        - ont-minimap2/src/3rdparty/zlib-ng
+zstd:
+    description: >
+        Fast lossless compression algorithm.
+    version: "97a3da1df009d4dc67251de0c4b1c9d7fe286fc1"
+    url: https://github.com/facebook/zstd
+    license: zstd/LICENSE
+    files:
+        - zstd
