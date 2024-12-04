@@ -35,13 +35,13 @@ void PolishProgressTracker::set_description(const std::string& desc) {
     m_progress_bar.set_option(indicators::option::PostfixText{desc});
 }
 
-void PolishProgressTracker::summarize() const {
-    erase_progress_bar_line();
+// void PolishProgressTracker::summarize() const {
+//     erase_progress_bar_line();
 
-    // if (m_num_polished_sequences > 0) {
-    //     spdlog::info("Polished sequences written: {}", m_num_polished_sequences);
-    // }
-}
+//     // if (m_num_polished_sequences > 0) {
+//     //     spdlog::info("Polished sequences written: {}", m_num_polished_sequences);
+//     // }
+// }
 
 void PolishProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     auto fetch_stat = [&stats](const std::string& name) {
@@ -64,6 +64,11 @@ void PolishProgressTracker::update_progress_bar(const stats::NamedStats& stats) 
     }
 }
 
+void PolishProgressTracker::finalize() {
+    internal_set_progress(100.0);
+    std::cerr << '\n';
+}
+
 void PolishProgressTracker::internal_set_progress(double progress) {
     // The progress bar uses escape sequences that only TTYs understand.
     if (!utils::is_fd_tty(stderr)) {
@@ -74,17 +79,12 @@ void PolishProgressTracker::internal_set_progress(double progress) {
     progress = std::min(progress, 100.);
 
     // Draw it.
+    std::cerr << '\r';
 #ifdef _WIN32
     m_progress_bar.set_progress(static_cast<size_t>(progress));
 #else
     m_progress_bar.set_progress(progress);
 #endif
-
-    if (progress < 100.0) {
-        std::cerr << '\r';
-    } else {
-        std::cerr << '\n';
-    }
 }
 
 }  // namespace dorado::polisher

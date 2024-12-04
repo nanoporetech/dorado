@@ -21,8 +21,9 @@ public:
 
     void set_description(const std::string& desc);
 
-    void summarize() const;
+    // void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
+    void finalize();
 
 private:
     void internal_set_progress(double progress);

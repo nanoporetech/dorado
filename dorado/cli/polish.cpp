@@ -1126,9 +1126,9 @@ void run_polishing(const Options& opt,
         // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
 
-    polish_stats.update("processed", static_cast<double>(total_input_bases));
+    tracker.finalize();
 
-    spdlog::debug("Done!");
+    spdlog::info("Done!");
 }
 
 int polish(int argc, char* argv[]) {
@@ -1174,7 +1174,7 @@ int polish(int argc, char* argv[]) {
         // at::set_num_interop_threads(opt.threads);
         torch::set_num_threads(1);
 
-        spdlog::debug("Parsing the model config.", opt.threads);
+        spdlog::info("Parsing the model config: {}", (opt.model_path / "config.toml").string());
         const std::string model_file = opt.load_scripted_model ? "model.pt" : "weights.pt";
         const polisher::ModelConfig model_config =
                 polisher::parse_model_config(opt.model_path / "config.toml", model_file);
