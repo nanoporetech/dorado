@@ -172,8 +172,10 @@ polisher::ConsensusResult stitch_sequence(
     const std::string draft = fetch_seq(in_draft_fn, header, 0, -1);
 
     if (std::empty(samples_for_seq)) {
-        spdlog::warn("Sequence '{}' has zero inferred samples. Copying contig verbatim from input.",
-                     header);
+        spdlog::debug(
+                "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
+                "from input.",
+                header, std::size(draft));
         std::string dummy_quals(std::size(draft), '!');
         return polisher::ConsensusResult{draft, std::move(dummy_quals)};
     }
