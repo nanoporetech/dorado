@@ -11,7 +11,8 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     throw std::runtime_error{"Unknown feature encoder type: '" + type + "'!"};
 }
 
-std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
+std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
+                                             const int32_t min_mapq_override) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -39,7 +40,9 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
         const std::string normalise = get_value(kwargs, "normalise");
         const bool tag_keep_missing = get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq = std::stoi(get_value(kwargs, "min_mapq"));
+        const int32_t min_mapq = (min_mapq_override >= 0)
+                                         ? min_mapq_override
+                                         : std::stoi(get_value(kwargs, "min_mapq"));
         const bool sym_indels = get_bool_value(kwargs, "sym_indels");
 
         NormaliseType normalise_type = parse_normalise_type(normalise);
@@ -55,7 +58,9 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config) {
 
     } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
         const bool tag_keep_missing = get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq = std::stoi(get_value(kwargs, "min_mapq"));
+        const int32_t min_mapq = (min_mapq_override >= 0)
+                                         ? min_mapq_override
+                                         : std::stoi(get_value(kwargs, "min_mapq"));
         const int32_t max_reads = std::stoi(get_value(kwargs, "max_reads"));
         const bool row_per_read = get_bool_value(kwargs, "row_per_read");
         const bool include_dwells = get_bool_value(kwargs, "include_dwells");

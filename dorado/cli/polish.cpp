@@ -117,6 +117,7 @@ struct Options {
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
+    int32_t min_mapq = -1;
     // int32_t min_depth = 0;
 };
 
@@ -192,6 +193,11 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--region")
                 .help("Process only this region of the input. Htslib format (start is 1-based, end "
                       "is inclusive).");
+        parser->visible.add_argument("--min-mapq")
+                .help("Minimum mapping quality of the input alignments. If specified, overrides "
+                      "the same option in the model config.")
+                .default_value(-1)
+                .scan<'i', int>();
 
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than min_depth will not be polished.")
@@ -278,11 +284,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.verbosity = verbosity;
     opt.region =
             (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
+    opt.min_mapq = parser.visible.get<int>("min-mapq");
+    // opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
-    // opt.min_depth = parser.visible.get<int>("min-depth");
-
     opt.queue_size = parser.hidden.get<int>("queue-size");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
@@ -455,7 +461,8 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
                                    const int32_t num_inference_cpu_threads,
-                                   const bool full_precision) {
+                                   const bool full_precision,
+                                   const int32_t min_mapq_override) {
     PolisherResources resources;
 
     spdlog::info("Initializing the devices.");
@@ -506,7 +513,7 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     resources.models = create_models();
 
     spdlog::info("Creating the encoder.");
-    resources.encoder = polisher::encoder_factory(model_config);
+    resources.encoder = polisher::encoder_factory(model_config, min_mapq_override);
 
     spdlog::info("Creating the decoder.");
     resources.decoder = polisher::decoder_factory(model_config);
@@ -1178,7 +1185,7 @@ int polish(int argc, char* argv[]) {
         // Create the models, encoders and BAM handles.
         PolisherResources resources =
                 create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
-                                 opt.infer_threads, opt.full_precision);
+                                 opt.infer_threads, opt.full_precision, opt.min_mapq);
 
         // Progress bar.
         polisher::PolishStats polish_stats;

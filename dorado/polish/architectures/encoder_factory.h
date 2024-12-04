@@ -16,6 +16,7 @@ enum class FeatureEncoderType {
 
 FeatureEncoderType parse_feature_encoder_type(const std::string& type);
 
-std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config);
+std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
+                                             const int32_t min_mapq_override);
 
 }  // namespace dorado::polisher
