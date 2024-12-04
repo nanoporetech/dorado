@@ -840,7 +840,7 @@ void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& bat
 
     decode_queue.terminate();
 
-    spdlog::debug("[run_polishing] Finished running inference.");
+    spdlog::debug("[infer_samples_in_parallel_2] Finished running inference.");
 }
 
 void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
@@ -976,7 +976,7 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
                        std::make_move_iterator(std::end(vals)));
     }
 
-    spdlog::debug("[run_polishing] Finished decoding the output.");
+    spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
 }
 
 }  // namespace polisher
@@ -1125,10 +1125,6 @@ void run_polishing(const Options& opt,
 
         // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
-
-    tracker.finalize();
-
-    spdlog::info("Done!");
 }
 
 int polish(int argc, char* argv[]) {
@@ -1197,6 +1193,13 @@ int polish(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         run_polishing(opt, resources, tracker, polish_stats);
+
+        tracker.finalize();
+        stats_sampler->terminate();
+
+        // Hack to clear the last line from the progress bar. The library automatically does '\r'.
+        std::cerr << std::string(200, ' ') << '\r';
+        spdlog::info("Done!");
 
     } catch (const std::exception& e) {
         spdlog::error("Caught exception: {}", e.what());
