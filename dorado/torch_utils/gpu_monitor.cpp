@@ -503,7 +503,8 @@ class DeviceInfoCache final {
     std::pair<std::optional<DeviceStatusInfo>, nvmlDevice_t> get_cached_device_info(
             unsigned int device_index) {
         std::lock_guard<std::mutex> lock(m_mutex);
-        auto device = m_device_handles->get_handle(m_visible_device_indices[device_index]);
+        const unsigned int mapped_device_index = m_visible_device_indices[device_index];
+        auto device = m_device_handles->get_handle(mapped_device_index);
         if (!device) {
             return {std::nullopt, nullptr};
         }
@@ -513,7 +514,7 @@ class DeviceInfoCache final {
             return {device_info_lookup->second, *device};
         }
 
-        return {create_new_device_entry(device_index, *device), *device};
+        return {create_new_device_entry(mapped_device_index, *device), *device};
     }
 
 public:
