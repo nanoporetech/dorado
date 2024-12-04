@@ -1,10 +1,10 @@
 #include "ModBaseModelConfig.h"
 
-#include "spdlog/spdlog.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <cmath>
@@ -156,7 +156,7 @@ ContextParams ContextParams::normalised(const int stride) const {
     const int64_t sa = normalise(samples_after, stride);
     const int64_t cs = normalise(chunk_size, stride);
 
-    spdlog::debug(
+    spdlog::trace(
             "Normalised modbase context for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
             "[samples_before, samples_after, chunk_size]",
             stride, samples_before, samples_after, chunk_size, sb, sa, cs);

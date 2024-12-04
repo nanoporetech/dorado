@@ -278,20 +278,17 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 
 dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config,
                                                 const at::TensorOptions& options) {
+    c10::InferenceMode guard;
     const auto params = config.general;
     switch (params.model_type) {
     case ModelType::CONV_LSTM_V1: {
-        constexpr bool is_conv_lstm_v2 = false;
-        auto model =
-                nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out,
-                                         is_conv_lstm_v2, params.sig_stride, params.seq_stride);
+        auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, false,
+                                              params.sig_stride, params.seq_stride);
         return populate_model(model, config.model_path, options);
     }
     case ModelType::CONV_LSTM_V2: {
-        constexpr bool is_conv_lstm_v2 = true;
-        auto model =
-                nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out,
-                                         is_conv_lstm_v2, params.sig_stride, params.seq_stride);
+        auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
+                                              params.sig_stride, params.seq_stride);
         return populate_model(model, config.model_path, options);
     }
     case ModelType::CONV_V1: {

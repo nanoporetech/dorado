@@ -368,7 +368,7 @@ int duplex(int argc, char* argv[]) {
                 .default_value(default_parameters.methylation_threshold)
                 .scan<'f', float>();
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(default_parameters.remora_batchsize)
+                .default_value(default_parameters.modbase_batchsize)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }

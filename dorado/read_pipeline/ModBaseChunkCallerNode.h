@@ -107,10 +107,8 @@ private:
     const int64_t m_batch_size;
 
     const int m_kmer_len;
-    const bool m_is_reverse;
+    const bool m_is_rna_model;
 
-    // FIXME: remove on release
-    const int64_t m_processed_chunks_max_size;
     utils::AsyncQueue<std::unique_ptr<ModBaseChunk>> m_processed_chunks;
     std::vector<std::unique_ptr<utils::AsyncQueue<std::unique_ptr<ModBaseChunk>>>> m_chunk_queues;
     std::mutex m_working_reads_mutex;
@@ -134,8 +132,6 @@ private:
     std::atomic<int64_t> m_num_samples_processed{0};
     std::atomic<int64_t> m_num_samples_processed_incl_padding{0};
 
-    // FIXME: Remove when done investigating
-    const bool m_pad_tile{0};
     const bool m_pad_end_align{0};
 
     void validate_runners() const;
@@ -150,7 +146,6 @@ private:
     void populate_signal(at::Tensor& signal,
                          std::vector<uint64_t>& seq_to_sig_map,
                          const at::Tensor& raw_data,
-                         const size_t signal_len,
                          const std::vector<int>& int_seq,
                          const modbase::RunnerPtr& runner) const;
 

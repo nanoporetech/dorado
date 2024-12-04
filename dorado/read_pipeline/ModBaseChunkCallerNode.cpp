@@ -14,7 +14,6 @@
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
-#include <torch/types.h>
 
 #include <algorithm>
 #include <atomic>
@@ -67,14 +66,8 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
           m_canonical_stride(canonical_stride),
           m_batch_size(m_runners.at(0)->batch_size()),
           m_kmer_len(m_runners.at(0)->model_params(0).context.kmer_len),
-          // This is set for RNA
-          m_is_reverse(m_runners.at(0)->model_params(0).context.reverse),
-          // FIXME: REMOVE
-          m_processed_chunks_max_size(
-                  utils::get_dev_opt<int64_t>("modbase_processed_chunks",
-                                              m_runners.size() * 3 * m_batch_size)),
-          m_processed_chunks(m_processed_chunks_max_size),
-          m_pad_tile(utils::get_dev_opt<bool>("modbase_pad_tile", 1)),
+          m_is_rna_model(m_runners.at(0)->model_params(0).context.reverse),
+          m_processed_chunks(m_runners.size() * 8 * m_batch_size),
           m_pad_end_align(utils::get_dev_opt<bool>("modbase_pad_end_align", 0)) {
     init_modbase_info();
     validate_runners();
@@ -83,18 +76,12 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
         m_chunk_queues.push_back(std::make_unique<utils::AsyncQueue<std::unique_ptr<ModBaseChunk>>>(
                 m_batch_size * 10));
     }
-    // FIXME: Remove
-    spdlog::info("ModBaseChunkCallerNode::processed_chunks.size()={}", m_processed_chunks_max_size);
-    spdlog::info("ModBaseChunkCallerNode padding - modbase_pad_tile:{}, modbase_pad_end_align:{}",
-                 m_pad_tile, m_pad_end_align);
 }
 
 ModBaseChunkCallerNode::~ModBaseChunkCallerNode() { terminate_impl(); }
 
 void ModBaseChunkCallerNode::start_threads() {
-    for (int i = 0; i < utils::get_dev_opt("modbase_output_threads", 1); ++i) {
-        m_output_workers.emplace_back([=] { output_thread_fn(); });
-    }
+    m_output_workers.emplace_back([=] { output_thread_fn(); });
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_models(); ++model_id) {
@@ -242,8 +229,8 @@ void ModBaseChunkCallerNode::validate_runners() const {
             throw std::runtime_error(name + "all models must use the same kmer length.");
         }
 
-        if (ctx.reverse != m_is_reverse) {
-            throw std::runtime_error(name + "all models must use the same strand direction.");
+        if (ctx.reverse != m_is_rna_model) {
+            throw std::runtime_error(name + "all models must be exclusively for DNA or RNA.");
         }
     }
 }
@@ -274,7 +261,7 @@ std::vector<uint64_t> ModBaseChunkCallerNode::get_seq_to_sig_map(const std::vect
                                                                  const size_t reserve) const {
     nvtx3::scoped_range range{"pop_s2s_map"};
     auto seq_to_sig_map = utils::moves_to_map(moves, m_canonical_stride, raw_samples, reserve);
-    if (m_is_reverse) {
+    if (m_is_rna_model) {
         utils::reverse_seq_to_sig_map(seq_to_sig_map, raw_samples);
     }
     return seq_to_sig_map;
@@ -365,15 +352,11 @@ void ModBaseChunkCallerNode::populate_encoded_kmer(
 void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
                                              std::vector<uint64_t>& seq_to_sig_map,
                                              const at::Tensor& raw_data,
-                                             const size_t signal_len,
                                              const std::vector<int>& int_seq,
                                              const modbase::RunnerPtr& runner) const {
-    if (m_is_reverse) {
+    if (m_is_rna_model) {
         nvtx3::scoped_range range{"pop_sig_rev"};
-        std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
-        std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
-                       std::begin(seq_to_sig_map),
-                       [signal_len](auto signal_pos) { return signal_len - signal_pos; });
+        // seq_to_sig_map is reversed on init do not reverse it again here.
         signal = runner->scale_signal(0, at::flip(raw_data, 0), int_seq, seq_to_sig_map);
         return;
     }
@@ -520,8 +503,7 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     std::vector<int> int_seq = utils::sequence_to_ints(read.seq);
 
-    populate_signal(working_read->signal, seq_to_sig_map, read.raw_data, raw_samples, int_seq,
-                    runner);
+    populate_signal(working_read->signal, seq_to_sig_map, read.raw_data, int_seq, runner);
 
     populate_encoded_kmer(working_read->encoded_kmers, raw_samples, int_seq, seq_to_sig_map);
     assert(static_cast<int64_t>(working_read->encoded_kmers.size()) ==
@@ -603,36 +585,25 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
             }
 
             auto signal_chunk = chunk->working_read->signal.index({Slice(start, end)});
-            // FIXME -- this copying could be eliminated
+            // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
             auto encoded_kmers_chunk = std::vector<int8_t>(
                     chunk->working_read->encoded_kmers.begin() + start * kmer_size_per_sample,
                     chunk->working_read->encoded_kmers.begin() + end * kmer_size_per_sample);
 
             // Add any necessary padding to the end of the chunk.
             if (len < chunk_size) {
-                if (m_pad_tile) {
-                    // Tile the signal tensor
-                    auto [n_tiles, overhang] = std::div(chunk_size, len);
-                    signal_chunk = at::concat({signal_chunk.repeat({n_tiles}),
-                                               signal_chunk.index({Slice(0, overhang)})},
-                                              -1);
-                    // Tile the kmer vector
-                    const int64_t original_size = static_cast<int64_t>(encoded_kmers_chunk.size());
-                    const int64_t extended_size = chunk_size * kmer_size_per_sample;
-                    encoded_kmers_chunk.resize(extended_size);
+                // Tile the signal tensor
+                auto [n_tiles, overhang] = std::div(chunk_size, len);
+                signal_chunk = at::concat(
+                        {signal_chunk.repeat({n_tiles}), signal_chunk.index({Slice(0, overhang)})},
+                        -1);
+                // Tile the kmer vector
+                const int64_t original_size = static_cast<int64_t>(encoded_kmers_chunk.size());
+                const int64_t extended_size = chunk_size * kmer_size_per_sample;
+                encoded_kmers_chunk.resize(extended_size);
 
-                    for (int64_t i = original_size; i < extended_size; ++i) {
-                        encoded_kmers_chunk[i] = encoded_kmers_chunk[i % original_size];
-                    }
-
-                } else {
-                    // Zero-padded
-                    const int64_t tail_padding_samples = chunk_size - len;
-                    signal_chunk = at::constant_pad_nd(signal_chunk, {0, tail_padding_samples}, 0);
-                    if (signal_chunk.size(0) != chunk_size) {
-                        throw std::runtime_error("Modbase chunking failed - padding error.");
-                    }
-                    encoded_kmers_chunk.resize(chunk_size * kmer_size_per_sample, 0);
+                for (int64_t i = original_size; i < extended_size; ++i) {
+                    encoded_kmers_chunk[i] = encoded_kmers_chunk[i % original_size];
                 }
             }
 

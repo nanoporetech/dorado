@@ -274,7 +274,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Create runners
     std::string device;
-    int batch_size = default_params.remora_batchsize;
+    int batch_size = default_params.modbase_batchsize;
     if (gpu) {
 #if DORADO_METAL_BUILD
         device = "metal";

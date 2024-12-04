@@ -10,9 +10,9 @@ struct DefaultParameters {
     int overlap{500};
     int num_runners{2};
 #ifdef DORADO_TX2
-    int remora_batchsize{128};
+    int modbase_batchsize{128};
 #else
-    int remora_batchsize{1024};
+    int modbase_batchsize{1024};
 #endif
     int remora_threads{4};
     int mod_base_runners_per_caller{2};

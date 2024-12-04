@@ -229,7 +229,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(default_parameters.remora_batchsize)
+                .default_value(default_parameters.modbase_batchsize)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }

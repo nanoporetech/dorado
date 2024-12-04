@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -80,7 +81,7 @@ struct RefinementParams {
     const size_t center_idx;             ///< The position in the kmer at which to check the levels
     const std::vector<float> levels;     ///< Expected kmer levels for rough rescaling
 
-    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0), levels({}) {};
+    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0), levels({}) {}
     RefinementParams(const int kmer_len_,
                      const int center_idx_,
                      std::vector<float> refine_kmer_levels_)
@@ -143,12 +144,14 @@ struct ModificationParams {
         }
     }
 
+private:
     static char get_canonical_base_name(const std::string& motif, size_t motif_offset) {
         if (motif.size() < motif_offset) {
             throw std::runtime_error(err + "mods params: 'invalid motif offset'.");
         }
 
-        const std::string canonical_bases = "ACGT";
+        // Assert a canonical base is at motif[motif_offset]
+        constexpr std::string_view canonical_bases = "ACGT";
         std::string motif_base = motif.substr(motif_offset, 1);
         if (canonical_bases.find(motif_base) == std::string::npos) {
             throw std::runtime_error(err + "mods params: 'invalid motif base " + motif_base + "'.");
@@ -159,17 +162,17 @@ struct ModificationParams {
 };
 
 struct ContextParams {
-    const int64_t samples_before;  ///< Number of context signal samples before a context hit.
-    const int64_t samples_after;   ///< Number of context signal samples after a context hit.
-    const int64_t samples;         ///< The total context samples (before + after)
-    const int64_t chunk_size;      ///< The total samples in a chunk
+    const int64_t samples_before{0};  ///< Number of context signal samples before a context hit.
+    const int64_t samples_after{1};   ///< Number of context signal samples after a context hit.
+    const int64_t samples{1};         ///< The total context samples (before + after)
+    const int64_t chunk_size{1};      ///< The total samples in a chunk
 
-    const int bases_before;  ///< Number of bases before the primary base of a kmer.
-    const int bases_after;   ///< Number of bases after the primary base of a kmer.
-    const int kmer_len;      ///< The kmer length given by `bases_before + bases_after + 1`
+    const int bases_before{0};  ///< Number of bases before the primary base of a kmer.
+    const int bases_after{1};   ///< Number of bases after the primary base of a kmer.
+    const int kmer_len{1};      ///< The kmer length given by `bases_before + bases_after + 1`
 
-    const bool reverse;             ///< Reverse model data before processing (rna model)
-    const bool base_start_justify;  ///< To justify the kmer encoding to start the context hit
+    const bool reverse{false};             ///< Reverse model data before processing (rna model)
+    const bool base_start_justify{false};  ///< Justify the kmer encoding to start the context hit
 
     ContextParams(int64_t samples_before_,
                   int64_t samples_after_,

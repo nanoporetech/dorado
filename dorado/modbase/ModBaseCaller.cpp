@@ -103,6 +103,10 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
                              const int batch_size,
                              const std::string& device)
         : m_num_models(model_paths.size()) {
+    if (m_num_models == 0) {
+        throw std::logic_error("ModBaseCaller given zero models.");
+    }
+
     if (device == "cpu") {
         // no slow_conv2d_cpu for type Half, need to use float32
         m_options = at::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
@@ -147,7 +151,7 @@ std::vector<at::Tensor> ModBaseCaller::create_input_sig_tensors() const {
                         .dtype(m_options.dtype());
     std::vector<at::Tensor> input_sigs;
     input_sigs.reserve(m_model_data.size());
-    for (auto& caller_data : m_model_data) {
+    for (const auto& caller_data : m_model_data) {
         input_sigs.emplace_back(
                 torch::empty({caller_data->batch_size, 1, caller_data->get_sig_len()}, opts));
     }
@@ -161,7 +165,7 @@ std::vector<at::Tensor> ModBaseCaller::create_input_seq_tensors() const {
                         .dtype(torch::kInt8);
     std::vector<at::Tensor> input_seqs;
     input_seqs.reserve(m_model_data.size());
-    for (auto& model_data : m_model_data) {
+    for (const auto& model_data : m_model_data) {
         const int channels = model_data->params.context.kmer_len * utils::BaseInfo::NUM_BASES;
         const auto seq_len = model_data->get_seq_len();
         input_seqs.emplace_back(torch::empty({model_data->batch_size, seq_len, channels}, opts));

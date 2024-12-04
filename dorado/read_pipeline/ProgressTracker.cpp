@@ -77,29 +77,19 @@ void ProgressTracker::summarize() const {
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
             samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Samples/s: {} Samples: {:.6e}", samples_sec.str(),
-                         double(m_num_samples_processed));
-            spdlog::debug("> Including Padding @ Samples/s: {:.6e} Samples: {:.6e}",
+            spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
+            spdlog::debug("> Including Padding @ Samples/s: {:.3e} ({:.2f}%)",
                           m_num_samples_incl_padding / (duration / 1000.0),
-                          double(m_num_samples_incl_padding));
+                          100.f * m_num_samples_processed / m_num_samples_incl_padding);
         }
     }
     if (m_num_mods_samples_processed > 0) {
-        std::ostringstream samples_sec;
-        // if (m_duplex) {
-        //     samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-        //     spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
-        // } else {
-        // samples_sec << std::scientific << m_num_mods_samples_processed / (duration / 1000.0);
-        // spdlog::info("> Modbasecalled @ Samples/s: {}", samples_sec.str());
-
         const auto call_rate = m_num_mods_samples_processed / (duration / 1000.0);
         const auto pad_call_rate = m_num_mods_samples_incl_padding / (duration / 1000.0);
-        spdlog::info("> Modbasecalled @ Samples/s: {:.6e} Samples: {:.6e}", call_rate,
-                     double(m_num_mods_samples_processed));
+        spdlog::debug("> Modbasecalled @ Samples/s: {:.6e} Samples: {:.6e}", call_rate,
+                      double(m_num_mods_samples_processed));
         spdlog::debug("> Modbasecalled Including Padding @ Samples/s: {:.6e} Samples: {:.6e}",
                       pad_call_rate, double(m_num_mods_samples_incl_padding));
-        // }
     }
 
     if (m_num_barcodes_demuxed > 0) {
