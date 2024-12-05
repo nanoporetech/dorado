@@ -696,7 +696,7 @@ std::unordered_map<std::string, std::string> barcodes = {
         {"AD02R_12", "AGATTCAACC"},
         {"AE02F_13", "CCGATTATTC"},
         {"AE02R_13", "TTCAGGAGAT"},
-        {"AF02F_14", "CGGAGTGTGT"},
+        {"AF02F_14", "ACACACTCCG"},
         {"AF02R_14", "AAGGCGTCTG"},
         {"AG02F_15", "CGGTCGGTAA"},
         {"AG02R_15", "ACGCTTGACA"},
@@ -829,7 +829,7 @@ std::unordered_map<std::string, std::string> barcodes = {
         {"AG10F_79", "ACAGCGTGTG"},
         {"AG10R_79", "GAACGGAGAC"},
         {"AH10F_80", "TGTACAACCA"},
-        {"AH10R_80", "GAACGGAGAC"},
+        {"AH10R_80", "CGCTACCATC"},
         {"AA11F_81", "TGTGAGTGAT"},
         {"AA11R_81", "TTACGGTAAC"},
         {"AB11F_82", "TCTACCTCCG"},
@@ -938,7 +938,7 @@ void add_custom_barcode_kit(const std::string& kit_name, const KitInfo& custom_k
 
 void add_custom_barcodes(const std::unordered_map<std::string, std::string>& custom_barcodes) {
     std::set<std::string> duplicated_barcode_names;
-    for (auto [barcode_name, barcode_seq] : custom_barcodes) {
+    for (const auto& [barcode_name, barcode_seq] : custom_barcodes) {
         auto [_, success] = barcodes.insert({barcode_name, barcode_seq});
         if (!success) {
             duplicated_barcode_names.insert(barcode_name);
@@ -953,7 +953,7 @@ void add_custom_barcodes(const std::unordered_map<std::string, std::string>& cus
         throw std::runtime_error(error);
     }
 
-    for (auto [barcode_name, _] : custom_barcodes) {
+    for (const auto& [barcode_name, _] : custom_barcodes) {
         custom_barcode_names.insert(barcode_name);
     }
 }
@@ -968,6 +968,11 @@ void clear_custom_barcodes() {
     for (const auto& barcode_name : custom_barcode_names) {
         barcodes.erase(barcode_name);
     }
+}
+
+bool is_valid_barcode_kit(const std::string& kit_name) {
+    const auto kit_info = barcode_kits::get_kit_info(kit_name);
+    return kit_info != nullptr;
 }
 
 std::string barcode_kits_list_str() {

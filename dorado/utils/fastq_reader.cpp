@@ -1,5 +1,10 @@
 #include "fastq_reader.h"
 
+#include "gzip_reader.h"
+#include "types.h"
+
+#include <htslib/hfile.h>
+#include <htslib/hts.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -11,6 +16,99 @@
 namespace dorado::utils {
 
 namespace {
+
+class GzipStreamBuf : public std::streambuf {
+    GzipReader m_gzip_reader;
+
+    void throw_to_set_bad_bit_if_gzip_reader_invalid() {
+        // throwing during a call to underflow will cause the stream bad bit to be set
+        if (m_gzip_reader.is_valid()) {
+            return;
+        }
+        spdlog::error(m_gzip_reader.error_message());
+        throw std::runtime_error(m_gzip_reader.error_message());
+    }
+
+    void read_next_chunk_into_get_area() {
+        while (m_gzip_reader.read_next() && m_gzip_reader.is_valid() &&
+               m_gzip_reader.num_bytes_read() == 0) {
+        }
+        throw_to_set_bad_bit_if_gzip_reader_invalid();
+        setg(m_gzip_reader.decompressed_buffer().data(), m_gzip_reader.decompressed_buffer().data(),
+             m_gzip_reader.decompressed_buffer().data() + m_gzip_reader.num_bytes_read());
+    }
+
+public:
+    GzipStreamBuf(const std::string& gzip_file, std::size_t buffer_size)
+            : m_gzip_reader(gzip_file, buffer_size) {}
+
+    int underflow() {
+        throw_to_set_bad_bit_if_gzip_reader_invalid();
+        if (gptr() == egptr()) {
+            read_next_chunk_into_get_area();
+        }
+        return gptr() == egptr() ? std::char_traits<char>::eof()
+                                 : std::char_traits<char>::to_int_type(*gptr());
+    }
+};
+
+class GzipInputStream : public std::istream {
+    std::unique_ptr<GzipStreamBuf> m_gzip_stream_buf{};
+
+public:
+    GzipInputStream(const std::string& gzip_file, std::size_t buffer_size)
+            : std::istream(nullptr),
+              m_gzip_stream_buf(std::make_unique<GzipStreamBuf>(gzip_file, buffer_size)) {
+        // The base class (istream) will be constructed first so can't pass
+        // the buffer as part of the member initalisation list, instead set
+        // the buffer here after the base class has been constructed.
+        rdbuf(m_gzip_stream_buf.get());
+    }
+};
+
+bool check_file_can_be_opened_for_reading(const std::string& input_file) {
+    std::ifstream check_normal_file(input_file);
+    return check_normal_file.is_open();
+}
+
+struct HfileDestructor {
+    void operator()(hFILE* fp) {
+        if (fp && hclose(fp) == EOF) {
+            spdlog::warn("Problem closing hFILE. return code: {}.", errno);
+        }
+    }
+};
+using HfilePtr = std::unique_ptr<hFILE, HfileDestructor>;
+
+std::unique_ptr<std::istream> create_input_stream(const std::string& input_file) {
+    // check for a normal file that can be opened for reading before calling hopen
+    // as hopen has special semantics and does not do this check, e.g. calling with
+    // "-" would block waiting on the stdin stream.
+    if (!check_file_can_be_opened_for_reading(input_file)) {
+        return {};
+    }
+    HfilePtr hfile(hopen(input_file.c_str(), "r"));
+    if (!hfile) {
+        return {};
+    }
+    htsFormat format_check;
+    auto fmt_detect_result = hts_detect_format(hfile.get(), &format_check);
+    // Note the format check does not detect fastq if Ts are replaced with Us
+    // So treat a text file as a potential fastq
+    if (fmt_detect_result < 0 || (format_check.format != htsExactFormat::fastq_format &&
+                                  format_check.format != htsExactFormat::text_format)) {
+        return {};
+    }
+
+    static constexpr std::size_t DECOMPRESSION_BUFFER_SIZE{65536};
+    if (format_check.compression == htsCompression::no_compression) {
+        return std::make_unique<std::ifstream>(input_file);
+    } else if (format_check.compression == htsCompression::gzip) {
+        return std::make_unique<GzipInputStream>(input_file, DECOMPRESSION_BUFFER_SIZE);
+    }
+
+    return {};
+}
 
 bool is_valid_separator_field(const std::string& field) {
     assert(!field.empty());
@@ -135,11 +233,21 @@ std::optional<FastqRecord> FastqRecord::try_create(std::istream& input_stream,
     return result;
 }
 
+bool operator==(const FastqRecord& lhs, const FastqRecord& rhs) {
+    return std::tie(lhs.header(), lhs.sequence(), lhs.qstring()) ==
+           std::tie(rhs.header(), rhs.sequence(), rhs.qstring());
+}
+
+bool operator!=(const FastqRecord& lhs, const FastqRecord& rhs) { return !(lhs == rhs); }
+
 FastqReader::FastqReader(std::string input_file) : m_input_file(std::move(input_file)) {
     if (!is_fastq(m_input_file)) {
         return;
     }
-    m_input_stream = std::make_unique<std::ifstream>(m_input_file);
+
+    // Simplest to create another input stream after the is_fastq check because our
+    // gzip istream has not implemented seek.
+    m_input_stream = create_input_stream(m_input_file);
 }
 
 FastqReader::FastqReader(std::unique_ptr<std::istream> input_stream)
@@ -171,8 +279,8 @@ std::optional<FastqRecord> FastqReader::try_get_next_record() {
 }
 
 bool is_fastq(const std::string& input_file) {
-    std::ifstream input_stream{input_file};
-    return is_fastq(input_stream);
+    auto input_stream = create_input_stream(input_file);
+    return input_stream ? is_fastq(*input_stream) : false;
 }
 
 bool is_fastq(std::istream& input_stream) {

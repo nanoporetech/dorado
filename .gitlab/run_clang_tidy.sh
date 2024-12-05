@@ -63,4 +63,5 @@ clang-tidy --dump-config
 run-clang-tidy \
   -p ${build_dir} \
   -j ${num_jobs} \
-  ${apply_fixits}
+  ${apply_fixits} \
+  -quiet

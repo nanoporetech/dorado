@@ -27,6 +27,7 @@ elseif(WIN32)
                     -A x64
                     -D CMAKE_INSTALL_PREFIX=${HDF5_ZLIB_INSTALL_DIR}
                     -D CMAKE_CONFIGURATION_TYPES=Release
+                    -G ${CMAKE_GENERATOR}
             COMMAND_ERROR_IS_FATAL ANY
         )
         execute_process(

@@ -118,7 +118,7 @@ inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
 // ArgumentParser has no method returning optional arguments with default values so this function returns
 // optional<T> which lets us determine if the value (including the default value) was explictly set by the user.
 template <typename T>
-inline std::optional<T> get_optional_argument(const std::string arg_name,
+inline std::optional<T> get_optional_argument(const std::string& arg_name,
                                               const argparse::ArgumentParser& parser) {
     static_assert(std::is_default_constructible_v<T>, "T must be default constructible");
     return parser.is_used(arg_name) ? std::optional<T>(parser.get<T>(arg_name)) : std::nullopt;

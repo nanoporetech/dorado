@@ -33,13 +33,6 @@ void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t,uint64_t> sample
     raw_data = raw_data.index({Slice(sample_trim_interval.first, sample_trim_interval.second)});
 }
 
-// For alignments that are reverse complemented, the trim interval derived from adapters/barcodes
-// will need to be reverse complemented when applied to the trimming of modbase tags because
-// modbase tags are all relative to the original sequence that was basecalled.
-std::pair<int, int> reverse_complement_interval(const std::pair<int, int>& interval, int seqlen) {
-    return {seqlen - interval.second, seqlen - interval.first};
-}
-
 }  // namespace
 
 namespace dorado {
@@ -165,10 +158,8 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
         }
     }
 
-    auto [trimmed_modbase_str, trimmed_modbase_probs] = utils::trim_modbase_info(
-            seq, modbase_str, modbase_probs,
-            is_seq_reversed ? reverse_complement_interval(trim_interval, int(seq.length()))
-                            : trim_interval);
+    auto [trimmed_modbase_str, trimmed_modbase_probs] =
+            utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
 
     // Create a new bam record to hold the trimmed read.
     BamPtr output(utils::new_unmapped_record(input_record, trimmed_seq, trimmed_qual));

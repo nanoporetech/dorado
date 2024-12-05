@@ -255,7 +255,7 @@ TEST_CASE(
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
-    client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
+    client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
     read->read_common.client_info = client_info;
 
     std::vector<uint8_t> moves;
@@ -403,7 +403,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     auto barcoding_info = create_barcoding_info(kit, barcode_both_ends, !no_trim, std::nullopt);
-    client_info->contexts().register_context<const demux::BarcodingInfo>(std::move(barcoding_info));
+    client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
 
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());
@@ -490,8 +490,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
                     .string()});
 
     auto kit_info = dorado::demux::parse_custom_arrangement(kit_file);
-    REQUIRE(kit_info.has_value());
-    dorado::barcode_kits::add_custom_barcode_kit(kit_info->first, kit_info->second);
+    dorado::barcode_kits::add_custom_barcode_kit(kit_info.first, kit_info.second);
     auto kit_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
 
@@ -504,7 +503,7 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
     auto barcode_cleanup =
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcodes(); });
 
-    demux::BarcodeClassifier classifier(kit_info->first);
+    demux::BarcodeClassifier classifier(kit_info.first);
 
     for (std::string bc : {"CUSTOM-SQK-RPB004_CUSTOM-BC01", "CUSTOM-SQK-RPB004_CUSTOM-BC05",
                            "CUSTOM-SQK-RPB004_CUSTOM-BC11", "unclassified"}) {

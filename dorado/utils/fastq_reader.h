@@ -53,6 +53,9 @@ private:
     std::string m_qstring;
 };
 
+bool operator==(const FastqRecord& lhs, const FastqRecord& rhs);
+bool operator!=(const FastqRecord& lhs, const FastqRecord& rhs);
+
 class FastqReader {
 public:
     FastqReader(const std::string input_file);

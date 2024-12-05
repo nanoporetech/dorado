@@ -45,6 +45,8 @@ void add_custom_barcodes(const std::unordered_map<std::string, std::string>& bar
 void clear_custom_barcode_kits();
 void clear_custom_barcodes();
 
+bool is_valid_barcode_kit(const std::string& kit_name);
+
 std::string barcode_kits_list_str();
 
 std::string normalize_barcode_name(const std::string& barcode_name);

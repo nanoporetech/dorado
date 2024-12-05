@@ -1,7 +1,7 @@
 #include <metal_stdlib>
 using namespace metal;
 
-constant int TILE_SIZE = 8;
+static constexpr constant int TILE_SIZE = 8;
 
 // Values set via the FunctionConstantValues object passed in at MTL::Function
 // creation time.
@@ -51,7 +51,6 @@ typedef metal::simdgroup_half8x8 simdgroup_ftype8x8;
 // (Scores are int8_t.)
 typedef float ftype_out;
 
-#define MAX_LAYER_SIZE 512
 #define KERNEL_INDEX_INPUTS                                                  \
     [[maybe_unused]] uint tid [[thread_index_in_threadgroup]],               \
             [[maybe_unused]] uint gid [[threadgroup_position_in_grid]],      \
@@ -634,11 +633,13 @@ public:
         }
     }
 
-    void load_bias(const device ftype* const bias, int col) {
+    void load_bias(const device ftype* bias, int col) {
+        bias += col * SIMD_TILES_N * TILE_SIZE;
         for (int i = 0; i < SIMD_TILES_N; ++i) {
             for (int j = 0; j < SIMD_TILES_M; ++j) {
-                simdgroup_load(acc(j, i), bias + col + i * TILE_SIZE, 0);
+                simdgroup_load(acc(j, i), bias, 0);
             }
+            bias += TILE_SIZE;
         }
     }
 
@@ -1006,7 +1007,7 @@ kernel void conv3_simd(const device ConvArgs* const args,
             int start_pad_tiles = max(0, -start_pos) * in_size_tiles;
             int end_pad_tiles = max(0, start_pos + win_size - chunk_size_in) * in_size_tiles;
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 TileBlock<RowMajor> mat_a(in_buf, in_buf_stride, m_blk * SIMD_TILES_M * TILE_SIZE,
                                           start_pos * in_size_tiles * TILE_SIZE);
                 TileBlock<RowMajor> mat_b(weights_buf, out_size, 0,
@@ -1125,15 +1126,16 @@ kernel void lstm(const device LstmArgs* const args,
                  threadgroup ftype (*const simd_res_buf)[2 * TILE_SIZE * TILE_SIZE],
                  threadgroup ftype (*const simd_out_buf)[TILE_SIZE * TILE_SIZE],
                  KERNEL_INDEX_INPUTS) {
+    constexpr int kLstmGates = 4;
     const int chunk_size = args->chunk_size;
     const int batch_tiles = args->batch_tiles;
     const int time_step_begin = args->time_step_begin;
     const int time_step_end = args->time_step_end;
     const int m_blks = batch_tiles / SIMD_TILES_M;
-    const int n_blks = kLstmLayerSize * 4 / (TILE_SIZE * SIMD_TILES_N);
+    const int n_blks = kLstmLayerSize * kLstmGates / (TILE_SIZE * SIMD_TILES_N);
     const int k_tiles = kLstmLayerSize / TILE_SIZE;
     const int batch_size = batch_tiles * TILE_SIZE;
-    const int w_stride = kLstmLayerSize * 4;
+    const int w_stride = kLstmLayerSize * kLstmGates;
     MatMul<SIMD_TILES_M, SIMD_TILES_N> mm;
     using MatLayoutLSTM = MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, NO_OFFSET>;
     const device ftype* const bias = weights_buf + 3 * kLstmLayerSize * w_stride;
@@ -1159,7 +1161,7 @@ kernel void lstm(const device LstmArgs* const args,
         const int timestep_in = kLstmReversedInTime ? chunk_size - iter : iter;
         for (int m_blk = gid; m_blk < m_blks; m_blk += threadgroups) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 auto mat_a = MatLayoutLSTM::tnc_block(in_out, 0, batch_size, kLstmLayerSize,
                                                       timestep_in, m_blk, 0);
                 TileBlock<RowMajor> mat_b(weights_buf, w_stride, 0,
@@ -1173,14 +1175,15 @@ kernel void lstm(const device LstmArgs* const args,
                 mm.mma(0, k_tiles, mat_a, mat_b);
                 mm.mma(2 * k_tiles, 3 * k_tiles, mat_a, mat_b);
 
-                for (int i = 0; i < SIMD_TILES_M; ++i) {
-                    const uint chunk_idx = (m_blk * SIMD_TILES_M + i) * TILE_SIZE + row;
-                    for (int j = 0; j < SIMD_TILES_N; j += 2) {
-                        simdgroup_store(mm.acc(i, j + 0), simd_res_buf[sid], 2 * TILE_SIZE);
-                        simdgroup_store(mm.acc(i, j + 1), simd_res_buf[sid] + TILE_SIZE,
+                for (int tile_i = 0; tile_i < SIMD_TILES_M; ++tile_i) {
+                    const uint chunk_idx = (m_blk * SIMD_TILES_M + tile_i) * TILE_SIZE + row;
+                    for (int tile_j = 0; tile_j < SIMD_TILES_N; tile_j += 2) {
+                        simdgroup_store(mm.acc(tile_i, tile_j + 0), simd_res_buf[sid],
+                                        2 * TILE_SIZE);
+                        simdgroup_store(mm.acc(tile_i, tile_j + 1), simd_res_buf[sid] + TILE_SIZE,
                                         2 * TILE_SIZE);
                         simdgroup_barrier(mem_flags::mem_threadgroup);
-                        const uint col = j * 2 + col_bits;
+                        const uint col = tile_j * 2 + col_bits;
                         const uint out_col = n_blk * SIMD_TILES_N * 2 + col;
                         const uint out_idx = out_col * batch_size + chunk_idx;
                         const float g = tanh_fast(simd_res_buf[sid][rb_idx + 0]);
@@ -1197,7 +1200,7 @@ kernel void lstm(const device LstmArgs* const args,
                     for (int j = 0; j < SIMD_TILES_N / 4; ++j) {
                         simdgroup_load(A, simd_out_buf[sid], SIMD_TILES_N * 2,
                                        ulong2(j * TILE_SIZE, 0));
-                        mat_c.store(A, i, n_blk * (SIMD_TILES_N / 4) + j);
+                        mat_c.store(A, tile_i, n_blk * (SIMD_TILES_N / 4) + j);
                     }
                 }
             }
@@ -1240,7 +1243,7 @@ kernel void linear(const device LinearArgs* const args,
 
         for (int m_blk = 0; m_blk < m_blks; ++m_blk) {
             for (int n_blk = sid; n_blk < n_blks; n_blk += simdgroups) {
-                mm.load_bias(bias, n_blk * SIMD_TILES_N * TILE_SIZE);
+                mm.load_bias(bias, n_blk);
                 auto mat_a =
                         InputMatLayout::tnc_block(in_buf, chunk_size, in_batch_size, kLinearInSize,
                                                   ts, m_blk + in_batch_block_offset, 0);
@@ -1300,3 +1303,6 @@ linear<MatLayoutLSTM<SIMD_TILES_M, SIMD_TILES_N, REVERSE_LSTM_OUTPUT>>(
         device void* const,
         threadgroup ftype (*const simd_out_buf)[TILE_SIZE * TILE_SIZE],
         KERNEL_INDEX_INPUTS);
+
+// Force inspection of a buffer for tracing.
+kernel void inspect_buffer(const device void*) {}

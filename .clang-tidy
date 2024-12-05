@@ -7,7 +7,10 @@ WarningsAsErrors: '*'
 
 # clang-tidy's regex doesn't support negative lookahead, so we have to list all the places to
 # check rather than "not 3rdparty" -_-
-HeaderFilterRegex: 'dorado/(alignment|cli|data_loader|decode|demux|modbase|models|nn|read_pipeline|splitter|utils)'
+HeaderFilterRegex: 'dorado/(alignment|api|basecall|cli|compat|correct|data_loader|demux|devtools|file_info|hts_io|modbase|model_downloader|models|polish|poly_tail|read_pipeline|splitter|summary|torch_utils|utils)'
+# When llvm-19 becomes available we might be able to switch to the following, though in testing
+# it seems like this skips some of our headers.
+# ExcludeHeaderFilterRegex: '3rdparty'
 
 CheckOptions:
   - key:    performance-move-const-arg.CheckTriviallyCopyableMove

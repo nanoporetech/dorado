@@ -162,21 +162,21 @@ TEST_CASE("Test trim mod base info", TEST_GROUP) {
         // the second mod is eliminated
         // in the third mod, first base position changes and the last is dropped
         auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {3, 18});
-        CHECK(str == "A+a?,0,0;C+m?,;T+x?,1;");
+        CHECK(str == "A+a?,0,0;C+m?;T+x?,1;");
         const std::vector<uint8_t> expected = {2, 3, 20};
         CHECK_THAT(probs, Equals(expected));
     }
 
     SECTION("Trim whole sequence") {
         auto [str, probs] = utils::trim_modbase_info(seq, modbase_str, modbase_probs, {8, 8});
-        CHECK(str == "A+a?,;C+m?,;T+x?,;");
+        CHECK(str == "A+a?;C+m?;T+x?;");
         CHECK(probs.size() == 0);
     }
 }
 
-// This test case is useful because trimming of reverse strand requires
-// the modbase tags to be treated differently since they are written
-// relative to the original sequence that was basecalled.
+// This test case is useful because trimming of the reverse strand requires
+// the sequence to be reversed, but the modbase tags are stored in the
+// original sequencing direction
 TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     const auto data_dir = fs::path(get_data_dir("trimmer"));
     const auto bam_file = data_dir / "reverse_strand_record.bam";
@@ -192,7 +192,7 @@ TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     CHECK(seqlen == (trim_interval.second - trim_interval.first));
     CHECK(bam_aux2i(bam_aux_get(trimmed_record.get(), "MN")) == seqlen);
     CHECK_THAT(bam_aux2Z(bam_aux_get(trimmed_record.get(), "MM")),
-               Equals("C+h?,28,24;C+m?,28,24;"));
+               Equals("C+h?,18,24;C+m?,18,24;"));
 }
 
 TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {

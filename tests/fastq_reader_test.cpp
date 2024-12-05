@@ -1,7 +1,10 @@
 #include "utils/fastq_reader.h"
 
+#include "TestUtils.h"
+
 #include <catch2/catch.hpp>
 
+#include <filesystem>
 #include <sstream>
 
 #define CUT_TAG "[dorado::utils::fastq_reader]"
@@ -42,10 +45,27 @@ const std::string VALID_FASTQ_U_RECORD{VALID_ID_LINE + VALID_SEQ_LINE_WITH_U +
                                        VALID_SEPARATOR_LINE + VALID_QUAL_LINE};
 const std::string MISSING_QUAL_FIELD_RECORD{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE};
 
+std::filesystem::path get_fastq_folder() { return get_data_dir("fastq"); }
+
 }  // namespace
 
 DEFINE_TEST("is_fastq with non existent file return false") {
     REQUIRE_FALSE(is_fastq("non_existent_file.278y"));
+}
+
+DEFINE_TEST("is_fastq with valid fastq file return true") {
+    auto fastq_file = get_fastq_folder() / "fastq.fastq";
+    REQUIRE(is_fastq(fastq_file.string()));
+}
+
+DEFINE_TEST("is_fastq with valid compressed fastq file return true") {
+    auto compressed_fastq_file = get_fastq_folder() / "fastq.fastq.gz";
+    REQUIRE(is_fastq(compressed_fastq_file.string()));
+}
+
+DEFINE_TEST("is_fastq with gzip fle containing multiple compressed sections returns true") {
+    auto compressed_fastq_file = get_fastq_folder() / "fastq_multiple_compressed_sections.fastq.gz";
+    REQUIRE(is_fastq(compressed_fastq_file.string()));
 }
 
 DEFINE_TEST("is_fastq parameterized testing") {
@@ -239,6 +259,18 @@ DEFINE_TEST("FastqReader::is_valid constructed with valid fastq returns true") {
     REQUIRE(cut.is_valid());
 }
 
+DEFINE_TEST("FastqReader::is_valid constructed with valid fastq file returns true") {
+    auto input_fastq = get_fastq_folder() / "fastq.fastq";
+    dorado::utils::FastqReader cut(input_fastq.string());
+    REQUIRE(cut.is_valid());
+}
+
+DEFINE_TEST("FastqReader::is_valid constructed with valid compressed fastq file returns true") {
+    auto input_fastq = get_fastq_folder() / "fastq.fastq.gz";
+    dorado::utils::FastqReader cut(input_fastq.string());
+    REQUIRE(cut.is_valid());
+}
+
 DEFINE_TEST("FastqReader::try_get_next_record when not valid returns null") {
     dorado::utils::FastqReader cut("invalid_file");
     auto record = cut.try_get_next_record();
@@ -300,6 +332,38 @@ DEFINE_TEST("FastqReader::try_get_next_record with Us not Ts returns record with
     CHECK(record->header() == VALID_ID);
     CHECK(record->sequence() == VALID_SEQ);  // Check Ts not Us
     CHECK(record->qstring() == VALID_QUAL);
+}
+
+DEFINE_TEST("FastqReader files parameterised testing") {
+    auto [compressed_file, expected_results_file] = GENERATE(table<std::string, std::string>({
+            {"fastq.fastq.gz", "fastq.fastq"},
+            {"fastq_with_us.fastq", "fastq.fastq"},
+            {"fastq_with_us.fastq.gz", "fastq.fastq"},
+            {"fastq_multiple_compressed_sections.fastq.gz",
+             "fastq_multiple_compressed_sections_decompressed.fastq"},
+    }));
+    CAPTURE(compressed_file, expected_results_file);
+
+    compressed_file = (get_fastq_folder() / compressed_file).string();
+    std::vector<FastqRecord> decompressed_fastq_records{};
+    FastqReader compressed_read(compressed_file);
+    for (auto record = compressed_read.try_get_next_record(); record;
+         record = compressed_read.try_get_next_record()) {
+        decompressed_fastq_records.push_back(std::move(*record));
+    }
+
+    expected_results_file = (get_fastq_folder() / expected_results_file).string();
+    std::vector<FastqRecord> expected_fastq_records{};
+    FastqReader expected_results_reader(expected_results_file);
+    for (auto record = expected_results_reader.try_get_next_record(); record;
+         record = expected_results_reader.try_get_next_record()) {
+        expected_fastq_records.push_back(std::move(*record));
+    }
+
+    REQUIRE(decompressed_fastq_records.size() == expected_fastq_records.size());
+    for (std::size_t index{}; index < expected_fastq_records.size(); ++index) {
+        REQUIRE(decompressed_fastq_records[index] == expected_fastq_records[index]);
+    }
 }
 
 }  // namespace dorado::utils::fastq_reader::test

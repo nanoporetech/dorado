@@ -92,30 +92,6 @@ public:
     const DataLoader::InputFiles& files() const { return m_input_files; }
 };
 
-void validate_barcode_kit_info(const std::string& kit_name) {
-    const auto kit_info = barcode_kits::get_kit_info(kit_name);
-    if (!kit_info) {
-        spdlog::error(
-                "{} is not a valid barcode kit name. Please run the help "
-                "command to find out available barcode kits.",
-                kit_name);
-        std::exit(EXIT_FAILURE);
-    }
-}
-
-std::pair<std::string, barcode_kits::KitInfo> get_custom_barcode_kit_info(
-        const std::string& custom_kit_file) {
-    auto custom_kit_info = demux::parse_custom_arrangement(custom_kit_file);
-    if (!custom_kit_info) {
-        spdlog::error("Unable to load custom barcode arrangement file: {}", custom_kit_file);
-        std::exit(EXIT_FAILURE);
-    }
-
-    custom_kit_info->second.scoring_params =
-            demux::parse_scoring_params(custom_kit_file, barcode_kits::BarcodeKitScoringParams{});
-    return *custom_kit_info;
-}
-
 void set_basecaller_params(const argparse::ArgumentParser& arg,
                            basecall::CRFModelConfig& model_config,
                            const std::string& device) {
@@ -325,8 +301,8 @@ void setup(const std::vector<std::string>& args,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelComplex& model_complex,
-           std::shared_ptr<const dorado::demux::BarcodingInfo> barcoding_info,
-           std::shared_ptr<const dorado::demux::AdapterInfo> adapter_info,
+           const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
+           const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
            std::unique_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::debug(model_config.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
@@ -454,7 +430,6 @@ void setup(const std::vector<std::string>& args,
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
     if (barcoding_info) {
-        validate_barcode_kit_info(barcoding_info->kit_name);
         utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
                                                sample_sheet.get());
     } else {
@@ -496,20 +471,19 @@ void setup(const std::vector<std::string>& args,
             (adapter_info->rna_adapters || (barcoding_info && !barcoding_info->kit_name.empty()));
 
     auto client_info = std::make_shared<DefaultClientInfo>();
-    client_info->contexts().register_context<const demux::AdapterInfo>(std::move(adapter_info));
+    client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
 
     if (estimate_poly_a) {
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
                         polya_config, is_rna_model(model_config), is_rna_adapter);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
-                std::move(poly_tail_calc_selector));
+                poly_tail_calc_selector);
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
                 {current_sink_node}, std::thread::hardware_concurrency(), 1000);
     }
     if (barcoding_info) {
-        client_info->contexts().register_context<const demux::BarcodingInfo>(
-                std::move(barcoding_info));
+        client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         current_sink_node = pipeline_desc.add_node<BarcodeClassifierNode>(
                 {current_sink_node}, thread_allocations.barcoder_threads);
     }
@@ -765,25 +739,50 @@ int basecaller(int argc, char* argv[]) {
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");
         if (custom_seqs.has_value()) {
-            std::unordered_map<std::string, std::string> custom_barcodes;
-            auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
-            for (const auto& entry : custom_sequences) {
-                custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+            try {
+                std::unordered_map<std::string, std::string> custom_barcodes;
+                auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
+                for (const auto& entry : custom_sequences) {
+                    custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+                }
+                barcode_kits::add_custom_barcodes(custom_barcodes);
+            } catch (const std::exception& e) {
+                spdlog::error(e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
+                std::exit(EXIT_FAILURE);
             }
-            barcode_kits::add_custom_barcodes(custom_barcodes);
         }
 
         std::optional<std::string> custom_kit =
                 parser.visible.present<std::string>("--barcode-arrangement");
         if (custom_kit.has_value()) {
-            auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
-            barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            try {
+                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
+                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+            } catch (const std::exception& e) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
+                              e.what());
+                std::exit(EXIT_FAILURE);
+            } catch (...) {
+                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
             sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
             barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
+        }
+
+        if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
+            spdlog::error(
+                    "{} is not a valid barcode kit name. Please run the help "
+                    "command to find out available barcode kits.",
+                    barcoding_info->kit_name);
+            std::exit(EXIT_FAILURE);
         }
     }
 

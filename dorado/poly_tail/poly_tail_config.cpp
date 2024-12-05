@@ -53,6 +53,14 @@ PolyTailConfig update_config(const toml::value& config_toml, PolyTailConfig conf
                                          std::to_string(config.primer_window));
             }
         }
+
+        if (anchors.contains("min_primer_separation")) {
+            config.min_primer_separation = toml::find<int>(anchors, "min_primer_separation");
+            if (config.min_primer_separation <= 0) {
+                throw std::runtime_error("min_primer_separation size needs to be > 0, given " +
+                                         std::to_string(config.min_primer_separation));
+            }
+        }
     }
 
     if (config_toml.contains("threshold")) {

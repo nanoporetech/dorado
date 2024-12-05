@@ -18,6 +18,7 @@ struct PolyTailConfig {
     std::string rc_plasmid_rear_flank;
     int rna_offset = 61;
     int primer_window = 150;
+    int min_primer_separation = 10;
     float flank_threshold = 0.6f;
     bool is_plasmid = false;
     int tail_interrupt_length = 0;
