@@ -123,8 +123,8 @@ TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_GROUP) 
     auto custom_primer_file = (seq_dir / "custom_adapter_primer_with_kits.fasta").string();
 
     demux::AdapterDetector detector(custom_primer_file);
-    const auto& adapters = detector.get_adapter_sequences("test_kit1");
-    auto primers = detector.get_primer_sequences("test_kit2");
+    const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
+    auto primers = detector.get_primer_sequences("TEST_KIT2");
     sort_queries(primers);
     // Make sure the adapters and primers have been properly loaded.
     std::string expected_adapter_name = "adapter1";
@@ -133,12 +133,12 @@ TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_GROUP) 
     std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV"};
     std::vector<std::string> expected_primer_fronts = {"TGCGAAT", "CAGAGGTC"};
     std::vector<std::string> expected_primer_rears = {"GACCTCTG", "ATTCGCA"};
-    CHECK(adapters.size() == 1);
+    REQUIRE(adapters.size() == 1);
     CHECK(adapters[0].name == expected_adapter_name);
     CHECK(adapters[0].front_sequence == expected_adapter_front);
     CHECK(adapters[0].rear_sequence == expected_adapter_rear);
 
-    CHECK(primers.size() == 2);
+    REQUIRE(primers.size() == 2);
     CHECK(primers[0].name == expected_primer_names[0]);
     CHECK(primers[0].front_sequence == expected_primer_fronts[0]);
     CHECK(primers[0].rear_sequence == expected_primer_rears[0]);
@@ -153,7 +153,7 @@ TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_GROUP) 
     for (const auto& primer : primers) {
         // Put the front primer at the beginning, and the rear primer at the end.
         auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
-        auto res1 = detector.find_primers(new_sequence1, "test_kit2");
+        auto res1 = detector.find_primers(new_sequence1, "TEST_KIT2");
         CHECK(res1.front.name == primer.name + "_FRONT");
         CHECK(res1.front.position == std::make_pair(6, int(primer.front_sequence.length()) + 5));
         CHECK(res1.front.score == 1.0f);
@@ -176,8 +176,8 @@ TEST_CASE("AdapterDetector: test custom primer detection without kit", TEST_GROU
     auto custom_primer_file = (seq_dir / "custom_adapter_primer_no_kits.fasta").string();
 
     demux::AdapterDetector detector(custom_primer_file);
-    const auto& adapters = detector.get_adapter_sequences("test_kit1");
-    auto primers = detector.get_primer_sequences("test_kit2");
+    const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
+    auto primers = detector.get_primer_sequences("TEST_KIT2");
     sort_queries(primers);
     // Make sure the adapters and primers have been properly loaded.
     std::string expected_adapter_name = "adapter1";
@@ -202,7 +202,7 @@ TEST_CASE("AdapterDetector: test custom primer detection without kit", TEST_GROU
         // Put the front primer at the beginning, and the rear primer at the end.
         auto new_sequence1 =
                 "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
-        auto res1 = detector.find_primers(new_sequence1, "test_kit2");
+        auto res1 = detector.find_primers(new_sequence1, "TEST_KIT2");
         CHECK(res1.front.name == primers[i].name + "_FRONT");
         CHECK(res1.front.position ==
               std::make_pair(6, int(primers[i].front_sequence.length()) + 5));

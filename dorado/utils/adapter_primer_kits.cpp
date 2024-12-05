@@ -64,7 +64,8 @@ std::set<std::string> parse_kit_names(const std::string& kit_string) {
     std::string token;
     while (std::getline(kit_stream, token, ',')) {
         if (!token.empty()) {
-            kit_names.insert(std::move(token));
+            auto kit_name = dorado::utils::to_uppercase(token);
+            kit_names.insert(std::move(kit_name));
         }
     }
     return kit_names;
@@ -90,16 +91,16 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string record_
         if (record_name.size() != front_start + 6) {
             return {};
         }
-        auto kit_name = dorado::utils::to_uppercase(record_name.substr(0, front_start));
-        return {std::move(kit_name), CustomItem::FRONT};
+        auto name = record_name.substr(0, front_start);
+        return {std::move(name), CustomItem::FRONT};
     }
     auto rear_start = record_name.find("_rear");
     if (rear_start != std::string::npos) {
         if (record_name.size() != rear_start + 5) {
             return {};
         }
-        auto kit_name = dorado::utils::to_uppercase(record_name.substr(0, rear_start));
-        return {std::move(kit_name), CustomItem::REAR};
+        auto name = record_name.substr(0, rear_start);
+        return {std::move(name), CustomItem::REAR};
     }
     return {};
 }
@@ -190,7 +191,7 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
 
 std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& kit_name,
                                                             CandidateType ty) const {
-    // If the requested kit name is "all", then all candidates will be returned, regardless of kit
+    // If the requested kit name is "ALL", then all candidates will be returned, regardless of kit
     // compatibility. Otherwise only candidates matching the requested kit, and candidates listed
     // as beign for any kit, will be included. Note that the latter will only exist if a custom
     // adapter/primer file was used, for entries with no kit information provided.
