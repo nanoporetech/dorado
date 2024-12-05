@@ -5,6 +5,8 @@
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
 
+#include <stdexcept>
+
 namespace dorado::polisher {
 
 namespace {
@@ -313,13 +315,24 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
 
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
-    PileupData pileup = calculate_pileup(
-            bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, num_qstrat, m_tag_name,
-            m_tag_value, m_tag_keep_missing, weibull_summation, m_read_group, m_min_mapq);
+    CountsResult pileup_tensors;
+    try {
+        PileupData pileup =
+                calculate_pileup(bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes,
+                                 num_qstrat, m_tag_name, m_tag_value, m_tag_keep_missing,
+                                 weibull_summation, m_read_group, m_min_mapq);
 
-    // Create Torch tensors from the pileup.
-    const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes * num_qstrat;
-    CountsResult pileup_tensors = plp_data_to_tensors(pileup, n_rows);
+        // Create Torch tensors from the pileup.
+        const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes * num_qstrat;
+        pileup_tensors = plp_data_to_tensors(pileup, n_rows);
+
+    } catch (const std::exception& e) {
+        spdlog::warn(
+                "[EncoderCounts] Could not encode region: {}:{}-{}! Caught error: '{}'. Returning "
+                "empty.",
+                ref_name, ref_start + 1, ref_end, e.what());
+        return {};
+    }
 
     if (!pileup_tensors.counts.numel()) {
         const std::string region =

@@ -4,6 +4,7 @@
 #include "medaka_bamiter.h"
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cassert>
@@ -44,19 +45,33 @@ struct Read {
 /** Populate an array of dwells per base.
  *
  *  @param alignment an htslib alignment.
- *  @returns pointer to dewell array.
+ *  @param ret_dwells return vector of dwells.
+ *  @returns status of dwell computation (success, no dwell tags or bad alignment).
  */
-std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
+enum class CalcDwellsReturnValue {
+    SUCCESS,
+    NO_DWELL_TAG,
+    BAD_ALIGNMENT,
+};
+CalcDwellsReturnValue calculate_dwells(const bam1_t *alignment, std::vector<int8_t> &ret_dwells) {
+    ret_dwells.clear();
+
+    if (alignment == nullptr) {
+        return CalcDwellsReturnValue::BAD_ALIGNMENT;
+    }
+
     const int32_t length = alignment->core.l_qseq;
     constexpr int32_t MAX_INT8 = std::numeric_limits<int8_t>::max();
 
-    std::vector<int8_t> dwell_arr(length);
+    ret_dwells.clear();
+    ret_dwells.resize(length, 0);
 
-    uint8_t *mv_tag = bam_aux_get(alignment, "mv");
+    const uint8_t *mv_tag = bam_aux_get(alignment, "mv");
     if (!mv_tag) {
-        return dwell_arr;
+        return CalcDwellsReturnValue::NO_DWELL_TAG;
     }
-    int32_t mv_len = static_cast<int32_t>(bam_auxB_len(mv_tag));
+
+    const int32_t mv_len = static_cast<int32_t>(bam_auxB_len(mv_tag));
     // uint8_t stride = bam_auxB2i(mv_tag, 0);
 
     int64_t qpos = 0;  // base index
@@ -69,7 +84,11 @@ std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
         for (int32_t i = (mv_len - 1); i > 0; --i) {
             ++dwell;
             if (bam_auxB2i(mv_tag, i) == 1) {
-                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
+                if (qpos >= length) {
+                    ret_dwells.clear();
+                    return CalcDwellsReturnValue::BAD_ALIGNMENT;
+                }
+                ret_dwells[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
                 ++qpos;
                 dwell = 0;
             }
@@ -81,15 +100,26 @@ std::vector<int8_t> calculate_dwells(const bam1_t *alignment) {
         // add the dwell since the last move afterwards
         for (int32_t i = 2; i < mv_len; ++i) {
             if (bam_auxB2i(mv_tag, i) == 1) {
-                dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
+                if (qpos >= length) {
+                    ret_dwells.clear();
+                    return CalcDwellsReturnValue::BAD_ALIGNMENT;
+                }
+                ret_dwells[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
                 ++qpos;
                 dwell = 0;
             }
             ++dwell;
         }
-        dwell_arr[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
+
+        if (qpos >= length) {
+            ret_dwells.clear();
+            return CalcDwellsReturnValue::BAD_ALIGNMENT;
+        }
+
+        ret_dwells[qpos] = static_cast<int8_t>(std::min(dwell, MAX_INT8));
     }
-    return dwell_arr;
+
+    return CalcDwellsReturnValue::SUCCESS;
 }
 
 size_t aligned_ref_pos_from_cigar(uint32_t *cigar, uint32_t n_cigar) {
@@ -404,6 +434,16 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                     failed = errno == EINVAL;
                 }
 
+                std::vector<int8_t> dwells;
+                if (include_dwells) {
+                    const CalcDwellsReturnValue rv = calculate_dwells(alignment, dwells);
+                    if ((rv != CalcDwellsReturnValue::SUCCESS) &&
+                        (rv != CalcDwellsReturnValue::NO_DWELL_TAG)) {
+                        throw std::runtime_error{"Bad BAM alignment for qname: '" + qname +
+                                                 "', could not extract tags!"};
+                    }
+                }
+
                 Read read = {
                         alignment->core.pos,
                         qname,
@@ -416,7 +456,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                         static_cast<int64_t>(alignment->core.pos +
                                              aligned_ref_pos_from_cigar(bam_get_cigar(alignment),
                                                                         alignment->core.n_cigar)),
-                        (include_dwells ? calculate_dwells(alignment) : std::vector<int8_t>()),
+                        std::move(dwells),
                 };
 
                 // insert read into read_array in place of a read that's already completed

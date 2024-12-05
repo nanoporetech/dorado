@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
 
+#include <stdexcept>
 #include <unordered_map>
 
 namespace dorado::polisher {
@@ -339,13 +340,22 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
                                            const int64_t ref_end,
                                            const int32_t seq_id) const {
     // Compute the counts and data.
-    ReadAlignmentData counts = calculate_read_alignment(
-            bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name, m_tag_value,
-            m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read, m_include_dwells,
-            m_include_haplotype, m_max_reads);
+    ReadAlignmentTensors tensors;
+    try {
+        ReadAlignmentData counts = calculate_read_alignment(
+                bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name,
+                m_tag_value, m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read,
+                m_include_dwells, m_include_haplotype, m_max_reads);
 
-    // Create Torch tensors from the pileup.
-    ReadAlignmentTensors tensors = read_matrix_data_to_tensors(counts);
+        // Create Torch tensors from the pileup.
+        tensors = read_matrix_data_to_tensors(counts);
+    } catch (const std::exception& e) {
+        spdlog::warn(
+                "[EncoderReadAlignment] Could not encode region: {}:{}-{}! Caught error: '{}'. "
+                "Returning empty.",
+                ref_name, ref_start + 1, ref_end, e.what());
+        return {};
+    }
 
     if (!tensors.counts.numel()) {
         const std::string region =
