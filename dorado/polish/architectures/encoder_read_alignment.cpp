@@ -315,7 +315,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const std::string_view tag_name,
                                            const int32_t tag_value,
                                            const bool tag_keep_missing,
-                                           const std::string_view read_group,
+                                           const std::string& read_group,
                                            const int32_t min_mapq,
                                            const int32_t max_reads,
                                            const bool row_per_read,
@@ -338,12 +338,10 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
                                            const int64_t ref_start,
                                            const int64_t ref_end,
                                            const int32_t seq_id) const {
-    const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
-
     // Compute the counts and data.
     ReadAlignmentData counts = calculate_read_alignment(
             bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name, m_tag_value,
-            m_tag_keep_missing, read_group_ptr, m_min_mapq, m_row_per_read, m_include_dwells,
+            m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read, m_include_dwells,
             m_include_haplotype, m_max_reads);
 
     // Create Torch tensors from the pileup.

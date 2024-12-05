@@ -30,7 +30,7 @@ public:
                   const std::string_view tag_name,
                   const int32_t tag_value,
                   const bool tag_keep_missing,
-                  const std::string_view read_group,
+                  const std::string& read_group,
                   const int32_t min_mapq,
                   const bool symmetric_indels);
 

@@ -5,6 +5,7 @@
 #include "model_config.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace dorado::polisher {
@@ -17,6 +18,10 @@ enum class FeatureEncoderType {
 FeatureEncoderType parse_feature_encoder_type(const std::string& type);
 
 std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
-                                             const int32_t min_mapq_override);
+                                             const std::string& read_group,
+                                             const std::string& tag_name,
+                                             const int32_t tag_value,
+                                             const std::optional<bool>& tag_keep_missing_override,
+                                             const std::optional<int32_t>& min_mapq_override);
 
 }  // namespace dorado::polisher

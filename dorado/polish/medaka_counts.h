@@ -136,7 +136,7 @@ PileupData calculate_pileup(BamFile& bam_file,
                             const int32_t tag_value,
                             const bool keep_missing,
                             const bool weibull_summation,
-                            const char* read_group,
+                            const std::string& read_group,
                             const int32_t min_mapq);
 
 }  // namespace dorado::polisher

@@ -118,7 +118,13 @@ struct Options {
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
-    int32_t min_mapq = -1;
+
+    std::optional<int32_t> min_mapq;
+    std::string read_group;
+    bool ignore_read_groups = false;
+    std::string tag_name;
+    int32_t tag_value = 0;
+    std::optional<bool> tag_keep_missing;
     // int32_t min_depth = 0;
 };
 
@@ -242,17 +248,24 @@ ParserPtr create_cli(int& verbosity) {
                       "end "
                       "is inclusive).")
                 .default_value("");
-        // parser->visible.add_argument("--RG").help("Read group to select.");
-        // parser->visible.add_argument("--ignore-read-groups")
-        //         .help("Ignore read groups in bam file.")
-        //         .default_value(false)
-        //         .implicit_value(true);
-        // parser->visible.add_argument("--tag-name").help("Two-letter BAM tag name.");
-        // parser->visible.add_argument("--tag-value").help("Value of the tag.");
-        // parser->visible.add_argument("--tag-keep-missing")
-        //         .help("Keep alignments when tag is missing.")
-        //         .default_value(false)
-        //         .implicit_value(true);
+        parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
+        parser->visible.add_argument("--ignore-read-groups")
+                .help("Ignore read groups in bam file.")
+                .default_value(false)
+                .implicit_value(true);
+        parser->visible.add_argument("--tag-name")
+                .help("Two-letter BAM tag name.")
+                .default_value("");
+        parser->visible.add_argument("--tag-value")
+                .help("Value of the tag.")
+                .default_value(0)
+                .scan<'i', int>();
+
+        parser->visible.add_argument("--tag-keep-missing")
+                .help("Keep alignments when tag is missing. If specified, overrides "
+                      "the same option in the model config.")
+                .default_value(false)
+                .implicit_value(true);
         parser->visible.add_argument("--min-mapq")
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
@@ -342,12 +355,23 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
     opt.regions = parse_regions(parser.visible.get<std::string>("regions"));
-    opt.min_mapq = parser.visible.get<int>("min-mapq");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
+
+    opt.read_group = parser.visible.get<std::string>("RG");
+    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
+    opt.tag_name = parser.visible.get<std::string>("tag-name");
+    opt.tag_value = parser.visible.get<int>("tag-value");
+    opt.tag_keep_missing =
+            (parser.visible.is_used("--tag-keep-missing"))
+                    ? std::optional<bool>{parser.visible.get<bool>("tag-keep-missing")}
+                    : std::nullopt;
+    opt.min_mapq = (parser.visible.is_used("--min-mapq"))
+                           ? std::optional<int32_t>{parser.visible.get<int>("min-mapq")}
+                           : std::nullopt;
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -431,6 +455,14 @@ void validate_options(const Options& opt) {
 
     if (opt.queue_size <= 0) {
         spdlog::error("Queue size needs o be > 0, given: {}.", opt.queue_size);
+        std::exit(EXIT_FAILURE);
+    }
+
+    if ((std::size(opt.tag_name) == 1) || (std::size(opt.tag_name) > 2)) {
+        spdlog::error(
+                "The tag_name is specified, but it needs to contain exactly two characters. Given: "
+                "'{}'.",
+                opt.tag_name);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -520,7 +552,11 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
                                    const int32_t num_bam_threads,
                                    const int32_t num_inference_cpu_threads,
                                    const bool full_precision,
-                                   const int32_t min_mapq_override) {
+                                   const std::string& read_group,
+                                   const std::string& tag_name,
+                                   const int32_t tag_value,
+                                   const std::optional<bool>& tag_keep_missing_override,
+                                   const std::optional<int32_t>& min_mapq_override) {
     PolisherResources resources;
 
     spdlog::info("Initializing the devices.");
@@ -571,7 +607,8 @@ PolisherResources create_resources(const polisher::ModelConfig& model_config,
     resources.models = create_models();
 
     spdlog::info("Creating the encoder.");
-    resources.encoder = polisher::encoder_factory(model_config, min_mapq_override);
+    resources.encoder = polisher::encoder_factory(model_config, read_group, tag_name, tag_value,
+                                                  tag_keep_missing_override, min_mapq_override);
 
     spdlog::info("Creating the decoder.");
     resources.decoder = polisher::decoder_factory(model_config);
@@ -1243,7 +1280,8 @@ int polish(int argc, char* argv[]) {
         // Create the models, encoders and BAM handles.
         PolisherResources resources =
                 create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
-                                 opt.infer_threads, opt.full_precision, opt.min_mapq);
+                                 opt.infer_threads, opt.full_precision, opt.read_group,
+                                 opt.tag_name, opt.tag_value, opt.tag_keep_missing, opt.min_mapq);
 
         // Progress bar.
         polisher::PolishStats polish_stats;

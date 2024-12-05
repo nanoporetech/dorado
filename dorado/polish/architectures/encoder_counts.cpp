@@ -289,7 +289,7 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
                              const std::string_view tag_name,
                              const int32_t tag_value,
                              const bool tag_keep_missing,
-                             const std::string_view read_group,
+                             const std::string& read_group,
                              const int32_t min_mapq,
                              const bool symmetric_indels)
         : m_normalise_type{normalise_type},
@@ -311,13 +311,11 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
-    const char* read_group_ptr = std::empty(m_read_group) ? nullptr : m_read_group.c_str();
-
     // Compute the pileup.
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     PileupData pileup = calculate_pileup(
             bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, num_qstrat, m_tag_name,
-            m_tag_value, m_tag_keep_missing, weibull_summation, read_group_ptr, m_min_mapq);
+            m_tag_value, m_tag_keep_missing, weibull_summation, m_read_group, m_min_mapq);
 
     // Create Torch tensors from the pileup.
     const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes * num_qstrat;

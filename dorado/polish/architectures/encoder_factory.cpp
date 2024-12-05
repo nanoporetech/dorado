@@ -12,7 +12,11 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
 }
 
 std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
-                                             const int32_t min_mapq_override) {
+                                             const std::string& read_group,
+                                             const std::string& tag_name,
+                                             const int32_t tag_value,
+                                             const std::optional<bool>& tag_keep_missing_override,
+                                             const std::optional<int32_t>& min_mapq_override) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -39,39 +43,34 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
 
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
         const std::string normalise = get_value(kwargs, "normalise");
-        const bool tag_keep_missing = get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq = (min_mapq_override >= 0)
-                                         ? min_mapq_override
-                                         : std::stoi(get_value(kwargs, "min_mapq"));
+        const bool tag_keep_missing = (tag_keep_missing_override)
+                                              ? *tag_keep_missing_override
+                                              : get_bool_value(kwargs, "tag_keep_missing");
+        const int32_t min_mapq =
+                (min_mapq_override) ? *min_mapq_override : std::stoi(get_value(kwargs, "min_mapq"));
         const bool sym_indels = get_bool_value(kwargs, "sym_indels");
 
         NormaliseType normalise_type = parse_normalise_type(normalise);
-        const std::string tag_name;
-        constexpr int32_t TAG_VALUE = 0;
-        const std::string read_group;
 
         std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
-                normalise_type, config.feature_encoder_dtypes, tag_name, TAG_VALUE,
+                normalise_type, config.feature_encoder_dtypes, tag_name, tag_value,
                 tag_keep_missing, read_group, min_mapq, sym_indels);
 
         return ret;
 
     } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
-        const bool tag_keep_missing = get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq = (min_mapq_override >= 0)
-                                         ? min_mapq_override
-                                         : std::stoi(get_value(kwargs, "min_mapq"));
+        const bool tag_keep_missing = (tag_keep_missing_override)
+                                              ? *tag_keep_missing_override
+                                              : get_bool_value(kwargs, "tag_keep_missing");
+        const int32_t min_mapq =
+                (min_mapq_override) ? *min_mapq_override : std::stoi(get_value(kwargs, "min_mapq"));
         const int32_t max_reads = std::stoi(get_value(kwargs, "max_reads"));
         const bool row_per_read = get_bool_value(kwargs, "row_per_read");
         const bool include_dwells = get_bool_value(kwargs, "include_dwells");
         const bool include_haplotype = get_bool_value(kwargs, "include_haplotype");
 
-        const std::string tag_name;
-        constexpr int32_t TAG_VALUE = 0;
-        const std::string read_group;
-
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
-                config.feature_encoder_dtypes, tag_name, TAG_VALUE, tag_keep_missing, read_group,
+                config.feature_encoder_dtypes, tag_name, tag_value, tag_keep_missing, read_group,
                 min_mapq, max_reads, row_per_read, include_dwells, include_haplotype);
 
         return ret;

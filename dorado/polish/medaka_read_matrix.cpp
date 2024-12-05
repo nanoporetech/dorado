@@ -245,7 +245,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                                            const std::string &tag_name,
                                            const int32_t tag_value,
                                            const bool keep_missing,
-                                           const char *read_group,
+                                           const std::string &read_group,
                                            const int32_t min_mapq,
                                            const bool row_per_read,
                                            const bool include_dwells,
@@ -278,7 +278,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     memcpy(data->tag_name, tag_name.c_str(), 2);
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
-    data->read_group = read_group;
+    data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
     bam_mplp_t mplp = bam_mplp_init(1, read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
