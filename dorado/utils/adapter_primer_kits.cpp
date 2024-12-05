@@ -1,9 +1,11 @@
 #include "adapter_primer_kits.h"
 
 #include "demux/parse_custom_sequences.h"
+#include "string_utils.h"
 
 #include <spdlog/spdlog.h>
 
+#include <cctype>
 #include <set>
 #include <sstream>
 
@@ -88,14 +90,16 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string record_
         if (record_name.size() != front_start + 6) {
             return {};
         }
-        return {record_name.substr(0, front_start), CustomItem::FRONT};
+        auto kit_name = dorado::utils::to_uppercase(record_name.substr(0, front_start));
+        return {std::move(kit_name), CustomItem::FRONT};
     }
     auto rear_start = record_name.find("_rear");
     if (rear_start != std::string::npos) {
         if (record_name.size() != rear_start + 5) {
             return {};
         }
-        return {record_name.substr(0, rear_start), CustomItem::REAR};
+        auto kit_name = dorado::utils::to_uppercase(record_name.substr(0, rear_start));
+        return {std::move(kit_name), CustomItem::REAR};
     }
     return {};
 }
@@ -171,7 +175,7 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
     for (auto& entry : custom_items) {
         auto& kits = custom_item_kits[entry.first];
         if (kits.empty()) {
-            kits.insert("any");
+            kits.insert("ANY");
         }
         Candidate candidate{entry.first, entry.second.front_sequence, entry.second.rear_sequence};
         for (const auto& kit : kits) {
@@ -203,7 +207,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
                 "Unexpected candidate type in AdapterPrimerManager::get_candidate method.");
     }
     std::vector<Candidate> results;
-    if (kit_name == "all") {
+    if (kit_name == "ALL") {
         for (const auto& item : *candidate_lut) {
             results.insert(results.end(), item.second.begin(), item.second.end());
         }
@@ -213,7 +217,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     if (iter != candidate_lut->end()) {
         results = iter->second;
     }
-    iter = candidate_lut->find("any");
+    iter = candidate_lut->find("ANY");
     if (iter != candidate_lut->end()) {
         results.insert(results.end(), iter->second.begin(), iter->second.end());
     }

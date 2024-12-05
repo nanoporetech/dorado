@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -50,6 +51,12 @@ inline std::string_view rtrim_view(const std::string& s) {
     const auto last_char_it =
             std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base();
     return std::string_view(s.data(), last_char_it - s.begin());
+}
+
+inline std::string to_uppercase(std::string in) {
+    std::transform(in.begin(), in.end(), in.begin(),
+                   [](unsigned char c) { return std::toupper(c); });
+    return in;
 }
 
 }  // namespace dorado::utils

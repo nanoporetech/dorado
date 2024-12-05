@@ -10,6 +10,7 @@
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -64,24 +65,33 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     }
     int seqlen = irecord->core.l_qseq;
 
-    // If no kit-name has been provided, then only look for adapters and/or
-    // primers that are have been designated as valid targets for any kit.
-    // Normally these will only exist if a custom primer file was used.
-    auto kit_name = bam_message.sequencing_kit;
-    if (kit_name.empty()) {
-        kit_name = "any";
-    }
-
-    auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
-
-    std::pair<int, int> adapter_trim_interval = {0, seqlen};
-    std::pair<int, int> primer_trim_interval = {0, seqlen};
-
     const auto& adapter_info =
             bam_message.client_info->contexts().get_ptr<const demux::AdapterInfo>();
     if (!adapter_info) {
         return;
     }
+
+    auto kit_name = bam_message.sequencing_kit;
+    if (kit_name.empty()) {
+        if (adapter_info->kit_name) {
+            // For the standalone trim application, the kit name is provided on
+            // the command-line, and passed here via the adapter_info object.
+            kit_name = adapter_info->kit_name.value();
+        } else {
+            // If no kit-name has been provided, then only look for adapters
+            // and/or primers that are have been designated as valid targets for
+            // any kit. Normally these will only exist if a custom primer file
+            // was used.
+            kit_name = "ANY";
+        }
+    }
+    // All kit names are uppercase in the AdapterDetector lookup-tables.
+    kit_name = utils::to_uppercase(kit_name);
+
+    auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
+
+    std::pair<int, int> adapter_trim_interval = {0, seqlen};
+    std::pair<int, int> primer_trim_interval = {0, seqlen};
 
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
@@ -128,8 +138,10 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
     // Normally these will only exist if a custom primer file was used.
     auto kit_name = read.read_common.sequencing_kit;
     if (kit_name.empty()) {
-        kit_name = "any";
+        kit_name = "ANY";
     }
+    // All kit names are uppercase in the AdapterDetector lookup-tables.
+    kit_name = utils::to_uppercase(kit_name);
 
     auto detector = get_detector(*adapter_info);
     if (adapter_info->trim_adapters) {
