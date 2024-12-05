@@ -119,6 +119,8 @@ struct Options {
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
 
+    bool fill_gaps = true;
+    std::optional<char> fill_char;
     std::optional<int32_t> min_mapq;
     std::string read_group;
     bool ignore_read_groups = false;
@@ -231,12 +233,13 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value(100000)
                 .scan<'i', int>();
 
-        // parser->visible.add_argument("--no-fillgaps")
-        //         .help("Do not fill gaps in consensus sequence with draft sequence.")
-        //         .default_value(false)
-        //         .implicit_value(true);
-        // parser->visible.add_argument("--fill-char")
-        //         .help("Use a designated character to fill gaps.");
+        parser->visible.add_argument("--no-fill-gaps")
+                .help("Do not fill gaps in consensus sequence with draft sequence.")
+                .default_value(false)
+                .implicit_value(true);
+        parser->visible.add_argument("--fill-char")
+                .help("Use a designated character to fill gaps.")
+                .default_value("");
 
         // }
         // {
@@ -361,6 +364,10 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
 
+    opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
+    opt.fill_char = (parser.visible.is_used("--fill-char"))
+                            ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
+                            : std::nullopt;
     opt.read_group = parser.visible.get<std::string>("RG");
     opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
@@ -515,21 +522,30 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     return ret;
 }
 
-[[maybe_unused]] void write_consensus_result(std::ostream& os,
-                                             const std::string& seq_name,
-                                             const polisher::ConsensusResult& result,
-                                             const bool write_quals) {
-    if (std::empty(result.seq)) {
+void write_consensus_results(std::ostream& os,
+                             const std::string& seq_name,
+                             const std::vector<polisher::ConsensusResult>& results,
+                             const bool fill_gaps,
+                             const bool write_quals) {
+    if (std::empty(results)) {
         return;
     }
 
-    polisher::ConsensusResult out = result;
-    remove_deletions(out);
+    for (size_t i = 0; i < std::size(results); ++i) {
+        polisher::ConsensusResult out = results[i];
+        remove_deletions(out);
 
-    if (write_quals) {
-        os << '@' << seq_name << '\n' << out.seq << "\n+\n" << out.quals << '\n';
-    } else {
-        os << '>' << seq_name << '\n' << out.seq << '\n';
+        std::string header = seq_name;
+        if (!fill_gaps) {
+            header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
+                      std::to_string(out.draft_end);
+        }
+
+        if (write_quals) {
+            os << '@' << header << '\n' << out.seq << "\n+\n" << out.quals << '\n';
+        } else {
+            os << '>' << header << '\n' << out.seq << '\n';
+        }
     }
 }
 
@@ -1216,13 +1232,13 @@ void run_polishing(const Options& opt,
             auto& group = groups[seq_id];
             std::sort(std::begin(group), std::end(group));  // Sort by start pos.
 
-            const polisher::ConsensusResult consensus =
-                    polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
-                                              all_results, group, seq_id);
+            const std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
+                    opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first, all_results, group,
+                    opt.fill_gaps, opt.fill_char, seq_id);
 
             const std::string& header = draft_lens_batch[seq_id].first;
-            write_consensus_result(*ofs, header, consensus,
-                                   (opt.out_format == OutputFormat::FASTQ));
+            write_consensus_results(*ofs, header, consensus, opt.fill_gaps,
+                                    (opt.out_format == OutputFormat::FASTQ));
         }
 
         // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));

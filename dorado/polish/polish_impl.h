@@ -48,11 +48,14 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int32_t window_overlap,
                                    const int32_t region_id);
 
-ConsensusResult stitch_sequence(const std::filesystem::path& in_draft_fn,
-                                const std::string& header,
-                                const std::vector<ConsensusResult>& sample_results,
-                                const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
-                                [[maybe_unused]] const int32_t seq_id);
+std::vector<ConsensusResult> stitch_sequence(
+        const std::filesystem::path& in_draft_fn,
+        const std::string& header,
+        const std::vector<ConsensusResult>& sample_results,
+        const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        [[maybe_unused]] const int32_t seq_id);
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
         std::vector<BamFile>& bam_handles,

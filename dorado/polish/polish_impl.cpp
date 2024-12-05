@@ -163,24 +163,39 @@ void remove_deletions(polisher::ConsensusResult& cons) {
     cons.quals.resize(n);
 }
 
-polisher::ConsensusResult stitch_sequence(
+std::vector<polisher::ConsensusResult> stitch_sequence(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
         const std::vector<polisher::ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
         [[maybe_unused]] const int32_t seq_id) {
     const std::string draft = fetch_seq(in_draft_fn, header, 0, -1);
+    const int64_t draft_len = dorado::ssize(draft);
 
-    if (std::empty(samples_for_seq)) {
-        spdlog::debug(
-                "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
-                "from input.",
-                header, std::size(draft));
-        std::string dummy_quals(std::size(draft), '!');
-        return polisher::ConsensusResult{draft, std::move(dummy_quals)};
+    if (std::empty(samples_for_seq) && fill_gaps) {
+        if (fill_gaps) {
+            spdlog::debug(
+                    "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
+                    "from input.",
+                    header, std::size(draft));
+            std::string dummy_quals(std::size(draft), '!');
+            return {polisher::ConsensusResult{draft, std::move(dummy_quals)}};
+        } else {
+            spdlog::debug(
+                    "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
+                    "verbatim "
+                    "from input because fill_gaps == false.",
+                    header, std::size(draft));
+            return {};
+        }
     }
 
+    std::vector<polisher::ConsensusResult> ret;
     polisher::ConsensusResult result;
+    result.draft_start = draft_len;
+    result.draft_end = 0;
 
 #ifdef DEBUG_POLISH_DUMP_SEQ_PIECES
     std::ofstream ofs("debug.seq_id_" + std::to_string(seq_id) + ".fasta");
@@ -193,13 +208,35 @@ polisher::ConsensusResult stitch_sequence(
         const polisher::ConsensusResult& sample_result = sample_results[sample_index];
 
         if (sample_result.draft_start > last_end) {
-            spdlog::trace(
-                    "[stitch_sequence] header = '{}', result.seq.size() = {}, adding draft region: "
-                    "[{}, {}]",
-                    header, std::size(result.seq), last_end, sample_result.draft_start);
+            if (fill_gaps) {
+                spdlog::trace(
+                        "[stitch_sequence] Gap between polished chunks. header = '{}', "
+                        "result.seq.size() = {}, fill_char = {}, draft region: "
+                        "[{}, {}], using fill_char: {}",
+                        header, std::size(result.seq),
+                        ((fill_char) ? std::string(1, *fill_char) : "nullopt"), last_end,
+                        sample_result.draft_start, fill_char ? "true" : "false");
 
-            result.seq += draft.substr(last_end, sample_result.draft_start - last_end);
-            result.quals += std::string(sample_result.draft_start - last_end, '!');
+                const int64_t fill_len = sample_result.draft_start - last_end;
+                result.seq += (fill_char) ? std::string(fill_len, *fill_char)
+                                          : draft.substr(last_end, fill_len);
+                result.quals += std::string(fill_len, '!');
+                result.draft_start = std::min(result.draft_start, last_end);
+                result.draft_end = std::max(result.draft_end, sample_result.draft_start);
+            } else {
+                spdlog::trace(
+                        "[stitch_sequence] Gap between polished chunks. header = '{}', "
+                        "result.seq.size() = {}, draft region: "
+                        "[{}, {}]. Dumping the current polished subchunk.",
+                        header, std::size(result.seq), last_end, sample_result.draft_start);
+
+                if (!std::empty(result.seq)) {
+                    ret.emplace_back(std::move(result));
+                }
+                result = {};
+                result.draft_start = draft_len;
+                result.draft_end = 0;
+            }
         }
 
         spdlog::trace(
@@ -209,24 +246,48 @@ polisher::ConsensusResult stitch_sequence(
 
         result.seq += sample_result.seq;
         result.quals += sample_result.quals;
+        result.draft_start = std::min(result.draft_start, sample_result.draft_start);
+        result.draft_end = std::max(result.draft_end, sample_result.draft_end);
 
         last_end = sample_result.draft_end;
     }
 
     // Add the back draft part.
     if (last_end < dorado::ssize(draft)) {
-        spdlog::trace(
-                "[stitch_sequence] header = '{}', result.seq.size() = {}, adding trailing draft "
-                "region: [{}, {}]",
-                header, std::size(result.seq), last_end, std::size(draft));
-        result.seq += draft.substr(last_end);
-        result.quals += std::string(dorado::ssize(draft) - last_end, '!');
+        if (fill_gaps) {
+            spdlog::trace(
+                    "[stitch_sequence] Trailing gap. header = '{}', result.seq.size() = {}, "
+                    "fill_char = {}, draft region: "
+                    "[{}, {}], using fill_char: {}",
+                    header, std::size(result.seq),
+                    ((fill_char) ? std::string(1, *fill_char) : "nullopt"), last_end, draft_len,
+                    fill_char ? "true" : "false");
+
+            const int64_t fill_len = draft_len - last_end;
+            result.seq += (fill_char) ? std::string(fill_len, *fill_char) : draft.substr(last_end);
+            result.quals += std::string(draft_len - last_end, '!');
+            result.draft_start = std::min(result.draft_start, last_end);
+            result.draft_end = std::max(result.draft_end, draft_len);
+            if (!std::empty(result.seq)) {
+                ret.emplace_back(std::move(result));
+            }
+        } else {
+            spdlog::trace(
+                    "[stitch_sequence] Trailing gap. header = '{}', result.seq.size() = {}, draft "
+                    "region: "
+                    "[{}, {}]. Dumping the current polished subchunk.",
+                    header, std::size(result.seq), last_end, draft_len);
+        }
+    }
+
+    if (!std::empty(result.seq)) {
+        ret.emplace_back(std::move(result));
     }
 
     spdlog::trace("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
                   std::size(result.seq));
 
-    return result;
+    return ret;
 }
 
 std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& sample) {
