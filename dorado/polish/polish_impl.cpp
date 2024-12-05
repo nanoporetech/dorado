@@ -885,51 +885,52 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::string& region_str) {
+        const std::vector<std::string>& regions) {
     // Canonical case where each sequence is linearly split with an overlap.
-    if (std::empty(region_str)) {
+    if (std::empty(regions)) {
         std::vector<Window> windows;
         for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
             const int64_t len = draft_lens[seq_id].second;
             const std::vector<Window> new_windows =
                     create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap, -1);
             windows.reserve(std::size(windows) + std::size(new_windows));
-            windows.insert(windows.end(), new_windows.begin(), new_windows.end());
+            windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }
         return windows;
     } else {
         // Create windows for only this one region.
+        std::unordered_map<std::string, int32_t> draft_ids;
+        for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
+            draft_ids[draft_lens[seq_id].first] = seq_id;
+        }
 
-        auto [region_name, region_start, region_end] = parse_region_string(region_str);
+        std::vector<Window> windows;
 
-        spdlog::info("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
-                     region_end);
+        for (const auto& region_str : regions) {
+            auto [region_name, region_start, region_end] = parse_region_string(region_str);
 
-        // Find the sequence ID of the region sequence name.
-        int32_t seq_id = -1;
-        int64_t seq_length = 0;
-        for (int32_t i = 0; i < static_cast<int32_t>(std::size(draft_lens)); ++i) {
-            if (draft_lens[i].first == region_name) {
-                seq_id = i;
-                seq_length = draft_lens[i].second;
-                break;
+            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
+                          region_end);
+
+            const auto it = draft_ids.find(region_name);
+            if (it == std::end(draft_ids)) {
+                throw std::runtime_error(
+                        "Sequence provided by custom region not found in input! Sequence name: " +
+                        region_name);
             }
-        }
-        if (region_start < 0) {
-            region_start = 0;
-        }
-        if (region_end <= 0) {
-            region_end = seq_length;
-        }
-        if (seq_id < 0) {
-            throw std::runtime_error(
-                    "Sequence provided by custom region not found in input! region_name = " +
-                    region_name);
-        }
+            const int32_t seq_id = it->second;
+            const int64_t seq_length = draft_lens[seq_id].second;
 
-        // Split-up the custom region if it's too long.
-        std::vector<Window> windows = create_windows(seq_id, region_start, region_end, seq_length,
-                                                     bam_chunk_len, window_overlap, -1);
+            region_start = std::max<int64_t>(0, region_start);
+            region_end = std::min(seq_length, region_end);
+
+            // Split-up the custom region if it's too long.
+            std::vector<Window> new_windows =
+                    create_windows(seq_id, region_start, region_end, seq_length, bam_chunk_len,
+                                   window_overlap, -1);
+            windows.reserve(std::size(windows) + std::size(new_windows));
+            windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
+        }
 
         return windows;
     }

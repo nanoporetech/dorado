@@ -22,6 +22,7 @@
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/ssize.h"
+#include "utils/string_utils.h"
 #include "utils/timer_high_res.h"
 
 #include <cxxpool.h>
@@ -113,13 +114,42 @@ struct Options {
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
-    std::string region;
+    std::vector<std::string> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
     int32_t min_mapq = -1;
     // int32_t min_depth = 0;
 };
+
+/// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
+///         separated list of regions in the given string.
+std::vector<std::string> parse_regions(const std::string& regions_arg) {
+    if (std::empty(regions_arg)) {
+        return {};
+    }
+
+    // Check if the string points to a file on disk.
+    if (std::filesystem::exists(regions_arg)) {
+        // Parse the BED-like format.
+        std::vector<std::string> ret;
+        std::ifstream ifs(regions_arg);
+        std::string line;
+        while (std::getline(ifs, line)) {
+            std::istringstream iss(line);
+            std::string chr;
+            int64_t start = 0;
+            int64_t end = 0;
+            iss >> chr >> start >> end;
+            ret.emplace_back(chr + ":" + std::to_string(start + 1) + "-" + std::to_string(end));
+        }
+        return ret;
+    } else {
+        return dorado::utils::split(regions_arg, ',');
+    }
+
+    return {};
+}
 
 /// \brief Define the CLI options.
 ParserPtr create_cli(int& verbosity) {
@@ -153,9 +183,13 @@ ParserPtr create_cli(int& verbosity) {
                 .nargs(0)
                 .action([&](const auto&) { ++verbosity; })
                 .append();
+        parser->visible.add_argument("--quiet")
+                .help("Minimal logging, warning level and above.")
+                .default_value(false)
+                .implicit_value(true);
     }
     {
-        parser->visible.add_group("Input/output arguments");
+        parser->visible.add_group("Input/output options");
         parser->visible.add_argument("-o", "--out-path")
                 .help("Output to a file instead of stdout.");
         parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
@@ -165,7 +199,7 @@ ParserPtr create_cli(int& verbosity) {
                 .implicit_value(true);
     }
     {
-        parser->visible.add_group("Advanced arguments");
+        parser->visible.add_group("Advanced options");
         parser->visible.add_argument("-b", "--batch-size")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
                 .default_value(100)
@@ -190,17 +224,42 @@ ParserPtr create_cli(int& verbosity) {
                       "regions of this size for parallel processing.")
                 .default_value(100000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--region")
-                .help("Process only this region of the input. Htslib format (start is 1-based, end "
-                      "is inclusive).");
+
+        // parser->visible.add_argument("--no-fillgaps")
+        //         .help("Do not fill gaps in consensus sequence with draft sequence.")
+        //         .default_value(false)
+        //         .implicit_value(true);
+        // parser->visible.add_argument("--fill-char")
+        //         .help("Use a designated character to fill gaps.");
+
+        // }
+        // {
+        //     parser->visible.add_group("Filtering options");
+
+        parser->visible.add_argument("--regions")
+                .help("Process only these regions of the input. Can be either a path to a BED file "
+                      "or a list of comma-separated Htslib-formatted regions (start is 1-based, "
+                      "end "
+                      "is inclusive).")
+                .default_value("");
+        // parser->visible.add_argument("--RG").help("Read group to select.");
+        // parser->visible.add_argument("--ignore-read-groups")
+        //         .help("Ignore read groups in bam file.")
+        //         .default_value(false)
+        //         .implicit_value(true);
+        // parser->visible.add_argument("--tag-name").help("Two-letter BAM tag name.");
+        // parser->visible.add_argument("--tag-value").help("Value of the tag.");
+        // parser->visible.add_argument("--tag-keep-missing")
+        //         .help("Keep alignments when tag is missing.")
+        //         .default_value(false)
+        //         .implicit_value(true);
         parser->visible.add_argument("--min-mapq")
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
                 .default_value(-1)
                 .scan<'i', int>();
-
         // parser->visible.add_argument("--min-depth")
-        //         .help("Sites with depth lower than min_depth will not be polished.")
+        //         .help("Sites with depth lower than this value will not be polished.")
         //         .default_value(0)
         //         .scan<'i', int>();
     }
@@ -282,8 +341,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
-    opt.region =
-            (parser.visible.is_used("--region")) ? parser.visible.get<std::string>("region") : "";
+    opt.regions = parse_regions(parser.visible.get<std::string>("regions"));
     opt.min_mapq = parser.visible.get<int>("min-mapq");
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
@@ -1025,7 +1083,7 @@ void run_polishing(const Options& opt,
     // Compute the total number of BAM regions over the entire input file.
     {
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
-                draft_lens, opt.bam_chunk, opt.window_overlap, opt.region);
+                draft_lens, opt.bam_chunk, opt.window_overlap, opt.regions);
 
         polish_stats.update("total", static_cast<double>(total_input_bases));
         polish_stats.update("processed", 0.0);
@@ -1041,7 +1099,7 @@ void run_polishing(const Options& opt,
                 std::begin(draft_lens) + draft_batch.start,
                 std::begin(draft_lens) + draft_batch.end);
         const std::vector<polisher::Window> bam_regions = polisher::create_bam_regions(
-                draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.region);
+                draft_lens_batch, opt.bam_chunk, opt.window_overlap, opt.regions);
 
         const int64_t total_bases = std::accumulate(
                 std::begin(draft_lens_batch), std::end(draft_lens_batch), static_cast<int64_t>(0),

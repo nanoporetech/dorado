@@ -77,7 +77,7 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::string& region_str);
+        const std::vector<std::string>& regions);
 
 std::vector<Sample> encode_regions_in_parallel(
         std::vector<BamFile>& bam_handles,
