@@ -24,12 +24,14 @@ Preparing test data here. This block does not actually run tests. The data produ
 Polish with a very LARGE draft batch size - all sequences should be in a single batch.
 There are 3 input sequences, so 3 NM lines and length lines.
   $ ${DORADO_BIN} polish --device cpu --draft-batch-size 200M out/in.aln.bam out/in.draft.fasta -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/stderr
+  > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   > grep "draft sequences: 0-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  Exit code: 0
   NM:i:2
   NM:i:2
   NM:i:2
@@ -42,6 +44,7 @@ There are 3 input sequences, so 3 NM lines and length lines.
 Polish with a very SMALL draft batch size - each sequence should be in an individual batch.
 There are 3 input sequences, so 3 NM lines and length lines.
   $ ${DORADO_BIN} polish --device cpu --draft-batch-size 1 out/in.aln.bam out/in.draft.fasta -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/stderr
+  > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fasta
@@ -50,6 +53,7 @@ There are 3 input sequences, so 3 NM lines and length lines.
   > grep "draft sequences: 0-1/3" out/stderr | wc -l | awk '{ print $1 }'
   > grep "draft sequences: 1-2/3" out/stderr | wc -l | awk '{ print $1 }'
   > grep "draft sequences: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  Exit code: 0
   NM:i:2
   NM:i:2
   NM:i:2
@@ -64,6 +68,7 @@ There are 3 input sequences, so 3 NM lines and length lines.
 Polish with a draft batch that fits 2 sequences. There will be 2 batches - first one with 2 sequences and second one with 1 sequence.
 There are 3 input sequences, so 3 NM lines and length lines.
   $ ${DORADO_BIN} polish --device cpu --draft-batch-size 20k out/in.aln.bam out/in.draft.fasta -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/stderr
+  > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fasta
@@ -71,6 +76,7 @@ There are 3 input sequences, so 3 NM lines and length lines.
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   > grep "draft sequences: 0-2/3" out/stderr | wc -l | awk '{ print $1 }'
   > grep "draft sequences: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  Exit code: 0
   NM:i:2
   NM:i:2
   NM:i:2
@@ -83,10 +89,14 @@ There are 3 input sequences, so 3 NM lines and length lines.
 
 Edge case test - draft batch size < 0.
   $ ${DORADO_BIN} polish --device cpu --draft-batch-size -1 out/in.aln.bam out/in.draft.fasta -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/stderr
+  > echo "Exit code: $?"
   > grep "Draft batch size should be > 0" out/stderr | wc -l | awk '{ print $1 }'
+  Exit code: 1
   1
 
 Edge case test - draft batch size == 0.
   $ ${DORADO_BIN} polish --device cpu --draft-batch-size 0 out/in.aln.bam out/in.draft.fasta -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/stderr
+  > echo "Exit code: $?"
   > grep "Draft batch size should be > 0" out/stderr | wc -l | awk '{ print $1 }'
+  Exit code: 1
   1
