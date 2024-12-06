@@ -237,7 +237,7 @@ ModBaseInfo get_modbase_info(
         const auto& params = params_ref.get().mods;
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
-            throw std::runtime_error("Invalid base in remora model metadata.");
+            throw std::runtime_error("Invalid base in modbase model metadata.");
         }
         auto& map_entry = model_info[utils::BaseInfo::BASE_IDS[base]];
         map_entry.long_names = params.long_names;

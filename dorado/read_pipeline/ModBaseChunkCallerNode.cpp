@@ -58,10 +58,10 @@ struct ModBaseChunkCallerNode::WorkingRead {
 };
 
 ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
-                                               size_t remora_threads,
+                                               size_t modbase_threads,
                                                size_t canonical_stride,
                                                size_t max_reads)
-        : MessageSink(max_reads, static_cast<int>(remora_threads)),
+        : MessageSink(max_reads, static_cast<int>(modbase_threads)),
           m_runners(std::move(model_runners)),
           m_canonical_stride(canonical_stride),
           m_batch_size(m_runners.at(0)->batch_size()),

@@ -540,7 +540,7 @@ void setup(const std::vector<std::string>& args,
     api::create_simplex_pipeline(
             pipeline_desc, std::move(runners), std::move(modbase_runners), mean_qscore_start_pos,
             thread_allocations.scaler_node_threads, true /* Enable read splitting */,
-            thread_allocations.splitter_node_threads, thread_allocations.remora_threads,
+            thread_allocations.splitter_node_threads, thread_allocations.modbase_threads,
             current_sink_node, PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
@@ -862,14 +862,14 @@ int basecaller(int argc, char* argv[]) {
     bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
                                     parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const int remora_threads =
-            utils::get_dev_opt<int>("modbase_threads", default_parameters.remora_threads);
+    const int modbase_threads =
+            utils::get_dev_opt<int>("modbase_threads", default_parameters.modbase_threads);
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
-              modbase_batchsize, remora_threads, methylation_threshold, std::move(hts_file),
+              modbase_batchsize, modbase_threads, methylation_threshold, std::move(hts_file),
               parser.visible.get<bool>("--emit-moves"), parser.visible.get<int>("--max-reads"),
               parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), *minimap_options,

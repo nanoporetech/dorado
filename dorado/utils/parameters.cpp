@@ -6,7 +6,7 @@
 namespace dorado::utils {
 
 ThreadAllocations default_thread_allocations(int num_devices,
-                                             int num_remora_threads,
+                                             int num_modbase_threads,
                                              bool enable_aligner,
                                              bool enable_barcoder,
                                              bool adapter_trimming) {
@@ -15,13 +15,13 @@ ThreadAllocations default_thread_allocations(int num_devices,
     allocs.writer_threads = num_devices * 2;
     allocs.read_converter_threads = num_devices * 2;
     allocs.read_filter_threads = num_devices * 2;
-    allocs.remora_threads = num_devices * num_remora_threads;
+    allocs.modbase_threads = num_devices * num_modbase_threads;
     allocs.scaler_node_threads = num_devices * 4;
     allocs.splitter_node_threads = num_devices;
     allocs.loader_threads = num_devices;
     int total_threads_used =
             (allocs.writer_threads + allocs.read_converter_threads + allocs.read_filter_threads +
-             allocs.remora_threads + allocs.scaler_node_threads + allocs.loader_threads +
+             allocs.modbase_threads + allocs.scaler_node_threads + allocs.loader_threads +
              allocs.splitter_node_threads);
     int remaining_threads = max_threads - total_threads_used;
     remaining_threads = std::max(num_devices * 10, remaining_threads);

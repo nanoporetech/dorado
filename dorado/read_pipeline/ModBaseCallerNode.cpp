@@ -25,12 +25,12 @@ namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
-struct ModBaseCallerNode::RemoraChunk {
-    RemoraChunk(std::shared_ptr<WorkingRead> read,
-                at::Tensor input_signal,
-                std::vector<int8_t> kmer_data,
-                size_t position,
-                bool template_direction)
+struct ModBaseCallerNode::ModBaseChunk {
+    ModBaseChunk(std::shared_ptr<WorkingRead> read,
+                 at::Tensor input_signal,
+                 std::vector<int8_t> kmer_data,
+                 size_t position,
+                 bool template_direction)
             : working_read(std::move(read)),
               signal(std::move(input_signal)),
               encoded_kmers(std::move(kmer_data)),
@@ -53,10 +53,10 @@ struct ModBaseCallerNode::WorkingRead {
 };
 
 ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runners,
-                                     size_t remora_threads,
+                                     size_t modbase_threads,
                                      size_t block_stride,
                                      size_t max_reads)
-        : MessageSink(max_reads, static_cast<int>(remora_threads)),
+        : MessageSink(max_reads, static_cast<int>(modbase_threads)),
           m_runners(std::move(model_runners)),
           m_block_stride(block_stride),
           m_batch_size(m_runners[0]->batch_size()),
@@ -65,8 +65,8 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
     init_modbase_info();
     for (size_t i = 0; i < m_runners[0]->num_models(); i++) {
         m_chunk_queues.emplace_back(
-                std::make_unique<utils::AsyncQueue<std::unique_ptr<RemoraChunk>>>(m_batch_size *
-                                                                                  5));
+                std::make_unique<utils::AsyncQueue<std::unique_ptr<ModBaseChunk>>>(m_batch_size *
+                                                                                   5));
     }
 }
 
@@ -161,7 +161,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
 
         // all runners have the same set of callers, so we only need to use the first one
         auto& runner = m_runners[0];
-        std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
+        std::vector<std::vector<std::unique_ptr<ModBaseChunk>>> chunks_to_enqueue_by_caller(
                 runner->num_models());
 
         std::vector<unsigned long> all_context_hits;
@@ -248,7 +248,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
                                 read->read_common.seq.size() - (context_hit + target_start + 1));
                     }
 
-                    chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
+                    chunks_to_enqueue.push_back(std::make_unique<ModBaseChunk>(
                             working_read, input_signal, std::move(slice.data),
                             context_hit_in_duplex_space, is_template_direction));
 
@@ -317,7 +317,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
 
     // all runners have the same set of callers, so we only need to use the first one
     auto& runner = m_runners[0];
-    std::vector<std::vector<std::unique_ptr<RemoraChunk>>> chunks_to_enqueue_by_caller(
+    std::vector<std::vector<std::unique_ptr<ModBaseChunk>>> chunks_to_enqueue_by_caller(
             runner->num_models());
     for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
         nvtx3::scoped_range range{"generate_chunks"};
@@ -361,7 +361,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
                         input_signal,
                         {(int64_t)slice.lead_samples_needed, (int64_t)slice.tail_samples_needed});
             }
-            chunks_to_enqueue.push_back(std::make_unique<RemoraChunk>(
+            chunks_to_enqueue.push_back(std::make_unique<ModBaseChunk>(
                     working_read, input_signal, std::move(slice.data), context_hit, true));
 
             ++working_read->num_modbase_chunks;
@@ -420,7 +420,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    std::vector<std::unique_ptr<RemoraChunk>> batched_chunks;
+    std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
     size_t previous_chunk_count = 0;
@@ -428,7 +428,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
-        auto grab_chunk = [&batched_chunks](std::unique_ptr<RemoraChunk> chunk) {
+        auto grab_chunk = [&batched_chunks](std::unique_ptr<ModBaseChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
         const auto status = chunk_queue->process_and_pop_n_with_timeout(
@@ -482,7 +482,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
 void ModBaseCallerNode::call_current_batch(
         size_t worker_id,
         size_t caller_id,
-        std::vector<std::unique_ptr<RemoraChunk>>& batched_chunks) {
+        std::vector<std::unique_ptr<ModBaseChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_current_batch"};
 
     dorado::stats::Timer timer;
@@ -520,8 +520,8 @@ void ModBaseCallerNode::output_worker_thread() {
 
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
-    std::vector<std::unique_ptr<RemoraChunk>> processed_chunks;
-    auto grab_chunk = [&processed_chunks](std::unique_ptr<RemoraChunk> chunk) {
+    std::vector<std::unique_ptr<ModBaseChunk>> processed_chunks;
+    auto grab_chunk = [&processed_chunks](std::unique_ptr<ModBaseChunk> chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
     while (m_processed_chunks.process_and_pop_n(grab_chunk, m_processed_chunks.capacity()) ==
