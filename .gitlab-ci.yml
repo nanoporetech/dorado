@@ -549,6 +549,7 @@ build_archive:macos:x64:
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
     - bash ./tests/test_dorado_correct_cram.sh ./dist/bin/dorado
+    - bash ./tests/test_dorado_polish.sh ./dist/bin/dorado
 
 .test_dorado_windows:
   stage: test
