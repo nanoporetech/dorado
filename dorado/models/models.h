@@ -38,6 +38,7 @@ const ModelList& simplex_models();
 const ModelList& stereo_models();
 const ModelList& modified_models();
 const ModelList& correction_models();
+const ModelList& polish_models();
 
 std::vector<std::string> simplex_model_names();
 std::vector<std::string> stereo_model_names();

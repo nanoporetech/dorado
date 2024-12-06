@@ -35,6 +35,7 @@ bool download_models(const std::string& target_directory, const std::string& sel
     download_model_set(models::stereo_models());
     download_model_set(models::modified_models());
     download_model_set(models::correction_models());
+    download_model_set(models::polish_models());
 
     return success;
 }
