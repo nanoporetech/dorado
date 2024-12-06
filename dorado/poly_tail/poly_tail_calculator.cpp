@@ -51,6 +51,14 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
     }
 
     float avg = average_samples_per_base(sizes);
+
+    // filter out reads that are outside a reasonable range
+    // these will likely be very bad reads, and allowing too
+    // large a value makes these take an excessively long time
+    if (avg > 1000 || avg < 1) {
+        return {0.f, 0.f};
+    }
+
     auto quantiles = dorado::utils::quantiles(sizes, {0.1f, 0.9f});
     float sum_diff_2 = 0.f;
     int count = 0;
@@ -247,6 +255,9 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                   signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
 
     auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
+    if (num_samples_per_base == 0) {
+        return 0;
+    }
 
     // Walk through signal. Require a minimum of length 10 poly-A since below that
     // the current algorithm returns a lot of false intervals.
