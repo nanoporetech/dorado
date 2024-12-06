@@ -103,13 +103,13 @@ void ModBaseCallerNode::terminate_impl() {
 }
 
 void ModBaseCallerNode::restart() {
+    m_processed_chunks.restart();
     for (auto& runner : m_runners) {
         runner->restart();
     }
     for (auto& chunk_queue : m_chunk_queues) {
         chunk_queue->restart();
     }
-    m_processed_chunks.restart();
     start_threads();
 }
 

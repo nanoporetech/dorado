@@ -457,13 +457,13 @@ void BasecallerNode::terminate_impl() {
 }
 
 void BasecallerNode::restart() {
+    m_processed_chunks.restart();
     for (auto &runner : m_model_runners) {
         runner->restart();
     }
     for (auto &chunk_queue : m_chunk_in_queues) {
         chunk_queue->restart();
     }
-    m_processed_chunks.restart();
     start_threads();
 }
 
