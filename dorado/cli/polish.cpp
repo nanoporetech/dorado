@@ -1293,14 +1293,12 @@ int polish(int argc, char* argv[]) {
         if (!std::empty(opt.model_path) && std::filesystem::exists(opt.model_path)) {
             model_dir = opt.model_path;
             spdlog::info("Using a model specified by path: {}", opt.model_path.string());
-            spdlog::info("Model directory: {}", model_dir.string());
         } else {
             constexpr std::string_view DEFAULT_MODEL = "read_level_lstm384_unidirectional_20241204";
             const std::string model_name = std::empty(opt.model_path) ? std::string(DEFAULT_MODEL)
                                                                       : opt.model_path.string();
             spdlog::info("Downloading model: '{}'", model_name);
             model_dir = download_model(model_name);
-            spdlog::info("Model directory: {}", model_dir.string());
         }
 
         spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
