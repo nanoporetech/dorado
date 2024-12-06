@@ -93,10 +93,7 @@ int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
 int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
-
-    const int64_t stride = params.general.sig_stride / params.general.seq_stride;
-    const int64_t chunk_size = get_sig_len() / stride;
-    return chunk_size;
+    return get_sig_len();
 }
 
 ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
@@ -178,7 +175,7 @@ at::Tensor ModBaseCaller::call_chunks(size_t model_id,
                                       at::Tensor& input_seqs,
                                       int num_chunks) {
     NVTX3_FUNC_RANGE();
-    auto& model_data = m_model_data[model_id];
+    auto& model_data = m_model_data.at(model_id);
     auto task = std::make_shared<ModBaseTask>(input_sigs.to(m_options.device()),
                                               input_seqs.to(m_options.device()), num_chunks);
     {

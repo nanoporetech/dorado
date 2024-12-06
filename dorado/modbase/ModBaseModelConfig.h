@@ -30,36 +30,22 @@ struct ModelGeneralParams {
     const int size{0};
     const int kmer_len{0};
     const int num_out{0};
-    const int sig_stride{0};
-    const int seq_stride{0};
-    const int enc_kmer_stride{0};
+    const int stride{0};
 
-    ModelGeneralParams(ModelType model_type_,
-                       int size_,
-                       int kmer_len_,
-                       int num_out_,
-                       int sig_stride_,
-                       int seq_stride_,
-                       int enc_kmer_stride_)
+    ModelGeneralParams(ModelType model_type_, int size_, int kmer_len_, int num_out_, int stride_)
             : model_type(model_type_),
               size(size_),
               kmer_len(kmer_len_),
               num_out(num_out_),
-              sig_stride(sig_stride_),
-              seq_stride(seq_stride_),
-              enc_kmer_stride(enc_kmer_stride_) {
+              stride(stride_) {
         if (model_type == ModelType::UNKNOWN) {
             throw std::runtime_error(err + "general params: 'model type not set or unknown'");
         }
-        if (size < 1 || kmer_len < 1 || num_out < 1 || sig_stride < 1 || seq_stride < 1) {
+        if (size < 1 || kmer_len < 1 || num_out < 1 || stride < 1) {
             throw std::runtime_error(err + "general params: 'negative or zero value'.");
         }
         if (kmer_len % 2 != 1) {
             throw std::runtime_error(err + "general params: 'kmer_length is not odd'.");
-        }
-        if (seq_stride != sig_stride) {
-            throw std::runtime_error(
-                    err + "general params: 'sequence_stride and signal_stride must be equal'.");
         }
     }
 };
@@ -232,7 +218,7 @@ struct ModBaseModelConfig {
               general(std::move(general_)),
               mods(std::move(mods_)),
               context(general_.model_type == ModelType::CONV_LSTM_V2
-                              ? context_.normalised(general.sig_stride)
+                              ? context_.normalised(general.stride)
                               : std::move(context_)),
               refine(std::move(refine_)) {
         // Kmer length is duplicated in modbase model configs - check they match

@@ -76,15 +76,13 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     constexpr int MAX_SIZE = 4096;
     constexpr int MAX_KMER = 19;
     constexpr int MAX_FEATURES = 10;
-    constexpr int MAX_STRIDE = 12;
+    constexpr int MAX_STRIDE = 6;
     ModelGeneralParams params{
             parse_model_type(config_toml),
             get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
             get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
             get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED),
-            get_int_in_range(segment, "signal_stride", 1, MAX_STRIDE, 3),
-            get_int_in_range(segment, "sequence_stride", 1, MAX_STRIDE, 3),
-            get_int_in_range(segment, "encoded_kmer_stride", 1, MAX_STRIDE, 1),
+            get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3),
     };
     return params;
 }

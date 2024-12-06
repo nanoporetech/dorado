@@ -145,23 +145,18 @@ const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
 };
 
 struct ModBaseConvLSTMModelImpl : Module {
-    ModBaseConvLSTMModelImpl(int size,
-                             int kmer_len,
-                             int num_out,
-                             bool is_conv_lstm_v2,
-                             int sig_stride,
-                             int seq_stride)
+    ModBaseConvLSTMModelImpl(int size, int kmer_len, int num_out, bool is_conv_lstm_v2, int stride)
             : m_is_conv_lstm_v2(is_conv_lstm_v2) {
         // conv_lstm_v2 models are padded to ensure the output shape is nicely indexable by the stride
         sig_conv1 = register_module("sig_conv1", ModsConv(1, 4, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
         sig_conv2 = register_module("sig_conv2", ModsConv(4, 16, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
         sig_conv3 = register_module("sig_conv3",
-                                    ModsConv(16, size, 9, sig_stride, m_is_conv_lstm_v2 ? 4 : 0));
+                                    ModsConv(16, size, 9, stride, m_is_conv_lstm_v2 ? 4 : 0));
 
         seq_conv1 = register_module("seq_conv1",
                                     ModsConv(kmer_len * 4, 16, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
         seq_conv2 = register_module("seq_conv2",
-                                    ModsConv(16, size, 13, seq_stride, m_is_conv_lstm_v2 ? 6 : 0));
+                                    ModsConv(16, size, 13, stride, m_is_conv_lstm_v2 ? 6 : 0));
 
         merge_conv1 = register_module("merge_conv1",
                                       ModsConv(size * 2, size, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
@@ -283,12 +278,12 @@ dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config
     switch (params.model_type) {
     case ModelType::CONV_LSTM_V1: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, false,
-                                              params.sig_stride, params.seq_stride);
+                                              params.stride);
         return populate_model(model, config.model_path, options);
     }
     case ModelType::CONV_LSTM_V2: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
-                                              params.sig_stride, params.seq_stride);
+                                              params.stride);
         return populate_model(model, config.model_path, options);
     }
     case ModelType::CONV_V1: {

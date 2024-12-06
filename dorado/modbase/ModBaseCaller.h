@@ -76,7 +76,7 @@ public:
 
     stats::NamedStats sample_stats() const;
 
-    const std::unique_ptr<ModBaseData>& modbase_model_data(size_t model_idx) {
+    const std::unique_ptr<ModBaseData>& modbase_model_data(size_t model_idx) const {
         return m_model_data.at(model_idx);
     }
     size_t num_models() const { return m_model_data.size(); }

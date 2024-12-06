@@ -192,37 +192,16 @@ void ModBaseChunkCallerNode::validate_runners() const {
             throw std::runtime_error(name + "model strides are not compatible.");
         }
 
-        if (m_canonical_stride % config.general.sig_stride != 0) {
-            spdlog::error(
-                    "{} canonical_model_stride:{} is not divisible by modbase_signal_stride:{}.",
-                    name, m_canonical_stride, config.general.sig_stride);
+        if (m_canonical_stride % config.general.stride != 0) {
+            spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
+                          name, m_canonical_stride, config.general.stride);
             throw std::runtime_error(name + "model strides are not compatible.");
         }
 
-        if (m_canonical_stride % config.general.seq_stride != 0) {
-            spdlog::error(
-                    "{} canonical_model_stride:{} is not divisible by modbase_sequence_stride:{}.",
-                    name, m_canonical_stride, config.general.seq_stride);
-            throw std::runtime_error(name + "model strides are not compatible.");
-        }
-
-        if (ctx.chunk_size % config.general.sig_stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by modbase_signal_stride:{}.", name,
-                          ctx.chunk_size, config.general.sig_stride);
+        if (ctx.chunk_size % config.general.stride != 0) {
+            spdlog::error("{} chunk_size:{} is not divisible by modbase_stride:{}.", name,
+                          ctx.chunk_size, config.general.stride);
             throw std::runtime_error(name + "model stride and chunk size are not compatible.");
-        }
-
-        if (ctx.chunk_size % config.general.seq_stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by modbase_sequence_stride:{}.", name,
-                          ctx.chunk_size, config.general.seq_stride);
-            throw std::runtime_error(name + "model stride and chunk size are not compatible.");
-        }
-
-        if (config.general.sig_stride % config.general.seq_stride != 0) {
-            spdlog::error(
-                    "{} modbase_signal_stride:{} is not divisible by modbase_sequence_stride:{}.",
-                    name, ctx.chunk_size, config.general.seq_stride);
-            throw std::runtime_error(name + "model strides are not compatible.");
         }
 
         if (ctx.kmer_len != m_kmer_len) {
@@ -731,7 +710,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         }
 
         const auto& cfg = runner->model_params(chunk->model_id);
-        const int64_t modbase_stride = cfg.general.sig_stride;
+        const int64_t modbase_stride = cfg.general.stride;
         const int64_t chunk_size = cfg.context.chunk_size;
         const int64_t context_samples_before = cfg.context.samples_before;
         const int64_t context_samples_after = cfg.context.samples_after;
