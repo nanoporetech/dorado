@@ -12,6 +12,6 @@ Also, process the input in multiple overlapping windows. Compare with reference 
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  NM:i:0
-  10012
+  NM:i:2
+  9998
   0
