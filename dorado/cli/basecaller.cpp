@@ -267,7 +267,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.visible.add_argument("-o", "--overlap")
+        parser.visible.add_argument("--overlap")
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
