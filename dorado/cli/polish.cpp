@@ -242,10 +242,6 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Use a designated character to fill gaps.")
                 .default_value("");
 
-        // }
-        // {
-        //     parser->visible.add_group("Filtering options");
-
         parser->visible.add_argument("--regions")
                 .help("Process only these regions of the input. Can be either a path to a BED file "
                       "or a list of comma-separated Htslib-formatted regions (start is 1-based, "
@@ -253,10 +249,10 @@ ParserPtr create_cli(int& verbosity) {
                       "is inclusive).")
                 .default_value("");
         parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
-        parser->visible.add_argument("--ignore-read-groups")
-                .help("Ignore read groups in bam file.")
-                .default_value(false)
-                .implicit_value(true);
+        // parser->visible.add_argument("--ignore-read-groups")
+        //         .help("Ignore read groups in bam file.")
+        //         .default_value(false)
+        //         .implicit_value(true);
         parser->visible.add_argument("--tag-name")
                 .help("Two-letter BAM tag name.")
                 .default_value("");
@@ -371,7 +367,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
                             ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
                             : std::nullopt;
     opt.read_group = parser.visible.get<std::string>("RG");
-    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
+    // opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
     opt.tag_value = parser.visible.get<int>("tag-value");
     opt.tag_keep_missing =
