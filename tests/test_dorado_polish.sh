@@ -46,22 +46,12 @@ fi
 CRAM=$(pwd)/cram-0.6/cram.py
 popd
 
-# # Set the model directory for the tests.
-# MODEL_DIR=${output_dir}/herro-v1
-# # Download the model once.
-# if [[ ! -d "${MODEL_DIR}" ]]; then
-#     ${DORADO_BIN} download --model "herro-v1" --models-directory ${output_dir}
-# fi
-# MODEL_DIR="${HOME}/work/gitlab/medaka/model-dump/r1041_e82_400bps_hac_v5.0.0"
-MODEL_DIR="${HOME}/work/data/testing/dorado-polish/models-rw/v02/r1041_e82_400bps_hac_v5.0.0_model_gru_export/model"
-
-# mkdir -p ${output_dir}/models
-# pushd ${output_dir}/models
-# curl -o r1041_e82_400bps_hac_v5.0.0.tar.gz https://artifactory.oxfordnanolabs.local/ui/repos/tree/General/Dorado/private_models/r1041_e82_400bps_hac_v5.0.0.tar.gz
-# tar -xzvf r1041_e82_400bps_hac_v5.0.0.tar.gz
-# ls -lhrt
-# MODEL_DIR=$(pwd)
-# popd
+# Download the model once.
+MODEL_NAME="read_level_lstm384_unidirectional_20241204"
+MODEL_DIR=${output_dir}/${MODEL_NAME}
+if [[ ! -d "${MODEL_DIR}" ]]; then
+    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
+fi
 
 export DORADO_BIN
 export TEST_DATA_DIR
