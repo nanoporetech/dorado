@@ -6,7 +6,7 @@ Also, process the input in multiple overlapping windows. Compare with reference 
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --window-len 1000 --window-overlap 100 --bam-chunk 7000 ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/stderr
+  > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 7000 ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/stderr
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fasta
