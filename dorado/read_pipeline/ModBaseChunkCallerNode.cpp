@@ -9,11 +9,14 @@
 #include "utils/thread_naming.h"
 #include "utils/types.h"
 
+#include <ATen/Functions.h>
+#include <ATen/TensorIndexing.h>
+#include <ATen/TensorOperators.h>
+#include <ATen/core/TensorBody.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <algorithm>
 #include <atomic>
@@ -29,8 +32,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-using namespace torch::indexing;
 
 namespace {
 using namespace std::chrono_literals;
@@ -563,7 +564,8 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
                 throw std::runtime_error("Modbase chunking failed.");
             }
 
-            auto signal_chunk = chunk->working_read->signal.index({Slice(start, end)});
+            auto signal_chunk =
+                    chunk->working_read->signal.index({at::indexing::Slice(start, end)});
             // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
             auto encoded_kmers_chunk = std::vector<int8_t>(
                     chunk->working_read->encoded_kmers.begin() + start * kmer_size_per_sample,
@@ -573,9 +575,9 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
             if (len < chunk_size) {
                 // Tile the signal tensor
                 auto [n_tiles, overhang] = std::div(chunk_size, len);
-                signal_chunk = at::concat(
-                        {signal_chunk.repeat({n_tiles}), signal_chunk.index({Slice(0, overhang)})},
-                        -1);
+                signal_chunk = at::concat({signal_chunk.repeat({n_tiles}),
+                                           signal_chunk.index({at::indexing::Slice(0, overhang)})},
+                                          -1);
                 // Tile the kmer vector
                 const int64_t original_size = static_cast<int64_t>(encoded_kmers_chunk.size());
                 const int64_t extended_size = chunk_size * kmer_size_per_sample;
