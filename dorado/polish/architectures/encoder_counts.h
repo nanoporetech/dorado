@@ -9,8 +9,8 @@
 #include <torch/torch.h>
 #include <torch/types.h>
 
+#include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace dorado::polisher {
@@ -27,7 +27,7 @@ public:
 
     EncoderCounts(const NormaliseType normalise_type,
                   const std::vector<std::string>& dtypes,
-                  const std::string_view tag_name,
+                  const std::string& tag_name,
                   const int32_t tag_value,
                   const bool tag_keep_missing,
                   const std::string& read_group,

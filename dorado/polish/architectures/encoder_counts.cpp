@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
 
+#include <cstddef>
 #include <stdexcept>
 
 namespace dorado::polisher {
@@ -288,7 +289,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
 
 EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
                              const std::vector<std::string>& dtypes,
-                             const std::string_view tag_name,
+                             const std::string& tag_name,
                              const int32_t tag_value,
                              const bool tag_keep_missing,
                              const std::string& read_group,

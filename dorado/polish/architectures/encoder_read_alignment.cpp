@@ -313,7 +313,7 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 }  // namespace
 
 EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtypes,
-                                           const std::string_view tag_name,
+                                           const std::string& tag_name,
                                            const int32_t tag_value,
                                            const bool tag_keep_missing,
                                            const std::string& read_group,
