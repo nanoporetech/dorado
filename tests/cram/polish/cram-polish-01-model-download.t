@@ -6,7 +6,6 @@ Unknown model.
   > model="unknown"
   > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 2000 ${in_bam} ${in_draft} -t 4 --infer-threads 1 --model-path "${model}" -vv > out/out.fasta 2> out/stderr
   > grep "Selected model doesn't exist" out/stderr | wc -l | awk '{ print $1 }'
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/
   1
 
 Download a model by name.
