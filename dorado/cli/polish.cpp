@@ -104,6 +104,7 @@ struct Options {
     std::filesystem::path model_path;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
+    bool quiet = false;
     int32_t threads = 0;
     int32_t infer_threads = 1;
     bool infer_threads_is_set = false;
@@ -357,6 +358,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
+    opt.quiet = parser.visible.get<bool>("quiet");
     opt.regions = parse_regions(parser.visible.get<std::string>("regions"));
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
@@ -1262,15 +1264,14 @@ int polish(int argc, char* argv[]) {
         // Initialize the options from the CLI.
         const Options opt = set_options(*parser, verbosity);
 
-        if (opt.verbosity == 0) {
+        if (opt.quiet) {
+            spdlog::set_level(spdlog::level::warn);
+        } else if (opt.verbosity == 0) {
             spdlog::set_level(spdlog::level::info);
         } else if (opt.verbosity == 1) {
             spdlog::set_level(spdlog::level::debug);
-        } else if (opt.verbosity == 2) {
+        } else if (opt.verbosity >= 2) {
             spdlog::set_level(spdlog::level::trace);
-        } else {
-            // Disable everything but warnings and errors.
-            spdlog::set_level(spdlog::level::warn);
         }
 
         spdlog::flush_every(std::chrono::seconds(1));
