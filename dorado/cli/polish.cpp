@@ -85,6 +85,12 @@ enum class OutputFormat {
     FASTQ,
 };
 
+struct BamInfo {
+    bool uses_dorado_aligner = false;
+    bool has_dwells = false;
+    std::unordered_set<std::string> read_groups;
+};
+
 struct PolisherResources {
     std::unique_ptr<polisher::EncoderBase> encoder;
     std::unique_ptr<polisher::FeatureDecoder> decoder;
@@ -128,6 +134,9 @@ struct Options {
     std::string tag_name;
     int32_t tag_value = 0;
     std::optional<bool> tag_keep_missing;
+
+    bool any_bam = false;
+
     // int32_t min_depth = 0;
 };
 
@@ -283,13 +292,16 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Always use full precision for inference.")
                 .default_value(false)
                 .implicit_value(true);
-
         parser->hidden.add_argument("--queue-size")
                 .help("Queue size for processing.")
                 .default_value(1000)
                 .scan<'i', int>();
         parser->hidden.add_argument("--scripted")
                 .help("Load the scripted Torch model instead of building one internally.")
+                .default_value(false)
+                .implicit_value(true);
+        parser->hidden.add_argument("--any-bam")
+                .help("Allow any BAM as input, not just Dorado aligned.")
                 .default_value(false)
                 .implicit_value(true);
     }
@@ -361,6 +373,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.full_precision = parser.hidden.get<bool>("full-precision");
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
+    opt.any_bam = parser.hidden.get<bool>("any-bam");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
@@ -639,6 +652,68 @@ std::filesystem::path download_model(const std::string& model_name) {
         std::exit(EXIT_FAILURE);
     }
     return (tmp_dir / model_name);
+}
+
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
+    BamInfo ret;
+
+    BamFile bam(in_aln_bam_fn);
+
+    const std::vector<HeaderLineData> header = bam.parse_header();
+
+    // header_to_stream(std::cerr, header);
+
+    // Get info from headers: program and the read groups.
+    for (const auto& line : header) {
+        // Convert all tags into a lookup.
+        const std::unordered_map<std::string, std::string> tags = [&]() {
+            std::unordered_map<std::string, std::string> local_ret;
+            for (const auto& [key, value] : line.tags) {
+                local_ret[key] = value;
+            }
+            return local_ret;
+        }();
+
+        if (line.header_type == "@PG") {
+            const auto& it_pn = tags.find("PN");
+            const auto& it_id = tags.find("ID");
+            if ((it_pn != std::end(tags)) && it_id != std::end(tags)) {
+                // Convert the program name to lowercase just in case.
+                std::string pn = it_pn->second;
+                std::transform(std::begin(pn), std::end(pn), std::begin(pn),
+                               [](unsigned char c) { return std::tolower(c); });
+
+                // Convert the program ID to lowercase just in case.
+                std::string id = it_id->second;
+                std::transform(std::begin(id), std::end(id), std::begin(id),
+                               [](unsigned char c) { return std::tolower(c); });
+
+                if ((pn == "dorado") && (id.rfind("aligner", 0) == 0)) {
+                    // The id.rfind performs a startswith comparison, because a tool
+                    // may be run multiple times and the ID field needs to be unique.
+                    // Example possibilites: aligner, aligner.1, samtools.1, samtools.2, etc.
+                    ret.uses_dorado_aligner = true;
+                }
+            }
+        } else if (line.header_type == "@RG") {
+            const auto& it_id = tags.find("ID");
+            if (it_id != std::end(tags)) {
+                ret.read_groups.emplace(it_id->second);
+            }
+        }
+    }
+
+    // Check for the dwells ("mv") tag.
+    const bam1_t* record = nullptr;
+    while ((record = bam.get_next())) {
+        if (bam_aux_get(record, "mv") != nullptr) {
+            ret.has_dwells = true;
+        }
+        // Only parse one record, intentionally.
+        break;
+    }
+
+    return ret;
 }
 
 }  // namespace
@@ -1279,6 +1354,24 @@ int polish(int argc, char* argv[]) {
 
         // Check if input options are good.
         validate_options(opt);
+
+        // Get info from BAM needed for the run.
+        const BamInfo bam_info = analyze_bam(opt.in_aln_bam_fn);
+
+        // Debug printing.
+        {
+            spdlog::debug("bam_info.uses_dorado_aligner = {}", bam_info.uses_dorado_aligner);
+            spdlog::debug("bam_info.has_dwells = {}", bam_info.has_dwells);
+            spdlog::debug("bam_info.read_groups:");
+            for (const auto& rg : bam_info.read_groups) {
+                spdlog::debug("    - {}", rg);
+            }
+        }
+
+        // Allow only Dorado aligned BAMs.
+        if ((bam_info.uses_dorado_aligner == false) && (opt.any_bam == false)) {
+            throw std::runtime_error("Input BAM file was not aligned using Dorado.");
+        }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         // at::set_num_interop_threads(opt.threads);
