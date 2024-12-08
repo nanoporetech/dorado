@@ -684,14 +684,20 @@ std::vector<Window> create_bam_regions(
             const auto it = draft_ids.find(region_name);
             if (it == std::end(draft_ids)) {
                 throw std::runtime_error(
-                        "Sequence provided by custom region not found in input! Sequence name: " +
+                        "Sequence specified by custom region not found in input! Sequence name: " +
                         region_name);
             }
             const int32_t seq_id = it->second;
             const int64_t seq_length = draft_lens[seq_id].second;
 
             region_start = std::max<int64_t>(0, region_start);
-            region_end = std::min(seq_length, region_end);
+            region_end = (region_end < 0) ? seq_length : std::min(seq_length, region_end);
+
+            if (region_start >= region_end) {
+                throw std::runtime_error{"Region coordinates not valid. Given: '" + region_str +
+                                         "'. region_start = " + std::to_string(region_start) +
+                                         ", region_end = " + std::to_string(region_end)};
+            }
 
             // Split-up the custom region if it's too long.
             std::vector<Window> new_windows =

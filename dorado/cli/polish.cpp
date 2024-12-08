@@ -121,6 +121,7 @@ struct Options {
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
+    std::optional<std::string> regions_str;
     std::vector<std::string> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
@@ -368,6 +369,10 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.verbosity = verbosity;
     opt.quiet = parser.visible.get<bool>("quiet");
     opt.regions = parse_regions(parser.visible.get<std::string>("regions"));
+    opt.regions_str =
+            (parser.visible.is_used("--regions"))
+                    ? std::optional<std::string>{parser.visible.get<std::string>("regions")}
+                    : std::nullopt;
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
@@ -476,6 +481,11 @@ void validate_options(const Options& opt) {
                 "The tag_name is specified, but it needs to contain exactly two characters. Given: "
                 "'{}'.",
                 opt.tag_name);
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (opt.regions_str && std::empty(opt.regions)) {
+        spdlog::error("Option --regions is specified, but and empty set of regions is given!");
         std::exit(EXIT_FAILURE);
     }
 }
