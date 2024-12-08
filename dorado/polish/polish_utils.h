@@ -21,6 +21,8 @@ std::string tensor_shape_as_string(const torch::Tensor& tensor);
  */
 std::vector<int32_t> parse_int32_vector(const std::string& input);
 
+std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_chunks);
+
 template <typename T>
 void print_container(std::ostream& os, const T& data, const std::string& delimiter) {
     bool first = true;

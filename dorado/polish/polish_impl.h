@@ -57,25 +57,6 @@ std::vector<ConsensusResult> stitch_sequence(
         const std::optional<char>& fill_char,
         [[maybe_unused]] const int32_t seq_id);
 
-std::pair<std::vector<Sample>, std::vector<TrimInfo>> create_samples(
-        std::vector<BamFile>& bam_handles,
-        const EncoderBase& encoder,
-        const std::vector<Window>& bam_regions,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const int32_t num_threads,
-        const int32_t window_len,
-        const int32_t window_overlap,
-        const int32_t bam_subchunk_len);
-
-std::vector<ConsensusResult> infer_samples_in_parallel(
-        const std::vector<Sample>& in_samples,
-        const std::vector<TrimInfo>& in_trims,
-        const std::vector<std::shared_ptr<ModelTorchBase>>& models,
-        const EncoderBase& encoder,
-        const FeatureDecoder& decoder,
-        const int32_t window_len,
-        const int32_t batch_size);
-
 std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,

@@ -1131,10 +1131,6 @@ void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
             // Inference.
             std::vector<polisher::ConsensusResult> results_samples = batch_decode(item, tid);
 
-            //         polisher::infer_samples_in_parallel(item.samples, item.trims, resources.models,
-            //                                             *resources.encoder, *resources.decoder,
-            //                                             opt.window_len, opt.batch_size);
-
             thread_results.insert(std::end(thread_results),
                                   std::make_move_iterator(std::begin(results_samples)),
                                   std::make_move_iterator(std::end(results_samples)));
@@ -1277,19 +1273,6 @@ void run_polishing(const Options& opt,
         if (thread_sample_decoder.joinable()) {
             thread_sample_decoder.join();
         }
-
-        // Produce samples (tensors) for inference.
-        // auto [samples, trims] = polisher::create_samples(
-        //         resources.bam_handles, *resources.encoder, bam_regions, draft_lens_batch,
-        //         opt.threads, opt.window_len, opt.window_overlap, opt.bam_subchunk);
-
-        // spdlog::debug("Produced num samples: {}", std::size(samples));
-
-        // // Inference.
-        // std::vector<polisher::ConsensusResult> results_samples =
-        //         polisher::infer_samples_in_parallel(samples, trims, resources.models,
-        //                                             *resources.encoder, *resources.decoder,
-        //                                             opt.window_len, opt.batch_size);
 
         spdlog::debug(
                 "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
