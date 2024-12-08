@@ -28,10 +28,13 @@ public:
 
     std::vector<HeaderLineData> parse_header() const;
 
+    const bam1_t* get_next();
+
 private:
     std::unique_ptr<htsFile, decltype(&hts_close)> m_fp;
     std::unique_ptr<hts_idx_t, decltype(&hts_idx_destroy)> m_idx;
     std::unique_ptr<sam_hdr_t, decltype(&sam_hdr_destroy)> m_hdr;
+    std::unique_ptr<bam1_t, decltype(&bam_destroy1)> m_current_record;
 };
 
 void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& header);
