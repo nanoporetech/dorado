@@ -51,13 +51,12 @@ std::string relationship_to_string(const Relationship rel) {
 }
 
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs) {
-    return std::tie(lhs.start, lhs.end, lhs.is_last_in_contig, lhs.heuristic) ==
-           std::tie(rhs.start, rhs.end, rhs.is_last_in_contig, rhs.heuristic);
+    return std::tie(lhs.start, lhs.end, lhs.heuristic) ==
+           std::tie(rhs.start, rhs.end, rhs.heuristic);
 }
 
 std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs) {
-    os << "start = " << rhs.start << ", end = " << rhs.end
-       << ", is_last_in_contig = " << rhs.is_last_in_contig << ", heuristic = " << rhs.heuristic;
+    os << "start = " << rhs.start << ", end = " << rhs.end << ", heuristic = " << rhs.heuristic;
     return os;
 }
 
@@ -361,7 +360,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
             std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
 
         } else if (rel == Relationship::FORWARD_GAPPED) {
-            trim2.is_last_in_contig = true;
+            // Deprecated: trim2.is_last_in_contig = true;
 
         } else if (rel == Relationship::DIFFERENT_REF_NAME) {
             // Pass. No trimming should be applied.
@@ -383,7 +382,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
 
     {
         result.back().end = dorado::ssize(samples.back().positions_major);
-        result.back().is_last_in_contig = true;
+        // Deprecated: result.back().is_last_in_contig = true;
     }
 
     // Trim each sample to the region.
