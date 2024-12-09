@@ -793,30 +793,16 @@ void sample_producer(PolisherResources& resources,
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
-    // // A BAM region needs to be processed fully and then split into overlapping samples for inference.
-    // // We cannot predict how many samples there will be in a BAM region due to indels, so we make an approximate
-    // // guess here, and will iteratively fill the buffer until enough samples are added.
-    // const int32_t approx_bam_buffer_size = dorado::ssize(resources.devices) * batch_size * std::max(1, (bam_subchunk_len / window_len));
-
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<polisher::Interval> bam_region_batches =
             create_batches(bam_region_intervals, num_threads,
                            [](const Interval& val) { return val.end - val.start; });
-
-    // std::cerr << "buffer_size = " << buffer_size << "\n";
-
-    // const int64_t notify_buffer_size = dorado::ssize(resources.devices) * batch_size;
 
     InferenceData buffer;
 
     // Each iteration of the for loop produces full BAM regions of samples to fit at least num_threads windows.
     // It is important to process full BAM regions because of splitting/merging/splitting and trimming.
     for (const auto [region_id_start, region_id_end] : bam_region_batches) {
-        // std::unique_lock<std::mutex> lock_produce(mtx_queue);
-        // mtx_queue.wait(lock_produce, [&] {
-        //     return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
-        // });
-
         if (region_id_end <= region_id_start) {
             continue;
         }
@@ -825,13 +811,6 @@ void sample_producer(PolisherResources& resources,
         const int32_t window_id_start = bam_region_intervals[region_id_start].start;
         const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
         const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
-
-        // std::cerr << "region_id_start = " << region_id_start << ", region_id_end = " << region_id_end << ", num_regions = " << num_regions << ", num_windows = " << num_windows << "\n";
-
-        // << ", bam_region_intervals.size() = " << bam_region_intervals.size() << "\n";
-        // for (int32_t region_id = first; region_id < last; ++region_id) {
-        //     std::cerr << "    - region_id = " << region_id << ", bam_region_intervals[region_id].start = " << bam_region_intervals[region_id].start << ", bam_region_intervals[region_id].end = " << bam_region_intervals[region_id].end << "\n";
-        // }
 
         // Encode windows to samples in parallel. Non-const by design, data will be moved.
         std::vector<Sample> region_samples = encode_regions_in_parallel(
@@ -883,26 +862,6 @@ void sample_producer(PolisherResources& resources,
                 buffer = {};
             }
         }
-
-        // buffer.samples.insert(std::end(buffer.samples),
-        //                       std::make_move_iterator(std::begin(samples)),
-        //                       std::make_move_iterator(std::end(samples)));
-
-        // buffer.trims.insert(std::end(buffer.trims), std::make_move_iterator(std::begin(trims)),
-        //                     std::make_move_iterator(std::end(trims)));
-
-        // std::cerr << "samples.size() = " << samples.size() << ", buffer_samples.size() = " << buffer.samples.size() << "\n";
-
-        // // Once the buffer is full enough, add to queue.
-        // if (dorado::ssize(buffer.samples) >= notify_buffer_size) {
-        //     // This will block until the queue is empty (because it is set to size 1);
-        //     // assert(infer_data.capacity() == 1);
-        //     spdlog::debug("[producer] Pushing data to infer_data queue. size = {}",
-        //                   std::size(buffer.samples));
-        //     infer_data.try_push(std::move(buffer));
-        //     buffer = {};
-        //     spdlog::debug("[producer] Pushed.");
-        // }
     }
 
     if (!std::empty(buffer.samples)) {
