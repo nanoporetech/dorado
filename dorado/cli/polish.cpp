@@ -715,8 +715,8 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
 
     // Check for the dwells ("mv") tag. Only parse one record.
     {
-        const bam1_t* record = bam.get_next();
-        if ((record != nullptr) && (bam_aux_get(record, "mv") != nullptr)) {
+        const auto record = bam.get_next();
+        if ((record != nullptr) && (bam_aux_get(record.get(), "mv") != nullptr)) {
             ret.has_dwells = true;
         }
     }

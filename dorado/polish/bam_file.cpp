@@ -8,8 +8,7 @@
 BamFile::BamFile(const std::filesystem::path& in_fn)
         : m_fp{hts_open(in_fn.string().c_str(), "rb"), hts_close},
           m_idx{sam_index_load(m_fp.get(), in_fn.string().c_str()), hts_idx_destroy},
-          m_hdr{sam_hdr_read(m_fp.get()), sam_hdr_destroy},
-          m_current_record{bam_init1(), bam_destroy1} {
+          m_hdr{sam_hdr_read(m_fp.get()), sam_hdr_destroy} {
     if (!m_fp) {
         throw std::runtime_error{"Could not open BAM file: '" + in_fn.string() + "'!"};
     }
@@ -20,10 +19,6 @@ BamFile::BamFile(const std::filesystem::path& in_fn)
 
     if (!m_hdr) {
         throw std::runtime_error{"Could not load header from BAM file: '" + in_fn.string() + "'!"};
-    }
-
-    if (!m_current_record) {
-        throw std::runtime_error{"Failed to initialize BAM record"};
     }
 }
 
@@ -82,19 +77,19 @@ std::vector<HeaderLineData> BamFile::parse_header() const {
     return ret;
 }
 
-const bam1_t* BamFile::get_next() {
-    m_current_record.release();
-    m_current_record = std::unique_ptr<bam1_t, decltype(&bam_destroy1)>(bam_init1(), bam_destroy1);
+std::unique_ptr<bam1_t, decltype(&bam_destroy1)> BamFile::get_next() {
+    std::unique_ptr<bam1_t, decltype(&bam_destroy1)> record(bam_init1(), bam_destroy1);
 
-    if (m_current_record == nullptr) {
-        return nullptr;
+    if (record == nullptr) {
+        throw std::runtime_error{"Failed to initialize BAM record"};
+        return std::unique_ptr<bam1_t, decltype(&bam_destroy1)>(nullptr, bam_destroy1);
     }
 
-    if (sam_read1(m_fp.get(), m_hdr.get(), m_current_record.get()) >= 0) {
-        return m_current_record.get();  // Return the managed BAM record.
+    if (sam_read1(m_fp.get(), m_hdr.get(), record.get()) >= 0) {
+        return record;
     }
 
-    return nullptr;
+    return std::unique_ptr<bam1_t, decltype(&bam_destroy1)>(nullptr, bam_destroy1);
 }
 
 void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& header) {
