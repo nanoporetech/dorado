@@ -10,8 +10,6 @@ add_library(dorado_torch_utils
     tensor_utils.h
     torch_utils.cpp
     torch_utils.h
-    trim_rapid_adapter.cpp
-    trim_rapid_adapter.h
     trim.cpp
     trim.h
 )
