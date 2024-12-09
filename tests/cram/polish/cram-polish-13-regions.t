@@ -1,7 +1,7 @@
 Region string is empty. This should fail.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -13,7 +13,7 @@ Region string is empty. This should fail.
 Region: full length of the input chromosome.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --qualities --regions "contig_1:1-10000" -vv > out/out.fastq 2> out/stderr
   > # Eval.
@@ -32,7 +32,7 @@ Region: only contig name is provided, polish the entire sequence.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -47,7 +47,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
 Unknown contig name is specified.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "nonexistent_contig" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -60,7 +60,7 @@ Region: input region ends after contig length. Clamp to [0, contig_len] interval
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:1-999999" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -76,7 +76,7 @@ Region: only start coordinate is specified. Clamp to [start, contig_len] interva
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:500" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -92,7 +92,7 @@ Region: only end coordinate is specified. Clamp to [0, end] interval.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:-500" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -107,7 +107,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
 Region start is not valid compared to region end.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:501-500" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -119,7 +119,7 @@ Region start is not valid compared to region end.
 Region completely out of coordinate range of the target.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:50000-55000" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -132,7 +132,7 @@ Multiple regions.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:1-500,contig_1:7000-7200,contig_1:8123-8124" -vv > out/out.fasta 2> out/stderr
   > # Eval.
@@ -152,7 +152,7 @@ Loading from a BED file with multiple regions.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > printf 'contig_1\t0\t500\n' > out/in.bed
   > printf 'contig_1\t6999\t7200\n' >> out/in.bed
   > printf 'contig_1\t8122\t8124\n' >> out/in.bed
@@ -175,7 +175,7 @@ Loading from an empty BED file.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > touch out/in.bed
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions out/in.bed -vv > out/out.fasta 2> out/stderr

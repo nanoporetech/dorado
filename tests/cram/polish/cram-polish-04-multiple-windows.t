@@ -4,7 +4,7 @@ Process the input in multiple overlapping windows. Compare with reference via al
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 1000000 ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr

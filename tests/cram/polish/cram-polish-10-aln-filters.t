@@ -6,7 +6,7 @@ If the filter works, then there will be zero alignments usable for pileup featur
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --min-mapq 100 -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${in_draft} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
@@ -24,7 +24,7 @@ Filter: "--tag-name" and "--tag-value".
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --tag-name "mx" --tag-value 2 -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${in_draft} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
@@ -43,7 +43,7 @@ Bad tag name - it only has one character instead of two.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --tag-name "m" --tag-value 2 -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > grep "The tag_name is specified, but it needs to contain exactly two characters." out/stderr | wc -l | awk '{ print $1 }'
@@ -57,7 +57,7 @@ draft contig verbatim.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --tag-name "xy" --tag-value 2 -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
@@ -73,7 +73,7 @@ If the filter works, then there will be zero alignments usable for pileup featur
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --tag-keep-missing -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
@@ -91,7 +91,7 @@ Filter: "--RG" with a non-existent read group specified, should ignore all align
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --RG "some-read-group" -vv > out/out.fastq 2> out/stderr
   > echo "Exit code: $?"
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
@@ -103,7 +103,7 @@ Filter: "--RG" with a non-existent read group specified, should ignore all align
 #   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
 #   > in_bam=${in_dir}/calls_to_draft.bam
 #   > in_draft=${in_dir}/draft.fasta.gz
-#   > model_var=${MODEL_DIR:+--model-path ${MODEL_DIR}}
+#   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
 #   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" -vv > out/out.fastq 2> out/stderr
 #   > echo "Exit code: $?"
 #   > ${DORADO_BIN} aligner ${expected} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
