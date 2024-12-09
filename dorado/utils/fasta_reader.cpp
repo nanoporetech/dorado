@@ -40,7 +40,7 @@ const std::string& FastaRecord::header() const { return m_header.header(); }
 
 const std::string& FastaRecord::sequence() const { return m_sequence; }
 
-bool FastaRecord::set_header(std::string line) { return m_header.set_header(line); }
+bool FastaRecord::set_header(std::string line) { return m_header.set_header(std::move(line)); }
 
 std::optional<FastaRecord> FastaRecord::try_create(std::istream& input_stream,
                                                    std::string& error_message) {

@@ -85,7 +85,7 @@ CustomItem::ItemType item_type(const std::unordered_map<std::string, std::string
     return CustomItem::UNKNOWN;
 }
 
-std::pair<std::string, CustomItem::ItemPos> split_name(const std::string record_name) {
+std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record_name) {
     auto front_start = record_name.find("_front");
     if (front_start != std::string::npos) {
         if (record_name.size() != front_start + 6) {
@@ -122,7 +122,7 @@ AdapterPrimerManager::AdapterPrimerManager() {
     for (const auto& entry : adapter_kit_map) {
         auto adapter_code = entry.first;
         const auto& kit_codes = entry.second;
-        auto adapter = adapters.at(adapter_code);
+        const auto& adapter = adapters.at(adapter_code);
         for (auto kit_code : kit_codes) {
             auto kit_name = dorado::models::to_string(kit_code);
             m_kit_adapter_lut[kit_name].push_back(adapter);
@@ -131,7 +131,7 @@ AdapterPrimerManager::AdapterPrimerManager() {
     for (const auto& entry : primer_kit_map) {
         auto primer_code = entry.first;
         const auto& kit_codes = entry.second;
-        auto primer = primers.at(primer_code);
+        const auto& primer = primers.at(primer_code);
         for (auto kit_code : kit_codes) {
             auto kit_name = dorado::models::to_string(kit_code);
             m_kit_primer_lut[kit_name].push_back(primer);

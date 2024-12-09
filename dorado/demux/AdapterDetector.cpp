@@ -126,6 +126,7 @@ AdapterScoreResult AdapterDetector::find_primers(const std::string& seq,
 
 std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences(
         const std::string& kit_name) {
+    std::lock_guard<std::mutex> guard(m_mutex);
     auto it = m_adapter_sequences.find(kit_name);
     if (it != m_adapter_sequences.end()) {
         return it->second;
@@ -137,6 +138,7 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences(
 
 std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences(
         const std::string& kit_name) {
+    std::lock_guard<std::mutex> guard(m_mutex);
     auto it = m_primer_sequences.find(kit_name);
     if (it != m_primer_sequences.end()) {
         return it->second;

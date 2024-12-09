@@ -4,6 +4,7 @@
 #include "utils/types.h"
 
 #include <atomic>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>

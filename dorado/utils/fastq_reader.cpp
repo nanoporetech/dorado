@@ -199,7 +199,7 @@ std::vector<std::string> FastqRecord::get_bam_tags() const {
     return tags;
 }
 
-bool FastqRecord::set_header(std::string line) { return m_header.set_header(line); }
+bool FastqRecord::set_header(std::string line) { return m_header.set_header(std::move(line)); }
 
 std::optional<FastqRecord> FastqRecord::try_create(std::istream& input_stream,
                                                    std::string& error_message) {
