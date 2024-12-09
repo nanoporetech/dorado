@@ -713,14 +713,12 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
         }
     }
 
-    // Check for the dwells ("mv") tag.
-    const bam1_t* record = nullptr;
-    while ((record = bam.get_next())) {
-        if (bam_aux_get(record, "mv") != nullptr) {
+    // Check for the dwells ("mv") tag. Only parse one record.
+    {
+        const bam1_t* record = bam.get_next();
+        if ((record != nullptr) && (bam_aux_get(record, "mv") != nullptr)) {
             ret.has_dwells = true;
         }
-        // Only parse one record, intentionally.
-        break;
     }
 
     return ret;
