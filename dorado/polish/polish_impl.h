@@ -18,17 +18,30 @@
 
 namespace dorado::polisher {
 
+/**
+ * \brief Struct which holds data prepared for inference. In practice,
+ *          vectors here hold one batch for inference. Both vectors should
+ *          have identical length.
+ */
 struct InferenceData {
     std::vector<Sample> samples;
     std::vector<TrimInfo> trims;
 };
 
+/**
+ * \brief Struct which holds output of inference, passed into the decoding thread.
+ */
 struct DecodeData {
     std::vector<Sample> samples;
     torch::Tensor logits;
     std::vector<TrimInfo> trims;
 };
 
+/**
+ * \brief Takes consensus results for all samples and stitches them into full sequences.
+ *          If fill_gaps is true, missing pieces will be filled with either the draft sequence
+ *          or with an optional fill_char character.
+ */
 std::vector<ConsensusResult> stitch_sequence(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
@@ -61,6 +74,11 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         const int32_t window_overlap,
         const int32_t window_interval_offset);
 
+/**
+ * \brief For a given consensus, goes through the sequence and removes all '*' characters.
+ *          It also removes the corresponding positions from the quality field.
+ *          Works in-place.
+ */
 void remove_deletions(ConsensusResult& cons);
 
 }  // namespace dorado::polisher

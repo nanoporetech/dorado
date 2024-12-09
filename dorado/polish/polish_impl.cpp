@@ -4,12 +4,13 @@
 #include "polish/polish_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"
-#include "utils/timer_high_res.h"
 
 #include <cxxpool.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
+
+#include <memory>
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
@@ -26,19 +27,18 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
                       const std::string& seq_name,
                       int32_t start,
                       int32_t end) {
-    faidx_t* fai = fai_load(index_fn.string().c_str());
+    std::unique_ptr<faidx_t, decltype(&fai_destroy)> fai(fai_load(index_fn.string().c_str()),
+                                                         fai_destroy);
+
     if (!fai) {
         spdlog::error("Failed to load index for file: '{}'.", index_fn.string());
         return {};
     }
 
-    const int32_t seq_len = faidx_seq_len(fai, seq_name.c_str());
+    const int32_t seq_len = faidx_seq_len(fai.get(), seq_name.c_str());
 
     start = std::max(start, 0);
     end = (end < 0) ? seq_len : std::min(end, seq_len);
-
-    int32_t temp_seq_len = 0;
-    char* seq = faidx_fetch_seq(fai, seq_name.c_str(), start, end - 1, &temp_seq_len);
 
     if (end <= start) {
         spdlog::error(
@@ -46,6 +46,11 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
                 seq_name, start, end);
         return {};
     }
+
+    // Get the sequence.
+    int32_t temp_seq_len = 0;
+    std::unique_ptr<char, decltype(&free)> seq(
+            faidx_fetch_seq(fai.get(), seq_name.c_str(), start, end - 1, &temp_seq_len), free);
 
     if (temp_seq_len != (end - start)) {
         spdlog::error(
@@ -57,18 +62,15 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
 
     std::string ret;
     if (seq) {
-        ret = std::string(seq, temp_seq_len);
-        free(seq);
+        ret = std::string(seq.get(), temp_seq_len);
     }
-
-    fai_destroy(fai);
 
     return ret;
 }
 
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
 void debug_print_samples(std::ostream& os,
-                         const std::vector<polisher::Sample>& samples,
+                         const std::vector<Sample>& samples,
                          int64_t start /* = 0*/,
                          int64_t end /* = -1 */,
                          int64_t debug_id /* = -1 */) {
@@ -77,13 +79,13 @@ void debug_print_samples(std::ostream& os,
 
     for (int64_t i = start; i < end; ++i) {
         os << "[i = " << i << "] ";
-        polisher::debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+        debug_print_sample(os, samples[i], 0, -1, i == debug_id);
         os << '\n';
     }
 }
 #endif
 
-void remove_deletions(polisher::ConsensusResult& cons) {
+void remove_deletions(ConsensusResult& cons) {
     if (std::size(cons.seq) != std::size(cons.quals)) {
         spdlog::error(
                 "[remove_deletions] Sequence and quality string length mismatch! Not removing "
@@ -104,10 +106,10 @@ void remove_deletions(polisher::ConsensusResult& cons) {
     cons.quals.resize(n);
 }
 
-std::vector<polisher::ConsensusResult> stitch_sequence(
+std::vector<ConsensusResult> stitch_sequence(
         const std::filesystem::path& in_draft_fn,
         const std::string& header,
-        const std::vector<polisher::ConsensusResult>& sample_results,
+        const std::vector<ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
         const std::optional<char>& fill_char,
@@ -122,7 +124,7 @@ std::vector<polisher::ConsensusResult> stitch_sequence(
                     "from input.",
                     header, std::size(draft));
             std::string dummy_quals(std::size(draft), '!');
-            return {polisher::ConsensusResult{draft, std::move(dummy_quals)}};
+            return {ConsensusResult{draft, std::move(dummy_quals)}};
         } else {
             spdlog::debug(
                     "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
@@ -133,8 +135,8 @@ std::vector<polisher::ConsensusResult> stitch_sequence(
         }
     }
 
-    std::vector<polisher::ConsensusResult> ret;
-    polisher::ConsensusResult result;
+    std::vector<ConsensusResult> ret;
+    ConsensusResult result;
     result.draft_start = draft_len;
     result.draft_end = 0;
 
@@ -146,7 +148,7 @@ std::vector<polisher::ConsensusResult> stitch_sequence(
     int64_t last_end = 0;
     for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
-        const polisher::ConsensusResult& sample_result = sample_results[sample_index];
+        const ConsensusResult& sample_result = sample_results[sample_index];
 
         if (sample_result.draft_start > last_end) {
             if (fill_gaps) {
@@ -231,8 +233,8 @@ std::vector<polisher::ConsensusResult> stitch_sequence(
     return ret;
 }
 
-std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& sample) {
-    std::vector<polisher::Sample> results;
+std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
+    std::vector<Sample> results;
 
     const auto find_gaps = [](const std::vector<int64_t>& positions,
                               int64_t threshold) -> std::vector<int64_t> {
@@ -277,10 +279,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            results.emplace_back(polisher::Sample{
-                    sample.features.slice(0, start, i), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
-                    sample.region_id, std::move(read_ids_left), placeholder_ids});
+            results.emplace_back(
+                    Sample{sample.features.slice(0, start, i), std::move(new_major_pos),
+                           std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
+                           sample.region_id, std::move(read_ids_left), placeholder_ids});
             start = i;
         }
 
@@ -289,10 +291,10 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
                                                sample.positions_major.end());
             std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
                                                sample.positions_minor.end());
-            results.emplace_back(polisher::Sample{
-                    sample.features.slice(0, start), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start), sample.seq_id,
-                    sample.region_id, placeholder_ids, sample.read_ids_right});
+            results.emplace_back(Sample{sample.features.slice(0, start), std::move(new_major_pos),
+                                        std::move(new_minor_pos), sample.depth.slice(0, start),
+                                        sample.seq_id, sample.region_id, placeholder_ids,
+                                        sample.read_ids_right});
         }
     }
 
@@ -307,24 +309,23 @@ std::vector<polisher::Sample> split_sample_on_discontinuities(polisher::Sample& 
  *          In case of a smalle trailing portion (smaller than chunk_len), a potentially large overlap is produced to
  *          cover this region instead of just outputing the small chunk.
  */
-std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> samples,
-                                            const int64_t chunk_len,
-                                            const int64_t chunk_overlap) {
+std::vector<Sample> split_samples(std::vector<Sample> samples,
+                                  const int64_t chunk_len,
+                                  const int64_t chunk_overlap) {
     if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
         throw std::runtime_error(
                 "Wrong chunk_overlap length. chunk_len = " + std::to_string(chunk_len) +
                 ", chunk_overlap = " + std::to_string(chunk_overlap));
     }
 
-    const auto create_chunk = [](const polisher::Sample& sample, const int64_t start,
-                                 const int64_t end) {
+    const auto create_chunk = [](const Sample& sample, const int64_t start, const int64_t end) {
         torch::Tensor new_features = sample.features.slice(0, start, end);
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        return polisher::Sample{
+        return Sample{
                 std::move(new_features),
                 std::move(new_major),
                 std::move(new_minor),
@@ -336,7 +337,7 @@ std::vector<polisher::Sample> split_samples(std::vector<polisher::Sample> sample
         };
     };
 
-    std::vector<polisher::Sample> results;
+    std::vector<Sample> results;
     results.reserve(std::size(samples));
 
     for (auto& sample : samples) {
@@ -400,7 +401,7 @@ std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string&
 
 std::vector<Sample> encode_regions_in_parallel(
         std::vector<BamFile>& bam_handles,
-        const polisher::EncoderBase& encoder,
+        const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads) {
@@ -468,8 +469,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     //  3. Split the merged samples into equally sized pieces which will be used for inference.
 
     const auto worker = [&](const int32_t start, const int32_t end,
-                            std::vector<std::vector<polisher::Sample>>& results_samples,
-                            std::vector<std::vector<polisher::TrimInfo>>& results_trims) {
+                            std::vector<std::vector<Sample>>& results_samples,
+                            std::vector<std::vector<TrimInfo>>& results_trims) {
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
             Interval interval = bam_region_intervals[bam_region_id];
             interval.start -= window_interval_offset;
@@ -485,13 +486,12 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
 #endif
 
-            std::vector<polisher::Sample> local_samples;
+            std::vector<Sample> local_samples;
 
             // Split all samples on discontinuities.
             for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
                 auto& sample = window_samples[sample_id];
-                std::vector<polisher::Sample> disc_samples =
-                        split_sample_on_discontinuities(sample);
+                std::vector<Sample> disc_samples = split_sample_on_discontinuities(sample);
                 local_samples.insert(std::end(local_samples),
                                      std::make_move_iterator(std::begin(disc_samples)),
                                      std::make_move_iterator(std::end(disc_samples)));
@@ -530,7 +530,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 #endif
 
             const Window& reg = bam_regions[bam_region_id];
-            results_trims[bam_region_id] = polisher::trim_samples(
+            results_trims[bam_region_id] = trim_samples(
                     local_samples,
                     std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
@@ -540,8 +540,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     // InferenceInputs results;
     // results.samples.resize(std::size(bam_region_intervals));
     // results.trims.resize(std::size(bam_region_intervals));
-    std::vector<std::vector<polisher::Sample>> merged_samples(std::size(bam_region_intervals));
-    std::vector<std::vector<polisher::TrimInfo>> merged_trims(std::size(bam_region_intervals));
+    std::vector<std::vector<Sample>> merged_samples(std::size(bam_region_intervals));
+    std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM windows in parallel.
     const std::vector<Interval> thread_chunks =
@@ -575,14 +575,14 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         num_samples += std::size(vals);
     }
 
-    std::vector<polisher::Sample> results_samples;
+    std::vector<Sample> results_samples;
     results_samples.reserve(num_samples);
     for (auto& vals : merged_samples) {
         results_samples.insert(std::end(results_samples), std::make_move_iterator(std::begin(vals)),
                                std::make_move_iterator(std::end(vals)));
     }
 
-    std::vector<polisher::TrimInfo> results_trims;
+    std::vector<TrimInfo> results_trims;
     results_trims.reserve(num_samples);
     for (auto& vals : merged_trims) {
         results_trims.insert(std::end(results_trims), std::make_move_iterator(std::begin(vals)),
