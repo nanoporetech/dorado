@@ -71,6 +71,7 @@ add_executable(dorado_tests
     TrimTest.cpp
     PafUtilsTest.cpp
     WindowTest.cpp
+    PolishTrimTest.cpp
 )
 if (NOT IOS)
     target_sources(dorado_tests
