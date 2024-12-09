@@ -23,7 +23,6 @@ Region: full length of the input chromosome.
   > samtools faidx out/out.fastq
   > cut -f 2,2 out/out.fastq.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/
   Exit code: 0
   NM:i:2
   9998
