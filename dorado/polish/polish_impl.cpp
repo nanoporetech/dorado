@@ -22,63 +22,6 @@
 
 namespace dorado::polisher {
 
-std::ostream& operator<<(std::ostream& os, const Window& w) {
-    os << "seq_id = " << w.seq_id << ", seq_length = " << w.seq_length << ", start = " << w.start
-       << ", end = " << w.end << ", start_no_overlap = " << w.start_no_overlap
-       << ", end_no_overlap = " << w.end_no_overlap;
-    return os;
-}
-
-/**
- * \brief Linearly splits sequence lengths into windows. It also returns the backward mapping of which
- *          windows correspond to which sequences, needed for stitching.
- */
-std::vector<Window> create_windows(const int32_t seq_id,
-                                   const int64_t seq_start,
-                                   const int64_t seq_end,
-                                   const int64_t seq_len,
-                                   const int32_t window_len,
-                                   const int32_t window_overlap) {
-    if (window_overlap >= window_len) {
-        spdlog::error(
-                "The window overlap cannot be larger than the window size! window_len = {}, "
-                "window_overlap = {}\n",
-                window_len, window_overlap);
-        return {};
-    }
-
-    std::vector<Window> ret;
-    const int64_t length = seq_end - seq_start;
-
-    const int32_t num_windows =
-            static_cast<int32_t>(std::ceil(static_cast<double>(length) / window_len));
-
-    ret.reserve(num_windows);
-
-    int32_t win_id = 0;
-    for (int64_t start = seq_start; start < seq_end;
-         start += (window_len - window_overlap), ++win_id) {
-        const int64_t end = std::min(seq_end, start + window_len);
-        const int64_t start_no_overlap =
-                (start == seq_start) ? start : std::min<int64_t>(start + window_overlap, seq_end);
-
-        ret.emplace_back(Window{
-                seq_id,
-                seq_len,
-                start,
-                end,
-                start_no_overlap,
-                end,
-        });
-
-        if (end == seq_end) {
-            break;
-        }
-    }
-
-    return ret;
-}
-
 std::string fetch_seq(const std::filesystem::path& index_fn,
                       const std::string& seq_name,
                       int32_t start,
