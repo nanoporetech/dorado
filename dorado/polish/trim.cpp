@@ -6,6 +6,7 @@
 #include <torch/torch.h>
 
 #include <iostream>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -47,6 +48,17 @@ std::string relationship_to_string(const Relationship rel) {
     std::ostringstream oss;
     oss << rel;
     return oss.str();
+}
+
+bool operator==(const TrimInfo& lhs, const TrimInfo& rhs) {
+    return std::tie(lhs.start, lhs.end, lhs.is_last_in_contig, lhs.heuristic) ==
+           std::tie(rhs.start, rhs.end, rhs.is_last_in_contig, rhs.heuristic);
+}
+
+std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs) {
+    os << "start = " << rhs.start << ", end = " << rhs.end
+       << ", is_last_in_contig = " << rhs.is_last_in_contig << ", heuristic = " << rhs.heuristic;
+    return os;
 }
 
 Relationship relative_position(const Sample& s1, const Sample& s2) {
