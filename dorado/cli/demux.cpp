@@ -257,12 +257,13 @@ int demuxer(int argc, char* argv[]) {
     auto client_info = std::make_shared<DefaultClientInfo>();
     reader.set_client_info(client_info);
 
+    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
+
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
             {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
             std::move(sample_sheet), sort_bam);
 
-    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
     if (barcoding_info) {
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");

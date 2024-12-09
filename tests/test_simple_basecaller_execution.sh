@@ -348,13 +348,23 @@ test_barcoding_read_groups() (
     done
     sample_sheet=$1
     output_name=read_group_test${sample_sheet:+_sample_sheet}
-    $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} $data_dir/barcode_demux/read_group_test > $output_dir/${output_name}.bam
+    $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim > $output_dir/${output_name}.bam
+
     samtools quickcheck -u $output_dir/${output_name}.bam
     split_dir=$output_dir/${output_name}
     mkdir $split_dir
     samtools split -u $split_dir/unknown.bam -f "$split_dir/rg_%!.bam" $output_dir/${output_name}.bam
 
-    for bam in $split_dir/rg_*.bam; do
+    # There shouldn't be any unknown groups.
+    num_read_groups=$(samtools view -c $split_dir/unknown.bam)
+    if [[ $num_read_groups -ne "0" ]]; then
+        echo "Reads with unknown read groups found."
+        exit 1
+    fi
+
+    check_barcodes() (
+        bam=$1
+        echo "Checking file: $bam"
         if [[ $bam =~ "_SQK-RBK114-96_" ]]; then
             # Arrangement is |<kit>_<barcode>|, so trim the kit from the prefix and the .bam from the suffix.
             barcode=${bam#*_SQK-RBK114-96_}
@@ -363,6 +373,10 @@ test_barcoding_read_groups() (
             # Arrangement is |<barcode_alias>|, so trim the model from the prefix and the .bam from the suffix.
             barcode=${bam#*_${model_name_5k}_}
             barcode=${barcode%.bam*}
+        elif [[ $bam =~ "/9bf5b3eb10d3b031970acc022aecad4ecc918865_" ]]; then
+            # Demuxed file, so trim the run_id from the prefix and the .bam from the suffix.
+            barcode=${bam#*9bf5b3eb10d3b031970acc022aecad4ecc918865_}
+            barcode=${barcode%.bam*}            
         else
             barcode="unclassified"
         fi
@@ -374,13 +388,18 @@ test_barcoding_read_groups() (
             echo "Barcoding read group has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
             exit 1
         fi
+        exit 0
+    )
+    for bam in $split_dir/rg_*.bam; do
+        check_barcodes $bam
     done
-    # There shouldn't be any unknown groups.
-    num_read_groups=$(samtools view -c $split_dir/unknown.bam)
-    if [[ $num_read_groups -ne "0" ]]; then
-        echo "Reads with unknown read groups found."
-        exit 1
-    fi
+
+    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim > $output_dir/${output_name}-demux.bam
+    $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
+
+    for bam in $output_dir/${output_name}-demux/*.bam; do
+        check_barcodes $bam
+    done
 )
 
 # There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
