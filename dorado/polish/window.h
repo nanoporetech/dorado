@@ -19,6 +19,8 @@ struct Window {
 
 std::ostream& operator<<(std::ostream& os, const Window& w);
 
+bool operator==(const Window& lhs, const Window& rhs);
+
 /**
  * \brief Linearly splits sequence lengths into windows. It also returns the backward mapping of which
  *          windows correspond to which sequences, needed for stitching.

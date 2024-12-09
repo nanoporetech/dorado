@@ -13,6 +13,12 @@ std::ostream& operator<<(std::ostream& os, const Window& w) {
     return os;
 }
 
+bool operator==(const Window& lhs, const Window& rhs) {
+    return std::tie(lhs.seq_id, lhs.seq_length, lhs.start, lhs.end, lhs.start_no_overlap,
+                    lhs.end_no_overlap) == std::tie(rhs.seq_id, rhs.seq_length, rhs.start, rhs.end,
+                                                    rhs.start_no_overlap, rhs.end_no_overlap);
+}
+
 std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_start,
                                    const int64_t seq_end,
@@ -28,10 +34,36 @@ std::vector<Window> create_windows(const int32_t seq_id,
                 seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
         return {};
     }
+    if (window_len <= 0) {
+        spdlog::warn(
+                "Invalid window_len given to create_windows, should be > 0. Returning empty. "
+                "seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
+                "{}, window_len = {}, "
+                "window_overlap = {}",
+                seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
+        return {};
+    }
+    if (window_overlap < 0) {
+        spdlog::warn(
+                "Invalid window_overlap given to create_windows, should be >= 0. Returning empty. "
+                "seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
+                "{}, window_len = {}, "
+                "window_overlap = {}",
+                seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
+        return {};
+    }
     if ((seq_start < 0) || (seq_end < 0) || (seq_start >= seq_len) || (seq_end > seq_len) ||
         (seq_start >= seq_end)) {
         spdlog::warn(
                 "Invalid start/end coordinates for creating windows. Returning empty. seq_id = {}, "
+                "seq_start = {}, seq_end = {}, seq_len = {}, window_len = {}, "
+                "window_overlap = {}",
+                seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
+        return {};
+    }
+    if (seq_len <= 0) {
+        spdlog::warn(
+                "Invalid sequence length given to create_windows. Returning empty. seq_id = {}, "
                 "seq_start = {}, seq_end = {}, seq_len = {}, window_len = {}, "
                 "window_overlap = {}",
                 seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
