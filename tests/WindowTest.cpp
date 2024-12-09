@@ -7,7 +7,7 @@
 
 #define TEST_GROUP "[PolishCreateWindows]"
 
-TEST_CASE("create_windows empty", TEST_GROUP) {
+TEST_CASE("create_windows tests", TEST_GROUP) {
     using namespace dorado::polisher;
 
     struct TestCase {
@@ -105,7 +105,6 @@ TEST_CASE("create_windows empty", TEST_GROUP) {
         const std::vector<Window> result =
                 create_windows(data.seq_id, data.seq_start, data.seq_end, data.seq_len,
                                data.window_len, data.window_overlap);
-        CHECK(std::size(result) == std::size(data.expected));
         CHECK(result == data.expected);
     }
 }
