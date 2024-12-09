@@ -17,7 +17,7 @@ Download a model by name.
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
   > model="read_level_lstm384_unidirectional_20241204"
-  > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 1000000 ${in_bam} ${in_draft} -t 4 -vv --model-path "${model}" > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 1000000 ${in_bam} ${in_draft} -t 4 -vv --model-path "${model}" > out/out.fasta 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
@@ -25,13 +25,6 @@ Download a model by name.
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/stderr | wc -l | awk '{ print $1 }'
-  > timestamp=$(date +'%Y_%m_%d-%H_%M_%S')
-  > backup_folder_root="/media/groups/machine_learning/active/isovic/for/me/debug/polish-cram/01"
-  > backup_folder="${backup_folder_root}/${hostname}-${timestamp}"
-  > mkdir -p ${backup_folder}
-  > echo "${backup_folder}"
-  > cp -r out "${backup_folder}/"
-  > tail -n+1 out/*.stderr
   Exit code: 0
   NM:i:2
   9998
