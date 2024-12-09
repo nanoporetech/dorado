@@ -221,12 +221,12 @@ std::vector<polisher::ConsensusResult> stitch_sequence(
         }
     }
 
+    spdlog::trace("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
+                  std::size(result.seq));
+
     if (!std::empty(result.seq)) {
         ret.emplace_back(std::move(result));
     }
-
-    spdlog::trace("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
-                  std::size(result.seq));
 
     return ret;
 }
