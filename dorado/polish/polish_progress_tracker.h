@@ -8,8 +8,6 @@
 #include <indicators/block_progress_bar.hpp>
 #endif
 
-#include <chrono>
-#include <cstdint>
 #include <string>
 
 namespace dorado::polisher {
@@ -17,12 +15,13 @@ namespace dorado::polisher {
 class PolishProgressTracker {
 public:
     PolishProgressTracker();
+
     ~PolishProgressTracker();
 
     void set_description(const std::string& desc);
 
-    // void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
+
     void finalize();
 
 private:
