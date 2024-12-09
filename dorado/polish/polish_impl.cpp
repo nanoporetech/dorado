@@ -422,8 +422,8 @@ std::vector<Sample> encode_regions_in_parallel(
     };
 
     const std::vector<Interval> thread_chunks =
-            compute_chunks(static_cast<int32_t>(std::size(windows)),
-                           std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
+            compute_partitions(static_cast<int32_t>(std::size(windows)),
+                               std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
 
     spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
                   std::size(thread_chunks));
@@ -545,7 +545,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
     // Process BAM windows in parallel.
     const std::vector<Interval> thread_chunks =
-            compute_chunks(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+            compute_partitions(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
 
     spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
                   std::size(bam_region_intervals), std::size(thread_chunks));

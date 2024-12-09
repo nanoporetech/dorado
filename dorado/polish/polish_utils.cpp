@@ -48,11 +48,11 @@ std::vector<int32_t> parse_int32_vector(const std::string& input) {
     return result;
 }
 
-std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_chunks) {
+std::vector<Interval> compute_partitions(const int32_t num_items, const int32_t num_partitions) {
     std::vector<Interval> chunks;
-    const int32_t chunk_size = num_items / num_chunks;
-    std::vector<int32_t> chunk_sizes(num_chunks, chunk_size);
-    for (int32_t i = 0; i < (num_items % num_chunks); ++i) {
+    const int32_t chunk_size = num_items / num_partitions;
+    std::vector<int32_t> chunk_sizes(num_partitions, chunk_size);
+    for (int32_t i = 0; i < (num_items % num_partitions); ++i) {
         ++chunk_sizes[i];
     }
     int32_t sum = 0;
@@ -66,7 +66,8 @@ std::vector<Interval> compute_chunks(const int32_t num_items, const int32_t num_
     if (sum != num_items) {
         throw std::runtime_error{
                 "Wrong sum of items divided into chunks! num_items = " + std::to_string(num_items) +
-                ", num_chunks = " + std::to_string(num_chunks) + ", sum = " + std::to_string(sum)};
+                ", num_partitions = " + std::to_string(num_partitions) +
+                ", sum = " + std::to_string(sum)};
     }
     return chunks;
 }
