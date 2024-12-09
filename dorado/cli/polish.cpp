@@ -107,7 +107,7 @@ struct Options {
 
     // Optional parameters.
     std::filesystem::path out_consensus_fn;
-    std::filesystem::path model_path;
+    std::string model_str;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
     bool quiet = false;
@@ -211,7 +211,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Input/output options");
         parser->visible.add_argument("-o", "--out-path")
                 .help("Output to a file instead of stdout.");
-        parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
+        parser->visible.add_argument("-m", "--model").help("Path to correction model folder.");
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
                 .default_value(false)
@@ -335,9 +335,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
                                    ? parser.visible.get<std::string>("out-path")
                                    : "";
 
-    opt.model_path = (parser.visible.is_used("--model-path"))
-                             ? parser.visible.get<std::string>("model-path")
-                             : "";
+    opt.model_str =
+            (parser.visible.is_used("--model")) ? parser.visible.get<std::string>("model") : "";
 
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
@@ -1329,13 +1328,13 @@ int polish(int argc, char* argv[]) {
 
         // Resolve the model. Download if necessary.
         std::filesystem::path model_dir;
-        if (!std::empty(opt.model_path) && std::filesystem::exists(opt.model_path)) {
-            model_dir = opt.model_path;
-            spdlog::info("Using a model specified by path: {}", opt.model_path.string());
+        if (!std::empty(opt.model_str) && std::filesystem::exists(opt.model_str)) {
+            model_dir = opt.model_str;
+            spdlog::info("Using a model specified by path: {}", opt.model_str);
         } else {
             constexpr std::string_view DEFAULT_MODEL = "read_level_lstm384_unidirectional_20241204";
-            const std::string model_name = std::empty(opt.model_path) ? std::string(DEFAULT_MODEL)
-                                                                      : opt.model_path.string();
+            const std::string model_name =
+                    std::empty(opt.model_str) ? std::string(DEFAULT_MODEL) : opt.model_str;
             spdlog::info("Downloading model: '{}'", model_name);
             model_dir = download_model(model_name);
         }
