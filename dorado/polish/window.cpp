@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <ostream>
+
 namespace dorado::polisher {
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
