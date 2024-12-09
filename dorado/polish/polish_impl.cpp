@@ -23,9 +23,9 @@
 namespace dorado::polisher {
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
-    os << "seq_id = " << w.seq_id << ", start = " << w.start << ", end = " << w.end
-       << ", seq_length = " << w.seq_length
-       << ", region_id = " << w.region_id;  // << ", window_id = " << w.window_id;
+    os << "seq_id = " << w.seq_id << ", seq_length = " << w.seq_length << ", start = " << w.start
+       << ", end = " << w.end << ", start_no_overlap = " << w.start_no_overlap
+       << ", end_no_overlap = " << w.end_no_overlap;
     return os;
 }
 
@@ -38,8 +38,7 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_end,
                                    const int64_t seq_len,
                                    const int32_t window_len,
-                                   const int32_t window_overlap,
-                                   const int32_t region_id) {
+                                   const int32_t window_overlap) {
     if (window_overlap >= window_len) {
         spdlog::error(
                 "The window overlap cannot be larger than the window size! window_len = {}, "
@@ -68,7 +67,6 @@ std::vector<Window> create_windows(const int32_t seq_id,
                 seq_len,
                 start,
                 end,
-                region_id,
                 start_no_overlap,
                 end,
         });
@@ -661,7 +659,7 @@ std::vector<Window> create_bam_regions(
         for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
             const int64_t len = draft_lens[seq_id].second;
             const std::vector<Window> new_windows =
-                    create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap, -1);
+                    create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap);
             windows.reserve(std::size(windows) + std::size(new_windows));
             windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }
@@ -700,9 +698,8 @@ std::vector<Window> create_bam_regions(
             }
 
             // Split-up the custom region if it's too long.
-            std::vector<Window> new_windows =
-                    create_windows(seq_id, region_start, region_end, seq_length, bam_chunk_len,
-                                   window_overlap, -1);
+            std::vector<Window> new_windows = create_windows(
+                    seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap);
             windows.reserve(std::size(windows) + std::size(new_windows));
             windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }

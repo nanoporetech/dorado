@@ -781,7 +781,7 @@ void sample_producer(PolisherResources& resources,
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const Window& bw = bam_regions[i];
         std::vector<Window> new_windows =
-                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
+                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
         if (std::empty(new_windows)) {
             bam_region_intervals.emplace_back(Interval{0, 0});
             continue;

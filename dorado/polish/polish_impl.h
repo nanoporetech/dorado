@@ -17,15 +17,16 @@
 
 namespace dorado::polisher {
 
+// clang-format off
 struct Window {
-    int32_t seq_id = -1;
-    int64_t seq_length = 0;
-    int64_t start = 0;
-    int64_t end = 0;
-    int32_t region_id = 0;
-    int64_t start_no_overlap = 0;
-    int64_t end_no_overlap = 0;
+    int32_t seq_id = -1;            // ID of the sequence from which the window was sampled.
+    int64_t seq_length = 0;         // Length of the sequence where the window was sampled from.
+    int64_t start = 0;              // Window start, possible overlap with neighboring windows.
+    int64_t end = 0;                // Window end, possible overlap with neighboring windows.
+    int64_t start_no_overlap = 0;   // Start coordinate of the unique portion of this window (no overlaps with neighbors).
+    int64_t end_no_overlap = 0;     // End coordinate of the unique portion of this window (no overlaps with neighbors).
 };
+// clang-format on
 
 struct InferenceData {
     std::vector<Sample> samples;
@@ -45,8 +46,7 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_end,
                                    const int64_t seq_len,
                                    const int32_t window_len,
-                                   const int32_t window_overlap,
-                                   const int32_t region_id);
+                                   const int32_t window_overlap);
 
 std::vector<ConsensusResult> stitch_sequence(
         const std::filesystem::path& in_draft_fn,
