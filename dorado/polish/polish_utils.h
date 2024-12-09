@@ -5,6 +5,7 @@
 #include <torch/torch.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <iosfwd>
 #include <sstream>
 #include <string>
@@ -37,6 +38,11 @@ std::vector<int32_t> parse_int32_vector(const std::string& input);
  *          is given with a start (zero-based) and end (non-inclusive) item ID.
  */
 std::vector<Interval> compute_partitions(const int32_t num_items, const int32_t num_partitions);
+
+std::string fetch_seq(const std::filesystem::path& index_fn,
+                      const std::string& seq_name,
+                      int32_t start,
+                      int32_t end);
 
 /**
  * \brief Prints the contents of an iterable container to a stream. Useful for debug purposes.
