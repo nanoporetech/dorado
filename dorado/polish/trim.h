@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <iosfwd>
 #include <optional>
-#include <tuple>
 #include <vector>
 
 namespace dorado::polisher {

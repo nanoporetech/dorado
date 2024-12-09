@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 
 namespace dorado::polisher {
 
@@ -104,8 +105,8 @@ Relationship relative_position(const Sample& s1, const Sample& s2) {
     }
 
     // Sort s1 and s2 by first position, and then by size in descending order
-    const Sample& s1_ord = (std::tuple(s1.get_position(0), -dorado::ssize(s1.positions_major)) <=
-                            std::tuple(s2.get_position(0), -dorado::ssize(s2.positions_major)))
+    const Sample& s1_ord = (std::pair(s1.get_position(0), -dorado::ssize(s1.positions_major)) <=
+                            std::pair(s2.get_position(0), -dorado::ssize(s2.positions_major)))
                                    ? s1
                                    : s2;
     const Sample& s2_ord = (&s1_ord == &s1) ? s2 : s1;
@@ -138,38 +139,34 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     }
 
     // Linear search over the pairs.
-    const auto find_left =
-            [](const Sample& s,
-               const std::pair<int64_t, int64_t>
-                       target) {  // const std::vector<int64_t>& major, const std::vector<int64_t>& minor) {
-                int64_t idx = -1;
-                for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
-                    const std::pair<int64_t, int64_t> pos = s.get_position(idx);
-                    if (target < pos) {
-                        --idx;
-                        break;
-                    }
-                }
-                return idx;
-            };
-    const auto find_right =
-            [](const Sample& s,
-               const std::pair<int64_t, int64_t>
-                       target) {  // const std::vector<int64_t>& major, const std::vector<int64_t>& minor) {
-                int64_t idx = 0;
-                for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
-                    const std::pair<int64_t, int64_t> pos = s.get_position(idx);
-                    if (target <= pos) {
-                        ++idx;
-                        break;
-                    }
-                }
-                return idx;
-            };
+    const auto find_left = [](const Sample& s, const std::pair<int64_t, int64_t> target) {
+        int64_t idx = -1;
+        for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
+            const std::pair<int64_t, int64_t> pos = s.get_position(idx);
+            if (target < pos) {
+                --idx;
+                break;
+            }
+        }
+        return idx;
+    };
+
+    const auto find_right = [](const Sample& s, const std::pair<int64_t, int64_t> target) {
+        int64_t idx = 0;
+        for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
+            const std::pair<int64_t, int64_t> pos = s.get_position(idx);
+            if (target <= pos) {
+                ++idx;
+                break;
+            }
+        }
+        return idx;
+    };
+
     const int64_t ovl_start_ind1 = find_left(s1, s2.get_position(0));
     const int64_t ovl_end_ind2 = find_right(s2, s1.get_last_position());
 
-    if ((ovl_start_ind1) < 0 || (ovl_end_ind2 < 0)) {
+    if ((ovl_start_ind1 < 0) || (ovl_end_ind2 < 0)) {
         throw std::runtime_error(
                 "Samples should be overlappnig, but cannot find adequate cooordinate positions!");
     }
@@ -201,16 +198,16 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 
     bool heuristic = false;
 
+    // In this case, overlaps are not equal in structure.
     if (!compare_subvectors(s1.positions_minor, ovl_start_ind1, std::size(s1.positions_minor),
                             s2.positions_minor, 0, ovl_end_ind2)) {
-        // In this case, overlaps are not equal in structure.
         std::cerr << "[overlap_indices] Heuristic because compare_subvectors!\n    - s1 = " << s1
                   << "\n    - s2 = " << s2 << "\n\n";
         heuristic = true;
     }
 
     if (!heuristic) {
-        // Take midpoint as break point.
+        // Take midpoint as the break point.
         const int64_t overlap_len = ovl_end_ind2;  // Both are equal in size.
         const int64_t pad_1 = overlap_len / 2;
         const int64_t pad_2 = overlap_len - pad_1;
@@ -240,8 +237,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
         end_1_ind = dorado::ssize(s1.positions_major);
         start_2_ind = 0;
 
-        // std::cerr << "start_2_ind = " << start_2_ind << ", heuristic 1\n";
-
         const auto count_unique = [](const std::vector<int64_t>& a, const int64_t start,
                                      const int64_t end) -> int64_t {
             const int64_t len = dorado::ssize(a);
@@ -259,6 +254,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
             }
             return ret;
         };
+
         const auto streak_count = [](const std::vector<int64_t>& a,
                                      const int64_t start) -> int64_t {
             const int64_t len = dorado::ssize(a);
@@ -278,15 +274,11 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
                 count_unique(s1.positions_major, ovl_start_ind1, std::size(s1.positions_minor));
         const int64_t unique_s2 = count_unique(s2.positions_major, 0, ovl_end_ind2);
 
-        // std::cerr << "[heuristic 1] s2 = " << s2 << ", end_1_ind = " << end_1_ind << ", start2_ind = " << start_2_ind << ", unique_s1 = " << unique_s1 << ", unique_s2 = " << unique_s2 << "\n";
-
         if ((unique_s1 > UNIQ_MAJ) && (unique_s2 > UNIQ_MAJ)) {
             const int64_t start = s1.positions_major[ovl_start_ind1];
             const int64_t end = s1.positions_major.back();
             const int64_t mid = start + (end - start) / 2;
             int64_t offset = 1;
-
-            // std::cerr << "[heuristic 2] s2 = " << s2 << ", start = " << start << ", end = " << end << ", mid = " << mid << "\n";
 
             while (end_1_ind == -1) {
                 if (((mid + offset) > end) && ((mid - offset) < start)) {
@@ -305,13 +297,10 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
                     const int64_t left_streak = streak_count(s1.positions_major, left_pos);
                     const int64_t right_streak = streak_count(s2.positions_major, right_pos);
 
-                    // std::cerr << "[heuristic 3] s2 = " << s2 << ", left_streak = " << left_streak << ", right_stream = " << right_streak << "\n";
-
                     if ((left != std::end(s1.positions_major)) &&
                         (right != std::end(s2.positions_major)) && (left_streak == right_streak)) {
                         end_1_ind = left_pos;
                         start_2_ind = right_pos;
-                        // std::cerr << "[heuristic 4] s2 = " << s2 << ", end_1_ind = " << end_1_ind << ", start2_ind = " << start_2_ind << "\n";
                         break;
                     }
                 }
@@ -319,8 +308,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
                 offset += 1;
             }
         }
-
-        // std::cerr << "[heuristic 5] s2 = " << s2 << ", end_1_ind = " << end_1_ind << ", start2_ind = " << start_2_ind << "\n";
     }
 
     // If return coordinates are -1, then a viable junction was not found.
