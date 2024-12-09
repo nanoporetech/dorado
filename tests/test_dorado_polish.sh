@@ -35,6 +35,8 @@ if [[ "${OUT_DIR}" == "" ]]; then
     output_dir=${TEST_DIR}/${output_dir_name}
 fi
 
+env
+
 mkdir -p ${output_dir}
 
 # Download the Cram package.
