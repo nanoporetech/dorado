@@ -68,7 +68,6 @@ add_executable(dorado_tests
     synchronisation_test.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
-    TrimRapidAdapterTest.cpp
     TrimTest.cpp
     PafUtilsTest.cpp
 )
