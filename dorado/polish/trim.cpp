@@ -5,7 +5,6 @@
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
-#include <iostream>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -178,18 +177,10 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
                                        const int64_t a_end, const std::vector<int64_t>& b,
                                        const int64_t b_start, const int64_t b_end) {
         if ((a_end - a_start) != (b_end - b_start)) {
-            std::cerr << "[compare_subvectors] length mismatch: (a_end - a_start) = "
-                      << (a_end - a_start) << ", (b_end - b_start) = " << (b_end - b_start)
-                      << ", a_start = " << a_start << ", a_end = " << a_end
-                      << ", b_start = " << b_start << ", b_end = " << b_end << "\n";
             return false;
         }
         for (int64_t i = a_start, j = b_start; i < a_end; ++i, ++j) {
             if (a[i] != b[j]) {
-                std::cerr << "[compare_subvectors] minor mismatch: i = " << i << ", j = " << j
-                          << ", a[i] = " << a[i] << ", b[j] = " << b[j] << ", a_start = " << a_start
-                          << ", a_end = " << a_end << ", b_start = " << b_start
-                          << ", b_end = " << b_end << "\n";
                 return false;
             }
         }
@@ -201,8 +192,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     // In this case, overlaps are not equal in structure.
     if (!compare_subvectors(s1.positions_minor, ovl_start_ind1, std::size(s1.positions_minor),
                             s2.positions_minor, 0, ovl_end_ind2)) {
-        std::cerr << "[overlap_indices] Heuristic because compare_subvectors!\n    - s1 = " << s1
-                  << "\n    - s2 = " << s2 << "\n\n";
         heuristic = true;
     }
 
@@ -218,8 +207,6 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
             end_1_ind = -1;
             start_2_ind = -1;
             heuristic = true;
-            std::cerr << "[overlap_indices] Heuristic because slicing mismatch! s1 = " << s1
-                      << "\n";
         }
     }
 
