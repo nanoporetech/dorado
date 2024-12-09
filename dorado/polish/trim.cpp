@@ -327,7 +327,8 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     return {end_1_ind, start_2_ind, heuristic};
 }
 
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Region& region) {
+std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
+                                   const std::optional<const Region>& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
@@ -356,9 +357,6 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
         if (rel == Relationship::S2_WITHIN_S1) {
             continue;
 
-        } else if (rel == Relationship::FORWARD_OVERLAP) {
-            std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
-
         } else if (rel == Relationship::FORWARD_GAPPED) {
             // Deprecated: trim2.is_last_in_contig = true;
 
@@ -386,15 +384,22 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
     }
 
     // Trim each sample to the region.
-    if ((region.seq_id >= 0) && (region.start >= 0) && (region.end > 0)) {
-        // std::cerr << "Trimming to custom region: seq_id = " << region.seq_id
-        //           << ", start = " << region.start << ", end = " << region.end << "\n";
+    if (region) {
+        if ((region->seq_id < 0) || (region->start < 0) || (region->end <= 0)) {
+            throw std::runtime_error{"Region trimming coordinates are not valid. seq_id = " +
+                                     std::to_string(region->seq_id) +
+                                     ", start = " + std::to_string(region->start) +
+                                     ", end = " + std::to_string(region->end)};
+        }
+
+        spdlog::trace("[trim_samples] Trimming to region.");
+
         for (size_t i = 0; i < std::size(samples); ++i) {
             const auto& sample = samples[i];
             TrimInfo& trim = result[i];
 
             // Sample not on the specified sequence.
-            if (sample.seq_id != region.seq_id) {
+            if (sample.seq_id != region->seq_id) {
                 trim.start = -1;
                 trim.end = -1;
                 continue;
@@ -403,16 +408,16 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
             const int64_t num_positions = dorado::ssize(sample.positions_major);
 
             // Trim left.
-            for (; (region.start > 0) && (trim.start < num_positions); ++trim.start) {
-                if (sample.positions_major[trim.start] >= region.start) {
+            for (; (region->start > 0) && (trim.start < num_positions); ++trim.start) {
+                if (sample.positions_major[trim.start] >= region->start) {
                     break;
                 }
             }
             trim.start = (trim.start >= num_positions) ? -1 : trim.start;
 
             // Trim right. End is non-inclusive, so reduce it by 1 first.
-            for (--trim.end; (region.end > 0) && (trim.end >= 0); --trim.end) {
-                if (sample.positions_major[trim.end] < region.end) {
+            for (--trim.end; (region->end > 0) && (trim.end >= 0); --trim.end) {
+                if (sample.positions_major[trim.end] < region->end) {
                     break;
                 }
             }
@@ -426,7 +431,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples, const Reg
             }
         }
     } else {
-        spdlog::debug("[trim_samples] Not trimming to region because region not fully specified.");
+        spdlog::trace("[trim_samples] Not trimming to region.");
     }
 
     assert(std::size(result) == std::size(samples));

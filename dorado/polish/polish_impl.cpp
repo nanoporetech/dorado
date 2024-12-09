@@ -531,7 +531,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = polisher::trim_samples(
-                    local_samples, {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap});
+                    local_samples,
+                    std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
     };
