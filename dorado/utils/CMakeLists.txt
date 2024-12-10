@@ -38,6 +38,8 @@ add_library(dorado_utils
     memory_utils.h
     MergeHeaders.cpp
     MergeHeaders.h
+    modbase_parameters.cpp
+    modbase_parameters.h
     overlap.h
     parameters.cpp
     parameters.h

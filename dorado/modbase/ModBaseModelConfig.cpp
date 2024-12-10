@@ -2,6 +2,7 @@
 
 #include "torch_utils/tensor_utils.h"
 #include "utils/bam_utils.h"
+#include "utils/modbase_parameters.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -40,36 +41,6 @@ int get_int_in_range(const toml::value& p,
 
 namespace dorado::modbase {
 
-std::string to_string(const ModelType& model_type) {
-    switch (model_type) {
-    case CONV_LSTM_V1:
-        return std::string("conv_lstm");
-    case CONV_LSTM_V2:
-        return std::string("conv_lstm_v2");
-    case CONV_V1:
-        return std::string("conv_v1");
-    default:
-        throw std::runtime_error("Unknown modbase ModelType");
-    }
-};
-
-ModelType model_type_from_string(const std::string& model_type) {
-    if (model_type == "conv_lstm") {
-        return ModelType::CONV_LSTM_V1;
-    }
-    if (model_type == "conv_lstm_v2") {
-        return ModelType::CONV_LSTM_V2;
-    }
-    if (model_type == "conv_only" || model_type == "conv_v1") {
-        return ModelType::CONV_V1;
-    }
-    throw std::runtime_error("Unknown modbase model type: `" + model_type + "`");
-}
-
-ModelType parse_model_type(const toml::value& config_toml) {
-    return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
-}
-
 ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     const auto segment = toml::find(config_toml, "model_params");
 
@@ -78,7 +49,8 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     constexpr int MAX_FEATURES = 10;
     constexpr int MAX_STRIDE = 6;
     ModelGeneralParams params{
-            parse_model_type(config_toml),
+            utils::modbase::model_type_from_string(
+                    toml::find<std::string>(config_toml, "general", "model")),
             get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
             get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
             get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED),

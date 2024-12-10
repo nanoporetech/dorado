@@ -9,14 +9,6 @@ struct DefaultParameters {
     int chunksize{10000};
     int overlap{500};
     int num_runners{2};
-#ifdef DORADO_TX2
-    int modbase_batchsize{128};
-#else
-    int modbase_batchsize{1024};
-#endif
-    int modbase_threads{4};
-    int mod_base_runners_per_caller{2};
-    float methylation_threshold{0.05f};
 
     // Minimum length for a sequence to be outputted.
     size_t min_sequence_length{5};

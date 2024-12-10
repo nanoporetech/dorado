@@ -2,6 +2,7 @@
 
 #include "utils/bam_utils.h"
 #include "utils/dev_utils.h"
+#include "utils/modbase_parameters.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -21,9 +22,7 @@ const std::string err = "Invalid modbase model parameter in ";
 
 namespace dorado::modbase {
 
-enum ModelType { CONV_LSTM_V1, CONV_LSTM_V2, CONV_V1, UNKNOWN };
-std::string to_string(const ModelType& model_type);
-ModelType model_type_from_string(const std::string& model_type);
+using ModelType = utils::modbase::ModelType;
 
 struct ModelGeneralParams {
     const ModelType model_type{ModelType::UNKNOWN};
@@ -207,7 +206,7 @@ struct ModBaseModelConfig {
     RefinementParams refine;           ///< Params for kmer refinement
 
     // Returns true if this modbase model processes chunks instead of context hits
-    bool is_chunked_input_model() const { return general.model_type == CONV_LSTM_V2; };
+    bool is_chunked_input_model() const { return general.model_type == ModelType::CONV_LSTM_V2; };
 
     ModBaseModelConfig(std::filesystem::path model_path_,
                        ModelGeneralParams general_,

@@ -23,6 +23,7 @@
 #include "torch_utils/trim_rapid_adapter.h"
 #include "utils/PostCondition.h"
 #include "utils/SampleSheet.h"
+#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 
 #include <torch/cuda.h>
@@ -253,7 +254,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    const auto& default_params = dorado::utils::default_parameters;
+    const auto& default_modbase_params = dorado::utils::modbase::default_modbase_parameters;
     const char modbase_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
     const auto modbase_model_dir = download_model(modbase_model_name);
     const auto modbase_model = modbase_model_dir.m_path / modbase_model_name;
@@ -274,7 +275,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Create runners
     std::string device;
-    int batch_size = default_params.modbase_batchsize;
+    int batch_size = default_modbase_params.batchsize;
     if (gpu) {
 #if DORADO_METAL_BUILD
         device = "metal";
@@ -313,7 +314,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     });
 
     auto modbase_runners = dorado::api::create_modbase_runners(
-            {modbase_model, modbase_model_6mA}, device, default_params.mod_base_runners_per_caller,
+            {modbase_model, modbase_model_6mA}, device, default_modbase_params.runners_per_caller,
             batch_size);
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(modbase_runners), 2, model_stride, 1000);
@@ -328,7 +329,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
     set_pipeline_restart(pipeline_restart);
 
     run_smoke_test<dorado::ReadToBamTypeNode>(
-            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
+            emit_moves, 2, dorado::utils::modbase::default_modbase_parameters.methylation_threshold,
+            nullptr, 1000);
 }
 
 struct BarcodeKitInputs {
