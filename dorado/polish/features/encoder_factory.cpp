@@ -1,5 +1,8 @@
 #include "encoder_factory.h"
 
+#include <stdexcept>
+#include <unordered_map>
+
 namespace dorado::polisher {
 
 FeatureEncoderType parse_feature_encoder_type(const std::string& type) {

@@ -4,6 +4,7 @@
 #include "encoder_read_alignment.h"
 #include "polish/architectures/model_config.h"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
