@@ -1,9 +1,7 @@
 #pragma once
 
 #include "polish/bam_file.h"
-#include "polish/consensus_result.h"
 #include "polish/features/encoder_base.h"
-#include "polish/features/medaka_bamiter.h"
 #include "polish/sample.h"
 
 #include <torch/torch.h>

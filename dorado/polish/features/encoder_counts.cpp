@@ -1,9 +1,9 @@
 #include "polish/features/encoder_counts.h"
 
 #include "polish/features/medaka_counts.h"
+#include "utils/ssize.h"
 
 #include <spdlog/spdlog.h>
-#include <utils/timer_high_res.h>
 
 #include <cstddef>
 #include <stdexcept>
@@ -12,6 +12,9 @@ namespace dorado::polisher {
 
 namespace {
 
+/**
+ * \brief Conver the vectors produced by the pileup function into proper tensors.
+ */
 CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     const size_t num_bytes = static_cast<size_t>(data.n_cols() * n_rows * sizeof(int64_t));
 
@@ -21,13 +24,13 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
 
     CountsResult result;
 
-    // Allocate a tensor of the appropriate size directly for `result.counts` on the CPU
+    // Allocate a tensor of the appropriate size on the CPU.
     result.counts = torch::empty({static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
                                  torch::kInt64);
 
     assert(result.counts.data_ptr<int64_t>() != nullptr);
 
-    // Copy the data from `data.matrix()` into `result.counts`
+    // Copy the data from `data.matrix` into `result.counts`
     std::memcpy(result.counts.data_ptr<int64_t>(), data.get_matrix().data(), num_bytes);
 
     result.positions_major = std::move(data.get_major());
@@ -37,7 +40,7 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
 }
 
 /**
- * \brief Function to calculate feature vector normalization groups
+ * \brief Function to calculate feature vector normalization groups.
  * \param dtypes Vector of data type names (strings).
  * \param num_qstrat Qscore stratifications.
  * \return Lookup of the form: key = (dtype, strand) -> vector of indices
@@ -47,18 +50,16 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
     // Create a map to store the indices.
     FeatureIndicesType indices;
 
-    const int64_t plp_bases_size = static_cast<int64_t>(std::size(PILEUP_BASES));
-
     constexpr size_t featlen = std::size(PILEUP_BASES);
 
     // Iterate over each datatype.
-    for (int64_t dti = 0; dti < static_cast<int64_t>(std::size(dtypes)); ++dti) {
+    for (int64_t dti = 0; dti < dorado::ssize(dtypes); ++dti) {
         const std::string& dt = dtypes[dti];
 
         // Iterate over qscore stratification layers.
         for (int64_t qindex = 0; qindex < static_cast<int64_t>(num_qstrat); ++qindex) {
             // Iterate over the base codes (e.g., 'a', 'c', 'g', 't', etc.)
-            for (int64_t base_i = 0; base_i < plp_bases_size; ++base_i) {
+            for (int64_t base_i = 0; base_i < PILEUP_BASES_SIZE; ++base_i) {
                 const char code = PILEUP_BASES[base_i];
                 const bool is_rev = std::islower(code);
                 const int64_t index = base_i + dti * num_qstrat * featlen + qindex * featlen;
@@ -70,6 +71,9 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
     return indices;
 }
 
+/**
+ * \brief Normalizes the counts to produce the features for inference.
+ */
 Sample counts_to_features(CountsResult& pileup,
                           const int32_t seq_id,
                           const bool sym_indels,
@@ -77,7 +81,9 @@ Sample counts_to_features(CountsResult& pileup,
                           const NormaliseType normalise_type) {
     // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
     // on a very high level with lots of redundancy in computation.
-    const int64_t num_rows = static_cast<int64_t>(std::size(pileup.positions_major));
+
+    // Get indices of minor positions.
+    const int64_t num_rows = dorado::ssize(pileup.positions_major);
     std::vector<int64_t> minor_inds;
     std::vector<int64_t> major_pos_at_minor_inds;
     std::vector<int64_t> major_ind_at_minor_inds;
@@ -95,8 +101,10 @@ Sample counts_to_features(CountsResult& pileup,
         }
     }
 
+    // Compute the depth of each column.
     auto depth = pileup.counts.sum(1);
 
+    // Set depth at minor positions to match the depth of the corresponding major position.
     auto depth_data = depth.data_ptr<int64_t>();
     for (size_t i = 0; i < std::size(minor_inds); ++i) {
         if (major_ind_at_minor_inds[i] != -1) {
@@ -105,6 +113,7 @@ Sample counts_to_features(CountsResult& pileup,
     }
     const auto depth_unsequezed = depth.unsqueeze(1).to(FeatureTensorType);
 
+    // Symmetric indel handling.
     if (sym_indels) {
         const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
         const torch::Tensor major_ind_at_minor_inds_tensor =
@@ -117,31 +126,19 @@ Sample counts_to_features(CountsResult& pileup,
 
             const auto dt_depth =
                     pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
-            // dt_depth.index_put_({minor_inds}, dt_depth.index({major_ind_at_minor_inds}));
 
             // Define deletion index.
             const int64_t featlen_index = is_rev ? PILEUP_POS_DEL_REV : PILEUP_POS_DEL_FWD;
             const int64_t dtype_size = PILEUP_BASES_SIZE;
 
             // Find the deletion index
-            // std::vector<int64_t> deletion_indices;
             for (const int64_t x : inds) {
                 if ((x % dtype_size) == featlen_index) {
-                    // deletion_indices.emplace_back(x);
                     pileup.counts.index_put_({minor_inds_tensor, x},
                                              dt_depth.index({major_ind_at_minor_inds_tensor}) -
                                                      dt_depth.index({minor_inds_tensor}));
                 }
             }
-            // // Ensure we have at least one valid deletion index
-            // if (!deletion_indices.empty()) {
-            //     del_ind = deletion_indices[0];  // Take the first valid index
-            //     // Update counts for minor indices based on the calculated depths
-            //     counts.index_put_({minor_inds, del_ind}, dt_depth.index({major_ind_at_minor_inds}) - dt_depth.index({minor_inds}));
-            // } else {
-            //     // Handle the case where no deletion index is found (optional)
-            //     // e.g., log a warning or set a default behavior
-            // }
         }
     }
 
