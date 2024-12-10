@@ -8,6 +8,7 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <array>
 #include <cassert>
 #include <filesystem>
 #include <map>
@@ -23,6 +24,9 @@ constexpr size_t MAX_FILES_FOR_MERGE{512};  // Maximum number of files to merge 
 bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& header2) {
     return (strcmp(sam_hdr_str(header1.get()), sam_hdr_str(header2.get())) == 0);
 }
+
+// BAM tags to add to the read header for fastx output
+constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs"};
 
 }  // namespace
 
@@ -60,15 +64,15 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
     switch (m_mode) {
     case OutputMode::FASTQ:
         m_file.reset(hts_open(m_filename.c_str(), "wf"));
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
+        for (const auto& tag : fastq_aux_tags) {
+            hts_set_opt(m_file.get(), FASTQ_OPT_AUX, tag);
+        }
         break;
     case OutputMode::FASTA:
         m_file.reset(hts_open(filename.c_str(), "wF"));
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "RG");
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "st");
-        hts_set_opt(m_file.get(), FASTQ_OPT_AUX, "DS");
+        for (const auto& tag : fastq_aux_tags) {
+            hts_set_opt(m_file.get(), FASTQ_OPT_AUX, tag);
+        }
         break;
     case OutputMode::BAM:
         if (m_filename != "-" && m_sort_bam) {
