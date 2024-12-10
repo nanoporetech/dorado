@@ -4,7 +4,6 @@
 #include "polish/architectures/model_config.h"
 
 #include <memory>
-#include <string>
 
 namespace dorado::polisher {
 
