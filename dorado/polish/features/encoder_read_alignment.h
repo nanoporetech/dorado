@@ -1,16 +1,14 @@
 #pragma once
 
 #include "polish/bam_file.h"
-#include "polish/consensus_result.h"
 #include "polish/features/encoder_base.h"
-#include "polish/features/medaka_bamiter.h"
 #include "polish/sample.h"
 
 #include <torch/torch.h>
 #include <torch/types.h>
 
+#include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace dorado::polisher {
@@ -48,8 +46,7 @@ public:
 
     torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
 
-    std::vector<polisher::Sample> merge_adjacent_samples(
-            std::vector<Sample> samples) const override;
+    std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const override;
 
 private:
     std::vector<std::string> m_dtypes;

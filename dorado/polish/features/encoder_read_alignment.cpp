@@ -7,13 +7,18 @@
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
 
+#include <cstddef>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace dorado::polisher {
 
 namespace {
 
+/**
+ * \brief Converts the data into proper tensors.
+ */
 ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     const size_t num_bytes =
             static_cast<size_t>(data.n_pos * data.buffer_reads * data.featlen * sizeof(int8_t));
@@ -45,7 +50,7 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     return result;
 }
 
-std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> samples) {
+std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
     const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
         size_t size = 0;
         for (const auto& vec : vecs) {
@@ -61,7 +66,7 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
     const auto pad_reads = [](std::vector<torch::Tensor> chunks, int64_t target_depth) {
         // Determine the target depth if not provided
-        if (target_depth == -1) {
+        if (target_depth < 0) {
             target_depth = 0;
             for (const auto& chunk : chunks) {
                 target_depth = std::max(target_depth, chunk.size(1));
@@ -71,19 +76,24 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
         // Pad each chunk to match the target depth
         std::vector<torch::Tensor> padded_chunks;
         for (auto& chunk : chunks) {
-            int64_t pad_depth = target_depth - chunk.size(1);
+            const int64_t pad_depth = target_depth - chunk.size(1);
             if (pad_depth > 0) {
                 auto padding =
                         torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
+
                 spdlog::trace("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
                               tensor_shape_as_string(chunk), tensor_shape_as_string(padding));
+
                 auto concated = torch::cat({std::move(chunk), std::move(padding)}, 1);
+
                 spdlog::trace("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
                               tensor_shape_as_string(concated));
+
                 padded_chunks.emplace_back(std::move(concated));
             } else {
                 spdlog::trace("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
                               tensor_shape_as_string(chunk));
+
                 padded_chunks.emplace_back(std::move(chunk));
             }
         }
@@ -91,6 +101,10 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
         return padded_chunks;
     };
 
+    /**
+     * \brief This lambda reorders reads in the chunk tensors, because some rows (reads) may be missing
+     *          between neighboring samples (e.g. some reads end/begin).
+     */
     const auto reorder_reads = [](std::vector<torch::Tensor> chunks,
                                   const std::vector<std::vector<std::string>>& read_ids_in,
                                   const std::vector<std::vector<std::string>>& read_ids_out) {
@@ -106,7 +120,6 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
 
         for (int64_t n = 1; n < dorado::ssize(chunks); ++n) {
             auto& chunk = chunks[n];
-            // const auto& rids_out = read_ids_out[n - 1];
             const auto& rids_in = read_ids_in[n];
 
             spdlog::trace(
@@ -128,16 +141,18 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                 new_indices[i] = (it != std::end(rids_in_map)) ? it->second : -1;
             }
 
-            // Find missing indices.
+            // Find missing out indices.
             std::vector<int64_t> missing_out_indices;
             for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
                 if (new_indices[i] == -1) {
                     missing_out_indices.emplace_back(i);
                 }
             }
+
+            // Find missing in indices.
+            const std::unordered_set<int64_t> new_indices_set(std::begin(new_indices),
+                                                              std::end(new_indices));
             std::vector<int64_t> missing_in_indices;
-            std::unordered_set<int64_t> new_indices_set(std::begin(new_indices),
-                                                        std::end(new_indices));
             for (int64_t i = 0; i < dorado::ssize(rids_in); ++i) {
                 if (new_indices_set.count(i) == 0) {
                     missing_in_indices.emplace_back(i);
@@ -148,10 +163,8 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                     "[reorder_reads] n = {}, missing_in_indices.size() = {}, "
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
-
             spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
                           print_container_as_string(missing_in_indices, ", "));
-
             spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
                           print_container_as_string(missing_out_indices, ", "));
 
@@ -176,10 +189,6 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
                      static_cast<int64_t>(std::max(std::size(rids_out), std::size(rids_in))),
                      chunk.size(2)},
                     chunk.options());
-            spdlog::trace(
-                    "[reorder_reads] n = {}, before permute. reordered_chunk.shape = {}, "
-                    "new_indices.size() = {}",
-                    n, tensor_shape_as_string(reordered_chunk), std::size(new_indices));
             for (size_t i = 0; i < std::size(new_indices); ++i) {
                 if (new_indices[i] == -1) {
                     continue;
@@ -198,7 +207,6 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
             if ((n + 1) < dorado::ssize(chunks)) {
                 rids_out.clear();
                 rids_out.resize(std::size(new_indices));
-                // auto& tmp_next_rids_out = read_ids_out[n - 1];
                 for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
                     const int64_t idx = new_indices[i];
                     rids_out[i] = (idx == -1) ? ("__inserted_" + std::to_string(i))
@@ -262,7 +270,7 @@ std::vector<Sample> merge_adjacent_samples_read_matrix(std::vector<Sample> sampl
     std::vector<int64_t> buffer_ids;
     int64_t last_end = -1;
 
-    std::vector<polisher::Sample> results;
+    std::vector<Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
         auto& sample = samples[i];
@@ -412,13 +420,6 @@ torch::Tensor EncoderReadAlignment::collate(std::vector<torch::Tensor> batch) co
         // Initialize a zero-filled feature tensor.
         features = torch::zeros({batch_size, npos, max_depth, nfeats}, torch::kUInt8);
 
-        // for (size_t i = 0; i < std::size(batch); ++i) {
-        //     std::ostringstream oss;
-        //     print_tensor_shape(oss, batch[i]);
-        //     std::cerr << "[i = " << i << "] batch[i].shape = " << oss.str() << "\n";
-        //     // spdlog::info("[i = {}] batch[i].shape = {}", i, oss.str());
-        // }
-
         // Fill the tensor with sample data, padding as necessary.
         for (size_t i = 0; i < std::size(batch); ++i) {
             features.index_put_({static_cast<int64_t>(i), torch::indexing::Slice(),
@@ -427,32 +428,12 @@ torch::Tensor EncoderReadAlignment::collate(std::vector<torch::Tensor> batch) co
         }
     }
 
-    // // Calculate masks if requested.
-    // std::unordered_map<std::string, torch::Tensor> masks;
-    // if (calculate_masks) {
-    //     // Assuming `medaka::common::get_sample_masks` is implemented elsewhere.
-    //     std::vector<std::unordered_map<std::string, torch::Tensor>> masks_per_sample;
-    //     for (const auto& sample : samples) {
-    //         masks_per_sample.push_back(medaka::common::get_sample_masks(sample));
-    //     }
-
-    //     // Extract mask keys and stack the masks for each key.
-    //     const auto& mask_keys = masks_per_sample[0];
-    //     for (const auto& [key, _] : mask_keys) {
-    //         std::vector<torch::Tensor> stacked_masks;
-    //         for (const auto& sample_masks : masks_per_sample) {
-    //             stacked_masks.push_back(sample_masks.at(key));
-    //         }
-    //         masks[key] = torch::stack(stacked_masks);
-    //     }
-    // }
-
     return features;
 }
 
-std::vector<polisher::Sample> EncoderReadAlignment::merge_adjacent_samples(
+std::vector<Sample> EncoderReadAlignment::merge_adjacent_samples(
         std::vector<Sample> samples) const {
-    return merge_adjacent_samples_read_matrix(std::move(samples));
+    return merge_adjacent_samples_impl(std::move(samples));
 }
 
 }  // namespace dorado::polisher
