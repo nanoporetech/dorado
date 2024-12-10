@@ -613,6 +613,7 @@ test:linux:arm64:bionic:
     MODEL_SPEED: hac
     MODEL_VERSION: v4.2.0
     NO_TEST_DORADO_CORRECT: 1
+    NO_TEST_DORADO_POLISH: 1
     NO_TEST_DUPLEX: 1
   needs:
     - build:linux:arm64:bionic
