@@ -13,9 +13,9 @@ namespace dorado::polisher {
 namespace {
 
 /**
- * \brief Conver the vectors produced by the pileup function into proper tensors.
+ * \brief Converts the vectors produced by the pileup function into proper tensors.
  */
-CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
+CountsResult counts_data_to_tensors(PileupData& data, const size_t n_rows) {
     const size_t num_bytes = static_cast<size_t>(data.n_cols() * n_rows * sizeof(int64_t));
 
     if (num_bytes == 0) {
@@ -326,7 +326,7 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
 
         // Create Torch tensors from the pileup.
         const size_t n_rows = std::size(PILEUP_BASES) * m_num_dtypes * num_qstrat;
-        pileup_tensors = plp_data_to_tensors(pileup, n_rows);
+        pileup_tensors = counts_data_to_tensors(pileup, n_rows);
 
     } catch (const std::exception& e) {
         spdlog::warn(
