@@ -1,5 +1,5 @@
 #pragma once
-#include "utils/adapter_primer_kits.h"
+#include "adapter_primer_kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 

@@ -1,6 +1,4 @@
 add_library(dorado_utils
-    adapter_primer_kits.cpp
-    adapter_primer_kits.h
     alignment_utils.cpp
     alignment_utils.h
     arg_parse_ext.h

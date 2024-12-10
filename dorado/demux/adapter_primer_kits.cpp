@@ -1,7 +1,7 @@
 #include "adapter_primer_kits.h"
 
-#include "demux/parse_custom_sequences.h"
-#include "string_utils.h"
+#include "parse_custom_sequences.h"
+#include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 

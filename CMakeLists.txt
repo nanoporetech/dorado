@@ -177,6 +177,8 @@ add_library(dorado_lib
     dorado/api/runner_creation.h
     dorado/api/pipeline_creation.cpp
     dorado/api/pipeline_creation.h
+    dorado/demux/adapter_primer_kits.cpp
+    dorado/demux/adapter_primer_kits.h
     dorado/demux/adapter_info.h
     dorado/demux/AdapterDetector.cpp
     dorado/demux/AdapterDetector.h
