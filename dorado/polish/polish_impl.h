@@ -30,11 +30,11 @@ struct DeviceInfo {
 };
 
 struct PolisherResources {
-    std::unique_ptr<polisher::EncoderBase> encoder;
-    std::unique_ptr<polisher::DecoderBase> decoder;
+    std::unique_ptr<EncoderBase> encoder;
+    std::unique_ptr<DecoderBase> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
-    std::vector<std::shared_ptr<polisher::ModelTorchBase>> models;
+    std::vector<std::shared_ptr<ModelTorchBase>> models;
 };
 
 struct BamInfo {
@@ -88,17 +88,17 @@ private:
 /**
  * \brief Creates all resources required to run polishing.
  */
-polisher::PolisherResources create_resources(const polisher::ModelConfig& model_config,
-                                             const std::filesystem::path& in_aln_bam_fn,
-                                             const std::string& device_str,
-                                             const int32_t num_bam_threads,
-                                             const int32_t num_inference_cpu_threads,
-                                             const bool full_precision,
-                                             const std::string& read_group,
-                                             const std::string& tag_name,
-                                             const int32_t tag_value,
-                                             const std::optional<bool>& tag_keep_missing_override,
-                                             const std::optional<int32_t>& min_mapq_override);
+PolisherResources create_resources(const ModelConfig& model_config,
+                                   const std::filesystem::path& in_aln_bam_fn,
+                                   const std::string& device_str,
+                                   const int32_t num_bam_threads,
+                                   const int32_t num_inference_cpu_threads,
+                                   const bool full_precision,
+                                   const std::string& read_group,
+                                   const std::string& tag_name,
+                                   const int32_t tag_value,
+                                   const std::optional<bool>& tag_keep_missing_override,
+                                   const std::optional<int32_t>& min_mapq_override);
 
 /**
  * \brief Opens the input BAM file and summarizes some information needed at runtime.
@@ -173,19 +173,19 @@ std::vector<Window> create_bam_regions(
         const int32_t window_overlap,
         const std::vector<std::string>& regions);
 
-void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
-                                utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
+                                utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
-                                const polisher::DecoderBase& decoder,
+                                const DecoderBase& decoder,
                                 const int32_t num_threads);
 
-void infer_samples_in_parallel(utils::AsyncQueue<polisher::InferenceData>& batch_queue,
-                               utils::AsyncQueue<polisher::DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
-                               const polisher::EncoderBase& encoder);
+void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
+                               utils::AsyncQueue<DecodeData>& decode_queue,
+                               std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               const EncoderBase& encoder);
 
 void sample_producer(PolisherResources& resources,
-                     const std::vector<polisher::Window>& bam_regions,
+                     const std::vector<Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                      const int32_t num_threads,
                      const int32_t batch_size,

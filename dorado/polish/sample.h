@@ -60,7 +60,7 @@ struct Sample {
 };
 
 inline void debug_print_sample(std::ostream& os,
-                               const polisher::Sample& sample,
+                               const Sample& sample,
                                int64_t start /*= 0*/,
                                int64_t end /*= -1 */,
                                bool debug /*= false */) {

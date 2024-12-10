@@ -42,8 +42,7 @@ public:
 
     torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
 
-    std::vector<polisher::Sample> merge_adjacent_samples(
-            std::vector<Sample> samples) const override;
+    std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const override;
 
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};

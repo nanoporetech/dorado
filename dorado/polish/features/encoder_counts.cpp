@@ -181,7 +181,7 @@ Sample counts_to_features(CountsResult& pileup,
     return sample;
 }
 
-std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples) {
+std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
     const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
         size_t size = 0;
         for (const auto& vec : vecs) {
@@ -240,7 +240,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
     std::vector<int64_t> buffer_ids;
     int64_t last_end = -1;
 
-    std::vector<polisher::Sample> results;
+    std::vector<Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
         auto& sample = samples[i];
@@ -352,8 +352,7 @@ torch::Tensor EncoderCounts::collate(std::vector<torch::Tensor> batch) const {
     return torch::stack(batch);
 }
 
-std::vector<polisher::Sample> EncoderCounts::merge_adjacent_samples(
-        std::vector<Sample> samples) const {
+std::vector<Sample> EncoderCounts::merge_adjacent_samples(std::vector<Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
 }
 
