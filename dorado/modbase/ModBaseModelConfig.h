@@ -16,11 +16,10 @@
 #include <utility>
 #include <vector>
 
-namespace {
-const std::string err = "Invalid modbase model parameter in ";
-}
-
 namespace dorado::modbase {
+namespace {
+const std::string err_str = "Invalid modbase model parameter in ";
+}
 
 using ModelType = utils::modbase::ModelType;
 
@@ -38,13 +37,13 @@ struct ModelGeneralParams {
               num_out(num_out_),
               stride(stride_) {
         if (model_type == ModelType::UNKNOWN) {
-            throw std::runtime_error(err + "general params: 'model type not set or unknown'");
+            throw std::runtime_error(err_str + "general params: 'model type not set or unknown'");
         }
         if (size < 1 || kmer_len < 1 || num_out < 1 || stride < 1) {
-            throw std::runtime_error(err + "general params: 'negative or zero value'.");
+            throw std::runtime_error(err_str + "general params: 'negative or zero value'.");
         }
         if (kmer_len % 2 != 1) {
-            throw std::runtime_error(err + "general params: 'kmer_length is not odd'.");
+            throw std::runtime_error(err_str + "general params: 'kmer_length is not odd'.");
         }
     }
 };
@@ -55,7 +54,7 @@ struct LinearParams {
 
     LinearParams(int in_, int out_) : in(in_), out(out_) {
         if (in < 1 || out < 1) {
-            throw std::runtime_error(err + "linear params: 'negative or zero value'.");
+            throw std::runtime_error(err_str + "linear params: 'negative or zero value'.");
         }
     }
 };
@@ -75,16 +74,16 @@ struct RefinementParams {
               center_idx(static_cast<size_t>(center_idx_)),
               levels(std::move(refine_kmer_levels_)) {
         if (kmer_len < 1 || kmer_len_ < 1) {
-            throw std::runtime_error(err + "refinement params: 'negative or zero kmer len'.");
+            throw std::runtime_error(err_str + "refinement params: 'negative or zero kmer len'.");
         }
         if (center_idx_ < 0) {
-            throw std::runtime_error(err + "refinement params: 'negative center index'.");
+            throw std::runtime_error(err_str + "refinement params: 'negative center index'.");
         }
         if (kmer_len < center_idx) {
-            throw std::runtime_error(err + "refinement params: 'invalid center index'.");
+            throw std::runtime_error(err_str + "refinement params: 'invalid center index'.");
         }
         if (levels.empty()) {
-            throw std::runtime_error(err + "refinement params: 'missing levels'.");
+            throw std::runtime_error(err_str + "refinement params: 'missing levels'.");
         }
     }
 };
@@ -112,18 +111,18 @@ struct ModificationParams {
               base(get_canonical_base_name(motif, motif_offset)),
               base_id(utils::BaseInfo::BASE_IDS[base]) {
         if (codes.empty()) {
-            throw std::runtime_error(err + "mods params: 'empty modifications.");
+            throw std::runtime_error(err_str + "mods params: 'empty modifications.");
         }
         if (long_names.empty()) {
-            throw std::runtime_error(err + "mods params: 'empty long names.");
+            throw std::runtime_error(err_str + "mods params: 'empty long names.");
         }
         if (codes.size() != long_names.size()) {
-            throw std::runtime_error(err + "mods params: 'mods and names size mismatch.");
+            throw std::runtime_error(err_str + "mods params: 'mods and names size mismatch.");
         }
 
         for (const auto& code : codes) {
             if (!utils::validate_bam_tag_code(code)) {
-                std::string e = err + "mods params: 'invalid mod code ";
+                std::string e = err_str + "mods params: 'invalid mod code ";
                 throw std::runtime_error(e + code + "'.");
             }
         }
@@ -132,14 +131,15 @@ struct ModificationParams {
 private:
     static char get_canonical_base_name(const std::string& motif, size_t motif_offset) {
         if (motif.size() < motif_offset) {
-            throw std::runtime_error(err + "mods params: 'invalid motif offset'.");
+            throw std::runtime_error(err_str + "mods params: 'invalid motif offset'.");
         }
 
         // Assert a canonical base is at motif[motif_offset]
         constexpr std::string_view canonical_bases = "ACGT";
         std::string motif_base = motif.substr(motif_offset, 1);
         if (canonical_bases.find(motif_base) == std::string::npos) {
-            throw std::runtime_error(err + "mods params: 'invalid motif base " + motif_base + "'.");
+            throw std::runtime_error(err_str + "mods params: 'invalid motif base " + motif_base +
+                                     "'.");
         }
 
         return motif_base[0];
@@ -176,13 +176,13 @@ struct ContextParams {
               reverse(reverse_),
               base_start_justify(base_start_justify_) {
         if (samples_before < 0 || samples_after < 0) {
-            throw std::runtime_error(err + "context params: 'negative context samples'.");
+            throw std::runtime_error(err_str + "context params: 'negative context samples'.");
         }
         if (chunk_size < samples) {
-            throw std::runtime_error(err + "context params: 'chunk size < context size'.");
+            throw std::runtime_error(err_str + "context params: 'chunk size < context size'.");
         }
         if (bases_before < 1 || bases_after < 1) {
-            throw std::runtime_error(err + "context params: 'negative or zero context bases'.");
+            throw std::runtime_error(err_str + "context params: 'negative or zero context bases'.");
         }
     }
 
@@ -224,7 +224,7 @@ struct ModBaseModelConfig {
         if (general.kmer_len != context.kmer_len) {
             auto kl_a = std::to_string(general.kmer_len);
             auto kl_b = std::to_string(context.kmer_len);
-            throw std::runtime_error(err + "config: 'inconsistent kmer_len: " + kl_a +
+            throw std::runtime_error(err_str + "config: 'inconsistent kmer_len: " + kl_a +
                                      " != " + kl_b + "'.");
         }
     }
