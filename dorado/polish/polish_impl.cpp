@@ -471,8 +471,8 @@ std::vector<Window> create_bam_regions(
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
         const std::vector<std::string>& regions) {
-    // Canonical case where each sequence is linearly split with an overlap.
     if (std::empty(regions)) {
+        // Canonical case where each sequence is linearly split with an overlap.
         std::vector<Window> windows;
         for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
             const int64_t len = draft_lens[seq_id].second;
@@ -482,8 +482,9 @@ std::vector<Window> create_bam_regions(
             windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }
         return windows;
+
     } else {
-        // Create windows for only this one region.
+        // Create windows only for the selected regions.
         std::unordered_map<std::string, int32_t> draft_ids;
         for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
             draft_ids[draft_lens[seq_id].first] = seq_id;
