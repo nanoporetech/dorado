@@ -2,6 +2,7 @@
 
 #include "polish/interval.h"
 #include "polish/polish_utils.h"
+#include "polish/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"
 
@@ -270,36 +271,13 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
     return results;
 }
 
-std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string& region) {
-    const size_t colon_pos = region.find(':');
-    if (colon_pos == std::string::npos) {
-        return {region, -1, -1};
-    }
-
-    std::string name = region.substr(0, colon_pos);
-
-    if ((colon_pos + 1) == std::size(region)) {
-        return {std::move(name), -1, -1};
-    }
-
-    size_t dash_pos = region.find('-', colon_pos + 1);
-    dash_pos = (dash_pos == std::string::npos) ? std::size(region) : dash_pos;
-    const int64_t start =
-            ((dash_pos - colon_pos - 1) == 0)
-                    ? -1
-                    : std::stoll(region.substr(colon_pos + 1, dash_pos - colon_pos - 1)) - 1;
-    const int64_t end =
-            ((dash_pos + 1) < std::size(region)) ? std::stoll(region.substr(dash_pos + 1)) : -1;
-
-    return {std::move(name), start, end};
-}
-
 std::vector<Sample> encode_regions_in_parallel(
         std::vector<BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads) {
+    // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<Sample>& results) {
         for (int32_t i = start; i < end; ++i) {
