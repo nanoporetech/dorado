@@ -4,7 +4,6 @@
 #include "polish/bam_file.h"
 
 #include <array>
-#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string_view>
@@ -29,114 +28,88 @@ static constexpr std::array<int32_t, 32> NUM_TO_COUNT_BASE{
 
 class PileupData {
 public:
-    /** Constructs a pileup data structure.
-     *
-     *  @param n_cols number of pileup columns.
-     *  @param buffer_cols number of pileup columns.
-     *  @param num_dtypes number of datatypes in pileup.
-     *  @param num_homop maximum homopolymer length to consider.
-     *  @param fixed_size if not zero data matrix is allocated as fixed_size * n_cols, ignoring other arguments.
-     *
-     *  The return value can be freed with destroy_plp_data.
-     *
+    /**
+     * \brief Constructs a pileup data structure.
+     * \param n_cols Number of pileup columns.
+     * \param buffer_cols Number of pileup columns.
+     * \param num_dtypes Number of datatypes in pileup.
+     * \param num_homop Maximum homopolymer length to consider.
+     * \param fixed_size If not zero data matrix is allocated as fixed_size * n_cols, ignoring other arguments.
      */
-    PileupData(const int64_t n_cols,
-               const int64_t buffer_cols,
-               const int64_t num_dtypes,
-               const int64_t num_homop,
-               const int64_t fixed_size);
+    PileupData(const int64_t n_cols_,
+               const int64_t buffer_cols_,
+               const int64_t num_dtypes_,
+               const int64_t num_homop_,
+               const int64_t fixed_size_);
 
-    /** Resize the internal buffers of a pileup data structure.
-     *
-     *  @param buffer_cols number of pileup columns for which to allocate memory.
-     *
+    /**
+     * \brief Resize the internal buffers of a pileup data structure.
+     * \param buffer_cols Number of pileup columns for which to allocate memory.
      */
     void resize_cols(const int64_t buffer_cols);
 
-    int64_t buffer_cols() const { return m_buffer_cols; }
-    int64_t num_dtypes() const { return m_num_dtypes; }
-    int64_t num_homop() const { return m_num_homop; }
-    int64_t n_cols() const { return m_n_cols; }
-
-    // Can't call thse getters and setters just `major()` or `minor` because:
-    //  "error: In the GNU C Library, "major" is defined"
-    const std::vector<int64_t>& get_matrix() const { return m_matrix; }
-    const std::vector<int64_t>& get_major() const { return m_major; }
-    const std::vector<int64_t>& get_minor() const { return m_minor; }
-
-    std::vector<int64_t>& get_matrix() { return m_matrix; }
-    std::vector<int64_t>& get_major() { return m_major; }
-    std::vector<int64_t>& get_minor() { return m_minor; }
-
-    void set_major(std::vector<int64_t> data) { std::swap(m_major, data); }
-    void set_minor(std::vector<int64_t> data) { std::swap(m_minor, data); }
-
-    void n_cols(const int64_t val) { m_n_cols = val; }
-
-private:
-    int64_t m_buffer_cols = 0;
-    int64_t m_num_dtypes = 0;
-    int64_t m_num_homop = 0;
-    int64_t m_n_cols = 0;
-    std::vector<int64_t> m_matrix;
-    std::vector<int64_t> m_major;
-    std::vector<int64_t> m_minor;
+    int64_t buffer_cols = 0;
+    int64_t num_dtypes = 0;
+    int64_t num_homop = 0;
+    int64_t n_cols = 0;
+    std::vector<int64_t> matrix;
+    std::vector<int64_t> major;
+    std::vector<int64_t> minor;
 };
 
-/** Prints a pileup data structure.
- *
- *  @param pileup a pileup counts structure.
- *  @param num_dtypes number of datatypes in the pileup.
- *  @param dtypes datatype prefix strings.
- *  @param num_homop maximum homopolymer length to consider.
- *  @returns void
- *
+/**
+ * \brief Prints a pileup data structure.
+ * \param pileup a pileup structure.
+ * \param num_dtypes number of datatypes in the pileup.
+ * \param dtypes datatype prefix strings.
+ * \param num_homop maximum homopolymer length to consider.
  */
-void print_pileup_data(std::ostream& os,
-                       const PileupData& pileup,
+void print_pileup_data(std::ostream &os,
+                       const PileupData &pileup,
                        const int64_t num_dtypes,
-                       const std::vector<std::string>& dtypes,
+                       const std::vector<std::string> &dtypes,
                        const int64_t num_homop);
 
-/** Generates medaka-style feature data in a region of a bam.
+/**
+ * \brief Generates medaka-style feature data in a region of a BAM.
+ * \param bam_file Input aligment file.
+ * \param chr_name Name of the input sequence for the queried region.
+ * \param start Start coordinate of the region. Zero-based.
+ * \param end End coordinate of the region. Non-inclusive.
+ * \param num_dtypes Number of datatypes in bam.
+ * \param dtypes Prefixes on query names indicating datatype.
+ * \param num_homopo Maximum homopolymer length to consider.
+ * \param tag_name Tag name by which to filter alignments.
+ * \param tag_value Tag value by which to filter data. Only int supported.
+ * \param keep_missing Keeps alignments which do not have the tag specified with tag_name.
+ * \param weibull_summation Use predefined BAM tags to perform homopolymer partial counts.
+ * \param read_group Used for filtering.
+ * \param min_mapq Mininimum mapping quality.
+ * \returns PileupData object which contains base counts per column.
  *
- *  @param region 1-based region string.
- *  @param bam_file input aligment file.
- *  @param num_dtypes number of datatypes in bam.
- *  @param dtypes prefixes on query names indicating datatype.
- *  @param num_homop maximum homopolymer length to consider.
- *  @param tag_name by which to filter alignments
- *  @param tag_value by which to filter data
- *  @param keep_missing alignments which do not have tag
- *  @param weibull_summation use predefined bam tags to perform homopolymer partial counts.
- *  @param read group used for filtering.
- *  @param mininimum mapping quality for filtering.
- *  @returns a pileup counts data pointer.
+ * Throws exceptions on errors.
  *
- *  The return value can be freed with destroy_plp_data.
- *
- *  If num_dtypes is 1, dtypes should be NULL; all reads in the bam will be
+ *  If num_dtypes is 1, dtypes should be empty; all reads in the BAM will be
  *  treated equally. If num_dtypes is not 1, dtypes should be an array of
  *  strings, these strings being prefixes of query names of reads within the
- *  bam file. Any read not matching the prefixes will cause exit(1).
+ *  bam file. Any read not matching the prefixes will cause an exception to be thrown.
  *
- *  If tag_name is not NULL alignments are filtered by the (integer) tag value.
- *  When tag_name is given the behaviour for alignments without the tag is
+ *  If tag_name is not empty, alignments are filtered by the (integer) tag value.
+ *  When tag_name is given, the behaviour for alignments without the tag is
  *  determined by keep_missing.
- *
  */
-PileupData calculate_pileup(BamFile& bam_file,
-                            const std::string& seq_name,
-                            const int64_t region_start,
-                            const int64_t region_end,
+PileupData calculate_pileup(BamFile &bam_file,
+                            const std::string &chr_name,
+                            const int64_t start,  // Zero-based.
+                            const int64_t end,    // Non-inclusive.
                             const int64_t num_dtypes,
-                            const std::vector<std::string>& dtypes,
+                            const std::vector<std::string> &dtypes,
                             const int64_t num_homop,
-                            const std::string& tag_name,
+                            const std::string &tag_name,
                             const int32_t tag_value,
                             const bool keep_missing,
                             const bool weibull_summation,
-                            const std::string& read_group,
+                            const std::string &read_group,
                             const int32_t min_mapq);
 
 }  // namespace dorado::polisher

@@ -18,42 +18,33 @@
 
 namespace dorado::polisher {
 
-PileupData::PileupData(const int64_t n_cols,
-                       const int64_t buffer_cols,
-                       const int64_t num_dtypes,
-                       const int64_t num_homop,
-                       const int64_t fixed_size)
-        : m_buffer_cols{buffer_cols},
-          m_num_dtypes{num_dtypes},
-          m_num_homop{num_homop},
-          m_n_cols{n_cols} {
-    if (fixed_size > 0) {
+PileupData::PileupData(const int64_t n_cols_,
+                       const int64_t buffer_cols_,
+                       const int64_t num_dtypes_,
+                       const int64_t num_homop_,
+                       const int64_t fixed_size_)
+        : buffer_cols{buffer_cols_},
+          num_dtypes{num_dtypes_},
+          num_homop{num_homop_},
+          n_cols{n_cols_} {
+    if (fixed_size_ > 0) {
         assert(buffer_cols == n_cols);
-        m_matrix.resize(fixed_size * n_cols, 0);
+        matrix.resize(fixed_size_ * n_cols, 0);
     } else {
-        m_matrix.resize(PILEUP_BASES_SIZE * num_dtypes * buffer_cols * num_homop, 0);
+        matrix.resize(PILEUP_BASES_SIZE * num_dtypes * buffer_cols * num_homop, 0);
     }
-    m_major.resize(buffer_cols);
-    m_minor.resize(buffer_cols);
+    major.resize(buffer_cols);
+    minor.resize(buffer_cols);
 }
 
-void PileupData::resize_cols(const int64_t buffer_cols) {
-    const int64_t new_size = PILEUP_BASES_SIZE * m_num_dtypes * m_num_homop * buffer_cols;
-    m_matrix.resize(new_size, 0);
-    m_major.resize(buffer_cols, 0);
-    m_minor.resize(buffer_cols, 0);
-    m_buffer_cols = buffer_cols;
+void PileupData::resize_cols(const int64_t buffer_cols_) {
+    const int64_t new_size = PILEUP_BASES_SIZE * num_dtypes * num_homop * buffer_cols_;
+    matrix.resize(new_size, 0);
+    major.resize(buffer_cols_, 0);
+    minor.resize(buffer_cols_, 0);
+    buffer_cols = buffer_cols_;
 }
 
-/** Prints a pileup data structure.
- *
- *  @param pileup a pileup structure.
- *  @param num_dtypes number of datatypes in the pileup.
- *  @param dtypes datatype prefix strings.
- *  @param num_homop maximum homopolymer length to consider.
- *  @returns void
- *
- */
 void print_pileup_data(std::ostream &os,
                        const PileupData &pileup,
                        const int64_t num_dtypes,
@@ -74,13 +65,12 @@ void print_pileup_data(std::ostream &os,
         }
     }
     os << "depth\n";
-    for (int64_t j = 0; j < static_cast<int64_t>(pileup.n_cols()); ++j) {
+    for (int64_t j = 0; j < static_cast<int64_t>(pileup.n_cols); ++j) {
         int64_t s = 0;
-        os << pileup.get_major()[j] << '\t' << pileup.get_minor()[j] << '\t';
+        os << pileup.major[j] << '\t' << pileup.minor[j] << '\t';
         for (int64_t i = 0; i < static_cast<int64_t>(num_dtypes * PILEUP_BASES_SIZE * num_homop);
              ++i) {
-            const int64_t c =
-                    pileup.get_matrix().at(j * num_dtypes * PILEUP_BASES_SIZE * num_homop + i);
+            const int64_t c = pileup.matrix.at(j * num_dtypes * PILEUP_BASES_SIZE * num_homop + i);
             s += c;
             os << c << '\t';
         }
@@ -98,7 +88,7 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     static const char *wtags[] = {"WL", "WK"};  // scale, shape
     double wtag_vals[2] = {0.0, 0.0};
     for (int64_t i = 0; i < 2; ++i) {
-        uint8_t *tag = bam_aux_get(p->b, wtags[i]);
+        const uint8_t *tag = bam_aux_get(p->b, wtags[i]);
         if (tag == NULL) {
             const std::string read_id(bam_get_qname(p->b));
             const auto it = bad_reads.find(read_id);
@@ -109,7 +99,7 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
             }
             return fraction_counts;
         }
-        uint32_t taglen = bam_auxB_len(tag);
+        const uint32_t taglen = bam_auxB_len(tag);
         if (p->qpos + indel >= taglen) {
             spdlog::warn("%s tag was out of range for %s position %lu. taglen: %i\n", wtags[i],
                          bam_get_qname(p->b), p->qpos + indel, taglen);
@@ -118,10 +108,10 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
         wtag_vals[i] = bam_auxB2f(tag, p->qpos + static_cast<int32_t>(indel));
     }
 
-    // found tags, fill in values
-    float scale = static_cast<float>(wtag_vals[0]);  //wl
-    float shape = static_cast<float>(wtag_vals[1]);  //wk
-    for (int64_t x = 1; x < num_homop + 1; ++x) {
+    // Found tags, fill in values.
+    const float scale = static_cast<float>(wtag_vals[0]);  //wl
+    const float shape = static_cast<float>(wtag_vals[1]);  //wk
+    for (int64_t x = 1; x < (num_homop + 1); ++x) {
         float a = std::pow((x - 1) / scale, shape);
         float b = std::pow(x / scale, shape);
         fraction_counts[x - 1] = std::fmax(0.0f, -std::exp(-a) * std::expm1(a - b));
@@ -129,31 +119,6 @@ std::vector<float> _get_weibull_scores(const bam_pileup1_t *p,
     return fraction_counts;
 }
 
-/** Generates medaka-style feature data in a region of a bam.
- *
- *  @param region 1-based region string.
- *  @param bam_file input aligment file.
- *  @param num_dtypes number of datatypes in bam.
- *  @param dtypes prefixes on query names indicating datatype.
- *  @param num_homop maximum homopolymer length to consider.
- *  @param tag_name by which to filter alignments.
- *  @param tag_value by which to filter data.
- *  @param keep_missing alignments which do not have tag.
- *  @param weibull_summation use predefined bam tags to perform homopolymer partial counts.
- *  @returns a pileup data pointer.
- *
- *  The return value can be freed with destroy_plp_data.
- *
- *  If num_dtypes is 1, dtypes should be NULL; all reads in the bam will be
- *  treated equally. If num_dtypes is not 1, dtypes should be an array of
- *  strings, these strings being prefixes of query names of reads within the
- *  bam file. Any read not matching the prefixes will cause exit(1).
- *
- *  If tag_name is not NULL alignments are filtered by the (integer) tag value.
- *  When tag_name is given the behaviour for alignments without the tag is
- *  determined by keep_missing.
- *
- */
 PileupData calculate_pileup(BamFile &bam_file,
                             const std::string &chr_name,
                             const int64_t start,  // Zero-based.
@@ -210,9 +175,9 @@ PileupData calculate_pileup(BamFile &bam_file,
     const int64_t buffer_cols = 2 * (end - start);
     PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
 
-    int64_t *pileup_matrix = pileup.get_matrix().data();
-    int64_t *pileup_major = pileup.get_major().data();
-    int64_t *pileup_minor = pileup.get_minor().data();
+    int64_t *pileup_matrix = pileup.matrix.data();
+    int64_t *pileup_major = pileup.major.data();
+    int64_t *pileup_minor = pileup.minor.data();
 
     // get counts
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
@@ -243,16 +208,16 @@ PileupData calculate_pileup(BamFile &bam_file,
         }
 
         // reallocate output if necessary
-        if ((n_cols + max_ins) > static_cast<int32_t>(pileup.buffer_cols())) {
+        if ((n_cols + max_ins) > static_cast<int32_t>(pileup.buffer_cols)) {
             const float cols_per_pos = static_cast<float>(n_cols + max_ins) / (1 + pos - start);
             // max_ins can dominate so add at least that
             const int64_t new_buffer_cols =
-                    max_ins + std::max(2 * pileup.buffer_cols(),
+                    max_ins + std::max(2 * pileup.buffer_cols,
                                        static_cast<int64_t>(cols_per_pos * (end - start)));
             pileup.resize_cols(new_buffer_cols);
-            pileup_matrix = pileup.get_matrix().data();
-            pileup_major = pileup.get_major().data();
-            pileup_minor = pileup.get_minor().data();
+            pileup_matrix = pileup.matrix.data();
+            pileup_major = pileup.major.data();
+            pileup_minor = pileup.minor.data();
         }
 
         // set major/minor position indexes, minors hold ins
@@ -349,9 +314,9 @@ PileupData calculate_pileup(BamFile &bam_file,
         n_cols += max_ins;
     }
 
-    pileup.n_cols(n_cols);
-    pileup.get_major().resize(n_cols);
-    pileup.get_minor().resize(n_cols);
+    pileup.n_cols = n_cols;
+    pileup.major.resize(n_cols);
+    pileup.minor.resize(n_cols);
 
     bam_itr_destroy(data->iter);
     bam_mplp_destroy(mplp);

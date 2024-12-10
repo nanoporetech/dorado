@@ -16,7 +16,7 @@ namespace {
  * \brief Converts the vectors produced by the pileup function into proper tensors.
  */
 CountsResult counts_data_to_tensors(PileupData& data, const size_t n_rows) {
-    const size_t num_bytes = static_cast<size_t>(data.n_cols() * n_rows * sizeof(int64_t));
+    const size_t num_bytes = static_cast<size_t>(data.n_cols * n_rows * sizeof(int64_t));
 
     if (num_bytes == 0) {
         return {};
@@ -25,16 +25,16 @@ CountsResult counts_data_to_tensors(PileupData& data, const size_t n_rows) {
     CountsResult result;
 
     // Allocate a tensor of the appropriate size on the CPU.
-    result.counts = torch::empty({static_cast<long>(data.n_cols()), static_cast<long>(n_rows)},
+    result.counts = torch::empty({static_cast<long>(data.n_cols), static_cast<long>(n_rows)},
                                  torch::kInt64);
 
     assert(result.counts.data_ptr<int64_t>() != nullptr);
 
     // Copy the data from `data.matrix` into `result.counts`
-    std::memcpy(result.counts.data_ptr<int64_t>(), std::data(data.get_matrix()), num_bytes);
+    std::memcpy(result.counts.data_ptr<int64_t>(), std::data(data.matrix), num_bytes);
 
-    result.positions_major = std::move(data.get_major());
-    result.positions_minor = std::move(data.get_minor());
+    result.positions_major = std::move(data.major);
+    result.positions_minor = std::move(data.minor);
 
     return result;
 }
