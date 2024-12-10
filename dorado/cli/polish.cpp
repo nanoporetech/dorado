@@ -22,7 +22,6 @@
 #include "utils/parameters.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
-#include "utils/timer_high_res.h"
 
 #include <cxxpool.h>
 #include <htslib/faidx.h>
@@ -71,31 +70,9 @@ namespace {
 
 using ParserPtr = std::unique_ptr<utils::arg_parse::ArgParser>;
 
-enum class DeviceType { CPU, CUDA, METAL, UNKNOWN };
-
-struct DeviceInfo {
-    std::string name;
-    DeviceType type;
-    torch::Device device;
-};
-
 enum class OutputFormat {
     FASTA,
     FASTQ,
-};
-
-struct BamInfo {
-    bool uses_dorado_aligner = false;
-    bool has_dwells = false;
-    std::unordered_set<std::string> read_groups;
-};
-
-struct PolisherResources {
-    std::unique_ptr<polisher::EncoderBase> encoder;
-    std::unique_ptr<polisher::DecoderBase> decoder;
-    std::vector<BamFile> bam_handles;
-    std::vector<DeviceInfo> devices;
-    std::vector<std::shared_ptr<polisher::ModelTorchBase>> models;
 };
 
 /// \brief All options for this tool.
@@ -125,7 +102,6 @@ struct Options {
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
-
     bool fill_gaps = true;
     std::optional<char> fill_char;
     std::optional<int32_t> min_mapq;
@@ -134,7 +110,6 @@ struct Options {
     std::string tag_name;
     int32_t tag_value = 0;
     std::optional<bool> tag_keep_missing;
-
     bool any_bam = false;
 
     // int32_t min_depth = 0;
@@ -488,34 +463,6 @@ void validate_options(const Options& opt) {
     }
 }
 
-std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
-    std::vector<DeviceInfo> devices;
-
-    if (devices_str == "cpu") {
-        torch::Device torch_device = torch::Device(devices_str);
-        devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
-    }
-#if DORADO_CUDA_BUILD
-    else if (utils::starts_with(devices_str, "cuda")) {
-        spdlog::debug("Parsing CUDA device string.");
-        const std::vector<std::string> parsed_devices =
-                dorado::utils::parse_cuda_device_string(devices_str);
-        if (parsed_devices.empty()) {
-            throw std::runtime_error("CUDA device requested but no devices found.");
-        }
-        for (const auto& val : parsed_devices) {
-            torch::Device torch_device = torch::Device(val);
-            devices.emplace_back(DeviceInfo{val, DeviceType::CUDA, std::move(torch_device)});
-        }
-    }
-#endif
-    else {
-        throw std::runtime_error("Unsupported device: " + devices_str);
-    }
-
-    return devices;
-}
-
 std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
         const std::filesystem::path& in_fastx_fn) {
     const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
@@ -576,82 +523,6 @@ std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
     return ofs;
 }
 
-PolisherResources create_resources(const polisher::ModelConfig& model_config,
-                                   const std::filesystem::path& in_aln_bam_fn,
-                                   const std::string& device_str,
-                                   const int32_t num_bam_threads,
-                                   const int32_t num_inference_cpu_threads,
-                                   const bool full_precision,
-                                   const std::string& read_group,
-                                   const std::string& tag_name,
-                                   const int32_t tag_value,
-                                   const std::optional<bool>& tag_keep_missing_override,
-                                   const std::optional<int32_t>& min_mapq_override) {
-    PolisherResources resources;
-
-    spdlog::info("Initializing the devices.");
-    resources.devices = init_devices(device_str);
-    if (std::empty(resources.devices)) {
-        throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
-    }
-
-    // Construct the model.
-    spdlog::debug("[create_resources] Loading the model.");
-    const auto create_models = [&]() {
-        std::vector<std::shared_ptr<polisher::ModelTorchBase>> ret;
-
-        for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
-            const auto& device_info = resources.devices[device_id];
-
-            spdlog::debug("[create_resources] Creating a model from the config.");
-            auto model = polisher::model_factory(model_config);
-
-            spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
-                          device_info.name);
-            model->to_device(device_info.device);
-
-            // Half-precision if needed.
-            if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-                spdlog::debug("[create_resources] Converting the model to half.");
-                model->to_half();
-            } else {
-                spdlog::debug("[create_resources] Using full precision.");
-            }
-
-            spdlog::debug("[create_resources] Switching model to eval mode.");
-            model->set_eval();
-
-            ret.emplace_back(std::move(model));
-
-            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
-        }
-        // In case the device is set to CPU, we add up to inference_threads models.
-        if ((std::size(resources.devices) == 1) &&
-            (resources.devices.front().type == DeviceType::CPU)) {
-            for (int32_t i = 1; i < num_inference_cpu_threads; ++i) {
-                ret.emplace_back(ret.front());
-            }
-        }
-        return ret;
-    };
-    resources.models = create_models();
-
-    spdlog::info("Creating the encoder.");
-    resources.encoder = polisher::encoder_factory(model_config, read_group, tag_name, tag_value,
-                                                  tag_keep_missing_override, min_mapq_override);
-
-    spdlog::info("Creating the decoder.");
-    resources.decoder = polisher::decoder_factory(model_config);
-
-    // Open the BAM file for each thread.
-    spdlog::info("Creating {} BAM handles.", num_bam_threads);
-    for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
-    }
-
-    return resources;
-}
-
 std::filesystem::path download_model(const std::string& model_name) {
     const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
     const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
@@ -662,484 +533,10 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
-    BamInfo ret;
-
-    BamFile bam(in_aln_bam_fn);
-
-    const std::vector<HeaderLineData> header = bam.parse_header();
-
-    // header_to_stream(std::cerr, header);
-
-    // Get info from headers: program and the read groups.
-    for (const auto& line : header) {
-        // Convert all tags into a lookup.
-        const std::unordered_map<std::string, std::string> tags = [&]() {
-            std::unordered_map<std::string, std::string> local_ret;
-            for (const auto& [key, value] : line.tags) {
-                local_ret[key] = value;
-            }
-            return local_ret;
-        }();
-
-        if (line.header_type == "@PG") {
-            const auto& it_pn = tags.find("PN");
-            const auto& it_id = tags.find("ID");
-            if ((it_pn != std::end(tags)) && it_id != std::end(tags)) {
-                // Convert the program name to lowercase just in case.
-                std::string pn = it_pn->second;
-                std::transform(std::begin(pn), std::end(pn), std::begin(pn),
-                               [](unsigned char c) { return std::tolower(c); });
-
-                // Convert the program ID to lowercase just in case.
-                std::string id = it_id->second;
-                std::transform(std::begin(id), std::end(id), std::begin(id),
-                               [](unsigned char c) { return std::tolower(c); });
-
-                if ((pn == "dorado") && (id.rfind("aligner", 0) == 0)) {
-                    // The id.rfind performs a startswith comparison, because a tool
-                    // may be run multiple times and the ID field needs to be unique.
-                    // Example possibilites: aligner, aligner.1, samtools.1, samtools.2, etc.
-                    ret.uses_dorado_aligner = true;
-                }
-            }
-        } else if (line.header_type == "@RG") {
-            const auto& it_id = tags.find("ID");
-            if (it_id != std::end(tags)) {
-                ret.read_groups.emplace(it_id->second);
-            }
-        }
-    }
-
-    // Check for the dwells ("mv") tag. Only parse one record.
-    {
-        const auto record = bam.get_next();
-        if ((record != nullptr) && (bam_aux_get(record.get(), "mv") != nullptr)) {
-            ret.has_dwells = true;
-        }
-    }
-
-    return ret;
-}
-
 }  // namespace
 
-namespace polisher {
-
-class PolishStats {
-public:
-    PolishStats() = default;
-
-    void update(const std::string& name, const double value) { m_stats[name] = value; }
-
-    void increment(const std::string& name) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += 1.0;
-    }
-
-    void add(const std::string& name, const double value) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += value;
-    }
-
-    stats::NamedStats get_stats() const { return m_stats; }
-
-private:
-    stats::NamedStats m_stats;
-    std::mutex m_mtx;
-};
-
-void sample_producer(PolisherResources& resources,
-                     const std::vector<polisher::Window>& bam_regions,
-                     const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                     const int32_t num_threads,
-                     const int32_t batch_size,
-                     const int32_t window_len,
-                     const int32_t window_overlap,
-                     const int32_t bam_subchunk_len,
-                     utils::AsyncQueue<InferenceData>& infer_data) {
-    // (void)resources;
-    // (void)bam_regions;
-    // (void)draft_lens;
-    // (void)num_threads;
-    // (void)window_len;
-    // (void)window_overlap;
-    // (void)bam_subchunk_len;
-
-    // const int32_t buffer_size = dorado::ssize(resources.devices) * batch_size;
-    // const int32_t approx_max_buffer_size = buffer_size * 2;
-
-    spdlog::debug("[producer] Input: {} BAM windows from {} sequences.", std::size(bam_regions),
-                  std::size(draft_lens));
-
-    // Split large BAM regions into non-overlapping windows for parallel encoding.
-    // The non-overlapping windows will be merged after samples are constructed.
-    std::vector<Window> windows;
-    std::vector<Interval> bam_region_intervals;
-    for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
-        const Window& bw = bam_regions[i];
-        std::vector<Window> new_windows =
-                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
-        if (std::empty(new_windows)) {
-            bam_region_intervals.emplace_back(Interval{0, 0});
-            continue;
-        }
-        const int32_t num_windows = static_cast<int32_t>(std::size(windows));
-        const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
-        bam_region_intervals.emplace_back(Interval{num_windows, num_windows + num_new_windows});
-        windows.reserve(std::size(windows) + std::size(new_windows));
-        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
-    }
-
-    // Divide draft sequences into groups of specified size, as sort of a barrier.
-    const std::vector<polisher::Interval> bam_region_batches =
-            create_batches(bam_region_intervals, num_threads,
-                           [](const Interval& val) { return val.end - val.start; });
-
-    InferenceData buffer;
-
-    // Each iteration of the for loop produces full BAM regions of samples to fit at least num_threads windows.
-    // It is important to process full BAM regions because of splitting/merging/splitting and trimming.
-    for (const auto [region_id_start, region_id_end] : bam_region_batches) {
-        if (region_id_end <= region_id_start) {
-            continue;
-        }
-
-        const int32_t num_regions = region_id_end - region_id_start;
-        const int32_t window_id_start = bam_region_intervals[region_id_start].start;
-        const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
-        const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
-
-        // Encode samples in parallel. Non-const by design, data will be moved.
-        std::vector<Sample> region_samples = encode_windows_in_parallel(
-                resources.bam_handles, *resources.encoder, draft_lens,
-                Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
-
-        spdlog::debug(
-                "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
-                num_regions, std::size(region_samples));
-
-        auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
-                region_samples, *resources.encoder,
-                Span<const Window>(std::data(bam_regions) + region_id_start, num_regions),
-                Span<const Interval>(std::data(bam_region_intervals) + region_id_start,
-                                     num_regions),
-                num_threads, window_len, window_overlap, window_id_start);
-
-        if (std::size(samples) != std::size(trims)) {
-            throw std::runtime_error("Size of samples and trims does not match! samples.size() = " +
-                                     std::to_string(std::size(samples)) +
-                                     ", trims.size() = " + std::to_string(std::size(trims)));
-        }
-
-        // Add samples to the batches.
-        for (size_t i = 0; i < std::size(samples); ++i) {
-            // If any of the samples is of wrong size, create a remainder batch of 1.
-            if (dorado::ssize(samples[i].positions_major) != window_len) {
-                InferenceData remainder_buffer;
-                remainder_buffer.samples = {std::move(samples[i])};
-                remainder_buffer.trims = {std::move(trims[i])};
-                spdlog::debug(
-                        "[producer] Pushing a batch of data to infer_data queue. "
-                        "remainder_buffer.samples.size() = {}",
-                        std::size(remainder_buffer.samples));
-                infer_data.try_push(std::move(remainder_buffer));
-                continue;
-            }
-
-            // Expand the current buffer.
-            buffer.samples.emplace_back(std::move(samples[i]));
-            buffer.trims.emplace_back(std::move(trims[i]));
-
-            if (dorado::ssize(buffer.samples) == batch_size) {
-                spdlog::debug(
-                        "[producer] Pushing a batch of data to infer_data queue. "
-                        "buffer.samples.size() = {}",
-                        std::size(buffer.samples));
-                infer_data.try_push(std::move(buffer));
-                buffer = {};
-            }
-        }
-    }
-
-    if (!std::empty(buffer.samples)) {
-        spdlog::debug(
-                "[producer] Pushing a batch of data to infer_data queue. "
-                "buffer.samples.size() = {} (final)",
-                std::size(buffer.samples));
-        infer_data.try_push(std::move(buffer));
-        buffer = {};
-        spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
-    }
-
-    infer_data.terminate();
-}
-
-void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& batch_queue,
-                                 utils::AsyncQueue<polisher::DecodeData>& decode_queue,
-                                 std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
-                                 const polisher::EncoderBase& encoder) {
-    if (std::empty(models)) {
-        throw std::runtime_error("No models have been initialized, cannot run inference.");
-    }
-
-    auto batch_infer = [&encoder](polisher::ModelTorchBase& model, const InferenceData& batch,
-                                  const int32_t tid) {
-        utils::ScopedProfileRange infer("infer", 1);
-        timer::TimerHighRes timer_total;
-
-        // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
-        timer::TimerHighRes timer_collate;
-        std::vector<torch::Tensor> batch_features;
-        batch_features.reserve(std::size(batch.samples));
-        for (const auto& sample : batch.samples) {
-            batch_features.emplace_back(sample.features);
-        }
-        torch::Tensor batch_features_tensor = encoder.collate(std::move(batch_features));
-        const int64_t time_collate = timer_collate.GetElapsedMilliseconds();
-
-        // Debug output.
-        {
-            std::ostringstream oss;
-            print_tensor_shape(oss, batch_features_tensor);
-            spdlog::debug(
-                    "[consumer {}] About to call forward(): batch_features_tensor.size() = {}, "
-                    "approx "
-                    "size: {} MB.",
-                    tid, oss.str(),
-                    batch_features_tensor.numel() * batch_features_tensor.element_size() /
-                            (1024.0 * 1024.0));
-        }
-
-        // Inference.
-        timer::TimerHighRes timer_forward;
-        torch::Tensor output;
-        try {
-            output = model.predict_on_batch(std::move(batch_features_tensor));
-        } catch (std::exception& e) {
-            std::cerr << "ERROR! Exception caught: " << e.what() << "\n";
-            throw e;
-        }
-        const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
-
-        const int64_t time_total = timer_total.GetElapsedMilliseconds();
-
-        spdlog::debug(
-                "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} ms, "
-                "total = {}",
-                tid, time_collate, time_forward, time_total);
-
-        return output;
-    };
-
-    const auto worker = [&](const int32_t tid) {
-        at::InferenceMode infer_guard;
-
-        while (true) {
-            spdlog::debug("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
-                          std::size(batch_queue));
-
-            const auto last_chunk_reserve_time = std::chrono::system_clock::now();
-
-            polisher::InferenceData item;
-            const auto pop_status = batch_queue.try_pop_until(
-                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
-
-            spdlog::debug("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
-                          tid, std::size(item.samples), batch_queue.size());
-
-            if (pop_status == utils::AsyncQueueStatus::Terminate) {
-                break;
-            }
-
-            if (pop_status == utils::AsyncQueueStatus::Timeout) {
-                spdlog::warn(
-                        "[consumer {}] Timeout when popping item from infer_data queue! "
-                        "item.samples.size() = {}",
-                        tid, std::size(item.samples));
-            }
-
-            // This should handle the timeout case too.
-            if (std::empty(item.samples)) {
-                continue;
-            }
-
-            // Inference.
-            torch::Tensor logits = batch_infer(*models[tid], item, tid);
-
-            polisher::DecodeData out_item;
-            out_item.samples = std::move(item.samples);
-            out_item.logits = std::move(logits);
-            out_item.trims = std::move(item.trims);
-
-            spdlog::debug(
-                    "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
-                    "out_item.samples.size() = {}, decode queue size: {}",
-                    tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
-                    decode_queue.size());
-            decode_queue.try_push(std::move(out_item));
-        }
-    };
-
-    const size_t num_threads = std::size(models);
-    cxxpool::thread_pool pool{num_threads};
-
-    std::vector<std::future<void>> futures;
-    futures.reserve(num_threads);
-
-    for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid));
-    }
-
-    try {
-        for (auto& f : futures) {
-            f.get();
-        }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inferencetask: ") + e.what()};
-    }
-
-    decode_queue.terminate();
-
-    spdlog::debug("[infer_samples_in_parallel_2] Finished running inference.");
-}
-
-void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
-                                utils::AsyncQueue<polisher::DecodeData>& decode_queue,
-                                PolishStats& polish_stats,
-                                const polisher::DecoderBase& decoder,
-                                const int32_t num_threads) {
-    auto batch_decode = [&decoder, &polish_stats](const DecodeData& item, const int32_t tid) {
-        utils::ScopedProfileRange scope_decode("decode", 1);
-        timer::TimerHighRes timer_total;
-
-        // Decode output to bases and qualities.
-        // Convert to sequences and qualities.
-        timer::TimerHighRes timer_decode;
-        std::vector<polisher::ConsensusResult> local_results = decoder.decode_bases(item.logits);
-        const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
-
-        assert(std::size(local_results) == std::size(item.samples));
-        assert(std::size(local_results) == std::size(item.trims));
-
-        // Trim the overlapping sequences.
-        timer::TimerHighRes timer_trim;
-        for (int64_t j = 0; j < dorado::ssize(local_results); ++j) {
-            auto& result = local_results[j];
-            const Sample& sample = item.samples[j];
-            const TrimInfo& trim = item.trims[j];
-
-            // Trim and mark the region.
-            result.draft_id = sample.seq_id;
-            result.draft_start = sample.positions_major[trim.start];
-            result.draft_end = sample.positions_major[trim.end - 1] + 1;
-            result.seq = result.seq.substr(trim.start, trim.end - trim.start);
-            result.quals = result.quals.substr(trim.start, trim.end - trim.start);
-
-            polish_stats.add("processed",
-                             static_cast<double>(result.draft_end - result.draft_start));
-        }
-        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
-
-        const int64_t time_total = timer_total.GetElapsedMilliseconds();
-
-        spdlog::debug(
-                "[decoder {}] Computed batch decode. Timings - decode = {} "
-                "ms, trim = {} ms, total = {}",
-                tid, time_decode, time_trim, time_total);
-
-        return local_results;
-    };
-
-    const auto worker = [&](const int32_t tid,
-                            std::vector<polisher::ConsensusResult>& thread_results) {
-        at::InferenceMode infer_guard;
-
-        while (true) {
-            // spdlog::debug("[decoder {}] Waiting to pop data for decoding Queue size: {}", tid,
-            //               std::size(decode_queue));
-
-            const auto last_chunk_reserve_time = std::chrono::system_clock::now();
-
-            polisher::DecodeData item;
-            const auto pop_status = decode_queue.try_pop_until(
-                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
-
-            if (pop_status == utils::AsyncQueueStatus::Terminate) {
-                break;
-            }
-
-            if (pop_status == utils::AsyncQueueStatus::Timeout) {
-                spdlog::trace(
-                        "[decoder {}] Timeout when popping item from infer_data queue! "
-                        "item.samples.size() = {}",
-                        tid, tensor_shape_as_string(item.logits));
-                continue;
-            }
-
-            const int64_t tensor_batch_size =
-                    (item.logits.sizes().size() == 0) ? 0 : item.logits.size(0);
-
-            assert(tensor_batch_size == dorado::ssize(item.trims));
-
-            spdlog::debug(
-                    "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
-                    "tensor_batch_size = {}, queue size: {}",
-                    tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
-                    tensor_batch_size, decode_queue.size());
-
-            // This should handle the timeout case too.
-            if (tensor_batch_size == 0) {
-                continue;
-            }
-
-            // Inference.
-            std::vector<polisher::ConsensusResult> results_samples = batch_decode(item, tid);
-
-            thread_results.insert(std::end(thread_results),
-                                  std::make_move_iterator(std::begin(results_samples)),
-                                  std::make_move_iterator(std::end(results_samples)));
-        }
-    };
-
-    std::vector<std::vector<polisher::ConsensusResult>> thread_results(num_threads);
-
-    cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
-
-    std::vector<std::future<void>> futures;
-    futures.reserve(num_threads);
-
-    for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid, std::ref(thread_results[tid])));
-    }
-
-    try {
-        for (auto& f : futures) {
-            f.get();
-        }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inferencetask: ") + e.what()};
-    }
-
-    // Flatten the results.
-    size_t total_size = 0;
-    for (const auto& vals : thread_results) {
-        total_size += std::size(vals);
-    }
-    results.clear();
-    results.reserve(total_size);
-    for (auto& vals : thread_results) {
-        results.insert(std::end(results), std::make_move_iterator(std::begin(vals)),
-                       std::make_move_iterator(std::end(vals)));
-    }
-
-    spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
-}
-
-}  // namespace polisher
-
 void run_polishing(const Options& opt,
-                   PolisherResources& resources,
+                   polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
                    polisher::PolishStats& polish_stats) {
     spdlog::info("Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
@@ -1226,8 +623,8 @@ void run_polishing(const Options& opt,
                             std::ref(decode_queue), std::ref(polish_stats),
                             std::cref(*resources.decoder), opt.threads);
 
-        polisher::infer_samples_in_parallel_2(batch_queue, decode_queue, resources.models,
-                                              *resources.encoder);
+        polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
+                                            *resources.encoder);
 
         // sample_consumer();
 
@@ -1304,7 +701,7 @@ int polish(int argc, char* argv[]) {
         validate_options(opt);
 
         // Get info from BAM needed for the run.
-        const BamInfo bam_info = analyze_bam(opt.in_aln_bam_fn);
+        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn);
 
         // Debug printing.
         {
@@ -1344,10 +741,10 @@ int polish(int argc, char* argv[]) {
                 polisher::parse_model_config(model_dir / "config.toml", model_file);
 
         // Create the models, encoders and BAM handles.
-        PolisherResources resources =
-                create_resources(model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads,
-                                 opt.infer_threads, opt.full_precision, opt.read_group,
-                                 opt.tag_name, opt.tag_value, opt.tag_keep_missing, opt.min_mapq);
+        polisher::PolisherResources resources = polisher::create_resources(
+                model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads, opt.infer_threads,
+                opt.full_precision, opt.read_group, opt.tag_name, opt.tag_value,
+                opt.tag_keep_missing, opt.min_mapq);
 
         // Progress bar.
         polisher::PolishStats polish_stats;

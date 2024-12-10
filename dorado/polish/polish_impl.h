@@ -7,7 +7,10 @@
 #include "polish/sample.h"
 #include "polish/trim.h"
 #include "polish/window.h"
+#include "utils/AsyncQueue.h"
 #include "utils/span.h"
+#include "utils/stats.h"
+#include "utils/timer_high_res.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -17,6 +20,28 @@
 #include <vector>
 
 namespace dorado::polisher {
+
+enum class DeviceType { CPU, CUDA, METAL, UNKNOWN };
+
+struct DeviceInfo {
+    std::string name;
+    DeviceType type;
+    torch::Device device;
+};
+
+struct PolisherResources {
+    std::unique_ptr<polisher::EncoderBase> encoder;
+    std::unique_ptr<polisher::DecoderBase> decoder;
+    std::vector<BamFile> bam_handles;
+    std::vector<DeviceInfo> devices;
+    std::vector<std::shared_ptr<polisher::ModelTorchBase>> models;
+};
+
+struct BamInfo {
+    bool uses_dorado_aligner = false;
+    bool has_dwells = false;
+    std::unordered_set<std::string> read_groups;
+};
 
 /**
  * \brief Struct which holds data prepared for inference. In practice,
@@ -36,6 +61,49 @@ struct DecodeData {
     torch::Tensor logits;
     std::vector<TrimInfo> trims;
 };
+
+class PolishStats {
+public:
+    PolishStats() = default;
+
+    void update(const std::string& name, const double value) { m_stats[name] = value; }
+
+    void increment(const std::string& name) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_stats[name] += 1.0;
+    }
+
+    void add(const std::string& name, const double value) {
+        std::unique_lock<std::mutex> lock(m_mtx);
+        m_stats[name] += value;
+    }
+
+    stats::NamedStats get_stats() const { return m_stats; }
+
+private:
+    stats::NamedStats m_stats;
+    std::mutex m_mtx;
+};
+
+/**
+ * \brief Creates all resources required to run polishing.
+ */
+polisher::PolisherResources create_resources(const polisher::ModelConfig& model_config,
+                                             const std::filesystem::path& in_aln_bam_fn,
+                                             const std::string& device_str,
+                                             const int32_t num_bam_threads,
+                                             const int32_t num_inference_cpu_threads,
+                                             const bool full_precision,
+                                             const std::string& read_group,
+                                             const std::string& tag_name,
+                                             const int32_t tag_value,
+                                             const std::optional<bool>& tag_keep_missing_override,
+                                             const std::optional<int32_t>& min_mapq_override);
+
+/**
+ * \brief Opens the input BAM file and summarizes some information needed at runtime.
+ */
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
@@ -104,5 +172,26 @@ std::vector<Window> create_bam_regions(
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
         const std::vector<std::string>& regions);
+
+void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
+                                utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+                                PolishStats& polish_stats,
+                                const polisher::DecoderBase& decoder,
+                                const int32_t num_threads);
+
+void infer_samples_in_parallel(utils::AsyncQueue<polisher::InferenceData>& batch_queue,
+                               utils::AsyncQueue<polisher::DecodeData>& decode_queue,
+                               std::vector<std::shared_ptr<polisher::ModelTorchBase>>& models,
+                               const polisher::EncoderBase& encoder);
+
+void sample_producer(PolisherResources& resources,
+                     const std::vector<polisher::Window>& bam_regions,
+                     const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                     const int32_t num_threads,
+                     const int32_t batch_size,
+                     const int32_t window_len,
+                     const int32_t window_overlap,
+                     const int32_t bam_subchunk_len,
+                     utils::AsyncQueue<InferenceData>& infer_data);
 
 }  // namespace dorado::polisher
