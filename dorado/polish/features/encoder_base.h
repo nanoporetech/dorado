@@ -8,6 +8,7 @@
 #include <torch/types.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -21,7 +22,7 @@ enum class NormaliseType {
 
 struct KeyHash {
     template <typename T1, typename T2>
-    std::size_t operator()(const std::pair<T1, T2>& key) const {
+    size_t operator()(const std::pair<T1, T2>& key) const {
         return std::hash<T1>()(key.first) ^ std::hash<T2>()(key.second);
     }
 };
@@ -32,6 +33,7 @@ using FeatureIndicesType =
 constexpr auto FeatureTensorType = torch::kFloat32;
 
 inline NormaliseType parse_normalise_type(std::string type) {
+    // Convert to lower case.
     std::transform(std::begin(type), std::end(type), std::begin(type),
                    [](unsigned char c) { return std::tolower(c); });
     if (type == "total") {
@@ -54,8 +56,7 @@ public:
 
     virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
 
-    virtual std::vector<polisher::Sample> merge_adjacent_samples(
-            std::vector<Sample> samples) const = 0;
+    virtual std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const = 0;
 };
 
 }  // namespace dorado::polisher
