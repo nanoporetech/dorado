@@ -114,7 +114,7 @@ struct Options {
     int32_t infer_threads = 1;
     bool infer_threads_is_set = false;
     std::string device_str;
-    int32_t batch_size = 128;
+    int32_t batch_size = 16;
     int64_t draft_batch_size = 200'000'000;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
@@ -220,7 +220,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Advanced options");
         parser->visible.add_argument("-b", "--batch-size")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
-                .default_value(100)
+                .default_value(16)
                 .scan<'i', int>();
         parser->visible.add_argument("--draft-batch-size")
                 .help("Input draft sequences will be process in batches of roughly this size.")
