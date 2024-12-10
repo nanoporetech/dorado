@@ -6,6 +6,7 @@
 #include "model_torch_base.h"
 #include "model_torch_script.h"
 
+#include <memory>
 #include <string>
 
 namespace dorado::polisher {

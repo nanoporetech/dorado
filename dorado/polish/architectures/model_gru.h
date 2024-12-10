@@ -4,6 +4,7 @@
 
 #include <torch/torch.h>
 
+#include <cstdint>
 #include <memory>
 
 namespace dorado::polisher {

@@ -4,10 +4,11 @@
 #include <toml/value.hpp>
 
 #include <iostream>
+#include <stdexcept>
 
 namespace dorado::polisher {
 
-inline void print_toml(const toml::value& val, int indent) {
+void print_toml(const toml::value& val, int indent) {
     const std::string indent_str(indent, ' ');
 
     if (val.is_table()) {
@@ -84,7 +85,6 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     {
         const auto& section = toml::find(config_toml, "model");
         cfg.model_type = toml::find<std::string>(section, "type");
-        // cfg.model_file = toml::find<std::string>(section, "model_file");
         cfg.model_file = model_file;
         cfg.model_dir = config_path.parent_path().string();
 

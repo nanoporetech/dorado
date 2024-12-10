@@ -12,7 +12,6 @@
 
 namespace dorado::polisher {
 
-// Class for ReadLevelConv
 class ReadLevelConvImpl : public torch::nn::Module {
 public:
     ReadLevelConvImpl(const int32_t num_in_features,             // 5

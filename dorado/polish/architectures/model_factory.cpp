@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::polisher {
