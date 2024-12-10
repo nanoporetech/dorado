@@ -31,7 +31,7 @@ CountsResult plp_data_to_tensors(PileupData& data, const size_t n_rows) {
     assert(result.counts.data_ptr<int64_t>() != nullptr);
 
     // Copy the data from `data.matrix` into `result.counts`
-    std::memcpy(result.counts.data_ptr<int64_t>(), data.get_matrix().data(), num_bytes);
+    std::memcpy(result.counts.data_ptr<int64_t>(), std::data(data.get_matrix()), num_bytes);
 
     result.positions_major = std::move(data.get_major());
     result.positions_minor = std::move(data.get_minor());
@@ -182,16 +182,6 @@ Sample counts_to_features(CountsResult& pileup,
 }
 
 std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples) {
-    std::vector<torch::Tensor> features_buffer;
-    std::vector<std::vector<int64_t>> positions_major_buffer;
-    std::vector<std::vector<int64_t>> positions_minor_buffer;
-    std::vector<torch::Tensor> depth_buffer;
-    int32_t seq_id_buffer = -1;
-    int32_t region_id_buffer = -1;
-    int64_t last_end = -1;
-
-    std::vector<polisher::Sample> results;
-
     const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
         size_t size = 0;
         for (const auto& vec : vecs) {
@@ -205,78 +195,92 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
         return ret;
     };
 
-    for (auto& sample : samples) {
+    const auto merge_samples = [&samples, &cat_vectors](const std::vector<int64_t>& sample_ids) {
+        if (std::empty(sample_ids)) {
+            return Sample{};
+        }
+
+        // The torch::cat is slow, so just move if there is nothing to concatenate.
+        if (std::size(sample_ids) == 1) {
+            return std::move(samples[sample_ids.front()]);
+        }
+
+        std::vector<torch::Tensor> features;
+        std::vector<std::vector<int64_t>> positions_major;
+        std::vector<std::vector<int64_t>> positions_minor;
+        std::vector<torch::Tensor> depth;
+
+        const int32_t seq_id = samples[sample_ids.front()].seq_id;
+        const int32_t region_id = samples[sample_ids.front()].region_id;
+
+        // Make buffers.
+        for (const int64_t id : sample_ids) {
+            Sample& sample = samples[id];
+            features.emplace_back(std::move(sample.features));
+            depth.emplace_back(std::move(sample.depth));
+            positions_major.emplace_back(std::move(sample.positions_major));
+            positions_minor.emplace_back(std::move(sample.positions_minor));
+        }
+
+        // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
+        Sample ret{
+                torch::cat(std::move(features)),
+                cat_vectors(positions_major),
+                cat_vectors(positions_minor),
+                torch::cat(std::move(depth)),
+                seq_id,
+                region_id,
+                {},
+                {},
+        };
+
+        return ret;
+    };
+
+    std::vector<int64_t> buffer_ids;
+    int64_t last_end = -1;
+
+    std::vector<polisher::Sample> results;
+
+    for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
+        auto& sample = samples[i];
+
         if (std::empty(sample.positions_major)) {
             continue;
         }
+
         const int64_t start = sample.start();
 
-        if (std::empty(features_buffer) ||
-            ((sample.seq_id == seq_id_buffer) && (sample.region_id == region_id_buffer) &&
-             ((start - last_end) == 0))) {
+        const int64_t first_id = std::empty(buffer_ids) ? -1 : buffer_ids.front();
+
+        if (std::empty(buffer_ids) ||
+            ((sample.seq_id == samples[first_id].seq_id) &&
+             (sample.region_id == samples[first_id].region_id) && ((start - last_end) == 0))) {
             // New or contiguous chunk.
             last_end = sample.end();
-            features_buffer.emplace_back(std::move(sample.features));
-            positions_major_buffer.emplace_back(std::move(sample.positions_major));
-            positions_minor_buffer.emplace_back(std::move(sample.positions_minor));
-            depth_buffer.emplace_back(std::move(sample.depth));
-            seq_id_buffer = sample.seq_id;
-            region_id_buffer = sample.region_id;
+            buffer_ids.emplace_back(i);
+            spdlog::trace("[merge_adjacent_samples_impl] Emplacing to buffer_ids, i = {}", i);
 
         } else {
-            // Discontinuity found, finalize the current chunk
+            // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
-
-            // The torch::cat is slow, so just move if there is nothing to concatenate.
-            if (std::size(features_buffer) == 1) {
-                results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
-                                                      std::move(positions_major_buffer.front()),
-                                                      std::move(positions_minor_buffer.front()),
-                                                      std::move(depth_buffer.front()),
-                                                      seq_id_buffer,
-                                                      region_id_buffer,
-                                                      {},
-                                                      {}});
-            } else {
-                results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
-                                                      cat_vectors(positions_major_buffer),
-                                                      cat_vectors(positions_minor_buffer),
-                                                      torch::cat(std::move(depth_buffer)),
-                                                      seq_id_buffer,
-                                                      region_id_buffer,
-                                                      {},
-                                                      {}});
-            }
-            features_buffer = {std::move(sample.features)};
-            positions_major_buffer = {std::move(sample.positions_major)};
-            positions_minor_buffer = {std::move(sample.positions_minor)};
-            depth_buffer = {std::move(sample.depth)};
-            seq_id_buffer = sample.seq_id;
-            region_id_buffer = sample.region_id;
+            results.emplace_back(merge_samples(buffer_ids));
+            buffer_ids = {i};
+            spdlog::trace(
+                    "[merge_adjacent_samples_impl] Merging samples in buffer, resetting the "
+                    "buffer. i = {}",
+                    i);
+            spdlog::trace("[merge_adjacent_samples_impl] Merged.");
         }
     }
 
-    if (!features_buffer.empty()) {
-        // The torch::cat is slow, so just move if there is nothing to concatenate.
-        if (std::size(features_buffer) == 1) {
-            results.emplace_back(polisher::Sample{std::move(features_buffer.front()),
-                                                  std::move(positions_major_buffer.front()),
-                                                  std::move(positions_minor_buffer.front()),
-                                                  std::move(depth_buffer.front()),
-                                                  seq_id_buffer,
-                                                  region_id_buffer,
-                                                  {},
-                                                  {}});
-        } else {
-            results.emplace_back(polisher::Sample{torch::cat(std::move(features_buffer)),
-                                                  cat_vectors(positions_major_buffer),
-                                                  cat_vectors(positions_minor_buffer),
-                                                  torch::cat(std::move(depth_buffer)),
-                                                  seq_id_buffer,
-                                                  region_id_buffer,
-                                                  {},
-                                                  {}});
-        }
+    if (!std::empty(buffer_ids)) {
+        spdlog::trace(
+                "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
+                "the buffer. buffer_ids.size() = {}",
+                std::size(buffer_ids));
+        results.emplace_back(merge_samples(buffer_ids));
+        spdlog::trace("[merge_adjacent_samples_read_matrix] Merged.");
     }
 
     return results;
