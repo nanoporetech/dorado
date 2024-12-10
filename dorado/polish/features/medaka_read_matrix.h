@@ -9,7 +9,7 @@
 namespace dorado::polisher {
 
 // medaka-style feature data
-struct ReadAlignmentData {
+class ReadAlignmentData {
 public:
     ReadAlignmentData(const int32_t n_pos_,
                       const int32_t n_reads_,
@@ -35,8 +35,8 @@ public:
     std::vector<std::string> read_ids_right;
 };
 
-/** Generates medaka-style feature data in a region of a bam.
- *
+/**
+ * \brief Generates medaka-style feature data in a region of a BAM.
  * \param bam_file Input aligment file.
  * \param chr_name Name of the input sequence for the queried region.
  * \param start Start coordinate of the region. Zero-based.
