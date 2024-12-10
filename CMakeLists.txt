@@ -309,12 +309,6 @@ add_library(dorado_lib
     dorado/polish/bam_file.cpp
     dorado/polish/bam_file.h
     dorado/polish/interval.h
-    dorado/polish/architectures/medaka_bamiter.cpp
-    dorado/polish/architectures/medaka_bamiter.h
-    dorado/polish/architectures/medaka_counts.cpp
-    dorado/polish/architectures/medaka_counts.h
-    dorado/polish/architectures/medaka_read_matrix.cpp
-    dorado/polish/architectures/medaka_read_matrix.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp
@@ -328,25 +322,29 @@ add_library(dorado_lib
     dorado/polish/trim.h
     dorado/polish/window.cpp
     dorado/polish/window.h
-    dorado/polish/architectures/decoder_factory.cpp
-    dorado/polish/architectures/decoder_factory.h
-    dorado/polish/architectures/encoder_base.h
-    dorado/polish/architectures/encoder_counts.cpp
-    dorado/polish/architectures/encoder_counts.h
-    dorado/polish/architectures/encoder_factory.cpp
-    dorado/polish/architectures/encoder_factory.h
-    dorado/polish/architectures/encoder_read_alignment.cpp
-    dorado/polish/architectures/encoder_read_alignment.h
-    dorado/polish/architectures/feature_decoder.cpp
-    dorado/polish/architectures/feature_decoder.h
-    dorado/polish/architectures/model_factory.cpp
-    dorado/polish/architectures/model_factory.h
-    dorado/polish/architectures/model_gru.cpp
-    dorado/polish/architectures/model_gru.h
+    dorado/polish/features/decoder_base.cpp
+    dorado/polish/features/decoder_base.h
+    dorado/polish/features/decoder_factory.cpp
+    dorado/polish/features/decoder_factory.h
+    dorado/polish/features/encoder_base.h
+    dorado/polish/features/encoder_counts.cpp
+    dorado/polish/features/encoder_counts.h
+    dorado/polish/features/encoder_factory.cpp
+    dorado/polish/features/encoder_factory.h
+    dorado/polish/features/encoder_read_alignment.cpp
+    dorado/polish/features/encoder_read_alignment.h
+    dorado/polish/features/medaka_bamiter.cpp
+    dorado/polish/features/medaka_bamiter.h
+    dorado/polish/features/medaka_counts.cpp
+    dorado/polish/features/medaka_counts.h
+    dorado/polish/features/medaka_read_matrix.cpp
+    dorado/polish/features/medaka_read_matrix.h
     dorado/polish/architectures/model_config.cpp
     dorado/polish/architectures/model_config.h
     dorado/polish/architectures/model_factory.cpp
     dorado/polish/architectures/model_factory.h
+    dorado/polish/architectures/model_gru.cpp
+    dorado/polish/architectures/model_gru.h
     dorado/polish/architectures/model_latent_space_lstm.cpp
     dorado/polish/architectures/model_latent_space_lstm.h
     dorado/polish/architectures/model_torch_base.cpp

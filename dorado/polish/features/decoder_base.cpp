@@ -1,13 +1,15 @@
-#include "polish/architectures/feature_decoder.h"
+#include "polish/features/decoder_base.h"
 
+#include <cassert>
 #include <cstdint>
+#include <stdexcept>
 
 namespace dorado::polisher {
 
-FeatureDecoder::FeatureDecoder(const LabelSchemeType label_scheme_type)
+DecoderBase::DecoderBase(const LabelSchemeType label_scheme_type)
         : m_label_scheme_type(label_scheme_type) {}
 
-std::vector<ConsensusResult> FeatureDecoder::decode_bases(const torch::Tensor& logits) const {
+std::vector<ConsensusResult> DecoderBase::decode_bases(const torch::Tensor& logits) const {
     return decode_bases_impl(m_label_scheme_type, logits);
 }
 

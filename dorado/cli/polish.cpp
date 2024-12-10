@@ -2,11 +2,11 @@
 #include "correct/infer.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
-#include "polish/architectures/decoder_factory.h"
-#include "polish/architectures/encoder_factory.h"
 #include "polish/architectures/model_config.h"
 #include "polish/architectures/model_factory.h"
 #include "polish/bam_file.h"
+#include "polish/features/decoder_factory.h"
+#include "polish/features/encoder_factory.h"
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
@@ -92,7 +92,7 @@ struct BamInfo {
 
 struct PolisherResources {
     std::unique_ptr<polisher::EncoderBase> encoder;
-    std::unique_ptr<polisher::FeatureDecoder> decoder;
+    std::unique_ptr<polisher::DecoderBase> decoder;
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<polisher::ModelTorchBase>> models;
@@ -1007,7 +1007,7 @@ void infer_samples_in_parallel_2(utils::AsyncQueue<polisher::InferenceData>& bat
 void decode_samples_in_parallel(std::vector<polisher::ConsensusResult>& results,
                                 utils::AsyncQueue<polisher::DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
-                                const polisher::FeatureDecoder& decoder,
+                                const polisher::DecoderBase& decoder,
                                 const int32_t num_threads) {
     auto batch_decode = [&decoder, &polish_stats](const DecodeData& item, const int32_t tid) {
         utils::ScopedProfileRange scope_decode("decode", 1);

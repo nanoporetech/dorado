@@ -14,9 +14,9 @@ enum class LabelSchemeType {
     HAPLOID,
 };
 
-class FeatureDecoder {
+class DecoderBase {
 public:
-    FeatureDecoder(const LabelSchemeType label_scheme_type);
+    DecoderBase(const LabelSchemeType label_scheme_type);
 
     std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const;
 

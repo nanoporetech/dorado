@@ -1,6 +1,6 @@
-#include "polish/architectures/encoder_counts.h"
+#include "polish/features/encoder_counts.h"
 
-#include "polish/architectures/medaka_counts.h"
+#include "polish/features/medaka_counts.h"
 
 #include <spdlog/spdlog.h>
 #include <utils/timer_high_res.h>
