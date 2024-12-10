@@ -1259,9 +1259,9 @@ void run_polishing(const Options& opt,
             auto& group = groups[seq_id];
             std::sort(std::begin(group), std::end(group));  // Sort by start pos.
 
-            const std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
-                    opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first, all_results, group,
-                    opt.fill_gaps, opt.fill_char, seq_id);
+            const std::vector<polisher::ConsensusResult> consensus =
+                    polisher::stitch_sequence(opt.in_draft_fastx_fn, draft_lens_batch[seq_id].first,
+                                              all_results, group, opt.fill_gaps, opt.fill_char);
 
             const std::string& header = draft_lens_batch[seq_id].first;
             write_consensus_results(*ofs, header, consensus, opt.fill_gaps,
