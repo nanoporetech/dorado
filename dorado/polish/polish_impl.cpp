@@ -22,23 +22,6 @@
 
 namespace dorado::polisher {
 
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-void debug_print_samples(std::ostream& os,
-                         const std::vector<Sample>& samples,
-                         int64_t start /* = 0*/,
-                         int64_t end /* = -1 */,
-                         int64_t debug_id /* = -1 */) {
-    start = std::max<int64_t>(0, start);
-    end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
-
-    for (int64_t i = start; i < end; ++i) {
-        os << "[i = " << i << "] ";
-        debug_print_sample(os, samples[i], 0, -1, i == debug_id);
-        os << '\n';
-    }
-}
-#endif
-
 void remove_deletions(ConsensusResult& cons) {
     if (std::size(cons.seq) != std::size(cons.quals)) {
         spdlog::error(
@@ -66,54 +49,40 @@ std::vector<ConsensusResult> stitch_sequence(
         const std::vector<ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
-        const std::optional<char>& fill_char,
-        [[maybe_unused]] const int32_t seq_id) {
+        const std::optional<char>& fill_char) {
     const std::string draft = fetch_seq(in_draft_fn, header, 0, -1);
     const int64_t draft_len = dorado::ssize(draft);
 
-    if (std::empty(samples_for_seq) && fill_gaps) {
-        if (fill_gaps) {
-            spdlog::debug(
-                    "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
-                    "from input.",
-                    header, std::size(draft));
-            std::string dummy_quals(std::size(draft), '!');
-            return {ConsensusResult{draft, std::move(dummy_quals)}};
-        } else {
-            spdlog::debug(
-                    "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
-                    "verbatim "
-                    "from input because fill_gaps == false.",
-                    header, std::size(draft));
-            return {};
-        }
+    if (fill_gaps && std::empty(samples_for_seq)) {
+        spdlog::debug(
+                "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
+                "from input.",
+                header, std::size(draft));
+        std::string dummy_quals(std::size(draft), '!');
+        return {ConsensusResult{draft, std::move(dummy_quals)}};
+    } else if (!fill_gaps && std::empty(samples_for_seq)) {
+        spdlog::debug(
+                "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
+                "verbatim from input because fill_gaps == false.",
+                header, std::size(draft));
+        return {};
     }
 
     std::vector<ConsensusResult> ret;
+
     ConsensusResult result;
     result.draft_start = draft_len;
     result.draft_end = 0;
 
-#ifdef DEBUG_POLISH_DUMP_SEQ_PIECES
-    std::ofstream ofs("debug.seq_id_" + std::to_string(seq_id) + ".fasta");
-#endif
-
-    // This is an inclusive coordinate. If it was 0, then adding front draft chunk would miss 1 base.
+    // This is an inclusive coordinate.
     int64_t last_end = 0;
     for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
         const ConsensusResult& sample_result = sample_results[sample_index];
 
+        // Fill the gap with either the draft or a fill char.
         if (sample_result.draft_start > last_end) {
             if (fill_gaps) {
-                spdlog::trace(
-                        "[stitch_sequence] Gap between polished chunks. header = '{}', "
-                        "result.seq.size() = {}, fill_char = {}, draft region: "
-                        "[{}, {}], using fill_char: {}",
-                        header, std::size(result.seq),
-                        ((fill_char) ? std::string(1, *fill_char) : "nullopt"), last_end,
-                        sample_result.draft_start, fill_char ? "true" : "false");
-
                 const int64_t fill_len = sample_result.draft_start - last_end;
                 result.seq += (fill_char) ? std::string(fill_len, *fill_char)
                                           : draft.substr(last_end, fill_len);
@@ -121,12 +90,6 @@ std::vector<ConsensusResult> stitch_sequence(
                 result.draft_start = std::min(result.draft_start, last_end);
                 result.draft_end = std::max(result.draft_end, sample_result.draft_start);
             } else {
-                spdlog::trace(
-                        "[stitch_sequence] Gap between polished chunks. header = '{}', "
-                        "result.seq.size() = {}, draft region: "
-                        "[{}, {}]. Dumping the current polished subchunk.",
-                        header, std::size(result.seq), last_end, sample_result.draft_start);
-
                 if (!std::empty(result.seq)) {
                     ret.emplace_back(std::move(result));
                 }
@@ -136,11 +99,7 @@ std::vector<ConsensusResult> stitch_sequence(
             }
         }
 
-        spdlog::trace(
-                "[stitch_sequence] header = '{}', result.seq.size() = {}, adding consensus chunk "
-                "sample_result.seq.size() = {}",
-                header, std::size(result.seq), std::size(sample_result.seq));
-
+        // Splice a polished chunk.
         result.seq += sample_result.seq;
         result.quals += sample_result.quals;
         result.draft_start = std::min(result.draft_start, sample_result.draft_start);
@@ -149,31 +108,15 @@ std::vector<ConsensusResult> stitch_sequence(
         last_end = sample_result.draft_end;
     }
 
-    // Add the back draft part.
-    if (last_end < dorado::ssize(draft)) {
-        if (fill_gaps) {
-            spdlog::trace(
-                    "[stitch_sequence] Trailing gap. header = '{}', result.seq.size() = {}, "
-                    "fill_char = {}, draft region: "
-                    "[{}, {}], using fill_char: {}",
-                    header, std::size(result.seq),
-                    ((fill_char) ? std::string(1, *fill_char) : "nullopt"), last_end, draft_len,
-                    fill_char ? "true" : "false");
-
-            const int64_t fill_len = draft_len - last_end;
-            result.seq += (fill_char) ? std::string(fill_len, *fill_char) : draft.substr(last_end);
-            result.quals += std::string(draft_len - last_end, '!');
-            result.draft_start = std::min(result.draft_start, last_end);
-            result.draft_end = std::max(result.draft_end, draft_len);
-            if (!std::empty(result.seq)) {
-                ret.emplace_back(std::move(result));
-            }
-        } else {
-            spdlog::trace(
-                    "[stitch_sequence] Trailing gap. header = '{}', result.seq.size() = {}, draft "
-                    "region: "
-                    "[{}, {}]. Dumping the current polished subchunk.",
-                    header, std::size(result.seq), last_end, draft_len);
+    // Add the back draft part (or fill char).
+    if ((last_end < dorado::ssize(draft)) && fill_gaps) {
+        const int64_t fill_len = draft_len - last_end;
+        result.seq += (fill_char) ? std::string(fill_len, *fill_char) : draft.substr(last_end);
+        result.quals += std::string(draft_len - last_end, '!');
+        result.draft_start = std::min(result.draft_start, last_end);
+        result.draft_end = std::max(result.draft_end, draft_len);
+        if (!std::empty(result.seq)) {
+            ret.emplace_back(std::move(result));
         }
     }
 
@@ -187,6 +130,13 @@ std::vector<ConsensusResult> stitch_sequence(
     return ret;
 }
 
+/**
+ * \brief If the input sample coordinates (positions_major) have gaps,
+ *          this function splits the sample on those gaps and produces
+ *          one or more samples in the output.
+ *          When possible, input data is moved to the output, and that is
+ *          why the inpunt is not const.
+ */
 std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
     std::vector<Sample> results;
 
@@ -201,7 +151,7 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
         return ret;
     };
 
-    // Helper function to generate placeholder read IDs
+    // Helper function to generate placeholder read IDs for read level models.
     const auto placeholder_read_ids = [](const int64_t n) {
         std::vector<std::string> placeholder_ids(n);
         for (int64_t i = 0; i < n; ++i) {
@@ -210,9 +160,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
         return placeholder_ids;
     };
 
-    // for (auto& data : pileups) {
+    // Find gaps in data.
     const std::vector<int64_t> gaps = find_gaps(sample.positions_major, 1);
 
+    // Reusable.
     const std::vector<std::string> placeholder_ids =
             placeholder_read_ids(dorado::ssize(sample.read_ids_left));
 
@@ -224,27 +175,27 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
 
         int64_t start = 0;
         for (int64_t n = 0; n < dorado::ssize(gaps); ++n) {
-            const int64_t i = gaps[n];
-            std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
-                                               sample.positions_major.begin() + i);
-            std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
-                                               sample.positions_minor.begin() + i);
+            const int64_t end = gaps[n];
+            std::vector<int64_t> new_major_pos(std::begin(sample.positions_major) + start,
+                                               std::begin(sample.positions_major) + end);
+            std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
+                                               std::begin(sample.positions_minor) + end);
 
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            results.emplace_back(
-                    Sample{sample.features.slice(0, start, i), std::move(new_major_pos),
-                           std::move(new_minor_pos), sample.depth.slice(0, start, i), sample.seq_id,
-                           sample.region_id, std::move(read_ids_left), placeholder_ids});
-            start = i;
+            results.emplace_back(Sample{
+                    sample.features.slice(0, start, end), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start, end), sample.seq_id,
+                    sample.region_id, std::move(read_ids_left), placeholder_ids});
+            start = end;
         }
 
         if (start < num_positions) {
-            std::vector<int64_t> new_major_pos(sample.positions_major.begin() + start,
-                                               sample.positions_major.end());
-            std::vector<int64_t> new_minor_pos(sample.positions_minor.begin() + start,
-                                               sample.positions_minor.end());
+            std::vector<int64_t> new_major_pos(std::begin(sample.positions_major) + start,
+                                               std::end(sample.positions_major));
+            std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
+                                               std::end(sample.positions_minor));
             results.emplace_back(Sample{sample.features.slice(0, start), std::move(new_major_pos),
                                         std::move(new_minor_pos), sample.depth.slice(0, start),
                                         sample.seq_id, sample.region_id, placeholder_ids,
@@ -256,11 +207,9 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
 }
 
 /**
- * \brief Takes an input sample and splits it bluntly if it has too many positions. This can happen when
- *          there are many long insertions in an input window, and can easily cause out-of-memory issues on the GPU
- *          if the sample is not split.
+ * \brief Takes an input sample and splits it bluntly into overlapping windows.
  *          Splitting is implemented to match Medaka, where a simple sliding window is used to create smaller samples.
- *          In case of a smalle trailing portion (smaller than chunk_len), a potentially large overlap is produced to
+ *          In case of a short trailing portion (shorter than chunk_len), a potentially large overlap is produced to
  *          cover this region instead of just outputing the small chunk.
  */
 std::vector<Sample> split_samples(std::vector<Sample> samples,
@@ -304,13 +253,9 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
 
         const int64_t step = chunk_len - chunk_overlap;
 
-        spdlog::trace("[split_samples] sample_len = {}, features.shape = {}, step = {}", sample_len,
-                      tensor_shape_as_string(sample.features), step);
-
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
-            spdlog::trace("[split_samples]     - creating chunk: start = {}, end = {}", start, end);
             results.emplace_back(create_chunk(sample, start, end));
         }
 
@@ -318,13 +263,9 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
-            spdlog::trace("[split_samples]     - creating end chunk: start = {}, end = {}", start,
-                          end);
             results.emplace_back(create_chunk(sample, start, end));
         }
     }
-
-    spdlog::trace("[split_samples]     - done, results.size() = {}", std::size(results));
 
     return results;
 }
@@ -421,6 +362,21 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
     //  2. Check for discontinuities in any of the samples and split (gap in coverage).
     //  3. Split the merged samples into equally sized pieces which will be used for inference.
+
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+    const auto debug_print_samples = [](std::ostream& os, const std::vector<Sample>& samples,
+                                        int64_t start /* = 0*/, int64_t end /* = -1 */,
+                                        int64_t debug_id /* = -1 */) {
+        start = std::max<int64_t>(0, start);
+        end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
+
+        for (int64_t i = start; i < end; ++i) {
+            os << "[i = " << i << "] ";
+            debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+            os << '\n';
+        }
+    };
+#endif
 
     const auto worker = [&](const int32_t start, const int32_t end,
                             std::vector<std::vector<Sample>>& results_samples,
