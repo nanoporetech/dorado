@@ -811,8 +811,8 @@ void sample_producer(PolisherResources& resources,
         const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
         const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
 
-        // Encode windows to samples in parallel. Non-const by design, data will be moved.
-        std::vector<Sample> region_samples = encode_regions_in_parallel(
+        // Encode samples in parallel. Non-const by design, data will be moved.
+        std::vector<Sample> region_samples = encode_windows_in_parallel(
                 resources.bam_handles, *resources.encoder, draft_lens,
                 Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
 

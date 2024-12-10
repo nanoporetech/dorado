@@ -271,7 +271,146 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
     return results;
 }
 
-std::vector<Sample> encode_regions_in_parallel(
+std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
+        std::vector<Sample>& window_samples,
+        const EncoderBase& encoder,
+        const Span<const Window> bam_regions,
+        const Span<const Interval> bam_region_intervals,
+        const int32_t num_threads,
+        const int32_t window_len,
+        const int32_t window_overlap,
+        const int32_t window_interval_offset) {
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+    const auto debug_print_samples = [](std::ostream& os, const std::vector<Sample>& samples,
+                                        int64_t start /* = 0*/, int64_t end /* = -1 */,
+                                        int64_t debug_id /* = -1 */) {
+        start = std::max<int64_t>(0, start);
+        end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
+
+        for (int64_t i = start; i < end; ++i) {
+            os << "[i = " << i << "] ";
+            debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+            os << '\n';
+        }
+    };
+#endif
+
+    const auto worker = [&](const int32_t start, const int32_t end,
+                            std::vector<std::vector<Sample>>& results_samples,
+                            std::vector<std::vector<TrimInfo>>& results_trims) {
+        for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
+            // Get the interval of samples for this BAM region and subtract the offset due to batching.
+            Interval interval = bam_region_intervals[bam_region_id];
+            interval.start -= window_interval_offset;
+            interval.end -= window_interval_offset;
+
+            spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
+                          bam_region_id, interval.start, interval.end);
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
+#endif
+
+            std::vector<Sample> local_samples;
+
+            // Split all samples on discontinuities.
+            for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
+                auto& sample = window_samples[sample_id];
+                std::vector<Sample> disc_samples = split_sample_on_discontinuities(sample);
+                local_samples.insert(std::end(local_samples),
+                                     std::make_move_iterator(std::begin(disc_samples)),
+                                     std::make_move_iterator(std::end(disc_samples)));
+            }
+
+            spdlog::trace(
+                    "- [bam_region_id = {}] (1) After splitting on discontinuities: "
+                    "local_samples = {}",
+                    bam_region_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            // Merge adjacent samples.
+            local_samples = encoder.merge_adjacent_samples(local_samples);
+
+            spdlog::trace("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
+                          bam_region_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            // Bluntly split samples for inference.
+            local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
+
+            spdlog::trace(
+                    "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
+                    "window_len = {}, window_overlap = {}",
+                    bam_region_id, std::size(local_samples), window_len, window_overlap);
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+            // Compute sample trimming coordinates.
+            const Window& reg = bam_regions[bam_region_id];
+            results_trims[bam_region_id] = trim_samples(
+                    local_samples,
+                    std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
+            results_samples[bam_region_id] = std::move(local_samples);
+        }
+    };
+
+    // Result vectors for each BAM region.
+    std::vector<std::vector<Sample>> merged_samples(std::size(bam_region_intervals));
+    std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
+
+    // Process BAM regions in parallel.
+    const std::vector<Interval> thread_chunks =
+            compute_partitions(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+
+    spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
+                  std::size(bam_region_intervals), std::size(thread_chunks));
+
+    // Parallel processing of BAM regions.
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
+                                       std::ref(merged_trims)));
+    }
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
+                                 e.what()};
+    }
+
+    // Flatten the samples obtained for each BAM region.
+    size_t num_samples = 0;
+    for (const auto& vals : merged_samples) {
+        num_samples += std::size(vals);
+    }
+
+    std::vector<Sample> results_samples;
+    results_samples.reserve(num_samples);
+    for (auto& vals : merged_samples) {
+        results_samples.insert(std::end(results_samples), std::make_move_iterator(std::begin(vals)),
+                               std::make_move_iterator(std::end(vals)));
+    }
+
+    std::vector<TrimInfo> results_trims;
+    results_trims.reserve(num_samples);
+    for (auto& vals : merged_trims) {
+        results_trims.insert(std::end(results_trims), std::make_move_iterator(std::begin(vals)),
+                             std::make_move_iterator(std::end(vals)));
+    }
+
+    return {results_samples, results_trims};
+}
+
+std::vector<Sample> encode_windows_in_parallel(
         std::vector<BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -325,159 +464,6 @@ std::vector<Sample> encode_regions_in_parallel(
     }
 
     return results;
-}
-
-std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
-        std::vector<Sample>& window_samples,
-        const EncoderBase& encoder,
-        const Span<const Window> bam_regions,
-        const Span<const Interval> bam_region_intervals,
-        const int32_t num_threads,
-        const int32_t window_len,
-        const int32_t window_overlap,
-        const int32_t window_interval_offset) {
-    // Three tasks for this worker:
-    //  1. Merge adjacent samples, which were split for efficiencly of computing the pileup.
-    //  2. Check for discontinuities in any of the samples and split (gap in coverage).
-    //  3. Split the merged samples into equally sized pieces which will be used for inference.
-
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-    const auto debug_print_samples = [](std::ostream& os, const std::vector<Sample>& samples,
-                                        int64_t start /* = 0*/, int64_t end /* = -1 */,
-                                        int64_t debug_id /* = -1 */) {
-        start = std::max<int64_t>(0, start);
-        end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
-
-        for (int64_t i = start; i < end; ++i) {
-            os << "[i = " << i << "] ";
-            debug_print_sample(os, samples[i], 0, -1, i == debug_id);
-            os << '\n';
-        }
-    };
-#endif
-
-    const auto worker = [&](const int32_t start, const int32_t end,
-                            std::vector<std::vector<Sample>>& results_samples,
-                            std::vector<std::vector<TrimInfo>>& results_trims) {
-        for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
-            Interval interval = bam_region_intervals[bam_region_id];
-            interval.start -= window_interval_offset;
-            interval.end -= window_interval_offset;
-
-            spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
-                          bam_region_id, interval.start, interval.end);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "[merged_samples worker bam_region_id = " << bam_region_id
-                      << "] Before merging. interval = [" << interval.start << ", " << interval.end
-                      << ">:\n";
-            std::cerr << "- [bam_region_id = " << bam_region_id << "] Input (window_samples):\n";
-            debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
-#endif
-
-            std::vector<Sample> local_samples;
-
-            // Split all samples on discontinuities.
-            for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
-                auto& sample = window_samples[sample_id];
-                std::vector<Sample> disc_samples = split_sample_on_discontinuities(sample);
-                local_samples.insert(std::end(local_samples),
-                                     std::make_move_iterator(std::begin(disc_samples)),
-                                     std::make_move_iterator(std::end(disc_samples)));
-            }
-
-            spdlog::trace(
-                    "- [bam_region_id = {}] (1) After splitting on discontinuities: "
-                    "local_samples = {}",
-                    bam_region_id, std::size(local_samples));
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_region_id = " << bam_region_id
-                      << "] After splitting on discontinuities (local_samples):\n";
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-            local_samples = encoder.merge_adjacent_samples(local_samples);
-
-            spdlog::trace("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
-                          bam_region_id, std::size(local_samples));
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_region_id = " << bam_region_id
-                      << "] After merging adjacent (local_samples):\n";
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-            local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
-
-            spdlog::trace(
-                    "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
-                    "window_len = {}, window_overlap = {}",
-                    bam_region_id, std::size(local_samples), window_len, window_overlap);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            std::cerr << "- [bam_region_id = " << bam_region_id
-                      << "] After splitting samples (local_samples):\n";
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-            const Window& reg = bam_regions[bam_region_id];
-            results_trims[bam_region_id] = trim_samples(
-                    local_samples,
-                    std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
-            results_samples[bam_region_id] = std::move(local_samples);
-        }
-    };
-
-    // InferenceInputs results;
-    // results.samples.resize(std::size(bam_region_intervals));
-    // results.trims.resize(std::size(bam_region_intervals));
-    std::vector<std::vector<Sample>> merged_samples(std::size(bam_region_intervals));
-    std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
-
-    // Process BAM windows in parallel.
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
-
-    spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
-                  std::size(bam_region_intervals), std::size(thread_chunks));
-
-    cxxpool::thread_pool pool{std::size(thread_chunks)};
-    std::vector<std::future<void>> futures;
-    futures.reserve(std::size(thread_chunks));
-
-    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
-        const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
-                                       std::ref(merged_trims)));
-    }
-
-    try {
-        for (auto& f : futures) {
-            f.get();
-        }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
-                                 e.what()};
-    }
-
-    // Flatten the samples.
-    size_t num_samples = 0;
-    for (const auto& vals : merged_samples) {
-        num_samples += std::size(vals);
-    }
-
-    std::vector<Sample> results_samples;
-    results_samples.reserve(num_samples);
-    for (auto& vals : merged_samples) {
-        results_samples.insert(std::end(results_samples), std::make_move_iterator(std::begin(vals)),
-                               std::make_move_iterator(std::end(vals)));
-    }
-
-    std::vector<TrimInfo> results_trims;
-    results_trims.reserve(num_samples);
-    for (auto& vals : merged_trims) {
-        results_trims.insert(std::end(results_trims), std::make_move_iterator(std::begin(vals)),
-                             std::make_move_iterator(std::end(vals)));
-    }
-
-    return {results_samples, results_trims};
 }
 
 std::vector<Window> create_bam_regions(
