@@ -172,7 +172,7 @@ std::vector<std::string> parse_regions(const std::string& regions_arg) {
 
 /// \brief Define the CLI options.
 ParserPtr create_cli(int& verbosity) {
-    ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado consensus");
+    ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado polish");
 
     parser->visible.add_description("Consensus tool for polishing draft assemblies");
 
