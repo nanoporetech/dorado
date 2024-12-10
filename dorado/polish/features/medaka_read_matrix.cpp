@@ -2,6 +2,7 @@
 
 #include "medaka_bamiter.h"
 #include "polish/bam_file.h"
+#include "utils/ssize.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -45,9 +46,9 @@ struct Read {
 
 /** Populate an array of dwells per base.
  *
- *  @param alignment an htslib alignment.
- *  @param ret_dwells return vector of dwells.
- *  @returns status of dwell computation (success, no dwell tags or bad alignment).
+ *  \param alignment an htslib alignment.
+ *  \param ret_dwells return vector of dwells.
+ *  \returns status of dwell computation (success, no dwell tags or bad alignment).
  */
 enum class CalcDwellsReturnValue {
     SUCCESS,
@@ -228,64 +229,10 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
     buffer_reads = new_buffer_reads;
 }
 
-// /** Prints a pileup data structure.
-//  *
-//  *  @param pileup a pileup structure.
-//  *  @returns void
-//  *
-//  */
-// void print_read_aln_data(const ReadAlignmentData& pileup){
-//     for (size_t p = 0; p < pileup.n_pos; ++p) {
-//         fprintf(stdout, "(pos, ins)\t");
-//         fprintf(stdout, "(%zu, %zu)\n", pileup.major[p], pileup.minor[p]);
-//         for (size_t r = 0; r < pileup.n_reads; ++r) {
-//             if (p == 0) {
-//                 fprintf(stdout, "%s\t", pileup.read_ids_left[r]);
-//             }
-//             for (size_t f = 0; f < pileup.featlen; ++f) {
-//                 int8_t c = pileup.matrix[p * pileup.buffer_reads * pileup.featlen + r * pileup.featlen + f];
-//                 fprintf(stdout, "%i\t", c);
-//             }
-//             if (p == pileup.n_pos - 1) {
-//                 fprintf(stdout, "%s\t", pileup.read_ids_right[r]);
-//             }
-//             fprintf(stdout, "\n");
-//         }
-//     }
-// }
-
-/** Generates medaka-style feature data in a region of a bam.
- *
- *  @param region 1-based region string.
- *  @param bam_file input aligment file.
- *  @param num_dtypes number of datatypes in bam.
- *  @param dtypes prefixes on query names indicating datatype.
- *  @param tag_name by which to filter alignments.
- *  @param tag_value by which to filter data.
- *  @param keep_missing alignments which do not have tag.
- *  @param read_group used for filtering.
- *  @param min_mapq mininimum mapping quality.
- *  @param include_dwells whether to include dwells channel in features.
- *  @param include_haplotype whether to include haplotag channel in features.
- *  @param max_reads maximum allowed read depth.
- *  @returns a pileup data pointer.
- *
- *  The return value can be freed with destroy_read_aln_data.
- *
- *  If num_dtypes is 1, dtypes should be NULL; all reads in the bam will be
- *  treated equally. If num_dtypes is not 1, dtypes should be an array of
- *  strings, these strings being prefixes of query names of reads within the
- *  bam file. Any read not matching the prefixes will cause exit(1).
- *
- *  If tag_name is not NULL alignments are filtered by the (integer) tag value.
- *  When tag_name is given the behaviour for alignments without the tag is
- *  determined by keep_missing.
- *
- */
 ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                                            const std::string &chr_name,
-                                           const int64_t start,  // Zero-based.
-                                           const int64_t end,    // Non-inclusive.
+                                           const int64_t start,
+                                           const int64_t end,  // Non-inclusive.
                                            const int64_t num_dtypes,
                                            const std::vector<std::string> &dtypes,
                                            const std::string &tag_name,
@@ -306,11 +253,14 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
         throw std::runtime_error("The num_dtypes needs to be > 0.");
     }
 
-    // open bam etc.
-    // this is all now deferred to the caller
+    // Open bam etc. This is all now deferred to the caller
     htsFile *fp = bam_file.fp();
     hts_idx_t *idx = bam_file.idx();
     sam_hdr_t *hdr = bam_file.hdr();
+
+    if (!fp || !idx || !hdr) {
+        throw std::runtime_error{"[calculate_read_alignment] BamFile not opened properly!"};
+    }
 
     const std::string region =
             chr_name + ':' + std::to_string(start + 1) + '-' + std::to_string(end);
@@ -346,9 +296,10 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     n_pos = 0;              // number of processed columns (including insertions)
     int64_t min_gap = 5;    // minimum gap before starting a new read on an existing row
 
-    // a vector to store all read struct
+    // A vector to store all read structs.
     std::vector<Read> read_array;
-    // hash map from read ids to index in above vector
+
+    // hash map from read ids to index in above vector.
     std::unordered_map<std::string, int32_t> read_map;
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
@@ -375,10 +326,10 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
         }
         max_n_reads = std::max(max_n_reads, n_plp);
 
-        // reallocate output if necessary
+        // Reallocate output if necessary.
         if ((n_pos + max_ins) > pileup.buffer_pos) {
             const float cols_per_pos = static_cast<float>(n_pos + max_ins) / (1 + pos - start);
-            // max_ins can dominate so add at least that
+            // max_ins can dominate so add at least that.
             const int32_t new_buffer_pos =
                     max_ins + std::max(2 * pileup.buffer_pos,
                                        static_cast<int32_t>(cols_per_pos * (end - start)));
@@ -389,24 +340,39 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
             ((max_n_reads + row_offset) > pileup.buffer_reads)) {
             const int32_t new_buffer_reads = std::min(
                     max_reads, std::max(max_n_reads + row_offset, 2 * pileup.buffer_reads));
-            // correct start position of the column we're about to write
+            // Correct the start position of the column we're about to write.
             major_col = (major_col / pileup.buffer_reads) * new_buffer_reads;
             pileup.resize_num_reads(new_buffer_reads);
         }
-        // set major/minor position indexes, minors hold ins
+        // Set major/minor position indexes, minors hold ins.
+        const int64_t col_idx = major_col / (pileup.featlen * pileup.buffer_reads);
+        if ((col_idx < 0) || ((col_idx + max_ins) >= dorado::ssize(pileup.major))) {
+            throw std::runtime_error{
+                    "[calculate_read_alignment] Index out of bounds: col_idx = " +
+                    std::to_string(col_idx) + ", max_ins = " + std::to_string(max_ins) +
+                    ", pileup.major.size = " + std::to_string(std::size(pileup.major))};
+        }
         for (int i = 0; i <= max_ins; ++i) {
-            pileup.major[major_col / (pileup.featlen * pileup.buffer_reads) + i] = pos;
-            pileup.minor[major_col / (pileup.featlen * pileup.buffer_reads) + i] = i;
+            pileup.major[col_idx + i] = pos;
+            pileup.minor[col_idx + i] = i;
         }
 
         // loop through all reads at this position
         for (int32_t i = 0; i < n_plp; ++i) {
             const bam_pileup1_t *p = plp[0] + i;
+            if (p == nullptr) {
+                throw std::runtime_error{"[calculate_read_alignment] p is nullptr! i = " +
+                                         std::to_string(i)};
+            }
             if (p->is_refskip) {
                 continue;
             }
 
             const bam1_t *alignment = p->b;
+            if (alignment == nullptr) {
+                throw std::runtime_error{"[calculate_read_alignment] Alignment is nullptr!"};
+            }
+
             const std::string qname(bam_get_qname(alignment));
 
             // check whether read is in hash list
@@ -501,7 +467,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 }
             }
 
-            if (read_i >= pileup.buffer_reads) {
+            if ((read_i < 0) || (read_i >= (pileup.buffer_reads))) {
                 continue;
             }
 

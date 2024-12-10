@@ -11,12 +11,12 @@ namespace dorado::polisher {
 // medaka-style feature data
 struct ReadAlignmentData {
 public:
-    ReadAlignmentData(int32_t n_pos_,
-                      int32_t n_reads_,
-                      int32_t buffer_pos_,
-                      int32_t buffer_reads_,
-                      int32_t extra_featlen_,
-                      int32_t fixed_size_);
+    ReadAlignmentData(const int32_t n_pos_,
+                      const int32_t n_reads_,
+                      const int32_t buffer_pos_,
+                      const int32_t buffer_reads_,
+                      const int32_t extra_featlen_,
+                      const int32_t fixed_size_);
 
     void resize_cols(const int32_t new_buffer_cols);
 
@@ -35,43 +35,37 @@ public:
     std::vector<std::string> read_ids_right;
 };
 
-// /** Prints a pileup data structure.
-//  *
-//  *  @param pileup a pileup counts structure.
-//  *  @returns void
-//  *
-//  */
-// void print_read_aln_data(const ReadAlignmentData& pileup);
-
 /** Generates medaka-style feature data in a region of a bam.
  *
- *  @param region 1-based region string.
- *  @param bam_file input aligment file.
- *  @param num_dtypes number of datatypes in bam.
- *  @param dtypes prefixes on query names indicating datatype.
- *  @param tag_name by which to filter alignments
- *  @param tag_value by which to filter data
- *  @param keep_missing alignments which do not have tag.
- *  @param read_group used for filtering.
- *  @param min_mapq mininimum mapping quality.
- *  @param row_per_read place each new read on a new row.
- *  @param include_dwells whether to include dwells channel in features.
- *  @param include_haplotype whether to include haplotag channel in features.
- *  @param max_reads maximum allowed read depth.
- *  @returns a pileup counts data pointer.
+ * \param bam_file Input aligment file.
+ * \param chr_name Name of the input sequence for the queried region.
+ * \param start Start coordinate of the region. Zero-based.
+ * \param end End coordinate of the region. Non-inclusive.
+ * \param num_dtypes Number of datatypes in bam.
+ * \param dtypes Prefixes on query names indicating datatype.
+ * \param tag_name Tag name by which to filter alignments.
+ * \param tag_value Tag value by which to filter data. Only int supported.
+ * \param keep_missing Keeps alignments which do not have the tag specified with tag_name.
+ * \param read_group Used for filtering.
+ * \param min_mapq Mininimum mapping quality.
+ * \param row_per_read Place each new read on a new row.
+ * \param include_dwells Include dwells channel in features.
+ * \param include_haplotype Include haplotag channel in features.
+ * \param max_reads Maximum allowed read depth.
+ * \returns ReadAlignmentData object which contains the features, positions and read IDs.
  *
- *  The return value can be freed with destroy_read_aln_data.
+ * Throws exceptions on errors.
  *
- *  If num_dtypes is 1, dtypes should be NULL; all reads in the bam will be
+ *  If num_dtypes is 1, dtypes should be empty; all reads in the BAM will be
  *  treated equally. If num_dtypes is not 1, dtypes should be an array of
  *  strings, these strings being prefixes of query names of reads within the
- *  bam file. Any read not matching the prefixes will cause exit(1).
+ *  bam file. Any read not matching the prefixes will cause an exception to be thrown.
  *
- *  If tag_name is not NULL alignments are filtered by the (integer) tag value.
- *  When tag_name is given the behaviour for alignments without the tag is
+ *  If tag_name is not empty, alignments are filtered by the (integer) tag value.
+ *  When tag_name is given, the behaviour for alignments without the tag is
  *  determined by keep_missing.
  *
- *  If row_per_read is False, new reads will be placed in the first row where
+ *  If row_per_read is false, new reads will be placed in the first row where
  *  there previous read has terminated, if one exists.
  */
 ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
