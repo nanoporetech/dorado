@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -19,12 +20,12 @@
 
 namespace {
 
-static constexpr int32_t BASE_FEATLEN = 4;  // minimal number of feature channels
-static constexpr int8_t DEL_VAL = 5;        // value representing deletion in base channel
-static const char DATATYPE_TAG[] = "DT";
+static constexpr int32_t BASE_FEATLEN = 4;  // Minimal number of feature channels.
+static constexpr int8_t DEL_VAL = 5;        // Value representing deletion in base channel.
+static constexpr std::string_view DATATYPE_TAG{"DT", 2};
 
 // convert 16bit IUPAC (+16 for strand) to plp_bases index
-static const int8_t num2countbase_symm[32] = {
+static constexpr std::array<int8_t, 32> NUM_TO_COUNT_BASE_SYMM{
         -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
         -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
 };
@@ -68,23 +69,24 @@ CalcDwellsReturnValue calculate_dwells(const bam1_t *alignment, std::vector<int8
 
     const uint8_t *mv_tag = bam_aux_get(alignment, "mv");
     if (!mv_tag) {
+        // Return, but don't clear the ret_dwells so that an empty column is added.
         return CalcDwellsReturnValue::NO_DWELL_TAG;
     }
 
     const int32_t mv_len = static_cast<int32_t>(bam_auxB_len(mv_tag));
-    // uint8_t stride = bam_auxB2i(mv_tag, 0);
 
-    int64_t qpos = 0;  // base index
+    int64_t qpos = 0;  // Base index.
 
     if (alignment->core.flag & BAM_FREVERSE) {
         int32_t dwell = 0;
         // Reversed alignment, iterate backward through move table.
         // Last entry is the first move which corresponds to
-        // the last base
+        // the last base.
         for (int32_t i = (mv_len - 1); i > 0; --i) {
             ++dwell;
             if (bam_auxB2i(mv_tag, i) == 1) {
                 if (qpos >= length) {
+                    // Return and clear data, this alignment is all wrong.
                     ret_dwells.clear();
                     return CalcDwellsReturnValue::BAD_ALIGNMENT;
                 }
@@ -97,10 +99,11 @@ CalcDwellsReturnValue calculate_dwells(const bam1_t *alignment, std::vector<int8
         int32_t dwell = 1;
         // Skip first entry since this is always a move.
         // Last entry is the last sample point so need to
-        // add the dwell since the last move afterwards
+        // add the dwell since the last move afterwards.
         for (int32_t i = 2; i < mv_len; ++i) {
             if (bam_auxB2i(mv_tag, i) == 1) {
                 if (qpos >= length) {
+                    // Return and clear data, this alignment is all wrong.
                     ret_dwells.clear();
                     return CalcDwellsReturnValue::BAD_ALIGNMENT;
                 }
@@ -112,6 +115,7 @@ CalcDwellsReturnValue calculate_dwells(const bam1_t *alignment, std::vector<int8
         }
 
         if (qpos >= length) {
+            // Return and clear data, this alignment is all wrong.
             ret_dwells.clear();
             return CalcDwellsReturnValue::BAD_ALIGNMENT;
         }
@@ -122,11 +126,11 @@ CalcDwellsReturnValue calculate_dwells(const bam1_t *alignment, std::vector<int8
     return CalcDwellsReturnValue::SUCCESS;
 }
 
-size_t aligned_ref_pos_from_cigar(uint32_t *cigar, uint32_t n_cigar) {
+size_t aligned_ref_pos_from_cigar(const uint32_t *cigar, const uint32_t n_cigar) {
     uint32_t aligned_ref_pos = 0;
     for (size_t ci = 0; ci < n_cigar; ++ci) {
-        uint32_t cigar_len = cigar[ci] >> 4;
-        uint8_t cigar_op = cigar[ci] & 0xf;
+        const uint32_t cigar_len = cigar[ci] >> 4;
+        const uint8_t cigar_op = cigar[ci] & 0xf;
         if ((cigar_op == BAM_CMATCH) || (cigar_op == BAM_CDEL) || (cigar_op == BAM_CEQUAL) ||
             (cigar_op == BAM_CDIFF)) {
             aligned_ref_pos += cigar_len;
@@ -141,19 +145,19 @@ namespace dorado::polisher {
 
 /** Constructs a ReadAlignmentData data structure.
  *
- *  @param n_pos number of pileup positions (columns).
- *  @param n_reads number of pileup reads (rows).
- *  @param buffer_pos number of pileup positions.
- *  @param buffer_reads number of pileup reads.
- *  @param extra_featlen number of extra feature channels.
- *  @param fixed_size if not zero data matrix is allocated as fixed_size * n_reads * n_pos, ignoring other arguments
+ *  \param n_pos_ Number of pileup positions (columns).
+ *  \param n_reads_ Number of pileup reads (rows).
+ *  \param buffer_pos_ Number of pileup positions.
+ *  \param buffer_reads_ Number of pileup reads.
+ *  \param extra_featlen_ Number of extra feature channels.
+ *  \param fixed_size_ If not zero data matrix is allocated as fixed_size * n_reads * n_pos, ignoring other arguments
  */
-ReadAlignmentData::ReadAlignmentData(int32_t n_pos_,
-                                     int32_t n_reads_,
-                                     int32_t buffer_pos_,
-                                     int32_t buffer_reads_,
-                                     int32_t extra_featlen_,
-                                     int32_t fixed_size_)
+ReadAlignmentData::ReadAlignmentData(const int32_t n_pos_,
+                                     const int32_t n_reads_,
+                                     const int32_t buffer_pos_,
+                                     const int32_t buffer_reads_,
+                                     const int32_t extra_featlen_,
+                                     const int32_t fixed_size_)
         : buffer_pos{buffer_pos_},
           buffer_reads{buffer_reads_},
           num_dtypes{1},
@@ -190,20 +194,30 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
 
     // move old data to the new part of matrix
     for (int64_t p = (buffer_pos - 1); p > 0; --p) {
+        // Precompute coords in the outer loop.
+        const int64_t old_coord_part = p * this->buffer_reads * featlen;
+        const int64_t new_coord_part = p * new_buffer_reads * featlen;
         for (int64_t r = (this->buffer_reads - 1); r >= 0; --r) {
+            // Precompute coords in the outer loop.
+            const int64_t old_coord_part_2 = old_coord_part + r * featlen;
+            const int64_t new_coord_part_2 = new_coord_part + r * featlen;
             for (int64_t f = (featlen - 1); f >= 0; --f) {
-                const int64_t old_coord = p * this->buffer_reads * featlen + r * featlen + f;
-                const int64_t new_coord = p * new_buffer_reads * featlen + r * featlen + f;
+                const int64_t old_coord = old_coord_part_2 + f;
+                const int64_t new_coord = new_coord_part_2 + f;
                 matrix[new_coord] = matrix[old_coord];
             }
         }
     }
 
-    // zero out old entries
+    // Zero out old entries.
     for (int64_t p = 0; p < buffer_pos; ++p) {
+        // Precompute coords in the outer loop.
+        const int64_t old_coord_1 = p * new_buffer_reads * featlen;
         for (int64_t r = this->buffer_reads; r < new_buffer_reads; ++r) {
+            // Precompute coords in the outer loop.
+            const int64_t old_coord_2 = old_coord_1 + r * featlen;
             for (int64_t f = 0; f < featlen; ++f) {
-                const int64_t old_coord = p * new_buffer_reads * featlen + r * featlen + f;
+                const int64_t old_coord = old_coord_2 + f;
                 if (old_coord < old_size) {
                     matrix[old_coord] = 0;
                 }
@@ -404,7 +418,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                 bool failed = false;
                 if (num_dtypes > 1) {
                     char *tag_val = nullptr;
-                    const uint8_t *tag = bam_aux_get(alignment, DATATYPE_TAG);
+                    const uint8_t *tag = bam_aux_get(alignment, std::data(DATATYPE_TAG));
                     if (tag == NULL) {  // tag isn't present
                         failed = true;
                     } else {
@@ -522,7 +536,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
             int32_t minor = min_minor;
             for (; minor <= max_minor; ++minor, ++query_pos_offset) {
                 const int32_t base_j = bam1_seqi(read.seqi, p->qpos + query_pos_offset);
-                const int8_t base_i = num2countbase_symm[base_j];
+                const int8_t base_i = NUM_TO_COUNT_BASE_SYMM[base_j];
                 const size_t partial_index =
                         major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
                         + pileup.featlen * read_i;  // skip to read row
