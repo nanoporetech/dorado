@@ -102,4 +102,6 @@ std::vector<Interval> create_batches(const T& data,
     return ret;
 }
 
+void save_tensor(const torch::Tensor& tensor, const std::string& file_path);
+
 }  // namespace dorado::polisher

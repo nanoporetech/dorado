@@ -120,4 +120,10 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
+void save_tensor(const torch::Tensor& tensor, const std::string& file_path) {
+    auto pickled = torch::pickle_save(tensor);
+    std::ofstream fout(file_path, std::ios::out | std::ios::binary);
+    fout.write(std::data(pickled), std::size(pickled));
+}
+
 }  // namespace dorado::polisher
