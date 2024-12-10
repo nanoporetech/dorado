@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+namespace dorado::polisher {
+
 // medaka-style feature data
 struct ReadAlignmentData {
 public:
@@ -51,7 +53,7 @@ public:
  *  @param tag_value by which to filter data
  *  @param keep_missing alignments which do not have tag.
  *  @param read_group used for filtering.
- *  @param min_mapQ mininimum mapping quality.
+ *  @param min_mapq mininimum mapping quality.
  *  @param row_per_read place each new read on a new row.
  *  @param include_dwells whether to include dwells channel in features.
  *  @param include_haplotype whether to include haplotag channel in features.
@@ -87,3 +89,5 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
                                            const bool include_dwells,
                                            const bool include_haplotype,
                                            const int32_t max_reads);
+
+}  // namespace dorado::polisher

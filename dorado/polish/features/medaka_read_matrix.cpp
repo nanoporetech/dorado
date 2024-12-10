@@ -137,6 +137,8 @@ size_t aligned_ref_pos_from_cigar(uint32_t *cigar, uint32_t n_cigar) {
 
 }  // namespace
 
+namespace dorado::polisher {
+
 /** Constructs a ReadAlignmentData data structure.
  *
  *  @param n_pos number of pileup positions (columns).
@@ -248,7 +250,7 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
  *  @param tag_value by which to filter data.
  *  @param keep_missing alignments which do not have tag.
  *  @param read_group used for filtering.
- *  @param min_mapQ mininimum mapping quality.
+ *  @param min_mapq mininimum mapping quality.
  *  @param include_dwells whether to include dwells channel in features.
  *  @param include_haplotype whether to include haplotag channel in features.
  *  @param max_reads maximum allowed read depth.
@@ -304,12 +306,12 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     data->fp = fp;
     data->hdr = hdr;
     data->iter = bam_itr_querys(idx, hdr, region.c_str());
-    data->min_mapQ = min_mapq;
+    data->min_mapq = min_mapq;
     memcpy(data->tag_name, tag_name.c_str(), 2);
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
-    bam_mplp_t mplp = bam_mplp_init(1, read_bam, reinterpret_cast<void **>(&raw_data_ptr));
+    bam_mplp_t mplp = bam_mplp_init(1, mpileup_read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
     int32_t ret = 0;
@@ -600,3 +602,5 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
 
     return pileup;
 }
+
+}  // namespace dorado::polisher

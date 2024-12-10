@@ -192,12 +192,12 @@ PileupData calculate_pileup(BamFile &bam_file,
     data->fp = fp;
     data->hdr = hdr;
     data->iter = bam_itr_querys(idx, hdr, region.c_str());
-    data->min_mapQ = min_mapq;
+    data->min_mapq = min_mapq;
     memcpy(data->tag_name, tag_name.c_str(), 2);
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
-    bam_mplp_t mplp = bam_mplp_init(1, read_bam, reinterpret_cast<void **>(&raw_data_ptr));
+    bam_mplp_t mplp = bam_mplp_init(1, mpileup_read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
     int32_t ret = 0;
