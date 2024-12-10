@@ -380,7 +380,7 @@ int duplex(int argc, char* argv[]) {
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.visible.add_argument("-o", "--overlap")
+        parser.visible.add_argument("--overlap")
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
