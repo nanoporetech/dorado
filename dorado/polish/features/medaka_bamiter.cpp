@@ -3,40 +3,45 @@
 #include <cerrno>
 #include <cstring>
 
-// iterator for reading bam
-int read_bam(void *data, bam1_t *b) {
-    HtslibMpileupData *aux = (HtslibMpileupData *)data;
-    uint8_t *tag;
-    bool check_tag = (strcmp(aux->tag_name, "") != 0);
-    bool have_rg = (aux->read_group != NULL);
-    uint8_t *rg;
-    char *rg_val;
-    int ret;
-    while (1) {
+namespace dorado::polisher {
+
+int32_t mpileup_read_bam(void *data, bam1_t *b) {
+    HtslibMpileupData *aux = reinterpret_cast<HtslibMpileupData *>(data);
+
+    const bool check_tag = (strcmp(aux->tag_name, "") != 0);
+    const bool have_rg = (aux->read_group != nullptr);
+
+    int32_t ret = 0;
+
+    while (true) {
         ret = aux->iter ? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
+
         if (ret < 0) {
             break;
         }
-        // only take primary alignments
+
+        // Skip secondary, supplementary and unmapped alignments.
         if (b->core.flag &
             (BAM_FUNMAP | BAM_FSECONDARY | BAM_FSUPPLEMENTARY | BAM_FQCFAIL | BAM_FDUP)) {
             continue;
         }
-        // filter by mapping quality
-        if ((int)b->core.qual < aux->min_mapQ) {
+
+        // Filter by mapping quality.
+        if (static_cast<int32_t>(b->core.qual) < aux->min_mapq) {
             continue;
         }
-        // filter by tag
+
+        // Filter by tag
         if (check_tag) {
-            tag = bam_aux_get((const bam1_t *)b, aux->tag_name);
-            if (tag == NULL) {  // tag isn't present or is currupt
+            const uint8_t *tag = bam_aux_get(const_cast<const bam1_t *>(b), aux->tag_name);
+            if (tag == nullptr) {  // Tag isn't present or is corrupt.
                 if (aux->keep_missing) {
                     break;
                 } else {
                     continue;
                 }
             }
-            int tag_value = static_cast<int32_t>(bam_aux2i(tag));
+            const int32_t tag_value = static_cast<int32_t>(bam_aux2i(tag));
             if (errno == EINVAL) {
                 continue;  // tag was not integer
             }
@@ -44,21 +49,25 @@ int read_bam(void *data, bam1_t *b) {
                 continue;
             }
         }
-        // filter by RG (read group):
+
+        // Filter by RG (read group).
         if (have_rg) {
-            rg = bam_aux_get((const bam1_t *)b, "RG");
-            if (rg == NULL) {
-                continue;  // missing
+            const uint8_t *rg = bam_aux_get((const bam1_t *)b, "RG");
+            if (rg == nullptr) {
+                continue;  // Missing.
             }
-            rg_val = bam_aux2Z(rg);
+            const char *rg_val = bam_aux2Z(rg);
             if (errno == EINVAL) {
-                continue;  // bad parse
+                continue;  // Bad parse.
             }
             if (strcmp(aux->read_group, rg_val) != 0) {
-                continue;  // not wanted
+                continue;  // Not wanted.
             }
         }
         break;
     }
+
     return ret;
 }
+
+}  // namespace dorado::polisher
