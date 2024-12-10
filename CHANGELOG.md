@@ -2,6 +2,33 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.7.4] (11 Dec 2024)
+
+This release of Dorado matches the version included in MinKNOW 24.11 and Dorado Basecall Server 7.6.7. We only recommend this release to users who require matching performance to MinKNOW 24.11. Other users should use the latest version of Dorado (≥0.8.3) to benefit from all available improvements. Changes from 0.7.3 in this release include:
+
+* 40296da37d815a1ae2dc7f5739daeabd76dc5767 - Reduced false positive classifications for NBD barcode kits
+* 687f234cb4a9deb3cf029591707a8b69b5a2572b - Improved GPU batch submission timeout logic to improve basecall performance with low data throughput
+* 03e5eecd22f48ea13ce3fc8f65269fab96fa1c27 - Fix incorrect basecalls being emitted from SUP models on Apple Silicon
+* 9a81cbc269b742cad64b514a50aeb30a7bf25811 - Fix errors when running `dorado basecaller` on multi-GPU systems
+* 3cc4de3c941601fad906c80b6c770fef2814ad9c - Prevent "Too many open files" error when using `--sort-bam` with `dorado demux`
+* f35c8cc3ebf900cfd6e19cf6ebaebc94fbb8619b - Fix bug when downloading models for `dorado correct`
+* 4a28d589d5e244f62543ebb4d744e8c2843bde93 - Always trim DNA adapter signal before processing RNA reads
+* adc60bae22648fef6521608a625c0e5bc842ac2f - Package `libcupti.so` into ARM Linux builds
+* c65b3fb9596e306c8a443bfe355fa318bbc72981 - Added EXP-NBD114-24 alias for SQK-NBD114-24
+* 69cb26032d8393a781a9a3d32aa2ceb13ec65491 - Fix bug causing intermittent crashing with v5 SUP models
+* a674dadec1b3feb1ed8e8a6421d5d3fc17b0b5bd - Update `--help` documentation for `basecaller`, `duplex`, and `correct`
+* 6ec77c8b6cfc3a53433ae27f7a5383f77097eefa - Fix errors when performing duplex calling with modified bases
+* cb6eee1c3d63da2f1f11fb8fcc63418908154f81 - Decouple alignment and inference stages in `dorado correct`
+* 762e88689b31099081a7fcd39b959ddc4c7eb2e1 - Cache batch sizes to significantly reduce basecaller startup time on supported GPUs
+* 9e5db84725635ceaa282691e8e430dd56851ffa2 - Fix duplicated alignment tags in re-aligned files
+* 966c2ca38369a21855cdd491b025979a9628b5b5 - Update POD5 version to v0.3.15
+* e9281fa6d9ff36a7fb51efed0caf2c776b7d0c33 - Emit an error message if header from input HTS file cannot be read
+* fcb9d53ab168f42cdd02cfa740158a0ce0b5cc84 - Include run name in output files from `dorado demux` even if input files are FASTQ
+* 7f42b8fd869da5210f9a60a83a6656173023dcb0 - Warn and exit instead of crashing if a model path does not exist
+* 7d7424615830f46f7246a20125b73573c78ef7c9 - Improve index file error handling
+* 022901e29864fdeb9a99c4961c679882fe4a6b34 - Fix JSON output when using `--list-structured` with `dorado download`
+
+
 # [0.7.3] (1 Aug 2024)
 
 This release of Dorado updates `dorado correct` to fix handling of high copy repeats and avoid shutdown hanging. It also includes `dorado demux` improvements to reduce false matches in midstrand barcode detection and ensure correct file naming, along with other fixes.
