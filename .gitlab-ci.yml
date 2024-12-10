@@ -205,6 +205,7 @@ build:linux:x86:focal:install_deps:
     - .linux_runner
     - .build_and_test_dorado
     - .on_nightly_or_manual
+  artifacts: null
 
 build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
@@ -223,6 +224,7 @@ build:linux:x86:jammy:
     - .linux_dependencies
     - .linux_runner
     - .build_and_test_dorado
+  artifacts: null
 
 build:linux:x86:focal:debug:
   variables:
@@ -231,6 +233,7 @@ build:linux:x86:focal:debug:
     - build:linux:x86:focal
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
+  artifacts: null
 
 build:linux:x86:focal_coverage:
   stage: build
@@ -257,6 +260,7 @@ build:linux:x86:focal:clang_tidy:
     - apt update && apt install -y clang clang-tidy
     - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
+  artifacts: null
 
 .build:linux:x86:focal:valgrind:
   stage: build
@@ -342,12 +346,14 @@ build:linux:arm64:focal:no_ccache:
   extends:
     - build:linux:arm64:focal
     - .on_nightly_or_manual
+  artifacts: null
 
 build:linux:x86:focal_koi_download:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_runner
     - .build_and_test_dorado
+  artifacts: null
 
 build:linux:x86:focal_koi_download:no_ccache:
   variables:
@@ -355,6 +361,7 @@ build:linux:x86:focal_koi_download:no_ccache:
   extends:
     - build:linux:x86:focal_koi_download
     - .on_nightly_or_manual
+  artifacts: null
 
 build:windows:
   extends:
@@ -371,6 +378,7 @@ build:windows:debug:
     - build:windows
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
+  artifacts: null
 
 build:windows_koi_download:
   extends:
@@ -379,6 +387,7 @@ build:windows_koi_download:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+  artifacts: null
 
 build:macos:arm:
   variables:
@@ -393,6 +402,7 @@ build:macos:arm:no_ccache:
   extends:
     - build:macos:arm
     - .on_nightly_or_manual
+  artifacts: null
 
 build:macos:x64:
   variables:
@@ -407,6 +417,7 @@ build:macos:x64:no_ccache:
   extends:
     - build:macos:x64
     - .on_nightly_or_manual
+  artifacts: null
 
 build:ios:m1:
   variables:
@@ -433,6 +444,7 @@ build:ios:m1:
       -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
       -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
     - !reference [.build_and_test_dorado, script]
+  artifacts: null
 
 build:ios_sim:m1:
   variables:
@@ -443,6 +455,7 @@ build:ios_sim:m1:
     # Note that we don't technically need CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED
     # disabled for simulator builds, but it doesn't hurt.
     - build:ios:m1
+  artifacts: null
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
