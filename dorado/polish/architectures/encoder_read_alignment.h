@@ -1,9 +1,9 @@
 #pragma once
 
 #include "polish/architectures/encoder_base.h"
+#include "polish/architectures/medaka_bamiter.h"
 #include "polish/bam_file.h"
 #include "polish/consensus_result.h"
-#include "polish/medaka_bamiter.h"
 #include "polish/sample.h"
 
 #include <torch/torch.h>

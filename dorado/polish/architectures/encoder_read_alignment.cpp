@@ -1,6 +1,6 @@
 #include "polish/architectures/encoder_read_alignment.h"
 
-#include "polish/medaka_read_matrix.h"
+#include "polish/architectures/medaka_read_matrix.h"
 #include "polish/polish_utils.h"
 #include "utils/ssize.h"
 

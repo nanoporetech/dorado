@@ -309,12 +309,12 @@ add_library(dorado_lib
     dorado/polish/bam_file.cpp
     dorado/polish/bam_file.h
     dorado/polish/interval.h
-    dorado/polish/medaka_bamiter.cpp
-    dorado/polish/medaka_bamiter.h
-    dorado/polish/medaka_counts.cpp
-    dorado/polish/medaka_counts.h
-    dorado/polish/medaka_read_matrix.cpp
-    dorado/polish/medaka_read_matrix.h
+    dorado/polish/architectures/medaka_bamiter.cpp
+    dorado/polish/architectures/medaka_bamiter.h
+    dorado/polish/architectures/medaka_counts.cpp
+    dorado/polish/architectures/medaka_counts.h
+    dorado/polish/architectures/medaka_read_matrix.cpp
+    dorado/polish/architectures/medaka_read_matrix.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp

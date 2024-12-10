@@ -8,7 +8,6 @@
 #include "polish/architectures/model_factory.h"
 #include "polish/bam_file.h"
 #include "polish/interval.h"
-#include "polish/medaka_counts.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
 #include "polish/sample.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "bam_file.h"
 #include "medaka_bamiter.h"
+#include "polish/bam_file.h"
 
 #include <array>
 #include <cstddef>

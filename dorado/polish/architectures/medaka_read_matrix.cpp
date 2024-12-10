@@ -1,7 +1,7 @@
 #include "medaka_read_matrix.h"
 
-#include "bam_file.h"
 #include "medaka_bamiter.h"
+#include "polish/bam_file.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
