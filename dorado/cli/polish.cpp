@@ -724,6 +724,10 @@ int polish(int argc, char* argv[]) {
             for (const auto& rg : bam_info.read_groups) {
                 spdlog::debug("    - {}", rg);
             }
+            spdlog::debug("bam_info.basecaller_models:");
+            for (const auto& rg : bam_info.basecaller_models) {
+                spdlog::debug("    - {}", rg);
+            }
         }
 
         // Allow only Dorado aligned BAMs.

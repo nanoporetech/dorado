@@ -149,6 +149,9 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
         }();
 
         if (line.header_type == "@PG") {
+            // Example PG line:
+            //      @PG	ID:aligner	PP:samtools.2	PN:dorado	VN:0.0.0+2852e11d	DS:2.27-r1193
+
             const auto& it_pn = tags.find("PN");
             const auto& it_id = tags.find("ID");
             if ((it_pn != std::end(tags)) && it_id != std::end(tags)) {
@@ -169,9 +172,27 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
                 }
             }
         } else if (line.header_type == "@RG") {
+            // Example RG line:
+            //      @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	DT:2022-10-18T10:38:07.247961+00:00	DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 modbase_models=dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v2,dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v2	LB:PCR_zymo	PL:ONT	PM:4A	PU:PAM93185	al:PCR_zymo
+
+            // Parse the read group ID.
             const auto& it_id = tags.find("ID");
             if (it_id != std::end(tags)) {
                 ret.read_groups.emplace(it_id->second);
+            }
+
+            // Parse the basecaller model.
+            const auto& it_ds = tags.find("DS");
+            if (it_ds != std::end(tags)) {
+                const std::vector<std::string> tokens = utils::split(it_ds->second, ' ');
+                constexpr std::string_view TOKEN_NAME{"basecall_model="};
+                for (const auto& token : tokens) {
+                    if (!utils::starts_with(token, TOKEN_NAME)) {
+                        continue;
+                    }
+                    ret.basecaller_models.emplace(token.substr(std::size(TOKEN_NAME)));
+                    break;
+                }
             }
         }
     }

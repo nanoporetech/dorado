@@ -41,6 +41,7 @@ struct BamInfo {
     bool uses_dorado_aligner = false;
     bool has_dwells = false;
     std::unordered_set<std::string> read_groups;
+    std::unordered_set<std::string> basecaller_models;
 };
 
 /**
