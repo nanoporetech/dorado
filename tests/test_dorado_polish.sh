@@ -49,7 +49,7 @@ CRAM=$(pwd)/cram-0.6/cram.py
 popd
 
 # Download the model once.
-MODEL_NAME="read_level_lstm384_unidirectional_20241204"
+MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv"
 MODEL_DIR=${output_dir}/${MODEL_NAME}
 if [[ ! -d "${MODEL_DIR}" ]]; then
     ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
