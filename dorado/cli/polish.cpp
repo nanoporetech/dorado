@@ -545,9 +545,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                 "model can be processed."};
     }
 
-    // Logic:
-    //  - CLI option can be auto, in which case the model is determined from the BAM file.
-
     const std::string polish_model_suffix =
             std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
 
