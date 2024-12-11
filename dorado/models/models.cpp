@@ -1065,8 +1065,15 @@ namespace polisher {
 
 const std::vector<ModelInfo> models = {
         ModelInfo{
-                "read_level_lstm384_unidirectional_20241204",
-                "8662df664726c2b65fc984af0df765a7de0b6fa580ec6b3882ed5884e0ddb304",
+                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl",
+                "fdb6d18fe7e93f141c8e15f1b014e338e7cdd2b3f390abd0ff85cede33b50cc7",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv",
+                "719389cf723a4ddbd020690c20708885ed6b5000c51a2144a5af5b8064a055d2",
                 CC::UNKNOWN,
                 ModelVariantPair{},
                 ModsVariantPair{},
