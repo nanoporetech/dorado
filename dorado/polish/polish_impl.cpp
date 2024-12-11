@@ -869,7 +869,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         try {
             output = model.predict_on_batch(std::move(batch_features_tensor));
         } catch (std::exception& e) {
-            std::cerr << "ERROR! Exception caught: " << e.what() << "\n";
+            std::cerr << "ERROR! Exception caught: " << e.what() << '\n';
             throw e;
         }
         const int64_t time_forward = timer_forward.GetElapsedMilliseconds();

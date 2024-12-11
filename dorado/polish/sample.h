@@ -89,7 +89,7 @@ inline void debug_print_sample(std::ostream& os,
         const auto depth = sample.depth.slice(/*dim=*/0, /*start=*/0);
         for (int64_t k = 0; k < len; ++k) {
             os << "[k = " << k << "] pos = (" << sample.positions_major[k] << ", "
-               << sample.positions_minor[k] << "), depth = " << depth[k].item<float>() << "\n";
+               << sample.positions_minor[k] << "), depth = " << depth[k].item<float>() << '\n';
             os.flush();
         }
     }

@@ -17,7 +17,7 @@ void print_toml(std::ostream& os, const toml::value& val, int indent) {
         for (const auto& [key, value] : table) {
             os << indent_str << key << " = ";
             if (value.is_table() || value.is_array()) {
-                os << "\n";
+                os << '\n';
             }
             print_toml(os, value, indent + 2);
         }
@@ -36,11 +36,11 @@ void print_toml(std::ostream& os, const toml::value& val, int indent) {
         if (val.is_string()) {
             os << "\"" << val.as_string() << "\"\n";
         } else if (val.is_integer()) {
-            os << val.as_integer() << "\n";
+            os << val.as_integer() << '\n';
         } else if (val.is_floating()) {
-            os << val.as_floating() << "\n";
+            os << val.as_floating() << '\n';
         } else if (val.is_boolean()) {
-            os << (val.as_boolean() ? "true" : "false") << "\n";
+            os << (val.as_boolean() ? "true" : "false") << '\n';
         } else {
             os << "(unknown type)\n";
         }
