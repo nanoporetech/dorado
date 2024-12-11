@@ -553,7 +553,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     if (model_str == "auto") {
         spdlog::info("Auto resolving the model.");
 
-        // Check that there is at leas one basecaller listed in the BAM. Otherwise, no auto resolving.
+        // Check that there is at least one basecaller listed in the BAM. Otherwise, no auto resolving.
         if (std::empty(bam_info.basecaller_models)) {
             throw std::runtime_error{
                     "Cannot auto resolve the model because no model information is available in "
