@@ -175,9 +175,9 @@ PileupData calculate_pileup(BamFile &bam_file,
     const int64_t buffer_cols = 2 * (end - start);
     PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
 
-    int64_t *pileup_matrix = pileup.matrix.data();
-    int64_t *pileup_major = pileup.major.data();
-    int64_t *pileup_minor = pileup.minor.data();
+    int64_t *pileup_matrix = std::data(pileup.matrix);
+    int64_t *pileup_major = std::data(pileup.major);
+    int64_t *pileup_minor = std::data(pileup.minor);
 
     // get counts
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
@@ -185,7 +185,7 @@ PileupData calculate_pileup(BamFile &bam_file,
     std::unordered_set<std::string> no_rle_tags;
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
-                                const_cast<const bam_pileup1_t **>(plp.data()))) > 0) {
+                                const_cast<const bam_pileup1_t **>(std::data(plp)))) > 0) {
         const char *c_name = data->hdr->target_name[tid];
         if (c_name != chr_name) {
             continue;
@@ -215,9 +215,9 @@ PileupData calculate_pileup(BamFile &bam_file,
                     max_ins + std::max(2 * pileup.buffer_cols,
                                        static_cast<int64_t>(cols_per_pos * (end - start)));
             pileup.resize_cols(new_buffer_cols);
-            pileup_matrix = pileup.matrix.data();
-            pileup_major = pileup.major.data();
-            pileup_minor = pileup.minor.data();
+            pileup_matrix = std::data(pileup.matrix);
+            pileup_major = std::data(pileup.major);
+            pileup_minor = std::data(pileup.minor);
         }
 
         // set major/minor position indexes, minors hold ins
@@ -238,7 +238,7 @@ PileupData calculate_pileup(BamFile &bam_file,
             if (num_dtypes > 1) {
                 bool failed = false;
                 char *tag_val = nullptr;
-                uint8_t *tag = bam_aux_get(p->b, DATATYPE_TAG.data());
+                uint8_t *tag = bam_aux_get(p->b, std::data(DATATYPE_TAG));
                 if (tag == NULL) {  // tag isn't present
                     failed = true;
                 } else {

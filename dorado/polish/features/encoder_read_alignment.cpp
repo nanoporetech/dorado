@@ -35,7 +35,7 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     assert(result.counts.data_ptr<int8_t>() != nullptr);
 
     // Copy the data from `data.matrix` into `result.counts`
-    std::memcpy(result.counts.data_ptr<int8_t>(), data.matrix.data(), num_bytes);
+    std::memcpy(result.counts.data_ptr<int8_t>(), std::data(data.matrix), num_bytes);
 
     result.counts =
             result.counts.index({torch::indexing::Slice(),
@@ -306,7 +306,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         }
     }
 
-    if (!buffer_ids.empty()) {
+    if (!std::empty(buffer_ids)) {
         spdlog::trace(
                 "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
                 "the buffer. buffer_ids.size() = {}",

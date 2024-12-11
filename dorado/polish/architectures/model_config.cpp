@@ -24,9 +24,9 @@ void print_toml(std::ostream& os, const toml::value& val, int indent) {
     } else if (val.is_array()) {
         const auto& arr = val.as_array();
         os << "[";
-        for (size_t i = 0; i < arr.size(); ++i) {
+        for (size_t i = 0; i < std::size(arr); ++i) {
             print_toml(os, arr[i], 0);
-            if (i < arr.size() - 1) {
+            if ((i + 1) < std::size(arr)) {
                 os << ", ";
             }
         }

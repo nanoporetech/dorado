@@ -33,9 +33,9 @@ std::vector<int32_t> parse_int32_vector(const std::string& input) {
     }
 
     // Remove the brackets and trim the string
-    std::string trimmed = input.substr(1, input.size() - 2);
-    trimmed.erase(std::remove(trimmed.begin(), trimmed.end(), ' '), trimmed.end());
-    trimmed.erase(std::remove(trimmed.begin(), trimmed.end(), '\t'), trimmed.end());
+    std::string trimmed = input.substr(1, std::size(input) - 2);
+    trimmed.erase(std::remove(std::begin(trimmed), std::end(trimmed), ' '), std::end(trimmed));
+    trimmed.erase(std::remove(std::begin(trimmed), std::end(trimmed), '\t'), std::end(trimmed));
 
     std::vector<int32_t> result;
     std::istringstream ss(trimmed);
@@ -121,7 +121,7 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
 }
 
 void save_tensor(const torch::Tensor& tensor, const std::string& file_path) {
-    auto pickled = torch::pickle_save(tensor);
+    const std::vector<char> pickled = torch::pickle_save(tensor);
     std::ofstream fout(file_path, std::ios::out | std::ios::binary);
     fout.write(std::data(pickled), std::size(pickled));
 }

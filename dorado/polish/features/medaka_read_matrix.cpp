@@ -303,7 +303,7 @@ ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
     std::unordered_map<std::string, int32_t> read_map;
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
-                                const_cast<const bam_pileup1_t **>(plp.data()))) > 0) {
+                                const_cast<const bam_pileup1_t **>(std::data(plp)))) > 0) {
         const char *c_name = data->hdr->target_name[tid];
         if (c_name != chr_name) {
             continue;

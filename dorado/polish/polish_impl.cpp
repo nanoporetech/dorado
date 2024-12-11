@@ -36,7 +36,7 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
         spdlog::debug("Parsing CUDA device string.");
         const std::vector<std::string> parsed_devices =
                 dorado::utils::parse_cuda_device_string(devices_str);
-        if (parsed_devices.empty()) {
+        if (std::empty(parsed_devices)) {
             throw std::runtime_error("CUDA device requested but no devices found.");
         }
         for (const auto& val : parsed_devices) {
@@ -928,7 +928,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                     "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
                     "out_item.samples.size() = {}, decode queue size: {}",
                     tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
-                    decode_queue.size());
+                    std::size(decode_queue));
             decode_queue.try_push(std::move(out_item));
         }
     };
@@ -1048,7 +1048,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                     "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                     "tensor_batch_size = {}, queue size: {}",
                     tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
-                    tensor_batch_size, decode_queue.size());
+                    tensor_batch_size, std::size(decode_queue));
 
             // This should handle the timeout case too.
             if (tensor_batch_size == 0) {
