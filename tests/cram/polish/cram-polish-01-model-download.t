@@ -38,7 +38,6 @@ Negative test: BAM has no models listed (no RG tags).
   > ${DORADO_BIN} polish --model "${model}" --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > grep "Input BAM file has no basecaller models listed in the header." out/out.fasta.stderr | wc -l | awk '{ print $1 }'
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/
   Exit code: 1
   1
 

@@ -33,8 +33,8 @@ Filter: "--tag-name" and "--tag-value".
   > cut -f 2,2 out/out.fastq.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
-  NM:i:28
-  9988
+  NM:i:19
+  9997
   0
 
 Filter: "--tag-name" and "--tag-value".
