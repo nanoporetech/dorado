@@ -87,16 +87,9 @@ Load a model from path.
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
-  > grep "Using a model specified by path" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "Model specified by path" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   NM:i:2
   9998
   0
   1
-
-# Negative cases:
-#   + BAM has a model which is not available for download in auto mode.
-#   + Selected model does not match the model in BAM.
-#   + Empty model string provided: --model ""
-#   + BAM has no models listed (no RG tags).
-#   - Implement and test --any-model
