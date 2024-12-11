@@ -581,6 +581,10 @@ void run_polishing(const Options& opt,
     // Process the draft sequences in batches of user-specified size.
     for (const auto& draft_batch : draft_batches) {
         spdlog::debug("[run_polishing] =============================");
+        for (int32_t i = draft_batch.start; i < draft_batch.end; ++i) {
+            spdlog::debug("[run_polishing] draft i = {}: name = '{}', length = {}", i,
+                          draft_lens[i].first, draft_lens[i].second);
+        }
 
         // Split the sequences into larger BAM windows, like Medaka.
         spdlog::debug("Creating BAM windows.");
@@ -647,6 +651,15 @@ void run_polishing(const Options& opt,
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(std::size(draft_lens_batch));
         for (int32_t i = 0; i < dorado::ssize(all_results); ++i) {
             const polisher::ConsensusResult& r = all_results[i];
+            // Skip filtered samples.
+            if (r.draft_id < 0) {
+                continue;
+            }
+            if (r.draft_id >= dorado::ssize(draft_lens_batch)) {
+                spdlog::error("Draft ID out of bounds! r.draft_id = {}, draft_lens_batch.size = {}",
+                              r.draft_id, std::size(draft_lens_batch));
+                continue;
+            }
             groups[r.draft_id].emplace_back(r.draft_start, i);
         }
 

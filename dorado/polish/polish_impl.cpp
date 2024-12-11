@@ -5,6 +5,7 @@
 #include "polish/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"
+#include "utils/string_utils.h"
 
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
@@ -161,9 +162,8 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
                 std::transform(std::begin(id), std::end(id), std::begin(id),
                                [](unsigned char c) { return std::tolower(c); });
 
-                if ((pn == "dorado") && (id.rfind("aligner", 0) == 0)) {
-                    // The id.rfind performs a startswith comparison, because a tool
-                    // may be run multiple times and the ID field needs to be unique.
+                if ((pn == "dorado") && utils::starts_with(id, "aligner")) {
+                    // Multiple tools can be run on a BAM, and the ID field needs to be unique by spec.
                     // Example possibilites: aligner, aligner.1, samtools.1, samtools.2, etc.
                     ret.uses_dorado_aligner = true;
                 }
@@ -959,6 +959,17 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
             auto& result = local_results[j];
             const Sample& sample = item.samples[j];
             const TrimInfo& trim = item.trims[j];
+
+            const int64_t num_positions = dorado::ssize(sample.positions_major);
+            if ((trim.start < 0) || (trim.start >= num_positions) || (trim.end <= 0) ||
+                (trim.end > num_positions)) {
+                spdlog::debug(
+                        "Trim coordinate is < 0. j = {}, trim.start = {}, trim.end = {}, "
+                        "trim.heuristic = {}, num_positions = {}",
+                        j, trim.start, trim.end, trim.heuristic, num_positions);
+                result = {};
+                continue;
+            }
 
             // Trim and mark the region.
             result.draft_id = sample.seq_id;
