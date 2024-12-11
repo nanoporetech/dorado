@@ -1341,16 +1341,18 @@ std::string get_supported_model_info(const std::filesystem::path& model_download
                     for (const auto& mod_model : mod_matches) {
                         if (model_exists_in_folder(mod_model.name, model_download_folder)) {
                             result += "        \"" + mod_model.name + "\":{\n";
-                            result += "            \"canonical_base\": \"" +
+                            result += "          \"canonical_base\": \"" +
                                       canonical_base_map.at(mod_model.mods.variant) + "\",\n";
-                            result += "            \"variant\": \"" +
+                            result += "          \"context\": \"" +
+                                      get_mods_context(mod_model.mods.variant) + "\",\n";
+                            result += "          \"variant\": \"" +
                                       to_string(mod_model.mods.variant) + "\"";
                             // If there is a newer model for this condition, add the outdated flag.
                             const auto mod_type_matches = find_models(
                                     modified_models(), variant.first, simplex_model.simplex,
                                     {mod_model.mods.variant, ModelVersion::NONE});
                             if (mod_type_matches.back().name != mod_model.name) {
-                                result += ",\n            \"outdated\": true";
+                                result += ",\n          \"outdated\": true";
                             }
                             result += "\n        },\n";
                         }

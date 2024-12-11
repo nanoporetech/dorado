@@ -42,6 +42,15 @@ const std::unordered_map<ModsVariant, std::string> canonical_base_map = {
         {ModsVariant::M_pseU, "T"},
 };
 
+const std::unordered_map<ModsVariant, std::string> context_map = {
+        {ModsVariant::M_4mC_5mC, "C"}, {ModsVariant::M_5mC_5hmC, "C"},
+        {ModsVariant::M_5mCG, "CG"},   {ModsVariant::M_5mCG_5hmCG, "CG"},
+        {ModsVariant::M_5mC, "C"},     {ModsVariant::M_m5C, "C"},
+        {ModsVariant::M_6mA, "A"},     {ModsVariant::M_inosine_m6A, "A"},
+        {ModsVariant::M_m6A, "A"},     {ModsVariant::M_m6A_DRACH, "DRACH"},
+        {ModsVariant::M_pseU, "T"},
+};
+
 }  // namespace mods
 
 namespace version {
@@ -66,6 +75,7 @@ const std::unordered_map<std::string, ModsVariant>& mods_variants_map() { return
 const std::unordered_map<ModsVariant, std::string>& mods_canonical_base_map() {
     return mods::canonical_base_map;
 }
+const std::unordered_map<ModsVariant, std::string>& mods_context_map() { return mods::context_map; }
 const std::unordered_map<std::string, ModelVersion>& version_map() { return version::map; }
 
 namespace {
@@ -99,8 +109,19 @@ std::string to_string(const Variant& variant,
 ModelVariant get_model_variant(const std::string& variant) {
     return get_variant(variant, model_variants_map());
 }
+
 ModsVariant get_mods_variant(const std::string& variant) {
     return get_variant(variant, mods_variants_map());
+}
+
+std::string get_mods_context(const ModsVariant& variant) {
+    const auto& contexts = mods_context_map();
+    auto it = contexts.find(variant);
+    if (it == std::end(contexts)) {
+        const std::string var_str = to_string(variant);
+        throw std::logic_error("Unknown modification in context mapping: " + var_str);
+    }
+    return it->second;
 }
 
 std::string to_string(const ModelVariant& variant) {
