@@ -184,8 +184,11 @@ ParserPtr create_cli(int& verbosity) {
     {
         parser->visible.add_group("Input/output options");
         parser->visible.add_argument("-o", "--out-path")
-                .help("Output to a file instead of stdout.");
-        parser->visible.add_argument("-m", "--model").help("Path to correction model folder.");
+                .help("Output to a file instead of stdout.")
+                .default_value("");
+        parser->visible.add_argument("-m", "--model")
+                .help("Path to correction model folder.")
+                .default_value("auto");
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
                 .default_value(false)
@@ -305,12 +308,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.in_aln_bam_fn = parser.visible.get<std::string>("in_aln_bam");
     opt.in_draft_fastx_fn = parser.visible.get<std::string>("in_draft_fastx");
 
-    opt.out_consensus_fn = (parser.visible.is_used("--out-path"))
-                                   ? parser.visible.get<std::string>("out-path")
-                                   : "";
-
-    opt.model_str =
-            (parser.visible.is_used("--model")) ? parser.visible.get<std::string>("model") : "";
+    opt.out_consensus_fn = parser.visible.get<std::string>("out-path");
+    opt.model_str = parser.visible.get<std::string>("model");
 
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
@@ -533,6 +532,94 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
+const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
+                                          const std::string& model_str,
+                                          const bool load_scripted_model) {
+    if (std::empty(bam_info.basecaller_models)) {
+        throw std::runtime_error{"Input BAM file has no basecaller models listed in the header."};
+    }
+
+    if (std::size(bam_info.basecaller_models) > 1) {
+        throw std::runtime_error{
+                "Input BAM file has a mix of different basecaller models. Only one basecaller "
+                "model can be processed."};
+    }
+
+    // Logic:
+    //  - CLI option can be auto, in which case the model is determined from the BAM file.
+
+    const std::string polish_model_suffix =
+            std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
+
+    std::filesystem::path model_dir;
+
+    if (model_str == "auto") {
+        spdlog::info("Auto resolving the model.");
+
+        // Check that there is at leas one basecaller listed in the BAM. Otherwise, no auto resolving.
+        if (std::empty(bam_info.basecaller_models)) {
+            throw std::runtime_error{
+                    "Cannot auto resolve the model because no model information is available in "
+                    "the BAM file."};
+        }
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+        const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
+        std::string model_name = basecaller_model + polish_model_suffix;
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv
+        std::replace(std::begin(model_name), std::end(model_name), '@', '_');
+
+        spdlog::info("Downloading model: '{}'", model_name);
+        model_dir = download_model(model_name);
+
+    } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
+        spdlog::info("Model specified by path: '{}'", model_str);
+        model_dir = model_str;
+
+    } else if (!std::empty(model_str)) {
+        spdlog::info("Model specified by name: '{}'", model_str);
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+        const std::string& basecaller_model = model_str;
+
+        // Verify that the specified basecaller model is compatible with the BAM.
+        if (bam_info.basecaller_models.count(basecaller_model) == 0) {
+            throw std::runtime_error{"Specified basecaller model '" + basecaller_model +
+                                     "' not compatible with the input BAM!"};
+        }
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
+        std::string model_name = basecaller_model + polish_model_suffix;
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv
+        std::replace(std::begin(model_name), std::end(model_name), '@', '_');
+
+        spdlog::info("Downloading model: '{}'", model_name);
+        model_dir = download_model(model_name);
+
+    } else {
+        throw std::runtime_error{"Could not resolve model from string: '" + model_str + "'."};
+    }
+
+    // Load the model.
+    spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
+    const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
+    polisher::ModelConfig model_config =
+            polisher::parse_model_config(model_dir / "config.toml", model_file);
+
+    // Verify that the basecaller model of the loaded config is compatible with the BAM.
+    if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
+        throw std::runtime_error{"Polishing model was trained for the basecaller model '" +
+                                 model_config.basecaller_model +
+                                 "', which is not compatible with the input BAM!"};
+    }
+
+    return model_config;
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt,
@@ -739,23 +826,9 @@ int polish(int argc, char* argv[]) {
         // at::set_num_interop_threads(opt.threads);
         torch::set_num_threads(1);
 
-        // Resolve the model. Download if necessary.
-        std::filesystem::path model_dir;
-        if (!std::empty(opt.model_str) && std::filesystem::exists(opt.model_str)) {
-            model_dir = opt.model_str;
-            spdlog::info("Using a model specified by path: {}", opt.model_str);
-        } else {
-            constexpr std::string_view DEFAULT_MODEL = "read_level_lstm384_unidirectional_20241204";
-            const std::string model_name =
-                    std::empty(opt.model_str) ? std::string(DEFAULT_MODEL) : opt.model_str;
-            spdlog::info("Downloading model: '{}'", model_name);
-            model_dir = download_model(model_name);
-        }
-
-        spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
-        const std::string model_file = opt.load_scripted_model ? "model.pt" : "weights.pt";
+        // Resolve the model for polishing.
         const polisher::ModelConfig model_config =
-                polisher::parse_model_config(model_dir / "config.toml", model_file);
+                resolve_model(bam_info, opt.model_str, opt.load_scripted_model);
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(
