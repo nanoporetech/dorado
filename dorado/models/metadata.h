@@ -63,10 +63,12 @@ enum class ModelVersion : uint8_t {
 const std::unordered_map<std::string, ModelVariant>& model_variants_map();
 const std::unordered_map<std::string, ModsVariant>& mods_variants_map();
 const std::unordered_map<ModsVariant, std::string>& mods_canonical_base_map();
+const std::unordered_map<ModsVariant, std::string>& mods_context_map();
 const std::unordered_map<std::string, ModelVersion>& version_map();
 
 ModelVariant get_model_variant(const std::string& variant);
 ModsVariant get_mods_variant(const std::string& variant);
+std::string get_mods_context(const ModsVariant& mod);
 
 std::string to_string(const ModelVariant& variant);
 std::string to_string(const ModsVariant& mod);
