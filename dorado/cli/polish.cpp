@@ -1,17 +1,10 @@
 #include "cli/cli_utils.h"
-#include "correct/infer.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
 #include "polish/architectures/model_config.h"
-#include "polish/architectures/model_factory.h"
-#include "polish/bam_file.h"
-#include "polish/features/decoder_factory.h"
-#include "polish/features/encoder_factory.h"
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
-#include "polish/sample.h"
-#include "polish/trim.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/AsyncQueue.h"
@@ -19,11 +12,9 @@
 #include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/parameters.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
-#include <cxxpool.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 #include <torch/script.h>
@@ -41,7 +32,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -49,12 +39,9 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <thread>
 #include <tuple>
-#include <unordered_set>
 #include <vector>
-using namespace std::chrono_literals;
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -841,7 +828,7 @@ int polish(int argc, char* argv[]) {
         stats_callables.push_back([&tracker, &polish_stats](const stats::NamedStats& /*stats*/) {
             tracker.update_progress_bar(polish_stats.get_stats());
         });
-        constexpr auto kStatsPeriod = 1000ms;
+        constexpr auto kStatsPeriod = std::chrono::milliseconds(1000);
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
