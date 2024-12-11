@@ -81,6 +81,9 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     // Parse the config version.
     { cfg.version = toml::find<int>(config_toml, "config_version"); }
 
+    // Parse the config version.
+    { cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model"); }
+
     // Parse the model info.
     {
         const auto& section = toml::find(config_toml, "model");

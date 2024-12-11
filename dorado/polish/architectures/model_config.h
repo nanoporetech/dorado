@@ -10,6 +10,7 @@ namespace dorado::polisher {
 
 struct ModelConfig {
     int32_t version = 0;
+    std::string basecaller_model;
 
     // Model section.
     std::string model_type;
