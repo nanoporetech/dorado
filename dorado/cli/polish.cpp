@@ -89,10 +89,9 @@ struct Options {
     std::string tag_name;
     int32_t tag_value = 0;
     std::optional<bool> tag_keep_missing;  // Optionally overrides the model config if specified.
+    int32_t min_depth = 0;
     bool any_bam = false;
     bool any_model = false;
-
-    // int32_t min_depth = 0;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
@@ -223,10 +222,10 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
                 .scan<'i', int>();
-        // parser->visible.add_argument("--min-depth")
-        //         .help("Sites with depth lower than this value will not be polished.")
-        //         .default_value(0)
-        //         .scan<'i', int>();
+        parser->visible.add_argument("--min-depth")
+                .help("Sites with depth lower than this value will not be polished.")
+                .default_value(0)
+                .scan<'i', int>();
     }
 
     // Hidden advanced arguments.
@@ -308,7 +307,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     if (opt.regions_str) {
         opt.regions = parse_regions(*opt.regions_str);
     }
-    // opt.min_depth = parser.visible.get<int>("min-depth");
+    opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
@@ -738,7 +737,7 @@ void run_polishing(const Options& opt,
         std::thread thread_sample_decoder =
                 std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results),
                             std::ref(decode_queue), std::ref(polish_stats),
-                            std::cref(*resources.decoder), opt.threads);
+                            std::cref(*resources.decoder), opt.threads, opt.min_depth);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                             *resources.encoder);
