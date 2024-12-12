@@ -1,6 +1,7 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
+#include "models/models.h"
 #include "polish/architectures/model_config.h"
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
@@ -89,6 +90,7 @@ struct Options {
     int32_t tag_value = 0;
     std::optional<bool> tag_keep_missing;  // Optionally overrides the model config if specified.
     bool any_bam = false;
+    bool any_model = false;
 
     // int32_t min_depth = 0;
 };
@@ -242,6 +244,9 @@ ParserPtr create_cli(int& verbosity) {
         parser->hidden.add_argument("--any-bam")
                 .help("Allow any BAM as input, not just Dorado aligned.")
                 .flag();
+        parser->hidden.add_argument("--any-model")
+                .help("Allow any model to be applied on the data.")
+                .flag();
     }
 
     return parser;
@@ -309,6 +314,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
     opt.any_bam = parser.hidden.get<bool>("any-bam");
+    opt.any_model = parser.hidden.get<bool>("any-model");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
@@ -491,7 +497,50 @@ std::filesystem::path download_model(const std::string& model_name) {
 
 const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                           const std::string& model_str,
-                                          const bool load_scripted_model) {
+                                          const bool load_scripted_model,
+                                          const bool any_model) {
+    // Allow any model for development/debug purposes.
+    if (any_model) {
+        std::filesystem::path model_dir;
+        if (model_str == "auto") {
+            throw std::runtime_error{
+                    "When using --any-model, the model needs to be explicitly specified. Cannot "
+                    "use 'auto'."};
+
+        } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
+            spdlog::info("Model specified by path: '{}'", model_str);
+            model_dir = model_str;
+
+        } else {
+            const auto& infos = models::polish_models();
+            int32_t num_found = 0;
+            for (const auto& info : infos) {
+                if (info.name == model_str) {
+                    ++num_found;
+                }
+            }
+            if (num_found == 0) {
+                throw std::runtime_error("Could not find specified polishing model: '" + model_str +
+                                         "'.");
+            } else if (num_found > 1) {
+                throw std::runtime_error("Multiple models match the specified polishing model: '" +
+                                         model_str + "'.");
+            }
+
+            spdlog::info("Downloading model: '{}'", model_str);
+            model_dir = download_model(model_str);
+        }
+
+        // Load the model.
+        spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
+        const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
+        polisher::ModelConfig model_config =
+                polisher::parse_model_config(model_dir / "config.toml", model_file);
+
+        // Return without validating the compatibility with the input BAM.
+        return model_config;
+    }
+
     if (std::empty(bam_info.basecaller_models)) {
         throw std::runtime_error{"Input BAM file has no basecaller models listed in the header."};
     }
@@ -811,7 +860,7 @@ int polish(int argc, char* argv[]) {
 
         // Resolve the model for polishing.
         const polisher::ModelConfig model_config =
-                resolve_model(bam_info, opt.model_str, opt.load_scripted_model);
+                resolve_model(bam_info, opt.model_str, opt.load_scripted_model, opt.any_model);
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(
