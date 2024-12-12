@@ -8,6 +8,8 @@
 #include <cassert>
 #include <limits>
 
+#define USE_INTERVAL_TREE_NAMESPACE
+
 #ifdef USE_INTERVAL_TREE_NAMESPACE
 namespace interval_tree {
 #endif
@@ -20,7 +22,7 @@ public:
     Interval(const Scalar& s, const Scalar& e, const Value& v)
     : start(std::min(s, e))
     , stop(std::max(s, e))
-    , value(v) 
+    , value(v)
     {}
 };
 
@@ -93,16 +95,16 @@ public:
             interval_vector&& ivals,
             std::size_t depth = 16,
             std::size_t minbucket = 64,
-            std::size_t maxbucket = 512, 
+            std::size_t maxbucket = 512,
             Scalar leftextent = 0,
             Scalar rightextent = 0)
       : left(nullptr)
       , right(nullptr)
     {
         --depth;
-        const auto minmaxStop = std::minmax_element(ivals.begin(), ivals.end(), 
+        const auto minmaxStop = std::minmax_element(ivals.begin(), ivals.end(),
                                                     IntervalStopCmp());
-        const auto minmaxStart = std::minmax_element(ivals.begin(), ivals.end(), 
+        const auto minmaxStart = std::minmax_element(ivals.begin(), ivals.end(),
                                                      IntervalStartCmp());
         if (!ivals.empty()) {
             center = (minmaxStart.first->start + minmaxStop.second->stop) / 2;
@@ -134,7 +136,7 @@ public:
             interval_vector lefts;
             interval_vector rights;
 
-            for (typename interval_vector::const_iterator i = ivals.begin(); 
+            for (typename interval_vector::const_iterator i = ivals.begin();
                  i != ivals.end(); ++i) {
                 const interval& interval = *i;
                 if (interval.stop < center) {
@@ -149,13 +151,13 @@ public:
             }
 
             if (!lefts.empty()) {
-                left.reset(new IntervalTree(std::move(lefts), 
+                left.reset(new IntervalTree(std::move(lefts),
                                             depth, minbucket, maxbucket,
                                             leftp, center));
             }
             if (!rights.empty()) {
-                right.reset(new IntervalTree(std::move(rights), 
-                                             depth, minbucket, maxbucket, 
+                right.reset(new IntervalTree(std::move(rights),
+                                             depth, minbucket, maxbucket,
                                              center, rightp));
             }
         }
@@ -210,8 +212,8 @@ public:
     interval_vector findOverlapping(const Scalar& start, const Scalar& stop) const {
         interval_vector result;
         visit_overlapping(start, stop,
-                          [&](const interval& interval) { 
-                            result.emplace_back(interval); 
+                          [&](const interval& interval) {
+                            result.emplace_back(interval);
                           });
         return result;
     }
@@ -219,8 +221,8 @@ public:
     interval_vector findContained(const Scalar& start, const Scalar& stop) const {
         interval_vector result;
         visit_contained(start, stop,
-                        [&](const interval& interval) { 
-                          result.push_back(interval); 
+                        [&](const interval& interval) {
+                          result.push_back(interval);
                         });
         return result;
     }
@@ -228,7 +230,7 @@ public:
         if (left && !left->empty()) {
             return false;
         }
-        if (!intervals.empty()) { 
+        if (!intervals.empty()) {
             return false;
         }
         if (right && !right->empty()) {
@@ -266,11 +268,11 @@ public:
     // Check all constraints.
     // If first is false, second is invalid.
     std::pair<bool, std::pair<Scalar, Scalar>> is_valid() const {
-        const auto minmaxStop = std::minmax_element(intervals.begin(), intervals.end(), 
+        const auto minmaxStop = std::minmax_element(intervals.begin(), intervals.end(),
                                                     IntervalStopCmp());
-        const auto minmaxStart = std::minmax_element(intervals.begin(), intervals.end(), 
+        const auto minmaxStart = std::minmax_element(intervals.begin(), intervals.end(),
                                                      IntervalStartCmp());
-        
+
         std::pair<bool, std::pair<Scalar, Scalar>> result = {true, { std::numeric_limits<Scalar>::max(),
                                                                      std::numeric_limits<Scalar>::min() }};
         if (!intervals.empty()) {
@@ -294,7 +296,7 @@ public:
             result.second.first   = std::min(result.second.first,  valid.second.first);
             result.second.second  = std::min(result.second.second, valid.second.second);
             if (!result.first) { return result; }
-            if (valid.second.first <= center) { 
+            if (valid.second.first <= center) {
                 result.first = false;
                 return result;
             }
@@ -302,14 +304,14 @@ public:
         if (!std::is_sorted(intervals.begin(), intervals.end(), IntervalStartCmp())) {
             result.first = false;
         }
-        return result;        
+        return result;
     }
 
     friend std::ostream& operator<<(std::ostream& os, const IntervalTree& itree) {
         return writeOut(os, itree);
     }
 
-    friend std::ostream& writeOut(std::ostream& os, const IntervalTree& itree, 
+    friend std::ostream& writeOut(std::ostream& os, const IntervalTree& itree,
                                   std::size_t depth = 0) {
         auto pad = [&]() { for (std::size_t i = 0; i != depth; ++i) { os << ' '; } };
         pad(); os << "center: " << itree.center << '\n';
