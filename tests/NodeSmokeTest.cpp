@@ -20,7 +20,6 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "read_pipeline/ScalerNode.h"
-#include "torch_utils/trim_rapid_adapter.h"
 #include "utils/PostCondition.h"
 #include "utils/SampleSheet.h"
 #include "utils/parameters.h"
@@ -156,7 +155,6 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     using SampleType = dorado::models::SampleType;
     auto pipeline_restart = GENERATE(false, true);
     auto model_type = GENERATE(SampleType::DNA, SampleType::RNA002, SampleType::RNA004);
-    dorado::utils::rapid::Settings trim_rapid_adapter;
     CAPTURE(pipeline_restart);
     CAPTURE(model_type);
 
@@ -185,7 +183,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
     config.quantile.scale_multiplier = 0.53f;
-    run_smoke_test<dorado::ScalerNode>(config, model_type, trim_rapid_adapter, 2, 1000);
+    run_smoke_test<dorado::ScalerNode>(config, model_type, 2, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {

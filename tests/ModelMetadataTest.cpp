@@ -132,6 +132,25 @@ TEST_CASE(TEST_TAG "  mods_canonical_base_map", TEST_TAG) {
     }
 }
 
+TEST_CASE(TEST_TAG "  mods_context_map", TEST_TAG) {
+    const auto& mods = mods_context_map();
+
+    SECTION("All expected ModsVariant exist") {
+        CHECK(mods.at(ModsVariant::M_4mC_5mC) == "C");
+        CHECK(mods.at(ModsVariant::M_5mC_5hmC) == "C");
+        CHECK(mods.at(ModsVariant::M_5mCG) == "CG");
+        CHECK(mods.at(ModsVariant::M_5mCG_5hmCG) == "CG");
+        CHECK(mods.at(ModsVariant::M_5mC) == "C");
+        CHECK(mods.at(ModsVariant::M_m5C) == "C");
+        CHECK(mods.at(ModsVariant::M_6mA) == "A");
+        CHECK(mods.at(ModsVariant::M_inosine_m6A) == "A");
+        CHECK(mods.at(ModsVariant::M_m6A) == "A");
+        CHECK(mods.at(ModsVariant::M_m6A_DRACH) == "DRACH");
+        CHECK(mods.at(ModsVariant::M_pseU) == "T");
+        CHECK(mods.size() == static_cast<size_t>(ModsVariant::NONE));
+    }
+}
+
 TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
     const auto& vers = version_map();
 
