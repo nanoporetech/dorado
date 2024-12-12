@@ -243,7 +243,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->hidden.add_argument("--any-bam")
                 .help("Allow any BAM as input, not just Dorado aligned.")
                 .flag();
-        parser->hidden.add_argument("--any-model")
+        parser->hidden.add_argument("--skip-model-compatibility-check")
                 .help("Allow any model to be applied on the data.")
                 .flag();
     }
@@ -313,7 +313,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
     opt.any_bam = parser.hidden.get<bool>("any-bam");
-    opt.any_model = parser.hidden.get<bool>("any-model");
+    opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
@@ -503,7 +503,8 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         std::filesystem::path model_dir;
         if (model_str == "auto") {
             throw std::runtime_error{
-                    "When using --any-model, the model needs to be explicitly specified. Cannot "
+                    "When using --skip-model-compatibility-check, the model needs to be explicitly "
+                    "specified. Cannot "
                     "use 'auto'."};
 
         } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
