@@ -548,8 +548,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             // Compute sample trimming coordinates.
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
-                    local_samples,
-                    std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
+                    local_samples, std::optional<RegionInt>(
+                                           {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
     };

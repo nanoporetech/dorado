@@ -6,7 +6,7 @@
 
 namespace dorado::polisher {
 
-struct Region {
+struct RegionInt {
     int32_t seq_id = -1;
     int64_t start = 0;
     int64_t end = -1;
