@@ -87,32 +87,51 @@ If the filter works, then there will be zero alignments usable for pileup featur
   9998
   0
 
-Filter: "--RG" with a non-existent read group specified, should ignore all alignments.
+Filter `--min-depth` set to 1. No bases are under this limit, everything should be identical as if this were off.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
+  > expected=${in_dir}/ref.fasta.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --RG "some-read-group" -vv > out/out.fastq 2> out/stderr
+  > ${DORADO_BIN} polish --min-depth 1 --device cpu ${in_bam} ${in_draft} ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
-  > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
+  > ${DORADO_BIN} aligner ${expected} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
+  > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
+  > samtools faidx out/out.fasta
+  > cut -f 2,2 out/out.fasta.fai
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
-  1
+  NM:i:2
+  9998
+  0
 
-# Filter: "--RG" with a valid read group specified.
-#   $ rm -rf out; mkdir -p out
-#   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-#   > in_bam=${in_dir}/calls_to_draft.bam
-#   > in_draft=${in_dir}/draft.fasta.gz
-#   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-#   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" -vv > out/out.fastq 2> out/stderr
-#   > echo "Exit code: $?"
-#   > ${DORADO_BIN} aligner ${expected} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
-#   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
-#   > samtools faidx out/out.fastq
-#   > cut -f 2,2 out/out.fastq.fai
-#   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-#   Exit code: 0
-#   NM:i:2
-#   9998
-#   0
+Filter `--min-depth` set to 11. Many bases should be filtered out.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam=${in_dir}/calls_to_draft.bam
+  > in_draft=${in_dir}/draft.fasta.gz
+  > expected=${in_dir}/expected.medaka.min_depth_11.fasta.gz
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > ${DORADO_BIN} polish --min-depth 11 --device cpu ${in_bam} ${in_draft} ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
+  > echo "Exit code: $?"
+  > gunzip -c ${expected} > out/expected.fasta
+  > diff out/expected.fasta out/out.fasta
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  Exit code: 0
+  0
+
+Filter `--min-depth` set to 11. Many bases should be filtered out.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam=${in_dir}/calls_to_draft.bam
+  > in_draft=${in_dir}/draft.fasta.gz
+  > expected=${in_dir}/expected.medaka.min_depth_11.no_fillgaps.fasta.gz
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > ${DORADO_BIN} polish --min-depth 11 --no-fill-gaps --device cpu ${in_bam} ${in_draft} ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
+  > echo "Exit code: $?"
+  > gunzip -c ${expected} > out/expected.fasta
+  > diff out/expected.fasta out/out.fasta
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  Exit code: 0
+  0
