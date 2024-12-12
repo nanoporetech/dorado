@@ -98,11 +98,11 @@ Load a model from path.
   0
   1
 
-Download an explicit polishing model by name with `--any-model`.
+Download an explicit polishing model by name with `--skip-model-compatibility-check`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model="dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv"
-  > ${DORADO_BIN} polish --any-model --model "${model}" --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --skip-model-compatibility-check --model "${model}" --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${in_dir}/ref.fasta.gz out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
@@ -117,11 +117,11 @@ Download an explicit polishing model by name with `--any-model`.
   0
   1
 
-Fail to download model by basecaller model name with `--any-model`.
+Fail to download model by basecaller model name with `--skip-model-compatibility-check`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
-  > ${DORADO_BIN} polish --any-model --model "${model}" --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --skip-model-compatibility-check --model "${model}" --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
