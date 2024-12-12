@@ -201,9 +201,9 @@ ParserPtr create_cli(int& verbosity) {
                       "end "
                       "is inclusive).");
         parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
-        // parser->visible.add_argument("--ignore-read-groups")
-        //         .help("Ignore read groups in bam file.")
-        //         .flag();
+        parser->visible.add_argument("--ignore-read-groups")
+                .help("Ignore read groups in bam file.")
+                .flag();
         parser->visible.add_argument("--tag-name")
                 .help("Two-letter BAM tag name for filtering the alignments during feature "
                       "generation")
@@ -315,7 +315,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
                             ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
                             : std::nullopt;
     opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
-    // opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
+    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
     opt.tag_value = parser.visible.get<int>("tag-value");
     // The `"--tag-keep-missing` is a special case because it's a flag, and we cannot use `present`.
@@ -575,10 +575,14 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 }
 
 void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
+    std::cerr << "cli_read_group = '" << cli_read_group
+              << "', bam_info.read_group.size = " << bam_info.read_groups.size() << "\n";
     if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
-        throw std::runtime_error{"No RG tags found in the input BAM!"};
+        throw std::runtime_error{
+                "No @RG headers found in the input BAM, but user-specified RG was given. RG: '" +
+                cli_read_group + "'"};
 
-    } else if (std::empty(cli_read_group) && std::size(cli_read_group) > 1) {
+    } else if (std::empty(cli_read_group) && std::size(bam_info.read_groups) > 1) {
         throw std::runtime_error{
                 "The input BAM contains more than one read group. Please specify --RG to select "
                 "which read group to process."};
@@ -588,8 +592,7 @@ void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli
             std::ostringstream oss;
             polisher::print_container(oss, bam_info.read_groups, ", ");
             throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
-                                     cli_read_group + "', available groups in the BAM: [" +
-                                     oss.str() + "]."};
+                                     cli_read_group + "'"};
         }
     }
 }
