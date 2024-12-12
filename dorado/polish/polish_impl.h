@@ -174,7 +174,7 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::vector<std::string>& regions);
+        const std::vector<Region>& regions);
 
 void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                                 utils::AsyncQueue<DecodeData>& decode_queue,

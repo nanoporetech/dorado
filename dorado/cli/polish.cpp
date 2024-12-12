@@ -17,6 +17,7 @@
 #include "utils/string_utils.h"
 
 #include <ATen/Parallel.h>
+#include <IntervalTree.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
@@ -77,7 +78,7 @@ struct Options {
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
     std::optional<std::string> regions_str;
-    std::vector<std::string> regions;
+    std::vector<polisher::Region> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
@@ -96,15 +97,16 @@ struct Options {
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
 ///         separated list of regions in the given string.
-std::vector<std::string> parse_regions(const std::string& regions_arg) {
+std::vector<polisher::Region> parse_regions(const std::string& regions_arg) {
     if (std::empty(regions_arg)) {
         return {};
     }
 
+    std::vector<polisher::Region> ret;
+
     // Check if the string points to a file on disk.
     if (std::filesystem::exists(regions_arg)) {
         // Parse the BED-like format.
-        std::vector<std::string> ret;
         std::ifstream ifs(regions_arg);
         std::string line;
         while (std::getline(ifs, line)) {
@@ -113,14 +115,19 @@ std::vector<std::string> parse_regions(const std::string& regions_arg) {
             int64_t start = 0;
             int64_t end = 0;
             iss >> chr >> start >> end;
-            ret.emplace_back(chr + ":" + std::to_string(start + 1) + "-" + std::to_string(end));
+            ret.emplace_back(polisher::Region{chr, start, end});
         }
-        return ret;
+
     } else {
-        return dorado::utils::split(regions_arg, ',');
+        // Parse a comma delimited string of regions.
+        const auto str_regions = dorado::utils::split(regions_arg, ',');
+        for (const std::string& str_region : str_regions) {
+            polisher::Region region = polisher::parse_region_string(str_region);
+            ret.emplace_back(region);
+        }
     }
 
-    return {};
+    return ret;
 }
 
 /// \brief Define the CLI options.
@@ -646,6 +653,41 @@ void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli
     }
 }
 
+/**
+ * \brief Checks if any region overlaps amy of the other regions. This may produce wrong results, so
+ *          we disallow that.
+ */
+void validate_regions(const std::vector<polisher::Region>& regions) {
+    // Create intervals for each input sequence.
+    std::unordered_map<std::string, std::vector<interval_tree::Interval<int64_t, int64_t>>>
+            intervals;
+    for (const auto& region : regions) {
+        // NOTE: interval_tree has an inclusive end coordinate.
+        intervals[region.name].emplace_back(
+                interval_tree::Interval<int64_t, int64_t>(region.start, region.end - 1, 0));
+        std::cerr << "Added interval: " << intervals[region.name].back() << "\n";
+    }
+
+    // Compute the interval tree.
+    std::unordered_map<std::string, interval_tree::IntervalTree<int64_t, int64_t>> trees;
+    for (auto& [key, values] : intervals) {
+        trees[key] = interval_tree::IntervalTree<int64_t, int64_t>(std::move(values));
+    }
+
+    for (const auto& region : regions) {
+        std::vector<interval_tree::Interval<int64_t, int64_t>> results =
+                trees[region.name].findOverlapping(region.start, region.end - 1);
+        std::cerr << "Query interval: " << region.start << ", " << region.end << "\n";
+        for (const auto& res : results) {
+            std::cerr << "    -> Found: " << res << "\n";
+        }
+        if (std::size(results) > 1) {
+            throw std::runtime_error("Region '" + polisher::region_to_string(region) +
+                                     "' overlaps other regions. Regions have to be unique.");
+        }
+    }
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt,
@@ -853,6 +895,8 @@ int polish(int argc, char* argv[]) {
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
             check_read_groups(bam_info, opt.read_group);
         }
+
+        validate_regions(opt.regions);
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         // at::set_num_interop_threads(opt.threads);

@@ -666,7 +666,7 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::vector<std::string>& regions) {
+        const std::vector<Region>& regions) {
     if (std::empty(regions)) {
         // Canonical case where each sequence is linearly split with an overlap.
         std::vector<Window> windows;
@@ -688,33 +688,32 @@ std::vector<Window> create_bam_regions(
 
         std::vector<Window> windows;
 
-        for (const auto& region_str : regions) {
-            auto [region_name, region_start, region_end] = parse_region_string(region_str);
+        for (auto region : regions) {
+            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region.name, region.start + 1,
+                          region.end);
 
-            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
-                          region_end);
-
-            const auto it = draft_ids.find(region_name);
+            const auto it = draft_ids.find(region.name);
             if (it == std::end(draft_ids)) {
                 throw std::runtime_error(
                         "Sequence specified by custom region not found in input! Sequence name: " +
-                        region_name);
+                        region.name);
             }
             const int32_t seq_id = it->second;
             const int64_t seq_length = draft_lens[seq_id].second;
 
-            region_start = std::max<int64_t>(0, region_start);
-            region_end = (region_end < 0) ? seq_length : std::min(seq_length, region_end);
+            region.start = std::max<int64_t>(0, region.start);
+            region.end = (region.end < 0) ? seq_length : std::min(seq_length, region.end);
 
-            if (region_start >= region_end) {
-                throw std::runtime_error{"Region coordinates not valid. Given: '" + region_str +
-                                         "'. region_start = " + std::to_string(region_start) +
-                                         ", region_end = " + std::to_string(region_end)};
+            if (region.start >= region.end) {
+                throw std::runtime_error{"Region coordinates not valid. Given: region.name = '" +
+                                         region.name +
+                                         "', region.start = " + std::to_string(region.start) +
+                                         ", region.end = " + std::to_string(region.end)};
             }
 
             // Split-up the custom region if it's too long.
             std::vector<Window> new_windows = create_windows(
-                    seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap);
+                    seq_id, region.start, region.end, seq_length, bam_chunk_len, window_overlap);
             windows.reserve(std::size(windows) + std::size(new_windows));
             windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }
