@@ -29,6 +29,19 @@ Fails because the basecaller model cannot be determined.
   Exit code: 1
   Caught exception: Input BAM file has no basecaller models listed in the header.
 
+Zero read groups in the input and auto model selection.
+Fails even with `--any-model`, because a model cannot be auto resolved with this feature.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam="data/in.01.zero_read_groups.bam"
+  > # Run test.
+  > ${DORADO_BIN} polish --any-model --device cpu ${in_bam} ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 1
+  Caught exception: When using --any-model, the model needs to be explicitly specified. Cannot use 'auto'.
+
 Zero read groups in the input, and a model is specified by path.
 Fails because it still cannot match the model to the RG basecaller name in the BAM file (since there are no @RG header lines).
   $ rm -rf out; mkdir -p out
@@ -42,6 +55,27 @@ Fails because it still cannot match the model to the RG basecaller name in the B
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
   Caught exception: Input BAM file has no basecaller models listed in the header.
+
+Zero read groups in the input, and a model is specified by path.
+Allowed with`--any-model`.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam="data/in.01.zero_read_groups.bam"
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > # Run test.
+  > ${DORADO_BIN} polish --any-model --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > ${DORADO_BIN} aligner ${in_dir}/ref.fasta.gz out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
+  > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
+  > samtools faidx out/out.fasta
+  > cut -f 2,2 out/out.fasta.fai
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  NM:i:2
+  9998
+  0
 
 Zero read groups in the input and `--ignore-read-groups`.
 This does not help because this option only ignores RG checking after model selection. Model still cannot be selected.
@@ -190,6 +224,28 @@ Fails because multiple basecaller models are present.
   Caught exception: Input BAM file has a mix of different basecaller models. Only one basecaller model can be processed.
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
+Ignore the RG check.
+Passes because `--any-model` is used.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > # Run test.
+  > ${DORADO_BIN} polish --any-model --ignore-read-groups --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > ${DORADO_BIN} aligner ${in_dir}/ref.fasta.gz out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
+  > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
+  > samtools faidx out/out.fasta
+  > cut -f 2,2 out/out.fasta.fai
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  NM:i:2
+  9998
+  0
+
+Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Select one read group with `--RG`, which should automatically resolve the model for that group.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -224,3 +280,25 @@ Fails because the basecaller model for the second group is not supported (per te
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
   Caught exception: Polishing model was trained for the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0', which is not compatible with the input BAM!
+
+Two read groups are present in the input BAM, and two basecaller models (one for each read group).
+Select the second read group with `--RG`, which should automatically resolve the model for that group.
+Passes because `--any-model` is used.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > # Run test.
+  > ${DORADO_BIN} polish --any-model --RG "f9f2e0901209274f132de3554913a1dc0a4439ae_dna_r10.0.0_e8.2_400bps_hac@v4.3.0-2DEAC5EC" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > ${DORADO_BIN} aligner ${in_dir}/ref.fasta.gz out/out.fasta 1> out/out.sam 2> out/out.sam.stderr
+  > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
+  > samtools faidx out/out.fasta
+  > cut -f 2,2 out/out.fasta.fai
+  > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  NM:i:2
+  9998
+  0
