@@ -79,6 +79,23 @@ void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml)
     }
 }
 
+void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_toml) {
+    if (config_toml.contains("poly_a")) {
+        const auto &polya = toml::find(config_toml, "poly_a");
+        const auto &coeffs = toml::find(polya, "calibration_coefficients");
+        if (coeffs.is_array()) {
+            for (const auto &coeff : coeffs.as_array()) {
+                config.polya_coeffs.push_back(static_cast<float>(coeff.as_floating()));
+            }
+        } else if (coeffs.is_floating() || coeffs.is_integer()) {
+            config.polya_coeffs.push_back(static_cast<float>(coeffs.as_floating()));
+        } else {
+            throw std::runtime_error("Invalid type for polyA calibration coefficients in " +
+                                     config.model_path.u8string());
+        }
+    }
+}
+
 void parse_run_info(CRFModelConfig &config,
                     const std::string &model_name,
                     const toml::value &config_toml) {
@@ -288,6 +305,7 @@ CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     config.basecaller.update(path);
 
     parse_qscore_params(config, config_toml);
+    parse_polya_coefficients(config, config_toml);
 
     const auto &input = toml::find(config_toml, "input");
     config.num_features = toml::find<int>(input, "features");

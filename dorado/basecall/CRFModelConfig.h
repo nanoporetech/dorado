@@ -154,6 +154,9 @@ struct CRFModelConfig {
     SignalNormalisationParams signal_norm_params;
     std::filesystem::path model_path;
 
+    // polya translocation speed calibration coefficients
+    std::vector<float> polya_coeffs;
+
     // Start position for mean Q-score calculation for
     // short reads.
     int32_t mean_qscore_start_pos = -1;
