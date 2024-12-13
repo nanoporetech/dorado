@@ -275,11 +275,8 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
 
     auto signal_len = signal_end - signal_start;
 
-    if (m_calibration_coeffs.empty()) {
-        signal_len -= signal_length_adjustment(read, signal_len);
-    } else {
-        signal_len = adjust_signal_len(signal_len);
-    }
+    signal_len -= signal_length_adjustment(read, signal_len);
+    signal_len = apply_signal_len_calibration(signal_len);
 
     int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
                     signal_info.trailing_adapter_bases;
@@ -294,9 +291,13 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     return num_bases;
 }
 
-int PolyTailCalculator::adjust_signal_len(int signal_len) const {
+int PolyTailCalculator::apply_signal_len_calibration(int signal_len) const {
     if (signal_len <= 0) {
         return 0;
+    }
+
+    if (m_calibration_coeffs.empty()) {
+        return signal_len;
     }
 
     int calibrated_signal = 0;

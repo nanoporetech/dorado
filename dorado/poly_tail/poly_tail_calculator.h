@@ -51,7 +51,7 @@ protected:
     virtual int signal_length_adjustment(const SimplexRead& read, int signal_len) const = 0;
 
     // Applies any model calibration factors to the provided signal_len
-    int adjust_signal_len(int signal_len) const;
+    int apply_signal_len_calibration(int signal_len) const;
 
     // Floor for average signal value of poly tail.
     virtual float min_avg_val() const = 0;
