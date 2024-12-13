@@ -89,8 +89,8 @@ class InputFolderInfo final {
     const DataLoader::InputFiles m_input_files;
 
 public:
-    InputFolderInfo(std::filesystem::path data_path, bool recursive)
-            : m_data_path(std::move(data_path)), m_input_files(m_data_path, recursive) {}
+    InputFolderInfo(std::filesystem::path data_path, DataLoader::InputFiles input_files)
+            : m_data_path(std::move(data_path)), m_input_files(std::move(input_files)) {}
     const std::filesystem::path& path() const { return m_data_path; }
     const DataLoader::InputFiles& files() const { return m_input_files; }
 };
@@ -656,13 +656,19 @@ int basecaller(int argc, char* argv[]) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
-    const auto model_arg = parser.visible.get<std::string>("model");
-    InputFolderInfo input_folder_info{parser.visible.get<std::string>("data"),
-                                      parser.visible.get<bool>("--recursive")};
+    const std::filesystem::path data_path = parser.visible.get<std::string>("data");
+    const bool recursive_file_loading = parser.visible.get<bool>("--recursive");
+    auto input_files = DataLoader::InputFiles::search(data_path, recursive_file_loading);
+    if (!input_files.has_value()) {
+        // search() will have logged an error message for us.
+        return EXIT_FAILURE;
+    }
+    const InputFolderInfo input_folder_info(data_path, std::move(*input_files));
 
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
 
+    const auto model_arg = parser.visible.get<std::string>("model");
     const ModelComplex model_complex = parse_model_argument(model_arg);
 
     if (!mods_model_arguments_valid(model_complex, mod_bases, mod_bases_models)) {
