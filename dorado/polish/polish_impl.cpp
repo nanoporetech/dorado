@@ -1006,11 +1006,6 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
         at::InferenceMode infer_guard;
 
         while (true) {
-            // spdlog::debug("[decoder {}] Waiting to pop data for decoding Queue size: {}", tid,
-            //               std::size(decode_queue));
-
-            const auto last_chunk_reserve_time = std::chrono::system_clock::now();
-
             DecodeData item;
             const auto pop_status = decode_queue.try_pop(item);
 
