@@ -1,5 +1,7 @@
 #include "medaka_bamiter.h"
 
+#include <htslib/sam.h>
+
 #include <cerrno>
 #include <cstring>
 

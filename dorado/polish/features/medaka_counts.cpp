@@ -134,7 +134,7 @@ PileupData calculate_pileup(BamFile &bam_file,
                             const int32_t min_mapq) {
     if ((num_dtypes == 1) && !std::empty(dtypes)) {
         throw std::runtime_error(
-                "Recieved invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
+                "Received invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
                 std::to_string(std::size(dtypes)));
     }
     if (num_dtypes == 0) {

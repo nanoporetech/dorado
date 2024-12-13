@@ -166,7 +166,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 
     if ((ovl_start_ind1 < 0) || (ovl_end_ind2 < 0)) {
         throw std::runtime_error(
-                "Samples should be overlappnig, but cannot find adequate cooordinate positions!");
+                "Samples should be overlapping, but cannot find adequate cooordinate positions!");
     }
 
     int64_t end_1_ind = dorado::ssize(s1.positions_major);

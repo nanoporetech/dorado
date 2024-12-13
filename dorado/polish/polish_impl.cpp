@@ -9,6 +9,7 @@
 
 #include <ATen/ATen.h>
 #include <cxxpool.h>
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <memory>
@@ -134,8 +135,6 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
     BamFile bam(in_aln_bam_fn);
 
     const std::vector<HeaderLineData> header = bam.parse_header();
-
-    // header_to_stream(std::cerr, header);
 
     // Get info from headers: program and the read groups.
     for (const auto& line : header) {
@@ -558,7 +557,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     cxxpool::thread_pool pool{std::size(thread_chunks)};
     std::vector<std::future<void>> futures;
     futures.reserve(std::size(thread_chunks));
-    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
+    for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
         futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
                                        std::ref(merged_trims)));
@@ -854,7 +853,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         {
             std::ostringstream oss;
             print_tensor_shape(oss, batch_features_tensor);
-            spdlog::debug(
+            spdlog::trace(
                     "[consumer {}] About to call forward(): batch_features_tensor.size() = {}, "
                     "approx "
                     "size: {} MB.",
@@ -869,14 +868,14 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         try {
             output = model.predict_on_batch(std::move(batch_features_tensor));
         } catch (std::exception& e) {
-            std::cerr << "ERROR! Exception caught: " << e.what() << '\n';
-            throw e;
+            spdlog::error("ERROR! Exception caught: {}", e.what());
+            throw;
         }
         const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
 
         const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-        spdlog::debug(
+        spdlog::trace(
                 "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} ms, "
                 "total = {}",
                 tid, time_collate, time_forward, time_total);
@@ -888,7 +887,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         at::InferenceMode infer_guard;
 
         while (true) {
-            spdlog::debug("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
+            spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
                           std::size(batch_queue));
 
             const auto last_chunk_reserve_time = std::chrono::system_clock::now();
@@ -897,7 +896,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             const auto pop_status = batch_queue.try_pop_until(
                     item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
 
-            spdlog::debug("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
+            spdlog::trace("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
                           tid, std::size(item.samples), batch_queue.size());
 
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
@@ -924,7 +923,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             out_item.logits = std::move(logits);
             out_item.trims = std::move(item.trims);
 
-            spdlog::debug(
+            spdlog::trace(
                     "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
                     "out_item.samples.size() = {}, decode queue size: {}",
                     tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
@@ -948,7 +947,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             f.get();
         }
     } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inferencetask: ") + e.what()};
+        throw std::runtime_error{std::string("Caught exception from inference task: ") + e.what()};
     }
 
     decode_queue.terminate();
@@ -1006,7 +1005,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
 
         const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-        spdlog::debug(
+        spdlog::trace(
                 "[decoder {}] Computed batch decode. Timings - decode = {} "
                 "ms, trim = {} ms, total = {}",
                 tid, time_decode, time_trim, time_total);
@@ -1044,7 +1043,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
 
             assert(tensor_batch_size == dorado::ssize(item.trims));
 
-            spdlog::debug(
+            spdlog::trace(
                     "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                     "tensor_batch_size = {}, queue size: {}",
                     tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),

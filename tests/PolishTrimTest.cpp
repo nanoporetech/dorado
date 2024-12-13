@@ -336,7 +336,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
         }
 
         if (data.expect_throw) {
-            REQUIRE_THROWS(trim_samples(samples, data.region));
+            CHECK_THROWS(trim_samples(samples, data.region));
         } else {
             const std::vector<TrimInfo> result = trim_samples(samples, data.region);
             CHECK(data.expected == result);

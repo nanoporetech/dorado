@@ -1,12 +1,26 @@
 #pragma once
 
-#include <htslib/sam.h>
-
 #include <filesystem>
 #include <iosfwd>
 #include <memory>
 #include <tuple>
 #include <vector>
+
+struct htsFile;
+struct hts_idx_t;
+struct sam_hdr_t;
+struct bam1_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+int hts_close(htsFile* fp);
+void hts_idx_destroy(hts_idx_t* idx);
+void sam_hdr_destroy(sam_hdr_t* bh);
+void bam_destroy1(bam1_t* b);
+#ifdef __cplusplus
+}
+#endif
 
 struct HeaderLineData {
     std::string header_type;

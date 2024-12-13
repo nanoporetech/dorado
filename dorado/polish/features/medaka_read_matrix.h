@@ -1,10 +1,10 @@
 #pragma once
 
-#include "polish/bam_file.h"
-
 #include <cstdint>
 #include <string>
 #include <vector>
+
+class BamFile;
 
 namespace dorado::polisher {
 

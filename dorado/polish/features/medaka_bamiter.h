@@ -1,8 +1,11 @@
 #pragma once
 
-#include <htslib/sam.h>
-
 #include <cstdint>
+
+struct htsFile;
+struct sam_hdr_t;
+struct hts_itr_t;
+struct bam1_t;
 
 namespace dorado::polisher {
 
