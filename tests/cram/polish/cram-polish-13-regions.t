@@ -145,7 +145,6 @@ Checks that the interval coordinates internally are represented well
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/
   Exit code: 0
   contig_1_0 0-7200
   contig_1_0 7198
@@ -238,7 +237,6 @@ Checks that the interval coordinates internally are represented well
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/
   Exit code: 0
   contig_1_0 0-7200
   contig_1_0 7198
