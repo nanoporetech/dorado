@@ -302,13 +302,13 @@ int PolyTailCalculator::apply_signal_len_calibration(int signal_len) const {
         return signal_len;
     }
 
-    int calibrated_signal = 0;
+    float calibrated_signal = 0;
     int factor = 1;
     for (const auto& coeff : m_calibration_coeffs) {
         factor *= signal_len;
         calibrated_signal += coeff * factor;
     }
-    return calibrated_signal;
+    return static_cast<int>(calibrated_signal);
 }
 
 std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(

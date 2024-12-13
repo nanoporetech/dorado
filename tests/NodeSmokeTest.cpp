@@ -429,7 +429,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     auto pipeline_restart = GENERATE(false, true);
     auto is_rna = GENERATE(false, true);
     auto is_rna_adapter = false;
-    auto calibration_coeffs = GENERATE(std::vector<float>{}, std::vector<float>{0.95});
+    auto calibration_coeffs = GENERATE(std::vector<float>{}, std::vector<float>{0.95f});
     if (is_rna) {
         is_rna_adapter = GENERATE(false, true);
     }
