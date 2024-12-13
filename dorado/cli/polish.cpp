@@ -561,6 +561,12 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     const std::string polish_model_suffix =
             std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
 
+    if (bam_info.has_dwells) {
+        spdlog::info("Polishing using a model with move tables.");
+    } else {
+        spdlog::info("Polishing using a model without move tables.");
+    }
+
     std::filesystem::path model_dir;
 
     if (model_str == "auto") {
