@@ -104,10 +104,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // How close the mean values should be for consecutive intervals
     // to be merged.
     const float kMeanValueProximity = 0.25f;
+    // Sliding window size
+    const int kWindow = int(std::round(num_samples_per_base * 5));
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = int(std::round(num_samples_per_base * 5));
+    const int kMaxSampleGap = int(std::round(num_samples_per_base * 2));
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = kMaxSampleGap * 2;
+    const int kMinIntervalSizeForMerge = kWindow * 2;
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
@@ -117,8 +119,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::vector<Interval> intervals;
     const int kStride = 3;
 
-    for (int s = left_end; s < (right_end - kMaxSampleGap); s += kStride) {
-        const int e = s + kMaxSampleGap;
+    for (int s = left_end; s < (right_end - kWindow); s += kStride) {
+        const int e = s + kWindow;
         auto [avg, stdev] = calc_stats(s, e);
         if (avg > kMinAvgVal && stdev < kVar) {
             if (intervals.empty()) {
