@@ -144,13 +144,12 @@ ParserPtr create_cli(int& verbosity) {
     {
         // Default "Optional arguments" group
         parser->visible.add_argument("-t", "--threads")
-                .help("Number of threads for processing. "
-                      "Default uses all available threads.")
-                .default_value(1)
+                .help("Number of threads for processing (0=unlimited).")
+                .default_value(0)
                 .scan<'i', int>();
 
         parser->visible.add_argument("--infer-threads")
-                .help("Number of threads per device.")
+                .help("Number of threads for CPU inference")
                 .default_value(1)
                 .scan<'i', int>();
 
@@ -285,8 +284,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
     opt.threads = parser.visible.get<int>("threads");
-    opt.threads = (opt.threads == 0) ? std::max(1U, std::thread::hardware_concurrency() / 2)
-                                     : opt.threads;
+    opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : (opt.threads);
 
     opt.infer_threads = parser.visible.get<int>("infer-threads");
     opt.infer_threads_is_set = parser.visible.is_used("--infer-threads");
@@ -637,8 +635,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 }
 
 void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
-    std::cerr << "cli_read_group = '" << cli_read_group
-              << "', bam_info.read_group.size = " << bam_info.read_groups.size() << "\n";
     if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
         throw std::runtime_error{
                 "No @RG headers found in the input BAM, but user-specified RG was given. RG: '" +
