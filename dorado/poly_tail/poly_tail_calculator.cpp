@@ -185,8 +185,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                 }
             }
         }
-        std::swap(clustered_intervals, intervals);
-        clustered_intervals.clear();
+        intervals = std::exchange(clustered_intervals, {});
     }
 
     int_str = "";
