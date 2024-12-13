@@ -1,4 +1,4 @@
-#include "polish/architectures/model_config.h"
+#include "model_config.h"
 
 #include <toml.hpp>
 #include <toml/value.hpp>

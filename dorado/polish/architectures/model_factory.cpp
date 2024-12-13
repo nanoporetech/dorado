@@ -4,8 +4,9 @@
 #include "polish/polish_utils.h"
 
 #include <spdlog/spdlog.h>
+#include <torch/autograd.h>
+#include <torch/csrc/jit/serialization/pickle.h>
 #include <torch/script.h>
-#include <torch/torch.h>
 
 #include <filesystem>
 #include <fstream>
