@@ -9,7 +9,7 @@ namespace dorado::polisher {
 DecoderBase::DecoderBase(const LabelSchemeType label_scheme_type)
         : m_label_scheme_type(label_scheme_type) {}
 
-std::vector<ConsensusResult> DecoderBase::decode_bases(const torch::Tensor& logits) const {
+std::vector<ConsensusResult> DecoderBase::decode_bases(const at::Tensor& logits) const {
     return decode_bases_impl(m_label_scheme_type, logits);
 }
 
@@ -21,7 +21,7 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
 }
 
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
-                                               const torch::Tensor& logits) {
+                                               const at::Tensor& logits) {
     std::string label_scheme;
     if (label_scheme_type == LabelSchemeType::HAPLOID) {
         label_scheme = "*ACGT";
@@ -46,7 +46,7 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
         }
     }
 
-    const torch::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
+    const at::Tensor probs = torch::gather(logits, -1, indices.unsqueeze(-1)).squeeze(-1);
 
     for (int64_t sample_id = 0; sample_id < indices.size(0); ++sample_id) {
         std::string& quals = results[sample_id].quals;

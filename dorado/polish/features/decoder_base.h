@@ -2,7 +2,7 @@
 
 #include "polish/consensus_result.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 #include <torch/types.h>
 
 #include <string>
@@ -18,7 +18,7 @@ class DecoderBase {
 public:
     DecoderBase(const LabelSchemeType label_scheme_type);
 
-    std::vector<ConsensusResult> decode_bases(const torch::Tensor& logits) const;
+    std::vector<ConsensusResult> decode_bases(const at::Tensor& logits) const;
 
 private:
     LabelSchemeType m_label_scheme_type;
@@ -27,6 +27,6 @@ private:
 LabelSchemeType parse_label_scheme_type(const std::string& type);
 
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
-                                               const torch::Tensor& logits);
+                                               const at::Tensor& logits);
 
 }  // namespace dorado::polisher

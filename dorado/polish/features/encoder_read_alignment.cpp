@@ -64,7 +64,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         return ret;
     };
 
-    const auto pad_reads = [](std::vector<torch::Tensor> chunks, int64_t target_depth) {
+    const auto pad_reads = [](std::vector<at::Tensor> chunks, int64_t target_depth) {
         // Determine the target depth if not provided
         if (target_depth < 0) {
             target_depth = 0;
@@ -74,7 +74,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         }
 
         // Pad each chunk to match the target depth
-        std::vector<torch::Tensor> padded_chunks;
+        std::vector<at::Tensor> padded_chunks;
         for (auto& chunk : chunks) {
             const int64_t pad_depth = target_depth - chunk.size(1);
             if (pad_depth > 0) {
@@ -105,7 +105,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
      * \brief This lambda reorders reads in the chunk tensors, because some rows (reads) may be missing
      *          between neighboring samples (e.g. some reads end/begin).
      */
-    const auto reorder_reads = [](std::vector<torch::Tensor> chunks,
+    const auto reorder_reads = [](std::vector<at::Tensor> chunks,
                                   const std::vector<std::vector<std::string>>& read_ids_in,
                                   const std::vector<std::vector<std::string>>& read_ids_out) {
         spdlog::trace("[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
@@ -114,7 +114,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
             return chunks;
         }
 
-        std::vector<torch::Tensor> reordered_chunks{chunks[0]};
+        std::vector<at::Tensor> reordered_chunks{chunks[0]};
 
         std::vector<std::string> rids_out = read_ids_out[0];
 
@@ -230,10 +230,10 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
             return std::move(samples[sample_ids.front()]);
         }
 
-        std::vector<torch::Tensor> features;
+        std::vector<at::Tensor> features;
         std::vector<std::vector<int64_t>> positions_major;
         std::vector<std::vector<int64_t>> positions_minor;
-        std::vector<torch::Tensor> depth;
+        std::vector<at::Tensor> depth;
         std::vector<std::vector<std::string>> read_ids_left;
         std::vector<std::vector<std::string>> read_ids_right;
 
@@ -373,7 +373,7 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
         return {};
     }
 
-    torch::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
+    at::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
     Sample sample{std::move(tensors.counts),
                   std::move(tensors.positions_major),
@@ -387,7 +387,7 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
     return sample;
 }
 
-torch::Tensor EncoderReadAlignment::collate(std::vector<torch::Tensor> batch) const {
+at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch) const {
     if (std::empty(batch)) {
         return {};
     }
@@ -400,7 +400,7 @@ torch::Tensor EncoderReadAlignment::collate(std::vector<torch::Tensor> batch) co
         data = torch::clamp_min(data, 0);
     }
 
-    torch::Tensor features;
+    at::Tensor features;
 
     // Process read-level features if the shape indicates a 3D tensor.
     if (std::size(feature_shape) == 3) {

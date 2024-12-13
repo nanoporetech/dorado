@@ -4,7 +4,7 @@
 #include "polish/features/encoder_base.h"
 #include "polish/sample.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 #include <torch/types.h>
 
 #include <cstdint>
@@ -14,7 +14,7 @@
 namespace dorado::polisher {
 
 struct ReadAlignmentTensors {
-    torch::Tensor counts;
+    at::Tensor counts;
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     std::vector<std::string> read_ids_left;
@@ -44,7 +44,7 @@ public:
                          const int64_t ref_end,
                          const int32_t seq_id) const override;
 
-    torch::Tensor collate(std::vector<torch::Tensor> batch) const override;
+    at::Tensor collate(std::vector<at::Tensor> batch) const override;
 
     std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const override;
 

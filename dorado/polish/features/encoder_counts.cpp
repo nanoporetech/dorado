@@ -115,14 +115,14 @@ Sample counts_to_features(CountsResult& pileup,
 
     // Symmetric indel handling.
     if (sym_indels) {
-        const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
-        const torch::Tensor major_ind_at_minor_inds_tensor =
+        const at::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
+        const at::Tensor major_ind_at_minor_inds_tensor =
                 torch::tensor(major_ind_at_minor_inds, torch::kInt64);
 
         for (const auto& [key, inds] : feature_indices) {
             // const std::string& data_type = kv.first.first;
             const bool is_rev = key.second;
-            const torch::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
+            const at::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
 
             const auto dt_depth =
                     pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
@@ -142,19 +142,19 @@ Sample counts_to_features(CountsResult& pileup,
         }
     }
 
-    torch::Tensor feature_array;
+    at::Tensor feature_array;
     if (normalise_type == NormaliseType::TOTAL) {
         feature_array =
                 pileup.counts / torch::max(depth_unsequezed, torch::ones_like(depth_unsequezed));
 
     } else if (normalise_type == NormaliseType::FWD_REV) {
         feature_array = torch::empty_like(pileup.counts, FeatureTensorType);
-        const torch::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
-        const torch::Tensor major_ind_at_minor_inds_tensor =
+        const at::Tensor minor_inds_tensor = torch::tensor(minor_inds, torch::kInt64);
+        const at::Tensor major_ind_at_minor_inds_tensor =
                 torch::tensor(major_ind_at_minor_inds, torch::kInt64);
         for (const auto& kv : feature_indices) {
             const std::vector<int64_t>& inds = kv.second;
-            const torch::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
+            const at::Tensor inds_tensor = torch::tensor(inds, torch::dtype(torch::kInt64));
 
             auto dt_depth = pileup.counts.index({torch::indexing::Slice(), inds_tensor}).sum(1);
             dt_depth.index_put_({minor_inds_tensor},
@@ -205,10 +205,10 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
             return std::move(samples[sample_ids.front()]);
         }
 
-        std::vector<torch::Tensor> features;
+        std::vector<at::Tensor> features;
         std::vector<std::vector<int64_t>> positions_major;
         std::vector<std::vector<int64_t>> positions_minor;
-        std::vector<torch::Tensor> depth;
+        std::vector<at::Tensor> depth;
 
         const int32_t seq_id = samples[sample_ids.front()].seq_id;
         const int32_t region_id = samples[sample_ids.front()].region_id;
@@ -348,7 +348,7 @@ Sample EncoderCounts::encode_region(BamFile& bam_file,
                               m_normalise_type);
 }
 
-torch::Tensor EncoderCounts::collate(std::vector<torch::Tensor> batch) const {
+at::Tensor EncoderCounts::collate(std::vector<at::Tensor> batch) const {
     return torch::stack(batch);
 }
 
