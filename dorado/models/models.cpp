@@ -834,11 +834,25 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v2_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_4mC_5mC@v3",
+                "4e78cc53d78f09bd50de59365633d8045e2b5cb8d1ed5854f997f8ea7cb61c0f",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v3_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_4mC_5mC@v2",
                 "eb971340e111ebfdb27bd2b70390c5f0252ba91f5ac92eea0dbd59524bac68f7",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v2_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_4mC_5mC@v3",
+                "55402c4cb087cdde5d0cfa573d0207b160a68d1ccd9b32c525d65bb6a503269a",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v3_0_0},
         },
         // 5mC+5hmC all-context HAC and SUP
         ModelInfo{
@@ -863,11 +877,25 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v2_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v3",
+                "82e059428b82395468fdd6e90150517b22b3651c189fbd2f67a3b07ed64d1d03",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v3_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_5hmC@v2.0.1",
                 "757dabc280e25f1c442fcfeb3e1f4d44a2d445e0ea89bb30c15e4757879111be",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v2_0_1},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mC_5hmC@v3",
+                "9384a143fa08b946ff5f43a9f5a85e395c36df3b4895e418674099f8554956da",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v3_0_0},
         },
         // 5mC+5hmC CG-context HAC and SUP
         ModelInfo{
@@ -892,11 +920,25 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v2_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mCG_5hmCG@v3",
+                "df061855267edc5abdc9fa4c3add54390f08f2f80274c11ca90b74483be84ab7",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v3_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mCG_5hmCG@v2.0.1",
                 "c8ebafd13008a919232cd45514e07ea929509a5e20254c73b9eff2cd0e5a4786",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v2_0_1},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_5mCG_5hmCG@v3",
+                "0f6cc5d165fd25acb4227d2d791c017a59a21cc30d2a92b8c2925f84138974ee",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v3_0_0},
         },
         // 6mA all-context HAC and SUP
         ModelInfo{
@@ -921,11 +963,25 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
         },
         ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v3",
+                "7df772281e2d73e72c91b0a3b53e2487d4c4b62ad34dfe8d1296650a79b1920d",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v3_0_0},
+        },
+        ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v2",
                 "fc1d247475162d4f782d66bb3cd6f19c76e5589a8e064f738de4896f940568b3",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{ModsVariant::M_6mA, VV::v2_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v3",
+                "d7a6f9a52218a6996d31127d4c0513b96358721ac3ddaa4b008f9d7513d53473",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v3_0_0},
         },
         // RNA004 v3.0.1
         // m6A - DRACH
