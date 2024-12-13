@@ -101,10 +101,12 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
                     missing.emplace_back(name);
                 }
             }
-            throw std::runtime_error(
-                    "Cannot load weights into the model: weights file contains parameters "
-                    "which are not present in the model. Missing parameters: " +
-                    print_container_as_string(missing, ", "));
+            if (!std::empty(missing)) {
+                throw std::runtime_error(
+                        "Cannot load weights into the model: weights file contains parameters "
+                        "which are not present in the model. Missing parameters: " +
+                        print_container_as_string(missing, ", "));
+            }
         }
 
         // Set the model weights.
