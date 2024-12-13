@@ -277,7 +277,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
         if (m_reads_by_channel.find(channel) != m_reads_by_channel.end()) {
             // Sort the read ids within a channel by its mux
             // and start time.
-            spdlog::debug("Sort channel {}", channel);
+            spdlog::trace("Sort channel {}", channel);
             auto& reads = m_reads_by_channel.at(channel);
             std::sort(reads.begin(), reads.end(), [](ReadSortInfo& a, ReadSortInfo& b) {
                 if (a.mux != b.mux) {
@@ -292,7 +292,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             for (size_t i = 0; i < reads.size(); i++) {
                 m_read_id_to_index[reads[i].read_id] = i;
             }
-            spdlog::debug("Sorted channel {}", channel);
+            spdlog::trace("Sorted channel {}", channel);
         }
         for (const auto& entry : files) {
             if (m_loaded_read_count == m_max_reads) {
