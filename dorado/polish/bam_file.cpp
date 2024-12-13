@@ -6,10 +6,13 @@
 #include <ostream>
 #include <sstream>
 
+void HtsIdxDestructor::operator()(hts_idx_t* bam) { hts_idx_destroy(bam); }
+
+namespace dorado::polisher {
 BamFile::BamFile(const std::filesystem::path& in_fn)
-        : m_fp{hts_open(in_fn.string().c_str(), "rb"), hts_close},
-          m_idx{sam_index_load(m_fp.get(), in_fn.string().c_str()), hts_idx_destroy},
-          m_hdr{sam_hdr_read(m_fp.get()), sam_hdr_destroy} {
+        : m_fp{hts_open(in_fn.string().c_str(), "rb"), HtsFileDestructor()},
+          m_idx{sam_index_load(m_fp.get(), in_fn.string().c_str()), HtsIdxDestructor()},
+          m_hdr{sam_hdr_read(m_fp.get()), SamHdrDestructor()} {
     if (!m_fp) {
         throw std::runtime_error{"Could not open BAM file: '" + in_fn.string() + "'!"};
     }
@@ -78,19 +81,19 @@ std::vector<HeaderLineData> BamFile::parse_header() const {
     return ret;
 }
 
-std::unique_ptr<bam1_t, decltype(&bam_destroy1)> BamFile::get_next() {
-    std::unique_ptr<bam1_t, decltype(&bam_destroy1)> record(bam_init1(), bam_destroy1);
+BamPtr BamFile::get_next() {
+    BamPtr record(bam_init1(), BamDestructor());
 
     if (record == nullptr) {
         throw std::runtime_error{"Failed to initialize BAM record"};
-        return std::unique_ptr<bam1_t, decltype(&bam_destroy1)>(nullptr, bam_destroy1);
+        return BamPtr(nullptr, BamDestructor());
     }
 
     if (sam_read1(m_fp.get(), m_hdr.get(), record.get()) >= 0) {
         return record;
     }
 
-    return std::unique_ptr<bam1_t, decltype(&bam_destroy1)>(nullptr, bam_destroy1);
+    return BamPtr(nullptr, BamDestructor());
 }
 
 void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& header) {
@@ -108,3 +111,5 @@ std::string header_to_string(const std::vector<HeaderLineData>& header) {
     header_to_stream(oss, header);
     return oss.str();
 }
+
+}  // namespace dorado::polisher

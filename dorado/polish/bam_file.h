@@ -1,8 +1,9 @@
 #pragma once
 
+#include <utils/types.h>
+
 #include <filesystem>
 #include <iosfwd>
-#include <memory>
 #include <tuple>
 #include <vector>
 
@@ -11,16 +12,12 @@ struct hts_idx_t;
 struct sam_hdr_t;
 struct bam1_t;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-int hts_close(htsFile* fp);
-void hts_idx_destroy(hts_idx_t* idx);
-void sam_hdr_destroy(sam_hdr_t* bh);
-void bam_destroy1(bam1_t* b);
-#ifdef __cplusplus
-}
-#endif
+struct HtsIdxDestructor {
+    void operator()(hts_idx_t*);
+};
+using HtsIdxPtr = std::unique_ptr<hts_idx_t, HtsIdxDestructor>;
+
+namespace dorado::polisher {
 
 struct HeaderLineData {
     std::string header_type;
@@ -42,14 +39,16 @@ public:
 
     std::vector<HeaderLineData> parse_header() const;
 
-    std::unique_ptr<bam1_t, decltype(&bam_destroy1)> get_next();
+    BamPtr get_next();
 
 private:
-    std::unique_ptr<htsFile, decltype(&hts_close)> m_fp;
-    std::unique_ptr<hts_idx_t, decltype(&hts_idx_destroy)> m_idx;
-    std::unique_ptr<sam_hdr_t, decltype(&sam_hdr_destroy)> m_hdr;
+    HtsFilePtr m_fp;
+    HtsIdxPtr m_idx;
+    SamHdrPtr m_hdr;
 };
 
 void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& header);
 
 std::string header_to_string(const std::vector<HeaderLineData>& header);
+
+}  // namespace dorado::polisher
