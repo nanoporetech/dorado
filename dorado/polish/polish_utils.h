@@ -2,7 +2,7 @@
 
 #include "polish/interval.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -16,12 +16,12 @@ namespace dorado::polisher {
 /**
  * \brief Prints the tensor size to a stream.
  */
-void print_tensor_shape(std::ostream& os, const torch::Tensor& tensor);
+void print_tensor_shape(std::ostream& os, const at::Tensor& tensor);
 
 /**
  * \brief Returns a string with a formatted tensor size.
  */
-std::string tensor_shape_as_string(const torch::Tensor& tensor);
+std::string tensor_shape_as_string(const at::Tensor& tensor);
 
 /**
  * \brief Parses a string of form "[1, 17]" into a std::vector.
@@ -102,6 +102,6 @@ std::vector<Interval> create_batches(const T& data,
     return ret;
 }
 
-void save_tensor(const torch::Tensor& tensor, const std::string& file_path);
+void save_tensor(const at::Tensor& tensor, const std::string& file_path);
 
 }  // namespace dorado::polisher

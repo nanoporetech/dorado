@@ -4,7 +4,7 @@
 #include "polish/consensus_result.h"
 #include "polish/sample.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 #include <torch/types.h>
 
 #include <algorithm>
@@ -54,7 +54,7 @@ public:
                                  const int64_t ref_end,
                                  const int32_t seq_id) const = 0;
 
-    virtual torch::Tensor collate(std::vector<torch::Tensor> batch) const = 0;
+    virtual at::Tensor collate(std::vector<at::Tensor> batch) const = 0;
 
     virtual std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const = 0;
 };

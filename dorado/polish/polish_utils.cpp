@@ -2,12 +2,13 @@
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
+#include <torch/script.h>
 
 #include <ostream>
 
 namespace dorado::polisher {
 
-void print_tensor_shape(std::ostream& os, const torch::Tensor& tensor) {
+void print_tensor_shape(std::ostream& os, const at::Tensor& tensor) {
     os << "[";
     for (size_t i = 0; i < tensor.sizes().size(); ++i) {
         os << tensor.size(i);
@@ -18,7 +19,7 @@ void print_tensor_shape(std::ostream& os, const torch::Tensor& tensor) {
     os << "]";
 }
 
-std::string tensor_shape_as_string(const torch::Tensor& tensor) {
+std::string tensor_shape_as_string(const at::Tensor& tensor) {
     std::ostringstream oss;
     print_tensor_shape(oss, tensor);
     return oss.str();
@@ -120,8 +121,8 @@ std::string fetch_seq(const std::filesystem::path& index_fn,
     return ret;
 }
 
-void save_tensor(const torch::Tensor& tensor, const std::string& file_path) {
-    const std::vector<char> pickled = torch::pickle_save(tensor);
+void save_tensor(const at::Tensor& tensor, const std::string& file_path) {
+    const std::vector<char> pickled = torch::jit::pickle_save(tensor);
     std::ofstream fout(file_path, std::ios::out | std::ios::binary);
     fout.write(std::data(pickled), std::size(pickled));
 }

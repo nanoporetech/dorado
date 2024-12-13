@@ -7,9 +7,9 @@
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
+#include <ATen/ATen.h>
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <memory>
 
