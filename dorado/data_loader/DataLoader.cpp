@@ -73,12 +73,10 @@ std::string get_string_attribute(const HighFive::Group& group, const std::string
     return attribute_string;
 }
 
-std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
+std::optional<std::vector<std::filesystem::directory_entry>> filter_fast5_for_mixed_datasets(
         const std::vector<std::filesystem::directory_entry>& files) {
     std::vector<std::filesystem::directory_entry> pod5_entries;
     std::vector<std::filesystem::directory_entry> fast5_entries;
-
-    bool issued_fast5_warn = false;
 
     for (const auto& entry : files) {
         auto entry_path = std::filesystem::path(entry);
@@ -86,34 +84,30 @@ std::vector<std::filesystem::directory_entry> filter_fast5_for_mixed_datasets(
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         if (ext == ".fast5") {
-            if (!issued_fast5_warn) {
-                spdlog::warn(
-                        "Deprecation Warning: FAST5 support in Dorado will be dropped in an "
-                        "upcoming "
-                        "release. "
-                        "FAST5 loading is unoptimized and will result in poor performance. "
-                        "Please convert your dataset to POD5: "
-                        "https://pod5-file-format.readthedocs.io/en/latest/docs/"
-                        "tools.html#pod5-convert-fast5");
-                issued_fast5_warn = true;
-            }
-
             fast5_entries.push_back(entry);
         } else if (ext == ".pod5") {
             pod5_entries.push_back(entry);
         }
     }
 
-    if (pod5_entries.empty()) {
+    if (!pod5_entries.empty() && !fast5_entries.empty()) {
+        spdlog::error(
+                "Data folder contains both POD5 and FAST5 files. FAST5 loading is unoptimized and "
+                "will result in poor performance. Please basecall FAST5 separately or convert your "
+                "dataset to POD5: https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                "tools.html#pod5-convert-fast5");
+        // Note: once we drop POD5 support we can remove the use of optional here and in the caller
+        return std::nullopt;
+    }
+
+    if (!fast5_entries.empty()) {
+        spdlog::warn(
+                "Deprecation Warning: FAST5 support in Dorado will be dropped in an "
+                "upcoming release. FAST5 loading is unoptimized and will result in poor "
+                "performance. Please convert your dataset to POD5: "
+                "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                "tools.html#pod5-convert-fast5");
         return fast5_entries;
-    } else if (!pod5_entries.empty() && !fast5_entries.empty()) {
-        for (const auto& f5 : fast5_entries) {
-            spdlog::warn(
-                    "Data folder contains both POD5 and FAST5 files. Please basecall "
-                    "FAST5 separately. Skipping FAST5 "
-                    "file from {}.",
-                    f5.path().string());
-        }
     }
 
     return pod5_entries;
@@ -720,9 +714,20 @@ DataLoader::DataLoader(Pipeline& pipeline,
     std::call_once(vbz_init_flag, vbz_register);
 }
 
-DataLoader::InputFiles::InputFiles(const std::filesystem::path& path, bool recursive)
-        : m_entries(filter_fast5_for_mixed_datasets(
-                  utils::fetch_directory_entries(path, recursive))) {}
+std::optional<DataLoader::InputFiles> DataLoader::InputFiles::search(
+        const std::filesystem::path& path,
+        bool recursive) {
+    auto entries = filter_fast5_for_mixed_datasets(utils::fetch_directory_entries(path, recursive));
+    if (!entries.has_value()) {
+        return std::nullopt;
+    }
+
+    // Intentionally returning a valid object even if there are 0 entries since duplex uses that
+    // to differentiate between different modes of operation.
+    InputFiles files;
+    files.m_entries = std::move(*entries);
+    return files;
+}
 
 const std::vector<std::filesystem::directory_entry>& DataLoader::InputFiles::get() const {
     return m_entries;

@@ -46,7 +46,7 @@ public:
         std::vector<std::filesystem::directory_entry> m_entries;
 
     public:
-        InputFiles(const std::filesystem::path& path, bool recursive);
+        static std::optional<InputFiles> search(const std::filesystem::path& path, bool recursive);
         const std::vector<std::filesystem::directory_entry>& get() const;
     };
 
