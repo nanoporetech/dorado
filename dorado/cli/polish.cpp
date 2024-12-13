@@ -15,17 +15,9 @@
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
+#include <ATen/Parallel.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
-#include <torch/script.h>
-#include <torch/torch.h>
-
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-
-#include <c10/cuda/CUDACachingAllocator.h>
-#include <c10/cuda/CUDAGuard.h>
-#endif
 
 #include <algorithm>
 #include <cctype>
@@ -96,7 +88,7 @@ struct Options {
     bool ignore_read_groups = false;
     std::string tag_name;
     int32_t tag_value = 0;
-    std::optional<bool> tag_keep_missing;
+    std::optional<bool> tag_keep_missing;  // Optionally overrides the model config if specified.
     bool any_bam = false;
 
     // int32_t min_depth = 0;
@@ -158,15 +150,13 @@ ParserPtr create_cli(int& verbosity) {
         cli::add_device_arg(*parser);
 
         parser->visible.add_argument("-v", "--verbose")
-                .default_value(false)
-                .implicit_value(true)
+                .flag()
                 .nargs(0)
                 .action([&](const auto&) { ++verbosity; })
                 .append();
         parser->visible.add_argument("--quiet")
                 .help("Minimal logging, warning level and above.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
     }
     {
         parser->visible.add_group("Input/output options");
@@ -178,17 +168,16 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value("auto");
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
     }
     {
         parser->visible.add_group("Advanced options");
-        parser->visible.add_argument("-b", "--batch-size")
-                .help("Batch size for inference. Default: 0 for auto batch size detection.")
+        parser->visible.add_argument("-b", "--batchsize")
+                .help("Batch size for inference.")
                 .default_value(16)
                 .scan<'i', int>();
-        parser->visible.add_argument("--draft-batch-size")
-                .help("Input draft sequences will be process in batches of roughly this size.")
+        parser->visible.add_argument("--draft-batchsize")
+                .help("Approximate batch size for processing input draft sequences.")
                 .default_value(std::string{"200M"});
         parser->visible.add_argument("--window-len")
                 .help("Window size for calling consensus.")
@@ -203,30 +192,23 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value(1000000)
                 .scan<'i', int>();
         parser->visible.add_argument("--bam-subchunk")
-                .help("Each BAM region of bam_chunk length will be split into non-overlapping "
-                      "regions of this size for parallel processing.")
+                .help("Size of regions to split the bam_chunk in to for parallel processing")
                 .default_value(100000)
                 .scan<'i', int>();
-
         parser->visible.add_argument("--no-fill-gaps")
                 .help("Do not fill gaps in consensus sequence with draft sequence.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser->visible.add_argument("--fill-char")
-                .help("Use a designated character to fill gaps.")
-                .default_value("");
-
+                .help("Use a designated character to fill gaps.");
         parser->visible.add_argument("--regions")
                 .help("Process only these regions of the input. Can be either a path to a BED file "
                       "or a list of comma-separated Htslib-formatted regions (start is 1-based, "
                       "end "
-                      "is inclusive).")
-                .default_value("");
+                      "is inclusive).");
         parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
         // parser->visible.add_argument("--ignore-read-groups")
         //         .help("Ignore read groups in bam file.")
-        //         .default_value(false)
-        //         .implicit_value(true);
+        //         .flag();
         parser->visible.add_argument("--tag-name")
                 .help("Two-letter BAM tag name.")
                 .default_value("");
@@ -238,12 +220,10 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--tag-keep-missing")
                 .help("Keep alignments when tag is missing. If specified, overrides "
                       "the same option in the model config.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser->visible.add_argument("--min-mapq")
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
-                .default_value(-1)
                 .scan<'i', int>();
         // parser->visible.add_argument("--min-depth")
         //         .help("Sites with depth lower than this value will not be polished.")
@@ -255,20 +235,17 @@ ParserPtr create_cli(int& verbosity) {
     {
         parser->hidden.add_argument("--full-precision")
                 .help("Always use full precision for inference.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser->hidden.add_argument("--queue-size")
                 .help("Queue size for processing.")
                 .default_value(1000)
                 .scan<'i', int>();
         parser->hidden.add_argument("--scripted")
                 .help("Load the scripted Torch model instead of building one internally.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser->hidden.add_argument("--any-bam")
                 .help("Allow any BAM as input, not just Dorado aligned.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
     }
 
     return parser;
@@ -317,21 +294,20 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 #endif
     }
 
-    opt.batch_size = parser.visible.get<int>("batch-size");
+    opt.batch_size = parser.visible.get<int>("batchsize");
     opt.draft_batch_size =
             std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
-                                         parser.visible.get<std::string>("draft-batch-size")));
+                                         parser.visible.get<std::string>("draft-batchsize")));
     opt.window_len = parser.visible.get<int>("window-len");
     opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
     opt.quiet = parser.visible.get<bool>("quiet");
-    opt.regions = parse_regions(parser.visible.get<std::string>("regions"));
-    opt.regions_str =
-            (parser.visible.is_used("--regions"))
-                    ? std::optional<std::string>{parser.visible.get<std::string>("regions")}
-                    : std::nullopt;
+    opt.regions_str = parser.visible.present<std::string>("regions");
+    if (opt.regions_str) {
+        opt.regions = parse_regions(*opt.regions_str);
+    }
     // opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
@@ -347,13 +323,12 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     // opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
     opt.tag_value = parser.visible.get<int>("tag-value");
+    // The `"--tag-keep-missing` is a special case because it's a flag, and we cannot use `present`.
     opt.tag_keep_missing =
             (parser.visible.is_used("--tag-keep-missing"))
                     ? std::optional<bool>{parser.visible.get<bool>("tag-keep-missing")}
                     : std::nullopt;
-    opt.min_mapq = (parser.visible.is_used("--min-mapq"))
-                           ? std::optional<int32_t>{parser.visible.get<int>("min-mapq")}
-                           : std::nullopt;
+    opt.min_mapq = parser.visible.present<int32_t>("min-mapq");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -431,7 +406,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.queue_size <= 0) {
-        spdlog::error("Queue size needs o be > 0, given: {}.", opt.queue_size);
+        spdlog::error("Queue size needs to be > 0, given: {}.", opt.queue_size);
         std::exit(EXIT_FAILURE);
     }
 
@@ -444,7 +419,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.regions_str && std::empty(opt.regions)) {
-        spdlog::error("Option --regions is specified, but and empty set of regions is given!");
+        spdlog::error("Option --regions is specified, but an empty set of regions is given!");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -747,8 +722,6 @@ void run_polishing(const Options& opt,
             write_consensus_results(*ofs, header, consensus, opt.fill_gaps,
                                     (opt.out_format == OutputFormat::FASTQ));
         }
-
-        // polish_stats.update("processed", static_cast<double>(std::size(bam_regions)));
     }
 }
 
