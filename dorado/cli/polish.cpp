@@ -667,7 +667,6 @@ void validate_regions(const std::vector<polisher::Region>& regions) {
         // NOTE: interval_tree has an inclusive end coordinate.
         intervals[region.name].emplace_back(
                 interval_tree::Interval<int64_t, int64_t>(region.start, region.end - 1, 0));
-        std::cerr << "Added interval: " << intervals[region.name].back() << "\n";
     }
 
     // Compute the interval tree.
@@ -679,10 +678,6 @@ void validate_regions(const std::vector<polisher::Region>& regions) {
     for (const auto& region : regions) {
         std::vector<interval_tree::Interval<int64_t, int64_t>> results =
                 trees[region.name].findOverlapping(region.start, region.end - 1);
-        std::cerr << "Query interval: " << region.start << ", " << region.end << "\n";
-        for (const auto& res : results) {
-            std::cerr << "    -> Found: " << res << "\n";
-        }
         if (std::size(results) > 1) {
             throw std::runtime_error("Region '" + polisher::region_to_string(region) +
                                      "' overlaps other regions. Regions have to be unique.");
@@ -883,7 +878,7 @@ int polish(int argc, char* argv[]) {
             }
             if (!std::empty(opt.read_group)) {
                 spdlog::debug(
-                        "Only the user requested RG was selected from the input bam. RG: '{}'",
+                        "Only the user-requested RG was selected from the input bam. RG: '{}'",
                         opt.read_group);
             }
         }
