@@ -15,7 +15,6 @@ If the filter works, then there will be zero alignments usable for pileup featur
   > samtools faidx out/out.fastq
   > cut -f 2,2 out/out.fastq.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  > if [[ ${exit_code} != 0 ]]; then cat out/stderr; fi
   Exit code: 0
   NM:i:0
   10000

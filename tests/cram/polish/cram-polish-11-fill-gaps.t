@@ -63,7 +63,6 @@ Also, the `contig_2` sequence should be taken verbatim from input draft, and not
   > gunzip -c ${expected} > out/expected.fasta
   > diff out/expected.fasta out/out.fasta
   > tail -n 1 out/out.fasta
-  > if [[ ${exit_code} != 0 ]]; then cat out/stderr; fi
   Exit code: 0
   1
   AAAAAAAAAACCCCCCCCCCTTTTTTTTTTGGGGGGGGGG
