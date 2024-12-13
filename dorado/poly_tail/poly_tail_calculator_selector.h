@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace dorado::poly_tail {
 
@@ -15,13 +16,20 @@ class PolyTailCalculatorSelector {
 public:
     PolyTailCalculatorSelector(const std::filesystem::path& config,
                                bool is_rna,
-                               bool is_rna_adapter);
-    PolyTailCalculatorSelector(std::istream& config_stream, bool is_rna, bool is_rna_adapter);
+                               bool is_rna_adapter,
+                               const std::vector<float>& calibration_coeffs);
+    PolyTailCalculatorSelector(std::istream& config_stream,
+                               bool is_rna,
+                               bool is_rna_adapter,
+                               const std::vector<float>& calibration_coeffs);
 
     std::shared_ptr<const PolyTailCalculator> get_calculator(const std::string& name) const;
 
 private:
-    void init(std::istream& config_stream, bool is_rna, bool is_rna_adapter);
+    void init(std::istream& config_stream,
+              bool is_rna,
+              bool is_rna_adapter,
+              const std::vector<float>& calibration_coeffs);
 
     mutable std::mutex m_lut_mutex;
     std::unordered_map<std::string, std::shared_ptr<const PolyTailCalculator>> m_lut;

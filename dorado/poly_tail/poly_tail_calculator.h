@@ -30,7 +30,8 @@ struct SignalAnchorInfo {
 
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config) : m_config(std::move(config)) {}
+    PolyTailCalculator(PolyTailConfig config, const std::vector<float>& calibration_coeffs)
+            : m_config(std::move(config)), m_calibration_coeffs(calibration_coeffs) {}
 
     virtual ~PolyTailCalculator() = default;
 
@@ -72,13 +73,16 @@ protected:
                                                 float std_samples_per_base) const;
 
     const PolyTailConfig m_config;
+    const std::vector<float> m_calibration_coeffs;
 };
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
-                                                            bool is_rna,
-                                                            bool is_rna_adapter);
+    static std::shared_ptr<const PolyTailCalculator> create(
+            const PolyTailConfig& config,
+            bool is_rna,
+            bool is_rna_adapter,
+            const std::vector<float>& calibration_coeffs);
 };
 
 }  // namespace dorado::poly_tail

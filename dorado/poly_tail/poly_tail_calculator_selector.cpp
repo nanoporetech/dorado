@@ -8,12 +8,14 @@
 
 namespace dorado::poly_tail {
 
-PolyTailCalculatorSelector::PolyTailCalculatorSelector(const std::filesystem::path& config,
-                                                       bool is_rna,
-                                                       bool is_rna_adapter) {
+PolyTailCalculatorSelector::PolyTailCalculatorSelector(
+        const std::filesystem::path& config,
+        bool is_rna,
+        bool is_rna_adapter,
+        const std::vector<float>& calibration_coeffs) {
     if (config.empty()) {
         std::stringstream buffer("");
-        init(buffer, is_rna, is_rna_adapter);
+        init(buffer, is_rna, is_rna_adapter, calibration_coeffs);
         return;
     }
 
@@ -28,26 +30,30 @@ PolyTailCalculatorSelector::PolyTailCalculatorSelector(const std::filesystem::pa
 
     std::stringstream buffer;
     buffer << file.rdbuf();
-    init(buffer, is_rna, is_rna_adapter);
+    init(buffer, is_rna, is_rna_adapter, calibration_coeffs);
 }
 
-PolyTailCalculatorSelector::PolyTailCalculatorSelector(std::istream& config_stream,
-                                                       bool is_rna,
-                                                       bool is_rna_adapter) {
-    init(config_stream, is_rna, is_rna_adapter);
+PolyTailCalculatorSelector::PolyTailCalculatorSelector(
+        std::istream& config_stream,
+        bool is_rna,
+        bool is_rna_adapter,
+        const std::vector<float>& calibration_coeffs) {
+    init(config_stream, is_rna, is_rna_adapter, calibration_coeffs);
 }
 
 void PolyTailCalculatorSelector::init(std::istream& config_stream,
                                       bool is_rna,
-                                      bool is_rna_adapter) {
+                                      bool is_rna_adapter,
+                                      const std::vector<float>& calibration_coeffs) {
     auto configs = prepare_configs(config_stream);
-    m_default = PolyTailCalculatorFactory::create(configs.back(), is_rna, is_rna_adapter);
+    m_default = PolyTailCalculatorFactory::create(configs.back(), is_rna, is_rna_adapter,
+                                                  calibration_coeffs);
     configs.pop_back();
 
     std::lock_guard<std::mutex> lock(m_lut_mutex);
     for (const auto& config : configs) {
-        m_lut[config.barcode_id] =
-                PolyTailCalculatorFactory::create(config, is_rna, is_rna_adapter);
+        m_lut[config.barcode_id] = PolyTailCalculatorFactory::create(config, is_rna, is_rna_adapter,
+                                                                     calibration_coeffs);
     }
 }
 

@@ -476,7 +476,8 @@ void setup(const std::vector<std::string>& args,
     if (estimate_poly_a) {
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
-                        polya_config, is_rna_model(model_config), is_rna_adapter);
+                        polya_config, is_rna_model(model_config), is_rna_adapter,
+                        model_config.polya_coeffs);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
                 poly_tail_calc_selector);
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(

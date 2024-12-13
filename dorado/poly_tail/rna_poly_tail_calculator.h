@@ -6,7 +6,9 @@ namespace dorado::poly_tail {
 
 class RNAPolyTailCalculator : public PolyTailCalculator {
 public:
-    RNAPolyTailCalculator(PolyTailConfig config, bool is_rna_adapter);
+    RNAPolyTailCalculator(PolyTailConfig config,
+                          bool is_rna_adapter,
+                          const std::vector<float>& calibration_coeffs);
     SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const override;
 
 protected:
