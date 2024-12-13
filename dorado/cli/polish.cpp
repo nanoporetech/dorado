@@ -153,7 +153,12 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value(1)
                 .scan<'i', int>();
 
-        cli::add_device_arg(*parser);
+        parser->visible.add_argument("-x", "--device")
+                .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
+                                  "'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will "
+                                  "choose either 'cpu' "
+                                  "or 'cuda:all' depending on the presence of a GPU device."})
+                .default_value(std::string{"auto"});
 
         parser->visible.add_argument("-v", "--verbose")
                 .flag()
