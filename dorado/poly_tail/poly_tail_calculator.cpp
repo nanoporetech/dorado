@@ -23,6 +23,8 @@ struct Interval {
     int start;
     int end;
     float avg;
+
+    int length() const { return end - start; }
 };
 
 }  // namespace
@@ -158,31 +160,37 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             (num_samples_per_base + 2 * std_samples_per_base) * m_config.tail_interrupt_length));
 
     std::vector<Interval> clustered_intervals;
-    bool keep_merging = true;
-    while (keep_merging) {  // break when we've stopped making changes
-        keep_merging = false;
-        for (const auto& i : intervals) {
-            if (clustered_intervals.empty()) {
-                clustered_intervals.push_back(i);
+    bool merge_intervals = intervals.size() > 1;
+    while (merge_intervals) {  // break when we've stopped making changes
+        merge_intervals = false;
+        clustered_intervals.push_back(intervals.front());
+        int longest_interval = clustered_intervals.front().length();
+        for (auto it = std::next(std::cbegin(intervals)); it != std::cend(intervals); ++it) {
+            const auto& i = *it;
+            auto& last = clustered_intervals.back();
+            bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
+            auto separation = i.start - last.end;
+            bool skip_glitch =
+                    std::abs(separation) < kMaxSampleGap &&
+                    last.length() > kMinIntervalSizeForMerge &&
+                    (i.length() > kMinIntervalSizeForMerge || i.end >= right_end - kStride);
+            bool allow_linker = separation >= 0 && separation < kMaxInterruption;
+            if (mean_proximity_ok && (skip_glitch || allow_linker)) {
+                // retain avg value from the best section to prevent drift for future merges
+                auto& best = (i.length() < last.length()) ? last : i;
+                spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end, last.start,
+                              i.end);
+                last = Interval{last.start, i.end, best.avg};
+                longest_interval = std::max(longest_interval, last.length());
+                merge_intervals = true;
             } else {
-                auto& last = clustered_intervals.back();
-                bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
-                auto separation = i.start - last.end;
-                bool skip_glitch = std::abs(separation) < kMaxSampleGap &&
-                                   last.end - last.start > kMinIntervalSizeForMerge &&
-                                   (i.end - i.start > kMinIntervalSizeForMerge ||
-                                    i.end >= right_end - kStride);
-                bool allow_linker = separation >= 0 && separation < kMaxInterruption;
-                if (mean_proximity_ok && (skip_glitch || allow_linker)) {
-                    // retain avg value from the best section to prevent drift for future merges
-                    auto& best = (i.end - i.start) < (last.end - last.start) ? last : i;
-                    spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end,
-                                  last.start, i.end);
-                    last = Interval{last.start, i.end, best.avg};
-                    keep_merging = true;
-                } else {
-                    clustered_intervals.push_back(i);
+                // drop unmergeable interval (unless it is our current best)
+                if (last.length() < longest_interval && last.length() <= kMinIntervalSizeForMerge) {
+                    clustered_intervals.pop_back();
+                    merge_intervals = true;
                 }
+                longest_interval = std::max(longest_interval, i.length());
+                clustered_intervals.push_back(i);
             }
         }
         intervals = std::exchange(clustered_intervals, {});
