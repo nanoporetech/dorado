@@ -19,8 +19,6 @@ namespace dorado::polisher {
 ModelType parse_model_type(const std::string& type) {
     if (type == "GRUModel") {
         return ModelType::GRU;
-    } else if (type == "LatentSpaceGRU") {
-        return ModelType::LATENT_SPACE_GRU;
     } else if (type == "LatentSpaceLSTM") {
         return ModelType::LATENT_SPACE_LSTM;
     }
@@ -30,7 +28,7 @@ ModelType parse_model_type(const std::string& type) {
 /**
  * \brief This function is a workaround around missing features in torchlib. There
  *          is currently no way to load only the state dict without the model either
- *          being traced of scripted.
+ *          being traced or scripted.
  *          Issue: "PytorchStreamReader failed locating file constants.pkl: file not found"
  *          Source: https://github.com/pytorch/pytorch/issues/36577#issuecomment-1279666295
  */
@@ -54,7 +52,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         }
     }
 
-    torch::NoGradGuard no_grad;
+    at::InferenceMode infer_guard;
 
     const std::vector<char> bytes = get_bytes(in_pt);
 
@@ -82,21 +80,31 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         }
 
         // Validate that all parameters exist.
-        for (const auto& name : set_model_params) {
-            if (set_loaded_params.count(name) == 0) {
+        {
+            std::vector<std::string> missing;
+            for (const auto& name : set_model_params) {
+                if (set_loaded_params.count(name) == 0) {
+                    missing.emplace_back(name);
+                }
+            }
+            if (!std::empty(missing)) {
                 throw std::runtime_error(
                         "Cannot load weights into the model: model contains parameters which are "
-                        "not present in the weights file. name = " +
-                        name);
+                        "not present in the weights file. Missing parameters: " +
+                        print_container_as_string(missing, ", "));
             }
         }
-        for (const auto& name : set_loaded_params) {
-            if (set_model_params.count(name) == 0) {
-                throw std::runtime_error(
-                        "Cannot load weights into the model: weights file contains parameters "
-                        "which are not present in the model. name = " +
-                        name);
+        {
+            std::vector<std::string> missing;
+            for (const auto& name : set_loaded_params) {
+                if (set_model_params.count(name) == 0) {
+                    missing.emplace_back(name);
+                }
             }
+            throw std::runtime_error(
+                    "Cannot load weights into the model: weights file contains parameters "
+                    "which are not present in the model. Missing parameters: " +
+                    print_container_as_string(missing, ", "));
         }
 
         // Set the model weights.

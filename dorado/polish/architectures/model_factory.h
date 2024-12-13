@@ -13,7 +13,6 @@ namespace dorado::polisher {
 
 enum class ModelType {
     GRU,
-    LATENT_SPACE_GRU,
     LATENT_SPACE_LSTM,
 };
 
