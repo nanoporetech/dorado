@@ -6,19 +6,23 @@
 set -ex
 set -o pipefail
 
+# Do nothing if this env variable is set.
+if [[ "${NO_TEST_DORADO_CORRECT}" == "1" ]]; then
+    exit 0
+fi
+
 if [[ $# -lt 1 ]]; then
     echo "Usage: $0 <dorado executable> [<out_dir>]"
     exit 1
 fi
 
+if [[ $# -eq 2 ]]; then
+    mkdir -p $2
+fi
+
 # CLI options.
 IN_DORADO_BIN="$1"
 OUT_DIR="$2"
-
-# Do nothing if this env variable is set.
-if [[ "${NO_TEST_DORADO_CORRECT}" == "1" ]]; then
-    exit 0
-fi
 
 TEST_DIR=$(cd "$(dirname $0)"; pwd -P)
 TEST_DATA_DIR=${TEST_DIR}/data
@@ -35,8 +39,10 @@ mkdir -p ${output_dir}
 
 # Download the Cram package.
 pushd ${output_dir}
-curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
-tar -xzf cram-0.6.tar.gz
+if [ ! -d cram-0.6 ]; then
+    curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
+    tar -xzf cram-0.6.tar.gz
+fi
 CRAM=$(pwd)/cram-0.6/cram.py
 popd
 
@@ -51,4 +57,4 @@ fi
 export DORADO_BIN
 export TEST_DATA_DIR
 export MODEL_DIR
-python3 ${CRAM} --verbose ${TEST_DIR}/cram/*.t
+python3 ${CRAM} --verbose ${TEST_DIR}/cram/correct/*.t

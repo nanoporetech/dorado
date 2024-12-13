@@ -72,6 +72,7 @@ int main(int argc, char* argv[]) {
             {"demux", &dorado::demuxer},
             {"trim", &dorado::trim},
             {"correct", &dorado::correct},
+            {"polish", &dorado::polish},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);

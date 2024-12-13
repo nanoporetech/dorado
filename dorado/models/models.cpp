@@ -1061,10 +1061,46 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace correction
 
+namespace polisher {
+
+const std::vector<ModelInfo> models = {
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl",
+                "fdb6d18fe7e93f141c8e15f1b014e338e7cdd2b3f390abd0ff85cede33b50cc7",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv",
+                "719389cf723a4ddbd020690c20708885ed6b5000c51a2144a5af5b8064a055d2",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl",
+                "3c0c7fbf2f204390ca6dfafaefc25a3f999870368e4a7b5d238eb600aa7e781b",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl_mv",
+                "eb9b4691bda3133e9b991aa1a2666cc632bbd5c2f803dff704ef1265f4315a90",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+};
+
+}  // namespace polisher
+
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
 const std::vector<ModelInfo>& modified_models() { return modified::models; }
 const std::vector<ModelInfo>& correction_models() { return correction::models; }
+const std::vector<ModelInfo>& polish_models() { return polisher::models; }
 
 namespace {
 std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
@@ -1081,6 +1117,7 @@ std::vector<std::string> simplex_model_names() { return unpack_names(simplex_mod
 std::vector<std::string> stereo_model_names() { return unpack_names(stereo_models()); };
 std::vector<std::string> modified_model_names() { return unpack_names(modified_models()); };
 std::vector<std::string> correction_model_names() { return unpack_names(correction_models()); };
+std::vector<std::string> polish_model_names() { return unpack_names(polish_models()); };
 
 std::vector<std::string> modified_model_variants() {
     std::vector<std::string> variants;
@@ -1092,8 +1129,8 @@ std::vector<std::string> modified_model_variants() {
 
 // Returns true if model_name matches any configured model
 bool is_valid_model(const std::string& model_name) {
-    for (const auto& collection :
-         {simplex::models, stereo::models, modified::models, correction::models}) {
+    for (const auto& collection : {simplex::models, stereo::models, modified::models,
+                                   correction::models, polisher::models}) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return true;
@@ -1190,6 +1227,7 @@ ModelInfo get_model_info(const std::string& model_name) {
     const auto& mods_model_infos = modified_models();
     const auto& stereo_model_infos = stereo_models();
     const auto& correction_model_infos = correction_models();
+    const auto& polish_model_infos = polish_models();
 
     auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
     std::vector<ModelInfo> matches;
@@ -1201,6 +1239,8 @@ ModelInfo get_model_info(const std::string& model_name) {
                  is_name_match);
     std::copy_if(correction_model_infos.begin(), correction_model_infos.end(),
                  std::back_inserter(matches), is_name_match);
+    std::copy_if(polish_model_infos.begin(), polish_model_infos.end(), std::back_inserter(matches),
+                 is_name_match);
 
     if (matches.empty()) {
         throw std::runtime_error("Could not find information on model: " + model_name);

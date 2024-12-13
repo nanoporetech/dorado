@@ -69,6 +69,8 @@ add_library(dorado_utils
     uuid_utils.h
     paf_utils.cpp
     paf_utils.h
+    fai_utils.cpp
+    fai_utils.h
  )
 
 target_compile_definitions(dorado_utils

@@ -307,6 +307,54 @@ add_library(dorado_lib
     dorado/correct/infer.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
+    dorado/polish/consensus_result.h
+    dorado/polish/bam_file.cpp
+    dorado/polish/bam_file.h
+    dorado/polish/interval.h
+    dorado/polish/polish_impl.cpp
+    dorado/polish/polish_impl.h
+    dorado/polish/polish_progress_tracker.cpp
+    dorado/polish/polish_progress_tracker.h
+    dorado/polish/polish_utils.cpp
+    dorado/polish/polish_utils.h
+    dorado/polish/region.cpp
+    dorado/polish/region.h
+    dorado/polish/sample.h
+    dorado/polish/trim.cpp
+    dorado/polish/trim.h
+    dorado/polish/window.cpp
+    dorado/polish/window.h
+    dorado/polish/features/decoder_base.cpp
+    dorado/polish/features/decoder_base.h
+    dorado/polish/features/decoder_factory.cpp
+    dorado/polish/features/decoder_factory.h
+    dorado/polish/features/encoder_base.h
+    dorado/polish/features/encoder_counts.cpp
+    dorado/polish/features/encoder_counts.h
+    dorado/polish/features/encoder_factory.cpp
+    dorado/polish/features/encoder_factory.h
+    dorado/polish/features/encoder_read_alignment.cpp
+    dorado/polish/features/encoder_read_alignment.h
+    dorado/polish/features/medaka_bamiter.cpp
+    dorado/polish/features/medaka_bamiter.h
+    dorado/polish/features/medaka_counts.cpp
+    dorado/polish/features/medaka_counts.h
+    dorado/polish/features/medaka_read_matrix.cpp
+    dorado/polish/features/medaka_read_matrix.h
+    dorado/polish/architectures/model_config.cpp
+    dorado/polish/architectures/model_config.h
+    dorado/polish/architectures/model_factory.cpp
+    dorado/polish/architectures/model_factory.h
+    dorado/polish/architectures/model_gru.cpp
+    dorado/polish/architectures/model_gru.h
+    dorado/polish/architectures/model_latent_space_lstm.cpp
+    dorado/polish/architectures/model_latent_space_lstm.h
+    dorado/polish/architectures/model_torch_base.cpp
+    dorado/polish/architectures/model_torch_base.h
+    dorado/polish/architectures/model_torch_script.cpp
+    dorado/polish/architectures/model_torch_script.h
+    dorado/utils/ssize.h
+    dorado/utils/span.h
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -374,6 +422,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
         dorado/cli/correct.cpp
+        dorado/cli/polish.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
         dorado/cli/model_resolution.h
