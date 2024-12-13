@@ -113,26 +113,26 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 }
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
-        const std::vector<std::filesystem::path>& remora_models,
+        const std::vector<std::filesystem::path>& modbase_models,
         const std::string& device,
-        size_t remora_runners_per_caller,
-        size_t remora_batch_size) {
-    if (remora_models.empty()) {
+        size_t runners_per_caller,
+        size_t batch_size) {
+    if (modbase_models.empty()) {
         return {};
     }
 
-    modbase::check_modbase_multi_model_compatibility(remora_models);
+    modbase::check_modbase_multi_model_compatibility(modbase_models);
 
     // generate model callers before nodes or it affects the speed calculations
-    std::vector<modbase::RunnerPtr> remora_runners;
+    std::vector<modbase::RunnerPtr> runners;
     std::vector<std::string> modbase_devices;
 
-    int remora_callers = 1;
+    int num_callers = 1;
     if (device == "cpu") {
         modbase_devices.push_back(device);
-        remora_batch_size = 128;
-        remora_runners_per_caller = 1;
-        remora_callers = std::thread::hardware_concurrency();
+        batch_size = 128;
+        runners_per_caller = 1;
+        num_callers = std::thread::hardware_concurrency();
     }
 #if DORADO_METAL_BUILD
     else if (device == "metal") {
@@ -144,16 +144,15 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     }
 #endif
     for (const auto& device_string : modbase_devices) {
-        for (int i = 0; i < remora_callers; ++i) {
-            auto caller =
-                    create_modbase_caller(remora_models, int(remora_batch_size), device_string);
-            for (size_t j = 0; j < remora_runners_per_caller; j++) {
-                remora_runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));
+        for (int i = 0; i < num_callers; ++i) {
+            auto caller = create_modbase_caller(modbase_models, int(batch_size), device_string);
+            for (size_t j = 0; j < runners_per_caller; j++) {
+                runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));
             }
         }
     };
 
-    return remora_runners;
+    return runners;
 }
 
 #if DORADO_CUDA_BUILD

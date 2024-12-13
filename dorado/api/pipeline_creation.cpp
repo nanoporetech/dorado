@@ -5,6 +5,7 @@
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"
+#include "read_pipeline/ModBaseChunkCallerNode.h"
 #include "read_pipeline/PairingNode.h"
 #include "read_pipeline/ReadSplitNode.h"
 #include "read_pipeline/ScalerNode.h"
@@ -13,6 +14,32 @@
 #include "splitter/RNAReadSplitter.h"
 
 #include <spdlog/spdlog.h>
+
+#include <stdexcept>
+
+namespace {
+
+dorado::NodeHandle insert_modbase_node(dorado::PipelineDescriptor& pipeline_desc,
+                                       std::vector<dorado::modbase::RunnerPtr>&& modbase_runners,
+                                       int modbase_node_threads,
+                                       int stride) {
+    if (modbase_runners.empty()) {
+        throw std::runtime_error("No modbase runners to insert");
+    }
+    const auto& takes_chunked_inputs = modbase_runners.at(0)->takes_chunk_inputs();
+    constexpr int kMaxReads = 1000;
+    if (takes_chunked_inputs) {
+        spdlog::trace("Using Modbase Chunk Caller");
+        return pipeline_desc.add_node<dorado::ModBaseChunkCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads, stride, kMaxReads);
+    } else {
+        spdlog::trace("Using Modbase Context Caller");
+        return pipeline_desc.add_node<dorado::ModBaseCallerNode>(
+                {}, std::move(modbase_runners), modbase_node_threads, stride, kMaxReads);
+    }
+}
+
+}  // namespace
 
 namespace dorado::api {
 
@@ -28,7 +55,11 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                              NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto overlap = model_config.basecaller.overlap();
-    assert(overlap % model_config.stride_inner() == 0);
+
+    if ((overlap % model_config.stride_inner()) != 0) {
+        throw std::runtime_error("Overlap and model stride must be evenly divisible.");
+    }
+
     std::string model_name =
             std::filesystem::canonical(model_config.model_path).filename().string();
 
@@ -79,8 +110,8 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
 
     if (!modbase_runners.empty()) {
-        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, model_config.stride, 1000);
+        auto mod_base_caller_node = insert_modbase_node(pipeline_desc, std::move(modbase_runners),
+                                                        modbase_node_threads, model_config.stride);
         pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
         current_node_handle = mod_base_caller_node;
         last_node_handle = mod_base_caller_node;
@@ -126,9 +157,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     NodeHandle last_node_handle = stereo_basecaller_node;
     if (!modbase_runners.empty()) {
-        auto mod_base_caller_node = pipeline_desc.add_node<ModBaseCallerNode>(
-                {}, std::move(modbase_runners), modbase_node_threads, size_t(model_config.stride),
-                1000);
+        auto mod_base_caller_node = insert_modbase_node(pipeline_desc, std::move(modbase_runners),
+                                                        modbase_node_threads, model_config.stride);
         pipeline_desc.add_node_sink(stereo_basecaller_node, mod_base_caller_node);
         last_node_handle = mod_base_caller_node;
     }

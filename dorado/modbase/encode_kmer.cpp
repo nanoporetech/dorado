@@ -6,15 +6,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <stdexcept>
 #include <vector>
 
 namespace {
 
-// OneHot encoding encodees categorical data (bases) into unique bool-like columns for each category.
+// OneHot encoding encodes categorical data (bases) into unique bool-like columns for each category.
 // This function returns a u32 representing the 4 i8 base categories and a 5th for N.
 // -1(N)[0,0,0,0]; 0(A)[1,0,0,0]; 1(C)[0,1,0,0]; 2(G)[0,0,1,0] 3(T)[0,0,0,1].
 // The encoding is done by bit shifting a 1 by the numerical "magnitude" of the base giving:
@@ -270,16 +270,15 @@ std::vector<int8_t> encode_kmer_context(const std::vector<int>& seq,
                                        context_samples);
 }
 
-// FIXME -- unused until DOR-849
 // Encodes a kmer chunk of the length `context_samples` symmetrically extending the
 // ends by `padding_samples` kmers of 'N' bases. Optionally centers the kmer if `kmer_centered` is set.
 // The returned vector is size `4 * kmer_len * (context_samples + 2*padding_samples)`
-[[maybe_unused]] std::vector<int8_t> encode_kmer_chunk(const std::vector<int>& seq,
-                                                       const std::vector<uint64_t>& seq_mappings,
-                                                       size_t kmer_len,
-                                                       size_t context_samples,
-                                                       size_t padding_samples,
-                                                       bool kmer_centered) {
+std::vector<int8_t> encode_kmer_chunk(const std::vector<int>& seq,
+                                      const std::vector<uint64_t>& seq_mappings,
+                                      size_t kmer_len,
+                                      size_t context_samples,
+                                      size_t padding_samples,
+                                      bool kmer_centered) {
     if (kmer_len == 9) {
         return encode_kmer_chunk_len9(seq, seq_mappings, context_samples, padding_samples,
                                       kmer_centered);

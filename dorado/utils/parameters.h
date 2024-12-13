@@ -9,14 +9,6 @@ struct DefaultParameters {
     int chunksize{10000};
     int overlap{500};
     int num_runners{2};
-#ifdef DORADO_TX2
-    int remora_batchsize{128};
-#else
-    int remora_batchsize{1024};
-#endif
-    int remora_threads{4};
-    int mod_base_runners_per_caller{2};
-    float methylation_threshold{0.05f};
 
     // Minimum length for a sequence to be outputted.
     size_t min_sequence_length{5};
@@ -28,7 +20,7 @@ struct ThreadAllocations {
     int writer_threads{0};
     int read_converter_threads{0};
     int read_filter_threads{0};
-    int remora_threads{0};
+    int modbase_threads{0};
     int scaler_node_threads{0};
     int splitter_node_threads{0};
     int loader_threads{0};
@@ -38,7 +30,7 @@ struct ThreadAllocations {
 };
 
 ThreadAllocations default_thread_allocations(int num_devices,
-                                             int num_remora_threads,
+                                             int num_modbase_threads,
                                              bool enable_aligner,
                                              bool enable_barcoder,
                                              bool adapter_trimming);

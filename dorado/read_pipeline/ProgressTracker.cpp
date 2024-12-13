@@ -50,6 +50,8 @@ void ProgressTracker::summarize() const {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
                                                                           m_initialization_time)
                             .count();
+
+    spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
         spdlog::info("> Simplex reads basecalled: {}", m_num_simplex_reads_written);
     }
@@ -80,6 +82,14 @@ void ProgressTracker::summarize() const {
                           m_num_samples_incl_padding / (duration / 1000.0),
                           100.f * m_num_samples_processed / m_num_samples_incl_padding);
         }
+    }
+    if (m_num_mods_samples_processed > 0) {
+        const auto call_rate = m_num_mods_samples_processed / (duration / 1000.0);
+        const auto pad_call_rate = m_num_mods_samples_incl_padding / (duration / 1000.0);
+        spdlog::debug("> Modbasecalled @ Samples/s: {:.6e} Samples: {:.6e}", call_rate,
+                      double(m_num_mods_samples_processed));
+        spdlog::debug("> Modbasecalled Including Padding @ Samples/s: {:.6e} Samples: {:.6e}",
+                      pad_call_rate, double(m_num_mods_samples_incl_padding));
     }
 
     if (m_num_barcodes_demuxed > 0) {
@@ -157,6 +167,11 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
+
+    // Modbase
+    m_num_mods_samples_processed = int64_t(fetch_stat("ModBaseChunkCallerNode.samples_processed"));
+    m_num_mods_samples_incl_padding =
+            int64_t(fetch_stat("ModBaseChunkCallerNode.samples_incl_padding"));
 
     // Barcode demuxing stats.
     m_num_barcodes_demuxed = int(fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed"));

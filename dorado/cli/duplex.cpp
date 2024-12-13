@@ -8,6 +8,7 @@
 #include "data_loader/DataLoader.h"
 #include "dorado_version.h"
 #include "file_info/file_info.h"
+#include "modbase/ModBaseModelConfig.h"
 #include "model_downloader/model_downloader.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
@@ -25,6 +26,7 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
+#include "utils/modbase_parameters.h"
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif
@@ -264,6 +266,7 @@ using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
+    using dorado::utils::modbase::default_modbase_parameters;
     utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
@@ -365,8 +368,12 @@ int duplex(int argc, char* argv[]) {
         parser.visible.add_argument("--modified-bases-threshold")
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].")
-                .default_value(default_parameters.methylation_threshold)
+                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>();
+        parser.visible.add_argument("--modified-bases-batchsize")
+                .default_value(default_modbase_parameters.batchsize)
+                .scan<'i', int>()
+                .help("The modified base models batch size.");
     }
     {
         parser.visible.add_group("Advanced arguments");
@@ -512,8 +519,15 @@ int duplex(int argc, char* argv[]) {
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }
+
+        const auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            spdlog::error("--modified-bases-threshold must be between 0 and 1.");
+            return EXIT_FAILURE;
+        }
+
         auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, 0.0f, nullptr, 1000);
+                {converted_reads_sink}, emit_moves, 2, methylation_threshold, nullptr, 1000);
         auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
@@ -595,10 +609,24 @@ int duplex(int argc, char* argv[]) {
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
+
+            // TODO: DOR-971 to add support for duplex + conv_lstm_v2 modbase models
+            if (!models.mods_model_paths.empty() &&
+                utils::modbase::get_modbase_model_type(models.mods_model_paths.front()) ==
+                        utils::modbase::ModelType::CONV_LSTM_V2) {
+                spdlog::error(
+                        "CONV_LSTM_V2 models are not supported by dorado duplex yet - DOR-971");
+                return EXIT_FAILURE;
+            }
+
+            const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
+                    models.mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
+                    methylation_threshold);
+
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
-            auto mod_base_runners = api::create_modbase_runners(
-                    models.mods_model_paths, device, default_parameters.mod_base_runners_per_caller,
-                    default_parameters.remora_batchsize);
+            auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,
+                                                                modbase_params.runners_per_caller,
+                                                                modbase_params.batchsize);
 
             if (!mod_base_runners.empty() && output_mode == OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
@@ -714,7 +742,7 @@ int duplex(int argc, char* argv[]) {
             api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
                     std::move(mod_base_runners), mean_qscore_start_pos, int(num_devices * 2),
-                    int(num_devices), int(default_parameters.remora_threads * num_devices),
+                    int(num_devices), int(modbase_params.threads * num_devices),
                     std::move(pairing_parameters), read_filter_node,
                     PipelineDescriptor::InvalidNodeHandle);
 

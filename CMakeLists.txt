@@ -230,6 +230,8 @@ add_library(dorado_lib
     dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
+    dorado/read_pipeline/ModBaseChunkCallerNode.cpp
+    dorado/read_pipeline/ModBaseChunkCallerNode.h    
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp

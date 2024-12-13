@@ -22,6 +22,7 @@
 #include "read_pipeline/ScalerNode.h"
 #include "utils/PostCondition.h"
 #include "utils/SampleSheet.h"
+#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 
 #include <torch/cuda.h>
@@ -251,17 +252,17 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    const auto& default_params = dorado::utils::default_parameters;
-    const char remora_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
-    const auto remora_model_dir = download_model(remora_model_name);
-    const auto remora_model = remora_model_dir.m_path / remora_model_name;
+    const auto& default_modbase_params = dorado::utils::modbase::default_modbase_parameters;
+    const char modbase_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
+    const auto modbase_model_dir = download_model(modbase_model_name);
+    const auto modbase_model = modbase_model_dir.m_path / modbase_model_name;
 
     // Add a second model into the mix
-    const char remora_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3";
-    const auto remora_model_6mA_dir = download_model(remora_model_6mA_name);
-    const auto remora_model_6mA = remora_model_6mA_dir.m_path / remora_model_6mA_name;
+    const char modbase_model_6mA_name[] = "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_6mA@v3";
+    const auto modbase_model_6mA_dir = download_model(modbase_model_6mA_name);
+    const auto modbase_model_6mA = modbase_model_6mA_dir.m_path / modbase_model_6mA_name;
 
-    // The model stride for RemoraCaller isn't in its config so grab it separately.
+    // The model stride for ModBaseCaller isn't in its config so grab it separately.
     // Note: We only look at the stride of one of the models since it's not what we're
     // testing for. In theory we could hardcode the stride to any number here, but to
     // be somewhat realistic we'll use an actual one.
@@ -272,7 +273,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Create runners
     std::string device;
-    int batch_size = default_params.remora_batchsize;
+    int batch_size = default_modbase_params.batchsize;
     if (gpu) {
 #if DORADO_METAL_BUILD
         device = "metal";
@@ -310,11 +311,11 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
                      m_rng);
     });
 
-    auto remora_runners = dorado::api::create_modbase_runners(
-            {remora_model, remora_model_6mA}, device, default_params.mod_base_runners_per_caller,
+    auto modbase_runners = dorado::api::create_modbase_runners(
+            {modbase_model, modbase_model_6mA}, device, default_modbase_params.runners_per_caller,
             batch_size);
 
-    run_smoke_test<dorado::ModBaseCallerNode>(std::move(remora_runners), 2, model_stride, 1000);
+    run_smoke_test<dorado::ModBaseCallerNode>(std::move(modbase_runners), 2, model_stride, 1000);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
@@ -326,7 +327,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
     set_pipeline_restart(pipeline_restart);
 
     run_smoke_test<dorado::ReadToBamTypeNode>(
-            emit_moves, 2, dorado::utils::default_parameters.methylation_threshold, nullptr, 1000);
+            emit_moves, 2, dorado::utils::modbase::default_modbase_parameters.methylation_threshold,
+            nullptr, 1000);
 }
 
 struct BarcodeKitInputs {

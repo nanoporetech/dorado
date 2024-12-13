@@ -41,6 +41,9 @@ std::vector<uint64_t> moves_to_map(const std::vector<uint8_t>& moves,
 // Compute cumulative sums of the move table
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves);
 
+// Reverse sequence to signal map in-place
+void reverse_seq_to_sig_map(std::vector<uint64_t>& seq_to_sig_map, size_t signal_len);
+
 class BaseInfo {
 public:
     static constexpr int NUM_BASES = 4;

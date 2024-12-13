@@ -38,6 +38,7 @@ add_executable(dorado_tests
     MathUtilsTest.cpp
     MergeHeadersTest.cpp
     Minimap2IndexTest.cpp
+    ModBaseChunkTest.cpp
     ModBaseConfigTest.cpp
     ModBaseEncoderTest.cpp
     ModelKitsTest.cpp
