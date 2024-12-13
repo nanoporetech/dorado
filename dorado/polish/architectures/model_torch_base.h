@@ -1,6 +1,7 @@
 #pragma once
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
+#include <torch/nn/module.h>
 
 #include <memory>
 
@@ -13,7 +14,7 @@ public:
     /**
      * \brief This function is virtual and must be overridden by derived classes.
      */
-    virtual torch::Tensor forward(torch::Tensor x) = 0;
+    virtual at::Tensor forward(at::Tensor x) = 0;
 
     /**
      * \brief Helper function to get the device where the model is located.
@@ -40,7 +41,7 @@ public:
     /**
      * \brief Predict on a batch with device and precision handling.
      */
-    virtual torch::Tensor predict_on_batch(torch::Tensor x);
+    virtual at::Tensor predict_on_batch(at::Tensor x);
 
 protected:
     bool m_half_precision = false;

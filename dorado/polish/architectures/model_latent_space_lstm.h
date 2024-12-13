@@ -3,7 +3,14 @@
 #include "model_torch_base.h"
 #include "polish/polish_utils.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
+#include <torch/nn/modules/activation.h>
+#include <torch/nn/modules/batchnorm.h>
+#include <torch/nn/modules/container/sequential.h>
+#include <torch/nn/modules/conv.h>
+#include <torch/nn/modules/embedding.h>
+#include <torch/nn/modules/linear.h>
+#include <torch/nn/modules/rnn.h>
 
 #include <cstdint>
 #include <memory>
@@ -21,7 +28,7 @@ public:
                       bool use_batch_norm  // True
     );
 
-    torch::Tensor forward(torch::Tensor x);
+    at::Tensor forward(at::Tensor x);
 
 private:
     torch::nn::Sequential m_convs;
@@ -31,7 +38,7 @@ TORCH_MODULE(ReadLevelConv);
 
 class MeanPoolerImpl : public torch::nn::Module {
 public:
-    torch::Tensor forward(const torch::Tensor& x, const torch::Tensor& non_empty_position_mask);
+    at::Tensor forward(const at::Tensor& x, const at::Tensor& non_empty_position_mask);
 };
 TORCH_MODULE(MeanPooler);
 
@@ -42,7 +49,7 @@ public:
                    const bool batch_first,
                    const bool reverse);
 
-    torch::Tensor forward(torch::Tensor x);
+    at::Tensor forward(at::Tensor x);
 
 private:
     torch::nn::LSTM m_lstm;
@@ -62,7 +69,7 @@ public:
                          const int32_t bases_embedding_size,
                          const bool bidirectional);
 
-    torch::Tensor forward(torch::Tensor x);
+    at::Tensor forward(at::Tensor x);
 
 private:
     // Model parameters.

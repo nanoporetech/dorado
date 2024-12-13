@@ -2,7 +2,9 @@
 
 #include "model_torch_base.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
+#include <torch/nn/modules/linear.h>
+#include <torch/nn/modules/rnn.h>
 
 #include <cstdint>
 #include <memory>
@@ -18,7 +20,7 @@ public:
              const bool bidirectional,
              const bool normalise);
 
-    torch::Tensor forward(torch::Tensor x) override;
+    at::Tensor forward(at::Tensor x) override;
 
 private:
     int32_t m_num_features = 10;

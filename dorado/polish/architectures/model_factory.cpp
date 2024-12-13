@@ -60,7 +60,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
 
     try {
         const c10::Dict<c10::IValue, c10::IValue> weights =
-                torch::pickle_load(bytes).toGenericDict();
+                torch::jit::pickle_load(bytes).toGenericDict();
 
         auto params = model.named_parameters(true /*recurse*/);
         auto buffers = model.named_buffers(true /*recurse*/);

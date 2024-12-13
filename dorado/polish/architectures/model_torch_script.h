@@ -2,7 +2,7 @@
 
 #include "model_torch_base.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <filesystem>
 
@@ -14,7 +14,7 @@ public:
 
     torch::Device get_device() const override;
 
-    torch::Tensor forward(torch::Tensor x) override;
+    at::Tensor forward(at::Tensor x) override;
 
     void to_half() override;
 
