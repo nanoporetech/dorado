@@ -171,7 +171,6 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         const bool bidirectional =
                 (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
         constexpr bool NORMALISE = true;
-        // const double read_majority_threshold = std::stod(get_value(config.model_kwargs, "read_majority_threshold"));
 
         model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
                                            bidirectional, NORMALISE);
