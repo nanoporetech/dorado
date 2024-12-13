@@ -664,7 +664,8 @@ void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli
  * \brief Checks if any region overlaps amy of the other regions. This may produce wrong results, so
  *          we disallow that.
  */
-void validate_regions(const std::vector<polisher::Region>& regions) {
+void validate_regions(const std::vector<polisher::Region>& regions,
+                      const std::vector<std::pair<std::string, int64_t>>& seq_lens) {
     // Create intervals for each input sequence.
     std::unordered_map<std::string, std::vector<interval_tree::Interval<int64_t, int64_t>>>
             intervals;
@@ -680,12 +681,37 @@ void validate_regions(const std::vector<polisher::Region>& regions) {
         trees[key] = interval_tree::IntervalTree<int64_t, int64_t>(std::move(values));
     }
 
+    // Validate that none of the regions is overlapping any other region.
     for (const auto& region : regions) {
         std::vector<interval_tree::Interval<int64_t, int64_t>> results =
                 trees[region.name].findOverlapping(region.start, region.end - 1);
         if (std::size(results) > 1) {
-            throw std::runtime_error("Region '" + polisher::region_to_string(region) +
+            throw std::runtime_error("Region validation failed: region '" +
+                                     polisher::region_to_string(region) +
                                      "' overlaps other regions. Regions have to be unique.");
+        }
+    }
+
+    // Validate that all of the regions are within the range of the input sequences.
+    std::unordered_map<std::string, int64_t> len_dict;
+    for (const auto& [key, val] : seq_lens) {
+        len_dict[key] = val;
+    }
+    for (const auto& region : regions) {
+        const auto it = len_dict.find(region.name);
+        if (it == std::end(len_dict)) {
+            throw std::runtime_error{"Region validation failed: sequence name for region '" +
+                                     polisher::region_to_string(region) +
+                                     "' does not exist in the input sequence file."};
+        }
+        const int64_t seq_len = it->second;
+        // Allow negative coordinates as a proxy for full sequence length.
+        if ((region.start >= seq_len) || (region.end > seq_len) ||
+            ((region.start >= 0) && (region.end >= 0) && (region.start >= region.end))) {
+            throw std::runtime_error{
+                    "Region validation failed: coordinates for region '" +
+                    polisher::region_to_string(region) +
+                    "' are not valid. Sequence length: " + std::to_string(seq_len)};
         }
     }
 }
@@ -713,6 +739,8 @@ void run_polishing(const Options& opt,
     spdlog::debug("[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
+
+    validate_regions(opt.regions, draft_lens);
 
     const int64_t total_input_bases =
             std::accumulate(std::begin(draft_lens), std::end(draft_lens), static_cast<int64_t>(0),
@@ -897,8 +925,6 @@ int polish(int argc, char* argv[]) {
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
             check_read_groups(bam_info, opt.read_group);
         }
-
-        validate_regions(opt.regions);
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         // at::set_num_interop_threads(opt.threads);
