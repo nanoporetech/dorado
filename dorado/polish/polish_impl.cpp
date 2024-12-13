@@ -777,7 +777,7 @@ void sample_producer(PolisherResources& resources,
                 resources.bam_handles, *resources.encoder, draft_lens,
                 Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
 
-        spdlog::debug(
+        spdlog::trace(
                 "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
                 num_regions, std::size(region_samples));
 
@@ -801,7 +801,7 @@ void sample_producer(PolisherResources& resources,
                 InferenceData remainder_buffer;
                 remainder_buffer.samples = {std::move(samples[i])};
                 remainder_buffer.trims = {std::move(trims[i])};
-                spdlog::debug(
+                spdlog::trace(
                         "[producer] Pushing a batch of data to infer_data queue. "
                         "remainder_buffer.samples.size() = {}",
                         std::size(remainder_buffer.samples));
@@ -814,7 +814,7 @@ void sample_producer(PolisherResources& resources,
             buffer.trims.emplace_back(std::move(trims[i]));
 
             if (dorado::ssize(buffer.samples) == batch_size) {
-                spdlog::debug(
+                spdlog::trace(
                         "[producer] Pushing a batch of data to infer_data queue. "
                         "buffer.samples.size() = {}",
                         std::size(buffer.samples));
@@ -825,7 +825,7 @@ void sample_producer(PolisherResources& resources,
     }
 
     if (!std::empty(buffer.samples)) {
-        spdlog::debug(
+        spdlog::trace(
                 "[producer] Pushing a batch of data to infer_data queue. "
                 "buffer.samples.size() = {} (final)",
                 std::size(buffer.samples));
