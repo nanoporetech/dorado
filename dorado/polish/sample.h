@@ -2,7 +2,7 @@
 
 #include "polish/polish_utils.h"
 
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
 #include <cstdint>
 #include <ostream>
@@ -13,10 +13,10 @@
 namespace dorado::polisher {
 
 struct Sample {
-    torch::Tensor features;
+    at::Tensor features;
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
-    torch::Tensor depth;
+    at::Tensor depth;
     int32_t seq_id = -1;
     int32_t region_id = -1;
     std::vector<std::string> read_ids_left;
@@ -24,10 +24,10 @@ struct Sample {
 
     Sample() = default;
 
-    Sample(torch::Tensor features_,
+    Sample(at::Tensor features_,
            std::vector<int64_t> positions_major_,
            std::vector<int64_t> positions_minor_,
-           torch::Tensor depth_,
+           at::Tensor depth_,
            const int32_t seq_id_,
            const int32_t region_id_,
            std::vector<std::string> read_ids_left_,

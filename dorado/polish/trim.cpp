@@ -3,7 +3,6 @@
 #include "utils/ssize.h"
 
 #include <spdlog/spdlog.h>
-#include <torch/torch.h>
 
 #include <ostream>
 #include <sstream>
