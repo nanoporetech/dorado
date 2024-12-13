@@ -1078,6 +1078,20 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{},
                 ModsVariantPair{},
         },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl",
+                "3c0c7fbf2f204390ca6dfafaefc25a3f999870368e4a7b5d238eb600aa7e781b",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl_mv",
+                "eb9b4691bda3133e9b991aa1a2666cc632bbd5c2f803dff704ef1265f4315a90",
+                CC::UNKNOWN,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
 };
 
 }  // namespace polisher
