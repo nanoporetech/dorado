@@ -1,8 +1,7 @@
 
 #include "modbase_parameters.h"
 
-#include "spdlog/spdlog.h"
-
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <filesystem>
@@ -10,7 +9,7 @@
 
 namespace dorado::utils::modbase {
 
-std::string to_string(const ModelType& model_type) {
+std::string to_string(const ModelType& model_type) noexcept {
     switch (model_type) {
     case CONV_LSTM_V1:
         return std::string("conv_lstm");
@@ -19,11 +18,11 @@ std::string to_string(const ModelType& model_type) {
     case CONV_V1:
         return std::string("conv_v1");
     default:
-        throw std::runtime_error("Unknown modbase ModelType");
+        return std::string("__UNKNOWN__");
     }
 };
 
-ModelType model_type_from_string(const std::string& model_type) {
+ModelType model_type_from_string(const std::string& model_type) noexcept {
     if (model_type == "conv_lstm") {
         return ModelType::CONV_LSTM_V1;
     }
@@ -33,12 +32,16 @@ ModelType model_type_from_string(const std::string& model_type) {
     if (model_type == "conv_only" || model_type == "conv_v1") {
         return ModelType::CONV_V1;
     }
-    throw std::runtime_error("Unknown modbase model type: `" + model_type + "`");
+    return ModelType::UNKNOWN;
 }
 
 ModelType get_modbase_model_type(const std::filesystem::path& path) {
     const auto config_toml = toml::parse(path / "config.toml");
     return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+}
+
+bool is_modbase_model(const std::filesystem::path& path) {
+    return get_modbase_model_type(path) != ModelType::UNKNOWN;
 }
 
 ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths,

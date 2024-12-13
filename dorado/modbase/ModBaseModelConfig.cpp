@@ -16,6 +16,8 @@
 
 namespace {
 
+const std::string ERR_STR = "Invalid modbase model parameter in ";
+
 // Indicates that a value has no default and is therefore required
 constexpr std::optional<int> REQUIRED = std::nullopt;
 
@@ -41,6 +43,27 @@ int get_int_in_range(const toml::value& p,
 
 namespace dorado::modbase {
 
+ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
+                                       int size_,
+                                       int kmer_len_,
+                                       int num_out_,
+                                       int stride_)
+        : model_type(model_type_),
+          size(size_),
+          kmer_len(kmer_len_),
+          num_out(num_out_),
+          stride(stride_) {
+    if (model_type == ModelType::UNKNOWN) {
+        throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
+    }
+    if (size < 1 || kmer_len < 1 || num_out < 1 || stride < 1) {
+        throw std::runtime_error(ERR_STR + "general params: 'negative or zero value'.");
+    }
+    if (kmer_len % 2 != 1) {
+        throw std::runtime_error(ERR_STR + "general params: 'kmer_length is not odd'.");
+    }
+}
+
 ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     const auto segment = toml::find(config_toml, "model_params");
 
@@ -59,11 +82,61 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     return params;
 }
 
+LinearParams::LinearParams(int in_, int out_) : in(in_), out(out_) {
+    if (in < 1 || out < 1) {
+        throw std::runtime_error(ERR_STR + "linear params: 'negative or zero value'.");
+    }
+}
+
 LinearParams parse_linear_params(const toml::value& segment) {
     constexpr int MAX_SIZE = 4096;
     LinearParams params{get_int_in_range(segment, "in", 1, MAX_SIZE, REQUIRED),
                         get_int_in_range(segment, "out", 1, MAX_SIZE, REQUIRED)};
     return params;
+}
+
+ModificationParams::ModificationParams(std::vector<std::string> codes_,
+                                       std::vector<std::string> long_names_,
+                                       std::string motif_,
+                                       const size_t motif_offset_)
+        : codes(std::move(codes_)),
+          long_names(std::move(long_names_)),
+          count(codes.size()),
+          motif(std::move(motif_)),
+          motif_offset(motif_offset_),
+          base(get_canonical_base_name(motif, motif_offset)),
+          base_id(utils::BaseInfo::BASE_IDS[base]) {
+    if (codes.empty()) {
+        throw std::runtime_error(ERR_STR + "mods params: 'empty modifications.");
+    }
+    if (long_names.empty()) {
+        throw std::runtime_error(ERR_STR + "mods params: 'empty long names.");
+    }
+    if (codes.size() != long_names.size()) {
+        throw std::runtime_error(ERR_STR + "mods params: 'mods and names size mismatch.");
+    }
+
+    for (const auto& code : codes) {
+        if (!utils::validate_bam_tag_code(code)) {
+            std::string e = ERR_STR + "mods params: 'invalid mod code ";
+            throw std::runtime_error(e + code + "'.");
+        }
+    }
+}
+
+char ModificationParams::get_canonical_base_name(const std::string& motif, size_t motif_offset) {
+    if (motif.size() < motif_offset) {
+        throw std::runtime_error(ERR_STR + "mods params: 'invalid motif offset'.");
+    }
+
+    // Assert a canonical base is at motif[motif_offset]
+    constexpr std::string_view canonical_bases = "ACGT";
+    std::string motif_base = motif.substr(motif_offset, 1);
+    if (canonical_bases.find(motif_base) == std::string::npos) {
+        throw std::runtime_error(ERR_STR + "mods params: 'invalid motif base " + motif_base + "'.");
+    }
+
+    return motif_base[0];
 }
 
 ModificationParams parse_modification_params(const toml::value& config_toml) {
@@ -100,6 +173,42 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
 }
 
+ContextParams::ContextParams(int64_t samples_before_,
+                             int64_t samples_after_,
+                             int64_t chunk_size_,
+                             int bases_before_,
+                             int bases_after_,
+                             bool reverse_,
+                             bool base_start_justify_)
+        : samples_before(samples_before_),
+          samples_after(samples_after_),
+          samples(samples_before + samples_after),
+          chunk_size(chunk_size_),
+          bases_before(bases_before_),
+          bases_after(bases_after_),
+          kmer_len(bases_before_ + bases_after_ + 1),
+          reverse(reverse_),
+          base_start_justify(base_start_justify_) {
+    if (samples_before < 0 || samples_after < 0) {
+        throw std::runtime_error(ERR_STR + "context params: 'negative context samples'.");
+    }
+    if (chunk_size < samples) {
+        throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
+    }
+    if (bases_before < 1 || bases_after < 1) {
+        throw std::runtime_error(ERR_STR + "context params: 'negative or zero context bases'.");
+    }
+}
+
+// Normalise `v` by `stride` strictly increasing the if needed.
+int64_t ContextParams::normalise(const int64_t v, const int64_t stride) {
+    const int64_t remainder = v % stride;
+    if (remainder == 0) {
+        return v;
+    }
+    return v + stride - remainder;
+}
+
 ContextParams parse_context_params(const toml::value& config_toml) {
     const auto& params = toml::find(config_toml, "modbases");
 
@@ -133,6 +242,27 @@ ContextParams ContextParams::normalised(const int stride) const {
     return ContextParams(sb, sa, cs, bases_before, bases_after, reverse, base_start_justify);
 }
 
+RefinementParams::RefinementParams(const int kmer_len_,
+                                   const int center_idx_,
+                                   std::vector<float> refine_kmer_levels_)
+        : do_rough_rescale(true),
+          kmer_len(static_cast<size_t>(kmer_len_)),
+          center_idx(static_cast<size_t>(center_idx_)),
+          levels(std::move(refine_kmer_levels_)) {
+    if (kmer_len < 1 || kmer_len_ < 1) {
+        throw std::runtime_error(ERR_STR + "refinement params: 'negative or zero kmer len'.");
+    }
+    if (center_idx_ < 0) {
+        throw std::runtime_error(ERR_STR + "refinement params: 'negative center index'.");
+    }
+    if (kmer_len < center_idx) {
+        throw std::runtime_error(ERR_STR + "refinement params: 'invalid center index'.");
+    }
+    if (levels.empty()) {
+        throw std::runtime_error(ERR_STR + "refinement params: 'missing levels'.");
+    }
+}
+
 RefinementParams parse_refinement_params(const toml::value& config_toml,
                                          const std::filesystem::path& model_path,
                                          const std::vector<float>& _test_levels) {
@@ -164,6 +294,27 @@ RefinementParams parse_refinement_params(const toml::value& config_toml,
             get_int_in_range(segment, "refine_kmer_center_idx", 0, kmer_len - 1, REQUIRED);
 
     return RefinementParams(kmer_len, center_index, std::move(kmer_levels));
+}
+
+ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
+                                       ModelGeneralParams general_,
+                                       ModificationParams mods_,
+                                       ContextParams context_,
+                                       RefinementParams refine_)
+        : model_path(std::move(model_path_)),
+          general(std::move(general_)),
+          mods(std::move(mods_)),
+          context(general_.model_type == ModelType::CONV_LSTM_V2
+                          ? context_.normalised(general.stride)
+                          : std::move(context_)),
+          refine(std::move(refine_)) {
+    // Kmer length is duplicated in modbase model configs - check they match
+    if (general.kmer_len != context.kmer_len) {
+        auto kl_a = std::to_string(general.kmer_len);
+        auto kl_b = std::to_string(context.kmer_len);
+        throw std::runtime_error(ERR_STR + "config: 'inconsistent kmer_len: " + kl_a +
+                                 " != " + kl_b + "'.");
+    }
 }
 
 ModBaseModelConfig load_modbase_model_config_impl(const std::filesystem::path& model_path,

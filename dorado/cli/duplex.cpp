@@ -610,6 +610,15 @@ int duplex(int argc, char* argv[]) {
             auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
 
+            // TODO: DOR-971 to add support for duplex + conv_lstm_v2 modbase models
+            if (!models.mods_model_paths.empty() &&
+                utils::modbase::get_modbase_model_type(models.mods_model_paths.front()) ==
+                        utils::modbase::ModelType::CONV_LSTM_V2) {
+                spdlog::error(
+                        "CONV_LSTM_V2 models are not supported by dorado duplex yet - DOR-971");
+                return EXIT_FAILURE;
+            }
+
             const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
                     models.mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
                     methylation_threshold);
