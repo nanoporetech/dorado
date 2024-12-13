@@ -28,7 +28,7 @@ bool check_fai_exists(const std::filesystem::path& in_fastx_fn) {
 
 bool create_fai_index(const std::filesystem::path& in_fastx_fn) {
     if (std::empty(in_fastx_fn)) {
-        spdlog::warn("No path specified, annnot load/create a FAI index!");
+        spdlog::warn("No path specified, cannnot load/create a FAI index!");
         return false;
     }
 
