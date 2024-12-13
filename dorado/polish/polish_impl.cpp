@@ -890,11 +890,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
                           std::size(batch_queue));
 
-            const auto last_chunk_reserve_time = std::chrono::system_clock::now();
-
             InferenceData item;
-            const auto pop_status = batch_queue.try_pop_until(
-                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
+            const auto pop_status = batch_queue.try_pop(item);
 
             spdlog::trace("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
                           tid, std::size(item.samples), batch_queue.size());
@@ -903,14 +900,6 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                 break;
             }
 
-            if (pop_status == utils::AsyncQueueStatus::Timeout) {
-                spdlog::warn(
-                        "[consumer {}] Timeout when popping item from infer_data queue! "
-                        "item.samples.size() = {}",
-                        tid, std::size(item.samples));
-            }
-
-            // This should handle the timeout case too.
             if (std::empty(item.samples)) {
                 continue;
             }
@@ -1023,19 +1012,10 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
             const auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
             DecodeData item;
-            const auto pop_status = decode_queue.try_pop_until(
-                    item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
+            const auto pop_status = decode_queue.try_pop(item);
 
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
                 break;
-            }
-
-            if (pop_status == utils::AsyncQueueStatus::Timeout) {
-                spdlog::trace(
-                        "[decoder {}] Timeout when popping item from infer_data queue! "
-                        "item.samples.size() = {}",
-                        tid, tensor_shape_as_string(item.logits));
-                continue;
             }
 
             const int64_t tensor_batch_size =
