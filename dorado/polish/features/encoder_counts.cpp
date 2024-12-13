@@ -1,10 +1,11 @@
-#include "polish/features/encoder_counts.h"
+#include "encoder_counts.h"
 
-#include "polish/features/medaka_counts.h"
+#include "medaka_counts.h"
 #include "utils/ssize.h"
 
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <cstddef>
 #include <stdexcept>
 
@@ -243,6 +244,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
     std::vector<Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
+        // Non-const so that it can be moved by the lambdas.
         auto& sample = samples[i];
 
         if (std::empty(sample.positions_major)) {

@@ -208,9 +208,9 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     x = x.permute({0, 2, 3, 1});
 
     // The sizes() returns a torch::IntArrayRef
-    const auto b = x.sizes()[0];
-    const auto d = x.sizes()[1];
-    const auto p = x.sizes()[3];
+    const auto b = at::size(x, 0);
+    const auto d = at::size(x, 1);
+    const auto p = at::size(x, 3);
 
     x = x.flatten(0, 1);
     x = m_read_level_conv->forward(std::move(x));

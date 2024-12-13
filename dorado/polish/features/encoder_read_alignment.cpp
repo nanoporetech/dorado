@@ -1,12 +1,13 @@
-#include "polish/features/encoder_read_alignment.h"
+#include "encoder_read_alignment.h"
 
-#include "polish/features/medaka_read_matrix.h"
+#include "medaka_read_matrix.h"
 #include "polish/polish_utils.h"
 #include "utils/ssize.h"
+#include "utils/timer_high_res.h"
 
 #include <spdlog/spdlog.h>
-#include <utils/timer_high_res.h>
 
+#include <cassert>
 #include <cstddef>
 #include <stdexcept>
 #include <unordered_map>

@@ -1,4 +1,4 @@
-#include "polish/features/decoder_base.h"
+#include "decoder_base.h"
 
 #include <cassert>
 #include <cstdint>

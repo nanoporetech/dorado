@@ -2,7 +2,6 @@
 
 #include "encoder_counts.h"
 #include "encoder_read_alignment.h"
-#include "polish/architectures/model_config.h"
 
 #include <cstdint>
 #include <memory>
@@ -10,6 +9,8 @@
 #include <string>
 
 namespace dorado::polisher {
+
+struct ModelConfig;
 
 enum class FeatureEncoderType {
     COUNTS_FEATURE_ENCODER,

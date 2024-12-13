@@ -1,5 +1,7 @@
 #include "decoder_factory.h"
 
+#include "polish/architectures/model_config.h"
+
 namespace dorado::polisher {
 
 std::unique_ptr<DecoderBase> decoder_factory(const ModelConfig& config) {

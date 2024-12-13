@@ -24,7 +24,7 @@ ModelGRU::ModelGRU(const int32_t num_features,
 }
 
 torch::Tensor ModelGRU::forward(torch::Tensor x) {
-    x = std::move(std::get<0>(m_gru->forward(x)));
+    x = std::get<0>(m_gru->forward(x));
     x = m_linear->forward(x);
     if (m_normalise) {
         x = torch::softmax(x, -1);

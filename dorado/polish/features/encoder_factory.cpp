@@ -1,5 +1,7 @@
 #include "encoder_factory.h"
 
+#include "polish/architectures/model_config.h"
+
 #include <stdexcept>
 #include <unordered_map>
 

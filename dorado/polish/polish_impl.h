@@ -1,16 +1,16 @@
 #pragma once
 
+#include "consensus_result.h"
 #include "polish/architectures/model_factory.h"
-#include "polish/consensus_result.h"
 #include "polish/features/decoder_factory.h"
 #include "polish/features/encoder_factory.h"
-#include "polish/sample.h"
-#include "polish/trim.h"
-#include "polish/window.h"
+#include "sample.h"
+#include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
 #include "utils/stats.h"
 #include "utils/timer_high_res.h"
+#include "window.h"
 
 #include <cstdint>
 #include <filesystem>

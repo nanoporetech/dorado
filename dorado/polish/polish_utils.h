@@ -1,6 +1,6 @@
 #pragma once
 
-#include "polish/interval.h"
+#include "interval.h"
 
 #include <ATen/ATen.h>
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "polish/region.h"
-#include "polish/sample.h"
+#include "region.h"
+#include "sample.h"
 
 #include <cstdint>
 #include <iosfwd>

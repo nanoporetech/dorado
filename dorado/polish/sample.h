@@ -1,6 +1,6 @@
 #pragma once
 
-#include "polish/polish_utils.h"
+#include "polish_utils.h"
 
 #include <ATen/ATen.h>
 

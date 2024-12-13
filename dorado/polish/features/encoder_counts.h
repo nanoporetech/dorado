@@ -1,7 +1,7 @@
 #pragma once
 
+#include "encoder_base.h"
 #include "polish/bam_file.h"
-#include "polish/features/encoder_base.h"
 #include "polish/sample.h"
 
 #include <ATen/ATen.h>
