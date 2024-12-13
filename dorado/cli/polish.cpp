@@ -65,7 +65,6 @@ struct Options {
     std::string model_str;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
-    bool quiet = false;
     int32_t threads = 0;
     int32_t infer_threads = 1;
     bool infer_threads_is_set = false;
@@ -151,12 +150,8 @@ ParserPtr create_cli(int& verbosity) {
 
         parser->visible.add_argument("-v", "--verbose")
                 .flag()
-                .nargs(0)
                 .action([&](const auto&) { ++verbosity; })
                 .append();
-        parser->visible.add_argument("--quiet")
-                .help("Minimal logging, warning level and above.")
-                .flag();
     }
     {
         parser->visible.add_group("Input/output options");
@@ -210,10 +205,11 @@ ParserPtr create_cli(int& verbosity) {
         //         .help("Ignore read groups in bam file.")
         //         .flag();
         parser->visible.add_argument("--tag-name")
-                .help("Two-letter BAM tag name.")
+                .help("Two-letter BAM tag name for filtering the alignments during feature "
+                      "generation")
                 .default_value("");
         parser->visible.add_argument("--tag-value")
-                .help("Value of the tag.")
+                .help("Value of the tag for filtering the alignments during feature generation")
                 .default_value(0)
                 .scan<'i', int>();
 
@@ -303,7 +299,6 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
     opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
-    opt.quiet = parser.visible.get<bool>("quiet");
     opt.regions_str = parser.visible.present<std::string>("regions");
     if (opt.regions_str) {
         opt.regions = parse_regions(*opt.regions_str);
@@ -742,9 +737,7 @@ int polish(int argc, char* argv[]) {
         // Initialize the options from the CLI.
         const Options opt = set_options(*parser, verbosity);
 
-        if (opt.quiet) {
-            spdlog::set_level(spdlog::level::warn);
-        } else if (opt.verbosity == 0) {
+        if (opt.verbosity == 0) {
             spdlog::set_level(spdlog::level::info);
         } else if (opt.verbosity == 1) {
             spdlog::set_level(spdlog::level::debug);
