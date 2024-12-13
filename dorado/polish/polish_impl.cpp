@@ -129,7 +129,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     return resources;
 }
 
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
     BamInfo ret;
 
     BamFile bam(in_aln_bam_fn);
@@ -176,12 +176,11 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
 
             // Parse the read group ID.
             const auto& it_id = tags.find("ID");
-            if (it_id != std::end(tags)) {
-                ret.read_groups.emplace(it_id->second);
-            }
+            const std::string id = (it_id != std::end(tags)) ? it_id->second : "";
 
             // Parse the basecaller model.
             const auto& it_ds = tags.find("DS");
+            std::string basecaller_model;
             if (it_ds != std::end(tags)) {
                 const std::vector<std::string> tokens = utils::split(it_ds->second, ' ');
                 constexpr std::string_view TOKEN_NAME{"basecall_model="};
@@ -189,10 +188,23 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
                     if (!utils::starts_with(token, TOKEN_NAME)) {
                         continue;
                     }
-                    ret.basecaller_models.emplace(token.substr(std::size(TOKEN_NAME)));
+                    basecaller_model = token.substr(std::size(TOKEN_NAME));
                     break;
                 }
             }
+
+            if (std::empty(id)) {
+                continue;
+            }
+            if (!std::empty(cli_read_group) && (id != cli_read_group)) {
+                continue;
+            }
+            if (std::empty(basecaller_model)) {
+                continue;
+            }
+
+            ret.read_groups.emplace(id);
+            ret.basecaller_models.emplace(basecaller_model);
         }
     }
 

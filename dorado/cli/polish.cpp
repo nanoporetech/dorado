@@ -314,7 +314,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.fill_char = (parser.visible.is_used("--fill-char"))
                             ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
                             : std::nullopt;
-    opt.read_group = parser.visible.get<std::string>("RG");
+    opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
     // opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
     opt.tag_value = parser.visible.get<int>("tag-value");
@@ -574,6 +574,26 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     return model_config;
 }
 
+void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
+    if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
+        throw std::runtime_error{"No RG tags found in the input BAM!"};
+
+    } else if (std::empty(cli_read_group) && std::size(cli_read_group) > 1) {
+        throw std::runtime_error{
+                "The input BAM contains more than one read group. Please specify --RG to select "
+                "which read group to process."};
+
+    } else if (!std::empty(cli_read_group) && !std::empty(bam_info.read_groups)) {
+        if (bam_info.read_groups.count(cli_read_group) == 0) {
+            std::ostringstream oss;
+            polisher::print_container(oss, bam_info.read_groups, ", ");
+            throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
+                                     cli_read_group + "', available groups in the BAM: [" +
+                                     oss.str() + "]."};
+        }
+    }
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt,
@@ -751,7 +771,7 @@ int polish(int argc, char* argv[]) {
         validate_options(opt);
 
         // Get info from BAM needed for the run.
-        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn);
+        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
 
         // Debug printing.
         {
@@ -765,11 +785,21 @@ int polish(int argc, char* argv[]) {
             for (const auto& rg : bam_info.basecaller_models) {
                 spdlog::debug("    - {}", rg);
             }
+            if (!std::empty(opt.read_group)) {
+                spdlog::debug(
+                        "Only the user requested RG was selected from the input bam. RG: '{}'",
+                        opt.read_group);
+            }
         }
 
         // Allow only Dorado aligned BAMs.
         if ((bam_info.uses_dorado_aligner == false) && (opt.any_bam == false)) {
             throw std::runtime_error("Input BAM file was not aligned using Dorado.");
+        }
+
+        // Validate the read groups in the BAM file.
+        if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
+            check_read_groups(bam_info, opt.read_group);
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.

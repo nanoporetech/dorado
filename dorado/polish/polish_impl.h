@@ -103,8 +103,10 @@ PolisherResources create_resources(const ModelConfig& model_config,
 
 /**
  * \brief Opens the input BAM file and summarizes some information needed at runtime.
+ * \param in_aln_bam_fn Path to the input BAM file.
+ * \param cli_read_group If not empty, only this read group will be loaded from the BAM header.
  */
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn);
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
