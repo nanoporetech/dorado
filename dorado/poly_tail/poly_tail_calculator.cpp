@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace dorado::poly_tail {
 
@@ -266,7 +267,12 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                                     num_samples_per_base, stddev);
 
     auto signal_len = signal_end - signal_start;
-    signal_len -= signal_length_adjustment(read, signal_len);
+
+    if (m_calibration_coeffs.empty()) {
+        signal_len -= signal_length_adjustment(read, signal_len);
+    } else {
+        signal_len = adjust_signal_len(signal_len);
+    }
 
     int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
                     signal_info.trailing_adapter_bases;
