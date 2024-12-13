@@ -1004,9 +1004,6 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
 
                 const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
                                           static_cast<size_t>(sample.depth.size(0)));
-                // std::vector<int64_t> depth{
-                //     1, 0, 0, 3, 3, 3, 0, 4, 4, 0, 0, 0, 5, 5, 5, 0, 7
-                // };
                 std::vector<int32_t> low_depth;
                 Interval interval{0, 0};
                 for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
@@ -1022,24 +1019,6 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                 if (interval.length() > 0) {
                     good_intervals.emplace_back(interval);
                 }
-
-                // depth_gaps = std::vector<int32_t>(std::data(depth), std::data(depth) + std::size(depth));
-
-                // const torch::Tensor indices = torch::nonzero(sample.depth.to(torch::kInt32) < static_cast<int32_t>(min_depth)).squeeze();
-                // depth_gaps = std::vector<int32_t>(indices.data_ptr<int32_t>(),
-                //                             indices.data_ptr<int32_t>() + indices.size(0));
-
-                // std::cerr << "Gaps: ";
-                // print_container(std::cerr, low_depth, ", ");
-                // std::cerr << "\n";
-                // std::cerr << "Depths: ";
-                // const std::vector<int32_t> depth_vec(depth.data(), depth.data() + depth.size());
-                // print_container(std::cerr, depth_vec, ", ");
-                // std::cerr << "\n";
-
-                // for (size_t ii = 0; ii < std::size(good_intervals); ++ii) {
-                //     std::cerr << "[ii = " << ii << "] start = " << good_intervals[ii].start << ", end = " << good_intervals[ii].end << "\n";
-                // }
 
                 spdlog::debug("Good depth intervals: {}, min depth = {}, num positions = {}",
                               std::size(good_intervals), min_depth, num_positions);
