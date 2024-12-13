@@ -133,8 +133,6 @@ void ModBaseCallerNode::init_modbase_info() {
 }
 
 void ModBaseCallerNode::duplex_mod_call(Message&& message) {
-    // Let's do this only for the template strand for now.
-
     auto read = std::get<DuplexReadPtr>(std::move(message));
     stats::Timer timer;
 
