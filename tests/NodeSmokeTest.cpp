@@ -429,6 +429,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     auto pipeline_restart = GENERATE(false, true);
     auto is_rna = GENERATE(false, true);
     auto is_rna_adapter = false;
+    auto calibration_coeffs = GENERATE(std::vector<float>{}, std::vector<float>{0.95f});
     if (is_rna) {
         is_rna_adapter = GENERATE(false, true);
     }
@@ -439,8 +440,8 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     set_pipeline_restart(pipeline_restart);
 
     client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
-            std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>("", is_rna,
-                                                                            is_rna_adapter));
+            std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(
+                    "", is_rna, is_rna_adapter, calibration_coeffs));
 
     set_read_mutator([](dorado::SimplexReadPtr& read) {
         read->read_common.model_stride = 2;

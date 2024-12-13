@@ -21,8 +21,11 @@ EdlibAlignConfig init_edlib_config_for_adapter() {
 
 namespace dorado::poly_tail {
 
-RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config, bool is_rna_adapter)
-        : PolyTailCalculator(std::move(config)), m_rna_adapter(is_rna_adapter) {}
+RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config,
+                                             bool is_rna_adapter,
+                                             const std::vector<float>& calibration_coeffs)
+        : PolyTailCalculator(std::move(config), calibration_coeffs),
+          m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
     const auto log_sum =

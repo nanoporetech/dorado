@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace dorado::poly_tail {
 
@@ -22,6 +23,8 @@ struct Interval {
     int start;
     int end;
     float avg;
+
+    int length() const { return end - start; }
 };
 
 }  // namespace
@@ -101,10 +104,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // How close the mean values should be for consecutive intervals
     // to be merged.
     const float kMeanValueProximity = 0.25f;
+    // Sliding window size
+    const int kWindow = int(std::round(num_samples_per_base * 5));
     // Maximum gap between intervals that can be combined.
-    const int kMaxSampleGap = int(std::round(num_samples_per_base * 5));
+    const int kMaxSampleGap = int(std::round(num_samples_per_base * 2));
     // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = kMaxSampleGap * 2;
+    const int kMinIntervalSizeForMerge = kWindow * 2;
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
@@ -114,8 +119,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::vector<Interval> intervals;
     const int kStride = 3;
 
-    for (int s = left_end; s < (right_end - kMaxSampleGap); s += kStride) {
-        const int e = s + kMaxSampleGap;
+    for (int s = left_end; s < (right_end - kWindow); s += kStride) {
+        const int e = s + kWindow;
         auto [avg, stdev] = calc_stats(s, e);
         if (avg > kMinAvgVal && stdev < kVar) {
             if (intervals.empty()) {
@@ -157,35 +162,40 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             (num_samples_per_base + 2 * std_samples_per_base) * m_config.tail_interrupt_length));
 
     std::vector<Interval> clustered_intervals;
-    bool keep_merging = true;
-    while (keep_merging) {  // break when we've stopped making changes
-        keep_merging = false;
-        for (const auto& i : intervals) {
-            if (clustered_intervals.empty()) {
-                clustered_intervals.push_back(i);
+    bool merge_intervals = intervals.size() > 1;
+    while (merge_intervals) {  // break when we've stopped making changes
+        merge_intervals = false;
+        clustered_intervals.push_back(intervals.front());
+        int longest_interval = clustered_intervals.front().length();
+        for (auto it = std::next(std::cbegin(intervals)); it != std::cend(intervals); ++it) {
+            const auto& i = *it;
+            auto& last = clustered_intervals.back();
+            bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
+            auto separation = i.start - last.end;
+            bool skip_glitch =
+                    std::abs(separation) < kMaxSampleGap &&
+                    last.length() > kMinIntervalSizeForMerge &&
+                    (i.length() > kMinIntervalSizeForMerge || i.end >= right_end - kStride);
+            bool allow_linker = separation >= 0 && separation < kMaxInterruption;
+            if (mean_proximity_ok && (skip_glitch || allow_linker)) {
+                // retain avg value from the best section to prevent drift for future merges
+                auto& best = (i.length() < last.length()) ? last : i;
+                spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end, last.start,
+                              i.end);
+                last = Interval{last.start, i.end, best.avg};
+                longest_interval = std::max(longest_interval, last.length());
+                merge_intervals = true;
             } else {
-                auto& last = clustered_intervals.back();
-                bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
-                auto separation = i.start - last.end;
-                bool skip_glitch = std::abs(separation) < kMaxSampleGap &&
-                                   last.end - last.start > kMinIntervalSizeForMerge &&
-                                   (i.end - i.start > kMinIntervalSizeForMerge ||
-                                    i.end >= right_end - kStride);
-                bool allow_linker = separation >= 0 && separation < kMaxInterruption;
-                if (mean_proximity_ok && (skip_glitch || allow_linker)) {
-                    // retain avg value from the best section to prevent drift for future merges
-                    auto& best = (i.end - i.start) < (last.end - last.start) ? last : i;
-                    spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end,
-                                  last.start, i.end);
-                    last = Interval{last.start, i.end, best.avg};
-                    keep_merging = true;
-                } else {
-                    clustered_intervals.push_back(i);
+                // drop unmergeable interval (unless it is our current best)
+                if (last.length() < longest_interval && last.length() <= kMinIntervalSizeForMerge) {
+                    clustered_intervals.pop_back();
+                    merge_intervals = true;
                 }
+                longest_interval = std::max(longest_interval, i.length());
+                clustered_intervals.push_back(i);
             }
         }
-        std::swap(clustered_intervals, intervals);
-        clustered_intervals.clear();
+        intervals = std::exchange(clustered_intervals, {});
     }
 
     int_str = "";
@@ -266,7 +276,9 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                                     num_samples_per_base, stddev);
 
     auto signal_len = signal_end - signal_start;
+
     signal_len -= signal_length_adjustment(read, signal_len);
+    signal_len = apply_signal_len_calibration(signal_len);
 
     int num_bases = int(std::round(static_cast<float>(signal_len) / num_samples_per_base)) -
                     signal_info.trailing_adapter_bases;
@@ -281,15 +293,36 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
     return num_bases;
 }
 
-std::shared_ptr<const PolyTailCalculator>
-PolyTailCalculatorFactory::create(const PolyTailConfig& config, bool is_rna, bool is_rna_adapter) {
+int PolyTailCalculator::apply_signal_len_calibration(int signal_len) const {
+    if (signal_len <= 0) {
+        return 0;
+    }
+
+    if (m_calibration_coeffs.empty()) {
+        return signal_len;
+    }
+
+    float calibrated_signal = 0;
+    int factor = 1;
+    for (const auto& coeff : m_calibration_coeffs) {
+        factor *= signal_len;
+        calibrated_signal += coeff * factor;
+    }
+    return static_cast<int>(calibrated_signal);
+}
+
+std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
+        const PolyTailConfig& config,
+        bool is_rna,
+        bool is_rna_adapter,
+        const std::vector<float>& calibration_coeffs) {
     if (is_rna) {
-        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter);
+        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter, calibration_coeffs);
     }
     if (config.is_plasmid) {
-        return std::make_unique<PlasmidPolyTailCalculator>(config);
+        return std::make_unique<PlasmidPolyTailCalculator>(config, calibration_coeffs);
     }
-    return std::make_unique<DNAPolyTailCalculator>(config);
+    return std::make_unique<DNAPolyTailCalculator>(config, calibration_coeffs);
 }
 
 }  // namespace dorado::poly_tail
