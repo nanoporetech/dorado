@@ -42,20 +42,34 @@ namespace dorado {
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
-struct ModBaseChunkCallerNode::WorkingRead {
-    Message read;  // Underlying read.
-
-    at::Tensor signal;                  // Scaled/padded signal.
-    std::vector<int8_t> encoded_kmers;  // Padded encoded kmers.
-    // Sequence indices for hits
+struct ModBaseChunkCallerNode::ModBaseData {
+    // Scaled/padded signal.
+    at::Tensor signal;
+    // Padded encoded kmers.
+    std::vector<int8_t> encoded_kmers;
+    // Sequence indices for hits for each base (i.e. one per model)
     PerBaseIntVec per_base_hits_seq;
-    // Signal indices for hits
+    // Signal indices for hits for each base (i.e. one per model)
     PerBaseIntVec per_base_hits_sig;
+    // The location in the target sequence where the realigned sequence starts - duplex only
+    int64_t target_start{0};
+};
 
-    size_t num_modbase_chunks;  // Number of modbase chunks to process.
-
+struct ModBaseChunkCallerNode::WorkingRead {
+    // Underlying read.
+    Message read;
+    // Template modbase data
+    ModBaseData template_data;
+    // Complement modbase data - **only valid for duplex**.
+    // This data is the reverse complement of the stereo input.
+    // This means that the signal and sequence are in the **template** strand direction
+    ModBaseData complement_data;
+    // True if this working read is from a duplex read
+    bool is_duplex{false};
+    // Number of modbase chunks to process.
+    size_t num_modbase_chunks{0};
     // Number of modbase chunks that have been processed.
-    std::atomic_size_t num_modbase_chunks_called;
+    std::atomic_size_t num_modbase_chunks_called{0};
 };
 
 ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
@@ -105,7 +119,7 @@ void ModBaseChunkCallerNode::input_thread_fn() {
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             simplex_mod_call(std::move(message));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
-            throw std::runtime_error("Duplex case not implemented!");
+            duplex_mod_call(std::move(message));
         }
     }
 }
@@ -215,6 +229,23 @@ void ModBaseChunkCallerNode::validate_runners() const {
     }
 }
 
+void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
+    // initialize base_mod_probs _before_ we start handing out chunks
+    read.base_mod_probs.resize(read.seq.size() * m_num_states, 0);
+    for (size_t i = 0; i < read.seq.size(); ++i) {
+        // Initialize for what corresponds to 100% canonical base for each position.
+        // This is like one-hot encoding the canonical bases
+        int base_id = utils::BaseInfo::BASE_IDS.at(read.seq[i]);
+        if (base_id < 0) {
+            spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
+                          read.seq[i], read.read_id);
+            throw std::runtime_error("Invalid character in sequence.");
+        }
+        read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
+    }
+    read.mod_base_info = m_mod_base_info;
+}
+
 // Get the index of the next context hit in `hit_sig_idxs` with a signal index
 // greater than or equal to `chunk_signal_start`.
 std::optional<int64_t> ModBaseChunkCallerNode::next_hit(const std::vector<int64_t>& hit_sig_idxs,
@@ -237,12 +268,12 @@ std::optional<int64_t> ModBaseChunkCallerNode::next_hit(const std::vector<int64_
 }
 
 std::vector<uint64_t> ModBaseChunkCallerNode::get_seq_to_sig_map(const std::vector<uint8_t>& moves,
-                                                                 const size_t raw_samples,
+                                                                 const size_t signal_len,
                                                                  const size_t reserve) const {
     nvtx3::scoped_range range{"pop_s2s_map"};
-    auto seq_to_sig_map = utils::moves_to_map(moves, m_canonical_stride, raw_samples, reserve);
+    auto seq_to_sig_map = utils::moves_to_map(moves, m_canonical_stride, signal_len, reserve);
     if (m_is_rna_model) {
-        utils::reverse_seq_to_sig_map(seq_to_sig_map, raw_samples);
+        utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
     }
     return seq_to_sig_map;
 }
@@ -285,38 +316,6 @@ void ModBaseChunkCallerNode::populate_hits_sig(PerBaseIntVec& per_base_hits_sig,
     }
 }
 
-// Returns the contiguous merged chunks
-std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_contigs(
-        const std::vector<ModBaseChunk>& chunks,
-        const int64_t chunk_size) const {
-    if (chunks.empty()) {
-        return {};
-    }
-
-    std::vector<std::pair<int64_t, int64_t>> contigs;
-    contigs.reserve(chunks.size());
-
-    int64_t contig_start = chunks[0].signal_start;
-    int64_t contig_end = contig_start + chunk_size;
-    for (const auto& chunk : chunks) {
-        if (chunk.signal_start <= contig_end) {
-            contig_end = chunk.signal_start + chunk_size;
-        } else {
-            contigs.emplace_back(std::make_pair(contig_start, contig_end));
-            contig_start = chunk.signal_start;
-            contig_end = chunk.signal_start + chunk_size;
-        }
-    }
-
-    const auto last_pair = std::make_pair(contig_start, contig_end);
-    if (contigs.empty() || contigs.back() != last_pair) {
-        contigs.emplace_back(last_pair);
-    }
-
-    contigs.shrink_to_fit();
-    return contigs;
-}
-
 void ModBaseChunkCallerNode::populate_encoded_kmer(
         std::vector<int8_t>& encoded_kmer,
         const size_t output_size,
@@ -348,11 +347,16 @@ void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
 // For each caller, get chunk definitions which always contain a context hit.
 std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_chunks(
         const modbase::RunnerPtr& runner,
-        const std::shared_ptr<WorkingRead>& working_read) const {
+        const std::shared_ptr<WorkingRead>& working_read,
+        const bool is_template) const {
     nvtx3::scoped_range range{"mbc_get_chunks"};
     std::vector<ModBaseChunks> chunks_to_enqueue_by_model(runner->num_models());
 
-    const int64_t signal_len = working_read->signal.size(0);
+    // Complement modbase data is stored in the template direction so there's no need for
+    // any indexing gymnastics in chunk creation
+    auto modbase_data = is_template ? working_read->template_data : working_read->complement_data;
+
+    const int64_t signal_len = modbase_data.signal.size(0);
 
     for (size_t model_id = 0; model_id < runner->num_models(); ++model_id) {
         auto& chunks_to_enqueue = chunks_to_enqueue_by_model.at(model_id);
@@ -360,7 +364,7 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
         const auto& config = runner->model_params(model_id);
         const auto base_id = config.mods.base_id;
 
-        const auto& hits_to_sig = working_read->per_base_hits_sig[base_id];
+        const auto& hits_to_sig = modbase_data.per_base_hits_sig[base_id];
 
         const auto num_states = config.mods.count + 1;
         const auto& ctx = config.context;
@@ -369,8 +373,9 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
                 m_pad_end_align);
 
         for (const auto& [chunk_start, hit_idx] : chunk_starts) {
-            chunks_to_enqueue.emplace_back(std::make_unique<ModBaseChunk>(
-                    working_read, int(model_id), base_id, chunk_start, hit_idx, num_states));
+            chunks_to_enqueue.emplace_back(
+                    std::make_unique<ModBaseChunk>(working_read, int(model_id), base_id,
+                                                   chunk_start, hit_idx, num_states, is_template));
         }
         working_read->num_modbase_chunks += chunk_starts.size();
     }
@@ -422,7 +427,8 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
     return chunks;
 }
 
-void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<dorado::SimplexRead>& read_ptr,
+template <typename ReadType>
+void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<ReadType>& read_ptr,
                                            std::shared_ptr<WorkingRead>& working_read) {
     if (!read_ptr || !working_read) {
         throw std::invalid_argument("Null pointer passed to finalise_read.");
@@ -439,6 +445,42 @@ void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<dorado::SimplexRead>&
     }
 }
 
+bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
+                                                   const modbase::RunnerPtr& runner,
+                                                   const std::string& seq,
+                                                   const at::Tensor& signal,
+                                                   const std::vector<uint8_t>& moves,
+                                                   const std::string& read_id) const {
+    const size_t signal_len = signal.size(0);
+
+    if (!populate_hits_seq(mbd.per_base_hits_seq, seq, runner)) {
+        return false;
+    }
+
+    std::vector<uint64_t> seq_to_sig_map = get_seq_to_sig_map(moves, signal_len, seq.size() + 1);
+    std::vector<int> int_seq = utils::sequence_to_ints(seq);
+
+    populate_hits_sig(mbd.per_base_hits_sig, mbd.per_base_hits_seq, seq_to_sig_map);
+    populate_signal(mbd.signal, seq_to_sig_map, signal, int_seq, runner);
+    populate_encoded_kmer(mbd.encoded_kmers, signal_len, int_seq, seq_to_sig_map);
+
+    if (signal_len != static_cast<size_t>(mbd.signal.size(0))) {
+        spdlog::error("Modbase signal length is incorrect for read:'{}' - {}!={}", read_id,
+                      signal_len, mbd.signal.size(0));
+        throw std::runtime_error("Modbase signal processing failed.");
+    }
+
+    const auto enc_kmer_size = mbd.encoded_kmers.size();
+    const auto expected = signal_len * m_kmer_len * utils::BaseInfo::NUM_BASES;
+    if (enc_kmer_size != expected) {
+        spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
+                      expected);
+        throw std::runtime_error("Modbase kmer encoding failed.");
+    }
+
+    return true;
+}
+
 void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     // The callers of each runner are all the same, so just take the first one.
     auto& runner = m_runners.at(0);
@@ -450,46 +492,19 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     stats::Timer timer;
 
-    // initialize base_mod_probs _before_ we start handing out chunks
-    read.base_mod_probs.resize(read.seq.size() * m_num_states, 0);
-    for (size_t i = 0; i < read.seq.size(); ++i) {
-        // Initialize for what corresponds to 100% canonical base for each position.
-        // This is like one-hot encoding the canonical bases
-        int base_id = utils::BaseInfo::BASE_IDS.at(read.seq[i]);
-        if (base_id < 0) {
-            spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
-                          read.seq[i], read.read_id);
-            throw std::runtime_error("Invalid character in sequence.");
-        }
-        read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
-    }
-    read.mod_base_info = m_mod_base_info;
+    initialise_base_mod_probs(read);
 
     auto working_read = std::make_shared<WorkingRead>();
-    working_read->num_modbase_chunks = 0;
-    working_read->num_modbase_chunks_called = 0;
+    auto& modbase_data = working_read->template_data;
 
-    if (!populate_hits_seq(working_read->per_base_hits_seq, read.seq, runner)) {
+    if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
+                               read_id)) {
         finalise_read(read_ptr, working_read);
         return;
-    }
+    };
 
-    const size_t raw_samples = read.get_raw_data_samples();
-    std::vector<uint64_t> seq_to_sig_map =
-            get_seq_to_sig_map(read.moves, raw_samples, read.seq.size() + 1);
-
-    populate_hits_sig(working_read->per_base_hits_sig, working_read->per_base_hits_seq,
-                      seq_to_sig_map);
-
-    std::vector<int> int_seq = utils::sequence_to_ints(read.seq);
-
-    populate_signal(working_read->signal, seq_to_sig_map, read.raw_data, int_seq, runner);
-
-    populate_encoded_kmer(working_read->encoded_kmers, raw_samples, int_seq, seq_to_sig_map);
-    assert(static_cast<int64_t>(working_read->encoded_kmers.size()) ==
-           working_read->signal.size(0) * m_kmer_len * utils::BaseInfo::NUM_BASES);
-
-    std::vector<ModBaseChunks> chunks_to_enqueue_by_caller = get_chunks(runner, working_read);
+    constexpr bool kIsTemplate = true;
+    std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
 
     finalise_read(read_ptr, working_read);
 
@@ -498,13 +513,173 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     // before we set that value otherwise.
     for (size_t model_id = 0; model_id < runner->num_models(); ++model_id) {
         auto& chunk_queue = m_chunk_queues.at(model_id);
-        auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(model_id);
+        auto& chunks_to_enqueue = chunks_by_caller.at(model_id);
         for (auto& chunk : chunks_to_enqueue) {
             chunk_queue->try_push(std::move(chunk));
         }
     }
 }
 
+void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
+    // The callers of each runner are all the same, so just take the first one.
+    auto& runner = m_runners.at(0);
+
+    // Get ownership of the read
+    auto read_ptr = std::get<DuplexReadPtr>(std::move(message));
+    auto& read_common = read_ptr->read_common;
+    auto& read_stereo = read_ptr->stereo_feature_inputs;
+    const std::string read_id = read_common.read_id;
+
+    stats::Timer timer;
+
+    initialise_base_mod_probs(read_common);
+
+    std::vector<ModBaseChunks> chunks_by_caller_template;
+    std::vector<ModBaseChunks> chunks_by_caller_complement;
+
+    auto working_read = std::make_shared<WorkingRead>();
+    working_read->is_duplex = true;
+
+    try {
+        for (const bool is_template_direction : {true, false}) {
+            auto& modbase_data = is_template_direction ? working_read->template_data
+                                                       : working_read->complement_data;
+
+            // ??? Why are we flipping the signal but not the moves?
+            auto simplex_signal = is_template_direction
+                                          ? read_stereo.template_signal
+                                          : at::flip(read_stereo.complement_signal, 0);
+
+            // const-ref extends lifetime of temporary
+            const auto& simplex_moves = is_template_direction ? read_stereo.template_moves
+                                                              : read_stereo.complement_moves;
+
+            // const-ref extends lifetime of temporary
+            const auto& simplex_seq =
+                    is_template_direction ? read_stereo.template_seq
+                                          : utils::reverse_complement(read_stereo.complement_seq);
+
+            // const-ref extends lifetime of temporary
+            const auto& duplex_seq = is_template_direction
+                                             ? read_common.seq
+                                             : utils::reverse_complement(read_common.seq);
+
+            auto [moves_offset, target_start, new_move_table] =
+                    utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
+
+            // If the alignment has failed, the rest of this duplex mod call cannot be
+            // completed in this direction
+            if (moves_offset == -1 && target_start == -1 && new_move_table.empty()) {
+                continue;
+            }
+
+            // Store the realigned target start to correctly resolve the sequence offset
+            // in the output predictions back onto the original sequence.
+            modbase_data.target_start = target_start;
+
+            auto new_signal_len = new_move_table.size() * m_canonical_stride;
+            auto new_num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
+            auto new_seq = duplex_seq.substr(target_start, new_num_moves);
+            auto signal = simplex_signal.slice(0, moves_offset * m_canonical_stride,
+                                               moves_offset * m_canonical_stride + new_signal_len);
+
+            if (!populate_modbase_data(modbase_data, runner, new_seq, signal, new_move_table,
+                                       read_id)) {
+                continue;
+            }
+
+            auto& chunks_by_caller =
+                    is_template_direction ? chunks_by_caller_template : chunks_by_caller_complement;
+            chunks_by_caller = get_chunks(runner, working_read, is_template_direction);
+        }
+    } catch (const std::exception& e) {
+        spdlog::error("ModBase Duplex Caller: {}", e.what());
+    }
+
+    finalise_read(read_ptr, working_read);
+
+    // Push the chunks to the chunk queues.
+    // Needs to be done after working_read->read is set as chunks could be processed
+    // before we set that value otherwise.
+    for (size_t model_id = 0; model_id < runner->num_models(); ++model_id) {
+        auto& chunk_queue = m_chunk_queues.at(model_id);
+        if (!chunks_by_caller_template.empty()) {
+            for (auto& template_chunk : chunks_by_caller_template.at(model_id)) {
+                chunk_queue->try_push(std::move(template_chunk));
+            }
+        }
+        if (!chunks_by_caller_complement.empty()) {
+            for (auto& complement_chunk : chunks_by_caller_complement.at(model_id)) {
+                chunk_queue->try_push(std::move(complement_chunk));
+            }
+        }
+    }
+}
+
+void ModBaseChunkCallerNode::create_and_submit_chunks(
+        modbase::RunnerPtr& runner,
+        const size_t model_id,
+        const int64_t previous_chunk_count,
+        std::vector<std::unique_ptr<ModBaseChunk>>& batched_chunks) const {
+    const auto& cfg = runner->model_params(model_id);
+    const int64_t chunk_size = cfg.context.chunk_size;
+    const int kmer_size_per_sample = cfg.context.kmer_len * utils::BaseInfo::NUM_BASES;
+
+    const int64_t num_chunks = static_cast<int64_t>(batched_chunks.size());
+    // We have just grabbed a number of chunks (0 in the case of timeout) from
+    // the chunk queue and added them to batched_chunks.  Insert those chunks
+    // into the model input tensors.
+    for (int64_t chunk_idx = previous_chunk_count; chunk_idx < num_chunks; ++chunk_idx) {
+        assert(chunk_idx < m_batch_size);
+        const auto& chunk = batched_chunks.at(chunk_idx);
+
+        const auto& working_read = chunk->working_read;
+        const auto& modbase_data =
+                chunk->is_template ? working_read->template_data : working_read->complement_data;
+        const auto& read_id = get_read_common_data(working_read->read).read_id;
+
+        const int64_t start = chunk->signal_start;
+        const int64_t end =
+                std::min(start + chunk_size, static_cast<int64_t>(modbase_data.signal.size(0)));
+        const int64_t len = end - start;
+
+        if (start > end) {
+            spdlog::error("Modbase chunking failed - start>end {}>{} id:{}.", start, end, read_id);
+            throw std::runtime_error("Modbase chunking failed.");
+        }
+        if (int64_t(modbase_data.encoded_kmers.size()) < end) {
+            spdlog::error("Modbase chunking failed - out of bounds {}<{} id:{}.",
+                          modbase_data.encoded_kmers.size(), end, read_id);
+            throw std::runtime_error("Modbase chunking failed.");
+        }
+
+        auto signal_chunk = modbase_data.signal.index({at::indexing::Slice(start, end)});
+        // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
+        auto encoded_kmers_chunk = std::vector<int8_t>(
+                modbase_data.encoded_kmers.begin() + start * kmer_size_per_sample,
+                modbase_data.encoded_kmers.begin() + end * kmer_size_per_sample);
+
+        // Add any necessary padding to the end of the chunk.
+        if (len < chunk_size) {
+            // Tile the signal tensor
+            auto [n_tiles, overhang] = std::div(chunk_size, len);
+            signal_chunk = at::concat({signal_chunk.repeat({n_tiles}),
+                                       signal_chunk.index({at::indexing::Slice(0, overhang)})},
+                                      -1);
+            // Tile the kmer vector
+            const int64_t original_size = static_cast<int64_t>(encoded_kmers_chunk.size());
+            const int64_t extended_size = chunk_size * kmer_size_per_sample;
+            encoded_kmers_chunk.resize(extended_size);
+
+            for (int64_t i = original_size; i < extended_size; ++i) {
+                encoded_kmers_chunk[i] = encoded_kmers_chunk[i % original_size];
+            }
+        }
+
+        runner->accept_chunk(static_cast<int>(model_id), static_cast<int>(chunk_idx), signal_chunk,
+                             encoded_kmers_chunk);
+    }
+}
 void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, const size_t model_id) {
     utils::set_thread_name("mbc_chunk_caller");
     at::InferenceMode inference_mode_guard;
@@ -516,10 +691,6 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
     auto last_chunk_reserve_time = std::chrono::system_clock::now();
 
     int64_t previous_chunk_count = 0;
-
-    auto& cfg = runner->model_params(model_id);
-    const int64_t chunk_size = cfg.context.chunk_size;
-    const int kmer_size_per_sample = cfg.context.kmer_len * utils::BaseInfo::NUM_BASES;
 
     while (true) {
         nvtx3::scoped_range range{"chunk_caller_thread_fn"};
@@ -538,59 +709,7 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
         // Reset timeout.
         last_chunk_reserve_time = std::chrono::system_clock::now();
 
-        const int64_t num_chunks = static_cast<int64_t>(batched_chunks.size());
-        // We have just grabbed a number of chunks (0 in the case of timeout) from
-        // the chunk queue and added them to batched_chunks.  Insert those chunks
-        // into the model input tensors.
-        for (int64_t chunk_idx = previous_chunk_count; chunk_idx < num_chunks; ++chunk_idx) {
-            assert(chunk_idx < m_batch_size);
-            const auto& chunk = batched_chunks.at(chunk_idx);
-
-            const auto& working_read = chunk->working_read;
-            const int64_t start = chunk->signal_start;
-            const int64_t end = std::min(start + chunk_size,
-                                         static_cast<int64_t>(working_read->signal.size(0)));
-            const int64_t len = end - start;
-
-            if (start > end) {
-                spdlog::error("Modbase chunking failed - start>end {}>{} id:{}.", start, end,
-                              get_read_common_data(working_read->read).read_id);
-                throw std::runtime_error("Modbase chunking failed.");
-            }
-            if (int64_t(chunk->working_read->encoded_kmers.size()) < end) {
-                spdlog::error("Modbase chunking failed - out of bounds {}<{} id:{}.",
-                              chunk->working_read->encoded_kmers.size(), end,
-                              get_read_common_data(working_read->read).read_id);
-                throw std::runtime_error("Modbase chunking failed.");
-            }
-
-            auto signal_chunk =
-                    chunk->working_read->signal.index({at::indexing::Slice(start, end)});
-            // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
-            auto encoded_kmers_chunk = std::vector<int8_t>(
-                    chunk->working_read->encoded_kmers.begin() + start * kmer_size_per_sample,
-                    chunk->working_read->encoded_kmers.begin() + end * kmer_size_per_sample);
-
-            // Add any necessary padding to the end of the chunk.
-            if (len < chunk_size) {
-                // Tile the signal tensor
-                auto [n_tiles, overhang] = std::div(chunk_size, len);
-                signal_chunk = at::concat({signal_chunk.repeat({n_tiles}),
-                                           signal_chunk.index({at::indexing::Slice(0, overhang)})},
-                                          -1);
-                // Tile the kmer vector
-                const int64_t original_size = static_cast<int64_t>(encoded_kmers_chunk.size());
-                const int64_t extended_size = chunk_size * kmer_size_per_sample;
-                encoded_kmers_chunk.resize(extended_size);
-
-                for (int64_t i = original_size; i < extended_size; ++i) {
-                    encoded_kmers_chunk[i] = encoded_kmers_chunk[i % original_size];
-                }
-            }
-
-            runner->accept_chunk(static_cast<int>(model_id), static_cast<int>(chunk_idx),
-                                 signal_chunk, encoded_kmers_chunk);
-        }
+        create_and_submit_chunks(runner, model_id, previous_chunk_count, batched_chunks);
 
         // If we have a complete batch, or we have a partial batch and timed out,
         // then call what we have.
@@ -658,6 +777,11 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
                                                     const int64_t context_samples_after,
                                                     const int64_t modbase_stride) {
     if (hit_sig_abs < chunk_signal_start) {
+        spdlog::error(
+                "hit_sig_abs:{} chunk_signal_start:{} scores_states:{} chunk_size:{} "
+                "context_samples_before:{} context_samples_after:{} modbase_stride:{}",
+                hit_sig_abs, chunk_signal_start, scores_states, chunk_size, context_samples_before,
+                context_samples_after, modbase_stride);
         spdlog::error("Modbase hit before chunk start: {}<{}", hit_sig_abs, chunk_signal_start);
         throw std::runtime_error("Modbase hit before chunk start.");
     }
@@ -668,8 +792,6 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
     // Skip hits at end of a chunk without enough downstream context
     // It will be processed at the start if the next chunk with complete context
     if (hit_sig_rel > chunk_size - context_samples_after) {
-        spdlog::trace("Modbase chunk end - hit context_samples_after {}>{}", hit_sig_rel,
-                      chunk_size - context_samples_after);
         return -2;
     }
 
@@ -677,12 +799,10 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
     // This hit will have been processed in a previous chunk
     // UNLESS it's the start of a read where there's no useful lead-in
     if (hit_sig_abs > context_samples_before && hit_sig_rel < context_samples_before) {
-        spdlog::trace("Modbase hit skip - hit context_samples_before {}<{}", hit_sig_rel,
-                      context_samples_before);
         return -1;
     }
 
-    // We should land on a canonical base*
+    // We should land on a canonical base
     if (hit_sig_rel % modbase_stride != 0) {
         spdlog::error(
                 "Modbase unaligned chunk - hit_absolute:{} hit_relative:{} stride:{} "
@@ -696,6 +816,16 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
     return hit_sig_rel / modbase_stride * scores_states;
 }
 
+int64_t ModBaseChunkCallerNode::resolve_duplex_sequence_index(const int64_t hit,
+                                                              const int64_t target_start,
+                                                              const int64_t sequence_size,
+                                                              const bool is_template_direction) {
+    if (is_template_direction) {
+        return hit + target_start;
+    }
+    return sequence_size - (hit + target_start + 1);
+}
+
 void ModBaseChunkCallerNode::output_thread_fn() {
     at::InferenceMode inference_mode_guard;
     utils::set_thread_name("mbc_output");
@@ -704,21 +834,15 @@ void ModBaseChunkCallerNode::output_thread_fn() {
     std::unique_ptr<ModBaseChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         auto working_read = chunk->working_read;
-        const auto& hits_seq = working_read->per_base_hits_seq.at(chunk->base_id);
-        const auto& hits_sig = working_read->per_base_hits_sig.at(chunk->base_id);
+        auto& read = get_read_common_data(working_read->read);
 
-        if (hits_seq.empty()) {
-            continue;
-        }
-
+        // Extract useful modbase model parameters
         const auto& cfg = runner->model_params(chunk->model_id);
+        const char modbase_model_base = cfg.mods.base;
         const int64_t modbase_stride = cfg.general.stride;
         const int64_t chunk_size = cfg.context.chunk_size;
         const int64_t context_samples_before = cfg.context.samples_before;
         const int64_t context_samples_after = cfg.context.samples_after;
-
-        auto& source_read = working_read->read;
-        auto& source_read_common = get_read_common_data(source_read);
 
         // The number of states predicted by this modbase model `num_mods + 1`
         const int64_t scores_states = chunk->num_states;
@@ -731,19 +855,42 @@ void ModBaseChunkCallerNode::output_thread_fn() {
             throw std::runtime_error("Modbase scores too long.");
         }
 
-        const char canonical_base = source_read_common.seq.at(hits_seq[0]);
+        const bool is_template_direction = chunk->is_template;
+        const ModBaseData& modbase_data =
+                is_template_direction ? working_read->template_data : working_read->complement_data;
+
+        const std::vector<int64_t>& hits_seq = modbase_data.per_base_hits_seq.at(chunk->base_id);
+        const std::vector<int64_t>& hits_sig = modbase_data.per_base_hits_sig.at(chunk->base_id);
+
+        if (hits_seq.empty()) {
+            continue;
+        }
+
         // The offset into the mod probs for the canonical base
         const int64_t base_offset = static_cast<int64_t>(m_base_prob_offsets.at(cfg.mods.base_id));
 
         for (size_t hit = chunk->hit_start; hit < hits_sig.size(); ++hit) {
-            // Context hit sequence index
-            const int64_t hit_seq = hits_seq.at(hit);
+            // Context hit sequence index in the chunk sequence
+            const int64_t hit_seq = !working_read->is_duplex
+                                            ? hits_seq.at(hit)
+                                            : resolve_duplex_sequence_index(
+                                                      hits_seq.at(hit), modbase_data.target_start,
+                                                      read.seq.size(), is_template_direction);
+
+            const auto& seq = is_template_direction
+                                      ? read.seq[hit_seq]
+                                      : dorado::utils::complement_table[read.seq[hit_seq]];
+
             // The canonical base should be constant for a single model
-            if (canonical_base != source_read_common.seq.at(hit_seq)) {
+            if (seq != modbase_model_base) {
+                spdlog::error(
+                        "Modbase base '{}' from hit index '{}' does not match the model "
+                        "context '{}' on '{}' {}",
+                        seq, hit, modbase_model_base, read.read_id, is_template_direction);
                 throw std::runtime_error("Modbase hit base is not correct.");
             }
 
-            const int64_t hit_score_idx = resolve_score_index(
+            int64_t hit_score_idx = resolve_score_index(
                     hits_sig.at(hit), chunk->signal_start, scores_states, chunk_size,
                     context_samples_before, context_samples_after, modbase_stride);
 
@@ -759,8 +906,8 @@ void ModBaseChunkCallerNode::output_thread_fn() {
             for (int64_t mod_offset = 0; mod_offset < scores_states; ++mod_offset) {
                 const int64_t score_idx = hit_score_idx + mod_offset;
                 if (score_idx >= scores_size) {
-                    spdlog::error("Modbase score index out of bounds: {}>={}", score_idx,
-                                  scores_size);
+                    spdlog::error("Modbase score index out of bounds: {}>={} on '{}", score_idx,
+                                  scores_size, read.read_id);
                     throw std::runtime_error("Modbase score index out of bounds.");
                 }
 
@@ -771,7 +918,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
                 // sequence_index * num_states := canonical "A" base probs index
                 // offset then by the canonical base modification offsets
                 const int64_t prob_idx = hit_seq * m_num_states + base_offset + mod_offset;
-                source_read_common.base_mod_probs.at(prob_idx) = score;
+                read.base_mod_probs.at(prob_idx) = score;
             }
         }
 
@@ -779,8 +926,6 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         // send it on to the sink and erase the working read.
         auto num_chunks_called = ++working_read->num_modbase_chunks_called;
         if (num_chunks_called == working_read->num_modbase_chunks) {
-            ReadCommon& read_common_data = get_read_common_data(source_read);
-            m_num_samples_processed += read_common_data.get_raw_data_samples();
             m_num_samples_processed_incl_padding += num_chunks_called * chunk_size;
 
             // Send the completed read on to the sink.
@@ -808,7 +953,6 @@ std::unordered_map<std::string, double> ModBaseChunkCallerNode::sample_stats() c
     }
     stats["batches_called"] = double(m_num_batches_called);
     stats["partial_batches_called"] = double(m_num_partial_batches_called);
-    stats["samples_processed"] = double(m_num_samples_processed);
     stats["samples_incl_padding"] = double(m_num_samples_processed_incl_padding);
     return stats;
 }

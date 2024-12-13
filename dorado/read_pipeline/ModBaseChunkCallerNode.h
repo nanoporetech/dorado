@@ -22,6 +22,7 @@
 namespace dorado {
 
 class ModBaseChunkCallerNode : public MessageSink {
+    struct ModBaseData;
     struct WorkingRead;
 
     struct ModBaseChunk {
@@ -30,13 +31,15 @@ class ModBaseChunkCallerNode : public MessageSink {
                      int base_id_,
                      int64_t signal_start_,
                      int64_t hit_start_,
-                     int64_t num_states_)
+                     int64_t num_states_,
+                     bool is_template_)
                 : working_read(std::move(working_read_)),
                   model_id(model_id_),
                   base_id(base_id_),
                   signal_start(signal_start_),
                   hit_start(hit_start_),
-                  num_states(num_states_) {}
+                  num_states(num_states_),
+                  is_template(is_template_) {}
 
         std::shared_ptr<WorkingRead> working_read;
         const int model_id;
@@ -47,6 +50,8 @@ class ModBaseChunkCallerNode : public MessageSink {
         const int64_t hit_start;
         // The number of states predicted by the modbase model `num_mods + 1`
         const int64_t num_states;
+        // False if the chunk uses the complement modbase data on the working read
+        const bool is_template;
         // The model predictions for this chunk arranged in `[canonical, mod1, .., modN, canonical, mod1, ..]`
         std::vector<float> scores;
     };
@@ -73,6 +78,11 @@ public:
                                        const int64_t context_samples_after,
                                        const int64_t modbase_stride);
 
+    static int64_t resolve_duplex_sequence_index(const int64_t resolved_score_index,
+                                                 const int64_t target_start,
+                                                 const int64_t sequence_size,
+                                                 const bool is_template_direction);
+
     static std::vector<std::pair<int64_t, int64_t>> get_chunk_starts(
             const int64_t signal_len,
             const std::vector<int64_t>& hits_to_sig,
@@ -93,11 +103,16 @@ private:
 
     void input_thread_fn();
 
+    void create_and_submit_chunks(modbase::RunnerPtr& runner,
+                                  const size_t model_id,
+                                  const int64_t previous_chunk_count,
+                                  std::vector<std::unique_ptr<ModBaseChunk>>& batched_chunks) const;
     void chunk_caller_thread_fn(size_t worker_id, size_t model_id);
 
     void output_thread_fn();
 
     void simplex_mod_call(Message&& message);
+    void duplex_mod_call(Message&& message);
 
     // Called by chunk_caller_thread_fn, calls the model and enqueues the results
     void call_batch(size_t worker_id, size_t model_id, ModBaseChunks& batched_chunks);
@@ -129,12 +144,20 @@ private:
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called{0};
     std::atomic<int64_t> m_num_partial_batches_called{0};
-    std::atomic<int64_t> m_num_samples_processed{0};
     std::atomic<int64_t> m_num_samples_processed_incl_padding{0};
 
     const bool m_pad_end_align{0};
 
     void validate_runners() const;
+
+    void initialise_base_mod_probs(ReadCommon& read) const;
+
+    bool populate_modbase_data(ModBaseData& modbase_data,
+                               const modbase::RunnerPtr& runner,
+                               const std::string& seq,
+                               const at::Tensor& signal,
+                               const std::vector<uint8_t>& moves,
+                               const std::string& read_id) const;
 
     bool populate_hits_seq(PerBaseIntVec& context_hits_seq,
                            const std::string& seq,
@@ -154,7 +177,8 @@ private:
                                const std::vector<int>& int_seq,
                                const std::vector<uint64_t>& seq_to_sig_map) const;
 
-    void finalise_read(std::unique_ptr<dorado::SimplexRead>& read_ptr,
+    template <typename ReadType>
+    void finalise_read(std::unique_ptr<ReadType>& read_ptr,
                        std::shared_ptr<WorkingRead>& working_read);
 
     std::vector<uint64_t> get_seq_to_sig_map(const std::vector<uint8_t>& moves,
@@ -162,11 +186,8 @@ private:
                                              const size_t reserve) const;
 
     std::vector<ModBaseChunks> get_chunks(const modbase::RunnerPtr& runner,
-                                          const std::shared_ptr<WorkingRead>& working_read) const;
-
-    std::vector<std::pair<int64_t, int64_t>> get_chunk_contigs(
-            const std::vector<ModBaseChunk>& chunks,
-            const int64_t chunk_size) const;
+                                          const std::shared_ptr<WorkingRead>& working_read,
+                                          const bool is_template) const;
 };
 
 }  // namespace dorado
