@@ -57,11 +57,13 @@ Also, the `contig_2` sequence should be taken verbatim from input draft, and not
   > in_bam="data/calls_to_draft.bam"
   > expected="${in_dir}/expected.synth.medaka.w_fill_gaps.fill_char_Z.fasta"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --fill-char "Z" -vv > out/out.fasta 2> out/stderr
-  > echo "Exit code: $?"
+  > exit_code=$?
+  > echo "Exit code: ${exit_code}"
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   > gunzip -c ${expected} > out/expected.fasta
   > diff out/expected.fasta out/out.fasta
   > tail -n 1 out/out.fasta
+  > if [[ ${exit_code} != 0 ]]; then cat out/stderr; fi
   Exit code: 0
   1
   AAAAAAAAAACCCCCCCCCCTTTTTTTTTTGGGGGGGGGG

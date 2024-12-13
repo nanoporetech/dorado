@@ -6,7 +6,7 @@ Region string is empty. This should fail.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "" -vv > out/out.fasta 2> out/stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Option --regions is specified, but and empty set of regions is given" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Option --regions is specified, but an empty set of regions is given" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 1
   1
 
@@ -181,7 +181,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions out/in.bed -vv > out/out.fasta 2> out/stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Option --regions is specified, but and empty set of regions is given" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Option --regions is specified, but an empty set of regions is given" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 1
   1
 

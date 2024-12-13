@@ -8,12 +8,14 @@ If the filter works, then there will be zero alignments usable for pileup featur
   > in_draft=${in_dir}/draft.fasta.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} ${model_var} --qualities --min-mapq 100 -vv > out/out.fastq 2> out/stderr
-  > echo "Exit code: $?"
+  > exit_code=$?
   > ${DORADO_BIN} aligner ${in_draft} out/out.fastq 1> out/out.sam 2> out/out.sam.stderr
+  > echo "Exit code: ${exit_code}"
   > samtools view out/out.sam | sed -E 's/^.*(NM:i:[0-9]+).*/\1/g'
   > samtools faidx out/out.fastq
   > cut -f 2,2 out/out.fastq.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
+  > if [[ ${exit_code} != 0 ]]; then cat out/stderr; fi
   Exit code: 0
   NM:i:0
   10000
