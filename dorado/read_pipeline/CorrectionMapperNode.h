@@ -32,7 +32,8 @@ public:
                          int threads,
                          uint64_t index_size,
                          std::string furthest_skip_header,
-                         std::unordered_set<std::string> skip_set);
+                         std::unordered_set<std::string> skip_set,
+                         int run_block_id);
     ~CorrectionMapperNode() = default;
     std::string get_name() const override { return "CorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;
@@ -40,6 +41,11 @@ public:
     void restart() override {}
     // Main driver function.
     void process(Pipeline& pipeline);
+
+    bool load_next_index_block();
+
+    int get_current_index_block_id() const;
+    int get_index_seqs() const;
 
 private:
     std::string m_index_file;
@@ -82,6 +88,7 @@ private:
 
     std::string m_furthest_skip_header;
     std::unordered_set<std::string> m_skip_set;
+    int m_run_block_id{-1};
 };
 
 }  // namespace dorado

@@ -183,7 +183,22 @@ void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
     }
 }
 
+bool CorrectionMapperNode::load_next_index_block() {
+    while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index) {
+        ++m_current_index;
+        return true;
+    }
+    return false;
+}
+
 void CorrectionMapperNode::process(Pipeline& pipeline) {
+    if (m_current_index < 0) {
+        spdlog::debug(
+                "Not processing because selected block is out of bounds. m_current_index = {}",
+                m_current_index);
+        return;
+    }
+
     std::thread reader_thread;
     std::vector<std::thread> aligner_threads;
     std::thread copy_thread =
@@ -224,6 +239,11 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
     }
 
     do {
+        // If a specific block was selected, stop as soon as it has been processed.
+        if ((m_run_block_id >= 0) && (m_current_index > m_run_block_id)) {
+            break;
+        }
+
         spdlog::debug("Align with index {}", m_current_index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
@@ -274,13 +294,15 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
                                            int threads,
                                            uint64_t index_size,
                                            std::string furthest_skip_header,
-                                           std::unordered_set<std::string> skip_set)
+                                           std::unordered_set<std::string> skip_set,
+                                           const int run_block_id)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
           m_reads_queue(5000),
           m_furthest_skip_header{std::move(furthest_skip_header)},
-          m_skip_set{std::move(skip_set)} {
+          m_skip_set{std::move(skip_set)},
+          m_run_block_id{run_block_id} {
     auto options = alignment::create_preset_options("ava-ont");
     auto& index_options = options.index_options->get();
     index_options.k = 25;
@@ -320,6 +342,19 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
         spdlog::debug("Loaded mm2 index.");
     }
     m_index_seqs = m_index->index()->n_seq;
+
+    // If a specific block has been selected, skip all earlier blocks.
+    while ((run_block_id >= 0) && (m_current_index < run_block_id)) {
+        spdlog::debug("Skipping index block: {}. Looking for block: {}", m_current_index,
+                      run_block_id);
+        const bool rv = load_next_index_block();
+        if (!rv) {
+            // Not found, the entire index has been looped through.
+            m_current_index = -1;
+            break;
+        }
+    }
+    spdlog::debug("Initial index block set to: {}", m_current_index);
 }
 
 stats::NamedStats CorrectionMapperNode::sample_stats() const {
@@ -330,5 +365,9 @@ stats::NamedStats CorrectionMapperNode::sample_stats() const {
     stats["current_idx"] = m_current_index;
     return stats;
 }
+
+int CorrectionMapperNode::get_current_index_block_id() const { return m_current_index; }
+
+int CorrectionMapperNode::get_index_seqs() const { return m_index_seqs; }
 
 }  // namespace dorado

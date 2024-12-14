@@ -58,6 +58,8 @@ struct Options {
     std::string in_paf_fn;
     std::string model_path;
     std::string resume_path_fn;
+    bool compute_num_blocks = false;
+    std::optional<int> run_block_id;
 };
 
 /// \brief Define the CLI options.
@@ -124,6 +126,13 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
                       "lower memory footprint.")
                 .default_value(std::string{"8G"});
+        parser->visible.add_argument("--compute-num-blocks")
+                .help("Computes and returns one number: the number of index blocks which would be "
+                      "processed on a normal run.")
+                .flag();
+        parser->visible.add_argument("--run-block-id")
+                .help("ID of the index block to run. If specified, only this block will be run.")
+                .scan<'i', int>();
     }
 
     return parser;
@@ -175,6 +184,9 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
 
     opt.verbosity = verbosity;
+
+    opt.compute_num_blocks = parser.visible.get<bool>("compute-num-blocks");
+    opt.run_block_id = parser.visible.present<int>("run-block-id");
 
     return opt;
 }
@@ -306,6 +318,20 @@ void validate_options(const Options& opt) {
         spdlog::error("Input resume index file {} does not exist!", opt.resume_path_fn);
         std::exit(EXIT_FAILURE);
     }
+    if (opt.compute_num_blocks && !std::empty(opt.resume_path_fn)) {
+        spdlog::error("The --compute-num-blocks option cannot be used together with --resume-from.",
+                      opt.resume_path_fn);
+        std::exit(EXIT_FAILURE);
+    }
+    if ((opt.run_block_id) && (*opt.run_block_id < 0)) {
+        spdlog::error("The --run-block-id option cannot be negative.");
+        std::exit(EXIT_FAILURE);
+    }
+    if ((opt.run_block_id) && (*opt.run_block_id >= 0) && !std::empty(opt.resume_path_fn)) {
+        spdlog::error("The --run-block-id option cannot be used together with --resume-from.",
+                      opt.resume_path_fn);
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 }  // namespace
@@ -359,6 +385,24 @@ int correct(int argc, char* argv[]) {
 
     // Load the resume list if it exists.
     try {
+        if (opt.compute_num_blocks) {
+            spdlog::debug("Only computing the number of index blocks.");
+
+            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1);
+
+            // Loop through all index blocks.
+            while (node.load_next_index_block()) {
+            }
+
+            // Handle empty sequence files.
+            const int64_t num_blocks =
+                    node.get_current_index_block_id() + ((node.get_index_seqs() > 0) ? 1 : 0);
+
+            std::cout << num_blocks << std::endl;
+
+            return EXIT_SUCCESS;
+        }
+
         std::unordered_set<std::string> skip_set =
                 (!std::empty(opt.resume_path_fn)) ? load_processed_reads(opt.resume_path_fn)
                                                   : std::unordered_set<std::string>{};
@@ -419,9 +463,9 @@ int correct(int argc, char* argv[]) {
             aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn, std::move(skip_set));
         } else {
             // 1. Alignment node that generates alignments per read to be corrected.
-            aligner = std::make_unique<CorrectionMapperNode>(in_reads_fn, aligner_threads,
-                                                             opt.index_size, furthest_skip_header,
-                                                             std::move(skip_set));
+            aligner = std::make_unique<CorrectionMapperNode>(
+                    in_reads_fn, aligner_threads, opt.index_size, furthest_skip_header,
+                    std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1);
         }
 
         // Set up stats counting.
