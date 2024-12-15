@@ -339,6 +339,38 @@ $ dorado correct reads.fastq --resume-from corrected_reads.1.fasta.fai > correct
 ```
 The input file format for the `--resume-from` feature can be any plain text file where the first whitespace-delimited column (or a full row) consists of sequence names to skip, one per row.
 
+#### HPC support
+Dorado `correct` now also provides a feature to enable simpler distributed computation.
+It is now possible to run a single block of the input target reads file, specified by the block ID. This enables granularization of the correction process, making it possible to easily utilise distributed HPC architectures.
+
+For example, this is now possible:
+```
+# Determine the number of input target blocks.
+num_blocks=$(dorado correct in.fastq --compute-num-blocks)
+
+# For every block, run correction of those target reads.
+for ((i=0; i<${num_blocks}; i++)); do
+    dorado correct in.fastq --run-block-id ${i} > out.block_${i}.fasta
+done
+
+# Optionally, concatenate the corrected reads.
+cat out.block_*.fasta > out.all.fasta
+```
+
+On an HPC system, individual blocks can simply be submitted to the cluster management system. For example:
+```
+# Determine the number of input target blocks.
+num_blocks=$(dorado correct in.fastq --compute-num-blocks)
+
+# For every block, run correction of those target reads.
+for ((i=0; i<${num_blocks}; i++)); do
+    qsub ... dorado correct in.fastq --run-block-id ${i} > out.block_${i}.fasta
+done
+```
+
+In case that the available HPC nodes do not have GPUs available, the CPU power of those nodes can still be leveraged for overlap computation - it is possible to combine a blocked run with the `--to-paf` option. Inference stage can then be run afterwards on another node with GPU devices from the generated PAF and the `--from-paf` option.
+
+
 #### Troubleshooting
 1. In case the process is consuming too much memory for your system, try running it with a smaller index size. For example:
     ```
