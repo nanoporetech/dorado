@@ -588,9 +588,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
         std::string model_name = basecaller_model + polish_model_suffix;
 
-        // Example: dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv
-        std::replace(std::begin(model_name), std::end(model_name), '@', '_');
-
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
@@ -612,9 +609,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
         std::string model_name = basecaller_model + polish_model_suffix;
-
-        // Example: dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv
-        std::replace(std::begin(model_name), std::end(model_name), '@', '_');
 
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
