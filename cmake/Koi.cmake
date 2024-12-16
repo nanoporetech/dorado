@@ -32,13 +32,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
             if(DEFINED GITLAB_CI_TOKEN)
                 message("Cloning Koi using CI token")
                 execute_process(
-                    COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR}
+                    COMMAND git clone --depth 1 https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR}
                     COMMAND_ERROR_IS_FATAL ANY
                 )
             else()
                 message("Cloning Koi using ssh")
                 execute_process(
-                    COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR}
+                    COMMAND git clone --depth 1 git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR}
                     COMMAND_ERROR_IS_FATAL ANY
                 )
             endif()
