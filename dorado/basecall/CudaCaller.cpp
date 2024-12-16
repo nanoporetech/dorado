@@ -230,7 +230,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
     const int granularity = get_batch_size_granularity(m_config);
-    const int cs_granularity = m_config.chunk_size_granularity();
+    const int cs_granularity = static_cast<int>(m_config.chunk_size_granularity());
     {
         // First set of batch dimensions. Adjust chunk size to be a multiple of stride_inner.
         // Batch size defaults to `granularity` but will be increased further down if memory allows.
