@@ -361,15 +361,11 @@ It takes as input a draft produced by an assembly tool (e.g. Hifiasm or Flye) an
 
 #### Quick Start
 
-To produce a polished assembly the following two inputs are needed:
-- Draft sequence to polish
-- Reads aligned to that draft in BAM format
-
 ```
 dorado polish <aligned_reads> <draft> > polished_assembly.fasta
 ```
 
-where `<aligned_reads>` is a BAM of reads aligned to a draft by dorado aligner and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
+In the above example, `<aligned_reads>` is a BAM of reads aligned to a draft by `dorado aligner` and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
 
 By default, `polish` queries the BAM and selects the best model for the basecalled reads.
 
@@ -406,55 +402,15 @@ If move tables are not available in the BAM, then the non-move table-aware model
 ##### Memory consumption
 The default inference batch size (`16`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
 ```
-dorado polish reads_to_draft.bam draft.fasta --batch-size <number> > consensus.fasta
+dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
 ```
 
-Alternatively, consider running model inference on the CPU, although this will take longer:
+Alternatively, consider running inference on the CPU, although this can take longer:
 ```
 dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
 ```
 
 Note that using multiple CPU inference threads can cause much higher memory usage.
-
-#### CLI reference
-
-```
-Consensus tool for polishing draft assemblies
-
-Positional arguments:
-  in_aln_bam            Aligned reads in BAM format
-  in_draft_fastx        Draft assembly for polishing
-
-Optional arguments:
-  -h, --help            shows help message and exits
-  -t, --threads         Number of threads for processing (0=unlimited). [nargs=0..1] [default: 0]
-  --infer-threads       Number of threads for CPU inference [nargs=0..1] [default: 1]
-  -x, --device          Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or 'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will choose either 'cpu' or 'cuda:all' depending on the presence of a GPU device. [nargs=0..1] [default: "auto"]
-  -v, --verbose         [may be repeated]
-
-Input/output options (detailed usage):
-  -o, --out-path        Output to a file instead of stdout. [nargs=0..1] [default: ""]
-  -m, --model           Path to correction model folder. [nargs=0..1] [default: "auto"]
-  -q, --qualities       Output with per-base quality scores (FASTQ).
-
-Advanced options (detailed usage):
-  -b, --batchsize       Batch size for inference. [nargs=0..1] [default: 16]
-  --draft-batchsize     Approximate batch size for processing input draft sequences. [nargs=0..1] [default: "200M"]
-  --window-len          Window size for calling consensus. [nargs=0..1] [default: 10000]
-  --window-overlap      Overlap length between windows. [nargs=0..1] [default: 1000]
-  --bam-chunk           Size of draft chunks to parse from the input BAM at a time. [nargs=0..1] [default: 1000000]
-  --bam-subchunk        Size of regions to split the bam_chunk in to for parallel processing [nargs=0..1] [default: 100000]
-  --no-fill-gaps        Do not fill gaps in consensus sequence with draft sequence.
-  --fill-char           Use a designated character to fill gaps.
-  --regions             Process only these regions of the input. Can be either a path to a BED file or a list of comma-separated Htslib-formatted regions (start is 1-based, end is inclusive).
-  --RG                  Read group to select. [nargs=0..1] [default: ""]
-  --ignore-read-groups  Ignore read groups in bam file.
-  --tag-name            Two-letter BAM tag name for filtering the alignments during feature generation [nargs=0..1] [default: ""]
-  --tag-value           Value of the tag for filtering the alignments during feature generation [nargs=0..1] [default: 0]
-  --tag-keep-missing    Keep alignments when tag is missing. If specified, overrides the same option in the model config.
-  --min-mapq            Minimum mapping quality of the input alignments. If specified, overrides the same option in the model config.
-  --min-depth           Sites with depth lower than this value will not be polished. [nargs=0..1] [default: 0]
-```
 
 ## Available basecalling models
 
