@@ -51,6 +51,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
             # the submodule checkout. Dropping down to HTTP/1.1 appears to help with that.
             execute_process(
                 COMMAND git config http.version "HTTP/1.1"
+                WORKING_DIRECTORY ${KOI_DIR}
+                COMMAND_ERROR_IS_FATAL ANY
+            )
+            execute_process(
+                COMMAND git config http.version "HTTP/1.1"
                 WORKING_DIRECTORY ${KOI_DIR}/koi
                 COMMAND_ERROR_IS_FATAL ANY
             )
