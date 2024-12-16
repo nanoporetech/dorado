@@ -39,12 +39,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
             execute_process(
                 COMMAND
                     git clone
-                    --depth 1
-                    -b v${KOI_VERSION}
-                    # TODO: once we drop centos support we can use these instead of a separate submodule update
-                    #--recurse-submodules --shallow-submodules
-                    ${KOI_REPO}
-                    ${KOI_DIR}
+                        -b v${KOI_VERSION}
+                        # TODO: once we drop centos support we can use these instead of a separate submodule update
+                        #--depth 1
+                        #--recurse-submodules
+                        #--shallow-submodules
+                        ${KOI_REPO}
+                        ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
             )
             execute_process(
