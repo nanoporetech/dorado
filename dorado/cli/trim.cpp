@@ -40,8 +40,7 @@ int trim(int argc, char* argv[]) {
             .nargs(argparse::nargs_pattern::any);
     parser.add_argument("-t", "--threads")
             .help("Combined number of threads for adapter/primer detection and output generation. "
-                  "Default uses "
-                  "all available threads.")
+                  "Default uses all available threads.")
             .default_value(0)
             .scan<'i', int>();
     parser.add_argument("-n", "--max-reads")
@@ -49,6 +48,8 @@ int trim(int argc, char* argv[]) {
                   "default.")
             .default_value(0)
             .scan<'i', int>();
+    parser.add_argument("-k", "--sequencing-kit")
+            .help("Sequencing kit name to use for selecting adapters and primers to trim.");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
             .default_value(std::string(""));
@@ -80,6 +81,16 @@ int trim(int argc, char* argv[]) {
 
     if (parser.get<bool>("--verbose")) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
+    }
+
+    if (!parser.is_used("--sequencing-kit")) {
+        spdlog::error("The sequencing kit name must be specified with --sequencing-kit.");
+        return EXIT_FAILURE;
+    }
+    auto kit_name = parser.get<std::string>("--sequencing-kit");
+    if (kit_name.empty()) {
+        spdlog::error("Sequencing kit name must be non-empty.");
+        return EXIT_FAILURE;
     }
 
     auto reads(parser.get<std::vector<std::string>>("reads"));
@@ -146,6 +157,7 @@ int trim(int argc, char* argv[]) {
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = true;
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
+    adapter_info->kit_name = kit_name;
     adapter_info->custom_seqs = custom_primer_file;
 
     auto client_info = std::make_shared<DefaultClientInfo>();

@@ -368,7 +368,11 @@ DEFINE_TEST(NodeSmokeTestRead, "BarcodeClassifierNode") {
             dorado::utils::PostCondition([] { dorado::barcode_kits::clear_custom_barcode_kits(); });
 
     if (!kit_inputs.custom_sequences.empty()) {
-        auto custom_barcodes = dorado::demux::parse_custom_sequences(kit_inputs.custom_sequences);
+        std::unordered_map<std::string, std::string> custom_barcodes;
+        auto custom_sequences = dorado::demux::parse_custom_sequences(kit_inputs.custom_sequences);
+        for (const auto& entry : custom_sequences) {
+            custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+        }
         dorado::barcode_kits::add_custom_barcodes(custom_barcodes);
     }
     auto barcode_cleanup =

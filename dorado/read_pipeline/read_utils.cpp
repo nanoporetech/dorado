@@ -40,6 +40,7 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->read_common.position_id = read.read_common.position_id;
     copy->read_common.experiment_id = read.read_common.experiment_id;
     copy->read_common.model_name = read.read_common.model_name;
+    copy->read_common.sequencing_kit = read.read_common.sequencing_kit;
 
     copy->read_common.base_mod_probs = read.read_common.base_mod_probs;
     copy->read_common.mod_base_info = read.read_common.mod_base_info;
