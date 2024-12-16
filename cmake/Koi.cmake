@@ -47,6 +47,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 WORKING_DIRECTORY ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
             )
+            # We're seeing issues like "unexpected disconnect while reading sideband packet" in CI during
+            # the submodule checkout. Dropping down to HTTP/1.1 appears to help with that.
+            execute_process(
+                COMMAND git config http.version "HTTP/1.1"
+                WORKING_DIRECTORY ${KOI_DIR}/koi
+                COMMAND_ERROR_IS_FATAL ANY
+            )
             execute_process(
                 COMMAND git submodule update --init --depth 1
                 WORKING_DIRECTORY ${KOI_DIR}
