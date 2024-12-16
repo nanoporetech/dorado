@@ -1004,11 +1004,9 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
 
                 const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
                                           static_cast<size_t>(sample.depth.size(0)));
-                std::vector<int32_t> low_depth;
                 Interval interval{0, 0};
                 for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
                     if (depth[ii] < min_depth) {
-                        low_depth.emplace_back(ii);
                         if (interval.length() > 0) {
                             good_intervals.emplace_back(interval);
                         }
@@ -1018,13 +1016,6 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                 }
                 if (interval.length() > 0) {
                     good_intervals.emplace_back(interval);
-                }
-
-                spdlog::debug("Good depth intervals: {}, min depth = {}, num positions = {}",
-                              std::size(good_intervals), min_depth, num_positions);
-                for (size_t ii = 0; ii < std::size(good_intervals); ++ii) {
-                    spdlog::debug("[good_intervals ii = {}] start = {}, end = {}", ii,
-                                  good_intervals[ii].start, good_intervals[ii].end);
                 }
             }
 
