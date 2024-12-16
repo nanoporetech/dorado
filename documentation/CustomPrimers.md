@@ -1,6 +1,6 @@
 ### Custom Adapter and Primer Sequences
 
-Dorado will normally automatically detect and trim any adapter or primer sequences it finds. The specific sequences it searches for depend on the specified sequencing kit. This applies to both the basecaller application, where the kit name is expected to be embedded in the read in the input pod5 file, and the trim application, where the kit must be specified as a command-line option to the application.
+Dorado will normally automatically detect and trim any adapter or primer sequences it finds. The specific sequences it searches for depend on the specified sequencing kit. This applies to both the basecaller subcommand, where the kit name is expected to be embedded in the read in the input pod5 file, and the trim subcommand, where the kit must be specified as a command-line option to dorado.
 
 In some cases, it may be necessary to find and remove adapter and/or primer sequences that would not normally be associated with the sequencing kit that was used, or you may be working with older data for which the sequencing kit and/or primers being used are no longer directly supported by dorado (for example, anything prior to kit14). In such cases, you can specify a custom adapter/primer file, using the command-line option `--primer-sequences`.
 
@@ -19,7 +19,7 @@ The `_front` and `_rear` part of the record name tells dorado how to search for 
 
 The `type` designator is required to designate whether the sequence in an adapter or a primer sequence, so that dorado knows how it should be used.
 
-The `kits` designator is optional. If provided, then the sequence will only be searched for if the sequencing-kit information in the read matches one of the kit names in the custom file. If the `kits` designator is not provided, then the sequence will be searched for in all reads, regardless of the kit that was used.
+The `kits` designator is optional. If provided, then the sequence will only be searched for if the sequencing-kit information in the read matches one of the kit names in the custom file. If the `kits` designator is not provided, then the sequence will be searched for in all reads, regardless of the kit that was used. Note that the kit names are case-insensitive.
 
 #### Example custom adapter/primer file.
 

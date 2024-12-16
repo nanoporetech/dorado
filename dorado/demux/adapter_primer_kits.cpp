@@ -22,34 +22,37 @@ struct CustomItem {
 
     bool add_sequence(std::string nm, std::string sequence, ItemType ty, ItemPos pos) {
         if (!name.empty() && name != nm) {
-            spdlog::error("Name mismatch error.");
+            spdlog::error("Custom adapter/primer name mismatch error: {} and {}", name, nm);
             return false;
         }
         if (item_type != ty && item_type != UNKNOWN) {
-            spdlog::error("Item type mismatch.");
+            spdlog::error("Custom adapter/primer type mismatch error. {} and {}", int(item_type),
+                          int(ty));
             return false;
         }
         if (sequence.empty()) {
-            spdlog::error("Empty sequence specified.");
+            spdlog::error("Custom adapter/primer parsing error: Empty sequence specified.");
             return false;
         }
         switch (pos) {
         case FRONT:
             if (!front_sequence.empty()) {
-                spdlog::error("Duplicate front sequence for '" + nm + "'.");
+                spdlog::error(
+                        "Custom adapter/primer parsing error: Duplicate front sequence for {}", nm);
                 return false;
             }
             front_sequence = std::move(sequence);
             break;
         case REAR:
             if (!rear_sequence.empty()) {
-                spdlog::error("Duplicate rear sequence for '" + nm + "'.");
+                spdlog::error("Custom adapter/primer parsing error: Duplicate rear sequence for {}",
+                              nm);
                 return false;
             }
             rear_sequence = std::move(sequence);
             break;
         default:
-            spdlog::error("Invalid sequence position.");
+            spdlog::error("Custom adapter/primer parsing error: Invalid sequence position.");
             return false;
         }
         name = std::move(nm);
@@ -108,7 +111,7 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record
 std::set<std::string> kit_names(const std::unordered_map<std::string, std::string>& tags) {
     auto kits_field = tags.find("kits");
     if (kits_field == tags.end()) {
-        spdlog::error("No 'kits' field found.");
+        spdlog::error("Custom adapter/primer parsing error: No 'kits' field found.");
         throw std::runtime_error("Error parsing custom adapter/primer file.");
     }
     return parse_kit_names(kits_field->second);
@@ -193,7 +196,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
                                                             CandidateType ty) const {
     // If the requested kit name is "ALL", then all candidates will be returned, regardless of kit
     // compatibility. Otherwise only candidates matching the requested kit, and candidates listed
-    // as beign for any kit, will be included. Note that the latter will only exist if a custom
+    // as being for any kit, will be included. Note that the latter will only exist if a custom
     // adapter/primer file was used, for entries with no kit information provided.
     const std::unordered_map<std::string, std::vector<Candidate>>* candidate_lut = nullptr;
     switch (ty) {
