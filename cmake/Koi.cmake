@@ -31,20 +31,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         if(NOT EXISTS ${KOI_DIR})
             if(DEFINED GITLAB_CI_TOKEN)
                 message("Cloning Koi using CI token")
-                execute_process(
-                    COMMAND git clone --depth 1 https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR}
-                    COMMAND_ERROR_IS_FATAL ANY
-                )
+                set(KOI_REPO https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git)
             else()
                 message("Cloning Koi using ssh")
-                execute_process(
-                    COMMAND git clone --depth 1 git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR}
-                    COMMAND_ERROR_IS_FATAL ANY
-                )
+                set(KOI_REPO git@git.oxfordnanolabs.local:machine-learning/koi.git)
             endif()
             execute_process(
-                COMMAND git checkout v${KOI_VERSION}
-                WORKING_DIRECTORY ${KOI_DIR}
+                COMMAND
+                    git clone
+                    --depth 1
+                    -b v${KOI_VERSION}
+                    ${KOI_REPO}
+                    ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
             )
             # We're seeing issues like "unexpected disconnect while reading sideband packet" in CI during
