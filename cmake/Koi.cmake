@@ -48,7 +48,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 COMMAND_ERROR_IS_FATAL ANY
             )
             execute_process(
-                COMMAND git submodule update --init --checkout
+                COMMAND git submodule update --init --depth 1
                 WORKING_DIRECTORY ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
             )
