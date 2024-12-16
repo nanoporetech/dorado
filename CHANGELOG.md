@@ -2,6 +2,35 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.9.0] (16 Dec 2024)
+
+This major release of Dorado introduces several new features and enhancements. The `polish` command, currently experimental, is optimised for refining draft assemblies of human genomes. This release also adds faster DNA modification calling models and improved 6mA false positive rate (FPR) in native human samples. Barcode demultiplexing accuracy has been significantly enhanced for kits with barcodes at both ends, including `SQK-NBD114`. Note that using custom barcode kits now requires the `--kit-name` option. A feature has been added to enable running `dorado correct` in blocks, allowing work to be divided into smaller pieces for easy submission to a compute cluster. Additional updates include the `qs` tag for mean basecall Q-scores in FASTQ output, an upgrade to POD5 to support systems with large page sizes, improvements to Poly(A) tail length estimation, and various bug fixes to enhance stability and functionality.
+
+* 2b96c0b3d421e7729b6189f334cd7c1be50d53a6 - New Dorado `polish` feature for assembly polishing
+* 0bab1669df18689aafbc6d42403aedacc36d297d - Faster modified base models for DNA `4mC_5mC`, `5mC_5hmC`, `5mCG_5hmCG`, and `6mA`
+* e6371667f8c2fbd66e2ef5b1b91f36d47b3767f5 - Enable running dorado correct in blocks, for easy submission to a compute cluster
+* 40296da37d815a1ae2dc7f5739daeabd76dc5767 - Reduced false positive classification rates for kits with barcodes at both ends
+* 35da003bfc50afdeef0462cfd15f2d2fc237e538 - Improve barcode classification when barcodes can be on either end
+* cbcdf38faaac21dc6d805ed70e14e1786b739d02 - Only classify barcodes which are present on sample sheet if provided
+* 2449d03c23c577fb281e9fa02d414289ae8e2c08 - Correct `AF02F_14` and `AH10R_80` barcodes from `TWIST-96A-UDI`
+* 631e94c823463156188d0e3364505c7f39d3327a - Prevent Dorado `demux` from stripping alignment information when `--no-trim` is specified
+* affea85594a405a2cb162637e1c22e8a71ac7cc5 - Prevent missing filenames when using `--emit-summary` with Dorado `demux`
+* 3dec15a4ae6f2acc7953c8f81e34bae63a659372 - Improve poly(A) tail estimation accuracy, including with interrupted tails
+* df57d34665d8c6ab6d45bc893c5f5ac95d54f58e - Limit poly(A) estimation to reads with plausible signal to prevent stalls in calculation
+* 6cf701a825959cf14079b976f2199e0643b450b2 - Add `min_primer_separation` option to custom poly(A) configuration
+* bf51bd492618a896afc33cbe246f76e8f62e852f - Add `qs` tag with mean basecall Q-score to FASTQ output
+* dac076de03f323bef273a159debfd458629befa6 - Upgrade to POD5 v0.3.23 to support systems with large page sizes for POD5 and .fast5
+* c7a7a58e9f5f264ae2c57982fe02bc6bb28fc6bd - Prevent silent failure or segfault on Windows with bad custom barcode files
+* 1e829d5494d5b3cf6c7bbc67697d0561e966c7d0 - Do not allow basecalling if target directory includes both POD5 and .fast5 files
+* 05d0981cbe5a05ca910806ace5bfe02fd8baef00 - Fix modified base trim for reverse-aligned BAM records
+* afdb06837706e69d06095c7652ef3fcea700bfa4 - Fix invalid `MM` tag after trimming when no mods are present
+* 0d788d7df7edcbc2e828985b5ff894f5535f5e49 - Prevent crash when insufficient permissions to read an input file/folder
+* dbece016fe88c1fded10162fd770bd1bdbf5ebed - Update custom barcoding documentation to accurately reflect demultiplexing logic
+* 6db40ec1f33b2a2974d475f701e3e48ee745421e - Correct model context info shown in `dorado download --list-structured`
+* 03acc12855fc944e071fef98ce89c99171ef465e - Use the `-o` short option only for `--output-dir` and not for `--overlap`
+* 8d9c017097b6dc5fa6b3f2f40f2a9851f88383cb - Added support for reading gzipped compressed FASTQ files
+
+
 # [0.8.3] (11 Nov 2024)
 
 This release of Dorado includes fixes and improvements to the Dorado 0.8.2 release, including a fix to SUP basecalling on Apple Silicon.
