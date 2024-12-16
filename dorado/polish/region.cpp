@@ -1,10 +1,23 @@
 #include "region.h"
 
 #include <cstddef>
+#include <ostream>
+#include <sstream>
 
 namespace dorado::polisher {
 
-std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string& region) {
+std::ostream& operator<<(std::ostream& os, const Region& region) {
+    os << region.name << ":" << (region.start + 1) << "-" << region.end;
+    return os;
+}
+
+std::string region_to_string(const Region& region) {
+    std::ostringstream oss;
+    oss << region;
+    return oss.str();
+}
+
+Region parse_region_string(const std::string& region) {
     const size_t colon_pos = region.find(':');
     if (colon_pos == std::string::npos) {
         return {region, -1, -1};
@@ -25,7 +38,7 @@ std::tuple<std::string, int64_t, int64_t> parse_region_string(const std::string&
     const int64_t end =
             ((dash_pos + 1) < std::size(region)) ? std::stoll(region.substr(dash_pos + 1)) : -1;
 
-    return {std::move(name), start, end};
+    return Region{std::move(name), start, end};
 }
 
 }  // namespace dorado::polisher

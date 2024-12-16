@@ -24,9 +24,9 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
     };
 
     struct TestCase {
-        std::string name;                    // Name of the test.
-        std::vector<MockSample> samples;     // Input samples to trim.
-        std::optional<const Region> region;  // Region from which the samples were generated.
+        std::string name;                       // Name of the test.
+        std::vector<MockSample> samples;        // Input samples to trim.
+        std::optional<const RegionInt> region;  // Region from which the samples were generated.
         bool expect_throw = false;
         std::vector<TrimInfo> expected;  // Expected results.
     };
@@ -49,7 +49,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // positions_minor
                 },
             },
-            Region{0, 0, 10},   // region
+            RegionInt{0, 0, 10},   // region
             false,              // expect_throw
             {   // Expected results.
                 TrimInfo{0, 10, false},
@@ -237,7 +237,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 1, 0, 1},   // positions_minor
                 },
             },
-            Region{0, 0, 1000},   // region
+            RegionInt{0, 0, 1000},   // region
             false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 9, false},
@@ -269,7 +269,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 1, 0, 0, 1, 2, 0, 0, 1, 2, 3},  // positions_minor
                 },
             },
-            Region{0, 1, 5},   // region
+            RegionInt{0, 1, 5},   // region
             false,          // expect_throw
             {   // Expected results.
                 TrimInfo{2, 9, false},
@@ -287,7 +287,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 1, 0, 0, 1, 2, 0, 0, 1, 2, 3},  // positions_minor
                 },
             },
-            Region{0, -1, 1000},   // region
+            RegionInt{0, -1, 1000},   // region
             true,          // expect_throw
             {   // Expected results.
             },
@@ -301,7 +301,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 1, 0, 0, 1, 2, 0, 0, 1, 2, 3},  // positions_minor
                 },
             },
-            Region{0, 1000, -1},   // region
+            RegionInt{0, 1000, -1},   // region
             true,          // expect_throw
             {   // Expected results.
             },
@@ -315,7 +315,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
                     {0, 1, 0, 0, 1, 2, 0, 0, 1, 2, 3},  // positions_minor
                 },
             },
-            Region{-1, 1000, 2000},   // region
+            RegionInt{-1, 1000, 2000},   // region
             true,          // expect_throw
             {   // Expected results.
             },

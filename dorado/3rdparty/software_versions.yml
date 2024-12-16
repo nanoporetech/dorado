@@ -88,6 +88,14 @@ indicators:
     license: indicators/LICENSE
     files:
         - indicators
+intervaltree:
+    description: >
+        Lightweight C++ interval tree library
+    version: "bd7b23e002881a01dee4871d7d0e52a3dfdf7dbd"
+    url: https://github.com/ekg/intervaltree.git
+    license: intervaltree/LICENSE
+    files:
+        - intervaltree
 minimap2:
     description: >
         Sequence alignment program

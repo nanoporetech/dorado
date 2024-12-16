@@ -1,6 +1,7 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
+#include "models/models.h"
 #include "polish/architectures/model_config.h"
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
@@ -16,6 +17,7 @@
 #include "utils/string_utils.h"
 
 #include <ATen/Parallel.h>
+#include <IntervalTree.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
@@ -76,7 +78,7 @@ struct Options {
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
     std::optional<std::string> regions_str;
-    std::vector<std::string> regions;
+    std::vector<polisher::Region> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
@@ -88,22 +90,23 @@ struct Options {
     std::string tag_name;
     int32_t tag_value = 0;
     std::optional<bool> tag_keep_missing;  // Optionally overrides the model config if specified.
+    int32_t min_depth = 0;
     bool any_bam = false;
-
-    // int32_t min_depth = 0;
+    bool any_model = false;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
 ///         separated list of regions in the given string.
-std::vector<std::string> parse_regions(const std::string& regions_arg) {
+std::vector<polisher::Region> parse_regions(const std::string& regions_arg) {
     if (std::empty(regions_arg)) {
         return {};
     }
 
+    std::vector<polisher::Region> ret;
+
     // Check if the string points to a file on disk.
     if (std::filesystem::exists(regions_arg)) {
         // Parse the BED-like format.
-        std::vector<std::string> ret;
         std::ifstream ifs(regions_arg);
         std::string line;
         while (std::getline(ifs, line)) {
@@ -112,14 +115,19 @@ std::vector<std::string> parse_regions(const std::string& regions_arg) {
             int64_t start = 0;
             int64_t end = 0;
             iss >> chr >> start >> end;
-            ret.emplace_back(chr + ":" + std::to_string(start + 1) + "-" + std::to_string(end));
+            ret.emplace_back(polisher::Region{chr, start, end});
         }
-        return ret;
+
     } else {
-        return dorado::utils::split(regions_arg, ',');
+        // Parse a comma delimited string of regions.
+        const auto str_regions = dorado::utils::split(regions_arg, ',');
+        for (const std::string& str_region : str_regions) {
+            polisher::Region region = polisher::parse_region_string(str_region);
+            ret.emplace_back(region);
+        }
     }
 
-    return {};
+    return ret;
 }
 
 /// \brief Define the CLI options.
@@ -136,17 +144,21 @@ ParserPtr create_cli(int& verbosity) {
     {
         // Default "Optional arguments" group
         parser->visible.add_argument("-t", "--threads")
-                .help("Number of threads for processing. "
-                      "Default uses all available threads.")
-                .default_value(1)
+                .help("Number of threads for processing (0=unlimited).")
+                .default_value(0)
                 .scan<'i', int>();
 
         parser->visible.add_argument("--infer-threads")
-                .help("Number of threads per device.")
+                .help("Number of threads for CPU inference")
                 .default_value(1)
                 .scan<'i', int>();
 
-        cli::add_device_arg(*parser);
+        parser->visible.add_argument("-x", "--device")
+                .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
+                                  "'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will "
+                                  "choose either 'cpu' "
+                                  "or 'cuda:all' depending on the presence of a GPU device."})
+                .default_value(std::string{"auto"});
 
         parser->visible.add_argument("-v", "--verbose")
                 .flag()
@@ -201,9 +213,9 @@ ParserPtr create_cli(int& verbosity) {
                       "end "
                       "is inclusive).");
         parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
-        // parser->visible.add_argument("--ignore-read-groups")
-        //         .help("Ignore read groups in bam file.")
-        //         .flag();
+        parser->visible.add_argument("--ignore-read-groups")
+                .help("Ignore read groups in bam file.")
+                .flag();
         parser->visible.add_argument("--tag-name")
                 .help("Two-letter BAM tag name for filtering the alignments during feature "
                       "generation")
@@ -221,10 +233,10 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
                 .scan<'i', int>();
-        // parser->visible.add_argument("--min-depth")
-        //         .help("Sites with depth lower than this value will not be polished.")
-        //         .default_value(0)
-        //         .scan<'i', int>();
+        parser->visible.add_argument("--min-depth")
+                .help("Sites with depth lower than this value will not be polished.")
+                .default_value(0)
+                .scan<'i', int>();
     }
 
     // Hidden advanced arguments.
@@ -241,6 +253,9 @@ ParserPtr create_cli(int& verbosity) {
                 .flag();
         parser->hidden.add_argument("--any-bam")
                 .help("Allow any BAM as input, not just Dorado aligned.")
+                .flag();
+        parser->hidden.add_argument("--skip-model-compatibility-check")
+                .help("Allow any model to be applied on the data.")
                 .flag();
     }
 
@@ -274,8 +289,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
     opt.threads = parser.visible.get<int>("threads");
-    opt.threads = (opt.threads == 0) ? std::max(1U, std::thread::hardware_concurrency() / 2)
-                                     : opt.threads;
+    opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : (opt.threads);
 
     opt.infer_threads = parser.visible.get<int>("infer-threads");
     opt.infer_threads_is_set = parser.visible.is_used("--infer-threads");
@@ -303,19 +317,20 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     if (opt.regions_str) {
         opt.regions = parse_regions(*opt.regions_str);
     }
-    // opt.min_depth = parser.visible.get<int>("min-depth");
+    opt.min_depth = parser.visible.get<int>("min-depth");
 
     opt.full_precision = parser.hidden.get<bool>("full-precision");
     opt.load_scripted_model = parser.hidden.get<bool>("scripted");
     opt.queue_size = parser.hidden.get<int>("queue-size");
     opt.any_bam = parser.hidden.get<bool>("any-bam");
+    opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
                             ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
                             : std::nullopt;
-    opt.read_group = parser.visible.get<std::string>("RG");
-    // opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
+    opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
+    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
     opt.tag_value = parser.visible.get<int>("tag-value");
     // The `"--tag-keep-missing` is a special case because it's a flag, and we cannot use `present`.
@@ -491,7 +506,51 @@ std::filesystem::path download_model(const std::string& model_name) {
 
 const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                           const std::string& model_str,
-                                          const bool load_scripted_model) {
+                                          const bool load_scripted_model,
+                                          const bool any_model) {
+    // Allow any model for development/debug purposes.
+    if (any_model) {
+        std::filesystem::path model_dir;
+        if (model_str == "auto") {
+            throw std::runtime_error{
+                    "When using --skip-model-compatibility-check, the model needs to be explicitly "
+                    "specified. Cannot "
+                    "use 'auto'."};
+
+        } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
+            spdlog::info("Model specified by path: '{}'", model_str);
+            model_dir = model_str;
+
+        } else {
+            const auto& infos = models::polish_models();
+            int32_t num_found = 0;
+            for (const auto& info : infos) {
+                if (info.name == model_str) {
+                    ++num_found;
+                }
+            }
+            if (num_found == 0) {
+                throw std::runtime_error("Could not find specified polishing model: '" + model_str +
+                                         "'.");
+            } else if (num_found > 1) {
+                throw std::runtime_error("Multiple models match the specified polishing model: '" +
+                                         model_str + "'.");
+            }
+
+            spdlog::info("Downloading model: '{}'", model_str);
+            model_dir = download_model(model_str);
+        }
+
+        // Load the model.
+        spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
+        const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
+        polisher::ModelConfig model_config =
+                polisher::parse_model_config(model_dir / "config.toml", model_file);
+
+        // Return without validating the compatibility with the input BAM.
+        return model_config;
+    }
+
     if (std::empty(bam_info.basecaller_models)) {
         throw std::runtime_error{"Input BAM file has no basecaller models listed in the header."};
     }
@@ -504,6 +563,12 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 
     const std::string polish_model_suffix =
             std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
+
+    if (bam_info.has_dwells) {
+        spdlog::info("Input data contains move tables.");
+    } else {
+        spdlog::info("Input data does not contain move tables.");
+    }
 
     std::filesystem::path model_dir;
 
@@ -574,6 +639,83 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     return model_config;
 }
 
+void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
+    if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
+        throw std::runtime_error{
+                "No @RG headers found in the input BAM, but user-specified RG was given. RG: '" +
+                cli_read_group + "'"};
+
+    } else if (std::empty(cli_read_group) && std::size(bam_info.read_groups) > 1) {
+        throw std::runtime_error{
+                "The input BAM contains more than one read group. Please specify --RG to select "
+                "which read group to process."};
+
+    } else if (!std::empty(cli_read_group) && !std::empty(bam_info.read_groups)) {
+        if (bam_info.read_groups.count(cli_read_group) == 0) {
+            std::ostringstream oss;
+            polisher::print_container(oss, bam_info.read_groups, ", ");
+            throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
+                                     cli_read_group + "'"};
+        }
+    }
+}
+
+/**
+ * \brief Checks if any region overlaps amy of the other regions. This may produce wrong results, so
+ *          we disallow that.
+ */
+void validate_regions(const std::vector<polisher::Region>& regions,
+                      const std::vector<std::pair<std::string, int64_t>>& seq_lens) {
+    // Create intervals for each input sequence.
+    std::unordered_map<std::string, std::vector<interval_tree::Interval<int64_t, int64_t>>>
+            intervals;
+    for (const auto& region : regions) {
+        // NOTE: interval_tree has an inclusive end coordinate.
+        intervals[region.name].emplace_back(
+                interval_tree::Interval<int64_t, int64_t>(region.start, region.end - 1, 0));
+    }
+
+    // Compute the interval tree.
+    std::unordered_map<std::string, interval_tree::IntervalTree<int64_t, int64_t>> trees;
+    for (auto& [key, values] : intervals) {
+        trees[key] = interval_tree::IntervalTree<int64_t, int64_t>(std::move(values));
+    }
+
+    // Validate that none of the regions is overlapping any other region.
+    for (const auto& region : regions) {
+        std::vector<interval_tree::Interval<int64_t, int64_t>> results =
+                trees[region.name].findOverlapping(region.start, region.end - 1);
+        if (std::size(results) > 1) {
+            throw std::runtime_error("Region validation failed: region '" +
+                                     polisher::region_to_string(region) +
+                                     "' overlaps other regions. Regions have to be unique.");
+        }
+    }
+
+    // Validate that all of the regions are within the range of the input sequences.
+    std::unordered_map<std::string, int64_t> len_dict;
+    for (const auto& [key, val] : seq_lens) {
+        len_dict[key] = val;
+    }
+    for (const auto& region : regions) {
+        const auto it = len_dict.find(region.name);
+        if (it == std::end(len_dict)) {
+            throw std::runtime_error{"Region validation failed: sequence name for region '" +
+                                     polisher::region_to_string(region) +
+                                     "' does not exist in the input sequence file."};
+        }
+        const int64_t seq_len = it->second;
+        // Allow negative coordinates as a proxy for full sequence length.
+        if ((region.start >= seq_len) || (region.end > seq_len) ||
+            ((region.start >= 0) && (region.end >= 0) && (region.start >= region.end))) {
+            throw std::runtime_error{
+                    "Region validation failed: coordinates for region '" +
+                    polisher::region_to_string(region) +
+                    "' are not valid. Sequence length: " + std::to_string(seq_len)};
+        }
+    }
+}
+
 }  // namespace
 
 void run_polishing(const Options& opt,
@@ -597,6 +739,8 @@ void run_polishing(const Options& opt,
     spdlog::debug("[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             load_seq_lengths(opt.in_draft_fastx_fn);
+
+    validate_regions(opt.regions, draft_lens);
 
     const int64_t total_input_bases =
             std::accumulate(std::begin(draft_lens), std::end(draft_lens), static_cast<int64_t>(0),
@@ -666,7 +810,7 @@ void run_polishing(const Options& opt,
         std::thread thread_sample_decoder =
                 std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results),
                             std::ref(decode_queue), std::ref(polish_stats),
-                            std::cref(*resources.decoder), opt.threads);
+                            std::cref(*resources.decoder), opt.threads, opt.min_depth);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                             *resources.encoder);
@@ -751,7 +895,7 @@ int polish(int argc, char* argv[]) {
         validate_options(opt);
 
         // Get info from BAM needed for the run.
-        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn);
+        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
 
         // Debug printing.
         {
@@ -765,11 +909,21 @@ int polish(int argc, char* argv[]) {
             for (const auto& rg : bam_info.basecaller_models) {
                 spdlog::debug("    - {}", rg);
             }
+            if (!std::empty(opt.read_group)) {
+                spdlog::debug(
+                        "Only the user-requested RG was selected from the input bam. RG: '{}'",
+                        opt.read_group);
+            }
         }
 
         // Allow only Dorado aligned BAMs.
         if ((bam_info.uses_dorado_aligner == false) && (opt.any_bam == false)) {
             throw std::runtime_error("Input BAM file was not aligned using Dorado.");
+        }
+
+        // Validate the read groups in the BAM file.
+        if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
+            check_read_groups(bam_info, opt.read_group);
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
@@ -778,7 +932,7 @@ int polish(int argc, char* argv[]) {
 
         // Resolve the model for polishing.
         const polisher::ModelConfig model_config =
-                resolve_model(bam_info, opt.model_str, opt.load_scripted_model);
+                resolve_model(bam_info, opt.model_str, opt.load_scripted_model, opt.any_model);
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(

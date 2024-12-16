@@ -103,8 +103,10 @@ PolisherResources create_resources(const ModelConfig& model_config,
 
 /**
  * \brief Opens the input BAM file and summarizes some information needed at runtime.
+ * \param in_aln_bam_fn Path to the input BAM file.
+ * \param cli_read_group If not empty, only this read group will be loaded from the BAM header.
  */
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn);
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
@@ -172,13 +174,14 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::vector<std::string>& regions);
+        const std::vector<Region>& regions);
 
 void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
-                                const int32_t num_threads);
+                                const int32_t num_threads,
+                                const int32_t min_depth);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,

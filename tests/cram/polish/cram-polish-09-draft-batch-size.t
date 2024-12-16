@@ -1,6 +1,4 @@
 
-This tests processing of the input draft FASTA file in batches of some size in bp.
-We will produce the inputs procedurally from the existing test data here.
 Preparing test data here. This block does not actually run tests. The data produced here will be used in the tests below.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny

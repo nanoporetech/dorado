@@ -353,6 +353,65 @@ The input file format for the `--resume-from` feature can be any plain text file
     - Input coverage is reasonable, preferrably `>=30x`.
     - Check the average base qualities of the input dataset. Dorado Correct expects accurate inputs for both mapping and inference.
 
+### Polishing
+
+Dorado `polish` is a high accuracy assembly polishing tool which outperforms similar tools for most ONT-based assemblies.
+
+It takes as input a draft produced by an assembly tool (e.g. Hifiasm or Flye) and reads aligned to that assembly and outputs an updated (polished) version of the assembly.
+
+#### Quick Start
+
+```
+dorado polish <aligned_reads> <draft> > polished_assembly.fasta
+```
+
+In the above example, `<aligned_reads>` is a BAM of reads aligned to a draft by `dorado aligner` and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
+
+By default, `polish` queries the BAM and selects the best model for the basecalled reads.
+
+> **IMPORTANT** Currently, dorado polish only supports V5.0 basecalls (both hac and sup).
+
+Dorado `polish` will automatically select the compute resources to perform polishing. It can use one or more GPU devices, or the CPU, to call consensus.
+
+To specify resources manually use:
+- `-x / --device` - to specify specific GPU resources (if available). For more information see here.
+- `--threads` -  to set the maximum number of threads to be used for everything but the inference.
+- `--infer-threads` -  to set the number of CPU threads for inference (when "--device cpu" is used).
+- `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
+
+Example:
+```
+dorado polish reads_to_draft.bam draft.fasta --device cuda:0 --threads 24 > consensus.fasta
+```
+
+#### Move Table Aware Models
+
+Significantly more accurate assemblies can be produced by giving the polishing model access to additional information about the underlying signal for each read. For more information, see this section from the [NCM 2024](https://youtu.be/IB6DmU40NIU?t=377) secondary analysis update.
+
+Dorado `polish` includes models which can use the move table to get temporal information about each read. These models will be selected automatically if the corresponding `mv` tag is in the input BAM. To do this, pass the `--emit-moves` tag to `dorado basecaller` when basecalling. To check if a BAM contains the move table for reads, use samtools:
+```
+samtools view --keep-tag "mv" -c <reads_to_draft_bam>
+```
+
+The output should be equal to the total number of reads in the bam (`samtools view -c <reads_to_draft_bam>`).
+
+If move tables are not available in the BAM, then the non-move table-aware model will be automatically selected.
+
+#### Troubleshooting
+
+##### Memory consumption
+The default inference batch size (`16`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
+```
+dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
+```
+
+Alternatively, consider running inference on the CPU, although this can take longer:
+```
+dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
+```
+
+Note that using multiple CPU inference threads can cause much higher memory usage.
+
 ## Available basecalling models
 
 To download all available Dorado models, run:

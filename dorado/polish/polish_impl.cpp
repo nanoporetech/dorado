@@ -129,7 +129,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     return resources;
 }
 
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
+BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
     BamInfo ret;
 
     BamFile bam(in_aln_bam_fn);
@@ -176,12 +176,11 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
 
             // Parse the read group ID.
             const auto& it_id = tags.find("ID");
-            if (it_id != std::end(tags)) {
-                ret.read_groups.emplace(it_id->second);
-            }
+            const std::string id = (it_id != std::end(tags)) ? it_id->second : "";
 
             // Parse the basecaller model.
             const auto& it_ds = tags.find("DS");
+            std::string basecaller_model;
             if (it_ds != std::end(tags)) {
                 const std::vector<std::string> tokens = utils::split(it_ds->second, ' ');
                 constexpr std::string_view TOKEN_NAME{"basecall_model="};
@@ -189,10 +188,23 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn) {
                     if (!utils::starts_with(token, TOKEN_NAME)) {
                         continue;
                     }
-                    ret.basecaller_models.emplace(token.substr(std::size(TOKEN_NAME)));
+                    basecaller_model = token.substr(std::size(TOKEN_NAME));
                     break;
                 }
             }
+
+            if (std::empty(id)) {
+                continue;
+            }
+            if (!std::empty(cli_read_group) && (id != cli_read_group)) {
+                continue;
+            }
+            if (std::empty(basecaller_model)) {
+                continue;
+            }
+
+            ret.read_groups.emplace(id);
+            ret.basecaller_models.emplace(basecaller_model);
         }
     }
 
@@ -536,8 +548,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             // Compute sample trimming coordinates.
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
-                    local_samples,
-                    std::optional<Region>({reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
+                    local_samples, std::optional<RegionInt>(
+                                           {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
     };
@@ -654,7 +666,7 @@ std::vector<Window> create_bam_regions(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const int32_t bam_chunk_len,
         const int32_t window_overlap,
-        const std::vector<std::string>& regions) {
+        const std::vector<Region>& regions) {
     if (std::empty(regions)) {
         // Canonical case where each sequence is linearly split with an overlap.
         std::vector<Window> windows;
@@ -676,33 +688,32 @@ std::vector<Window> create_bam_regions(
 
         std::vector<Window> windows;
 
-        for (const auto& region_str : regions) {
-            auto [region_name, region_start, region_end] = parse_region_string(region_str);
+        for (auto region : regions) {
+            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region.name, region.start + 1,
+                          region.end);
 
-            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region_name, region_start + 1,
-                          region_end);
-
-            const auto it = draft_ids.find(region_name);
+            const auto it = draft_ids.find(region.name);
             if (it == std::end(draft_ids)) {
                 throw std::runtime_error(
                         "Sequence specified by custom region not found in input! Sequence name: " +
-                        region_name);
+                        region.name);
             }
             const int32_t seq_id = it->second;
             const int64_t seq_length = draft_lens[seq_id].second;
 
-            region_start = std::max<int64_t>(0, region_start);
-            region_end = (region_end < 0) ? seq_length : std::min(seq_length, region_end);
+            region.start = std::max<int64_t>(0, region.start);
+            region.end = (region.end < 0) ? seq_length : std::min(seq_length, region.end);
 
-            if (region_start >= region_end) {
-                throw std::runtime_error{"Region coordinates not valid. Given: '" + region_str +
-                                         "'. region_start = " + std::to_string(region_start) +
-                                         ", region_end = " + std::to_string(region_end)};
+            if (region.start >= region.end) {
+                throw std::runtime_error{"Region coordinates not valid. Given: region.name = '" +
+                                         region.name +
+                                         "', region.start = " + std::to_string(region.start) +
+                                         ", region.end = " + std::to_string(region.end)};
             }
 
             // Split-up the custom region if it's too long.
             std::vector<Window> new_windows = create_windows(
-                    seq_id, region_start, region_end, seq_length, bam_chunk_len, window_overlap);
+                    seq_id, region.start, region.end, seq_length, bam_chunk_len, window_overlap);
             windows.reserve(std::size(windows) + std::size(new_windows));
             windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
         }
@@ -766,7 +777,7 @@ void sample_producer(PolisherResources& resources,
                 resources.bam_handles, *resources.encoder, draft_lens,
                 Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
 
-        spdlog::debug(
+        spdlog::trace(
                 "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
                 num_regions, std::size(region_samples));
 
@@ -790,7 +801,7 @@ void sample_producer(PolisherResources& resources,
                 InferenceData remainder_buffer;
                 remainder_buffer.samples = {std::move(samples[i])};
                 remainder_buffer.trims = {std::move(trims[i])};
-                spdlog::debug(
+                spdlog::trace(
                         "[producer] Pushing a batch of data to infer_data queue. "
                         "remainder_buffer.samples.size() = {}",
                         std::size(remainder_buffer.samples));
@@ -803,7 +814,7 @@ void sample_producer(PolisherResources& resources,
             buffer.trims.emplace_back(std::move(trims[i]));
 
             if (dorado::ssize(buffer.samples) == batch_size) {
-                spdlog::debug(
+                spdlog::trace(
                         "[producer] Pushing a batch of data to infer_data queue. "
                         "buffer.samples.size() = {}",
                         std::size(buffer.samples));
@@ -814,7 +825,7 @@ void sample_producer(PolisherResources& resources,
     }
 
     if (!std::empty(buffer.samples)) {
-        spdlog::debug(
+        spdlog::trace(
                 "[producer] Pushing a batch of data to infer_data queue. "
                 "buffer.samples.size() = {} (final)",
                 std::size(buffer.samples));
@@ -948,15 +959,21 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
-                                const int32_t num_threads) {
-    auto batch_decode = [&decoder, &polish_stats](const DecodeData& item, const int32_t tid) {
+                                const int32_t num_threads,
+                                const int32_t min_depth) {
+    auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
+                                                             const int32_t tid) {
         utils::ScopedProfileRange scope_decode("decode", 1);
         timer::TimerHighRes timer_total;
 
-        // Decode output to bases and qualities.
-        // Convert to sequences and qualities.
         timer::TimerHighRes timer_decode;
+
+        // Decode output to bases and qualities.
         std::vector<ConsensusResult> local_results = decoder.decode_bases(item.logits);
+
+        std::vector<ConsensusResult> final_results;
+        final_results.reserve(std::size(local_results));
+
         const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
 
         assert(std::size(local_results) == std::size(item.samples));
@@ -968,8 +985,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
             auto& result = local_results[j];
             const Sample& sample = item.samples[j];
             const TrimInfo& trim = item.trims[j];
-
             const int64_t num_positions = dorado::ssize(sample.positions_major);
+
             if ((trim.start < 0) || (trim.start >= num_positions) || (trim.end <= 0) ||
                 (trim.end > num_positions)) {
                 spdlog::debug(
@@ -980,12 +997,63 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                 continue;
             }
 
-            // Trim and mark the region.
-            result.draft_id = sample.seq_id;
-            result.draft_start = sample.positions_major[trim.start];
-            result.draft_end = sample.positions_major[trim.end - 1] + 1;
-            result.seq = result.seq.substr(trim.start, trim.end - trim.start);
-            result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+            std::vector<Interval> good_intervals{Interval{0, static_cast<int32_t>(num_positions)}};
+
+            if (min_depth > 0) {
+                good_intervals.clear();
+
+                const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
+                                          static_cast<size_t>(sample.depth.size(0)));
+                Interval interval{0, 0};
+                for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
+                    if (depth[ii] < min_depth) {
+                        if (interval.length() > 0) {
+                            good_intervals.emplace_back(interval);
+                        }
+                        interval.start = ii + 1;
+                    }
+                    interval.end = ii + 1;
+                }
+                if (interval.length() > 0) {
+                    good_intervals.emplace_back(interval);
+                }
+            }
+
+            if (std::size(good_intervals) == 1) {
+                // Trim and mark the region.
+                result.draft_id = sample.seq_id;
+                result.draft_start = sample.positions_major[trim.start];
+                result.draft_end = sample.positions_major[trim.end - 1] + 1;
+                result.seq = result.seq.substr(trim.start, trim.end - trim.start);
+                result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+
+                final_results.emplace_back(std::move(result));
+
+            } else {
+                for (const auto& interval : good_intervals) {
+                    if ((interval.start < 0) || (interval.end <= 0)) {
+                        continue;
+                    }
+
+                    ConsensusResult new_result;
+
+                    const int32_t start =
+                            std::max(static_cast<int32_t>(trim.start), interval.start);
+                    const int32_t end = std::min(static_cast<int32_t>(trim.end), interval.end);
+
+                    if (end <= start) {
+                        continue;
+                    }
+
+                    new_result.draft_id = sample.seq_id;
+                    new_result.draft_start = sample.positions_major[start];
+                    new_result.draft_end = sample.positions_major[end - 1] + 1;
+                    new_result.seq = result.seq.substr(start, end - start);
+                    new_result.quals = result.quals.substr(start, end - start);
+
+                    final_results.emplace_back(std::move(new_result));
+                }
+            }
 
             polish_stats.add("processed",
                              static_cast<double>(result.draft_end - result.draft_start));
@@ -999,7 +1067,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                 "ms, trim = {} ms, total = {}",
                 tid, time_decode, time_trim, time_total);
 
-        return local_results;
+        return final_results;
     };
 
     const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results) {

@@ -25,7 +25,7 @@ struct TrimInfo {
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
-                                   const std::optional<const Region>& region);
+                                   const std::optional<const RegionInt>& region);
 
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs);
 

@@ -20,7 +20,7 @@ Such samples should be filtered out from the output.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > # Create the edge-case input BAM.
-  > samtools merge out/in.bam ${in_dir}/calls_to_draft.bam ${in_dir}/calls_to_draft.single_read.long_insertion.bam
+  > samtools merge -c out/in.bam ${in_dir}/calls_to_draft.bam ${in_dir}/calls_to_draft.single_read.long_insertion.bam
   > samtools index out/in.bam
   > # Run.
   > ${DORADO_BIN} polish --any-bam --device cpu --bam-chunk 110 --bam-subchunk 20 --window-len 50 --window-overlap 20 out/in.bam ${in_dir}/draft.fasta.gz -t 1 --infer-threads 1 ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
