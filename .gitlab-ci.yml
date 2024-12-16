@@ -116,19 +116,20 @@ variables:
   - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
+.zip_test_files:
+  # Uploading these allows us to avoid checking out the repo in tests.
+  - zip -r tests.zip tests/*.sh tests/*.bat tests/data tests/cram
+
 .build_and_test_dorado:
   stage: build
   script:
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_ctest]
+    - !reference [.zip_test_files]
   artifacts:
     paths:
       - dist
-      # Uploading these allows us to avoid checking out the repo in tests.
-      - tests/*.sh
-      - tests/*.bat
-      - tests/data
-      - tests/cram
+      - tests.zip
     expire_in: 1 day
 
 .build_dorado_archive:
@@ -306,15 +307,11 @@ build:linux:arm64:bionic:
     - !reference [.run_dorado_cmake_build]
     # Modify the test paths so that we can run the tests on a different machine.
     - sed -i "s#$(pwd)#_BUILD_FOLDER_#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
+    - !reference [.zip_test_files]
   artifacts:
     paths:
-      # Can't !reference here, but it would be:
-      #- !reference [.build_and_test_dorado, artifacts, path]
       - dist
-      - tests/*.sh
-      - tests/*.bat
-      - tests/data
-      - tests/cram
+      - tests.zip
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
@@ -544,7 +541,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../tests ../dist .
+    - mv ../dist .
+    - unzip ../tests.zip
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
@@ -559,7 +557,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../tests ../dist .
+    - mv ../dist .
+    - unzip ../tests.zip
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive:
