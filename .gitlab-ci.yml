@@ -118,7 +118,14 @@ variables:
 
 .zip_test_files:
   # Uploading these allows us to avoid checking out the repo in tests.
-  - zip -r tests.zip tests/*.sh tests/*.bat tests/data tests/cram
+  - echo Zipping test files
+  - |
+    zip -r  tests.archive tests/*.sh tests/*.bat tests/data tests/cram ||
+    tar -cf tests.archive tests/*.sh tests/*.bat tests/data tests/cram
+
+.unzip_test_files:
+  - echo Unzipping test files
+  - unzip tests.archive || tar -xf tests.archive
 
 .build_and_test_dorado:
   stage: build
@@ -129,7 +136,7 @@ variables:
   artifacts:
     paths:
       - dist
-      - tests.zip
+      - tests.archive
     expire_in: 1 day
 
 .build_dorado_archive:
@@ -311,7 +318,7 @@ build:linux:arm64:bionic:
   artifacts:
     paths:
       - dist
-      - tests.zip
+      - tests.archive
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
@@ -541,8 +548,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../dist .
-    - unzip ../tests.zip
+    - mv ../dist ../tests.archive .
+    - !reference [.unzip_test_files]
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
@@ -557,8 +564,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../dist .
-    - unzip ../tests.zip
+    - mv ../dist ../tests.archive .
+    - !reference [.unzip_test_files]
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive:
