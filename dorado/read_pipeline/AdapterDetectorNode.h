@@ -33,8 +33,7 @@ private:
     void input_thread_fn();
     void process_read(BamMessage& bam_message);
     void process_read(SimplexRead& read);
-    std::shared_ptr<const demux::AdapterDetector> get_detector(
-            const demux::AdapterInfo& adapter_info);
+    std::shared_ptr<demux::AdapterDetector> get_detector(const demux::AdapterInfo& adapter_info);
 };
 
 }  // namespace dorado

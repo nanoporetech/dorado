@@ -140,7 +140,11 @@ TEST_CASE("Parse custom barcode sequences", "[barcode_demux]") {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/custom_barcodes"));
     const auto test_sequences = data_dir / "test_sequences.fasta";
 
-    auto barcode_sequences = dorado::demux::parse_custom_sequences(test_sequences.string());
+    std::unordered_map<std::string, std::string> barcode_sequences;
+    auto custom_sequences = dorado::demux::parse_custom_sequences(test_sequences.string());
+    for (const auto& entry : custom_sequences) {
+        barcode_sequences.emplace(std::make_pair(entry.name, entry.sequence));
+    }
 
     CHECK(barcode_sequences.size() == 4);
     CHECK(barcode_sequences["CUSTOM-BC01"] == "AAAAAA");

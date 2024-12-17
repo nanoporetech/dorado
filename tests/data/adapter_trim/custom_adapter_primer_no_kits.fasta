@@ -1,0 +1,12 @@
+>adapter1_front type=adapter kits=any
+AGGGAACT
+>adapter1_rear type=adapter kits=any
+AGTTCC
+>primer1_front type=primer kits=any
+TGCGAAT
+>primer1_rear type=primer kits=any
+GACCTCTG
+>primer2_front type=primer kits=any
+CTGACGT
+>primer2_rear type=primer kits=any
+TTCATTG

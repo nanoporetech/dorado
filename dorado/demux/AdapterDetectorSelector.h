@@ -13,10 +13,10 @@ struct AdapterInfo;
 
 class AdapterDetectorSelector final {
     std::mutex m_mutex{};
-    std::unordered_map<std::string, std::shared_ptr<const AdapterDetector>> m_detector_lut{};
+    std::unordered_map<std::string, std::shared_ptr<AdapterDetector>> m_detector_lut{};
 
 public:
-    std::shared_ptr<const AdapterDetector> get_detector(const AdapterInfo& adapter_info);
+    std::shared_ptr<AdapterDetector> get_detector(const AdapterInfo& adapter_info);
 };
 
 }  // namespace dorado::demux

@@ -180,6 +180,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
+    new_read->read_common.sequencing_kit = run_info_data->sequencing_kit;
     new_read->read_common.flow_cell_product_code = run_info_data->flow_cell_product_code;
     new_read->read_common.position_id = run_info_data->sequencer_position;
     new_read->read_common.experiment_id = run_info_data->experiment_name;

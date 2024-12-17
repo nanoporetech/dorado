@@ -1121,29 +1121,29 @@ namespace polisher {
 
 const std::vector<ModelInfo> models = {
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl",
-                "fdb6d18fe7e93f141c8e15f1b014e338e7cdd2b3f390abd0ff85cede33b50cc7",
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl",
+                "d343b4394b904d219257ad188c82ece63b935f15d78f09f551e591b2275da4b9",
                 CC::UNKNOWN,
                 ModelVariantPair{},
                 ModsVariantPair{},
         },
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac_v5.0.0_polish_rl_mv",
-                "719389cf723a4ddbd020690c20708885ed6b5000c51a2144a5af5b8064a055d2",
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv",
+                "928d9bcf3d68162eff479ada5839c5df3faa0ad393658729511aedffe65f089c",
                 CC::UNKNOWN,
                 ModelVariantPair{},
                 ModsVariantPair{},
         },
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl",
-                "3c0c7fbf2f204390ca6dfafaefc25a3f999870368e4a7b5d238eb600aa7e781b",
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl",
+                "6d8c5a8ce45311c25f824453d0af997fbe2f63a5f734fdb4d884d285ddafec33",
                 CC::UNKNOWN,
                 ModelVariantPair{},
                 ModsVariantPair{},
         },
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup_v5.0.0_polish_rl_mv",
-                "eb9b4691bda3133e9b991aa1a2666cc632bbd5c2f803dff704ef1265f4315a90",
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl_mv",
+                "0e0cb175aa41636de835d2abb5330b91fed14a00f811804edf983bc086cf477a",
                 CC::UNKNOWN,
                 ModelVariantPair{},
                 ModsVariantPair{},

@@ -309,9 +309,9 @@ if [[ $? -ne "0" ]]; then
 fi
 
 echo dorado trim test stage
-file1=$data_dir/adapter_trim/lsk109_single_read.fastq
-file2=$output_dir/lsk109_single_read_trimmed.fastq
-$dorado_bin trim --emit-fastq $file1 > $file2
+file1=$data_dir/adapter_trim/lsk110_single_read.fastq
+file2=$output_dir/lsk110_single_read_trimmed.fastq
+$dorado_bin trim --sequencing-kit SQK-LSK114 --emit-fastq $file1 > $file2
 if cmp --silent -- "$file1" "$file2"; then
   echo "Adapter was not trimmed. Input and output reads are identical."
   exit 1
