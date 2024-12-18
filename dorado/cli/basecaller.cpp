@@ -832,8 +832,13 @@ int basecaller(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 
-        mods_model_paths = model_resolution::get_non_complex_mods_models(
-                model_path, mod_bases, mod_bases_models, downloader);
+        try {
+            mods_model_paths = model_resolution::get_non_complex_mods_models(
+                    model_path, mod_bases, mod_bases_models, downloader);
+        } catch (std::runtime_error& e) {
+            spdlog::error(e.what());
+            return EXIT_FAILURE;
+        }
     } else {
         const auto chemistry =
                 file_info::get_unique_sequencing_chemistry(input_folder_info.files().get());
@@ -882,6 +887,14 @@ int basecaller(int argc, char* argv[]) {
     const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
             mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
             methylation_threshold);
+
+    for (const auto& mb_path : mods_model_paths) {
+        if (!utils::modbase::is_modbase_model(mb_path)) {
+            spdlog::error("Modified bases model not found in the model path at '{}'.",
+                          std::filesystem::weakly_canonical(mb_path).string());
+            return EXIT_FAILURE;
+        }
+    }
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,

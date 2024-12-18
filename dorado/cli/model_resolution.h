@@ -56,8 +56,8 @@ inline bool check_model_path(const std::filesystem::path& model_path) noexcept {
         const auto cfg = p / "config.toml";
         if (!fs::exists(cfg)) {
             spdlog::error(
-                    "Model directory is missing a configuration file at: '{}' - Please delete and "
-                    "re-download your model.",
+                    "Model directory is missing a configuration file at: '{}' - Please check your "
+                    "model path or download your model again.",
                     cfg.string());
             return false;
         }
@@ -140,9 +140,31 @@ inline std::vector<std::filesystem::path> get_non_complex_mods_models(
                        });
     } else if (!mod_bases_models.empty()) {
         // Foreach --modified-bases-models get a path
-        const auto split = utils::split(mod_bases_models, ',');
-        std::transform(split.begin(), split.end(), std::back_inserter(mods_model_paths),
-                       [&](const std::string& m) { return std::filesystem::path(m); });
+        const auto splits = utils::split(mod_bases_models, ',');
+        mods_model_paths.reserve(splits.size());
+        for (const auto& part : splits) {
+            const auto p = std::filesystem::path(part);
+
+            // Only the first path to --modified-bases-models is expanded by the OS. Catch
+            // the case where any other home-relative paths aren't resolved automatically
+            // and give an informative error.
+            if (utils::starts_with(part, "~") && !std::filesystem::exists(p)) {
+                spdlog::error(
+                        "Cannot resolve home directory for path set via --modified-bases-models "
+                        "'{}'. Please use an absolute path.",
+                        part);
+                throw std::runtime_error("Invalid model path passed to --modified-bases-models.");
+            }
+
+            if (!std::filesystem::exists(p)) {
+                spdlog::error(
+                        "A model path set via --modified-bases-models '{}', does not exist. Please "
+                        "check the modified bases model paths.",
+                        part);
+            }
+
+            mods_model_paths.emplace_back(p);
+        }
     }
 
     return mods_model_paths;

@@ -40,11 +40,12 @@ ModelType model_type_from_string(const std::string& model_type) noexcept {
     return ModelType::UNKNOWN;
 }
 
-ModelType get_modbase_model_type(const std::filesystem::path& path) {
-    const auto config_toml = toml::parse(path / "config.toml");
+ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
     try {
+        const auto config_toml = toml::parse(path / "config.toml");
         return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
     } catch (std::exception& e) {
+        spdlog::trace("get_modbase_model_type caught exception: {}", e.what());
         return ModelType::UNKNOWN;
     }
 }
