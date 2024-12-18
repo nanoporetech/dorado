@@ -1,5 +1,6 @@
 #include "torch_utils/tensor_utils.h"
 
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()
 #include <catch2/catch.hpp>
@@ -58,6 +59,26 @@ TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
 
     REQUIRE(torch::equal(computed, expected));
 }
+
+#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
+TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
+    const auto size = GENERATE(1000, 5000, 10000, 100000);
+    CAPTURE(size);
+
+    const auto x_int = at::randint(0, 2047, size);
+    const auto x_float = x_int.to(at::ScalarType::Float);
+    const auto x_short = x_int.to(at::ScalarType::Short);
+    const auto q = at::tensor({0.2, 0.9}, {at::ScalarType::Float});
+
+    BENCHMARK(fmt::format("torch quantile (float/{})", size)) { return at::quantile(x_float, q); };
+    BENCHMARK(fmt::format("our quantile (float/{})", size)) {
+        return dorado::utils::quantile(x_float, q);
+    };
+    BENCHMARK(fmt::format("our quantile (short/{})", size)) {
+        return dorado::utils::quantile_counting(x_short, q);
+    };
+}
+#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
 
 TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
     torch::manual_seed(42);
