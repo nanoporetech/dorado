@@ -42,6 +42,7 @@
 #include <argparse.hpp>
 #include <cxxpool.h>
 
+#include <stdexcept>
 #include <string>
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
@@ -819,13 +820,15 @@ int basecaller(int argc, char* argv[]) {
     model_downloader::ModelDownloader downloader(model_directory);
 
     if (model_complex.is_path()) {
-        model_path = fs::path(model_arg);
-
-        if (!fs::exists(model_path)) {
+        model_path = fs::weakly_canonical(fs::path(model_arg));
+        if (!check_model_path(model_path)) {
+            return EXIT_FAILURE;
+        }
+        if (utils::modbase::is_modbase_model(model_path)) {
             spdlog::error(
-                    "Model path does not exist at: '{}' - Please download the model or use a model "
-                    "complex",
-                    model_arg);
+                    "A modified bases model was found in the simplex model path at '{}' - Please "
+                    "check your model paths.",
+                    model_path.string());
             return EXIT_FAILURE;
         }
 
@@ -837,6 +840,9 @@ int basecaller(int argc, char* argv[]) {
         const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
             model_path = downloader.get(model_search.simplex(), "simplex");
+            if (!check_model_path(model_path)) {
+                throw std::runtime_error("Downloaded simplex model is invalid.");
+            }
             if (model_complex.has_mods_variant()) {
                 // Get mods models from complex - we assert above that there's only one method
                 mods_model_paths = downloader.get(model_search.mods(), "mods");
@@ -844,6 +850,11 @@ int basecaller(int argc, char* argv[]) {
                 // Get mods models from args
                 mods_model_paths = model_resolution::get_non_complex_mods_models(
                         model_path, mod_bases, mod_bases_models, downloader);
+            }
+            for (const auto& mods_model_path : mods_model_paths) {
+                if (!check_model_path(mods_model_path)) {
+                    throw std::runtime_error("Downloaded modified base model is invalid.");
+                }
             }
         } catch (std::exception& e) {
             spdlog::error(e.what());

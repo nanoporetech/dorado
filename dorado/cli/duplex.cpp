@@ -98,22 +98,22 @@ struct DuplexModels {
 ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntries& dir_entries) {
     const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
     if (model_complex.is_path()) {
-        if (!fs::exists(std::filesystem::path(model_arg))) {
+        const auto model_path = std::filesystem::weakly_canonical(model_complex.raw);
+
+        if (!check_model_path(model_path)) {
+            std::exit(EXIT_FAILURE);
+        };
+
+        if (utils::modbase::is_modbase_model(model_path)) {
             spdlog::error(
-                    "Model path does not exist at: '{}' - Please download the model or use a model "
-                    "complex",
-                    model_arg);
+                    "A modified bases model was found in the simplex model path at '{}' - Please "
+                    "check your model paths.",
+                    model_path.string());
             std::exit(EXIT_FAILURE);
         }
-
-        // Get the model name
-        const auto model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
-
         const auto model_name = model_path.filename().string();
-
-        // Find the simplex model - it must a known model otherwise we cannot match a stero model
+        // Find the simplex model - it must a known model otherwise we cannot match a stereo model
         const auto model_info = get_simplex_model_info(model_name);
-
         // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
         // There are no mods variants if model_arg is a path
         const auto inferred_selection =

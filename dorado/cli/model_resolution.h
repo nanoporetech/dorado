@@ -11,8 +11,8 @@
 
 #include <filesystem>
 #include <optional>
+#include <stdexcept>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace dorado {
@@ -26,6 +26,46 @@ inline models::ModelComplex parse_model_argument(const std::string& model_arg) {
         spdlog::error("Failed to parse model argument. {}", e.what());
         std::exit(EXIT_FAILURE);
     }
+}
+
+inline bool check_model_path(const std::filesystem::path& model_path) noexcept {
+    namespace fs = std::filesystem;
+    try {
+        const auto& p = fs::weakly_canonical(model_path);
+        if (!fs::exists(p)) {
+            spdlog::error(
+                    "Model does not exist at: '{}' - Please download the model or use a model "
+                    "complex to automatically download a model",
+                    p.string());
+            return false;
+        }
+        if (!fs::is_directory(p)) {
+            spdlog::error(
+                    "Model is not a directory at: '{}' - Please check your model path or use a "
+                    "model complex to automatically download a model.",
+                    p.string());
+            return false;
+        }
+        if (fs::is_empty(p)) {
+            spdlog::error(
+                    "Model is an empty directory at: '{}' - Please check your model path or use a "
+                    "model complex to automatically download a model.",
+                    p.string());
+            return false;
+        }
+        const auto cfg = p / "config.toml";
+        if (!fs::exists(cfg)) {
+            spdlog::error(
+                    "Model directory is missing a configuration file at: '{}' - Please delete and "
+                    "re-download your model.",
+                    cfg.string());
+            return false;
+        }
+    } catch (std::exception& e) {
+        spdlog::error("{}", e.what());
+        return false;
+    }
+    return true;
 }
 
 // Get the model search directory with the command line argument taking priority over the environment variable.
