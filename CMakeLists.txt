@@ -421,7 +421,6 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/duplex.cpp
         dorado/cli/trim.cpp
         dorado/cli/basecaller.cpp
-        dorado/cli/benchmark.cpp
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
         dorado/cli/correct.cpp
