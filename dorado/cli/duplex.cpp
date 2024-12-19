@@ -106,8 +106,8 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
 
         if (utils::modbase::is_modbase_model(model_path)) {
             spdlog::error(
-                    "A modified bases model was found in the simplex model path at '{}' - Please "
-                    "check your model paths.",
+                    "Specified model `{}` is not a simplex model but a modified bases model. Pass "
+                    "modified bases model paths using `--modified-bases-models`",
                     model_path.string());
             std::exit(EXIT_FAILURE);
         }

@@ -826,8 +826,8 @@ int basecaller(int argc, char* argv[]) {
         }
         if (utils::modbase::is_modbase_model(model_path)) {
             spdlog::error(
-                    "A modified bases model was found in the simplex model path at '{}' - Please "
-                    "check your model paths.",
+                    "Specified model `{}` is not a simplex model but a modified bases model. Pass "
+                    "modified bases model paths using `--modified-bases-models`",
                     model_path.string());
             return EXIT_FAILURE;
         }
