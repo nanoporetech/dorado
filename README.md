@@ -120,6 +120,8 @@ The `--trim` option takes as its argument one of the following values:
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
+Dorado determines which adapter and primer sequences to search for and trim based on the sequencing-kit specified in the input file. If the sequencing-kit is not specified in the file, or is not a recognized and supported kit, then no adapter or primer trimming will be done. Note that the dorado software only supports adapter and primer trimming for kit14 sequencing kits.
+
 If adapter/primer trimming is done in-line with basecalling in combination with demultiplexing, then the software will automatically ensure that the trimming of adapters and primers does not interfere with the demultiplexing process. However, if you intend to do demultiplexing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to ensure that any barcode sequences remain completely intact in the reads.
 
 #### Trimming existing datasets
@@ -127,10 +129,12 @@ If adapter/primer trimming is done in-line with basecalling in combination with 
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim <reads> > trimmed.bam
+$ dorado trim <reads> --sequencing-kit <kit_name> trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
+
+`<kit_name>` is required to tell dorado what sequencing kit was used for the experiment, since this information is not encoded in the input files.
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
 
@@ -140,7 +144,7 @@ The output of `dorado trim` will always be unaligned records, regardless of whet
 
 #### Custom primer trimming
 
-The software automatically searches for primer sequences used in Oxford Nanopore kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a FASTA file containing the primer sequences you want to search for. The record names of the sequences do not matter. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for.
+The software automatically searches for primer sequences used in Oxford Nanopore kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a FASTA file containing the primer sequences you want to search for. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for. More details on custom adapter/primer sequence files can be found in `CustomPrimers.md`.
 
 ### RNA adapter trimming
 
