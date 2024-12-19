@@ -28,7 +28,7 @@ Region: full length of the input chromosome.
   9998
   0
 
-Region: only contig name is provided, polish the entire sequence.
+Region: only the contig name is provided, polish the entire sequence.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -69,7 +69,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   Exit code: 1
   Caught exception: Region validation failed: coordinates for region 'contig_1:1-999999' are not valid. Sequence length: 10000
 
-Region: only start coordinate is specified. Clamp to [start, contig_len] interval.
+Region: only the start coordinate is specified. Clamp to [start, contig_len] interval.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -86,7 +86,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   contig_1_0 499-10000
   contig_1_0 9499
 
-Region: only end coordinate is specified. Clamp to [0, end] interval.
+Region: only the end coordinate is specified. Clamp to [0, end] interval.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -114,7 +114,23 @@ Region completely out of coordinate range of the target.
   Exit code: 1
   Caught exception: Region validation failed: coordinates for region 'contig_1:50000-55000' are not valid. Sequence length: 10000
 
-Multiple regions.
+Single valid region is specified.
+Evaluate using the "--no-gap-fill" to get only the polished region.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > # Run test.
+  > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:7000-7200" -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > grep ">" out/out.fasta | tr -d ">"
+  > samtools faidx out/out.fasta
+  > awk '{ print $1,$2 }' out/out.fasta.fai
+  Exit code: 0
+  contig_1_0 6999-7200
+  contig_1_0 201
+
+Multiple valid regions on the same contig.
 Evaluate using the "--no-gap-fill" to get only the polished region.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -134,7 +150,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   contig_1_1 201
   contig_1_2 2
 
-Checks that the interval coordinates internally are represented well
+Checks that the interval coordinates internally are represented well. Two neighboring regions, adjacent (0bp apart).
+If there was an off-by-one edge case (e.g. non-inclusive end coordinate), this would fail.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
@@ -224,7 +241,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   1
 
 Loading from a BED file with adjacent regions but with no overlap.
-Checks that the interval coordinates internally are represented well
+Checks that the interval coordinates internally are represented well.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
@@ -257,16 +274,3 @@ Fails because region overlap is not allowed.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
   Caught exception: Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
-
-# Regions for testing:
-# + Region longer than target
-# + Region with negative coords (not possible)
-# + Region completely out of coordinate range of the target.
-# + Multiple regions
-# + BED file with regions.
-# + Partially defined region. (E.g. missing end coordinate, or chromosome, etc.)
-# + Region for a target which is not present in the input.
-# + Empty region string provided to `--region ""`.
-# - Overlapping regions - merge?
-# - Duplicate regions
-# - Are these regions set as BAM regions or as chromosomal regions?
