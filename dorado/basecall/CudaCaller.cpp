@@ -243,8 +243,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 #ifdef DORADO_TX2
     requested_batch_size = (requested_batch_size == 0) ? 256 : requested_batch_size;
     requested_batch_size = std::min(256, utils::pad_to(requested_batch_size, batch_granularity));
-    auto iter = T_outs.begin();
-    m_batch_dims.push_back({requested_batch_size, *iter * stride, *iter});
+    int T_out = *(T_outs.begin());
+    m_batch_dims.push_back({requested_batch_size, T_out * stride, T_out});
     return;
 #endif
 
