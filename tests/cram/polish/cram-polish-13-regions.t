@@ -150,6 +150,28 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   contig_1_1 201
   contig_1_2 2
 
+Multiple contigs, single valid region is specified.
+Draft batch size is set to 1, so each contig is processed separately.
+Evaluate using the "--no-gap-fill" to get only the polished region.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > # Create a synthetic draft with 2
+  > gunzip -c ${in_dir}/draft.fasta.gz > out/in.draft.fasta
+  > gunzip -c ${in_dir}/draft.fasta.gz | sed -E 's/contig_1/contig_2/g' >> out/in.draft.fasta
+  > samtools faidx out/in.draft.fasta
+  > # Run test.
+  > ${DORADO_BIN} polish  --regions "contig_2:7000-7200" --draft-batchsize 1 --device cpu ${in_dir}/calls_to_draft.bam out/in.draft.fasta ${model_var} --no-fill-gaps -vv > out/out.fasta 2> out/out.fasta.stderr
+  > # Eval.
+  > echo "Exit code: $?"
+  > grep ">" out/out.fasta | tr -d ">"
+  > samtools faidx out/out.fasta
+  > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  contig_2_0 6999-7200
+  contig_2_0 201
+
 Checks that the interval coordinates internally are represented well. Two neighboring regions, adjacent (0bp apart).
 If there was an off-by-one edge case (e.g. non-inclusive end coordinate), this would fail.
   $ rm -rf out; mkdir -p out
