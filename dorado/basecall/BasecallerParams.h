@@ -56,8 +56,9 @@ public:
     // Update values from other basecaller params, self takes priory if tied unless forced
     void update(const BasecallerParams& other);
 
-    // Normalise the `chunk_size` and `overlap` to the nearest evenly divisible integer of divisor (stride)
-    void normalise(size_t chunk_size_divisor, size_t overlap_divisor);
+    // Normalise `chunk_size` and `overlap` so that `overlap` is a multiple of `stride`, and
+    // `chunk_size` is both greater than `overlap` and a multiple of `chunk_size_granularity`.
+    void normalise(int chunk_size_granularity, int stride);
 
     std::string to_string() const {
         std::string str = "BasecallerParams {";
