@@ -1,5 +1,6 @@
 #include "polish_impl.h"
 
+#include "hts_io/FastxRandomReader.h"
 #include "polish/interval.h"
 #include "polish/polish_utils.h"
 #include "polish/region.h"
@@ -241,13 +242,13 @@ void remove_deletions(ConsensusResult& cons) {
 }
 
 std::vector<ConsensusResult> stitch_sequence(
-        const std::filesystem::path& in_draft_fn,
+        const hts_io::FastxRandomReader& fastx_reader,
         const std::string& header,
         const std::vector<ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
         const std::optional<char>& fill_char) {
-    const std::string draft = fetch_seq(in_draft_fn, header, 0, -1);
+    const std::string draft = fastx_reader.fetch_seq(header);
     const int64_t draft_len = dorado::ssize(draft);
 
     if (fill_gaps && std::empty(samples_for_seq)) {

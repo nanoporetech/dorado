@@ -15,12 +15,21 @@ namespace dorado::hts_io {
 
 void FaidxDestructor::operator()(faidx_t* faidx) { fai_destroy(faidx); }
 
-FastxRandomReader::FastxRandomReader(const std::string& fastx_path) {
-    auto faidx_ptr = fai_load_format(fastx_path.c_str(), FAI_FASTQ);
+FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
+    // Attempt to load a FASTQ style .fai index.
+    faidx_t* faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTQ);
+
+    // Alternatively, attempt to load a FASTA style .fai index.
     if (!faidx_ptr) {
-        spdlog::error("Could not create/load index for FASTx file {}", fastx_path);
+        faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTA);
+    }
+
+    // Both attempts failed.
+    if (!faidx_ptr) {
+        spdlog::error("Could not create/load index for FASTx file {}", fastx_path.string());
         throw std::runtime_error("");
     }
+
     m_faidx.reset(faidx_ptr);
 }
 

@@ -76,51 +76,6 @@ std::vector<Interval> compute_partitions(const int32_t num_items, const int32_t 
     return chunks;
 }
 
-std::string fetch_seq(const std::filesystem::path& index_fn,
-                      const std::string& seq_name,
-                      int32_t start,
-                      int32_t end) {
-    std::unique_ptr<faidx_t, decltype(&fai_destroy)> fai(fai_load(index_fn.string().c_str()),
-                                                         fai_destroy);
-
-    if (!fai) {
-        spdlog::error("Failed to load index for file: '{}'.", index_fn.string());
-        return {};
-    }
-
-    const int32_t seq_len = faidx_seq_len(fai.get(), seq_name.c_str());
-
-    start = std::max(start, 0);
-    end = (end < 0) ? seq_len : std::min(end, seq_len);
-
-    if (end <= start) {
-        spdlog::error(
-                "Cannot load sequence because end <= start! seq_name = {}, start = {}, end = {}.",
-                seq_name, start, end);
-        return {};
-    }
-
-    // Get the sequence.
-    int32_t temp_seq_len = 0;
-    std::unique_ptr<char, decltype(&free)> seq(
-            faidx_fetch_seq(fai.get(), seq_name.c_str(), start, end - 1, &temp_seq_len), free);
-
-    if (temp_seq_len != (end - start)) {
-        spdlog::error(
-                "Loaded sequence length does not match the specified interval! seq_name = {}, "
-                "start = {}, end = {}, loaded len = {}.",
-                seq_name, start, end, temp_seq_len);
-        return {};
-    }
-
-    std::string ret;
-    if (seq) {
-        ret = std::string(seq.get(), temp_seq_len);
-    }
-
-    return ret;
-}
-
 void save_tensor(const at::Tensor& tensor, const std::string& file_path) {
     const std::vector<char> pickled = torch::jit::pickle_save(tensor);
     std::ofstream fout(file_path, std::ios::out | std::ios::binary);
