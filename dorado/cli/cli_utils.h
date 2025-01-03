@@ -62,7 +62,7 @@ inline void add_pg_hdr(sam_hdr_t* hdr,
     std::stringstream pg;
     pg << "@PG\tID:" << safe_id << "\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
     for (const auto& arg : args) {
-        pg << " " << arg;
+        pg << " " << std::quoted(arg);
     }
 
 #if DORADO_CUDA_BUILD
@@ -105,7 +105,7 @@ inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
     std::stringstream ss(cmd);
     std::string token;
     std::vector<std::string> tokens;
-    while (std::getline(ss, token, ' ')) {
+    while (ss >> std::quoted(token)) {
         tokens.push_back(token);
     }
     if (tokens.size() < 4) {
