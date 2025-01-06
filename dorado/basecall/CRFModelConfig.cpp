@@ -412,9 +412,18 @@ bool is_tx_model_config(const std::filesystem::path &path) {
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
-    auto path = std::filesystem::canonical(model_config.model_path);
-    auto filename = path.filename();
-    return filename.u8string().rfind("rna", 0) == 0;
+    switch (model_config.sample_type) {
+    case models::SampleType::DNA:
+        return false;
+    case models::SampleType::RNA002:
+        [[fallthrough]];
+    case models::SampleType::RNA004:
+        return true;
+    case models::SampleType::UNKNOWN:
+        throw std::logic_error("Model config sample type is unknown!");
+    }
+    // Exception to prevent us reaching the end of the function
+    throw std::logic_error("Model config sample type is not recognised!");
 }
 
 bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
