@@ -421,10 +421,9 @@ bool is_rna_model(const CRFModelConfig &model_config) {
         return true;
     case models::SampleType::UNKNOWN:
         throw std::logic_error("Model config sample type is unknown!");
-    default:
-        // default to catch any new additions to the enum that need to be added
-        throw std::logic_error("Model config sample type is not recognised!");
     }
+    // Exception to prevent us reaching the end of the function
+    throw std::logic_error("Model config sample type is not recognised!");
 }
 
 bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
