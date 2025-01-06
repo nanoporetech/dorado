@@ -258,7 +258,7 @@ then
     # n.b. some of these options (--skip, --mm2-opts) won't affect the basecall but are included to test that we can resume with them present
     $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check  > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
-    $dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} --mm2-opts "-k 15 -w 10" --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
     samtools quickcheck -u $output_dir/calls.bam
     num_reads=$(samtools view -c $output_dir/calls.bam)
     if [[ $num_reads -ne "4" ]]; then
