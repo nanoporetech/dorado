@@ -1485,6 +1485,32 @@ std::string get_supported_model_info(const std::filesystem::path& model_download
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
                     result += "\n      }";
                 }
+
+                // Polishing models.
+                {
+                    const auto polish_matches =
+                            find_models(polish_models(), variant.first, simplex_model.simplex,
+                                        ModsVariantPair());
+                    bool polish_models_available = false;
+                    for (const auto& polish_model : polish_matches) {
+                        if (model_exists_in_folder(polish_model.name, model_download_folder)) {
+                            polish_models_available = true;
+                            break;
+                        }
+                    }
+                    if (polish_models_available) {
+                        result += ",\n      \"polish_models\":{\n";
+                        for (const auto& polish_model : polish_matches) {
+                            if (model_exists_in_folder(polish_model.name, model_download_folder)) {
+                                result += "        \"" + polish_model.name + "\":{\n";
+                                result += "\n        },\n";
+                            }
+                        }
+                        result = result.substr(0, result.length() - 2);  // trim last ",\n"
+                        result += "\n      }";
+                    }
+                }
+
                 result += "\n    },\n";
             }
         }
