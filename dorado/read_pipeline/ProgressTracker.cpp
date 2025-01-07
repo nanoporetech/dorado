@@ -2,6 +2,7 @@
 
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"
+#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
@@ -98,7 +99,7 @@ void ProgressTracker::summarize() const {
             for (const auto& [bc_name, bc_count] : m_barcode_count) {
                 spdlog::debug("{} : {}", bc_name, bc_count);
                 total += bc_count;
-                if (bc_name == "unclassified") {
+                if (bc_name == UNCLASSIFIED) {
                     unclassified += bc_count;
                 }
             }

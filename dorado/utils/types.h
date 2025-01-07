@@ -16,6 +16,8 @@ struct kstring_t;
 
 namespace dorado {
 
+extern const std::string UNCLASSIFIED;
+
 struct AlignmentResult {
     std::string name;    ///< Record name, if applicable
     std::string genome;  ///< Name of the reference genome against which the strand has been aligned
@@ -81,9 +83,9 @@ struct BarcodeScoreResult {
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
-    std::string barcode_name = "unclassified";
-    std::string kit = "unclassified";
-    std::string barcode_kit = "unclassified";
+    std::string barcode_name = UNCLASSIFIED;
+    std::string kit = UNCLASSIFIED;
+    std::string barcode_kit = UNCLASSIFIED;
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
@@ -92,7 +94,7 @@ struct BarcodeScoreResult {
 
 struct SingleEndResult {
     float score = -1.f;
-    std::string name = "unclassified";
+    std::string name = UNCLASSIFIED;
     std::pair<int, int> position = {-1, -1};
 };
 

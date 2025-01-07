@@ -4,6 +4,7 @@
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/types.h"
 
 #include <htslib/sam.h>
 
@@ -29,7 +30,7 @@ std::string ReadCommon::generate_read_group() const {
         } else {
             read_group += model_name;
         }
-        if (!barcode.empty() && barcode != "unclassified") {
+        if (!barcode.empty() && barcode != UNCLASSIFIED) {
             read_group += '_' + barcode;
         }
     }
@@ -331,7 +332,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
              uint8_t(map_q), 0, nullptr, -1, next_pos, 0, seq.length(), seq.c_str(),
              (char *)qscore.data(), 0);
 
-    if (!barcode.empty() && barcode != "unclassified") {
+    if (!barcode.empty() && barcode != UNCLASSIFIED) {
         bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1), (uint8_t *)barcode.c_str());
     }
 

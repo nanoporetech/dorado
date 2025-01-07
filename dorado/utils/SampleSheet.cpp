@@ -3,6 +3,7 @@
 #include "PostCondition.h"
 #include "barcode_kits.h"
 #include "string_utils.h"
+#include "types.h"
 
 #include <algorithm>
 #include <fstream>
@@ -53,7 +54,7 @@ bool is_alias_forbidden(const std::string& input) {
     }
 
     // Unclassified
-    if (input == "unclassified") {
+    if (input == dorado::UNCLASSIFIED) {
         return true;
     }
 

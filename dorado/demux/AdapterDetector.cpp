@@ -192,5 +192,28 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     return {get_best_result(front_results), get_best_result(rear_results)};
 }
 
+std::string AdapterDetector::classify_primers(const AdapterScoreResult& result) {
+    std::string classification = UNCLASSIFIED;
+    auto strip_suffix = [](const std::string& name, const std::string& suffix) {
+        auto k = name.find(suffix);
+        if (k != std::string::npos) {
+            return name.substr(0, k);
+        }
+        return name;
+    };
+    auto front_name = strip_suffix(result.front.name, "_FRONT");
+    auto rear_name = strip_suffix(result.rear.name, "_REAR");
+    if (front_name != UNCLASSIFIED && rear_name != UNCLASSIFIED) {
+        if (front_name == rear_name) {
+            classification = front_name;
+        }
+    } else if (front_name != UNCLASSIFIED) {
+        classification = front_name;
+    } else {
+        classification = rear_name;
+    }
+    return classification;
+}
+
 }  // namespace demux
 }  // namespace dorado

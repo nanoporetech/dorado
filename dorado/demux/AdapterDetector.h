@@ -36,6 +36,8 @@ private:
     AdapterScoreResult detect(const std::string& seq,
                               const std::vector<Query>& queries,
                               QueryType query_type) const;
+
+    static std::string classify_primers(const AdapterScoreResult& result);
 };
 
 }  // namespace demux
