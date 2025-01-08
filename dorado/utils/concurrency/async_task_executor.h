@@ -64,8 +64,11 @@ public:
     }
 
     // Blocks until all queued tasks are completed.
-    // After invoking no further tasks may be enqueued by this executor.
+    // After invoking no further tasks may be enqueued by this executor until `restart` has been called.
     void flush();
+
+    // Allow jobs to be submitted once again.
+    void restart();
 
     // Testability. Do NOT use outside utests
     std::unique_ptr<std::thread> send_async(TaskType task);
