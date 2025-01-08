@@ -5,6 +5,7 @@
 #include "alignment/BedFileAccess.h"
 #include "alignment/IndexFileAccess.h"
 #include "alignment/Minimap2Options.h"
+#include "utils/concurrency/async_task_executor.h"
 #include "utils/concurrency/task_priority.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -19,7 +20,6 @@ typedef struct mm_tbuf_s mm_tbuf_t;
 namespace dorado {
 
 namespace utils::concurrency {
-class AsyncTaskExecutor;
 class MultiQueueThreadPool;
 }  // namespace utils::concurrency
 
@@ -42,10 +42,8 @@ public:
     ~AlignerNode() { stop_input_processing(); }
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { stop_input_processing(); }
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "aligner_node");
-    }
+    void terminate(const FlushOptions&) override;
+    void restart() override;
 
     alignment::HeaderSequenceRecords get_sequence_records_for_header() const;
 
@@ -55,10 +53,9 @@ private:
     std::shared_ptr<dorado::alignment::BedFile> get_bedfile(const ClientInfo& client_info,
                                                             const std::string& bedfile);
     template <typename READ>
-    void align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read);
+    void align_read(READ&& read);
 
-    void align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
-                           BamMessage&& bam_message);
+    void align_bam_message(BamMessage&& bam_message);
 
     void align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf);
     void add_bed_hits_to_record(const std::string& genome, bam1_t* record);
@@ -70,6 +67,7 @@ private:
     std::vector<std::string> m_header_sequence_names{};
     std::shared_ptr<alignment::IndexFileAccess> m_index_file_access{};
     std::shared_ptr<alignment::BedFileAccess> m_bed_file_access{};
+    utils::concurrency::AsyncTaskExecutor m_task_executor;
 };
 
 }  // namespace dorado
