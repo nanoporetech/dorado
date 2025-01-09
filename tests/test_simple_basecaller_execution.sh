@@ -373,9 +373,9 @@ test_barcoding_read_groups() (
             # Arrangement is |<barcode_alias>|, so trim the model from the prefix and the .bam from the suffix.
             barcode=${bam#*_${model_name_5k}_}
             barcode=${barcode%.bam*}
-        elif [[ $bam =~ "/9bf5b3eb10d3b031970acc022aecad4ecc918865_" ]]; then
+        elif [[ $bam =~ "/0d85015e-6a4e-400c-a80f-c187c65a6d03_" ]]; then
             # Demuxed file, so trim the run_id from the prefix and the .bam from the suffix.
-            barcode=${bam#*9bf5b3eb10d3b031970acc022aecad4ecc918865_}
+            barcode=${bam#*0d85015e-6a4e-400c-a80f-c187c65a6d03_}
             barcode=${barcode%.bam*}            
         else
             barcode="unclassified"
@@ -409,7 +409,7 @@ test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_unclassified.bam ; do
+for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam ; do
     if [ ! -f $bam ]; then
         echo "Missing expected bam file $bam.  Generated files:"
         ls -l $output_dir/demux_only_test/

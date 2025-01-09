@@ -32,7 +32,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
     };
 
     // clang-format off
-    const std::vector<TestCase> tests {
+    auto [test_case] = GENERATE(table<TestCase>({
         TestCase{
             "Empty input == empty output",
             {},             // samples
@@ -320,27 +320,24 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
             {   // Expected results.
             },
         },
-    };
+    }));
     // clang-format on
 
-    // Run tests.
-    for (const auto& data : tests) {
-        INFO(TEST_GROUP << " Test name: " << data.name);
-        std::vector<Sample> samples;
-        for (const auto& mock_sample : data.samples) {
-            Sample new_sample;
-            new_sample.seq_id = mock_sample.seq_id;
-            new_sample.positions_major = mock_sample.positions_major;
-            new_sample.positions_minor = mock_sample.positions_minor;
-            samples.emplace_back(std::move(new_sample));
-        }
+    INFO(TEST_GROUP << " Test name: " << test_case.name);
+    std::vector<Sample> samples;
+    for (const auto& mock_sample : test_case.samples) {
+        Sample new_sample;
+        new_sample.seq_id = mock_sample.seq_id;
+        new_sample.positions_major = mock_sample.positions_major;
+        new_sample.positions_minor = mock_sample.positions_minor;
+        samples.emplace_back(std::move(new_sample));
+    }
 
-        if (data.expect_throw) {
-            CHECK_THROWS(trim_samples(samples, data.region));
-        } else {
-            const std::vector<TrimInfo> result = trim_samples(samples, data.region);
-            CHECK(data.expected == result);
-        }
+    if (test_case.expect_throw) {
+        CHECK_THROWS(trim_samples(samples, test_case.region));
+    } else {
+        const std::vector<TrimInfo> result = trim_samples(samples, test_case.region);
+        CHECK(test_case.expected == result);
     }
 }
 

@@ -90,18 +90,22 @@ void BasecallerParams::update(const BasecallerParams &other) {
     merge(m_batch_size, other.m_batch_size, "batchsize");
 }
 
-void BasecallerParams::normalise(size_t chunk_size_divisor, size_t overlap_divisor) {
-    // Apply normalised value with FORCE
-    auto normalise_param = [&](Value &self, const std::string &name, int div) {
-        const int before_val = self.val;
-        const int new_val = (self.val / div) * div;
-        if (set_value(self, Value{new_val, Priority::FORCE})) {
-            spdlog::info("Normalised: {} {} -> {}", name, before_val, new_val);
-        }
-    };
+void BasecallerParams::normalise(int chunk_size_granularity, int stride) {
+    // Make sure overlap is a multiple of `stride`, and greater than 0
+    const int old_overlap = m_overlap.val;
+    const int new_overlap = std::max(1, old_overlap / stride) * stride;
+    if (set_value(m_overlap, Value{new_overlap, Priority::FORCE})) {
+        spdlog::info("Normalised: overlap {} -> {}", old_overlap, new_overlap);
+    }
 
-    normalise_param(m_chunk_size, "chunksize", static_cast<int>(chunk_size_divisor));
-    normalise_param(m_overlap, "overlap", static_cast<int>(overlap_divisor));
+    // Make sure chunk size is a multiple of `chunk_size_granularity`, and greater than `overlap`
+    const int old_chunk_size = m_chunk_size.val;
+    const int min_chunk_size = new_overlap + chunk_size_granularity - 1;
+    const int new_chunk_size = (std::max(min_chunk_size, old_chunk_size) / chunk_size_granularity) *
+                               chunk_size_granularity;
+    if (set_value(m_chunk_size, Value{new_chunk_size, Priority::FORCE})) {
+        spdlog::info("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
+    }
 }
 
 }  // namespace dorado::basecall

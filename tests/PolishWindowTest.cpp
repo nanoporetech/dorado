@@ -22,7 +22,7 @@ TEST_CASE("create_windows tests", TEST_GROUP) {
     };
 
     // clang-format off
-    const std::vector<TestCase> tests {
+    auto [test_case] = GENERATE(table<TestCase>({
         TestCase{
             "Coordinates and lengths all zero", 0, 0, 0, 0, 0, 0,
             {},
@@ -97,14 +97,12 @@ TEST_CASE("create_windows tests", TEST_GROUP) {
                 Window{0, 10000, 8000, 10000, 8000, 10000},
             },
         },
-    };
+    }));
     // clang-format on
 
-    for (const auto& data : tests) {
-        INFO(TEST_GROUP << " Test name: " << data.name);
-        const std::vector<Window> result =
-                create_windows(data.seq_id, data.seq_start, data.seq_end, data.seq_len,
-                               data.window_len, data.window_overlap);
-        CHECK(result == data.expected);
-    }
+    INFO(TEST_GROUP << " Test name: " << test_case.name);
+    const std::vector<Window> result =
+            create_windows(test_case.seq_id, test_case.seq_start, test_case.seq_end,
+                           test_case.seq_len, test_case.window_len, test_case.window_overlap);
+    CHECK(result == test_case.expected);
 }

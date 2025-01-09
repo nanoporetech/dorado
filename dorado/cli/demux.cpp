@@ -168,12 +168,8 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if ((parser.visible.is_used("--no-classify") && parser.visible.is_used("--kit-name")) ||
-        (!parser.visible.is_used("--no-classify") && !parser.visible.is_used("--kit-name") &&
-         !parser.visible.is_used("--barcode-arrangement"))) {
-        spdlog::error(
-                "Please specify either --no-classify or --kit-name or pass a custom barcode "
-                "arrangement with --barcode-arrangement to use the demux tool.");
+    if (parser.visible.is_used("--no-classify") == parser.visible.is_used("--kit-name")) {
+        spdlog::error("Please specify either --no-classify or --kit-name to use the demux tool.");
         return EXIT_FAILURE;
     }
 

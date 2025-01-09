@@ -3,12 +3,17 @@
 #include <cstddef>
 #include <ostream>
 #include <sstream>
+#include <tuple>
 
 namespace dorado::polisher {
 
 std::ostream& operator<<(std::ostream& os, const Region& region) {
     os << region.name << ":" << (region.start + 1) << "-" << region.end;
     return os;
+}
+
+bool operator<(const Region& l, const Region& r) {
+    return std::tie(l.name, l.start, l.end) < std::tie(r.name, r.start, r.end);
 }
 
 std::string region_to_string(const Region& region) {

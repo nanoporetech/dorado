@@ -45,6 +45,8 @@ void AsyncTaskExecutor::flush() {
     m_flushing_counter->wait();
 }
 
+void AsyncTaskExecutor::restart() { m_flushing_counter.reset(); }
+
 void AsyncTaskExecutor::increment_tasks_in_flight() {
     std::unique_lock lock(m_mutex);
     if (m_flushing_counter) {

@@ -412,9 +412,18 @@ bool is_tx_model_config(const std::filesystem::path &path) {
 }
 
 bool is_rna_model(const CRFModelConfig &model_config) {
-    auto path = std::filesystem::canonical(model_config.model_path);
-    auto filename = path.filename();
-    return filename.u8string().rfind("rna", 0) == 0;
+    switch (model_config.sample_type) {
+    case models::SampleType::DNA:
+        return false;
+    case models::SampleType::RNA002:
+        [[fallthrough]];
+    case models::SampleType::RNA004:
+        return true;
+    case models::SampleType::UNKNOWN:
+        throw std::logic_error("Model config sample type is unknown!");
+    }
+    // Exception to prevent us reaching the end of the function
+    throw std::logic_error("Model config sample type is not recognised!");
 }
 
 bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
@@ -591,26 +600,22 @@ void Params::check() const {
 
 bool CRFModelConfig::has_normalised_basecaller_params() const {
     bool is_normalised = true;
-    const auto si = stride_inner();
     const auto cs = basecaller.chunk_size();
-    if (cs % si != 0) {
-        spdlog::error("Expected normalised chunksize - got: {} - for model stride: {}", cs, si);
+    const auto csg = chunk_size_granularity();
+    if (cs % csg != 0) {
+        spdlog::error("Expected normalised chunksize - got: {} - for granularity: {}", cs, csg);
         is_normalised = false;
     }
 
-    if (is_tx_model()) {
-        if (cs % (si * 16) != 0) {
-            spdlog::error(
-                    "Expected normalised chunksize of stride * 16 for transformer model - got: {} "
-                    "- for model stride * 16: {}",
-                    cs, si * 16);
-            is_normalised = false;
-        }
-    }
-
     const auto ov = basecaller.overlap();
+    const auto si = stride_inner();
     if (ov % si != 0) {
         spdlog::error("Expected normalised overlap - got: {} - for model stride: {}", ov, si);
+        is_normalised = false;
+    }
+
+    if (cs <= ov) {
+        spdlog::error("Expected chunk size > overlap - got: {} - for overlap: {}", cs, ov);
         is_normalised = false;
     }
     return is_normalised;

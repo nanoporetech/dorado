@@ -38,7 +38,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     auto exp_start_time_ms = run_info_data->acquisition_start_time_ms;
                     std::string flowcell_id = run_info_data->flow_cell_id;
                     std::string device_id = run_info_data->system_name;
-                    std::string run_id = run_info_data->acquisition_id;
+                    std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
                     std::string position_id = run_info_data->sequencer_position;
                     std::string experiment_id = run_info_data->experiment_name;
