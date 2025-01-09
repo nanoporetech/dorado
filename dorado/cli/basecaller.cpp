@@ -550,11 +550,14 @@ void setup(const std::vector<std::string>& args,
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
 
+        std::vector<std::string> resume_args_excluding_mm2_opts{};
+        alignment::mm2::extract_options_string_arg(tokens, resume_args_excluding_mm2_opts);
+
         // Create a new basecaller parser to parse the resumed basecaller CLI string
         utils::arg_parse::ArgParser resume_parser("dorado");
         int verbosity = 0;
         set_dorado_basecaller_args(resume_parser, verbosity);
-        resume_parser.visible.parse_known_args(tokens);
+        resume_parser.visible.parse_known_args(resume_args_excluding_mm2_opts);
 
         const std::string model_arg = resume_parser.visible.get<std::string>("model");
         const ModelComplex resume_model_complex = ModelComplexParser::parse(model_arg);
