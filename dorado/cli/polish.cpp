@@ -892,7 +892,7 @@ void run_polishing(const Options& opt,
         // Each item is one batch for inference.
         utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
         utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
-        std::vector<polisher::ConsensusResult> all_results;
+        std::vector<polisher::ConsensusResult> all_results_cons;
 
         std::thread thread_sample_producer =
                 std::thread(&polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
@@ -900,14 +900,12 @@ void run_polishing(const Options& opt,
                             opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
 
         std::thread thread_sample_decoder =
-                std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results),
+                std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
                             std::ref(decode_queue), std::ref(polish_stats),
                             std::cref(*resources.decoder), opt.threads, opt.min_depth);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                             *resources.encoder);
-
-        // sample_consumer();
 
         if (thread_sample_producer.joinable()) {
             thread_sample_producer.join();
@@ -921,12 +919,13 @@ void run_polishing(const Options& opt,
                 "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
                 "length: {:.2f} Mbp), parts: {}",
                 batch_interval.start, batch_interval.end, std::size(input_regions),
-                std::size(region_batch), batch_bases / (1000.0 * 1000.0), std::size(all_results));
+                std::size(region_batch), batch_bases / (1000.0 * 1000.0),
+                std::size(all_results_cons));
 
         // Group samples by sequence ID.
         std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(batch_interval.length());
-        for (int32_t i = 0; i < dorado::ssize(all_results); ++i) {
-            const polisher::ConsensusResult& r = all_results[i];
+        for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
+            const polisher::ConsensusResult& r = all_results_cons[i];
             const int32_t local_id = r.draft_id - batch_interval.start;
             // Skip filtered samples.
             if (r.draft_id < 0) {
@@ -943,7 +942,7 @@ void run_polishing(const Options& opt,
             groups[local_id].emplace_back(r.draft_start, i);
         }
 
-        // Stitch the windows and write output.
+        // Consensus sequence - stitch the windows and write output.
         for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
             const int64_t seq_id = group_id + batch_interval.start;
 
@@ -953,7 +952,7 @@ void run_polishing(const Options& opt,
             const std::string& header = draft_lens[seq_id].first;
 
             const std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
-                    draft_reader, header, all_results, group, opt.fill_gaps, opt.fill_char);
+                    draft_reader, header, all_results_cons, group, opt.fill_gaps, opt.fill_char);
 
             write_consensus_results(*ofs_consensus, header, consensus, opt.fill_gaps,
                                     (opt.out_format == OutputFormat::FASTQ));

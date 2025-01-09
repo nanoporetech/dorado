@@ -900,6 +900,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             // Inference.
             torch::Tensor logits = batch_infer(*models[tid], item, tid);
 
+            // One out_item contains samples for one inference batch.
+            // No guarantees on any sort of logical ordering of the samples.
             DecodeData out_item;
             out_item.samples = std::move(item.samples);
             out_item.logits = std::move(logits);
