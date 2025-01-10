@@ -19,7 +19,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
-#include <stdexcept>
+#include <set>
 
 using namespace std::chrono_literals;
 
@@ -222,33 +222,29 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
 }
 
 void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
-    auto requested_chunk_size = params.model_config.basecaller.chunk_size();
-    auto requested_batch_size = params.model_config.basecaller.batch_size();
+    auto requested_chunk_size = m_config.basecaller.chunk_size();
+    auto requested_batch_size = m_config.basecaller.batch_size();
 
     c10::cuda::CUDAGuard device_guard(m_options.device());
     c10::cuda::CUDACachingAllocator::emptyCache();
     int64_t available = utils::available_memory(m_options.device());
     spdlog::debug("{} memory available: {:.2f}GB", m_device, available / GB);
-    const int granularity = get_batch_size_granularity(m_config);
-    const int cs_granularity = static_cast<int>(m_config.chunk_size_granularity());
-    {
-        // First set of batch dimensions. Adjust chunk size to be a multiple of stride_inner.
-        // Batch size defaults to `granularity` but will be increased further down if memory allows.
-        int T_out = (requested_chunk_size / m_config.stride / cs_granularity) * cs_granularity;
-        if (T_out < 1) {
-            spdlog::error("Cannot determine batch dims for chunksize of {} - too small",
-                          requested_chunk_size);
-            throw std::runtime_error("chunksize too small");
-        }
-        m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
-    }
+    const int batch_granularity = get_batch_size_granularity(m_config);
+    const int chunk_granularity = m_config.chunk_size_granularity();
+    const int stride = m_config.stride;
+    auto min_chunk_size = utils::pad_to(m_config.basecaller.overlap() + 1, chunk_granularity);
+    // Adjust chunk size to be a multiple of `chunk_granularity`, and greater than `overlap`.
+    auto calculate_T_out = [=](int x) -> int {
+        return std::max(min_chunk_size, (x / chunk_granularity) * chunk_granularity) / stride;
+    };
+
+    // First set of batch dimensions.
+    std::set<int> T_outs({calculate_T_out(requested_chunk_size)});
 #ifdef DORADO_TX2
-    if (requested_batch_size == 0) {
-        m_batch_dims[0].N = 256;
-    } else {
-        requested_batch_size = utils::pad_to(requested_batch_size, granularity);
-        m_batch_dims[0].N = std::clamp(requested_batch_size, granularity, 256);
-    }
+    requested_batch_size = (requested_batch_size == 0) ? 256 : requested_batch_size;
+    requested_batch_size = std::min(256, utils::pad_to(requested_batch_size, batch_granularity));
+    int T_out = *(T_outs.begin());
+    m_batch_dims.push_back({requested_batch_size, T_out * stride, T_out});
     return;
 #endif
 
@@ -265,30 +261,20 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
             constexpr char SEPARATOR = ';';
             std::string env_string(env_extra_chunk_sizes);
             for (size_t start = 0, end = 0; end != std::string::npos; start = end + 1) {
-                int T_out =
-                        (std::atoi(env_string.c_str() + start) / m_config.stride / cs_granularity) *
-                        cs_granularity;
-                if (T_out > 0) {
-                    m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
-                }
+                T_outs.insert(calculate_T_out(std::atoi(env_string.c_str() + start)));
                 end = env_string.find(SEPARATOR, start);
             }
         } else {
             // Use other chunk sizes as a fraction of the requested one
             // TODO: determine the best set of chunk sizes
             for (float fraction : {0.5f}) {
-                // First chunk is already divided by stride
-                int T_out = int(m_batch_dims[0].T_out * fraction / cs_granularity) * cs_granularity;
-                if (T_out < 1) {
-                    spdlog::error(
-                            "Cannot determine batch dims for partial chunksize of {}*{} - too "
-                            "small",
-                            m_batch_dims[0].T_out, fraction);
-                    throw std::runtime_error("partial chunksize too small");
-                }
-                m_batch_dims.push_back({granularity, T_out * m_config.stride, T_out});
+                T_outs.insert(calculate_T_out(int(requested_chunk_size * fraction)));
             }
         }
+    }
+
+    for (auto iter = T_outs.rbegin(); iter != T_outs.rend(); ++iter) {
+        m_batch_dims.push_back({batch_granularity, *iter * stride, *iter});
     }
 
     // If running on a Jetson device with unified memory for CPU and GPU we can't use all
@@ -317,18 +303,18 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     // Batch size will be rounded up to a multiple of batch_size_granularity, regardless of
     // user choice. This makes sure batch size is compatible with GPU kernels.
-    requested_batch_size = utils::pad_to(requested_batch_size, granularity);
+    requested_batch_size = utils::pad_to(requested_batch_size, batch_granularity);
     std::vector<int> max_batch_sizes;
     for (auto &batch_dim : m_batch_dims) {
         auto bytes_per_chunk = (crfmodel_bytes_per_ct + decode_bytes_per_ct) * batch_dim.T_out;
         int max_batch_size = int(gpu_mem_limit / bytes_per_chunk);
-        max_batch_size -= max_batch_size % granularity;
-        if (max_batch_size < granularity) {
+        max_batch_size -= max_batch_size % batch_granularity;
+        if (max_batch_size < batch_granularity) {
             spdlog::warn(
                     "{} maximum safe estimated batch size at chunk size {} is only {}. Required "
                     "minimum is {}, GPU may run out of memory.",
-                    m_device, batch_dim.T_in, max_batch_size, granularity);
-            max_batch_size = granularity;
+                    m_device, batch_dim.T_in, max_batch_size, batch_granularity);
+            max_batch_size = batch_granularity;
         } else {
             spdlog::debug("{} maximum safe estimated batch size at chunk size {} is {}", m_device,
                           batch_dim.T_in, max_batch_size);
@@ -353,31 +339,28 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     float best_time = std::numeric_limits<float>::max();
 
     assert(m_batch_dims.size() > 0);
-    int chunk_size = m_batch_dims.back().T_in;
     // We limit the maximum when doing benchmarking to avoid excessive startup time.
     // The limit for transformer models should be increased at a later time.
     int max_batch_size = *std::max_element(max_batch_sizes.begin(), max_batch_sizes.end());
     const int max_batch_size_limit = m_config.is_tx_model() ? 1024 : 10240;
     max_batch_size = std::min(max_batch_size, max_batch_size_limit);
 
-    if (params.emit_batchsize_benchmarks) {
-        // When we are emitting benchmarks, prefer accuracy over speed of benchmark generation, so run the benchmarks
-        //  at full chunk size.  We must round down the requested chunk size to a multiple of the minimum granularity.
-        const size_t chunk_granularity = params.model_config.chunk_size_granularity();
-        chunk_size = static_cast<int>((chunk_size / chunk_granularity) * chunk_granularity);
-    } else {
-        // 288 * stride (much shorter than the default chunk size of 10k) is a somewhat arbitrary
-        // trade-off between getting more accurate measurements and avoiding excessive startup time,
-        // while making chunk size a multiple of 16 * stride_inner as required by koi transformer kernels.
-        chunk_size = std::min(chunk_size, m_config.stride * 288);
+    // When we are emitting benchmarks, prefer accuracy to speed of benchmark generation, so
+    // run the benchmarks at full chunk size.
+    int chunk_size = m_batch_dims.back().T_in;
+    if (!params.emit_batchsize_benchmarks) {
+        // `288 * stride` (much shorter than the default chunk size of 10k), adjusted for
+        // granularity, is a somewhat arbitrary trade-off between getting accurate measurements
+        // and avoiding excessive startup time
+        chunk_size = utils::pad_to(288 * stride, chunk_granularity);
     }
     spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,
-                  granularity);
+                  batch_granularity);
 
     // Times and corresponding batch sizes.
     std::vector<std::pair<float, int>> times_and_batch_sizes;
     std::vector<std::pair<float, int>> all_times_and_batch_sizes;
-    times_and_batch_sizes.reserve(max_batch_size / granularity);
+    times_and_batch_sizes.reserve(max_batch_size / batch_granularity);
 
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
@@ -388,7 +371,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
                      ". Full benchmarking will run for this device, which may take some time.");
     }
 
-    for (int batch_size = granularity; batch_size <= max_batch_size; batch_size += granularity) {
+    for (int batch_size = batch_granularity; batch_size <= max_batch_size;
+         batch_size += batch_granularity) {
         float time = std::numeric_limits<float>::max();
 
         // Use the available cached chunk size if we haven't been explicitly told not to.

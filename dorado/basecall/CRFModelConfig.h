@@ -186,9 +186,10 @@ struct CRFModelConfig {
         basecaller.normalise(chunk_size_granularity(), stride_inner());
     }
 
-    size_t chunk_size_granularity() const { return stride_inner() * (is_tx_model() ? 16 : 1); }
+    int chunk_size_granularity() const { return stride_inner() * (is_tx_model() ? 16 : 1); }
 
-    // True if `chunk_size` and `overlap` is evenly divisible by the `strde_inner`
+    // True if `chunk_size` is greater than `overlap` and evenly divisible by
+    // `chunk_size_granularity`, and `overlap` is evenly divisible by `stride_inner`
     bool has_normalised_basecaller_params() const;
 
     std::string to_string() const;
