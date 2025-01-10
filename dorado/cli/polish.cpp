@@ -508,61 +508,18 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                           const std::string& model_str,
                                           const bool load_scripted_model,
                                           const bool any_model) {
-    // Allow any model for development/debug purposes.
-    if (any_model) {
-        std::filesystem::path model_dir;
-        if (model_str == "auto") {
-            throw std::runtime_error{
-                    "When using --skip-model-compatibility-check, the model needs to be explicitly "
-                    "specified. Cannot "
-                    "use 'auto'."};
-
-        } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-            spdlog::info("Model specified by path: '{}'", model_str);
-            model_dir = model_str;
-
-        } else {
-            const auto& infos = models::polish_models();
-            int32_t num_found = 0;
-            for (const auto& info : infos) {
-                if (info.name == model_str) {
-                    ++num_found;
-                }
+    const auto count_model_hits = [](const dorado::models::ModelList& model_list,
+                                     const std::string& model_name) {
+        int32_t num_found = 0;
+        for (const auto& info : model_list) {
+            if (info.name == model_name) {
+                ++num_found;
             }
-            if (num_found == 0) {
-                throw std::runtime_error("Could not find specified polishing model: '" + model_str +
-                                         "'.");
-            } else if (num_found > 1) {
-                throw std::runtime_error("Multiple models match the specified polishing model: '" +
-                                         model_str + "'.");
-            }
-
-            spdlog::info("Downloading model: '{}'", model_str);
-            model_dir = download_model(model_str);
         }
+        return num_found;
+    };
 
-        // Load the model.
-        spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
-        const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
-        polisher::ModelConfig model_config =
-                polisher::parse_model_config(model_dir / "config.toml", model_file);
-
-        // Return without validating the compatibility with the input BAM.
-        return model_config;
-    }
-
-    if (std::empty(bam_info.basecaller_models)) {
-        throw std::runtime_error{"Input BAM file has no basecaller models listed in the header."};
-    }
-
-    if (std::size(bam_info.basecaller_models) > 1) {
-        throw std::runtime_error{
-                "Input BAM file has a mix of different basecaller models. Only one basecaller "
-                "model can be processed."};
-    }
-
-    const std::string polish_model_suffix =
-            std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
+    std::filesystem::path model_dir;
 
     if (bam_info.has_dwells) {
         spdlog::info("Input data contains move tables.");
@@ -570,7 +527,25 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         spdlog::info("Input data does not contain move tables.");
     }
 
-    std::filesystem::path model_dir;
+    // Fail only if not explicitly permitting any model, or if any model is allowed but user specified
+    // auto model resolution (in which case, the model name needs to be available in the input BAM file).
+    if (!any_model ||
+        (any_model && (model_str == "auto") && (std::size(bam_info.basecaller_models) != 1))) {
+        const std::string suffix{(any_model) ? " Cannot use 'auto' to resolve the model." : ""};
+        if (std::empty(bam_info.basecaller_models)) {
+            throw std::runtime_error{
+                    "Input BAM file has no basecaller models listed in the header." + suffix};
+        }
+        if (std::size(bam_info.basecaller_models) > 1) {
+            throw std::runtime_error{
+                    "Input BAM file has a mix of different basecaller models. Only one basecaller "
+                    "model can be processed." +
+                    suffix};
+        }
+    }
+
+    const std::string polish_model_suffix =
+            std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
 
     if (model_str == "auto") {
         spdlog::info("Auto resolving the model.");
@@ -578,38 +553,40 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         // Check that there is at least one basecaller listed in the BAM. Otherwise, no auto resolving.
         if (std::empty(bam_info.basecaller_models)) {
             throw std::runtime_error{
-                    "Cannot auto resolve the model because no model information is available in "
-                    "the BAM file."};
+                    "Cannot auto resolve the model because no model information is available "
+                    "in the BAM file."};
         }
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
         const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = basecaller_model + polish_model_suffix;
+
+        spdlog::debug("Resolved model from input data: {}", model_name);
 
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
     } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
+        spdlog::debug("Resolved model from user-specified path: {}", model_str);
         spdlog::info("Model specified by path: '{}'", model_str);
         model_dir = model_str;
 
-    } else if (!std::empty(model_str)) {
-        spdlog::info("Model specified by name: '{}'", model_str);
+    } else if (count_model_hits(models::polish_models(), model_str) == 1) {
+        const std::string& model_name = model_str;
+        spdlog::debug("Resolved model from user-specified polishing model name: {}", model_name);
+        spdlog::info("Downloading model: '{}'", model_name);
+        model_dir = download_model(model_name);
 
+    } else if (count_model_hits(models::simplex_models(), model_str) == 1) {
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
         const std::string& basecaller_model = model_str;
 
-        // Verify that the specified basecaller model is compatible with the BAM.
-        if (bam_info.basecaller_models.count(basecaller_model) == 0) {
-            throw std::runtime_error{"Specified basecaller model '" + basecaller_model +
-                                     "' not compatible with the input BAM!"};
-        }
-
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = basecaller_model + polish_model_suffix;
 
+        spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
@@ -623,11 +600,50 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     polisher::ModelConfig model_config =
             polisher::parse_model_config(model_dir / "config.toml", model_file);
 
-    // Verify that the basecaller model of the loaded config is compatible with the BAM.
-    if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
-        throw std::runtime_error{"Polishing model was trained for the basecaller model '" +
-                                 model_config.basecaller_model +
-                                 "', which is not compatible with the input BAM!"};
+    // Check that both the model and data have dwells, or that they both do not have dwells.
+    const auto it_dwells = model_config.model_kwargs.find("use_dwells");
+    const bool model_uses_dwells = (it_dwells != std::end(model_config.model_kwargs))
+                                           ? (it_dwells->second == "true")
+                                           : false;
+
+    if (!any_model) {
+        // Verify that the basecaller model of the loaded config is compatible with the BAM.
+        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
+            throw std::runtime_error{"Polishing model was trained for the basecaller model '" +
+                                     model_config.basecaller_model +
+                                     "' which is not compatible with the input BAM!"};
+        }
+
+        // Fail if the dwell information in the model and the data does not match.
+        if (bam_info.has_dwells && !model_uses_dwells) {
+            throw std::runtime_error{
+                    "Input data has move tables, but a model without move table support has been "
+                    "chosen."};
+        } else if (!bam_info.has_dwells && model_uses_dwells) {
+            throw std::runtime_error{
+                    "Input data does not contain move tables, but a model which requires move "
+                    "tables has been chosen."};
+        }
+
+    } else {
+        // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
+        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
+            spdlog::warn(
+                    "Polishing model was trained for the basecaller model '{}' which is not "
+                    "compatible with the input BAM. This may produce inferior results.",
+                    model_config.basecaller_model);
+        }
+
+        // Allow to use a mismatched model, but emit a warning.
+        if (bam_info.has_dwells && !model_uses_dwells) {
+            spdlog::warn(
+                    "Input data has move tables, but a model without move table support has been "
+                    "chosen. This may produce inferior results.");
+        } else if (!bam_info.has_dwells && model_uses_dwells) {
+            spdlog::warn(
+                    "Input data does not contain move tables, but a model which requires move "
+                    "tables has been chosen. This may produce inferior results.");
+        }
     }
 
     return model_config;
