@@ -98,11 +98,11 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         auto adapter_res = detector->find_adapters(seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
+    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(seq, kit_name);
+        primer_res = detector->find_primers(seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
-
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
@@ -115,6 +115,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
             return;
         }
         bam_message.adapter_trim_interval = trim_interval;
+        bam_message.primer_classification = demux::AdapterDetector::classify_primers(primer_res);
     }
 }
 
@@ -148,8 +149,9 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         auto adapter_res = detector->find_adapters(read.read_common.seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
+    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(read.read_common.seq, kit_name);
+        primer_res = detector->find_primers(read.read_common.seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     }
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
@@ -164,6 +166,8 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
             return;
         }
         read.read_common.adapter_trim_interval = trim_interval;
+        read.read_common.primer_classification =
+                demux::AdapterDetector::classify_primers(primer_res);
     }
 }
 

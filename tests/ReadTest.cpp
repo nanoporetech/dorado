@@ -124,7 +124,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     }
 
     SECTION("Barcode unclassified") {
-        auto old_barcode = std::exchange(read_common.barcode, "unclassified");
+        auto old_barcode = std::exchange(read_common.barcode, dorado::UNCLASSIFIED);
 
         auto alignments = read_common.extract_sam_lines(false, 0, false);
         REQUIRE(alignments.size() == 1);

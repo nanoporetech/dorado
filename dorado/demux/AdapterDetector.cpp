@@ -192,5 +192,43 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     return {get_best_result(front_results), get_best_result(rear_results)};
 }
 
+PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult& result) {
+    PrimerClassification classification;
+    auto strip_suffix = [](const std::string& name, const std::string& suffix) {
+        auto k = name.find(suffix);
+        if (k != std::string::npos) {
+            return name.substr(0, k);
+        }
+        return name;
+    };
+    const auto front_name = strip_suffix(result.front.name, "_FRONT");
+    const auto rear_name = strip_suffix(result.rear.name, "_REAR");
+    auto get_dir = [](const std::string& name) {
+        auto k = name.find("_FWD");
+        if (k != std::string::npos) {
+            return StrandOrientation::FORWARD;
+        }
+        k = name.find("_REV");
+        if (k != std::string::npos) {
+            return StrandOrientation::REVERSE;
+        }
+        return StrandOrientation::UNKNOWN;
+    };
+
+    if (front_name != UNCLASSIFIED && rear_name != UNCLASSIFIED) {
+        if (front_name == rear_name) {
+            classification.primer_name = front_name;
+            classification.orientation = get_dir(front_name);
+        }
+    } else if (front_name != UNCLASSIFIED) {
+        classification.primer_name = front_name;
+        classification.orientation = get_dir(front_name);
+    } else if (rear_name != UNCLASSIFIED) {
+        classification.primer_name = rear_name;
+        classification.orientation = get_dir(rear_name);
+    }
+    return classification;
+}
+
 }  // namespace demux
 }  // namespace dorado

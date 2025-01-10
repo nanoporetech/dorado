@@ -95,7 +95,7 @@ void BarcodeDemuxerNode::input_thread_fn() {
 int BarcodeDemuxerNode::write(bam1_t& record) {
     assert(m_header);
     // Fetch the barcode name.
-    std::string barcode = "unclassified";
+    std::string barcode = UNCLASSIFIED;
     auto bam_tag = bam_aux_get(&record, "BC");
     if (bam_tag) {
         barcode = std::string(bam_aux2Z(bam_tag));

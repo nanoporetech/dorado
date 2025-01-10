@@ -61,6 +61,7 @@ public:
     uint64_t start_time_ms;
 
     std::shared_ptr<BarcodeScoreResult> barcoding_result;
+    PrimerClassification primer_classification{};
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
@@ -216,6 +217,7 @@ public:
     std::shared_ptr<ClientInfo> client_info;
     std::string sequencing_kit{};
     std::shared_ptr<BarcodeScoreResult> barcoding_result{};
+    PrimerClassification primer_classification{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
 };

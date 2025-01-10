@@ -2,6 +2,7 @@
 
 #include "poly_tail_calculator.h"
 #include "poly_tail_config.h"
+#include "utils/types.h"
 
 #include <fstream>
 #include <sstream>
@@ -64,9 +65,8 @@ std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorSelector::get_calcul
         const std::string& name) const {
     std::lock_guard<std::mutex> lock(m_lut_mutex);
     auto it = m_lut.find(name);
-    return (it == std::end(m_lut))
-                   ? (name == "unclassified" && !m_lut.empty() ? nullptr : m_default)
-                   : it->second;
+    return (it == std::end(m_lut)) ? (name == UNCLASSIFIED && !m_lut.empty() ? nullptr : m_default)
+                                   : it->second;
 }
 
 }  // namespace dorado::poly_tail

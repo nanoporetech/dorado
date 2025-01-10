@@ -26,6 +26,8 @@ public:
     std::vector<Query>& get_adapter_sequences(const std::string& kit_name);
     std::vector<Query>& get_primer_sequences(const std::string& kit_name);
 
+    static PrimerClassification classify_primers(const AdapterScoreResult& result);
+
 private:
     enum QueryType { ADAPTER, PRIMER };
 
