@@ -116,21 +116,28 @@ struct ReadGroup {
     std::string experiment_id;
 };
 
+enum class StrandOrientation : int {
+    REVERSE = -1,  ///< "-" orientation
+    UNKNOWN = 0,   ///< "?" orientation
+    FORWARD = 1,   ///< "+" orientation
+};
+
+inline char to_char(const StrandOrientation orientation) {
+    switch (orientation) {
+    case StrandOrientation::REVERSE:
+        return '-';
+    case StrandOrientation::FORWARD:
+        return '+';
+    case StrandOrientation::UNKNOWN:
+        return '?';
+    default:
+        throw std::runtime_error("Invalid orientation value " + std::to_string(int(orientation)));
+    }
+}
+
 struct PrimerClassification {
     std::string primer_name = UNCLASSIFIED;
-    int orientation = 0;
-    char orientation_char() const {
-        switch (orientation) {
-        case -1:
-            return '-';
-        case 1:
-            return '+';
-        case 0:
-            return '?';
-        default:
-            throw std::runtime_error("Invalid orientation value " + std::to_string(orientation));
-        }
-    }
+    StrandOrientation orientation = StrandOrientation::UNKNOWN;
 };
 
 using BarcodeFilterSet = std::optional<std::unordered_set<std::string>>;

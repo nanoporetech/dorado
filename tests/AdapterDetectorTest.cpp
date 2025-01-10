@@ -46,72 +46,72 @@ TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     res.rear.name = "test_FWD_REAR";
     auto classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_FWD");
-    CHECK(classification.orientation == 1);
-    CHECK(classification.orientation_char() == '+');
+    CHECK(classification.orientation == StrandOrientation::FORWARD);
+    CHECK(to_char(classification.orientation) == '+');
 
     // Only 5' primer at front
     res.front.name = "test_FWD_FRONT";
     res.rear.name = UNCLASSIFIED;
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_FWD");
-    CHECK(classification.orientation == 1);
-    CHECK(classification.orientation_char() == '+');
+    CHECK(classification.orientation == StrandOrientation::FORWARD);
+    CHECK(to_char(classification.orientation) == '+');
 
     // Only 3' primer at rear
     res.front.name = UNCLASSIFIED;
     res.rear.name = "test_FWD_REAR";
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_FWD");
-    CHECK(classification.orientation == 1);
-    CHECK(classification.orientation_char() == '+');
+    CHECK(classification.orientation == StrandOrientation::FORWARD);
+    CHECK(to_char(classification.orientation) == '+');
 
     // Consistent 3' primer at front and 5' primer at rear
     res.front.name = "test_REV_FRONT";
     res.rear.name = "test_REV_REAR";
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_REV");
-    CHECK(classification.orientation == -1);
-    CHECK(classification.orientation_char() == '-');
+    CHECK(classification.orientation == StrandOrientation::REVERSE);
+    CHECK(to_char(classification.orientation) == '-');
 
     // Only 3' primer at front
     res.front.name = "test_REV_FRONT";
     res.rear.name = UNCLASSIFIED;
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_REV");
-    CHECK(classification.orientation == -1);
-    CHECK(classification.orientation_char() == '-');
+    CHECK(classification.orientation == StrandOrientation::REVERSE);
+    CHECK(to_char(classification.orientation) == '-');
 
     // Only 5' primer at rear
     res.front.name = UNCLASSIFIED;
     res.rear.name = "test_REV_REAR";
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == "test_REV");
-    CHECK(classification.orientation == -1);
-    CHECK(classification.orientation_char() == '-');
+    CHECK(classification.orientation == StrandOrientation::REVERSE);
+    CHECK(to_char(classification.orientation) == '-');
 
     // No primers found at either end
     res.front.name = UNCLASSIFIED;
     res.rear.name = UNCLASSIFIED;
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == UNCLASSIFIED);
-    CHECK(classification.orientation == 0);
-    CHECK(classification.orientation_char() == '?');
+    CHECK(classification.orientation == StrandOrientation::UNKNOWN);
+    CHECK(to_char(classification.orientation) == '?');
 
     // Inconsistent 5' primer at front and 3' primer at rear
     res.front.name = "test1_FWD_FRONT";
     res.rear.name = "test2_FWD_REAR";
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == UNCLASSIFIED);
-    CHECK(classification.orientation == 0);
-    CHECK(classification.orientation_char() == '?');
+    CHECK(classification.orientation == StrandOrientation::UNKNOWN);
+    CHECK(to_char(classification.orientation) == '?');
 
     // 5' primer found at both front and rear
     res.front.name = "test1_FWD_FRONT";
     res.rear.name = "test1_REV_REAR";
     classification = demux::AdapterDetector::classify_primers(res);
     CHECK(classification.primer_name == UNCLASSIFIED);
-    CHECK(classification.orientation == 0);
-    CHECK(classification.orientation_char() == '?');
+    CHECK(classification.orientation == StrandOrientation::UNKNOWN);
+    CHECK(to_char(classification.orientation) == '?');
 }
 
 TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
@@ -126,37 +126,35 @@ TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < adapters.size(); ++i) {
         // First put the front adapter only at the beginning, with 6 bases in front of it.
-        auto new_sequence1 = "ACGTAC" + adapters[i].front_sequence + seq;
+        const auto& adapter = adapters[i];
+        auto new_sequence1 = "ACGTAC" + adapter.front_sequence + seq;
         auto res1 = detector.find_adapters(new_sequence1, TEST_KIT);
-        CHECK(res1.front.name == adapters[i].name + "_FRONT");
-        CHECK(res1.front.position ==
-              std::make_pair(6, int(adapters[i].front_sequence.length()) + 5));
+        CHECK(res1.front.name == adapter.name + "_FRONT");
+        CHECK(res1.front.position == std::make_pair(6, int(adapter.front_sequence.length()) + 5));
         CHECK(res1.front.score == 1.0f);
         CHECK(res1.rear.score < 0.7f);
 
         // Now put the rear adapter at the end, with 3 bases after it.
-        auto new_sequence2 = seq + adapters[i].rear_sequence + "TTT";
+        auto new_sequence2 = seq + adapter.rear_sequence + "TTT";
         auto res2 = detector.find_adapters(new_sequence2, TEST_KIT);
         CHECK(res2.front.score < 0.7f);
-        CHECK(res2.rear.name == adapters[i].name + "_REAR");
+        CHECK(res2.rear.name == adapter.name + "_REAR");
         CHECK(res2.rear.position ==
               std::make_pair(int(seq.length()),
-                             int(seq.length() + adapters[i].rear_sequence.length()) - 1));
+                             int(seq.length() + adapter.rear_sequence.length()) - 1));
         CHECK(res2.rear.score == 1.0f);
 
         // Now put them both in.
-        auto new_sequence3 =
-                "TGCA" + adapters[i].front_sequence + seq + adapters[i].rear_sequence + "GTA";
+        auto new_sequence3 = "TGCA" + adapter.front_sequence + seq + adapter.rear_sequence + "GTA";
         auto res3 = detector.find_adapters(new_sequence3, TEST_KIT);
-        CHECK(res3.front.name == adapters[i].name + "_FRONT");
-        CHECK(res3.front.position ==
-              std::make_pair(4, int(adapters[i].front_sequence.length()) + 3));
+        CHECK(res3.front.name == adapter.name + "_FRONT");
+        CHECK(res3.front.position == std::make_pair(4, int(adapter.front_sequence.length()) + 3));
         CHECK(res3.front.score == 1.0f);
-        CHECK(res3.rear.name == adapters[i].name + "_REAR");
+        CHECK(res3.rear.name == adapter.name + "_REAR");
         CHECK(res3.rear.position ==
-              std::make_pair(int(adapters[i].front_sequence.length() + seq.length()) + 4,
-                             int(adapters[i].front_sequence.length() + seq.length() +
-                                 adapters[i].rear_sequence.length()) +
+              std::make_pair(int(adapter.front_sequence.length() + seq.length()) + 4,
+                             int(adapter.front_sequence.length() + seq.length() +
+                                 adapter.rear_sequence.length()) +
                                      3));
         CHECK(res3.rear.score == 1.0f);
     }
@@ -175,22 +173,23 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     std::string seq = utils::extract_sequence(reader.record.get());
     CHECK(primers.size() == 2);
     for (size_t i = 0; i < primers.size(); ++i) {
-        auto new_sequence1 =
-                "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
+        const auto& primer = primers[i];
+        auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
         auto res = detector.find_primers(new_sequence1, TEST_KIT);
-        CHECK(res.front.name == primers[i].name + "_FRONT");
-        CHECK(res.front.position == std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
+        CHECK(res.front.name == primer.name + "_FRONT");
+        CHECK(res.front.position == std::make_pair(6, int(primer.front_sequence.length()) + 5));
         CHECK(res.front.score == 1.0f);
-        CHECK(res.rear.name == primers[i].name + "_REAR");
+        CHECK(res.rear.name == primer.name + "_REAR");
         CHECK(res.rear.position ==
-              std::make_pair(int(primers[i].front_sequence.length() + seq.length()) + 6,
-                             int(primers[i].front_sequence.length() + seq.length() +
-                                 primers[i].rear_sequence.length()) +
+              std::make_pair(int(primer.front_sequence.length() + seq.length()) + 6,
+                             int(primer.front_sequence.length() + seq.length() +
+                                 primer.rear_sequence.length()) +
                                      5));
         CHECK(res.rear.score == 1.0f);
         auto classification = demux::AdapterDetector::classify_primers(res);
-        CHECK(classification.primer_name == primers[i].name);
-        int expected_orientation = (i == 0) ? 1 : -1;
+        CHECK(classification.primer_name == primer.name);
+        StrandOrientation expected_orientation =
+                (i == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
         CHECK(classification.orientation == expected_orientation);
     }
 }
@@ -230,22 +229,23 @@ TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_GROUP) 
     std::string seq = utils::extract_sequence(reader.record.get());
     for (size_t i = 0; i < primers.size(); ++i) {
         // Put the front primer at the beginning, and the rear primer at the end.
-        auto new_sequence1 =
-                "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
+        const auto& primer = primers[i];
+        auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
         auto res = detector.find_primers(new_sequence1, "TEST_KIT2");
-        CHECK(res.front.name == primers[i].name + "_FRONT");
-        CHECK(res.front.position == std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
+        CHECK(res.front.name == primer.name + "_FRONT");
+        CHECK(res.front.position == std::make_pair(6, int(primer.front_sequence.length()) + 5));
         CHECK(res.front.score == 1.0f);
-        CHECK(res.rear.name == primers[i].name + "_REAR");
+        CHECK(res.rear.name == primer.name + "_REAR");
         CHECK(res.rear.position ==
-              std::make_pair(int(primers[i].front_sequence.length() + seq.length()) + 6,
-                             int(primers[i].front_sequence.length() + seq.length() +
-                                 primers[i].rear_sequence.length()) +
+              std::make_pair(int(primer.front_sequence.length() + seq.length()) + 6,
+                             int(primer.front_sequence.length() + seq.length() +
+                                 primer.rear_sequence.length()) +
                                      5));
         CHECK(res.rear.score == 1.0f);
         auto classification = demux::AdapterDetector::classify_primers(res);
         CHECK(classification.primer_name == primers[i].name);
-        int expected_orientation = (i == 0) ? 1 : -1;
+        StrandOrientation expected_orientation =
+                (i == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
         CHECK(classification.orientation == expected_orientation);
     }
 }
@@ -298,7 +298,8 @@ TEST_CASE("AdapterDetector: test custom primer detection without kit", TEST_GROU
         CHECK(res.rear.score == 1.0f);
         auto classification = demux::AdapterDetector::classify_primers(res);
         CHECK(classification.primer_name == primers[i].name);
-        int expected_orientation = (i % 2 == 0) ? 1 : -1;
+        StrandOrientation expected_orientation =
+                (i % 2 == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
         CHECK(classification.orientation == expected_orientation);
     }
 }
@@ -436,7 +437,7 @@ TEST_CASE(
             CHECK(qual.size() == seq.length());
 
             CHECK(bam_message.primer_classification.primer_name == "cDNA_FWD");
-            CHECK(bam_message.primer_classification.orientation == 1);
+            CHECK(bam_message.primer_classification.orientation == StrandOrientation::FORWARD);
             CHECK(bam_aux2A(bam_aux_get(rec, "TS")) == '+');
 
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
@@ -460,7 +461,7 @@ TEST_CASE(
             CHECK(read_common.moves == expected_move_vals);
 
             CHECK(read_common.primer_classification.primer_name == "cDNA_FWD");
-            CHECK(read_common.primer_classification.orientation == 1);
+            CHECK(read_common.primer_classification.orientation == StrandOrientation::FORWARD);
 
             // The mod probabilities table should now start mod at the first base.
             CHECK(read_common.base_mod_probs.size() ==

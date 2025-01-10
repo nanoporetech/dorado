@@ -201,18 +201,18 @@ PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult&
         }
         return name;
     };
-    auto front_name = strip_suffix(result.front.name, "_FRONT");
-    auto rear_name = strip_suffix(result.rear.name, "_REAR");
+    const auto front_name = strip_suffix(result.front.name, "_FRONT");
+    const auto rear_name = strip_suffix(result.rear.name, "_REAR");
     auto get_dir = [](const std::string& name) {
         auto k = name.find("_FWD");
         if (k != std::string::npos) {
-            return 1;
+            return StrandOrientation::FORWARD;
         }
         k = name.find("_REV");
         if (k != std::string::npos) {
-            return -1;
+            return StrandOrientation::REVERSE;
         }
-        return 0;
+        return StrandOrientation::UNKNOWN;
     };
 
     if (front_name != UNCLASSIFIED && rear_name != UNCLASSIFIED) {
