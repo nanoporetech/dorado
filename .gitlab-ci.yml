@@ -116,19 +116,27 @@ variables:
   - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
+.zip_test_files:
+  # Uploading these allows us to avoid checking out the repo in tests.
+  - echo Zipping test files
+  - |
+    zip -r  tests.archive tests/*.sh tests/*.bat tests/data tests/cram ||
+    tar -cf tests.archive tests/*.sh tests/*.bat tests/data tests/cram
+
+.unzip_test_files:
+  - echo Unzipping test files
+  - unzip tests.archive || tar -xf tests.archive
+
 .build_and_test_dorado:
   stage: build
   script:
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_ctest]
+    - !reference [.zip_test_files]
   artifacts:
     paths:
       - dist
-      # Uploading these allows us to avoid checking out the repo in tests.
-      - tests/*.sh
-      - tests/*.bat
-      - tests/data
-      - tests/cram
+      - tests.archive
     expire_in: 1 day
 
 .build_dorado_archive:
@@ -210,16 +218,27 @@ build:linux:x86:focal:install_deps:
 build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .linux_dependencies
     - .linux_runner
     - .build_and_test_dorado
 
+build:linux:x86:focal_koi_from_source:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+  extends:
+    - .linux_dependencies
+    - .linux_runner
+    - .build_and_test_dorado
+    - .on_nightly_or_manual
+  artifacts: null
+
 build:linux:x86:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-22.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
     - .linux_dependencies
     - .linux_runner
@@ -306,15 +325,11 @@ build:linux:arm64:bionic:
     - !reference [.run_dorado_cmake_build]
     # Modify the test paths so that we can run the tests on a different machine.
     - sed -i "s#$(pwd)#_BUILD_FOLDER_#g" ${BUILD_DIR}/tests/CTestTestfile.cmake
+    - !reference [.zip_test_files]
   artifacts:
     paths:
-      # Can't !reference here, but it would be:
-      #- !reference [.build_and_test_dorado, artifacts, path]
       - dist
-      - tests/*.sh
-      - tests/*.bat
-      - tests/data
-      - tests/cram
+      - tests.archive
       # Need to artifact parts of the build folder for the testing job.
       - ${BUILD_DIR}/CTestTestfile.cmake
       - ${BUILD_DIR}/tests
@@ -348,18 +363,11 @@ build:linux:arm64:focal:no_ccache:
     - .on_nightly_or_manual
   artifacts: null
 
-build:linux:x86:focal_koi_download:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  extends:
-    - .linux_runner
-    - .build_and_test_dorado
-  artifacts: null
-
-build:linux:x86:focal_koi_download:no_ccache:
+build:linux:x86:focal:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
   extends:
-    - build:linux:x86:focal_koi_download
+    - build:linux:x86:focal
     - .on_nightly_or_manual
   artifacts: null
 
@@ -369,7 +377,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
 
 build:windows:debug:
   variables:
@@ -380,13 +388,13 @@ build:windows:debug:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
   artifacts: null
 
-build:windows_koi_download:
+build:windows_koi_from_source:
   extends:
-    - .windows_runner
-    - .build_and_test_dorado
+    - build:windows
+    - .on_nightly_or_manual
   before_script:
-    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+    - !reference ["build:windows", before_script]
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   artifacts: null
 
 build:macos:arm:
@@ -459,8 +467,6 @@ build:ios_sim:m1:
 
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
-  variables:
-    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   extends:
     - .linux_runner
     - .build_dorado_archive
@@ -495,7 +501,7 @@ build_archive:linux:arm64:focal:
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
+    BUILD_OPTIONS: "-DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
   extends:
     - .linux_runner
     - .build_dorado_archive
@@ -504,7 +510,7 @@ build_archive:linux:x86:centos7:
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
   extends:
     - .windows_runner
     - .build_dorado_archive
@@ -544,7 +550,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../tests ../dist .
+    - mv ../dist ../tests.archive .
+    - !reference [.unzip_test_files]
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
@@ -559,7 +566,8 @@ build_archive:macos:x64:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
     - rm -rf test_archive && mkdir test_archive && pushd test_archive
-    - mv ../tests ../dist .
+    - mv ../dist ../tests.archive .
+    - !reference [.unzip_test_files]
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
 
 .test_archive:

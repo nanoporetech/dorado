@@ -31,20 +31,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         if(NOT EXISTS ${KOI_DIR})
             if(DEFINED GITLAB_CI_TOKEN)
                 message("Cloning Koi using CI token")
-                execute_process(
-                    COMMAND git clone https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git ${KOI_DIR}
-                    COMMAND_ERROR_IS_FATAL ANY
-                )
+                set(KOI_REPO https://gitlab-ci-token:${GITLAB_CI_TOKEN}@git.oxfordnanolabs.local/machine-learning/koi.git)
             else()
                 message("Cloning Koi using ssh")
-                execute_process(
-                    COMMAND git clone git@git.oxfordnanolabs.local:machine-learning/koi.git ${KOI_DIR}
-                    COMMAND_ERROR_IS_FATAL ANY
-                )
+                set(KOI_REPO git@git.oxfordnanolabs.local:machine-learning/koi.git)
             endif()
             execute_process(
-                COMMAND git checkout v${KOI_VERSION}
-                WORKING_DIRECTORY ${KOI_DIR}
+                COMMAND
+                    git clone
+                        -b v${KOI_VERSION}
+                        # TODO: once we drop centos support we can use these instead of a separate submodule update
+                        #--depth 1
+                        #--recurse-submodules
+                        #--shallow-submodules
+                        ${KOI_REPO}
+                        ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
             )
             execute_process(
