@@ -57,6 +57,12 @@ enum class OutputFormat {
     FASTQ,
 };
 
+enum class VariantCallingEnum {
+    NO_VARIANT_CALLING,
+    VCF,
+    GVCF,
+};
+
 /// \brief All options for this tool.
 struct Options {
     // Positional parameters.
@@ -95,6 +101,7 @@ struct Options {
     bool any_bam = false;
     bool any_model = false;
     bool bacteria = false;
+    VariantCallingEnum vc_type = VariantCallingEnum::NO_VARIANT_CALLING;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
@@ -182,6 +189,10 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
                 .flag();
+        parser->visible.add_argument("--vcf")
+                .help("Output a VCF file with variant calls to stdout.")
+                .flag();
+        parser->visible.add_argument("--gvcf").help("Output a gVCF file to stdout.").flag();
     }
     {
         parser->visible.add_group("Advanced options");
@@ -353,6 +364,18 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
                 "bam_subchunk = {}, bam_chunk = {}",
                 opt.bam_chunk, opt.bam_subchunk);
         opt.bam_subchunk = opt.bam_chunk;
+    }
+
+    // Parse the output variant calling format.
+    const bool vcf = parser.visible.get<bool>("vcf");
+    const bool gvcf = parser.visible.get<bool>("gvcf");
+    if (vcf && gvcf) {
+        spdlog::warn("Both --vcf and --gvcf are specified. gVCF will be output.");
+        opt.vc_type = VariantCallingEnum::GVCF;
+    } else if (vcf) {
+        opt.vc_type = VariantCallingEnum::VCF;
+    } else if (gvcf) {
+        opt.vc_type = VariantCallingEnum::GVCF;
     }
 
     return opt;
@@ -1024,15 +1047,31 @@ void run_polishing(const Options& opt,
                 std::size(region_batch), batch_bases / (1000.0 * 1000.0),
                 std::size(all_results_cons));
 
-        // Stitch the sample consensus sequences.
-        const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                construct_consensus_seqs(batch_interval, all_results_cons, draft_reader, draft_lens,
-                                         opt.fill_gaps, opt.fill_char);
+        spdlog::debug(
+                "Data for variant calling: vc_input_data.size() = {}, all_results_cons.size() = {}",
+                std::size(vc_input_data), std::size(all_results_cons));
+
+        // Placeholder for final results.
+        std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs;
+        std::vector<std::string> variants;
+
+        if (opt.vc_type != VariantCallingEnum::NO_VARIANT_CALLING) {
+            variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens);
+        } else {
+            // Stitch the sample consensus sequences.
+            consensus_seqs =
+                    construct_consensus_seqs(batch_interval, all_results_cons, draft_reader,
+                                             draft_lens, opt.fill_gaps, opt.fill_char);
+        }
 
         // Write out the consensus.
-        for (const auto& consensus : consensus_seqs) {
-            write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
-                                    (opt.out_format == OutputFormat::FASTQ));
+        if (opt.vc_type == VariantCallingEnum::NO_VARIANT_CALLING) {
+            for (const auto& consensus : consensus_seqs) {
+                write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
+                                        (opt.out_format == OutputFormat::FASTQ));
+            }
+        } else {
+            // Write the variant calls.
         }
     }
 }

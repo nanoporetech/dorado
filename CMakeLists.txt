@@ -233,7 +233,7 @@ add_library(dorado_lib
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/ModBaseChunkCallerNode.cpp
-    dorado/read_pipeline/ModBaseChunkCallerNode.h    
+    dorado/read_pipeline/ModBaseChunkCallerNode.h
     dorado/read_pipeline/NullNode.h
     dorado/read_pipeline/NullNode.cpp
     dorado/read_pipeline/PairingNode.cpp
@@ -324,6 +324,8 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
+    dorado/polish/variant_calling.cpp
+    dorado/polish/variant_calling.h
     dorado/polish/window.cpp
     dorado/polish/window.h
     dorado/polish/features/decoder_base.cpp

@@ -10,6 +10,7 @@
 #include "utils/span.h"
 #include "utils/stats.h"
 #include "utils/timer_high_res.h"
+#include "variant_calling.h"
 #include "window.h"
 
 #include <cstdint>
@@ -67,19 +68,6 @@ struct DecodeData {
     torch::Tensor logits;
     std::vector<TrimInfo> trims;
 };
-
-/**
- * \brief Type which holds the input data for variant calling. This includes _all_
- *          samples for the current batch of draft sequences and the inference results (logits) for those samples.
- *          The variant calling process will be responsible to group samples by draft sequence ID, etc.
- */
-using VariantCallingInputData = std::vector<std::pair<Sample, torch::Tensor>>;
-
-// struct VariantCallingInputData{
-//     std::vector<std::pair<Sample, torch::Tensor>>
-//     std::vector<Sample> samples;
-//     std::vector<torch::Tensor> logits;
-// };
 
 class PolishStats {
 public:
