@@ -115,6 +115,23 @@ struct ReadGroup {
     std::string experiment_id;
 };
 
+struct PrimerClassification {
+    std::string primer_name = UNCLASSIFIED;
+    int orientation = 0;
+    char orientation_char() const {
+        switch (orientation) {
+        case -1:
+            return '-';
+        case 1:
+            return '+';
+        case 0:
+            return '?';
+        default:
+            throw std::runtime_error("Invalid orientation value " + std::to_string(orientation));
+        }
+    }
+};
+
 using BarcodeFilterSet = std::optional<std::unordered_set<std::string>>;
 
 struct BamDestructor {

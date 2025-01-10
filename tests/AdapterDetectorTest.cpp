@@ -38,6 +38,82 @@ namespace fs = std::filesystem;
 
 using namespace dorado;
 
+TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
+    dorado::AdapterScoreResult res;
+
+    // Consistent 5' primer at front and 3' primer at rear
+    res.front.name = "test_FWD_FRONT";
+    res.rear.name = "test_FWD_REAR";
+    auto classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_FWD");
+    CHECK(classification.orientation == 1);
+    CHECK(classification.orientation_char() == '+');
+
+    // Only 5' primer at front
+    res.front.name = "test_FWD_FRONT";
+    res.rear.name = UNCLASSIFIED;
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_FWD");
+    CHECK(classification.orientation == 1);
+    CHECK(classification.orientation_char() == '+');
+
+    // Only 3' primer at rear
+    res.front.name = UNCLASSIFIED;
+    res.rear.name = "test_FWD_REAR";
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_FWD");
+    CHECK(classification.orientation == 1);
+    CHECK(classification.orientation_char() == '+');
+
+    // Consistent 3' primer at front and 5' primer at rear
+    res.front.name = "test_REV_FRONT";
+    res.rear.name = "test_REV_REAR";
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_REV");
+    CHECK(classification.orientation == -1);
+    CHECK(classification.orientation_char() == '-');
+
+    // Only 3' primer at front
+    res.front.name = "test_REV_FRONT";
+    res.rear.name = UNCLASSIFIED;
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_REV");
+    CHECK(classification.orientation == -1);
+    CHECK(classification.orientation_char() == '-');
+
+    // Only 5' primer at rear
+    res.front.name = UNCLASSIFIED;
+    res.rear.name = "test_REV_REAR";
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == "test_REV");
+    CHECK(classification.orientation == -1);
+    CHECK(classification.orientation_char() == '-');
+
+    // No primers found at either end
+    res.front.name = UNCLASSIFIED;
+    res.rear.name = UNCLASSIFIED;
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == UNCLASSIFIED);
+    CHECK(classification.orientation == 0);
+    CHECK(classification.orientation_char() == '?');
+
+    // Inconsistent 5' primer at front and 3' primer at rear
+    res.front.name = "test1_FWD_FRONT";
+    res.rear.name = "test2_FWD_REAR";
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == UNCLASSIFIED);
+    CHECK(classification.orientation == 0);
+    CHECK(classification.orientation_char() == '?');
+
+    // 5' primer found at both front and rear
+    res.front.name = "test1_FWD_FRONT";
+    res.rear.name = "test1_REV_REAR";
+    classification = demux::AdapterDetector::classify_primers(res);
+    CHECK(classification.primer_name == UNCLASSIFIED);
+    CHECK(classification.orientation == 0);
+    CHECK(classification.orientation_char() == '?');
+}
+
 TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
@@ -99,21 +175,23 @@ TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     std::string seq = utils::extract_sequence(reader.record.get());
     CHECK(primers.size() == 2);
     for (size_t i = 0; i < primers.size(); ++i) {
-        // First put the front primer at the beginning, and the rear primer at the end.
         auto new_sequence1 =
                 "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
-        auto res1 = detector.find_primers(new_sequence1, TEST_KIT);
-        CHECK(res1.front.name == primers[i].name + "_FRONT");
-        CHECK(res1.front.position ==
-              std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
-        CHECK(res1.front.score == 1.0f);
-        CHECK(res1.rear.name == primers[i].name + "_REAR");
-        CHECK(res1.rear.position ==
+        auto res = detector.find_primers(new_sequence1, TEST_KIT);
+        CHECK(res.front.name == primers[i].name + "_FRONT");
+        CHECK(res.front.position == std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
+        CHECK(res.front.score == 1.0f);
+        CHECK(res.rear.name == primers[i].name + "_REAR");
+        CHECK(res.rear.position ==
               std::make_pair(int(primers[i].front_sequence.length() + seq.length()) + 6,
                              int(primers[i].front_sequence.length() + seq.length() +
                                  primers[i].rear_sequence.length()) +
                                      5));
-        CHECK(res1.rear.score == 1.0f);
+        CHECK(res.rear.score == 1.0f);
+        auto classification = demux::AdapterDetector::classify_primers(res);
+        CHECK(classification.primer_name == primers[i].name);
+        int expected_orientation = (i == 0) ? 1 : -1;
+        CHECK(classification.orientation == expected_orientation);
     }
 }
 
@@ -150,20 +228,25 @@ TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_GROUP) 
     HtsReader reader(test_file.string(), std::nullopt);
     reader.read();
     std::string seq = utils::extract_sequence(reader.record.get());
-    for (const auto& primer : primers) {
+    for (size_t i = 0; i < primers.size(); ++i) {
         // Put the front primer at the beginning, and the rear primer at the end.
-        auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
-        auto res1 = detector.find_primers(new_sequence1, "TEST_KIT2");
-        CHECK(res1.front.name == primer.name + "_FRONT");
-        CHECK(res1.front.position == std::make_pair(6, int(primer.front_sequence.length()) + 5));
-        CHECK(res1.front.score == 1.0f);
-        CHECK(res1.rear.name == primer.name + "_REAR");
-        CHECK(res1.rear.position ==
-              std::make_pair(int(primer.front_sequence.length() + seq.length()) + 6,
-                             int(primer.front_sequence.length() + seq.length() +
-                                 primer.rear_sequence.length()) +
+        auto new_sequence1 =
+                "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
+        auto res = detector.find_primers(new_sequence1, "TEST_KIT2");
+        CHECK(res.front.name == primers[i].name + "_FRONT");
+        CHECK(res.front.position == std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
+        CHECK(res.front.score == 1.0f);
+        CHECK(res.rear.name == primers[i].name + "_REAR");
+        CHECK(res.rear.position ==
+              std::make_pair(int(primers[i].front_sequence.length() + seq.length()) + 6,
+                             int(primers[i].front_sequence.length() + seq.length() +
+                                 primers[i].rear_sequence.length()) +
                                      5));
-        CHECK(res1.rear.score == 1.0f);
+        CHECK(res.rear.score == 1.0f);
+        auto classification = demux::AdapterDetector::classify_primers(res);
+        CHECK(classification.primer_name == primers[i].name);
+        int expected_orientation = (i == 0) ? 1 : -1;
+        CHECK(classification.orientation == expected_orientation);
     }
 }
 
@@ -202,18 +285,21 @@ TEST_CASE("AdapterDetector: test custom primer detection without kit", TEST_GROU
         // Put the front primer at the beginning, and the rear primer at the end.
         auto new_sequence1 =
                 "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
-        auto res1 = detector.find_primers(new_sequence1, "TEST_KIT2");
-        CHECK(res1.front.name == primers[i].name + "_FRONT");
-        CHECK(res1.front.position ==
-              std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
-        CHECK(res1.front.score == 1.0f);
-        CHECK(res1.rear.name == primers[i].name + "_REAR");
-        CHECK(res1.rear.position ==
+        auto res = detector.find_primers(new_sequence1, "TEST_KIT2");
+        CHECK(res.front.name == primers[i].name + "_FRONT");
+        CHECK(res.front.position == std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
+        CHECK(res.front.score == 1.0f);
+        CHECK(res.rear.name == primers[i].name + "_REAR");
+        CHECK(res.rear.position ==
               std::make_pair(int(primers[i].front_sequence.length() + seq.length()) + 6,
                              int(primers[i].front_sequence.length() + seq.length() +
                                  primers[i].rear_sequence.length()) +
                                      5));
-        CHECK(res1.rear.score == 1.0f);
+        CHECK(res.rear.score == 1.0f);
+        auto classification = demux::AdapterDetector::classify_primers(res);
+        CHECK(classification.primer_name == primers[i].name);
+        int expected_orientation = (i % 2 == 0) ? 1 : -1;
+        CHECK(classification.orientation == expected_orientation);
     }
 }
 
@@ -349,6 +435,10 @@ TEST_CASE(
             auto qual = dorado::utils::extract_quality(rec);
             CHECK(qual.size() == seq.length());
 
+            CHECK(bam_message.primer_classification.primer_name == "cDNA_FWD");
+            CHECK(bam_message.primer_classification.orientation == 1);
+            CHECK(bam_aux2A(bam_aux_get(rec, "TS")) == '+');
+
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
             CHECK(move_vals == expected_move_vals);
 
@@ -368,6 +458,9 @@ TEST_CASE(
             CHECK(read_common.seq == nonbc_seq);
 
             CHECK(read_common.moves == expected_move_vals);
+
+            CHECK(read_common.primer_classification.primer_name == "cDNA_FWD");
+            CHECK(read_common.primer_classification.orientation == 1);
 
             // The mod probabilities table should now start mod at the first base.
             CHECK(read_common.base_mod_probs.size() ==

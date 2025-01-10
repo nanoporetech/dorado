@@ -503,7 +503,7 @@ void remove_alignment_tags_from_record(bam1_t* record) {
     // of tags to remove.
     static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "de",
                                                          "dv", "tp", "cm", "s1", "s2", "MD",
-                                                         "zd", "rl", "bh", "cs"};
+                                                         "zd", "rl", "bh", "cs", "TS"};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {

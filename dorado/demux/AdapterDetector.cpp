@@ -192,8 +192,8 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
     return {get_best_result(front_results), get_best_result(rear_results)};
 }
 
-std::string AdapterDetector::classify_primers(const AdapterScoreResult& result) {
-    std::string classification = UNCLASSIFIED;
+PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult& result) {
+    PrimerClassification classification;
     auto strip_suffix = [](const std::string& name, const std::string& suffix) {
         auto k = name.find(suffix);
         if (k != std::string::npos) {
@@ -203,14 +203,29 @@ std::string AdapterDetector::classify_primers(const AdapterScoreResult& result) 
     };
     auto front_name = strip_suffix(result.front.name, "_FRONT");
     auto rear_name = strip_suffix(result.rear.name, "_REAR");
+    auto get_dir = [](const std::string& name) {
+        auto k = name.find("_FWD");
+        if (k != std::string::npos) {
+            return 1;
+        }
+        k = name.find("_REV");
+        if (k != std::string::npos) {
+            return -1;
+        }
+        return 0;
+    };
+
     if (front_name != UNCLASSIFIED && rear_name != UNCLASSIFIED) {
         if (front_name == rear_name) {
-            classification = front_name;
+            classification.primer_name = front_name;
+            classification.orientation = get_dir(front_name);
         }
     } else if (front_name != UNCLASSIFIED) {
-        classification = front_name;
-    } else {
-        classification = rear_name;
+        classification.primer_name = front_name;
+        classification.orientation = get_dir(front_name);
+    } else if (rear_name != UNCLASSIFIED) {
+        classification.primer_name = rear_name;
+        classification.orientation = get_dir(rear_name);
     }
     return classification;
 }

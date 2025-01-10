@@ -104,6 +104,10 @@ void TrimmerNode::process_read(BamMessage& bam_message) {
 
     if (trim_adapter || trim_barcodes) {
         bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
+        if (bam_message.primer_classification.primer_name != UNCLASSIFIED) {
+            auto sense_data = uint8_t(bam_message.primer_classification.orientation_char());
+            bam_aux_append(bam_message.bam_ptr.get(), "TS", 'A', 1, &sense_data);
+        }
     } else {
         // Even if we don't trim this read, we need to strip any alignment details, since the BAM header
         // will not contain any alignment information anymore.
