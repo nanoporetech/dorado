@@ -6,6 +6,7 @@
 namespace dorado::polisher {
 
 struct ConsensusResult {
+    std::string name;
     std::string seq;
     std::string quals;
     int32_t draft_id = -1;    // Draft sequence ID where this comes from.
