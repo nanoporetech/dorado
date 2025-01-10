@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -16,7 +17,7 @@ struct kstring_t;
 
 namespace dorado {
 
-extern const std::string UNCLASSIFIED;
+inline const std::string UNCLASSIFIED = "unclassified";
 
 struct AlignmentResult {
     std::string name;    ///< Record name, if applicable

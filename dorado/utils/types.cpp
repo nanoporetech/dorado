@@ -6,8 +6,6 @@
 
 namespace dorado {
 
-const std::string UNCLASSIFIED = "unclassified";
-
 void BamDestructor::operator()(bam1_t* bam) { bam_destroy1(bam); }
 
 // Here mm_tbuf_t is used instead of mm_tbuf_s since minimap.h
