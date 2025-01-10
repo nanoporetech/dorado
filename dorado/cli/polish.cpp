@@ -994,6 +994,7 @@ void run_polishing(const Options& opt,
         utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
         utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
         std::vector<polisher::ConsensusResult> all_results_cons;
+        polisher::VariantCallingInputData vc_input_data;
 
         std::thread thread_sample_producer =
                 std::thread(&polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
@@ -1002,7 +1003,7 @@ void run_polishing(const Options& opt,
 
         std::thread thread_sample_decoder =
                 std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                            std::ref(decode_queue), std::ref(polish_stats),
+                            std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
                             std::cref(*resources.decoder), opt.threads, opt.min_depth);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,

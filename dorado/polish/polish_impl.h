@@ -68,6 +68,19 @@ struct DecodeData {
     std::vector<TrimInfo> trims;
 };
 
+/**
+ * \brief Type which holds the input data for variant calling. This includes _all_
+ *          samples for the current batch of draft sequences and the inference results (logits) for those samples.
+ *          The variant calling process will be responsible to group samples by draft sequence ID, etc.
+ */
+using VariantCallingInputData = std::vector<std::pair<Sample, torch::Tensor>>;
+
+// struct VariantCallingInputData{
+//     std::vector<std::pair<Sample, torch::Tensor>>
+//     std::vector<Sample> samples;
+//     std::vector<torch::Tensor> logits;
+// };
+
 class PolishStats {
 public:
     PolishStats() = default;
@@ -181,7 +194,20 @@ std::vector<Window> create_windows_from_regions(
         const int32_t bam_chunk_len,
         const int32_t window_overlap);
 
-void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
+/**
+ * \brief Fetches the decode data from an async queue, decodes the consensus and collects
+ *          the consensus results. It also returns a vector of the decode data taken off of the queue
+ *          (i.e. the input used for decoding). This will be needed downstream for variant calling.
+ * \param results Return vector of consensus results.
+ * \param decode_data Return vector of input data used for decoding, taken from the queue.
+ * \param decode_queue Queue where messages will be received.
+ * \param polish_stats Stats object, for the progress bar.
+ * \param decoder Decoder to convert integers to bases.
+ * \param num_threads Number of threads for processing.
+ * \param min_depth Consensus sequences will be split in regions of insufficient depth.
+ */
+void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
+                                VariantCallingInputData& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
