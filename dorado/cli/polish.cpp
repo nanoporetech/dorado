@@ -64,7 +64,7 @@ struct Options {
     std::filesystem::path in_draft_fastx_fn;
 
     // Optional parameters.
-    std::filesystem::path out_consensus_fn;
+    std::filesystem::path output_dir;
     std::string model_str;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
@@ -168,8 +168,9 @@ ParserPtr create_cli(int& verbosity) {
     }
     {
         parser->visible.add_group("Input/output options");
-        parser->visible.add_argument("-o", "--out-path")
-                .help("Output to a file instead of stdout.")
+        parser->visible.add_argument("-o", "--output-dir")
+                .help("If specified, output files will be written to the given folder. Otherwise, "
+                      "output is to stdout.")
                 .default_value("");
         parser->visible.add_argument("-m", "--model")
                 .help("Path to correction model folder.")
@@ -284,7 +285,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.in_aln_bam_fn = parser.visible.get<std::string>("in_aln_bam");
     opt.in_draft_fastx_fn = parser.visible.get<std::string>("in_draft_fastx");
 
-    opt.out_consensus_fn = parser.visible.get<std::string>("out-path");
+    opt.output_dir = parser.visible.get<std::string>("output-dir");
     opt.model_str = parser.visible.get<std::string>("model");
 
     opt.out_format =
@@ -363,11 +364,6 @@ void validate_options(const Options& opt) {
     }
     if (!std::filesystem::exists(opt.in_draft_fastx_fn)) {
         spdlog::error("Input reads file {} does not exist!", opt.in_draft_fastx_fn.string());
-        std::exit(EXIT_FAILURE);
-    }
-    if ((opt.out_consensus_fn == opt.in_aln_bam_fn) ||
-        (opt.out_consensus_fn == opt.in_draft_fastx_fn)) {
-        spdlog::error("Output path matches one of the input paths!");
         std::exit(EXIT_FAILURE);
     }
     if (opt.batch_size <= 0) {
@@ -810,8 +806,26 @@ void run_polishing(const Options& opt,
     // Open the draft FASTA file.
     const hts_io::FastxRandomReader draft_reader(opt.in_draft_fastx_fn);
 
-    // Open the output stream, to std::cout if the path is empty, otherwise to the file.
-    auto ofs = get_output_stream(opt.out_consensus_fn);
+    // Create the output folder if needed.
+    if (!std::empty(opt.output_dir)) {
+        // Check if the path exists, but fail if it is not a directory.
+        if (std::filesystem::exists(opt.output_dir) &&
+            !std::filesystem::is_directory(opt.output_dir)) {
+            throw std::runtime_error(
+                    "Path specified as output directory exists, but it is not a directory: '" +
+                    opt.output_dir.string() + "'.");
+        }
+
+        // Create the directory if needed/possible.
+        std::filesystem::create_directories(opt.output_dir);
+    }
+
+    // Open the output stream to a file/stdout for the consensus sequences.
+    const std::string bn =
+            (opt.out_format == OutputFormat::FASTA) ? "consensus.fasta" : "consensus.fastq";
+    const std::filesystem::path out_consensus_fn =
+            (std::empty(opt.output_dir)) ? "" : (opt.output_dir / bn);
+    auto ofs_consensus = get_output_stream(out_consensus_fn);
 
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
@@ -941,7 +955,7 @@ void run_polishing(const Options& opt,
             const std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
                     draft_reader, header, all_results, group, opt.fill_gaps, opt.fill_char);
 
-            write_consensus_results(*ofs, header, consensus, opt.fill_gaps,
+            write_consensus_results(*ofs_consensus, header, consensus, opt.fill_gaps,
                                     (opt.out_format == OutputFormat::FASTQ));
         }
     }
