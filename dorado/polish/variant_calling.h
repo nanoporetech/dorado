@@ -1,5 +1,6 @@
 #pragma once
 
+#include "features/decoder_base.h"
 #include "hts_io/FastxRandomReader.h"
 #include "interval.h"
 #include "sample.h"
@@ -25,6 +26,7 @@ std::vector<std::string> call_variants(
         const dorado::polisher::Interval& region_batch,
         const VariantCallingInputData& vc_input_data,
         const hts_io::FastxRandomReader& draft_reader,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens);
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const DecoderBase& decoder);
 
 }  // namespace dorado::polisher

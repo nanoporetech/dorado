@@ -1061,7 +1061,8 @@ void run_polishing(const Options& opt,
         std::vector<std::string> variants;
 
         if (opt.vc_type != VariantCallingEnum::NO_VARIANT_CALLING) {
-            variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens);
+            variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens,
+                                     *resources.decoder);
         } else {
             // Stitch the sample consensus sequences.
             consensus_seqs =
