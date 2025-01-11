@@ -951,6 +951,10 @@ void run_polishing(const Options& opt,
             (std::empty(opt.output_dir)) ? "" : (opt.output_dir / bn);
     auto ofs_consensus = get_output_stream(out_consensus_fn);
 
+    // Open the output stream to a file/stdout for the variant calls.
+    const std::filesystem::path out_vcf_fn = (std::empty(opt.output_dir)) ? "" : (opt.output_dir / "variants.vcf");
+    auto ofs_vcf = get_output_stream(out_vcf_fn);
+
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
             prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
@@ -1064,14 +1068,19 @@ void run_polishing(const Options& opt,
                                              draft_lens, opt.fill_gaps, opt.fill_char);
         }
 
-        // Write out the consensus.
-        if (opt.vc_type == VariantCallingEnum::NO_VARIANT_CALLING) {
-            for (const auto& consensus : consensus_seqs) {
+        // Write out the consensus. Write if output is to a folder, or if to stdout and we are not variant calling.
+        if (!std::empty(opt.output_dir) || (opt.vc_type == VariantCallingEnum::NO_VARIANT_CALLING)) {
+            for (const auto& consensus: consensus_seqs) {
                 write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
                                         (opt.out_format == OutputFormat::FASTQ));
             }
-        } else {
-            // Write the variant calls.
+        }
+
+        // Write out the variant calls. Write if output is to a folder, or if to stdout and we _are_ variant calling.
+        if (!std::empty(opt.output_dir) || (opt.vc_type != VariantCallingEnum::NO_VARIANT_CALLING)) {
+            for (const auto& line: variants) {
+                *ofs_vcf << line << "\n";
+            }
         }
     }
 }
