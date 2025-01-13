@@ -13,9 +13,9 @@ namespace dorado::polisher {
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
  */
-std::string create_draft_with_gaps(const std::string& draft,
-                                   const std::vector<int64_t>& positions_major,
-                                   const std::vector<int64_t>& positions_minor) {
+std::string extract_draft_with_gaps(const std::string& draft,
+                                    const std::vector<int64_t>& positions_major,
+                                    const std::vector<int64_t>& positions_minor) {
     if (std::size(positions_major) != std::size(positions_minor)) {
         throw std::runtime_error(
                 "The positions_major and positions_minor are not of the same size! "
@@ -23,9 +23,20 @@ std::string create_draft_with_gaps(const std::string& draft,
                 std::to_string(std::size(positions_major)) +
                 ", positions_minor.size = " + std::to_string(std::size(positions_minor)));
     }
+
     std::string ret(std::size(positions_major), '*');
+
     for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
         ret[i] = (positions_minor[i] == 0) ? draft[positions_major[i]] : '*';
+    }
+
+    return ret;
+}
+
+std::string extract_draft(const std::string& draft, const std::vector<int64_t>& positions_major) {
+    std::string ret(std::size(positions_major), '*');
+    for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
+        ret[i] = draft[positions_major[i]];
     }
     return ret;
 }
@@ -33,30 +44,37 @@ std::string create_draft_with_gaps(const std::string& draft,
 /**
  * \brief This function restructures the neighboring samples for one draft sequence
  */
-std::vector<Sample> join_samples(
-        const std::vector<VariantCallingSample>& vc_input_data,  // All samples for all drafts.
-        const std::vector<std::pair<int64_t, int32_t>>&
-                group_info,  // Samples which belong to the current draft, sorted by start coord.
-        // const std::vector<const Sample*>& samples,
-        const std::vector<TrimInfo>& trims,  // Trimming coordinates for these samples.
-        const std::string& draft,
-        const DecoderBase& decoder  // Decoder for logits -> bases.
-) {
-    // std::vector<ConsensusResult> consensuses(std::size(group_info));
-    // Compute the untrimmed consensus of each sample.
+std::vector<Sample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
+                                 const std::string& draft,
+                                 const DecoderBase& decoder) {
+    std::vector<VariantCallingSample> queue;
 
-    std::vector<torch::Tensor> queue;
+    for (int64_t i = 0; i < dorado::ssize(vc_samples); ++i) {
+        const VariantCallingSample& vc_sample = vc_samples[i];
+        const Sample& sample = vc_sample.sample;
 
-    for (int64_t i = 0; i < dorado::ssize(group_info); ++i) {
-        const auto& [start, id] = group_info[i];
+        // Validate the sample.
+        sample.validate();
+
+        // Validate the logits
+        if (!vc_sample.logits.defined()) {
+            throw std::runtime_error("Logits tensor is not defined!");
+        }
+        if (vc_sample.logits.size(0) != dorado::ssize(vc_sample.sample.positions_major)) {
+            throw std::runtime_error(
+                    "Length of the logits tensor does not match sample length! logits.size = " +
+                    std::to_string(vc_sample.logits.size(0)) + ", positions_major.size = " +
+                    std::to_string(std::size(vc_sample.sample.positions_major)));
+        }
 
         // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
         // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
         // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
         // In this case, the "batch size" is 1.
-        const at::Tensor logits = vc_input_data[id].logits.unsqueeze(0);
+        const at::Tensor logits = vc_sample.logits.unsqueeze(0);
         std::vector<ConsensusResult> c = decoder.decode_bases(logits);
 
+        // This shouldn't be possible.
         if (std::size(c) != 1) {
             spdlog::warn(
                     "Unexpected number of consensus sequences generated from a single sample: "
@@ -65,35 +83,49 @@ std::vector<Sample> join_samples(
             continue;
         }
 
-        const Sample& sample = vc_input_data[id].sample;
-
+        // Sequences for comparison.
         const std::string& call_with_gaps = c.front().seq;
         const std::string draft_with_gaps =
-                create_draft_with_gaps(draft, sample.positions_major, sample.positions_minor);
-
+                extract_draft_with_gaps(draft, sample.positions_major, sample.positions_minor);
         assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
 
         // Check if all positions are diffs, or if all positions are gaps in both sequences.
-        // If so, merge the entire sample with the next one.
-        int64_t count = 0;
-        for (int64_t j = 0; j < dorado::ssize(call_with_gaps); ++j) {
-            if ((call_with_gaps[j] != draft_with_gaps[j]) ||
-                (call_with_gaps[j] == '*' && draft_with_gaps[j] == '*')) {
-                ++count;
+        {
+            int64_t count = 0;
+            for (int64_t j = 0; j < dorado::ssize(call_with_gaps); ++j) {
+                if ((call_with_gaps[j] != draft_with_gaps[j]) ||
+                    (call_with_gaps[j] == '*' && draft_with_gaps[j] == '*')) {
+                    ++count;
+                }
+            }
+            if (count == dorado::ssize(call_with_gaps)) {
+                // Merge the entire sample with the next one. We need at least one non-diff non-gap pos.
+                queue.emplace_back(vc_sample);
+                continue;
             }
         }
-        if (count == dorado::ssize(call_with_gaps)) {
-            // queue.emplace_back(...);
-        }
+
+        // for (int64_t i =0
 
         // consensuses[i] = std::move(c.front());
 
         // std::cout << "[i = " << i << "] sample = " << sample << "\nC: " << consensuses[i].seq << "\nD: " << draft << "\n";
     }
 
-    (void)trims;
-
     return {};
+}
+
+std::vector<Sample> apply_trimming(const std::vector<const Sample*>& samples,
+                                   const std::vector<TrimInfo>& trims) {
+    std::vector<Sample> ret;
+
+    for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
+        const Sample* s = samples[i];
+        const TrimInfo& t = trims[i];
+        ret.emplace_back(slice_sample(*s, t.start, t.end));
+    }
+
+    return ret;
 }
 
 std::vector<std::string> call_variants(
@@ -150,9 +182,40 @@ std::vector<std::string> call_variants(
         }
 
         // Compute trimming of all samples for this draft sequence.
-        const auto trims = trim_samples(local_samples, std::nullopt);
+        const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
 
-        const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+        // Produce trimmed samples.
+        std::vector<Sample> trimmed_samples = apply_trimming(local_samples, trims);
+
+        // Produce trimmed logits.
+        std::vector<at::Tensor> trimmed_logits = [&]() {
+            std::vector<at::Tensor> ret;
+            for (size_t i = 0; i < std::size(trims); ++i) {
+                const int64_t id = group[i].second;
+                const TrimInfo& trim = trims[i];
+                at::Tensor t = vc_input_data[id]
+                                       .logits.index({at::indexing::Slice(trim.start, trim.end)})
+                                       .clone();
+                ret.emplace_back(std::move(t));
+            }
+            return ret;
+        }();
+
+        assert(std::size(trimmed_samples) == std::size(trimmed_logits));
+
+        // Interleave the samples and logits for easier handling.
+        const std::vector<VariantCallingSample> trimmed_vc_samples = [&]() {
+            std::vector<VariantCallingSample> ret;
+            for (size_t i = 0; i < std::size(trimmed_samples); ++i) {
+                ret.emplace_back(VariantCallingSample{std::move(trimmed_samples[i]),
+                                                      std::move(trimmed_logits[i])});
+            }
+            return ret;
+        }();
+
+        // Break and merge samples on non-variant positions.
+        // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+        const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
         // TODO:
         //      join_samples();
