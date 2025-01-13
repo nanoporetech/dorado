@@ -18,7 +18,6 @@ struct Sample {
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     at::Tensor depth;
-    at::Tensor logits;
     std::vector<std::string> read_ids_left;
     std::vector<std::string> read_ids_right;
 
