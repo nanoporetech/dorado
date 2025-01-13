@@ -27,12 +27,6 @@ void Sample::validate() const {
                 ", depth.size(0) = " + std::to_string(depth.size(0)) +
                 ", features.size(0) = " + std::to_string(features.size(0)));
     }
-
-    if (logits.defined() && (logits.size(0) != num_columns)) {
-        throw std::runtime_error("Sample::logits is of incorrect size. logits.size = " +
-                                 std::to_string(logits.size(0)) +
-                                 ", num_columns = " + std::to_string(num_columns));
-    }
 }
 
 Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end) {
@@ -57,13 +51,6 @@ Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t
 
     // Depth.
     sliced_sample.depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone();
-
-    // Logits.
-    if (sample.logits.defined()) {
-        // Logits dimensions have already been validated at the top.
-        sliced_sample.logits =
-                sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone();
-    }
 
     // Major positions.
     sliced_sample.positions_major =
