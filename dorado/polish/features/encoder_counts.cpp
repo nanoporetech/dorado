@@ -176,7 +176,6 @@ Sample counts_to_features(CountsResult& pileup,
                   std::move(pileup.positions_minor),
                   std::move(depth),
                   {},
-                  {},
                   {}};
 
     return sample;
@@ -229,7 +228,6 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                 cat_vectors(positions_major),
                 cat_vectors(positions_minor),
                 torch::cat(std::move(depth)),
-                {},
                 {},
                 {},
         };

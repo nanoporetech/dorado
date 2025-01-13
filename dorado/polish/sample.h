@@ -29,7 +29,6 @@ struct Sample {
            std::vector<int64_t> positions_major_,
            std::vector<int64_t> positions_minor_,
            at::Tensor depth_,
-           at::Tensor logits_,
            std::vector<std::string> read_ids_left_,
            std::vector<std::string> read_ids_right_)
             : seq_id{seq_id_},
@@ -37,7 +36,6 @@ struct Sample {
               positions_major{std::move(positions_major_)},
               positions_minor{std::move(positions_minor_)},
               depth{std::move(depth_)},
-              logits{std::move(logits_)},
               read_ids_left{std::move(read_ids_left_)},
               read_ids_right{std::move(read_ids_right_)} {}
 

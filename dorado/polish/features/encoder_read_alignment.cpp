@@ -261,7 +261,6 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                 torch::cat(std::move(depth)),
                 {},
                 {},
-                {},
         };
 
         return ret;
@@ -379,7 +378,6 @@ Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
                   std::move(tensors.positions_major),
                   std::move(tensors.positions_minor),
                   std::move(depth),
-                  {},
                   std::move(tensors.read_ids_left),
                   std::move(tensors.read_ids_right)};
 

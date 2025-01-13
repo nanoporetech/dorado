@@ -384,11 +384,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            results.emplace_back(Sample{
-                    sample.seq_id, sample.features.slice(0, start, end), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start, end),
-                    (sample.logits.defined() ? sample.logits.slice(0, start, end) : at::Tensor()),
-                    std::move(read_ids_left), placeholder_ids});
+            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start, end),
+                                        std::move(new_major_pos), std::move(new_minor_pos),
+                                        sample.depth.slice(0, start, end), std::move(read_ids_left),
+                                        placeholder_ids});
             start = end;
         }
 
@@ -397,11 +396,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
                                                std::end(sample.positions_major));
             std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
                                                std::end(sample.positions_minor));
-            results.emplace_back(
-                    Sample{sample.seq_id, sample.features.slice(0, start), std::move(new_major_pos),
-                           std::move(new_minor_pos), sample.depth.slice(0, start),
-                           (sample.logits.defined() ? sample.logits.slice(0, start) : at::Tensor()),
-                           placeholder_ids, sample.read_ids_right});
+            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start),
+                                        std::move(new_major_pos), std::move(new_minor_pos),
+                                        sample.depth.slice(0, start), placeholder_ids,
+                                        sample.read_ids_right});
         }
     }
 
@@ -430,15 +428,12 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        torch::Tensor new_logits =
-                sample.logits.defined() ? sample.logits.slice(0, start, end) : torch::Tensor();
         return Sample{
                 sample.seq_id,
                 std::move(new_features),
                 std::move(new_major),
                 std::move(new_minor),
                 std::move(new_depth),
-                std::move(new_logits),
                 {},
                 {},
         };
