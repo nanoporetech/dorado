@@ -17,6 +17,7 @@ struct Sample {
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     at::Tensor depth;
+    at::Tensor logits;
     int32_t seq_id = -1;
     int32_t region_id = -1;
     std::vector<std::string> read_ids_left;
@@ -28,6 +29,7 @@ struct Sample {
            std::vector<int64_t> positions_major_,
            std::vector<int64_t> positions_minor_,
            at::Tensor depth_,
+           at::Tensor logits_,
            const int32_t seq_id_,
            const int32_t region_id_,
            std::vector<std::string> read_ids_left_,
@@ -36,6 +38,7 @@ struct Sample {
               positions_major{std::move(positions_major_)},
               positions_minor{std::move(positions_minor_)},
               depth{std::move(depth_)},
+              logits{std::move(logits_)},
               seq_id{seq_id_},
               region_id{region_id_},
               read_ids_left{std::move(read_ids_left_)},
@@ -57,6 +60,8 @@ struct Sample {
     std::pair<int64_t, int64_t> get_last_position() const {
         return get_position(static_cast<int64_t>(std::size(positions_major)) - 1);
     }
+
+    void validate() const;
 };
 
 Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end);

@@ -6,7 +6,38 @@
 
 namespace dorado::polisher {
 
+void Sample::validate() const {
+    const int64_t num_columns = dorado::ssize(positions_major);
+
+    if (!features.defined()) {
+        throw std::runtime_error("Sample::features tensor is not defined!");
+    }
+
+    if (!depth.defined()) {
+        throw std::runtime_error("Sample::depth tensor is not defined!");
+    }
+
+    // Validate that the input data is sane.
+    if ((dorado::ssize(positions_minor) != num_columns) || (depth.size(0) != num_columns) ||
+        (features.size(0) != num_columns)) {
+        throw std::invalid_argument(
+                "Sample data dimensions are inconsistent. positions_major.size = " +
+                std::to_string(std::size(positions_major)) +
+                ", positions_minor.size = " + std::to_string(std::size(positions_minor)) +
+                ", depth.size(0) = " + std::to_string(depth.size(0)) +
+                ", features.size(0) = " + std::to_string(features.size(0)));
+    }
+
+    if (logits.defined() && (logits.size(0) != num_columns)) {
+        throw std::runtime_error("Sample::logits is of incorrect size. logits.size = " +
+                                 std::to_string(logits.size(0)) +
+                                 ", num_columns = " + std::to_string(num_columns));
+    }
+}
+
 Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end) {
+    sample.validate();
+
     // Validate idx.
     const int64_t num_columns = dorado::ssize(sample.positions_major);
     if ((idx_start < 0) || (idx_start >= num_columns) || (idx_end >= idx_start) ||
@@ -17,53 +48,40 @@ Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t
                 ", num_columns = " + std::to_string(num_columns));
     }
 
-    // Validate that the input data is sane.
-    if ((dorado::ssize(sample.positions_minor) != num_columns) ||
-        (sample.depth.size(0) != num_columns) || (sample.features.size(0) != num_columns)) {
-        throw std::invalid_argument(
-                "Input data dimensions are inconsistent. num_columns = " +
-                std::to_string(num_columns) + ", sample.positions_minor.size = " +
-                std::to_string(std::size(sample.positions_minor)) +
-                ", sample.depth.size(0) = " + std::to_string(sample.depth.size(0)) +
-                ", sample.features.size(0) = " + std::to_string(sample.features.size(0)));
-    }
-
     // Create the sliced Sample.
     Sample sliced_sample;
 
-    // Slice tensor data.
-    sliced_sample.features = sample.features.index({at::indexing::Slice(idx_start, idx_end)});
-    sliced_sample.depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)});
+    // Features.
+    sliced_sample.features =
+            sample.features.index({at::indexing::Slice(idx_start, idx_end)}).clone();
 
-    // Slice vector data
+    // Depth.
+    sliced_sample.depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone();
+
+    // Logits.
+    if (sample.logits.defined()) {
+        // Logits dimensions have already been validated at the top.
+        sliced_sample.logits =
+                sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone();
+    }
+
+    // Major positions.
     sliced_sample.positions_major =
             std::vector<int64_t>(std::begin(sample.positions_major) + idx_start,
                                  std::begin(sample.positions_major) + idx_end);
+
+    // Minor positions.
     sliced_sample.positions_minor =
             std::vector<int64_t>(std::begin(sample.positions_minor) + idx_start,
                                  std::begin(sample.positions_minor) + idx_end);
 
-    // Copy meta-information.
+    // Meta information.
     sliced_sample.seq_id = sample.seq_id;
     sliced_sample.region_id = sample.region_id;
 
-    // Read IDs are not mandatory. Slice them only if available.
-    if (!std::empty(sample.read_ids_left)) {
-        const int64_t vec_len = dorado::ssize(sample.read_ids_left);
-        if ((idx_start >= 0) && (idx_start < vec_len) && (idx_end >= 0) && (idx_end <= vec_len)) {
-            sliced_sample.read_ids_left.insert(std::begin(sliced_sample.read_ids_left),
-                                               std::begin(sample.read_ids_left) + idx_start,
-                                               std::begin(sample.read_ids_left) + idx_end);
-        }
-    }
-    if (!std::empty(sample.read_ids_right)) {
-        const int64_t vec_len = dorado::ssize(sample.read_ids_right);
-        if ((idx_start >= 0) && (idx_start < vec_len) && (idx_end >= 0) && (idx_end <= vec_len)) {
-            sliced_sample.read_ids_right.insert(std::begin(sliced_sample.read_ids_right),
-                                                std::begin(sample.read_ids_right) + idx_start,
-                                                std::begin(sample.read_ids_right) + idx_end);
-        }
-    }
+    // Not needed, but stating for clarity. Slicing will not produce these.
+    sliced_sample.read_ids_left.clear();
+    sliced_sample.read_ids_right.clear();
 
     return sliced_sample;
 }

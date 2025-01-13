@@ -386,8 +386,9 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
 
             results.emplace_back(Sample{
                     sample.features.slice(0, start, end), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start, end), sample.seq_id,
-                    sample.region_id, std::move(read_ids_left), placeholder_ids});
+                    std::move(new_minor_pos), sample.depth.slice(0, start, end),
+                    (sample.logits.defined() ? sample.logits.slice(0, start, end) : at::Tensor()),
+                    sample.seq_id, sample.region_id, std::move(read_ids_left), placeholder_ids});
             start = end;
         }
 
@@ -396,10 +397,11 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
                                                std::end(sample.positions_major));
             std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
                                                std::end(sample.positions_minor));
-            results.emplace_back(Sample{sample.features.slice(0, start), std::move(new_major_pos),
-                                        std::move(new_minor_pos), sample.depth.slice(0, start),
-                                        sample.seq_id, sample.region_id, placeholder_ids,
-                                        sample.read_ids_right});
+            results.emplace_back(Sample{
+                    sample.features.slice(0, start), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start),
+                    (sample.logits.defined() ? sample.logits.slice(0, start) : at::Tensor()),
+                    sample.seq_id, sample.region_id, placeholder_ids, sample.read_ids_right});
         }
     }
 
@@ -428,11 +430,14 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
+        torch::Tensor new_logits =
+                sample.logits.defined() ? sample.logits.slice(0, start, end) : torch::Tensor();
         return Sample{
                 std::move(new_features),
                 std::move(new_major),
                 std::move(new_minor),
                 std::move(new_depth),
+                std::move(new_logits),
                 sample.seq_id,
                 sample.region_id,
                 {},
