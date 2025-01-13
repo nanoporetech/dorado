@@ -321,6 +321,7 @@ add_library(dorado_lib
     dorado/polish/polish_utils.h
     dorado/polish/region.cpp
     dorado/polish/region.h
+    dorado/polish/sample.cpp
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h

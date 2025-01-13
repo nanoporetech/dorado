@@ -5,7 +5,7 @@
 #include <ATen/ATen.h>
 
 #include <cstdint>
-#include <ostream>
+#include <iosfwd>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -59,45 +59,14 @@ struct Sample {
     }
 };
 
-inline void debug_print_sample(std::ostream& os,
+Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end);
+
+void debug_print_sample(std::ostream& os,
                                const Sample& sample,
                                int64_t start /*= 0*/,
                                int64_t end /*= -1 */,
-                               bool debug /*= false */) {
-    const int64_t len = static_cast<int64_t>(std::size(sample.positions_major));
-    start = std::max<int64_t>(0, start);
-    end = (end <= 0) ? len : end;
+                               bool debug /*= false */);
 
-    os << "sample.positions = " << sample.start() << " - " << sample.end()
-       << " , dist = " << (sample.end() - sample.start()) << " , tensor = [";
-    os.flush();
-    for (int64_t k = start; k < std::min<int64_t>(start + 3, len); ++k) {
-        os << "(" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ") ";
-        os.flush();
-    }
-    os << " ...";
-    os.flush();
-    for (int64_t k = std::max<int64_t>(0, end - 3); k < end; ++k) {
-        os << " (" << sample.positions_major[k] << ", " << sample.positions_minor[k] << ")";
-        os.flush();
-    }
-    os << "], size = " << std::size(sample.positions_major);
-    os << ", depth.shape = " << tensor_shape_as_string(sample.depth);
-    os.flush();
-
-    if (debug) {
-        const auto depth = sample.depth.slice(/*dim=*/0, /*start=*/0);
-        for (int64_t k = 0; k < len; ++k) {
-            os << "[k = " << k << "] pos = (" << sample.positions_major[k] << ", "
-               << sample.positions_minor[k] << "), depth = " << depth[k].item<float>() << '\n';
-            os.flush();
-        }
-    }
-}
-
-inline std::ostream& operator<<(std::ostream& os, const Sample& sample) {
-    debug_print_sample(os, sample, 0, -1, false);
-    return os;
-}
+std::ostream& operator<<(std::ostream& os, const Sample& sample);
 
 }  // namespace dorado::polisher
