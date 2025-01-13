@@ -58,7 +58,6 @@ enum class OutputFormat {
 };
 
 enum class VariantCallingEnum {
-    NO_VARIANT_CALLING,
     VCF,
     GVCF,
 };
@@ -101,7 +100,9 @@ struct Options {
     bool any_bam = false;
     bool any_model = false;
     bool bacteria = false;
-    VariantCallingEnum vc_type = VariantCallingEnum::NO_VARIANT_CALLING;
+    VariantCallingEnum vc_type = VariantCallingEnum::VCF;
+    bool run_variant_calling = false;
+    bool write_consensus = false;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
@@ -366,9 +367,12 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
         opt.bam_subchunk = opt.bam_chunk;
     }
 
-    // Parse the output variant calling format.
+    // Variant calling setup.
     const bool vcf = parser.visible.get<bool>("vcf");
     const bool gvcf = parser.visible.get<bool>("gvcf");
+    if (!std::empty(opt.output_dir) || vcf || gvcf) {
+        opt.run_variant_calling = true;
+    }
     if (vcf && gvcf) {
         spdlog::warn("Both --vcf and --gvcf are specified. gVCF will be output.");
         opt.vc_type = VariantCallingEnum::GVCF;
@@ -376,6 +380,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
         opt.vc_type = VariantCallingEnum::VCF;
     } else if (gvcf) {
         opt.vc_type = VariantCallingEnum::GVCF;
+    }
+
+    // Write the consensus sequence only if: (1) to a folder, or (2) to stdout but no VC options were specified.
+    if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
+        opt.write_consensus = true;
     }
 
     return opt;
@@ -1056,32 +1065,25 @@ void run_polishing(const Options& opt,
                 "Data for variant calling: vc_input_data.size() = {}, all_results_cons.size() = {}",
                 std::size(vc_input_data), std::size(all_results_cons));
 
-        // Placeholder for final results.
-        std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs;
-        std::vector<std::string> variants;
-
-        if (opt.vc_type != VariantCallingEnum::NO_VARIANT_CALLING) {
-            variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens,
-                                     *resources.decoder);
-        } else {
-            // Stitch the sample consensus sequences.
-            consensus_seqs =
+        // Construct the consensus sequences, only if they will be written.
+        if (opt.write_consensus) {
+            const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
                     construct_consensus_seqs(batch_interval, all_results_cons, draft_reader,
                                              draft_lens, opt.fill_gaps, opt.fill_char);
-        }
 
-        // Write out the consensus. Write if output is to a folder, or if to stdout and we are not variant calling.
-        if (!std::empty(opt.output_dir) ||
-            (opt.vc_type == VariantCallingEnum::NO_VARIANT_CALLING)) {
+            // Write the consensus file.
             for (const auto& consensus : consensus_seqs) {
                 write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
                                         (opt.out_format == OutputFormat::FASTQ));
             }
         }
 
-        // Write out the variant calls. Write if output is to a folder, or if to stdout and we _are_ variant calling.
-        if (!std::empty(opt.output_dir) ||
-            (opt.vc_type != VariantCallingEnum::NO_VARIANT_CALLING)) {
+        // Run variant calling, optionally.
+        if (opt.run_variant_calling) {
+            const std::vector<std::string> variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens,
+                                     *resources.decoder);
+
+            // Write the VCF file.
             for (const auto& line : variants) {
                 *ofs_vcf << line << "\n";
             }
