@@ -17,7 +17,7 @@ std::string create_draft_with_gaps(const std::string& draft,
                                    const std::vector<int64_t>& positions_major,
                                    const std::vector<int64_t>& positions_minor) {
     assert(std::size(positions_major) == std::size(positions_minor));
-    std::string ret(std::size(positions_major));
+    std::string ret('*', std::size(positions_major));
     for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
         ret[i] = (positions_minor[i] == 0) ? draft[positions_major[i]] : '*';
     }
@@ -77,7 +77,7 @@ std::vector<Sample> join_samples(
             }
         }
         if (count == dorado::ssize(call_with_gaps)) {
-            queue.emplace_back(...);
+            // queue.emplace_back(...);
         }
 
         // consensuses[i] = std::move(c.front());
