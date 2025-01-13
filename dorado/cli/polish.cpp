@@ -1080,8 +1080,8 @@ void run_polishing(const Options& opt,
 
         // Run variant calling, optionally.
         if (opt.run_variant_calling) {
-            const std::vector<std::string> variants = call_variants(batch_interval, vc_input_data, draft_reader, draft_lens,
-                                     *resources.decoder);
+            const std::vector<std::string> variants = call_variants(
+                    batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder);
 
             // Write the VCF file.
             for (const auto& line : variants) {
