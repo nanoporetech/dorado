@@ -2,6 +2,8 @@
 
 #include "utils/ssize.h"
 
+#include <torch/types.h>
+
 #include <ostream>
 
 namespace dorado::polisher {
@@ -111,6 +113,36 @@ void debug_print_sample(std::ostream& os,
 std::ostream& operator<<(std::ostream& os, const Sample& sample) {
     debug_print_sample(os, sample, 0, -1, false);
     return os;
+}
+
+void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
+    if (lh.seq_id != rh.seq_id) {
+        std::ostringstream oss;
+        oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
+        throw std::runtime_error(oss.str());
+    }
+    if (lh.end() != (rh.start() + 1)) {
+        std::ostringstream oss;
+        oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh << ", rh = " << rh;
+        throw std::runtime_error(oss.str());
+    }
+
+    const size_t width = std::size(lh.positions_major);
+
+    // Merge the tensors.
+    lh.features = torch::cat({std::move(lh.features), rh.features});
+    lh.depth = torch::cat({std::move(lh.depth), rh.depth});
+
+    // Insert positions vectors.
+    lh.positions_major.reserve(width + std::size(rh.positions_major));
+    lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
+                              std::end(rh.positions_major));
+    lh.positions_minor.reserve(width + std::size(rh.positions_minor));
+    lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
+                              std::end(rh.positions_minor));
+
+    // Invalidate read IDs.
+    lh.read_ids_left.clear();
 }
 
 }  // namespace dorado::polisher
