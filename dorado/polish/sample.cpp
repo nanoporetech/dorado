@@ -77,7 +77,6 @@ Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t
 
     // Meta information.
     sliced_sample.seq_id = sample.seq_id;
-    sliced_sample.region_id = sample.region_id;
 
     // Not needed, but stating for clarity. Slicing will not produce these.
     sliced_sample.read_ids_left.clear();

@@ -170,13 +170,12 @@ Sample counts_to_features(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
-    Sample sample{std::move(feature_array),
+    Sample sample{seq_id,
+                  std::move(feature_array),
                   std::move(pileup.positions_major),
                   std::move(pileup.positions_minor),
                   std::move(depth),
                   {},
-                  seq_id,
-                  -1,
                   {},
                   {}};
 
@@ -213,7 +212,6 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         std::vector<at::Tensor> depth;
 
         const int32_t seq_id = samples[sample_ids.front()].seq_id;
-        const int32_t region_id = samples[sample_ids.front()].region_id;
 
         // Make buffers.
         for (const int64_t id : sample_ids) {
@@ -226,13 +224,12 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
 
         // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
         Sample ret{
+                seq_id,
                 torch::cat(std::move(features)),
                 cat_vectors(positions_major),
                 cat_vectors(positions_minor),
                 torch::cat(std::move(depth)),
                 {},
-                seq_id,
-                region_id,
                 {},
                 {},
         };
@@ -258,8 +255,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         const int64_t first_id = std::empty(buffer_ids) ? -1 : buffer_ids.front();
 
         if (std::empty(buffer_ids) ||
-            ((sample.seq_id == samples[first_id].seq_id) &&
-             (sample.region_id == samples[first_id].region_id) && ((start - last_end) == 0))) {
+            ((sample.seq_id == samples[first_id].seq_id) && ((start - last_end) == 0))) {
             // New or contiguous chunk.
             last_end = sample.end();
             buffer_ids.emplace_back(i);

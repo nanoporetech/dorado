@@ -13,34 +13,31 @@
 namespace dorado::polisher {
 
 struct Sample {
+    int32_t seq_id = -1;
     at::Tensor features;
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     at::Tensor depth;
     at::Tensor logits;
-    int32_t seq_id = -1;
-    int32_t region_id = -1;
     std::vector<std::string> read_ids_left;
     std::vector<std::string> read_ids_right;
 
     Sample() = default;
 
-    Sample(at::Tensor features_,
+    Sample(const int32_t seq_id_,
+           at::Tensor features_,
            std::vector<int64_t> positions_major_,
            std::vector<int64_t> positions_minor_,
            at::Tensor depth_,
            at::Tensor logits_,
-           const int32_t seq_id_,
-           const int32_t region_id_,
            std::vector<std::string> read_ids_left_,
            std::vector<std::string> read_ids_right_)
-            : features{std::move(features_)},
+            : seq_id{seq_id_},
+              features{std::move(features_)},
               positions_major{std::move(positions_major_)},
               positions_minor{std::move(positions_minor_)},
               depth{std::move(depth_)},
               logits{std::move(logits_)},
-              seq_id{seq_id_},
-              region_id{region_id_},
               read_ids_left{std::move(read_ids_left_)},
               read_ids_right{std::move(read_ids_right_)} {}
 
