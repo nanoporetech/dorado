@@ -34,7 +34,7 @@ std::string create_draft_with_gaps(const std::string& draft,
  * \brief This function restructures the neighboring samples for one draft sequence
  */
 std::vector<Sample> join_samples(
-        const VariantCallingInputData& vc_input_data,  // All samples for all drafts.
+        const std::vector<VariantCallingSample>& vc_input_data,  // All samples for all drafts.
         const std::vector<std::pair<int64_t, int32_t>>&
                 group_info,  // Samples which belong to the current draft, sorted by start coord.
         // const std::vector<const Sample*>& samples,
@@ -54,7 +54,7 @@ std::vector<Sample> join_samples(
         // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
         // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
         // In this case, the "batch size" is 1.
-        const at::Tensor logits = vc_input_data[id].second.unsqueeze(0);
+        const at::Tensor logits = vc_input_data[id].logits.unsqueeze(0);
         std::vector<ConsensusResult> c = decoder.decode_bases(logits);
 
         if (std::size(c) != 1) {
@@ -65,7 +65,7 @@ std::vector<Sample> join_samples(
             continue;
         }
 
-        const Sample& sample = vc_input_data[id].first;
+        const Sample& sample = vc_input_data[id].sample;
 
         const std::string& call_with_gaps = c.front().seq;
         const std::string draft_with_gaps =
@@ -98,7 +98,7 @@ std::vector<Sample> join_samples(
 
 std::vector<std::string> call_variants(
         const dorado::polisher::Interval& region_batch,
-        const VariantCallingInputData& vc_input_data,
+        const std::vector<VariantCallingSample>& vc_input_data,
         const hts_io::FastxRandomReader& draft_reader,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const DecoderBase& decoder) {
@@ -146,7 +146,7 @@ std::vector<std::string> call_variants(
         local_samples.reserve(std::size(group));
         // NOTE: I wouldn't use a reference here because both start and id are POD, but Clang complains.
         for (const auto& [start, id] : group) {
-            local_samples.emplace_back(&(vc_input_data[id].first));
+            local_samples.emplace_back(&(vc_input_data[id].sample));
         }
 
         // Compute trimming of all samples for this draft sequence.

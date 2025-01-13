@@ -19,12 +19,15 @@ namespace dorado::polisher {
  *          samples for the current batch of draft sequences and the inference results (logits) for those samples.
  *          The variant calling process will be responsible to group samples by draft sequence ID, etc.
  */
-using VariantCallingInputData = std::vector<std::pair<Sample, at::Tensor>>;
+struct VariantCallingSample {
+    Sample sample;
+    at::Tensor logits;
+};
 
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
 std::vector<std::string> call_variants(
         const dorado::polisher::Interval& region_batch,
-        const VariantCallingInputData& vc_input_data,
+        const std::vector<VariantCallingSample>& vc_input_data,
         const hts_io::FastxRandomReader& draft_reader,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const DecoderBase& decoder);

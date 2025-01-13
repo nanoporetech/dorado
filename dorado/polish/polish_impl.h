@@ -195,7 +195,7 @@ std::vector<Window> create_windows_from_regions(
  * \param min_depth Consensus sequences will be split in regions of insufficient depth.
  */
 void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
-                                VariantCallingInputData& results_vc_data,
+                                std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,

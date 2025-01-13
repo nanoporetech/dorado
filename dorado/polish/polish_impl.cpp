@@ -941,7 +941,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
 }
 
 void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
-                                VariantCallingInputData& results_vc_data,
+                                std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
@@ -1057,7 +1057,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
     };
 
     const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results,
-                            VariantCallingInputData& thread_vc_data) {
+                            std::vector<VariantCallingSample>& thread_vc_data) {
         at::InferenceMode infer_guard;
 
         while (true) {
@@ -1091,25 +1091,31 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                   std::make_move_iterator(std::begin(results_samples)),
                                   std::make_move_iterator(std::end(results_samples)));
 
-            // Split logits for each input sample in the batch, and check that the number matches.
-            const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
-            if (std::size(item.samples) != std::size(split_logits)) {
-                spdlog::error(
-                        "The number of logits produced by the batch inference does not match the "
-                        "input batch size! Variant calling for this batch will not be possible. "
-                        "samples.size = {}, split_logits.size = {}",
-                        std::size(item.samples), std::size(split_logits));
-                continue;
-            }
-            // Create the variant calling data. Clone the tensor to convert the view to actual data.
-            for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
-                thread_vc_data.emplace_back(std::move(item.samples[i]), split_logits[i].clone());
+            // Separate the logits for each sample.
+            {
+                // Split logits for each input sample in the batch, and check that the number matches.
+                const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
+                if (std::size(item.samples) != std::size(split_logits)) {
+                    spdlog::error(
+                            "The number of logits produced by the batch inference does not match "
+                            "the "
+                            "input batch size! Variant calling for this batch will not be "
+                            "possible. "
+                            "samples.size = {}, split_logits.size = {}",
+                            std::size(item.samples), std::size(split_logits));
+                    continue;
+                }
+                // Create the variant calling data. Clone the tensor to convert the view to actual data.
+                for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
+                    thread_vc_data.emplace_back(VariantCallingSample{std::move(item.samples[i]),
+                                                                     split_logits[i].clone()});
+                }
             }
         }
     };
 
     std::vector<std::vector<ConsensusResult>> thread_results(num_threads);
-    std::vector<VariantCallingInputData> thread_vc_data(num_threads);
+    std::vector<std::vector<VariantCallingSample>> thread_vc_data(num_threads);
 
     cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
 
