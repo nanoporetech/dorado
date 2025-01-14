@@ -419,6 +419,41 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
     }
 
     if (gvcf) {
+        for (int64_t i = 0; i < dorado::ssize(vc_sample.sample.positions_major); ++i) {
+            // Skip non-reference positions.
+            if (vc_sample.sample.positions_minor[i] != 0) {
+                continue;
+            }
+
+            const int64_t pos = vc_sample.sample.positions_major[i];
+            const std::string ref(1, draft[pos]);
+            const int32_t ref_encoded =
+                    (draft[pos] != 'N') ? symbol_lookup[draft[pos]] : symbol_lookup['*'];
+
+            const double qual = phred(1.0 - vc_sample.logits[i][ref_encoded].item<float>(), 70.0);
+            const std::string qual_d_str = format_double(qual, 3);
+            const std::string qual_i_str = std::to_string(static_cast<int32_t>(std::round(qual)));
+
+            const std::unordered_map<std::string, std::string> genotype{
+                    {"GT", "0"},
+                    {"GQ", qual_i_str},
+            };
+
+            // clang-format off
+            Variant variant{
+                vc_sample.sample.seq_id,
+                pos,
+                ref,
+                ".",
+                ".",
+                {},
+                qual_d_str,
+                genotype,
+            };
+            // clang-format on
+
+            variants.emplace_back(std::move(variant));
+        }
     }
 
     return variants;
@@ -441,7 +476,9 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
                                    const std::vector<VariantCallingSample>& vc_input_data,
                                    const hts_io::FastxRandomReader& draft_reader,
                                    const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                                   const DecoderBase& decoder) {
+                                   const DecoderBase& decoder,
+                                   const bool ambig_ref,
+                                   const bool gvcf) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -527,12 +564,9 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
         const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
-        constexpr bool AMBIG_REF = false;
-        constexpr bool GVCF = false;
-
         for (const auto& vc_sample : joined_samples) {
             std::vector<Variant> variants =
-                    decode_variants(decoder, vc_sample, draft, AMBIG_REF, GVCF);
+                    decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
             all_variants.insert(std::end(all_variants),
                                 std::make_move_iterator(std::begin(variants)),
                                 std::make_move_iterator(std::end(variants)));

@@ -40,6 +40,8 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
                                    const std::vector<VariantCallingSample>& vc_input_data,
                                    const hts_io::FastxRandomReader& draft_reader,
                                    const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                                   const DecoderBase& decoder);
+                                   const DecoderBase& decoder,
+                                   const bool ambig_ref,
+                                   const bool gvcf);
 
 }  // namespace dorado::polisher

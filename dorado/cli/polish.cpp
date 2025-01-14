@@ -101,6 +101,7 @@ struct Options {
     bool any_model = false;
     bool bacteria = false;
     VariantCallingEnum vc_type = VariantCallingEnum::VCF;
+    bool ambig_ref = false;
     bool run_variant_calling = false;
     bool write_consensus = false;
 };
@@ -194,6 +195,9 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Output a VCF file with variant calls to stdout.")
                 .flag();
         parser->visible.add_argument("--gvcf").help("Output a gVCF file to stdout.").flag();
+        parser->visible.add_argument("--ambig-ref")
+                .help("Decode variants at ambiguous reference positions.")
+                .flag();
     }
     {
         parser->visible.add_group("Advanced options");
@@ -381,6 +385,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     } else if (gvcf) {
         opt.vc_type = VariantCallingEnum::GVCF;
     }
+    opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
 
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout but no VC options were specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
@@ -1081,7 +1086,8 @@ void run_polishing(const Options& opt,
         // Run variant calling, optionally.
         if (opt.run_variant_calling) {
             const std::vector<polisher::Variant> variants = call_variants(
-                    batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder);
+                    batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder,
+                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF);
 
             // Write the VCF file.
             // clang-format off
