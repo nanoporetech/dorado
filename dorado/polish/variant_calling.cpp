@@ -287,7 +287,37 @@ Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
         } else {
             var.pos += start_pos;
         }
-        return var;
+    };
+
+    const auto trim_end_and_align = [](Variant& var, const std::string& reference) {
+        std::array<std::string, 2> seqs{var.ref, var.alt};
+        bool changed = true;
+        while (changed) {
+            changed = false;
+
+            // Trim the last base if identical.
+            if (!std::empty(seqs[0]) && !std::empty(seqs[1]) &&
+                (seqs[0].back() == seqs[1].back())) {
+                seqs[0] = seqs[0].substr(0, dorado::ssize(seqs[0]) - 1);
+                seqs[1] = seqs[1].substr(0, dorado::ssize(seqs[1]) - 1);
+                changed = true;
+            }
+
+            if (std::empty(seqs[0]) || std::empty(seqs[1])) {
+                if (var.pos == 0) {
+                    seqs[0] += reference[std::size(seqs[0])];
+                    seqs[1] += reference[std::size(seqs[1])];
+                    break;
+                } else {
+                    --var.pos;
+                    seqs[0] = reference[var.pos] + seqs[0];
+                    seqs[1] = reference[var.pos] + seqs[1];
+                    changed = true;
+                }
+            }
+        }
+        var.ref = seqs[0];
+        var.alt = seqs[1];
     };
 
     Variant ret = variant;
@@ -295,7 +325,7 @@ Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
     if (std::empty(ref_seq)) {
         trim_start(ret, true);
     } else {
-        // trim_end_and_align(ret, ref_seq);
+        trim_end_and_align(ret, ref_seq);
     }
 
     trim_start(ret, false);
