@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
-#include <tuple>
 
 namespace dorado::polisher {
 
@@ -20,6 +19,8 @@ struct Region {
 };
 
 std::ostream& operator<<(std::ostream& os, const Region& region);
+
+bool operator<(const Region& l, const Region& r);
 
 std::string region_to_string(const Region& region);
 

@@ -662,64 +662,46 @@ std::vector<Sample> encode_windows_in_parallel(
     return results;
 }
 
-std::vector<Window> create_bam_regions(
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+std::vector<Window> create_windows_from_regions(
+        const std::vector<Region>& regions,
+        const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
-        const int32_t window_overlap,
-        const std::vector<Region>& regions) {
-    if (std::empty(regions)) {
-        // Canonical case where each sequence is linearly split with an overlap.
-        std::vector<Window> windows;
-        for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-            const int64_t len = draft_lens[seq_id].second;
-            const std::vector<Window> new_windows =
-                    create_windows(seq_id, 0, len, len, bam_chunk_len, window_overlap);
-            windows.reserve(std::size(windows) + std::size(new_windows));
-            windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
+        const int32_t window_overlap) {
+    std::vector<Window> windows;
+
+    for (auto region : regions) {
+        spdlog::debug("Creating windows for region: '{}'.", region_to_string(region));
+
+        const auto it = draft_lookup.find(region.name);
+        if (it == std::end(draft_lookup)) {
+            throw std::runtime_error(
+                    "Sequence specified by custom region not found in input! Sequence name: " +
+                    region.name);
         }
-        return windows;
+        const auto [seq_id, seq_length] = it->second;
 
-    } else {
-        // Create windows only for the selected regions.
-        std::unordered_map<std::string, int32_t> draft_ids;
-        for (int32_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-            draft_ids[draft_lens[seq_id].first] = seq_id;
-        }
+        region.start = std::max<int64_t>(0, region.start);
+        region.end = (region.end < 0) ? seq_length : std::min(seq_length, region.end);
 
-        std::vector<Window> windows;
-
-        for (auto region : regions) {
-            spdlog::debug("Processing a custom region: '{}:{}-{}'.", region.name, region.start + 1,
-                          region.end);
-
-            const auto it = draft_ids.find(region.name);
-            if (it == std::end(draft_ids)) {
-                throw std::runtime_error(
-                        "Sequence specified by custom region not found in input! Sequence name: " +
-                        region.name);
-            }
-            const int32_t seq_id = it->second;
-            const int64_t seq_length = draft_lens[seq_id].second;
-
-            region.start = std::max<int64_t>(0, region.start);
-            region.end = (region.end < 0) ? seq_length : std::min(seq_length, region.end);
-
-            if (region.start >= region.end) {
-                throw std::runtime_error{"Region coordinates not valid. Given: region.name = '" +
-                                         region.name +
-                                         "', region.start = " + std::to_string(region.start) +
-                                         ", region.end = " + std::to_string(region.end)};
-            }
-
-            // Split-up the custom region if it's too long.
-            std::vector<Window> new_windows = create_windows(
-                    seq_id, region.start, region.end, seq_length, bam_chunk_len, window_overlap);
-            windows.reserve(std::size(windows) + std::size(new_windows));
-            windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
+        if (region.start >= region.end) {
+            throw std::runtime_error{"Region coordinates not valid. Given: region.name = '" +
+                                     region.name +
+                                     "', region.start = " + std::to_string(region.start) +
+                                     ", region.end = " + std::to_string(region.end)};
         }
 
-        return windows;
+        // Split the custom region if it's too long.
+        std::vector<Window> new_windows =
+                create_windows(static_cast<int32_t>(seq_id), region.start, region.end, seq_length,
+                               bam_chunk_len, window_overlap);
+
+        spdlog::debug("Generated {} windows for region: '{}'.", std::size(new_windows),
+                      region_to_string(region));
+        windows.reserve(std::size(windows) + std::size(new_windows));
+        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
+
+    return windows;
 }
 
 void sample_producer(PolisherResources& resources,
@@ -731,8 +713,7 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data) {
-    spdlog::debug("[producer] Input: {} BAM windows from {} sequences.", std::size(bam_regions),
-                  std::size(draft_lens));
+    spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
