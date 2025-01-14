@@ -13,6 +13,10 @@ std::vector<ConsensusResult> DecoderBase::decode_bases(const at::Tensor& logits)
     return decode_bases_impl(m_label_scheme_type, logits);
 }
 
+std::string DecoderBase::get_label_scheme_symbols() const {
+    return label_scheme_symbols(m_label_scheme_type);
+}
+
 LabelSchemeType parse_label_scheme_type(const std::string& type) {
     if (type == "HaploidLabelScheme") {
         return LabelSchemeType::HAPLOID;
@@ -22,12 +26,7 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
 
 std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
                                                const at::Tensor& logits) {
-    std::string label_scheme;
-    if (label_scheme_type == LabelSchemeType::HAPLOID) {
-        label_scheme = "*ACGT";
-    } else {
-        throw std::runtime_error("Unsupported label scheme type!");
-    }
+    const std::string label_scheme = label_scheme_symbols(label_scheme_type);
 
     const auto indices = logits.argmax(-1);  // Shape becomes [N, L]
 
@@ -65,6 +64,14 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
     }
 
     return results;
+}
+
+std::string label_scheme_symbols(const LabelSchemeType label_scheme_type) {
+    if (label_scheme_type == LabelSchemeType::HAPLOID) {
+        return "*ACGT";
+    } else {
+        throw std::runtime_error("Unsupported label scheme type!");
+    }
 }
 
 }  // namespace dorado::polisher
