@@ -141,8 +141,8 @@ spdlog:
 streamvbyte:
     description: >
           integer compression technique that applies SIMD instructions (vectorization) to Google's Group Varint approach.
-    version: "1813d4ec3d732f3f615821fd8d1f725204c15ecc"
-    url: https://github.com/lemire/streamvbyte
+    version: "v2.0.0"
+    url: https://github.com/fast-pack/streamvbyte
     license: hdf_plugins/third_party/streamvbyte/LICENSE
     files:
         - hdf_plugins/third_party/streamvbyte
