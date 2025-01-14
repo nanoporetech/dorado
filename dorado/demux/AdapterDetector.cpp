@@ -143,18 +143,21 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences(
     if (it != m_primer_sequences.end()) {
         return it->second;
     }
-    // With primers, we not only look for the front sequence at the start
-    // of the read, and the rear sequence at the end, but we also need to
-    // look for the reverse of the rear sequence at the start of the read,
-    // and the reverse of the front sequence at the end of the read.
+    // With primers, we look for the front sequence at the start of the read,
+    // and the rear sequence at the end, but we also need to look for the
+    // reverse of the rear sequence at the start of the read, and the reverse
+    // of the front sequence at the end of the read.
     auto primers = m_sequence_manager->get_primers(kit_name);
     std::vector<Query> primer_queries;
     for (const auto& primer : primers) {
-        primer_queries.push_back(
-                {primer.name + "_FWD", primer.front_sequence, primer.rear_sequence});
         auto front_rev_seq = utils::reverse_complement(primer.front_sequence);
         auto rear_rev_seq = utils::reverse_complement(primer.rear_sequence);
-        primer_queries.push_back({primer.name + "_REV", rear_rev_seq, front_rev_seq});
+        // Note that for primers, we look for the RC of the rear sequence near
+        // the end of the read. And for reverse reads we look for the rear
+        // near the beginning of the read, and the RC of the front sequence
+        // near the beginning of the read.
+        primer_queries.push_back({primer.name + "_FWD", primer.front_sequence, rear_rev_seq});
+        primer_queries.push_back({primer.name + "_REV", primer.rear_sequence, front_rev_seq});
     }
     auto result = m_primer_sequences.emplace(kit_name, std::move(primer_queries));
     return result.first->second;
