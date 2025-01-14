@@ -36,7 +36,7 @@ Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t
 
     // Validate idx.
     const int64_t num_columns = dorado::ssize(sample.positions_major);
-    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_end >= idx_start) ||
+    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_start >= idx_end) ||
         (idx_end > num_columns)) {
         throw std::out_of_range(
                 "Index is out of range in slice_sample. idx_start = " + std::to_string(idx_start) +
