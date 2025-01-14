@@ -413,7 +413,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             var_pred = draft[var_pos] + var_pred;
         }
         Variant variant{
-                vc_sample.sample.seq_id, var_pos, var_ref, var_pred, "pass", {}, qual_str, genotype,
+                vc_sample.sample.seq_id, var_pos, var_ref, var_pred, "PASS", {}, qual_str, genotype,
         };
         variants.emplace_back(std::move(variant));
     }
@@ -464,6 +464,8 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         }
         groups[local_id].emplace_back(sample.start(), i);
     }
+
+    std::vector<Variant> all_variants;
 
     // For each sequence, call variants.
     for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
@@ -529,7 +531,11 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         constexpr bool GVCF = false;
 
         for (const auto& vc_sample : joined_samples) {
-            const auto variants = decode_variants(decoder, vc_sample, draft, AMBIG_REF, GVCF);
+            std::vector<Variant> variants =
+                    decode_variants(decoder, vc_sample, draft, AMBIG_REF, GVCF);
+            all_variants.insert(std::end(all_variants),
+                                std::make_move_iterator(std::begin(variants)),
+                                std::make_move_iterator(std::end(variants)));
         }
 
         // TODO:
@@ -537,7 +543,7 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         //      decode_variants();
     }
 
-    return {};
+    return all_variants;
 }
 
 }  // namespace dorado::polisher
