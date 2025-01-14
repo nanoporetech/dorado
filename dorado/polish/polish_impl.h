@@ -170,11 +170,11 @@ std::vector<Sample> encode_windows_in_parallel(
  * \brief Creates windows from given input draft sequences or regions. If regions vector is empty, it will split all
  *          input draft sequences into windows.
  */
-std::vector<Window> create_bam_regions(
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+std::vector<Window> create_windows_from_regions(
+        const std::vector<Region>& regions,
+        const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
-        const int32_t window_overlap,
-        const std::vector<Region>& regions);
+        const int32_t window_overlap);
 
 void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
                                 utils::AsyncQueue<DecodeData>& decode_queue,

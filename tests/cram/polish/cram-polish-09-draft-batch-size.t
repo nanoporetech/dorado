@@ -28,7 +28,7 @@ There are 3 input sequences, so 3 NM lines and length lines.
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 0-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 0-3/3" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   NM:i:2
   NM:i:2
@@ -48,9 +48,9 @@ There are 3 input sequences, so 3 NM lines and length lines.
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 0-1/3" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 1-2/3" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 0-1/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 1-2/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   NM:i:2
   NM:i:2
@@ -72,8 +72,8 @@ There are 3 input sequences, so 3 NM lines and length lines.
   > samtools faidx out/out.fasta
   > cut -f 2,2 out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 0-2/3" out/stderr | wc -l | awk '{ print $1 }'
-  > grep "draft sequences: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 0-2/3" out/stderr | wc -l | awk '{ print $1 }'
+  > grep "Starting to produce consensus for regions: 2-3/3" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   NM:i:2
   NM:i:2
