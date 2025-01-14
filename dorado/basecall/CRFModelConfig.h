@@ -159,7 +159,8 @@ struct CRFModelConfig {
     std::filesystem::path model_path;
 
     // polya translocation speed calibration coefficients
-    std::vector<float> polya_coeffs;
+    float polya_speed_correction{1.f};
+    float polya_offset_correction{0.f};
 
     // Start position for mean Q-score calculation for
     // short reads.
