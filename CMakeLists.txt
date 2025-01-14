@@ -358,6 +358,7 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_base.h
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
+    dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
 )
