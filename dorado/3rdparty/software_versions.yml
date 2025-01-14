@@ -64,6 +64,14 @@ elzip:
     license: elzip/LICENSE
     files:
         - elzip
+gsl-lite:
+    description: >
+        A single-file header-only version of ISO C++ Guidelines Support Library (GSL) for C++98, C++11, and later
+    version: "v0.38.1"
+    url: https://github.com/gsl-lite/gsl-lite
+    license: PATH_NOT_AVAILABLE
+    files:
+        - hdf_plugins/third_party/gsl
 HighFive:
     description: >
         Header-only C++11 friendly interface for libhdf5.
