@@ -260,6 +260,49 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
     return ret;
 }
 
+Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
+    if (variant.alt == variant.ref) {
+        return variant;
+    }
+
+    const auto trim_start = [](Variant& var, const bool rev) {
+        std::array<std::string, 2> seqs{var.ref, var.alt};
+        if (rev) {
+            std::reverse(std::begin(seqs[0]), std::end(seqs[0]));
+            std::reverse(std::begin(seqs[1]), std::end(seqs[1]));
+        }
+        const int64_t min_len = std::min(dorado::ssize(seqs[0]), dorado::ssize(seqs[1]));
+        int64_t start_pos = 0;
+        for (int64_t i = 0; i < (min_len - 1); ++i) {
+            if (seqs[0][i] != seqs[1][i]) {
+                break;
+            }
+            ++start_pos;
+        }
+        var.ref = seqs[0].substr(start_pos);
+        var.alt = seqs[1].substr(start_pos);
+        if (rev) {
+            std::reverse(std::begin(var.ref), std::end(var.ref));
+            std::reverse(std::begin(var.alt), std::end(var.alt));
+        } else {
+            var.pos += start_pos;
+        }
+        return var;
+    };
+
+    Variant ret = variant;
+
+    if (std::empty(ref_seq)) {
+        trim_start(ret, true);
+    } else {
+        // trim_end_and_align(ret, ref_seq);
+    }
+
+    trim_start(ret, false);
+
+    return ret;
+}
+
 std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                      const VariantCallingSample& vc_sample,
                                      const std::string& draft,
@@ -415,6 +458,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         Variant variant{
                 vc_sample.sample.seq_id, var_pos, var_ref, var_pred, "PASS", {}, qual_str, genotype,
         };
+        variant = normalize_variant(variant, draft);
         variants.emplace_back(std::move(variant));
     }
 
