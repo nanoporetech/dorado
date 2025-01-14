@@ -984,6 +984,9 @@ void run_polishing(const Options& opt,
         polish_stats.update("processed", 0.0);
     }
 
+    // Unique variant ID counter.
+    int64_t var_id = 0;
+
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
@@ -1080,13 +1083,25 @@ void run_polishing(const Options& opt,
 
         // Run variant calling, optionally.
         if (opt.run_variant_calling) {
-            const std::vector<std::string> variants = call_variants(
+            const std::vector<polisher::Variant> variants = call_variants(
                     batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder);
 
             // Write the VCF file.
-            for (const auto& line : variants) {
-                *ofs_vcf << line << "\n";
+            // clang-format off
+            *ofs_vcf << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+            for (const auto& var : variants) {
+                *ofs_vcf << draft_lens[var.seq_id].first
+                     << '\t' << (var.pos + 1)
+                     << '\t' << '.'
+                     << '\t' << var.ref
+                     << '\t' << var.alt
+                     << '\t' << var.qual
+                     << '\t' << var.filter
+                     << '\t' << '.'
+                     << '\n';
+                ++var_id;
             }
+            // clang-format on
         }
     }
 }

@@ -2,11 +2,17 @@
 
 #include "consensus_result.h"
 #include "trim.h"
+#include "utils/rle.h"
 #include "utils/ssize.h"
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <iomanip>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace dorado::polisher {
 
@@ -56,7 +62,7 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
     }
 
     // Validate idx.
-    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_end >= idx_start) ||
+    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_start >= idx_end) ||
         (idx_end > num_columns)) {
         throw std::out_of_range("Index is out of range in slice_vc_sample. idx_start = " +
                                 std::to_string(idx_start) +
@@ -125,7 +131,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
         // In this case, the "batch size" is 1.
         const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-        std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+        const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
 
         // This shouldn't be possible.
         if (std::size(c) != 1) {
@@ -205,6 +211,219 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
     return ret;
 }
 
+std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
+                                  const std::string& reference,
+                                  const std::string& prediction) {
+    const bool lengths_valid = (std::size(minor) == std::size(reference)) &&
+                               (std::size(reference) == std::size(prediction));
+    if (!lengths_valid) {
+        std::ostringstream oss;
+        oss << "Cannot find variant columns because sequences are not of equal length. minor.size "
+               "= "
+            << std::size(minor) << ", reference.size = " << std::size(reference)
+            << ", prediction.size = " << std::size(prediction);
+        throw std::runtime_error(oss.str());
+    }
+
+    const int64_t len = dorado::ssize(prediction);
+    std::vector<bool> ret(len, false);
+
+    int64_t insert_length = 0;
+    bool is_var = (reference[0] != prediction[0]);  // Assume start on major.
+    ret[0] = is_var;
+
+    for (int64_t i = 1; i < len; ++i) {
+        if (minor[i] == 0) {
+            // Start of new reference position.
+            if (is_var) {
+                // If we saw any vars in an insert run, set all inserts to true.
+                for (int64_t j = (i - insert_length); j < i; ++j) {
+                    ret[j] = true;
+                }
+            }
+            is_var = (reference[i] != prediction[i]);
+            ret[i] = is_var;
+            insert_length = 0;
+        } else {
+            insert_length += 1;
+            is_var = (is_var || (reference[i] != prediction[i]));
+        }
+    }
+
+    // Set any remaining inserts.
+    if (is_var) {
+        for (int64_t j = (len - insert_length); j <= (len - 1); ++j) {
+            ret[j] = true;
+        }
+    }
+
+    return ret;
+}
+
+std::vector<Variant> decode_variants(const DecoderBase& decoder,
+                                     const VariantCallingSample& vc_sample,
+                                     const std::string& draft,
+                                     const bool ambig_ref,
+                                     const bool gvcf) {
+    // No work to do.
+    if (std::empty(vc_sample.sample.positions_major)) {
+        return {};
+    }
+
+    // Check that the sample begins on non-insertion base.
+    if (vc_sample.sample.positions_minor.front() != 0) {
+        std::ostringstream oss;
+        oss << "The first position of a sample must not be an insertion. sample = "
+            << vc_sample.sample;
+        throw std::runtime_error(oss.str());
+    }
+
+    // Helper lambdas.
+    const auto remove_gaps = [](const std::string_view seq) {
+        std::string ret;
+        ret.reserve(std::size(seq));
+        std::copy_if(std::begin(seq), std::end(seq), std::back_inserter(ret),
+                     [](char c) { return c != '*'; });
+        return ret;
+    };
+    const auto is_subset_of_symbols = [](const std::unordered_set<char>& symbol_map,
+                                         const std::string& query) {
+        for (const char c : query) {
+            if (symbol_map.count(c) == 0) {
+                return false;
+            }
+        }
+        return true;
+    };
+    const auto create_symbol_lookup = [](const std::string& symbols) {
+        std::array<int32_t, 256> ret;
+        std::fill(std::begin(ret), std::end(ret), -1);
+        for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
+            ret[static_cast<int32_t>(symbols[i])] = i;
+        }
+        return ret;
+    };
+    const auto encode_seq = [](const std::array<int32_t, 256>& symbol_lookup,
+                               const std::string_view seq, const bool substitute_n) {
+        std::vector<int32_t> ret(std::size(seq));
+        for (int64_t i = 0; i < dorado::ssize(seq); ++i) {
+            const char c = (substitute_n && (seq[i] == 'N')) ? '*' : seq[i];
+            ret[i] = symbol_lookup[c];
+        }
+        return ret;
+    };
+    const auto phred = [](double err, const double cap) {
+        err = std::clamp(err, std::pow(10, -cap / 10.0), 1.0);
+        const double q = -10.0 * std::log10(err);
+        return std::min(q, cap);
+    };
+    const auto compute_seq_quality = [&encode_seq, &phred](
+                                             const std::array<int32_t, 256>& symbol_lookup,
+                                             const at::Tensor& class_probs,
+                                             const std::string_view seq, const bool substitute_n) {
+        const std::vector<int32_t> encoded = encode_seq(symbol_lookup, seq, substitute_n);
+        double sum = 0.0;
+        for (size_t i = 0; i < std::size(encoded); ++i) {
+            const int32_t j = encoded[i];
+            const float prob = class_probs[i][j].item<float>();
+            const double err = 1.0 - prob;
+            sum += phred(err, 70.0);
+        }
+        return sum;
+    };
+    const auto format_double = [](const double val, const int32_t dec_places) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(dec_places) << val;
+        return oss.str();
+    };
+
+    // Alphabet for the label scheme.
+    const std::string symbols = decoder.get_label_scheme_symbols();
+    const std::unordered_set<char> symbol_set(std::begin(symbols), std::end(symbols));
+    const std::array<int32_t, 256> symbol_lookup = create_symbol_lookup(symbols);
+
+    // Predicted sequence with gaps.
+    const at::Tensor logits = vc_sample.logits.unsqueeze(0);
+    const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+    const std::string& prediction = c.front().seq;
+
+    // Draft sequence with gaps.
+    const std::string reference = extract_draft_with_gaps(draft, vc_sample.sample.positions_major,
+                                                          vc_sample.sample.positions_minor);
+
+    // Candidate variant positions.
+    const std::vector<bool> is_variant =
+            variant_columns(vc_sample.sample.positions_minor, reference, prediction);
+    const std::vector<std::tuple<int64_t, int64_t, bool>> runs =
+            dorado::run_length_encode(is_variant);
+
+    // Extract variants.
+    std::vector<Variant> variants;
+    for (const auto& [rstart, rend, is_var] : runs) {
+        // Skip non-variants.
+        if (!is_var) {
+            continue;
+        }
+
+        // Get the reference and the predictions for the variant stretch.
+        const std::string_view var_ref_with_gaps(std::data(reference) + rstart,
+                                                 static_cast<size_t>(rend - rstart));
+        const std::string_view var_pred_with_gaps(std::data(prediction) + rstart,
+                                                  static_cast<size_t>(rend - rstart));
+
+        //     std::begin(reference) + rstart, std::begin(reference) + rend);
+        // const std::string_view var_pred_with_gaps(std::begin(prediction) + rstart, std::begin(prediction) + rend);
+
+        // Mutable ref and pred sequences - a ref base may be prepended later.
+        std::string var_ref = remove_gaps(var_ref_with_gaps);
+        std::string var_pred = remove_gaps(var_pred_with_gaps);
+
+        // Verbatim comment from Medaka:
+        //      "del followed by insertion can lead to non-variant"
+        //      "maybe skip things if reference contains ambiguous symbols"
+        if ((var_ref == var_pred) && is_var) {
+            continue;
+        } else if (!ambig_ref && !is_subset_of_symbols(symbol_set, var_ref)) {
+            continue;
+        }
+
+        // // Encode the sequences: base -> number.
+        // const std::vector<int32_t> var_ref_encoded = encode_seq(symbol_lookup, var_ref_with_gaps, true);
+        // const std::vector<int32_t> var_pred_encoded = encode_seq(symbol_lookup, var_pred_with_gaps, false);
+        // const double pred_qual = compute_seq_quality(var_probs, var_ref_encoded);
+
+        // Calculate probabilities.
+        const at::Tensor var_probs = vc_sample.logits.slice(0, rstart, rend);
+        const double ref_qv =
+                compute_seq_quality(symbol_lookup, var_probs, var_ref_with_gaps, true);
+        const double pred_qv =
+                compute_seq_quality(symbol_lookup, var_probs, var_pred_with_gaps, false);
+
+        // Variant data.
+        const double qual = pred_qv - ref_qv;
+        const std::string qual_str = format_double(qual, 3);
+        const std::unordered_map<std::string, std::string> genotype{
+                {"GT", "1"},
+                {"GQ", qual_str},
+        };
+        const int64_t var_pos = vc_sample.sample.positions_major[rstart];
+        if (vc_sample.sample.positions_minor[rstart] != 0) {
+            // Variant starts on insert - prepend ref base.
+            var_ref = draft[var_pos] + var_ref;
+            var_pred = draft[var_pos] + var_pred;
+        }
+        Variant variant{
+                vc_sample.sample.seq_id, var_pos, var_ref, var_pred, "pass", {}, qual_str, genotype,
+        };
+        variants.emplace_back(std::move(variant));
+    }
+
+    if (gvcf) {
+    }
+
+    return variants;
+}
+
 std::vector<Sample> apply_trimming(const std::vector<const Sample*>& samples,
                                    const std::vector<TrimInfo>& trims) {
     std::vector<Sample> ret;
@@ -218,12 +437,11 @@ std::vector<Sample> apply_trimming(const std::vector<const Sample*>& samples,
     return ret;
 }
 
-std::vector<std::string> call_variants(
-        const dorado::polisher::Interval& region_batch,
-        const std::vector<VariantCallingSample>& vc_input_data,
-        const hts_io::FastxRandomReader& draft_reader,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const DecoderBase& decoder) {
+std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batch,
+                                   const std::vector<VariantCallingSample>& vc_input_data,
+                                   const hts_io::FastxRandomReader& draft_reader,
+                                   const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                                   const DecoderBase& decoder) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -306,6 +524,13 @@ std::vector<std::string> call_variants(
         // Break and merge samples on non-variant positions.
         // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
         const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+
+        constexpr bool AMBIG_REF = false;
+        constexpr bool GVCF = false;
+
+        for (const auto& vc_sample : joined_samples) {
+            const auto variants = decode_variants(decoder, vc_sample, draft, AMBIG_REF, GVCF);
+        }
 
         // TODO:
         //      join_samples();

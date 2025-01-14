@@ -24,12 +24,22 @@ struct VariantCallingSample {
     at::Tensor logits;
 };
 
+struct Variant {
+    int32_t seq_id = -1;
+    int64_t pos = -1;
+    std::string ref;
+    std::string alt;
+    std::string filter;
+    std::unordered_map<std::string, std::string> info;
+    std::string qual;
+    std::unordered_map<std::string, std::string> genotype;
+};
+
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
-std::vector<std::string> call_variants(
-        const dorado::polisher::Interval& region_batch,
-        const std::vector<VariantCallingSample>& vc_input_data,
-        const hts_io::FastxRandomReader& draft_reader,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const DecoderBase& decoder);
+std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batch,
+                                   const std::vector<VariantCallingSample>& vc_input_data,
+                                   const hts_io::FastxRandomReader& draft_reader,
+                                   const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                                   const DecoderBase& decoder);
 
 }  // namespace dorado::polisher
