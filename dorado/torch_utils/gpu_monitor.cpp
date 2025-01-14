@@ -32,7 +32,9 @@
 #include <mutex>
 #include <numeric>
 #include <regex>
+#include <set>
 #include <sstream>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -56,6 +58,8 @@ static_assert(ONT_NVML_BUFFER_SIZE, "nvml buffer size must be defined");
     X(DeviceGetCurrentClocksThrottleReasons, false) \
     X(DeviceGetHandleByIndex, false)                \
     X(DeviceGetHandleByIndex_v2, true)              \
+    X(DeviceGetHandleByUUID, false)                 \
+    X(DeviceGetIndex, false)                        \
     X(DeviceGetName, false)                         \
     X(DeviceGetPerformanceState, false)             \
     X(DeviceGetPowerManagementDefaultLimit, false)  \
@@ -451,10 +455,74 @@ class DeviceInfoCache final {
         // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
         const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
         if (cuda_visible_devices_env != nullptr) {
+            spdlog::debug("Found CUDA_VISIBLE_DEVICES={}", cuda_visible_devices_env);
+            std::set<int> used_ids;
             auto device_ids = utils::split(cuda_visible_devices_env, ',');
-            std::transform(std::begin(device_ids), std::end(device_ids),
-                           std::back_inserter(m_visible_device_indices),
-                           [](const std::string &device_id) { return std::stoi(device_id); });
+            if (device_ids.size() > device_count) {
+                spdlog::error(
+                        "CUDA_VISIBLE_DEVICES={} specifies more device ids than the number of GPUs "
+                        "present",
+                        cuda_visible_devices_env);
+                throw std::runtime_error("Invalid device ids");
+            }
+
+            if (!device_ids.empty() && (utils::starts_with(device_ids.front(), "GPU-") ||
+                                        utils::starts_with(device_ids.front(), "MIG-"))) {
+                for (const auto &id : device_ids) {
+                    nvmlDevice_t device;
+                    if (auto rc = m_nvml.m_DeviceGetHandleByUUID(id.c_str(), &device);
+                        rc != NVML_SUCCESS) {
+                        spdlog::warn(
+                                "Unable to identify GPU device '{}' - skipping further device "
+                                "enumeration",
+                                id);
+                        // stop parsing on error
+                        break;
+                    }
+
+                    unsigned int index = 0;
+                    if (auto rc = m_nvml.m_DeviceGetIndex(device, &index); rc != NVML_SUCCESS) {
+                        spdlog::warn(
+                                "Unable to retrieve index for GPU device '{}' - skipping further "
+                                "device enumeration",
+                                id);
+                        // stop parsing on error
+                        break;
+                    };
+                    used_ids.insert(index);
+                    m_visible_device_indices.push_back(index);
+                }
+            } else {
+                std::string_view last_device_id;
+                try {
+                    for (const auto &id : device_ids) {
+                        last_device_id = id;
+                        int index = std::stoi(id);
+                        if (index < 0 || index >= static_cast<int>(device_count)) {
+                            spdlog::warn(
+                                    "Invalid index '{}' for GPU device - skipping further device "
+                                    "enumeration",
+                                    index);
+                            // stop parsing on invalid id
+                            break;
+                        }
+
+                        used_ids.insert(index);
+                        m_visible_device_indices.push_back(index);
+                    }
+                } catch (const std::exception &) {
+                    // stop parsing on error
+                    spdlog::warn(
+                            "Unable to parse id '{}' for GPU device - skipping further device "
+                            "enumeration",
+                            last_device_id);
+                }
+            }
+            if (used_ids.size() != m_visible_device_indices.size()) {
+                // passing the same id twice should return no devices
+                spdlog::warn("Duplicate GPU ids detected - no GPUs identified");
+                m_visible_device_indices.clear();
+            }
         } else {
             m_visible_device_indices.resize(device_count);
             std::iota(std::begin(m_visible_device_indices), std::end(m_visible_device_indices), 0);
