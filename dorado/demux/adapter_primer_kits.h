@@ -54,7 +54,10 @@ const std::unordered_map<PrimerCode, Candidate> primers = {
          }},
         {PC::PCS110,
          {
-                 "PCS111",
+                 // These are actually truncated version of the actual primer sequences.
+                 // The missing part is at the beginning of the sequences, so the full
+                 // primer will still be trimmed.
+                 "PCS110",
                  "TTTCTGTTGGTGCTGATATTGCTTT",                          // SSP
                  "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT"  // VNP
          }},
