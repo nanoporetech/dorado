@@ -1085,9 +1085,13 @@ void run_polishing(const Options& opt,
 
         // Run variant calling, optionally.
         if (opt.run_variant_calling) {
-            const std::vector<polisher::Variant> variants = call_variants(
+            std::vector<polisher::Variant> variants = call_variants(
                     batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder,
                     opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF);
+
+            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+            });
 
             // Write the VCF file.
             // clang-format off
