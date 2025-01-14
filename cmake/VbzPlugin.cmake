@@ -58,16 +58,16 @@ function(add_hdf_vbz_plugin)
             COMMAND_ERROR_IS_FATAL ANY
         )
 
-        list(APPEND CMAKE_MODULE_PATH "${_dorado_root}/dorado/3rdparty/hdf_plugins/cmake")
+        list(PREPEND CMAKE_MODULE_PATH "${_dorado_root}/dorado/3rdparty/hdf_plugins/cmake")
         # Findzstd.cmake uses conan variables to determine where things are.
         set(CONAN_INCLUDE_DIRS_RELEASE ${ZSTD_INSTALL_DIR}/include)
         set(CONAN_LIB_DIRS_RELEASE ${ZSTD_INSTALL_DIR}/lib)
         find_package(zstd 1.3.6 REQUIRED)
 
     else()
-        # Some platforms need the Findzstd.cmake from hdf_plugins, but append it in case we already
+        # Some platforms need the Findzstd.cmake from hdf_plugins, but prepend it in case we already
         # have one in the path.
-        list(APPEND CMAKE_MODULE_PATH "${_dorado_root}/dorado/3rdparty/hdf_plugins/cmake")
+        list(PREPEND CMAKE_MODULE_PATH "${_dorado_root}/dorado/3rdparty/hdf_plugins/cmake")
         # hdf_plugins looks for 1.3.1 but the libarrow in POD5 requires 1.3.6 minimum.
         find_package(zstd 1.3.6 REQUIRED)
 
