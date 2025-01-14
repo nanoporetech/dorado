@@ -984,9 +984,6 @@ void run_polishing(const Options& opt,
         polish_stats.update("processed", 0.0);
     }
 
-    // Unique variant ID counter.
-    int64_t var_id = 0;
-
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
@@ -1099,7 +1096,6 @@ void run_polishing(const Options& opt,
                      << '\t' << var.filter
                      << '\t' << '.'
                      << '\n';
-                ++var_id;
             }
             // clang-format on
         }
