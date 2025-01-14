@@ -1123,29 +1123,29 @@ const std::vector<ModelInfo> models = {
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl",
                 "d343b4394b904d219257ad188c82ece63b935f15d78f09f551e591b2275da4b9",
-                CC::UNKNOWN,
-                ModelVariantPair{},
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
                 ModsVariantPair{},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv",
                 "928d9bcf3d68162eff479ada5839c5df3faa0ad393658729511aedffe65f089c",
-                CC::UNKNOWN,
-                ModelVariantPair{},
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
                 ModsVariantPair{},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl",
                 "6d8c5a8ce45311c25f824453d0af997fbe2f63a5f734fdb4d884d285ddafec33",
-                CC::UNKNOWN,
-                ModelVariantPair{},
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl_mv",
                 "0e0cb175aa41636de835d2abb5330b91fed14a00f811804edf983bc086cf477a",
-                CC::UNKNOWN,
-                ModelVariantPair{},
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{},
         },
 };
@@ -1485,6 +1485,32 @@ std::string get_supported_model_info(const std::filesystem::path& model_download
                     result = result.substr(0, result.length() - 2);  // trim last ",\n"
                     result += "\n      }";
                 }
+
+                // Polishing models.
+                {
+                    const auto polish_matches =
+                            find_models(polish_models(), variant.first, simplex_model.simplex,
+                                        ModsVariantPair());
+                    bool polish_models_available = false;
+                    for (const auto& polish_model : polish_matches) {
+                        if (model_exists_in_folder(polish_model.name, model_download_folder)) {
+                            polish_models_available = true;
+                            break;
+                        }
+                    }
+                    if (polish_models_available) {
+                        result += ",\n      \"polish_models\":{\n";
+                        for (const auto& polish_model : polish_matches) {
+                            if (model_exists_in_folder(polish_model.name, model_download_folder)) {
+                                result += "        \"" + polish_model.name + "\":{\n";
+                                result += "\n        },\n";
+                            }
+                        }
+                        result = result.substr(0, result.length() - 2);  // trim last ",\n"
+                        result += "\n      }";
+                    }
+                }
+
                 result += "\n    },\n";
             }
         }
