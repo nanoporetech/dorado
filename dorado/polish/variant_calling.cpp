@@ -475,9 +475,10 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         // Variant data.
         const double qual = pred_qv - ref_qv;
         const std::string qual_str = format_double(qual, 3);
-        const std::unordered_map<std::string, std::string> genotype{
-                {"GT", "1"},
-                {"GQ", qual_str},
+        const int32_t qual_i = static_cast<int32_t>(std::round(qual));
+        const std::vector<std::pair<std::string, int32_t>> genotype{
+                {"GT", 1},
+                {"GQ", qual_i},
         };
         const int64_t var_pos = vc_sample.sample.positions_major[rstart];
         if (vc_sample.sample.positions_minor[rstart] != 0) {
@@ -506,11 +507,11 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
 
             const double qual = phred(1.0 - vc_sample.logits[i][ref_encoded].item<float>(), 70.0);
             const std::string qual_d_str = format_double(qual, 3);
-            const std::string qual_i_str = std::to_string(static_cast<int32_t>(std::round(qual)));
+            const int32_t qual_i = static_cast<int32_t>(std::round(qual));
 
-            const std::unordered_map<std::string, std::string> genotype{
-                    {"GT", "0"},
-                    {"GQ", qual_i_str},
+            const std::vector<std::pair<std::string, int32_t>> genotype{
+                    {"GT", 0},
+                    {"GQ", qual_i},
             };
 
             // clang-format off

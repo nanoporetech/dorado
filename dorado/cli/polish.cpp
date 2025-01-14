@@ -7,6 +7,7 @@
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
+#include "polish/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/AsyncQueue.h"
@@ -967,8 +968,19 @@ void run_polishing(const Options& opt,
 
     // Open the output stream to a file/stdout for the variant calls.
     const std::filesystem::path out_vcf_fn =
-            (std::empty(opt.output_dir)) ? "" : (opt.output_dir / "variants.vcf");
-    auto ofs_vcf = get_output_stream(out_vcf_fn);
+            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
+    // auto ofs_vcf = get_output_stream(out_vcf_fn);
+
+    std::unique_ptr<polisher::VCFWriter> vcf_writer;
+
+    if (opt.run_variant_calling) {
+        // These are the only available FILTER options.
+        const std::vector<std::pair<std::string, std::string>> filters{
+                {"PASS", "All filters passed"},
+        };
+
+        vcf_writer = std::make_unique<polisher::VCFWriter>(out_vcf_fn, filters, draft_lens);
+    }
 
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
@@ -1094,19 +1106,23 @@ void run_polishing(const Options& opt,
             });
 
             // Write the VCF file.
-            // clang-format off
-            *ofs_vcf << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
-            for (const auto& var : variants) {
-                *ofs_vcf << draft_lens[var.seq_id].first
-                     << '\t' << (var.pos + 1)
-                     << '\t' << '.'
-                     << '\t' << var.ref
-                     << '\t' << var.alt
-                     << '\t' << var.qual
-                     << '\t' << var.filter
-                     << '\t' << '.'
-                     << '\n';
+            for (const auto& variant : variants) {
+                vcf_writer->write_variant(variant);
             }
+
+            // clang-format off
+            // *ofs_vcf << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+            // for (const auto& var : variants) {
+            //     *ofs_vcf << draft_lens[var.seq_id].first
+            //          << '\t' << (var.pos + 1)
+            //          << '\t' << '.'
+            //          << '\t' << var.ref
+            //          << '\t' << var.alt
+            //          << '\t' << var.qual
+            //          << '\t' << var.filter
+            //          << '\t' << '.'
+            //          << '\n';
+            // }
             // clang-format on
         }
     }

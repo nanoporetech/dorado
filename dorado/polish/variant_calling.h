@@ -4,6 +4,7 @@
 #include "hts_io/FastxRandomReader.h"
 #include "interval.h"
 #include "sample.h"
+#include "variant.h"
 
 #include <ATen/ATen.h>
 
@@ -22,17 +23,6 @@ namespace dorado::polisher {
 struct VariantCallingSample {
     Sample sample;
     at::Tensor logits;
-};
-
-struct Variant {
-    int32_t seq_id = -1;
-    int64_t pos = -1;
-    std::string ref;
-    std::string alt;
-    std::string filter;
-    std::unordered_map<std::string, std::string> info;
-    std::string qual;
-    std::unordered_map<std::string, std::string> genotype;
 };
 
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
