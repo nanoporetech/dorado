@@ -35,8 +35,6 @@
 
 #include <ATen/Functions.h>
 #include <torch/types.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -46,6 +44,10 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 namespace fs = std::filesystem;
 namespace {

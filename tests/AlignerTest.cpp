@@ -14,7 +14,6 @@
 #include "utils/string_utils.h"
 #include "utils/types.h"
 
-#include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
@@ -24,8 +23,13 @@
 #include <unordered_map>
 #include <vector>
 
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
+
 #define TEST_GROUP "[bam_utils][aligner]"
 
+using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::Equals;
 namespace fs = std::filesystem;
 
@@ -145,8 +149,6 @@ protected:
 }  // namespace
 
 TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment", TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "target.fq";
@@ -173,13 +175,11 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check standard alignment"
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli"};
     for (const auto& tag : tags) {
-        CHECK_THAT(aux, Contains(tag));
+        CHECK_THAT(aux, ContainsSubstring(tag));
     }
 }
 
 TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed file", TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "target.fq";
@@ -207,7 +207,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"NMi", "msi", "ASi", "nni", "def", "tpA", "cmi", "s1i", "rli", "bhi"};
     for (const auto& tag : tags) {
-        CHECK_THAT(aux, Contains(tag));
+        CHECK_THAT(aux, ContainsSubstring(tag));
     }
     auto bh_tag_ptr = bam_aux_get(rec, "bh");
     auto bh_tag_type = bam_aux_type(bh_tag_ptr);
@@ -217,8 +217,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check alignment with bed 
 }
 
 TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary alignment", TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "supplementary_aln_target.fa";
     auto query = aligner_test_dir / "supplementary_aln_query.fa";
@@ -235,7 +233,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
         // Check aux tags.
         uint32_t l_aux = bam_get_l_aux(rec);
         std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
-        CHECK_THAT(aux, Contains("tpAP"));
+        CHECK_THAT(aux, ContainsSubstring("tpAP"));
         CHECK(rec->core.l_qseq > 0);  // Primary alignment should have SEQ.
     }
 
@@ -246,7 +244,7 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
         // Check aux tags.
         uint32_t l_aux = bam_get_l_aux(rec);
         std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
-        CHECK_THAT(aux, Contains("tpAS"));
+        CHECK_THAT(aux, ContainsSubstring("tpAS"));
         CHECK(rec->core.l_qseq == 0);  // Secondary alignment doesn't need SEQ.
     }
 }
@@ -254,8 +252,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture, "AlignerTest: Check supplementary align
 TEST_CASE_METHOD(AlignerNodeTestFixture,
                  "AlignerTest: Check reverse complement alignment",
                  TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "target.fq";
     auto query = aligner_test_dir / "rev_target.fq";
@@ -286,8 +282,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 TEST_CASE_METHOD(AlignerNodeTestFixture,
                  "AlignerTest: Check dorado tags are retained",
                  TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
@@ -304,15 +298,13 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
     std::string aux((char*)bam_get_aux(rec), (char*)(bam_get_aux(rec) + l_aux));
     std::string tags[] = {"RGZ", "MMZ", "MLB"};
     for (const auto& tag : tags) {
-        CHECK_THAT(aux, Contains(tag));
+        CHECK_THAT(aux, ContainsSubstring(tag));
     }
 }
 
 TEST_CASE_METHOD(AlignerNodeTestFixture,
                  "AlignerTest: Check modbase tags are removed for secondary alignments",
                  TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
     auto query = aligner_test_dir / "basecall.sam";
@@ -600,8 +592,6 @@ TEST_CASE_METHOD(AlignerNodeTestFixture,
 TEST_CASE_METHOD(AlignerNodeTestFixture,
                  "AlignerTest: Check SA tag in non-primary alignments has correct CIGAR string",
                  TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
     auto ref = aligner_test_dir / "supplementary_basecall_target.fa";
     auto query = aligner_test_dir / "basecall_target.fa";

@@ -6,13 +6,16 @@
 #include "read_pipeline/read_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
 #include <random>
 #include <string>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 using Catch::Matchers::Equals;
 using Slice = at::indexing::Slice;

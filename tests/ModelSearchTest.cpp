@@ -3,7 +3,7 @@
 #include "models/model_complex.h"
 #include "models/models.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <stdexcept>
 

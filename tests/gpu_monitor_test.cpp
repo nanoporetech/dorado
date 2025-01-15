@@ -1,12 +1,14 @@
 #include "torch_utils/gpu_monitor.h"
 
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)

@@ -1,11 +1,13 @@
 #include "torch_utils/metal_utils.h"
 
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 using namespace dorado::utils;
 

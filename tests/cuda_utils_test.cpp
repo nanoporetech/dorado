@@ -1,6 +1,6 @@
 #include "torch_utils/cuda_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <spdlog/spdlog.h>
 
 #include <limits>

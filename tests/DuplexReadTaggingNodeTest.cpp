@@ -2,7 +2,9 @@
 
 #include "MessageSinkUtils.h"
 
-#include <catch2/catch.hpp>
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[read_pipeline][DuplexReadTaggingNode]"
 

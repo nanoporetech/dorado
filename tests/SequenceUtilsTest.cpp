@@ -1,6 +1,6 @@
 #include "utils/sequence_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <cstdint>
 #include <cstdlib>
@@ -94,7 +94,8 @@ TEST_CASE(TEST_GROUP "mean_q_score", TEST_GROUP) {
     std::srand(42);
     for (int q = 1; q <= 50; ++q) {
         std::string q_string(rand() % 100 + 1, '!' + static_cast<char>(q));
-        CHECK(dorado::utils::mean_qscore_from_qstring(q_string) == Approx(static_cast<float>(q)));
+        CHECK(dorado::utils::mean_qscore_from_qstring(q_string) ==
+              Catch::Approx(static_cast<float>(q)));
     }
 
     // Values outside normal range that will be clamped.
@@ -108,14 +109,14 @@ TEST_CASE(TEST_GROUP "mean_q_score", TEST_GROUP) {
             {"33B<87ESEA41GDDSGHDC?=>:84:<?568@", 23.70278f},
             {"%$$')*(,*+78665;3378H@=>A42004.", 10.62169f}};
     for (const auto& [str, score] : kExamples) {
-        CHECK(dorado::utils::mean_qscore_from_qstring(str) == Approx(score));
+        CHECK(dorado::utils::mean_qscore_from_qstring(str) == Catch::Approx(score));
     }
 }
 
 TEST_CASE(TEST_GROUP "mean_q_score from non-zero start position", TEST_GROUP) {
     auto [str, start_pos, score] = GENERATE(table<std::string, int, float>(
             {make_tuple("####%%%%", 0, 2.88587f), make_tuple("####%%%%", 4, 4.0f)}));
-    CHECK(dorado::utils::mean_qscore_from_qstring(str.substr(start_pos)) == Approx(score));
+    CHECK(dorado::utils::mean_qscore_from_qstring(str.substr(start_pos)) == Catch::Approx(score));
 }
 
 TEST_CASE(TEST_GROUP ": count leading chars", TEST_GROUP) {

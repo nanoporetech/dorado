@@ -2,7 +2,7 @@
 
 #include "modbase/ModBaseModelConfig.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[modbase_motif_matcher]"
 

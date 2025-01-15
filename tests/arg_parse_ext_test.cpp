@@ -1,6 +1,6 @@
 #include "utils/arg_parse_ext.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define CUT_TAG "[dorado::utils::arg_parse]"
 

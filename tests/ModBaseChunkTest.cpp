@@ -1,10 +1,12 @@
 #include "read_pipeline/ModBaseChunkCallerNode.h"
 
-#include <catch2/catch.hpp>
-
 #include <cstdint>
 #include <tuple>
 #include <utility>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[modbase_chunk]"
 

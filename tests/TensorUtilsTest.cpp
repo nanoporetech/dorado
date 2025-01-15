@@ -2,11 +2,13 @@
 
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdlib>
 #include <random>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define CUT_TAG "[TensorUtils]"
 
@@ -60,7 +62,7 @@ TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
     REQUIRE(torch::equal(computed, expected));
 }
 
-#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
+#if DORADO_ENABLE_BENCHMARK_TESTS
 TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
     const auto size = GENERATE(1000, 5000, 10000, 100000);
     CAPTURE(size);
@@ -78,7 +80,7 @@ TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
         return dorado::utils::quantile_counting(x_short, q);
     };
 }
-#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
 
 TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
     torch::manual_seed(42);
@@ -96,7 +98,7 @@ TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
         CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance, kAbsTolerance));
     }
 
-#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
+#if DORADO_ENABLE_BENCHMARK_TESTS
     {
         const auto num_elems = GENERATE(1'000, 100'000, 10'000'000);
         const auto elems_f32 = torch::rand({num_elems}, torch::kFloat32);
@@ -109,7 +111,7 @@ TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
                                               elems_f32.data_ptr<float>(), num_elems);
         };
     }
-#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }
 
 TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {

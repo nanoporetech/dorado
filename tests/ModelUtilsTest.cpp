@@ -2,7 +2,7 @@
 #include "models/kits.h"
 #include "models/models.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <stdexcept>
 #include <tuple>

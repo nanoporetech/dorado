@@ -5,7 +5,7 @@
 #include "alignment/minimap2_wrappers.h"
 #include "utils/stream_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <filesystem>
 

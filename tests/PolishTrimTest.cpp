@@ -1,10 +1,12 @@
 #include "polish/trim.h"
 
-#include <catch2/catch.hpp>
-
 #include <cstdint>
 #include <optional>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 namespace {
 

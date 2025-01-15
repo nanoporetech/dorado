@@ -106,15 +106,11 @@ target_link_libraries(dorado_tests_common
         dorado_torch_utils
         dorado_utils
         dorado_compat
-)
-target_include_directories(dorado_tests_common
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/catch2
+        Catch2::Catch2
 )
 target_compile_definitions(dorado_tests_common
     PUBLIC
-        $<$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>:CATCH_CONFIG_ENABLE_BENCHMARKING>
+        DORADO_ENABLE_BENCHMARK_TESTS=$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>
 )
 
 # Finish setting up each target and add them as tests.

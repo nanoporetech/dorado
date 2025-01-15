@@ -2,8 +2,11 @@
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
 #include <htslib/sam.h>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[ReadTest]"
 
@@ -47,7 +50,7 @@ TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         CHECK(bam_aux2i(bam_aux_get(aln, "sp")) == 0);
         CHECK(bam_aux_get(aln, "pt") == nullptr);
 
-        CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Approx(1.033).margin(1e-6));
+        CHECK(bam_aux2f(bam_aux_get(aln, "du")) == Catch::Approx(1.033).margin(1e-6));
         CHECK(bam_aux2f(bam_aux_get(aln, "sm")) == 128.3842f);
         CHECK(bam_aux2f(bam_aux_get(aln, "sd")) == 8.258f);
 
@@ -357,21 +360,21 @@ TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
 
     SECTION("Check with start pos = 0") {
         read_common.mean_qscore_start_pos = 0;
-        CHECK(read_common.calculate_mean_qscore() == Approx(8.79143f));
+        CHECK(read_common.calculate_mean_qscore() == Catch::Approx(8.79143f));
     }
 
     SECTION("Check with start pos > 0") {
         read_common.mean_qscore_start_pos = 2;
-        CHECK(read_common.calculate_mean_qscore() == Approx(14.0f));
+        CHECK(read_common.calculate_mean_qscore() == Catch::Approx(14.0f));
     }
 
     SECTION("Check start pos > qstring length returns 0.f") {
         read_common.mean_qscore_start_pos = 1000;
-        CHECK(read_common.calculate_mean_qscore() == Approx(8.79143f));
+        CHECK(read_common.calculate_mean_qscore() == Catch::Approx(8.79143f));
     }
 
     SECTION("Check start pos = qstring length") {
         read_common.mean_qscore_start_pos = int(read_common.qstring.length());
-        CHECK(read_common.calculate_mean_qscore() == Approx(8.79143f));
+        CHECK(read_common.calculate_mean_qscore() == Catch::Approx(8.79143f));
     }
 }

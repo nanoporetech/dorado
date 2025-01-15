@@ -12,13 +12,16 @@
 #include "utils/sequence_utils.h"
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[adapter_detect]"
 

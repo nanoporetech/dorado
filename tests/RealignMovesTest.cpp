@@ -1,7 +1,10 @@
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <catch2/catch.hpp>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 using Slice = at::indexing::Slice;
 using namespace dorado;

@@ -2,7 +2,7 @@
 #include "utils/PostCondition.h"
 #include "utils/hts_file.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>

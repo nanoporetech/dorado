@@ -2,7 +2,7 @@
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[cli_utils]"
 

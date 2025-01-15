@@ -1,12 +1,13 @@
-#define CATCH_CONFIG_RUNNER
 
 #include "torch_utils/torch_utils.h"
 #include "utils/locale_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
 #include <torch/utils.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 int main(int argc, char* argv[]) {
     // global setup...

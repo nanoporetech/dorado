@@ -3,7 +3,7 @@
 #include "demux/parse_custom_sequences.h"
 #include "utils/barcode_kits.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 namespace fs = std::filesystem;
 
@@ -123,7 +123,7 @@ TEST_CASE("Parse kit with incomplete double ended settings", "[barcode_demux]") 
     const auto test_file = data_dir / "bad_double_ended_kit_not_all_params_set.toml";
 
     CHECK_THROWS_WITH(dorado::demux::parse_custom_arrangement(test_file.string()),
-                      Catch::Matchers::Contains(
+                      Catch::Matchers::ContainsSubstring(
                               "mask2_front mask2_rear and barcode2_pattern must all be set"));
 }
 
@@ -132,7 +132,7 @@ TEST_CASE("Parse kit with no flanks", "[barcode_demux]") {
     const auto test_file = data_dir / "flank_free_arrangement.toml";
 
     CHECK_THROWS_WITH(dorado::demux::parse_custom_arrangement(test_file.string()),
-                      Catch::Matchers::Contains(
+                      Catch::Matchers::ContainsSubstring(
                               "At least one of mask1_front or mask1_rear needs to be specified"));
 }
 
@@ -169,7 +169,7 @@ TEST_CASE("Parse custom barcode scoring params", "[barcode_demux]") {
     CHECK(scoring_params.flank_right_pad == 10);
     CHECK(scoring_params.front_barcode_window == 150);
     CHECK(scoring_params.rear_barcode_window == 150);
-    CHECK(scoring_params.min_flank_score == Approx(0.5f));
+    CHECK(scoring_params.min_flank_score == Catch::Approx(0.5f));
 }
 
 TEST_CASE("Parse default scoring params", "[barcode_demux]") {

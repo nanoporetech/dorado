@@ -3,7 +3,7 @@
 #include "utils/fs_utils.h"
 #include "utils/stream_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[dorado::file_info]"
 

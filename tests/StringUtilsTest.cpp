@@ -1,6 +1,6 @@
 #include "utils/string_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define CUT_TAG "[dorado::utils::string_utils]"
 

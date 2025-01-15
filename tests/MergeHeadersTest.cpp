@@ -2,7 +2,7 @@
 
 #include "TestUtils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <htslib/sam.h>
 
 #define TEST_GROUP "[merge_headers]"

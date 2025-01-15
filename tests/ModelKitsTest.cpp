@@ -1,7 +1,7 @@
 #include "models/kits.h"
 #include "utils/string_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <set>
 

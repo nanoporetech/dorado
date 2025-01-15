@@ -10,12 +10,14 @@
 #include "splitter/ReadSplitter.h"
 
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[DuplexSplitTest]"
 

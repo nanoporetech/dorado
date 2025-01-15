@@ -5,15 +5,15 @@
 #include <torch/nn.h>
 #include <torch/version.h>
 
-// clang-format off
-#include <catch2/catch.hpp>
-// clang-format on
-
 #include <vector>
 
 #if TORCH_VERSION_MAJOR >= 2
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_TAG "[SDPA]"
 

@@ -1,6 +1,6 @@
 #include "utils/PostCondition.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #define CUT_TAG "[PostCondition]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)

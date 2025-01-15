@@ -4,7 +4,7 @@
 #include "modbase/encode_kmer.h"
 #include "utils/sequence_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <cstddef>
 #include <cstring>

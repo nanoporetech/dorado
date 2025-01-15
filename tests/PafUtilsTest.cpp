@@ -2,7 +2,7 @@
 #include "utils/overlap.h"
 #include "utils/paf_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <filesystem>
 #include <fstream>

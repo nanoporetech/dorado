@@ -9,14 +9,16 @@
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[poly_a_estimator]"
 

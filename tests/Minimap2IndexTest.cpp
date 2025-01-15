@@ -8,10 +8,13 @@
 #include "utils/stream_utils.h"
 #include "utils/types.h"
 
-#include <catch2/catch.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_all.hpp>
 
 #define TEST_GROUP "[alignment::Minimap2Index]"
 
