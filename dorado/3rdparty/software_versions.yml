@@ -10,7 +10,7 @@ argparse:
 cpp-httplib:
     description: >
         A C++11 single-file header-only cross platform HTTP/HTTPS library
-    version: "0.13.3"
+    version: "v0.18.3"
     url: https://github.com/yhirose/cpp-httplib
     license: cpp-httplib/LICENSE
     files:
