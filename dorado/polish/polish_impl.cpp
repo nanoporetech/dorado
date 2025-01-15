@@ -158,12 +158,12 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
                 // Convert the program name to lowercase just in case.
                 std::string pn = it_pn->second;
                 std::transform(std::begin(pn), std::end(pn), std::begin(pn),
-                               [](unsigned char c) { return std::tolower(c); });
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
                 // Convert the program ID to lowercase just in case.
                 std::string id = it_id->second;
                 std::transform(std::begin(id), std::end(id), std::begin(id),
-                               [](unsigned char c) { return std::tolower(c); });
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
                 if ((pn == "dorado") && utils::starts_with(id, "aligner")) {
                     // Multiple tools can be run on a BAM, and the ID field needs to be unique by spec.

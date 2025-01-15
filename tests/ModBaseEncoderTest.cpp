@@ -20,7 +20,7 @@ using namespace dorado::modbase;
 namespace {
 
 // Base to u32 one-hot encoding
-std::unordered_map<char, uint32_t> encode_map = {{
+const std::unordered_map<char, uint32_t> encode_map = {{
         {'N', uint32_t{0}},
         {'A', uint32_t{1} << (0 << 3)},
         {'C', uint32_t{1} << (1 << 3)},
@@ -29,11 +29,11 @@ std::unordered_map<char, uint32_t> encode_map = {{
 }};
 
 // Sequence int to base char
-std::unordered_map<int8_t, char> seq_int_map = {{
-        {0, 'A'},
-        {1, 'C'},
-        {2, 'G'},
-        {3, 'T'},
+const std::unordered_map<int8_t, char> seq_int_map = {{
+        {static_cast<int8_t>(0), 'A'},
+        {static_cast<int8_t>(1), 'C'},
+        {static_cast<int8_t>(2), 'G'},
+        {static_cast<int8_t>(3), 'T'},
 }};
 
 // Takes a string of bases and converts into the one hot encoding for testing
@@ -46,12 +46,13 @@ std::vector<int8_t> encode_bases(const std::string& bases) {
         if (base == ' ') {
             continue;
         }
-        if (encode_map.find(base) == encode_map.end()) {
+        auto encoded_iter = encode_map.find(base);
+        if (encoded_iter == encode_map.end()) {
             throw std::runtime_error("Cannot encode unknown sequence base: '" +
                                      std::to_string(base) + "'.");
         }
         count_bases++;
-        std::memcpy(p_out, &encode_map[base], sizeof(uint32_t));
+        std::memcpy(p_out, &encoded_iter->second, sizeof(uint32_t));
         p_out += sizeof(uint32_t);
     }
     out.resize(count_bases * 4);
@@ -74,7 +75,7 @@ std::string decode_bases(const std::vector<int8_t>& encoded_bases, size_t kmer_l
                 break;
             }
             if (encoded_bases[b * 4 + i] == 1) {
-                s += seq_int_map[i];
+                s += seq_int_map.at(i);
                 break;
             }
         }

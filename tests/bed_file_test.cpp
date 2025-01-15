@@ -233,16 +233,16 @@ TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
         table<std::string, std::string, std::size_t, std::size_t, char, bool>({
             {"Lambda\t1234\t2345\tcomment1\t100\t+", "Lambda", 1234, 2345, '+', true},
             {"Lambda\t1234\t2345", "Lambda", 1234, 2345, '.', true},
-            {"Lambda 1234 2345", "Lambda", 0, 0, 0, false},
-            {"Lambda\t1234", "Lambda", 0, 0, 0, false},
-            {"Lambda\tabc\t2345", "Lambda", 0, 0, 0, false},
-            {"Lambda\t1234\tbcde", "Lambda", 0, 0, 0, false},
+            {"Lambda 1234 2345", "Lambda", 0, 0, '\0', false},
+            {"Lambda\t1234", "Lambda", 0, 0, '\0', false},
+            {"Lambda\tabc\t2345", "Lambda", 0, 0, '\0', false},
+            {"Lambda\t1234\tbcde", "Lambda", 0, 0, '\0', false},
             {"Lambda\t1234\t2345\tcomment with spaces", "Lambda", 1234, 2345, '.', true},
             {"Lambda\t12345\t23456\tspaces column\t100", "Lambda", 12345, 23456, '.', true},
-            {"Lambda\t1234\t2345\tinvalid strand\t100\tTTT", "Lambda", 0, 0, 0, false},
+            {"Lambda\t1234\t2345\tinvalid strand\t100\tTTT", "Lambda", 0, 0, '\0', false},
             {"12Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t123,234\t456,567", "12Fields", 1, 2, '+', true},
-            {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, 0, false},
-            {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 0, 0, 0, false},
+            {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, '\0', false},
+            {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 0, 0, '\0', false},
             {"empty_last_column\t1\t2\tab c\t100\t+\t\t \t", "empty_last_column", 1, 2, '+', true},
         }));
     // clang-format on

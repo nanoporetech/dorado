@@ -305,7 +305,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         const size_t move_table_size =
                 (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
         read->read_common.moves.resize(move_table_size);
-        std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(), 1);
+        std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(),
+                    static_cast<uint8_t>(1));
         // First element must be 1, the rest can be shuffled
         std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
                      m_rng);

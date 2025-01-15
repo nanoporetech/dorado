@@ -14,7 +14,8 @@ Code get_code(const std::string& str,
               Code default_value,
               const std::unordered_map<Code, Info>& codes) {
     auto s = str;
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     auto it = std::find_if(std::begin(codes), std::end(codes),
                            [&s](auto&& kv) { return kv.second.name == s; });
 
