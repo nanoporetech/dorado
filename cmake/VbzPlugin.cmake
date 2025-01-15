@@ -26,6 +26,7 @@ function(add_hdf_vbz_plugin)
                 -B ${ZSTD_BUILD_DIR}
                 -A x64
                 -D CMAKE_CONFIGURATION_TYPES=Release
+                -D ZSTD_BUILD_SHARED=OFF
                 -G ${CMAKE_GENERATOR}
             COMMAND_ERROR_IS_FATAL ANY
         )
@@ -40,8 +41,6 @@ function(add_hdf_vbz_plugin)
         set(CONAN_LIB_DIRS_RELEASE ${ZSTD_BUILD_DIR}/lib/Release)
         set(CONAN_LIB_DIRS_DEBUG ${ZSTD_BUILD_DIR}/lib/Debug)
 
-        install(FILES ${ZSTD_BUILD_DIR}/lib/Release/zstd.dll DESTINATION bin)
-
     elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
         # The GCC8 CI build needs a newer version of zstd than provided by the docker image.
         set(ZSTD_BUILD_DIR ${CMAKE_BINARY_DIR}/cmake-build-zstd)
@@ -51,6 +50,7 @@ function(add_hdf_vbz_plugin)
                 -S ${DORADO_3RD_PARTY_SOURCE}/zstd/build/cmake
                 -B ${ZSTD_BUILD_DIR}
                 -D CMAKE_INSTALL_PREFIX=${ZSTD_INSTALL_DIR}
+                -D ZSTD_BUILD_SHARED=OFF
             COMMAND_ERROR_IS_FATAL ANY
         )
         execute_process(
