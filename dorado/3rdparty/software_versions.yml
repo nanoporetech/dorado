@@ -43,7 +43,7 @@ cxxpool:
 date:
     description: >
         Date and time handling libraries
-    version: "cc4685a21e4a4fdae707ad1233c61bbaff241f93"
+    version: "v3.0.3"
     url: https://github.com/HowardHinnant/date
     license: date/LICENSE.txt
     files:
