@@ -3,12 +3,6 @@ add_library(dorado_file_info STATIC
     file_info.h
 )
 
-target_include_directories(dorado_file_info
-    SYSTEM
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/HighFive/include
-)
-
 target_link_libraries(dorado_file_info
 PUBLIC    
     dorado_models_lib
@@ -18,6 +12,7 @@ PRIVATE
     HDF5::HDF5
     vbz_hdf_plugin
     ${ZLIB_LIBRARIES}
+    HighFive::Include
 )
 
 enable_warnings_as_errors(dorado_file_info)

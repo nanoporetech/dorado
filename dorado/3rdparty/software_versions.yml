@@ -75,7 +75,7 @@ gsl-lite:
 HighFive:
     description: >
         Header-only C++11 friendly interface for libhdf5.
-    version: "c59464737afb8cc8d0042d2d9e495967860797d1"
+    version: "v2.10.1"
     url: https://github.com/BlueBrain/HighFive
     license: HighFive/LICENSE
     files:
