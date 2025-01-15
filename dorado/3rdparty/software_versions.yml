@@ -64,6 +64,14 @@ elzip:
     license: elzip/LICENSE
     files:
         - elzip
+gsl-lite:
+    description: >
+        A single-file header-only version of ISO C++ Guidelines Support Library (GSL) for C++98, C++11, and later
+    version: "v0.38.1"
+    url: https://github.com/gsl-lite/gsl-lite
+    license: PATH_NOT_AVAILABLE
+    files:
+        - hdf_plugins/third_party/gsl
 HighFive:
     description: >
         Header-only C++11 friendly interface for libhdf5.
@@ -141,11 +149,19 @@ spdlog:
 streamvbyte:
     description: >
           integer compression technique that applies SIMD instructions (vectorization) to Google's Group Varint approach.
-    version: "1813d4ec3d732f3f615821fd8d1f725204c15ecc"
-    url: https://github.com/lemire/streamvbyte
+    version: "v2.0.0"
+    url: https://github.com/fast-pack/streamvbyte
     license: hdf_plugins/third_party/streamvbyte/LICENSE
     files:
         - hdf_plugins/third_party/streamvbyte
+toml11:
+    description: >
+        TOML for Modern C++
+    version: "59243256528d4133321e845c3193db2d2725e6ee"
+    url: https://github.com/ToruNiina/toml11
+    license: toml11/LICENSE
+    files:
+        - toml11
 zlib-ng:
     description: >
         zlib data compression library for the next generation systems.
@@ -157,7 +173,7 @@ zlib-ng:
 zstd:
     description: >
         Fast lossless compression algorithm.
-    version: "97a3da1df009d4dc67251de0c4b1c9d7fe286fc1"
+    version: "v1.4.8"
     url: https://github.com/facebook/zstd
     license: zstd/LICENSE
     files:
