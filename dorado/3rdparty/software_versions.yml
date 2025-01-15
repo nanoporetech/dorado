@@ -35,7 +35,7 @@ cutlass:
 cxxpool:
     description: >
         A header-only thread pool for C++
-    version: "4d8526e93771c4728cbdcd238369e434bad58d32"
+    version: "2.0.0"
     url: https://github.com/bloomen/cxxpool
     license: cxxpool/LICENSE
     files:
