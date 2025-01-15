@@ -19,6 +19,11 @@
 #include <tuple>
 #include <vector>
 
+// Forward declare the FastxRandomReader.
+namespace dorado::hts_io {
+class FastxRandomReader;
+}  // namespace dorado::hts_io
+
 namespace dorado::polisher {
 
 enum class DeviceType { CPU, CUDA, METAL, UNKNOWN };
@@ -121,7 +126,7 @@ void remove_deletions(ConsensusResult& cons);
  *          or with an optional fill_char character.
  */
 std::vector<ConsensusResult> stitch_sequence(
-        const std::filesystem::path& in_draft_fn,
+        const hts_io::FastxRandomReader& fastx_reader,
         const std::string& header,
         const std::vector<ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
