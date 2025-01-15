@@ -325,6 +325,7 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
+    dorado/polish/variant.cpp
     dorado/polish/variant.h
     dorado/polish/variant_calling.cpp
     dorado/polish/variant_calling.h

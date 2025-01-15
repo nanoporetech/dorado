@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -14,8 +15,10 @@ struct Variant {
     std::string alt;
     std::string filter;
     std::unordered_map<std::string, std::string> info;
-    std::string qual;
+    float qual = 0.0f;
     std::vector<std::pair<std::string, int32_t>> genotype;
 };
+
+std::ostream& operator<<(std::ostream& os, const Variant& v);
 
 }  // namespace dorado::polisher

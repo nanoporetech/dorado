@@ -385,9 +385,9 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         }
         return ret;
     };
-    const auto phred = [](double err, const double cap) {
-        err = std::clamp(err, std::pow(10, -cap / 10.0), 1.0);
-        const double q = -10.0 * std::log10(err);
+    const auto phred = [](float err, const float cap) {
+        err = std::clamp(err, std::pow(10.0f, -cap / 10.0f), 1.0f);
+        const float q = -10.0f * std::log10(err);
         return std::min(q, cap);
     };
     const auto compute_seq_quality = [&encode_seq, &phred](
@@ -395,19 +395,19 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                              const at::Tensor& class_probs,
                                              const std::string_view seq, const bool substitute_n) {
         const std::vector<int32_t> encoded = encode_seq(symbol_lookup, seq, substitute_n);
-        double sum = 0.0;
+        float sum = 0.0;
         for (size_t i = 0; i < std::size(encoded); ++i) {
             const int32_t j = encoded[i];
             const float prob = class_probs[i][j].item<float>();
-            const double err = 1.0 - prob;
-            sum += phred(err, 70.0);
+            const float err = 1.0f - prob;
+            sum += phred(err, 70.0f);
         }
         return sum;
     };
-    const auto format_double = [](const double val, const int32_t dec_places) {
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(dec_places) << val;
-        return oss.str();
+    const auto round_float = [](float val, const int32_t decimal_places) {
+        const float f = std::pow(10.0f, decimal_places);
+        val = std::round(val * f) / f;
+        return val;
     };
 
     // Alphabet for the label scheme.
@@ -467,14 +467,12 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
 
         // Calculate probabilities.
         const at::Tensor var_probs = vc_sample.logits.slice(0, rstart, rend);
-        const double ref_qv =
-                compute_seq_quality(symbol_lookup, var_probs, var_ref_with_gaps, true);
-        const double pred_qv =
+        const float ref_qv = compute_seq_quality(symbol_lookup, var_probs, var_ref_with_gaps, true);
+        const float pred_qv =
                 compute_seq_quality(symbol_lookup, var_probs, var_pred_with_gaps, false);
 
         // Variant data.
-        const double qual = pred_qv - ref_qv;
-        const std::string qual_str = format_double(qual, 3);
+        const float qual = pred_qv - ref_qv;
         const int32_t qual_i = static_cast<int32_t>(std::round(qual));
         const std::vector<std::pair<std::string, int32_t>> genotype{
                 {"GT", 1},
@@ -487,7 +485,8 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             var_pred = draft[var_pos] + var_pred;
         }
         Variant variant{
-                vc_sample.sample.seq_id, var_pos, var_ref, var_pred, "PASS", {}, qual_str, genotype,
+                vc_sample.sample.seq_id, var_pos,  var_ref, var_pred, "PASS", {},
+                round_float(qual, 3),    genotype,
         };
         variant = normalize_variant(variant, draft);
         variants.emplace_back(std::move(variant));
@@ -505,8 +504,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             const int32_t ref_encoded =
                     (draft[pos] != 'N') ? symbol_lookup[draft[pos]] : symbol_lookup['*'];
 
-            const double qual = phred(1.0 - vc_sample.logits[i][ref_encoded].item<float>(), 70.0);
-            const std::string qual_d_str = format_double(qual, 3);
+            const float qual = phred(1.0f - vc_sample.logits[i][ref_encoded].item<float>(), 70.0f);
             const int32_t qual_i = static_cast<int32_t>(std::round(qual));
 
             const std::vector<std::pair<std::string, int32_t>> genotype{
@@ -522,7 +520,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                 ".",
                 ".",
                 {},
-                qual_d_str,
+                round_float(qual, 3),
                 genotype,
             };
             // clang-format on
