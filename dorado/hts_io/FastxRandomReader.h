@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,7 +20,7 @@ class FastxRandomReader {
     std::unique_ptr<faidx_t, FaidxDestructor> m_faidx;
 
 public:
-    FastxRandomReader(const std::string& fastx_path);
+    FastxRandomReader(const std::filesystem::path& fastx_path);
     ~FastxRandomReader() = default;
 
     std::string fetch_seq(const std::string& read_id) const;

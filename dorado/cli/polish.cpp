@@ -1,5 +1,6 @@
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
+#include "hts_io/FastxRandomReader.h"
 #include "model_downloader/model_downloader.h"
 #include "models/models.h"
 #include "polish/architectures/model_config.h"
@@ -806,6 +807,9 @@ void run_polishing(const Options& opt,
 
     validate_regions(opt.regions, draft_lens);
 
+    // Open the draft FASTA file.
+    const hts_io::FastxRandomReader draft_reader(opt.in_draft_fastx_fn);
+
     // Open the output stream, to std::cout if the path is empty, otherwise to the file.
     auto ofs = get_output_stream(opt.out_consensus_fn);
 
@@ -934,9 +938,8 @@ void run_polishing(const Options& opt,
 
             const std::string& header = draft_lens[seq_id].first;
 
-            const std::vector<polisher::ConsensusResult> consensus =
-                    polisher::stitch_sequence(opt.in_draft_fastx_fn, header, all_results, group,
-                                              opt.fill_gaps, opt.fill_char);
+            const std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
+                    draft_reader, header, all_results, group, opt.fill_gaps, opt.fill_char);
 
             write_consensus_results(*ofs, header, consensus, opt.fill_gaps,
                                     (opt.out_format == OutputFormat::FASTQ));
