@@ -20,3 +20,5 @@ tests/test_output*
 log*
 *.t.err
 out*
+Makefile
+models/

@@ -257,7 +257,7 @@ std::vector<ConsensusResult> stitch_sequence(
                 "from input.",
                 header, std::size(draft));
         std::string dummy_quals(std::size(draft), '!');
-        return {ConsensusResult{draft, std::move(dummy_quals)}};
+        return {ConsensusResult{header, draft, std::move(dummy_quals)}};
     } else if (!fill_gaps && std::empty(samples_for_seq)) {
         spdlog::debug(
                 "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
@@ -269,6 +269,7 @@ std::vector<ConsensusResult> stitch_sequence(
     std::vector<ConsensusResult> ret;
 
     ConsensusResult result;
+    result.name = header;
     result.draft_start = draft_len;
     result.draft_end = 0;
 
@@ -292,6 +293,7 @@ std::vector<ConsensusResult> stitch_sequence(
                     ret.emplace_back(std::move(result));
                 }
                 result = {};
+                result.name = header;
                 result.draft_start = draft_len;
                 result.draft_end = 0;
             }
@@ -900,6 +902,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             // Inference.
             torch::Tensor logits = batch_infer(*models[tid], item, tid);
 
+            // One out_item contains samples for one inference batch.
+            // No guarantees on any sort of logical ordering of the samples.
             DecodeData out_item;
             out_item.samples = std::move(item.samples);
             out_item.logits = std::move(logits);
