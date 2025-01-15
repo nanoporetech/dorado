@@ -302,21 +302,37 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
                                    const std::optional<const RegionInt>& region) {
+    std::vector<const Sample*> ptrs;
+    ptrs.reserve(std::size(samples));
+    for (const auto& sample : samples) {
+        ptrs.emplace_back(&sample);
+    }
+    return trim_samples(ptrs, region);
+}
+
+std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
+                                   const std::optional<const RegionInt>& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
         return result;
     }
 
+    for (size_t i = 0; i < std::size(samples); ++i) {
+        if (!samples[i]) {
+            throw std::runtime_error{"Nullptr sample provided to trim_samples. Returning empty."};
+        }
+    }
+
     size_t idx_s1 = 0;
     int64_t num_heuristic = 0;
 
     result[0].start = 0;
-    result[0].end = dorado::ssize(samples.front().positions_major);
+    result[0].end = dorado::ssize(samples.front()->positions_major);
 
     for (size_t i = 1; i < std::size(samples); ++i) {
-        const Sample& s1 = samples[idx_s1];
-        const Sample& s2 = samples[i];
+        const Sample& s1 = *samples[idx_s1];
+        const Sample& s2 = *samples[i];
         bool heuristic = false;
 
         const Relationship rel = relative_position(s1, s2);
@@ -352,7 +368,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
     }
 
     {
-        result.back().end = dorado::ssize(samples.back().positions_major);
+        result.back().end = dorado::ssize(samples.back()->positions_major);
         // Deprecated: result.back().is_last_in_contig = true;
     }
 
@@ -368,7 +384,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
         spdlog::trace("[trim_samples] Trimming to region.");
 
         for (size_t i = 0; i < std::size(samples); ++i) {
-            const auto& sample = samples[i];
+            const Sample& sample = *samples[i];
             TrimInfo& trim = result[i];
 
             // Sample not on the specified sequence.
