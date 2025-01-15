@@ -142,7 +142,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
                       "read tag.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Input data arguments");
@@ -153,7 +153,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("-l", "--read-ids")
                 .help("A file with a newline-delimited list of reads to basecall. If not provided, "
                       "all reads will be basecalled.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         parser.visible.add_argument("-n", "--max-reads")
                 .help("Limit the number of reads to be basecalled.")
                 .default_value(0)
@@ -161,7 +161,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--resume-from")
                 .help("Resume basecalling from the given HTS file. Fully written read records are "
                       "not processed again.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Output arguments");
@@ -179,7 +179,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_group("Alignment arguments");
         parser.visible.add_argument("--reference")
                 .help("Path to reference for alignment.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         alignment::mm2::add_options_string_arg(parser);
     }
     {
@@ -199,7 +199,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                     return value;
                 });
         parser.visible.add_argument("--modified-bases-models")
-                .default_value(std::string())
+                .default_value(std::string{})
                 .help("A comma separated list of modified base model paths.");
         parser.visible.add_argument("--modified-bases-threshold")
                 .default_value(default_modbase_parameters.methylation_threshold)
@@ -219,7 +219,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(std::string{});
         parser.visible.add_argument("--sample-sheet")
                 .help("Path to the sample sheet to use.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         parser.visible.add_argument("--barcode-both-ends")
                 .help("Require both ends of a read to be barcoded for a double ended barcode.")
                 .default_value(false)
@@ -240,13 +240,12 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("--trim")
-                .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
-                      "Default behaviour is to trim all detected adapters, primers, or barcodes. "
-                      "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
-                      "adapters and primers, but not barcodes. The 'none' choice is equivelent to "
-                      "using --no-trim. Note that this only applies to DNA. "
-                      "RNA adapters are always trimmed.")
-                .default_value(std::string(""));
+                .help("Specify what to trim. Options are 'none', 'all', and 'adapters'. The "
+                      "default behaviour is to trim all detected adapters, primers, and barcodes. "
+                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivelent to "
+                      "using --no-trim. Note that this only applies to DNA. RNA adapters are "
+                      "always trimmed.")
+                .default_value(std::string{});
         parser.hidden.add_argument("--rna-adapters")
                 .help("Force use of RNA adapters.")
                 .implicit_value(true)
@@ -261,7 +260,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .implicit_value(true);
         parser.visible.add_argument("--poly-a-config")
                 .help("Configuration file for poly(A) estimation to change default behaviours")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Advanced arguments");
@@ -712,21 +711,19 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;
+    bool trim_barcodes = true, trim_primers = true, trim_adapters = true;
     auto trim_options = parser.visible.get<std::string>("--trim");
     if (parser.visible.get<bool>("--no-trim")) {
         if (!trim_options.empty()) {
             spdlog::error("Only one of --no-trim and --trim can be used.");
             return EXIT_FAILURE;
         }
-        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
+        trim_barcodes = trim_primers = trim_adapters = false;
     }
     if (trim_options == "none") {
-        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
-    } else if (trim_options == "primers") {
-        no_trim_barcodes = true;
+        trim_barcodes = trim_primers = trim_adapters = false;
     } else if (trim_options == "adapters") {
-        no_trim_barcodes = no_trim_primers = true;
+        trim_barcodes = trim_primers = false;
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
         return EXIT_FAILURE;
@@ -758,7 +755,7 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
-        barcoding_info->trim = !no_trim_barcodes;
+        barcoding_info->trim = trim_barcodes;
 
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");
@@ -811,8 +808,8 @@ int basecaller(int argc, char* argv[]) {
     }
 
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
-    adapter_info->trim_adapters = !no_trim_adapters;
-    adapter_info->trim_primers = !no_trim_primers;
+    adapter_info->trim_adapters = trim_adapters;
+    adapter_info->trim_primers = trim_primers;
     adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
 

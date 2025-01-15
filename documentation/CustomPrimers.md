@@ -15,7 +15,7 @@ The custom adapter/primer file is really just a fasta file, with the desired seq
 * Immediately following the record name must be a space, followed by either `type=adapter` or `type=primer`.
 * Following the type designator, you can have an additional space, followed by `kits=[kit1],[kit2],[kit3][etc...]`.
 
-The `_front` and `_rear` part of the record name tells dorado how to search for the sequence. In the case of adapters, dorado will look for the `front` sequence near the beginning of the read, and for the `rear` sequence near the end of the read. For primers, dorado also look for the `front` and `rear` sequences at the beginning and end of the read, just as with adapters, but it will also look for the reverse-complement of the `rear` sequence near the beginning of the read, and for the reverse-complement of the `front` sequence near the end of the read.
+The `_front` and `_rear` part of the record name tells dorado how to search for the sequence. In the case of adapters, dorado will look for the `front` sequence near the beginning of the read, and for the `rear` sequence near the end of the read. For primers things work a bit differently. Dorado will look for the `front` sequence near the beginning of the read, and the reverse-complement of the `rear` sequence near the end of the read. It will also look for the `rear` sequence near the beginning of the read, and the reverse-complement of the `front` sequence near the end of the read. This allows dorado to infer whether the forward or reverse strand has been sequenced. If dorado is able to infer this from the primers, then the BAM tag `TS` will be used to record this, using `+` for forward reads and `-` for reverse reads. If the sense cannot be inferred, the `TS` tag is not written.
 
 The `type` designator is required to designate whether the sequence in an adapter or a primer sequence, so that dorado knows how it should be used.
 
@@ -54,3 +54,5 @@ ACTTGCCTGTCGCTCTATCTTCGGCGTCTGCTTGGGTGTTTAACC
 >PCR_PSK_rear type=primer kits=SQK-PSK004
 AGGTTAAACACCCAAGCAGACGCCGCAATATCAGCACCAACAGAAA
 ```
+
+Note that for cDNA type experiments, the 3' primer will actually appear at the beginning of the forward strand, and the 5' primer at the end of the forward strand. For this reason, it is important that for this type of experiment your custom primer file must list what would normally be considered the "back" primer as the `front` sequence, and what would normally be considered the "front" primer as the `rear` sequence.

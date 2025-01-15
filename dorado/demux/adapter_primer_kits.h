@@ -44,7 +44,10 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
 // Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
 // will actually be found near the beginning of a forward read, and vice-versa for reverse
 // reads. So for example, we list the SSP cDNA primer as the frint primer, and the VNP one as
-// the rear primer, so that the code will work properly.
+// the rear primer, so that the code will work properly. The PCS and RAD primer sequences used
+// here are also truncated from the beginning. This does not affect trimming, because trimming
+// is done from the end of the detected primer. It does allow these sequences to be used with
+// barcoding, where a truncated version of the primer appears as the inside flanking region.
 const std::unordered_map<PrimerCode, Candidate> primers = {
         {PC::cDNA,
          {
@@ -55,15 +58,14 @@ const std::unordered_map<PrimerCode, Candidate> primers = {
         {PC::PCS110,
          {
                  // These are actually truncated version of the actual primer sequences.
-                 // The missing part is at the beginning of the sequences, so the full
-                 // primer will still be trimmed.
                  "PCS110",
                  "TTTCTGTTGGTGCTGATATTGCTTT",                          // SSP
                  "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT"  // VNP
          }},
         {PC::RAD,
          {
-                 "RAD", "GCTTGGGTGTTTAACCGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
+                 // This is also a truncated version of the actual primer sequence.
+                 "RAD", "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
                  ""  // No rear primer for RAD
          }}};
 
@@ -79,9 +81,11 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
         },
         {
                 PC::PCS110,
-                {KC::SQK_PCS114, KC::SQK_PCS114_260},
+                {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
         },
-        {PC::RAD, {KC::SQK_RAD114, KC::SQK_RAD114_260}}};
+        {PC::RAD,
+         {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_RBK114_24, KC::SQK_RBK114_24_260,
+          KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
 
 class AdapterPrimerManager {
 public:
