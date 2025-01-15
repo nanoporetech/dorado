@@ -8,7 +8,6 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/value.hpp>
 #include <torch/torch.h>
 // Catch2 must come after torch since both define CHECK()
 #include <catch2/catch.hpp>
@@ -118,8 +117,10 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Only one primer is provided") {
-        const toml::value data{{"anchors", toml::table{{"front_primer", "ACTG"}}}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [anchors]
+                front_primer = "ACTG"
+        )delim";
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
@@ -128,8 +129,10 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Only one plasmid flank is provided") {
-        const toml::value data{{"anchors", toml::table{{"plasmid_rear_flank", "ACTG"}}}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [anchors]
+                plasmid_rear_flank = "ACTG"
+        )delim";
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
@@ -138,12 +141,16 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Parse all supported configs") {
-        const toml::value data{{"anchors", toml::table{{"plasmid_front_flank", "CGTA"},
-                                                       {"plasmid_rear_flank", "ACTG"},
-                                                       {"front_primer", "AAAAAA"},
-                                                       {"rear_primer", "GGGGGG"}}},
-                               {"tail", toml::table{{"tail_interrupt_length", 10}}}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [anchors]
+                plasmid_front_flank = "CGTA"
+                plasmid_rear_flank = "ACTG"
+                front_primer = "AAAAAA"
+                rear_primer = "GGGGGG"
+
+            [tail]
+                tail_interrupt_length = 10
+        )delim";
         std::stringstream buffer(fmt);
 
         auto configs = dorado::poly_tail::prepare_configs(buffer);
@@ -162,14 +169,11 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Override config missing id") {
-        const int NUM_CONFIGS = 3;
-        toml::array config_toml;
-        for (int i = 0; i < NUM_CONFIGS; ++i) {
-            toml::table data{};
-            config_toml.push_back(data);
-        }
-        const toml::value data{{"overrides", config_toml}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [[overrides]]
+            [[overrides]]
+            [[overrides]]
+        )delim";
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
@@ -177,14 +181,14 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Override config duplicate id") {
-        const int NUM_CONFIGS = 3;
-        toml::array config_toml;
-        for (int i = 0; i < NUM_CONFIGS; ++i) {
-            toml::table data{{"barcode_id", "duplicate"}};
-            config_toml.push_back(data);
-        }
-        const toml::value data{{"overrides", config_toml}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [[overrides]]
+                barcode_id = "duplicate"
+            [[overrides]]
+                barcode_id = "duplicate"
+            [[overrides]]
+                barcode_id = "duplicate"
+        )delim";
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
@@ -192,14 +196,15 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
     }
 
     SECTION("Default config contains barcode id") {
-        const int NUM_CONFIGS = 3;
-        toml::array config_toml;
-        for (int i = 0; i < NUM_CONFIGS; ++i) {
-            toml::table data{{"barcode_id", "barcode" + std::to_string(i)}};
-            config_toml.push_back(data);
-        }
-        const toml::value data{{"barcode_id", "error"}, {"overrides", config_toml}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            barcode_id = "error"
+            [[overrides]]
+                barcode_id = "barcode0"
+            [[overrides]]
+                barcode_id = "barcode1"
+            [[overrides]]
+                barcode_id = "barcode2"
+        )delim";
         std::stringstream buffer(fmt);
 
         CHECK_THROWS_WITH(dorado::poly_tail::prepare_configs(buffer),
@@ -208,15 +213,16 @@ TEST_CASE("PolyTailConfig: Test parsing file", TEST_GROUP) {
 
     SECTION("Parse override configs") {
         const int NUM_CONFIGS = 3;
-        toml::array config_toml;
-        for (int i = 0; i < NUM_CONFIGS; ++i) {
-            toml::table data{{"barcode_id", "barcode" + std::to_string(i)}};
-            config_toml.push_back(data);
-        }
-
-        const toml::value data{{"tail", toml::table{{"tail_interrupt_length", 10}}},
-                               {"overrides", config_toml}};
-        const std::string fmt = toml::format(data);
+        const auto fmt = R"delim(
+            [tail]
+                tail_interrupt_length = 10
+            [[overrides]]
+                barcode_id = "barcode0"
+            [[overrides]]
+                barcode_id = "barcode1"
+            [[overrides]]
+                barcode_id = "barcode2"
+        )delim";
         std::stringstream buffer(fmt);
 
         auto configs = dorado::poly_tail::prepare_configs(buffer);

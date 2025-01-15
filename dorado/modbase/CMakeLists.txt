@@ -24,7 +24,6 @@ target_include_directories(dorado_modbase
     PUBLIC
     PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_modbase
@@ -34,6 +33,7 @@ target_link_libraries(dorado_modbase
         dorado_utils
         dorado_torch_utils
         spdlog::spdlog
+        toml11::toml11
 )
 
 enable_warnings_as_errors(dorado_modbase)

@@ -94,7 +94,6 @@ target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-    ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_utils
@@ -106,6 +105,7 @@ target_link_libraries(dorado_utils
         dorado_compat
         minimap2
         htslib
+        toml11::toml11
 )
 
 if (NOT APPLE)

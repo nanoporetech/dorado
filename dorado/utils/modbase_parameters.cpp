@@ -5,7 +5,6 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/get.hpp>
 
 #include <exception>
 #include <filesystem>
