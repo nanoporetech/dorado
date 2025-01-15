@@ -15,7 +15,9 @@
 
 // Catch must come last so we can undo torch defining CHECK.
 #undef CHECK
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 using Catch::Matchers::Equals;
 using Slice = at::indexing::Slice;
@@ -123,7 +125,6 @@ TEST_CASE("Test trim quality vector", TEST_GROUP) {
 }
 
 TEST_CASE("Test trim move table", TEST_GROUP) {
-    using Catch::Matchers::Equals;
     const std::vector<uint8_t> move = {1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1};
 
     SECTION("Trim nothing") {
@@ -147,7 +148,6 @@ TEST_CASE("Test trim move table", TEST_GROUP) {
 }
 
 TEST_CASE("Test trim mod base info", TEST_GROUP) {
-    using Catch::Matchers::Equals;
     const std::string seq = "TAAACTTACGGTGCATCGACTG";
     const std::string modbase_str = "A+a?,2,0,1;C+m?,4;T+x?,2,2;";
     const std::vector<uint8_t> modbase_probs = {2, 3, 4, 10, 20, 21};

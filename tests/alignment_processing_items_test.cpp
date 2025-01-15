@@ -4,11 +4,13 @@
 #include "utils/PostCondition.h"
 #include "utils/stream_utils.h"
 
-#include <catch2/catch_all.hpp>
-
 #include <filesystem>
 #include <fstream>
 #include <map>
+
+// Catch must come last so we can undo torch defining CHECK.
+#undef CHECK
+#include <catch2/catch_test_macros.hpp>
 
 #define CUT_TAG "[dorado::aligment::AlignmentProcessingItems]"
 

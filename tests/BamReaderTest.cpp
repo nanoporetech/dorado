@@ -10,7 +10,8 @@
 
 // Catch must come last so we can undo torch defining CHECK.
 #undef CHECK
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #define TEST_GROUP "[bam_utils][hts_reader]"
 

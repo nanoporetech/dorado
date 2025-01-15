@@ -25,7 +25,9 @@
 
 // Catch must come last so we can undo torch defining CHECK.
 #undef CHECK
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 #define TEST_GROUP "[bam_utils][aligner]"
 

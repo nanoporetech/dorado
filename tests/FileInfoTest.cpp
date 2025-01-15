@@ -3,7 +3,9 @@
 #include "utils/fs_utils.h"
 #include "utils/stream_utils.h"
 
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 
 #define TEST_GROUP "[dorado::file_info]"
 

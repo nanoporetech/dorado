@@ -3,7 +3,8 @@
 #include "models/model_complex.h"
 #include "models/models.h"
 
-#include <catch2/catch_all.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <stdexcept>
 
