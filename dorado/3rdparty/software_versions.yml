@@ -115,7 +115,7 @@ minimap2:
 NVTX:
     description: >
         API for annotating source code to provide contextual information to developer tools.
-    version: "61372b7a4cf1da41e9df4a1cb5a7a6e2c62113a8"
+    version: "v3.1.0"
     url: https://github.com/NVIDIA/NVTX
     license: NVTX/LICENSE.txt
     files:
