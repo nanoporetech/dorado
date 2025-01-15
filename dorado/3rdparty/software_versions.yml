@@ -83,7 +83,7 @@ HighFive:
 htslib:
     description: >
         C library for accessing common file formats, such as SAM, CRAM and VCF
-    version: "3c6f83f11e6e99cdcbed3541ae7d8d5f7786578d"
+    version: "1.21"
     url: https://github.com/samtools/htslib
     license: htslib/LICENSE
     files:
