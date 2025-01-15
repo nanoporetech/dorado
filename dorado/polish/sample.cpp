@@ -22,7 +22,7 @@ void Sample::validate() const {
     // Validate that the input data is sane.
     if ((dorado::ssize(positions_minor) != num_columns) || (depth.size(0) != num_columns) ||
         (features.size(0) != num_columns)) {
-        throw std::invalid_argument(
+        throw std::runtime_error(
                 "Sample data dimensions are inconsistent. positions_major.size = " +
                 std::to_string(std::size(positions_major)) +
                 ", positions_minor.size = " + std::to_string(std::size(positions_minor)) +
