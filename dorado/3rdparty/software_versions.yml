@@ -154,6 +154,14 @@ streamvbyte:
     license: hdf_plugins/third_party/streamvbyte/LICENSE
     files:
         - hdf_plugins/third_party/streamvbyte
+toml11:
+    description: >
+        TOML for Modern C++
+    version: "59243256528d4133321e845c3193db2d2725e6ee"
+    url: https://github.com/ToruNiina/toml11
+    license: toml11/LICENSE
+    files:
+        - toml11
 zlib-ng:
     description: >
         zlib data compression library for the next generation systems.
