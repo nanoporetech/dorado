@@ -6,7 +6,7 @@
 #include "utils/log_utils.h"
 #include "utils/time_utils.h"
 
-#include <argparse.hpp>
+#include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cctype>

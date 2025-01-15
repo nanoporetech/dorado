@@ -6,7 +6,7 @@
 #include "utils/math_utils.h"
 #include "utils/string_utils.h"
 
-#include <argparse.hpp>
+#include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>

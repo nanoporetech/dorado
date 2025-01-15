@@ -387,7 +387,6 @@ target_include_directories(dorado_lib
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/argparse
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include

@@ -101,6 +101,7 @@ target_link_libraries(dorado_utils
         date::date
         edlib
         spdlog::spdlog
+        argparse::argparse
     PRIVATE
         dorado_compat
         minimap2

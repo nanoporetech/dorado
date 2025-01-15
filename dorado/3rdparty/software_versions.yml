@@ -2,9 +2,9 @@
 argparse:
     description: >
         C++ argument parser
-    version: "3.1.0"
+    version: "v3.1"
     url: http://github.com/p-ranav/argparse
-    license: argparse/argparse.hpp
+    license: argparse/LICENSE
     files:
         - argparse
 cpp-httplib:

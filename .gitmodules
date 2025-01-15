@@ -40,3 +40,6 @@
 [submodule "dorado/3rdparty/date"]
 	path = dorado/3rdparty/date
 	url = https://github.com/HowardHinnant/date.git
+[submodule "dorado/3rdparty/argparse"]
+	path = dorado/3rdparty/argparse
+	url = https://github.com/p-ranav/argparse.git
