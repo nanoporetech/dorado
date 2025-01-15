@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::polisher {
@@ -11,6 +12,7 @@ namespace dorado::polisher {
 struct ModelConfig {
     int32_t version = 0;
     std::string basecaller_model;
+    std::unordered_set<std::string> supported_basecallers;
 
     // Model section.
     std::string model_type;
