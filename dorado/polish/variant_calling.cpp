@@ -344,7 +344,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         return {};
     }
 
-    // Check that the sample begins on non-insertion base.
+    // Check that the sample begins on a non-insertion base.
     if (vc_sample.sample.positions_minor.front() != 0) {
         std::ostringstream oss;
         oss << "The first position of a sample must not be an insertion. sample = "
