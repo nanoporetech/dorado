@@ -396,7 +396,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                              const at::Tensor& class_probs,
                                              const std::string_view seq, const bool substitute_n) {
         const std::vector<int32_t> encoded = encode_seq(symbol_lookup, seq, substitute_n);
-        float sum = 0.0;
+        float sum = 0.0f;
         for (size_t i = 0; i < std::size(encoded); ++i) {
             const int32_t j = encoded[i];
             const float prob = class_probs[i][j].item<float>();
@@ -461,11 +461,6 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             continue;
         }
 
-        // // Encode the sequences: base -> number.
-        // const std::vector<int32_t> var_ref_encoded = encode_seq(symbol_lookup, var_ref_with_gaps, true);
-        // const std::vector<int32_t> var_pred_encoded = encode_seq(symbol_lookup, var_pred_with_gaps, false);
-        // const double pred_qual = compute_seq_quality(var_probs, var_ref_encoded);
-
         // Calculate probabilities.
         const at::Tensor var_probs = vc_sample.logits.slice(0, rstart, rend);
         const float ref_qv = compute_seq_quality(symbol_lookup, var_probs, var_ref_with_gaps, true);
@@ -482,8 +477,8 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         const int64_t var_pos = vc_sample.sample.positions_major[rstart];
         if (vc_sample.sample.positions_minor[rstart] != 0) {
             // Variant starts on insert - prepend ref base.
-            var_ref = draft[var_pos] + var_ref;
-            var_pred = draft[var_pos] + var_pred;
+            var_ref.insert(0, 1, draft[var_pos]);
+            var_pred.insert(0, 1, draft[var_pos]);
         }
         Variant variant{
                 vc_sample.sample.seq_id, var_pos,  var_ref, var_pred, "PASS", {},
