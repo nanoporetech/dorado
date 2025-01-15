@@ -977,6 +977,7 @@ void run_polishing(const Options& opt,
         // These are the only available FILTER options.
         const std::vector<std::pair<std::string, std::string>> filters{
                 {"PASS", "All filters passed"},
+                {".", "Non-variant position"},
         };
 
         vcf_writer = std::make_unique<polisher::VCFWriter>(out_vcf_fn, filters, draft_lens);
