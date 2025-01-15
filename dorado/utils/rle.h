@@ -8,8 +8,9 @@
 namespace dorado {
 
 template <typename T, typename Compare = std::function<bool(const T&, const T&)>>
-std::vector<std::tuple<int64_t, int64_t, T>> run_length_encode(const std::vector<T>& data,
-                                                               Compare comp = std::equal_to<T>()) {
+std::vector<std::tuple<int64_t, int64_t, T>> run_length_encode(
+        const std::vector<T>& data,
+        Compare comp = std::equal_to<T>()) {  // NOLINT
     std::vector<std::tuple<int64_t, int64_t, T>> result;
 
     if (std::empty(data)) {

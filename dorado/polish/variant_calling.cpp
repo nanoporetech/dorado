@@ -406,7 +406,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         return sum;
     };
     const auto round_float = [](float val, const int32_t decimal_places) {
-        const float f = std::pow(10.0f, decimal_places);
+        const float f = std::pow(10.0f, static_cast<float>(decimal_places));
         val = std::round(val * f) / f;
         return val;
     };
