@@ -143,6 +143,7 @@ void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
 
     // Invalidate read IDs.
     lh.read_ids_left.clear();
+    lh.read_ids_right.clear();
 }
 
 }  // namespace dorado::polisher
