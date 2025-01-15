@@ -53,8 +53,7 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
     const int64_t num_columns = dorado::ssize(vc_sample.sample.positions_major);
 
     // Validate lengths.
-    if (vc_sample.logits.defined() &&
-        (vc_sample.logits.size(0) != dorado::ssize(vc_sample.sample.positions_major))) {
+    if (vc_sample.logits.defined() && (vc_sample.logits.size(0) != num_columns)) {
         throw std::runtime_error(
                 "VariantCallingSample::logits is of incorrect size. logits.size = " +
                 std::to_string(vc_sample.logits.size(0)) +
@@ -82,9 +81,7 @@ std::vector<VariantCallingSample> merge_vc_samples(
         return {};
     }
 
-    std::vector<VariantCallingSample> ret;
-
-    ret.emplace_back(vc_samples.front());
+    std::vector<VariantCallingSample> ret{vc_samples.front()};
 
     for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
         if (ret.back().sample.end() == (vc_samples[i].sample.start() + 1)) {
@@ -99,7 +96,11 @@ std::vector<VariantCallingSample> merge_vc_samples(
 }
 
 /**
- * \brief This function restructures the neighboring samples for one draft sequence
+ * \brief This function restructures the neighboring samples for one draft sequence.
+ *          Each input sample is split on the last non-variant position.
+ *          The left part is merged with anything previously added to a queue (i.e.
+ *          previous sample's right portion). The right part is then added to a cleared queue.
+ *          The goal of this function is to prevent calling variants on sample boundaries.
  */
 std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
                                                const std::string& draft,
