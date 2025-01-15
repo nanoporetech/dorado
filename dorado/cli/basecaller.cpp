@@ -475,6 +475,11 @@ void setup(const std::vector<std::string>& args,
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
             modbase_params.threshold, std::move(sample_sheet), 1000);
+
+    current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
+            {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
+            std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
+
     if ((barcoding_info && barcoding_info->trim) || adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
     }
@@ -505,10 +510,6 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = pipeline_desc.add_node<AdapterDetectorNode>(
                 {current_sink_node}, thread_allocations.adapter_threads);
     }
-
-    current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
-            {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
-            std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
 
