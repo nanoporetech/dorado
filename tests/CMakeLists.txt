@@ -101,6 +101,7 @@ add_library(dorado_tests_common STATIC
     main.cpp
     TestUtils.cpp
 )
+enable_warnings_as_errors(dorado_tests_common)
 target_link_libraries(dorado_tests_common
     PUBLIC
         dorado_torch_utils
@@ -191,6 +192,7 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # If this fails to link then we're not providing all of the libs for the symbols
     # that we use.
     add_library(dorado_symbol_test SHARED symbol_test.cpp)
+    enable_warnings_as_errors(dorado_symbol_test)
     target_link_libraries(dorado_symbol_test PUBLIC dorado_lib dorado_models_lib)
     if(MSVC)
         set_property(TARGET dorado_symbol_test APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
