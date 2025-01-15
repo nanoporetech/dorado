@@ -141,7 +141,7 @@ pytorch:
 spdlog:
     description: >
         C++ logging library.
-    version: "7e635fca68d014934b4af8a1cf874f63989352b7"
+    version: "v1.15.0"
     url: https://github.com/gabime/spdlog
     license: spdlog/LICENSE
     files:
