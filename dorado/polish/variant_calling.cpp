@@ -11,10 +11,79 @@
 #include <cassert>
 #include <cmath>
 #include <iomanip>
+#include <sstream>
 #include <unordered_map>
 #include <unordered_set>
 
 namespace dorado::polisher {
+
+void VariantCallingSample::validate() const {
+    if (seq_id < 0) {
+        std::ostringstream oss;
+        oss << "VariantCallingSample::seq_id < 0. seq_id = " << seq_id;
+        throw std::runtime_error(oss.str());
+    }
+
+    // Validate lengths.
+    if (std::size(vc_sample.positions_major) != std::size(vc_sample.positions_minor)) {
+        std::ostringstream oss;
+        oss << "VariantCallingSample::positions_major and positions_minor are not of same size. "
+               "positions_major.size = "
+            << std::size(vc_sample.positions_major)
+            << ", positions_minor.size = " << std::size(vc_sample.positions_minor);
+        throw std::runtime_error(oss.str());
+    }
+
+    if (!vc_sample.logits.defined()) {
+        throw std::runtime_error("VariantCallingSample::logits tensor is not defined!");
+    }
+
+    const int64_t num_columns = dorado::ssize(positions_major);
+
+    if (vc_sample.logits.size(0) != num_columns) {
+        std::ostringstream oss;
+        oss << "VariantCallingSample::logits is of incorrect size. logits.size = "
+            << vc_sample.logits.size(0) << ", num_columns = " << num_columns;
+        throw std::runtime_error(oss.str());
+    }
+}
+
+int64_t VariantCallingSample::start() const {
+    return (std::empty(positions_major) ? -1 : (positions_major.front()));
+}
+
+int64_t VariantCallingSample::end() const {
+    return (std::empty(positions_major) ? -1 : (positions_major.back() + 1));
+}
+
+std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample) {
+    // Make sure that vectors are of the same length.
+    vc_sample.validate();
+
+    // Print scalar info.
+    os << "seq_id = " << vc_sample.seq_id << ", positions = " << vc_sample.start() << " - "
+       << vc_sample.end() << " , dist = " << (vc_sample.end() - vc_sample.start())
+       << ", values = [";
+
+    // Print first the beginning and end of the positions vectors.
+    constexpr int64_t START = 0;
+    const int64_t len = dorado::ssize(vc_sample.positions_major);
+    for (int64_t k = START; k < std::min<int64_t>(START + 3, len); ++k) {
+        os << "(" << vc_sample.positions_major[k] << ", " << vc_sample.positions_minor[k] << ") ";
+        os.flush();
+    }
+    os << " ...";
+    os.flush();
+    const int64_t end = len;
+    for (int64_t k = std::max<int64_t>(START + 3, end - 3); k < end; ++k) {
+        os << " (" << vc_sample.positions_major[k] << ", " << vc_sample.positions_minor[k] << ")";
+        os.flush();
+    }
+    os << "], size = " << std::size(vc_sample.positions_major);
+    os.flush();
+
+    return os;
+}
 
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
@@ -50,15 +119,10 @@ std::string extract_draft(const std::string& draft, const std::vector<int64_t>& 
 VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                      const int64_t idx_start,
                                      const int64_t idx_end) {
-    const int64_t num_columns = dorado::ssize(vc_sample.sample.positions_major);
+    // Check that all members of the sample are of the same length.
+    vc_sample.validate();
 
-    // Validate lengths.
-    if (vc_sample.logits.defined() && (vc_sample.logits.size(0) != num_columns)) {
-        throw std::runtime_error(
-                "VariantCallingSample::logits is of incorrect size. logits.size = " +
-                std::to_string(vc_sample.logits.size(0)) +
-                ", num_columns = " + std::to_string(num_columns));
-    }
+    const int64_t num_columns = dorado::ssize(vc_sample.positions_major);
 
     // Validate idx.
     if ((idx_start < 0) || (idx_start >= num_columns) || (idx_start >= idx_end) ||
@@ -71,7 +135,11 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
 
     // Slice.
     return VariantCallingSample{
-            slice_sample(vc_sample.sample, idx_start, idx_end),
+            vc_sample.seq_id,
+            std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
+                                 std::begin(vc_sample.positions_major) + idx_end),
+            std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
+                                 std::begin(vc_sample.positions_minor) + idx_end),
             vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
 }
 
@@ -111,21 +179,8 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
 
     for (int64_t i = 0; i < dorado::ssize(vc_samples); ++i) {
         const VariantCallingSample& vc_sample = vc_samples[i];
-        const Sample& sample = vc_sample.sample;
 
-        // Validate the sample.
-        sample.validate();
-
-        // Validate the logits
-        if (!vc_sample.logits.defined()) {
-            throw std::runtime_error("Logits tensor is not defined!");
-        }
-        if (vc_sample.logits.size(0) != dorado::ssize(vc_sample.sample.positions_major)) {
-            throw std::runtime_error(
-                    "Length of the logits tensor does not match sample length! logits.size = " +
-                    std::to_string(vc_sample.logits.size(0)) + ", positions_major.size = " +
-                    std::to_string(std::size(vc_sample.sample.positions_major)));
-        }
+        vc_sample.validate();
 
         // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
         // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
@@ -145,8 +200,8 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
 
         // Sequences for comparison.
         const std::string& call_with_gaps = c.front().seq;
-        const std::string draft_with_gaps =
-                extract_draft_with_gaps(draft, sample.positions_major, sample.positions_minor);
+        const std::string draft_with_gaps = extract_draft_with_gaps(
+                draft, vc_sample.positions_major, vc_sample.positions_minor);
         assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
 
         const auto check_is_diff = [](const char base1, const char base2) {
@@ -340,15 +395,14 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                      const bool ambig_ref,
                                      const bool gvcf) {
     // No work to do.
-    if (std::empty(vc_sample.sample.positions_major)) {
+    if (std::empty(vc_sample.positions_major)) {
         return {};
     }
 
     // Check that the sample begins on a non-insertion base.
-    if (vc_sample.sample.positions_minor.front() != 0) {
+    if (vc_sample.positions_minor.front() != 0) {
         std::ostringstream oss;
-        oss << "The first position of a sample must not be an insertion. sample = "
-            << vc_sample.sample;
+        oss << "The first position of a sample must not be an insertion. sample = " << vc_sample;
         throw std::runtime_error(oss.str());
     }
 
@@ -422,12 +476,12 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
     const std::string& prediction = c.front().seq;
 
     // Draft sequence with gaps.
-    const std::string reference = extract_draft_with_gaps(draft, vc_sample.sample.positions_major,
-                                                          vc_sample.sample.positions_minor);
+    const std::string reference =
+            extract_draft_with_gaps(draft, vc_sample.positions_major, vc_sample.positions_minor);
 
     // Candidate variant positions.
     const std::vector<bool> is_variant =
-            variant_columns(vc_sample.sample.positions_minor, reference, prediction);
+            variant_columns(vc_sample.positions_minor, reference, prediction);
     const std::vector<std::tuple<int64_t, int64_t, bool>> runs =
             dorado::run_length_encode(is_variant);
 
@@ -474,28 +528,28 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                 {"GT", 1},
                 {"GQ", qual_i},
         };
-        const int64_t var_pos = vc_sample.sample.positions_major[rstart];
-        if (vc_sample.sample.positions_minor[rstart] != 0) {
+        const int64_t var_pos = vc_sample.positions_major[rstart];
+        if (vc_sample.positions_minor[rstart] != 0) {
             // Variant starts on insert - prepend ref base.
             var_ref.insert(0, 1, draft[var_pos]);
             var_pred.insert(0, 1, draft[var_pos]);
         }
         Variant variant{
-                vc_sample.sample.seq_id, var_pos,  var_ref, var_pred, "PASS", {},
-                round_float(qual, 3),    genotype,
+                vc_sample.seq_id,     var_pos,  var_ref, var_pred, "PASS", {},
+                round_float(qual, 3), genotype,
         };
         variant = normalize_variant(variant, draft);
         variants.emplace_back(std::move(variant));
     }
 
     if (gvcf) {
-        for (int64_t i = 0; i < dorado::ssize(vc_sample.sample.positions_major); ++i) {
+        for (int64_t i = 0; i < dorado::ssize(vc_sample.positions_major); ++i) {
             // Skip non-reference positions.
-            if (vc_sample.sample.positions_minor[i] != 0) {
+            if (vc_sample.positions_minor[i] != 0) {
                 continue;
             }
 
-            const int64_t pos = vc_sample.sample.positions_major[i];
+            const int64_t pos = vc_sample.positions_major[i];
             const std::string ref(1, draft[pos]);
             const int32_t ref_encoded =
                     (draft[pos] != 'N') ? symbol_lookup[draft[pos]] : symbol_lookup['*'];
@@ -510,7 +564,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
 
             // clang-format off
             Variant variant{
-                vc_sample.sample.seq_id,
+                vc_sample.seq_id,
                 pos,
                 ref,
                 ".",
@@ -551,24 +605,24 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
-        const auto& [sample, logits] = vc_input_data[i];
+        const auto& vc_sample = vc_input_data[i];
 
-        const int32_t local_id = sample.seq_id - region_batch.start;
+        const int32_t local_id = vc_sample.seq_id - region_batch.start;
 
         // Skip filtered samples.
-        if (sample.seq_id < 0) {
+        if (vc_sample.seq_id < 0) {
             continue;
         }
 
-        if ((sample.seq_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+        if ((vc_sample.seq_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
             (local_id >= dorado::ssize(groups))) {
             spdlog::error(
                     "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
                     "groups.size = {}",
-                    sample.seq_id, std::size(draft_lens), std::size(groups));
+                    vc_sample.seq_id, std::size(draft_lens), std::size(groups));
             continue;
         }
-        groups[local_id].emplace_back(sample.start(), i);
+        groups[local_id].emplace_back(vc_sample.start(), i);
     }
 
     std::vector<Variant> all_variants;

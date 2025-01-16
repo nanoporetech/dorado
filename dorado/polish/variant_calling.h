@@ -21,8 +21,14 @@ namespace dorado::polisher {
  *          The variant calling process will be responsible to group samples by draft sequence ID, etc.
  */
 struct VariantCallingSample {
-    Sample sample;
+    int32_t seq_id = -1;
+    std::vector<int64_t> positions_major;
+    std::vector<int64_t> positions_minor;
     at::Tensor logits;
+
+    void validate() const;
+    int64_t start() const;
+    int64_t end() const;
 };
 
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.

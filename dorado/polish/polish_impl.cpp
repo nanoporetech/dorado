@@ -1107,8 +1107,9 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                 }
                 // Create the variant calling data. Clone the tensor to convert the view to actual data.
                 for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
-                    thread_vc_data.emplace_back(VariantCallingSample{std::move(item.samples[i]),
-                                                                     split_logits[i].clone()});
+                    thread_vc_data.emplace_back(VariantCallingSample{
+                            item.samples[i].seq_id, std::move(item.samples[i].positions_major),
+                            std::move(item.samples[i].positions_minor), split_logits[i].clone()});
                 }
             }
         }
