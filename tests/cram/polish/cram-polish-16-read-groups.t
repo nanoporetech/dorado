@@ -299,7 +299,7 @@ Fails because the basecaller model for the second group is not supported (per te
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Polishing model was trained for the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0' which is not compatible with the input BAM!
+  Caught exception: Polishing model is not compatible with the input BAM!
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Select the second read group with `--RG`.

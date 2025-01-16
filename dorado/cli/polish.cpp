@@ -94,6 +94,7 @@ struct Options {
     int32_t min_depth = 0;
     bool any_bam = false;
     bool any_model = false;
+    bool bacteria = false;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
@@ -175,6 +176,9 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("-m", "--model")
                 .help("Path to correction model folder.")
                 .default_value("auto");
+        parser->visible.add_argument("--bacteria")
+                .help("Optimise polishing for plasmids and bacterial genomes.")
+                .flag();
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
                 .flag();
@@ -287,6 +291,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.output_dir = parser.visible.get<std::string>("output-dir");
     opt.model_str = parser.visible.get<std::string>("model");
+    opt.bacteria = parser.visible.get<bool>("bacteria");
 
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
@@ -550,6 +555,7 @@ std::filesystem::path download_model(const std::string& model_name) {
 const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                           const std::string& model_str,
                                           const bool load_scripted_model,
+                                          const bool bacteria,
                                           const bool any_model) {
     const auto count_model_hits = [](const dorado::models::ModelList& model_list,
                                      const std::string& model_name) {
@@ -560,6 +566,43 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
             }
         }
         return num_found;
+    };
+
+    // clang-format off
+    const std::unordered_map<std::string, std::string> compatible_bacterial_bc_models {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    };
+    // clang-format on
+
+    const auto determine_model_name = [&bacteria, &compatible_bacterial_bc_models,
+                                       &bam_info](const std::string& basecaller_model) {
+        if (bacteria) {
+            const auto it = compatible_bacterial_bc_models.find(basecaller_model);
+            if (it == std::cend(compatible_bacterial_bc_models)) {
+                throw std::runtime_error(
+                        "There are no bacterial models compatible with basecaller model: '" +
+                        basecaller_model + "'.");
+            }
+            return it->second;
+        } else {
+            const std::string polish_model_suffix =
+                    std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
+            return basecaller_model + polish_model_suffix;
+        }
+    };
+    const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
+                                   const std::unordered_set<std::string>& set2) {
+        for (const auto& val : set1) {
+            if (set2.count(val) > 0) {
+                return true;
+            }
+        }
+        return false;
     };
 
     std::filesystem::path model_dir;
@@ -587,9 +630,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         }
     }
 
-    const std::string polish_model_suffix =
-            std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
-
     if (model_str == "auto") {
         spdlog::info("Auto resolving the model.");
 
@@ -604,7 +644,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = determine_model_name(basecaller_model);
 
         spdlog::debug("Resolved model from input data: {}", model_name);
 
@@ -627,7 +667,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         const std::string& basecaller_model = model_str;
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = determine_model_name(basecaller_model);
 
         spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
@@ -651,14 +691,12 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
-        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
-            throw std::runtime_error{"Polishing model was trained for the basecaller model '" +
-                                     model_config.basecaller_model +
-                                     "' which is not compatible with the input BAM!"};
+        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+            throw std::runtime_error{"Polishing model is not compatible with the input BAM!"};
         }
 
         // Fail if the dwell information in the model and the data does not match.
-        if (bam_info.has_dwells && !model_uses_dwells) {
+        if (!bacteria && bam_info.has_dwells && !model_uses_dwells) {
             throw std::runtime_error{
                     "Input data has move tables, but a model without move table support has been "
                     "chosen."};
@@ -670,15 +708,14 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 
     } else {
         // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
-        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
+        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
             spdlog::warn(
-                    "Polishing model was trained for the basecaller model '{}' which is not "
-                    "compatible with the input BAM. This may produce inferior results.",
-                    model_config.basecaller_model);
+                    "Polishing model is not compatible with the input BAM. This may produce "
+                    "inferior results.");
         }
 
         // Allow to use a mismatched model, but emit a warning.
-        if (bam_info.has_dwells && !model_uses_dwells) {
+        if (!bacteria && bam_info.has_dwells && !model_uses_dwells) {
             spdlog::warn(
                     "Input data has move tables, but a model without move table support has been "
                     "chosen. This may produce inferior results.");
@@ -1048,8 +1085,8 @@ int polish(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         // Resolve the model for polishing.
-        const polisher::ModelConfig model_config =
-                resolve_model(bam_info, opt.model_str, opt.load_scripted_model, opt.any_model);
+        const polisher::ModelConfig model_config = resolve_model(
+                bam_info, opt.model_str, opt.load_scripted_model, opt.bacteria, opt.any_model);
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(
