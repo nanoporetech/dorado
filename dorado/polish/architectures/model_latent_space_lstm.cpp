@@ -221,10 +221,6 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     x = m_bidirectional ? std::get<0>(m_lstm_bidir->forward(x)) : m_lstm_unidir->forward(x);
     x = m_linear->forward(x);
 
-    if (m_normalise) {
-        x = torch::softmax(x, -1);
-    }
-
     return x;
 }
 

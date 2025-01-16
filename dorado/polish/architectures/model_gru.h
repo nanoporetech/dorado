@@ -17,8 +17,7 @@ public:
              const int32_t num_classes,
              const int32_t gru_size,
              const int32_t num_layers,
-             const bool bidirectional,
-             const bool normalise);
+             const bool bidirectional);
 
     at::Tensor forward(at::Tensor x) override;
 
@@ -28,7 +27,6 @@ private:
     int32_t m_gru_size = 128;
     int32_t m_num_layers = 2;
     bool m_bidirectional = true;
-    bool m_normalise = true;
     torch::nn::GRU m_gru{nullptr};
     torch::nn::Linear m_linear{nullptr};
 };
