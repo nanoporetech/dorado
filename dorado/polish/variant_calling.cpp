@@ -25,25 +25,25 @@ void VariantCallingSample::validate() const {
     }
 
     // Validate lengths.
-    if (std::size(vc_sample.positions_major) != std::size(vc_sample.positions_minor)) {
+    if (std::size(positions_major) != std::size(positions_minor)) {
         std::ostringstream oss;
         oss << "VariantCallingSample::positions_major and positions_minor are not of same size. "
                "positions_major.size = "
-            << std::size(vc_sample.positions_major)
-            << ", positions_minor.size = " << std::size(vc_sample.positions_minor);
+            << std::size(positions_major)
+            << ", positions_minor.size = " << std::size(positions_minor);
         throw std::runtime_error(oss.str());
     }
 
-    if (!vc_sample.logits.defined()) {
+    if (!logits.defined()) {
         throw std::runtime_error("VariantCallingSample::logits tensor is not defined!");
     }
 
     const int64_t num_columns = dorado::ssize(positions_major);
 
-    if (vc_sample.logits.size(0) != num_columns) {
+    if (logits.size(0) != num_columns) {
         std::ostringstream oss;
-        oss << "VariantCallingSample::logits is of incorrect size. logits.size = "
-            << vc_sample.logits.size(0) << ", num_columns = " << num_columns;
+        oss << "VariantCallingSample::logits is of incorrect size. logits.size = " << logits.size(0)
+            << ", num_columns = " << num_columns;
         throw std::runtime_error(oss.str());
     }
 }
@@ -149,12 +149,39 @@ std::vector<VariantCallingSample> merge_vc_samples(
         return {};
     }
 
+    const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
+                                                    const VariantCallingSample& rh) {
+        if (lh.seq_id != rh.seq_id) {
+            std::ostringstream oss;
+            oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
+            throw std::runtime_error(oss.str());
+        }
+        if (lh.end() != (rh.start() + 1)) {
+            std::ostringstream oss;
+            oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh
+                << ", rh = " << rh;
+            throw std::runtime_error(oss.str());
+        }
+
+        const size_t width = std::size(lh.positions_major);
+
+        // Insert positions vectors.
+        lh.positions_major.reserve(width + std::size(rh.positions_major));
+        lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
+                                  std::end(rh.positions_major));
+        lh.positions_minor.reserve(width + std::size(rh.positions_minor));
+        lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
+                                  std::end(rh.positions_minor));
+
+        // Merge the tensors.
+        lh.logits = torch::cat({std::move(lh.logits), rh.logits});
+    };
+
     std::vector<VariantCallingSample> ret{vc_samples.front()};
 
     for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
-        if (ret.back().sample.end() == (vc_samples[i].sample.start() + 1)) {
-            merge_adjacent_samples_in_place(ret.back().sample, vc_samples[i].sample);
-            ret.back().logits = torch::cat({std::move(ret.back().logits), vc_samples[i].logits});
+        if (ret.back().end() == (vc_samples[i].start() + 1)) {
+            merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
         } else {
             ret.emplace_back(vc_samples[i]);
         }
@@ -223,12 +250,12 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
             }
         }
 
-        const int64_t num_positions = dorado::ssize(sample.positions_major);
+        const int64_t num_positions = dorado::ssize(vc_sample.positions_major);
 
         // Find a location where to split the sample.
         int64_t last_non_var_start = 0;
         for (int64_t j = (num_positions - 1); j >= 0; --j) {
-            if ((sample.positions_minor[j] == 0) &&
+            if ((vc_sample.positions_minor[j] == 0) &&
                 !check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
                 last_non_var_start = j;
                 break;
@@ -582,17 +609,50 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
     return variants;
 }
 
-std::vector<Sample> apply_trimming(const std::vector<const Sample*>& samples,
-                                   const std::vector<TrimInfo>& trims) {
-    std::vector<Sample> ret;
-
-    for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
-        const Sample* s = samples[i];
-        const TrimInfo& t = trims[i];
-        ret.emplace_back(slice_sample(*s, t.start, t.end));
+std::vector<VariantCallingSample> trim_vc_samples(
+        const std::vector<VariantCallingSample>& vc_input_data,
+        const std::vector<std::pair<int64_t, int32_t>>& group) {
+    // Mock the Sample objects. Trimming works on Sample objects only, but
+    // it only needs positions, not the actual tensors.
+    std::vector<Sample> local_samples;
+    for (const auto& [start, id] : group) {
+        const auto& vc_sample = vc_input_data[id];
+        local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
+                                          vc_sample.positions_minor, {}, {}, {}));
     }
 
-    return ret;
+    // Compute trimming of all samples for this draft sequence.
+    const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
+
+    std::vector<VariantCallingSample> trimmed_samples;
+
+    for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
+        const int32_t id = group[i].second;
+        const auto& s = vc_input_data[id];
+        const TrimInfo& t = trims[i];
+
+        // Make sure that all vectors and tensors are of the same length.
+        s.validate();
+
+        const int64_t num_columns = dorado::ssize(s.positions_major);
+        if ((t.start < 0) || (t.start >= num_columns) || (t.start >= t.end) ||
+            (t.end > num_columns)) {
+            throw std::out_of_range("Index is out of range in slice_sample. idx_start = " +
+                                    std::to_string(t.start) +
+                                    ", idx_end = " + std::to_string(t.end) +
+                                    ", num_columns = " + std::to_string(num_columns));
+        }
+
+        trimmed_samples.emplace_back(VariantCallingSample{
+                s.seq_id,
+                std::vector<int64_t>(std::begin(s.positions_major) + t.start,
+                                     std::begin(s.positions_major) + t.end),
+                std::vector<int64_t>(std::begin(s.positions_minor) + t.start,
+                                     std::begin(s.positions_minor) + t.end),
+                s.logits.index({at::indexing::Slice(t.start, t.end)}).clone()});
+    }
+
+    return trimmed_samples;
 }
 
 std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batch,
@@ -643,45 +703,8 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         // Get the draft sequence.
         const std::string draft = draft_reader.fetch_seq(header);
 
-        // Create a view into samples for this draft.
-        std::vector<const Sample*> local_samples;
-        local_samples.reserve(std::size(group));
-        // NOTE: I wouldn't use a reference here because both start and id are POD, but Clang complains.
-        for (const auto& [start, id] : group) {
-            local_samples.emplace_back(&(vc_input_data[id].sample));
-        }
-
-        // Compute trimming of all samples for this draft sequence.
-        const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
-
-        // Produce trimmed samples.
-        std::vector<Sample> trimmed_samples = apply_trimming(local_samples, trims);
-
-        // Produce trimmed logits.
-        std::vector<at::Tensor> trimmed_logits = [&]() {
-            std::vector<at::Tensor> ret;
-            for (size_t i = 0; i < std::size(trims); ++i) {
-                const int64_t id = group[i].second;
-                const TrimInfo& trim = trims[i];
-                at::Tensor t = vc_input_data[id]
-                                       .logits.index({at::indexing::Slice(trim.start, trim.end)})
-                                       .clone();
-                ret.emplace_back(std::move(t));
-            }
-            return ret;
-        }();
-
-        assert(std::size(trimmed_samples) == std::size(trimmed_logits));
-
-        // Interleave the samples and logits for easier handling.
-        const std::vector<VariantCallingSample> trimmed_vc_samples = [&]() {
-            std::vector<VariantCallingSample> ret;
-            for (size_t i = 0; i < std::size(trimmed_samples); ++i) {
-                ret.emplace_back(VariantCallingSample{std::move(trimmed_samples[i]),
-                                                      std::move(trimmed_logits[i])});
-            }
-            return ret;
-        }();
+        // Trim the overlapping portions between samples.
+        const auto trimmed_vc_samples = trim_vc_samples(vc_input_data, group);
 
         // Break and merge samples on non-variant positions.
         // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
@@ -690,14 +713,11 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         for (const auto& vc_sample : joined_samples) {
             std::vector<Variant> variants =
                     decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+
             all_variants.insert(std::end(all_variants),
                                 std::make_move_iterator(std::begin(variants)),
                                 std::make_move_iterator(std::end(variants)));
         }
-
-        // TODO:
-        //      join_samples();
-        //      decode_variants();
     }
 
     return all_variants;
