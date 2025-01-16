@@ -145,10 +145,6 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
 
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples) {
-    if (std::empty(vc_samples)) {
-        return {};
-    }
-
     const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
                                                     const VariantCallingSample& rh) {
         if (lh.seq_id != rh.seq_id) {
@@ -176,6 +172,10 @@ std::vector<VariantCallingSample> merge_vc_samples(
         // Merge the tensors.
         lh.logits = torch::cat({std::move(lh.logits), rh.logits});
     };
+
+    if (std::empty(vc_samples)) {
+        return {};
+    }
 
     std::vector<VariantCallingSample> ret{vc_samples.front()};
 
@@ -275,6 +275,8 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         // Merge and insert.
         if (!std::empty(queue)) {
             auto new_samples = merge_vc_samples(queue);
+            queue.clear();
+
             ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
                        std::make_move_iterator(std::end(new_samples)));
         }
@@ -286,9 +288,10 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
     // Merge and insert.
     if (!std::empty(queue)) {
         auto new_samples = merge_vc_samples(queue);
+        queue.clear();
+
         ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
                    std::make_move_iterator(std::end(new_samples)));
-        queue.clear();
     }
 
     return ret;
