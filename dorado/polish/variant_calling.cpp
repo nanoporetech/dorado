@@ -421,6 +421,9 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                      const std::string& draft,
                                      const bool ambig_ref,
                                      const bool gvcf) {
+    // Validate that all vectors/tensors are of equal length.
+    vc_sample.validate();
+
     // No work to do.
     if (std::empty(vc_sample.positions_major)) {
         return {};
@@ -526,9 +529,6 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         const std::string_view var_pred_with_gaps(std::data(prediction) + rstart,
                                                   static_cast<size_t>(rend - rstart));
 
-        //     std::begin(reference) + rstart, std::begin(reference) + rend);
-        // const std::string_view var_pred_with_gaps(std::begin(prediction) + rstart, std::begin(prediction) + rend);
-
         // Mutable ref and pred sequences - a ref base may be prepended later.
         std::string var_ref = remove_gaps(var_ref_with_gaps);
         std::string var_pred = remove_gaps(var_pred_with_gaps);
@@ -621,10 +621,13 @@ std::vector<VariantCallingSample> trim_vc_samples(
                                           vc_sample.positions_minor, {}, {}, {}));
     }
 
-    // Compute trimming of all samples for this draft sequence.
+    // Compute trimming of all samples for this group.
     const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
 
     std::vector<VariantCallingSample> trimmed_samples;
+
+    assert(std::size(trims) == std::size(local_samples));
+    assert(std::size(trims) == std::size(group));
 
     for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
         const int32_t id = group[i].second;
@@ -637,7 +640,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
         const int64_t num_columns = dorado::ssize(s.positions_major);
         if ((t.start < 0) || (t.start >= num_columns) || (t.start >= t.end) ||
             (t.end > num_columns)) {
-            throw std::out_of_range("Index is out of range in slice_sample. idx_start = " +
+            throw std::out_of_range("Index is out of range in trim_vc_samples. idx_start = " +
                                     std::to_string(t.start) +
                                     ", idx_end = " + std::to_string(t.end) +
                                     ", num_columns = " + std::to_string(num_columns));
