@@ -580,7 +580,7 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
 
         // Sort the group by start positions.
         auto& group = groups[group_id];
-        std::sort(std::begin(group), std::end(group));
+        std::stable_sort(std::begin(group), std::end(group));
 
         if (std::empty(group)) {
             continue;
