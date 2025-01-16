@@ -28,7 +28,6 @@ allow it here for now.
   > grep -v "#" out/variants.vcf | sort > out/result.no_header.vcf
   > diff out/expected.no_header.vcf out/result.no_header.vcf > out/diff.txt
   > cat out/diff.txt | grep "[<>]" | sed "s/[<>] //g"
-  > cp -r out /Users/ivan.sovic/work/gitlab/dorado/temp/test-out
   Exit code: 0
   contig_1\t8950\t.\tG\t.\t43.382\t.\t.\tGT:GQ\t0:43 (esc)
   contig_1\t8950\t.\tG\t.\t43.394\t.\t.\tGT:GQ\t0:43 (esc)
