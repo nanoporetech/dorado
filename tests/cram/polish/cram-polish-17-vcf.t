@@ -26,8 +26,8 @@ allow it here for now.
   > echo "Exit code: $?"
   > gunzip -d --stdout ${expected} | grep -v "#" | sed 's/70\.0/70/g' | sort > out/expected.no_header.vcf
   > grep -v "#" out/variants.vcf | sort > out/result.no_header.vcf
-  > diff out/expected.no_header.vcf out/result.no_header.vcf > out/diff.txt
-  > cat out/diff.txt | grep "[<>]" | sed "s/[<>] //g"
+  > ### Remove the qual field because Torch results can vary slightly cross-platform.
+  > cut -f 1-5,7- out/expected.no_header.vcf > out/expected.no_header.no_qual.vcf
+  > cut -f 1-5,7- out/result.no_header.vcf > out/result.no_header.no_qual.vcf
+  > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   Exit code: 0
-  contig_1\t8950\t.\tG\t.\t43.382\t.\t.\tGT:GQ\t0:43 (esc)
-  contig_1\t8950\t.\tG\t.\t43.394\t.\t.\tGT:GQ\t0:43 (esc)
