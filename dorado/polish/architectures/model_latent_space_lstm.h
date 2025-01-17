@@ -82,7 +82,6 @@ private:
     int32_t m_bases_alphabet_size = 6;
     int32_t m_bases_embedding_size = 6;
     bool m_bidirectional = true;
-    bool m_normalise = true;
 
     // Layers.
     torch::nn::Embedding m_base_embedder;

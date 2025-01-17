@@ -170,10 +170,9 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         const int32_t n_layers = std::stoi(get_value(config.model_kwargs, "n_layers"));
         const bool bidirectional =
                 (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
-        constexpr bool NORMALISE = true;
 
         model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
-                                           bidirectional, NORMALISE);
+                                           bidirectional);
 
         // Set the weights of the internally constructed model.
         load_parameters(*model, config.model_dir / config.model_file);
