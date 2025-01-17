@@ -3,8 +3,11 @@
 #include "utils/types.h"
 #include "variant.h"
 
+#include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 struct bcf_hdr_t;
