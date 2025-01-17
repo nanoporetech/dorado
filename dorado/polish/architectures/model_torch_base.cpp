@@ -18,6 +18,8 @@ void ModelTorchBase::to_half() {
     m_half_precision = true;
 }
 
+void ModelTorchBase::set_normalise(const bool val) { m_normalise = val; }
+
 // Sets the eval mode.
 void ModelTorchBase::set_eval() { this->eval(); }
 
@@ -32,6 +34,9 @@ torch::Tensor ModelTorchBase::predict_on_batch(torch::Tensor x) {
     x = forward(std::move(x)).detach().cpu();
     if (m_half_precision) {
         x = x.to(torch::kFloat);
+    }
+    if (m_normalise) {
+        x = torch::softmax(x, -1);
     }
     return x;
 }
