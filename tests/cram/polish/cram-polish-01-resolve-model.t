@@ -86,6 +86,23 @@ Current bacterial model does not use dwells. This should not raise a warning nor
   1
   1
 
+Legacy HAC model for version 4.2.0 of the basecaller: "dna_r10.4.1_e8.2_400bps_hac@v4.2.0".
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ### Create the synthetic data with mocked model name.
+  > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v4.2.0/g' | samtools view -Sb > out/in.bam
+  > samtools index out/in.bam
+  > ### Run the unit under test.
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 -v > out/out.fasta 2> out/out.fasta.stderr
+  > ### Eval.
+  > echo "Exit code: $?"
+  > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  1
+  1
+
 ##############################################
 ### Test auto-resolve from the Basecaller  ###
 ### or Polishing model name and the dwell  ###
