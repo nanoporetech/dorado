@@ -38,6 +38,7 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
                                    const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                                    const DecoderBase& decoder,
                                    const bool ambig_ref,
-                                   const bool gvcf);
+                                   const bool gvcf,
+                                   const int32_t num_threads);
 
 }  // namespace dorado::polisher

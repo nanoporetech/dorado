@@ -5,6 +5,7 @@
 #include "utils/rle.h"
 #include "utils/ssize.h"
 
+#include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -667,7 +668,8 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
                                    const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                                    const DecoderBase& decoder,
                                    const bool ambig_ref,
-                                   const bool gvcf) {
+                                   const bool gvcf,
+                                   const int32_t num_threads) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -691,42 +693,93 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
         groups[local_id].emplace_back(vc_sample.start(), i);
     }
 
-    std::vector<Variant> all_variants;
-
-    // For each sequence, call variants.
-    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
-        const int64_t seq_id = group_id + region_batch.start;
-        const std::string& header = draft_lens[seq_id].first;
-
-        // Sort the group by start positions.
-        auto& group = groups[group_id];
-        std::stable_sort(std::begin(group), std::end(group));
-
-        if (std::empty(group)) {
-            continue;
+    // Worker for parallel processing.
+    const auto worker = [&](const int32_t start, const int32_t end,
+                            std::vector<std::vector<Variant>>& results) {
+        if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
+            throw std::runtime_error("Worker group_id is out of bounds! start = " +
+                                     std::to_string(start) + ", end = " + std::to_string(end) +
+                                     ", results.size = " + std::to_string(std::size(results)));
         }
 
-        // Get the draft sequence.
-        const std::string draft = draft_reader.fetch_seq(header);
+        for (int32_t group_id = start; group_id < end; ++group_id) {
+            const int64_t seq_id = group_id + region_batch.start;
+            const std::string& header = draft_lens[seq_id].first;
 
-        // Trim the overlapping portions between samples.
-        const auto trimmed_vc_samples = trim_vc_samples(vc_input_data, group);
+            // Sort the group by start positions.
+            auto& group = groups[group_id];
+            std::stable_sort(std::begin(group), std::end(group));
 
-        // Break and merge samples on non-variant positions.
-        // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
-        const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+            if (std::empty(group)) {
+                continue;
+            }
 
-        for (const auto& vc_sample : joined_samples) {
-            std::vector<Variant> variants =
-                    decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+            // Get the draft sequence.
+            const std::string draft = draft_reader.fetch_seq(header);
 
-            all_variants.insert(std::end(all_variants),
-                                std::make_move_iterator(std::begin(variants)),
-                                std::make_move_iterator(std::end(variants)));
+            // Trim the overlapping portions between samples.
+            const auto trimmed_vc_samples = trim_vc_samples(vc_input_data, group);
+
+            // Break and merge samples on non-variant positions.
+            // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+            const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+
+            for (const auto& vc_sample : joined_samples) {
+                std::vector<Variant> variants =
+                        decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+
+                results[group_id].insert(std::end(results[group_id]),
+                                         std::make_move_iterator(std::begin(variants)),
+                                         std::make_move_iterator(std::end(variants)));
+            }
+        }
+    };
+
+    // Partition groups to chunks for multithreaded processing.
+    const std::vector<Interval> thread_chunks =
+            compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+
+    // Create the thread pool.
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+
+    // Create the futures.
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+
+    // Reserve the space for results for each individual group.
+    std::vector<std::vector<Variant>> thread_results(std::size(groups));
+
+    // Add worker tasks.
+    for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(thread_results)));
+    }
+
+    // Join and catch exceptions.
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception when computing variants: ") +
+                                 e.what()};
+    }
+
+    // Flatten the results.
+    std::vector<Variant> all_results;
+    {
+        size_t count = 0;
+        for (const auto& vals : thread_results) {
+            count += std::size(vals);
+        }
+        all_results.reserve(count);
+        for (auto& vals : thread_results) {
+            all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(vals)),
+                               std::make_move_iterator(std::end(vals)));
         }
     }
 
-    return all_variants;
+    return all_results;
 }
 
 }  // namespace dorado::polisher

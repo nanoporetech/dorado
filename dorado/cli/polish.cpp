@@ -1100,7 +1100,7 @@ void run_polishing(const Options& opt,
         if (opt.run_variant_calling) {
             std::vector<polisher::Variant> variants = call_variants(
                     batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder,
-                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF);
+                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads);
 
             std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
                 return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
