@@ -4,13 +4,14 @@
 #include "polish/architectures/model_factory.h"
 #include "polish/features/decoder_factory.h"
 #include "polish/features/encoder_factory.h"
+#include "polish_stats.h"
 #include "sample.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
 #include "utils/stats.h"
 #include "utils/timer_high_res.h"
-#include "variant_calling.h"
+#include "variant_calling_sample.h"
 #include "window.h"
 
 #include <cstdint>
@@ -67,29 +68,6 @@ struct DecodeData {
     std::vector<Sample> samples;
     torch::Tensor logits;
     std::vector<TrimInfo> trims;
-};
-
-class PolishStats {
-public:
-    PolishStats() = default;
-
-    void update(const std::string& name, const double value) { m_stats[name] = value; }
-
-    void increment(const std::string& name) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += 1.0;
-    }
-
-    void add(const std::string& name, const double value) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += value;
-    }
-
-    stats::NamedStats get_stats() const { return m_stats; }
-
-private:
-    stats::NamedStats m_stats;
-    std::mutex m_mtx;
 };
 
 /**

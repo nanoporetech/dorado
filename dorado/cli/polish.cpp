@@ -7,6 +7,7 @@
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
+#include "polish/variant_calling.h"
 #include "polish/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
@@ -862,6 +863,16 @@ void validate_regions(const std::vector<polisher::Region>& regions,
     }
 }
 
+/**
+ * \brief Groups input regions into bins of sequence IDs.
+ * \param draft_lens Vector of sequence names and their lengths.
+ * \param user_regions Vector of user-provided regions. Optional, can be empty.
+ * \param draft_batch_size Split draft regions into batches of roughly this size. Each element is an interval
+ *                          of draft sequences.
+ * \returns Pair of two objects: (1) vector of sequence IDs (0 to len(draft_lens)), with the internal vector containing
+ *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
+ *          These intervals are indices of the first return vector in this pair.
+ */
 std::pair<std::vector<std::vector<polisher::Region>>, std::vector<polisher::Interval>>
 prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                        const std::vector<polisher::Region>& user_regions,
@@ -996,7 +1007,7 @@ void run_polishing(const Options& opt,
 
     // Update the progress tracker.
     {
-        const int64_t total_input_bases =
+        int64_t total_input_bases =
                 std::accumulate(std::begin(input_regions), std::end(input_regions),
                                 static_cast<int64_t>(0), [](const int64_t a, const auto& b) {
                                     int64_t sum = 0;
@@ -1005,9 +1016,18 @@ void run_polishing(const Options& opt,
                                     }
                                     return a + sum;
                                 });
+
+        // Variant calling likely takes much less time than consensus,
+        // but we need an estimate.
+        if (opt.run_variant_calling) {
+            total_input_bases *= 2;
+        }
+
         polish_stats.update("total", static_cast<double>(total_input_bases));
         polish_stats.update("processed", 0.0);
     }
+
+    int64_t total_batch_bases = 0;
 
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
@@ -1018,6 +1038,7 @@ void run_polishing(const Options& opt,
                                 std::end(input_regions[i]));
         }
 
+        // Total number of bases in this batch.
         const int64_t batch_bases = std::accumulate(
                 std::begin(region_batch), std::end(region_batch), static_cast<int64_t>(0),
                 [](const int64_t a, const auto& b) { return a + b.end - b.start; });
@@ -1079,6 +1100,10 @@ void run_polishing(const Options& opt,
             thread_sample_decoder.join();
         }
 
+        // Round the counter, in case some samples were dropped.
+        total_batch_bases += batch_bases;
+        polish_stats.set("processed", static_cast<double>(total_batch_bases));
+
         spdlog::debug(
                 "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
                 "length: {:.2f} Mbp), parts: {}",
@@ -1107,7 +1132,8 @@ void run_polishing(const Options& opt,
         if (opt.run_variant_calling) {
             std::vector<polisher::Variant> variants = call_variants(
                     batch_interval, vc_input_data, draft_readers, draft_lens, *resources.decoder,
-                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads);
+                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
+                    polish_stats);
 
             std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
                 return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
@@ -1117,6 +1143,11 @@ void run_polishing(const Options& opt,
             for (const auto& variant : variants) {
                 vcf_writer->write_variant(variant);
             }
+
+            // We approximate the progress by expecting 2x bases to be processed
+            // when doing variant calling.
+            total_batch_bases += batch_bases;
+            polish_stats.set("processed", static_cast<double>(total_batch_bases));
         }
     }
 }

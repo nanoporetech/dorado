@@ -3,8 +3,10 @@
 #include "features/decoder_base.h"
 #include "hts_io/FastxRandomReader.h"
 #include "interval.h"
+#include "polish_stats.h"
 #include "sample.h"
 #include "variant.h"
+#include "variant_calling_sample.h"
 
 #include <ATen/ATen.h>
 
@@ -15,22 +17,6 @@
 
 namespace dorado::polisher {
 
-/**
- * \brief Type which holds the input data for variant calling. This includes _all_
- *          samples for the current batch of draft sequences and the inference results (logits) for those samples.
- *          The variant calling process will be responsible to group samples by draft sequence ID, etc.
- */
-struct VariantCallingSample {
-    int32_t seq_id = -1;
-    std::vector<int64_t> positions_major;
-    std::vector<int64_t> positions_minor;
-    at::Tensor logits;
-
-    void validate() const;
-    int64_t start() const;
-    int64_t end() const;
-};
-
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
 std::vector<Variant> call_variants(
         const dorado::polisher::Interval& region_batch,
@@ -40,6 +26,7 @@ std::vector<Variant> call_variants(
         const DecoderBase& decoder,
         const bool ambig_ref,
         const bool gvcf,
-        const int32_t num_threads);
+        const int32_t num_threads,
+        PolishStats& polish_stats);
 
 }  // namespace dorado::polisher
