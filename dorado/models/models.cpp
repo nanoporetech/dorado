@@ -1148,6 +1148,13 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{},
         },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0",
+                "56e3763638677adb32de783e648dd721aa1ec04504d0328db70be208822aef6e",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
 };
 
 }  // namespace polisher
