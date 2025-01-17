@@ -942,8 +942,15 @@ void run_polishing(const Options& opt,
 
     validate_regions(opt.regions, draft_lens);
 
-    // Open the draft FASTA file.
-    const hts_io::FastxRandomReader draft_reader(opt.in_draft_fastx_fn);
+    // Open the draft FASTA file. One reader per thread.
+    std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
+    for (int32_t i = 0; i < opt.threads; ++i) {
+        draft_readers.emplace_back(
+                std::make_unique<hts_io::FastxRandomReader>(opt.in_draft_fastx_fn));
+    }
+    if (std::empty(draft_readers)) {
+        throw std::runtime_error("Could not create draft readers!");
+    }
 
     // Create the output folder if needed.
     if (!std::empty(opt.output_dir)) {
@@ -1086,8 +1093,9 @@ void run_polishing(const Options& opt,
         // Construct the consensus sequences, only if they will be written.
         if (opt.write_consensus) {
             const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                    construct_consensus_seqs(batch_interval, all_results_cons, draft_reader,
-                                             draft_lens, opt.fill_gaps, opt.fill_char);
+                    construct_consensus_seqs(batch_interval, all_results_cons,
+                                             *draft_readers.front(), draft_lens, opt.fill_gaps,
+                                             opt.fill_char);
 
             // Write the consensus file.
             for (const auto& consensus : consensus_seqs) {
@@ -1099,7 +1107,7 @@ void run_polishing(const Options& opt,
         // Run variant calling, optionally.
         if (opt.run_variant_calling) {
             std::vector<polisher::Variant> variants = call_variants(
-                    batch_interval, vc_input_data, draft_reader, draft_lens, *resources.decoder,
+                    batch_interval, vc_input_data, draft_readers, draft_lens, *resources.decoder,
                     opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads);
 
             std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {

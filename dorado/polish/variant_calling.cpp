@@ -662,14 +662,15 @@ std::vector<VariantCallingSample> trim_vc_samples(
     return trimmed_samples;
 }
 
-std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batch,
-                                   const std::vector<VariantCallingSample>& vc_input_data,
-                                   const hts_io::FastxRandomReader& draft_reader,
-                                   const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                                   const DecoderBase& decoder,
-                                   const bool ambig_ref,
-                                   const bool gvcf,
-                                   const int32_t num_threads) {
+std::vector<Variant> call_variants(
+        const dorado::polisher::Interval& region_batch,
+        const std::vector<VariantCallingSample>& vc_input_data,
+        const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const DecoderBase& decoder,
+        const bool ambig_ref,
+        const bool gvcf,
+        const int32_t num_threads) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -694,7 +695,7 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
     }
 
     // Worker for parallel processing.
-    const auto worker = [&](const int32_t start, const int32_t end,
+    const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
                             std::vector<std::vector<Variant>>& results) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
@@ -715,7 +716,7 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
             }
 
             // Get the draft sequence.
-            const std::string draft = draft_reader.fetch_seq(header);
+            const std::string draft = draft_readers[tid]->fetch_seq(header);
 
             // Trim the overlapping portions between samples.
             const auto trimmed_vc_samples = trim_vc_samples(vc_input_data, group);
@@ -752,7 +753,8 @@ std::vector<Variant> call_variants(const dorado::polisher::Interval& region_batc
     // Add worker tasks.
     for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(thread_results)));
+        futures.emplace_back(
+                pool.push(worker, tid, chunk_start, chunk_end, std::ref(thread_results)));
     }
 
     // Join and catch exceptions.
