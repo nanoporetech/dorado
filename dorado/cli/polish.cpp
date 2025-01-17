@@ -955,6 +955,7 @@ void run_polishing(const Options& opt,
 
     // Open the draft FASTA file. One reader per thread.
     std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
+    draft_readers.reserve(opt.threads);
     for (int32_t i = 0; i < opt.threads; ++i) {
         draft_readers.emplace_back(
                 std::make_unique<hts_io::FastxRandomReader>(opt.in_draft_fastx_fn));
