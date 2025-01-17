@@ -500,7 +500,7 @@ std::vector<std::vector<polisher::ConsensusResult>> construct_consensus_seqs(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
         const std::optional<char>& fill_char,
-        hts_io::FastxRandomReader& draft_reader, ) {
+        hts_io::FastxRandomReader& draft_reader) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
@@ -1063,10 +1063,10 @@ void run_polishing(const Options& opt,
                             std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
                             opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
 
-        std::thread thread_sample_decoder =
-                std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                            std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
-                            std::cref(*resources.decoder), opt.threads, opt.min_depth);
+        std::thread thread_sample_decoder = std::thread(
+                &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
+                std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
+                std::cref(*resources.decoder), opt.threads, opt.min_depth, opt.run_variant_calling);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                             *resources.encoder);

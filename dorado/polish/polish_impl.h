@@ -200,7 +200,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
                                 const int32_t num_threads,
-                                const int32_t min_depth);
+                                const int32_t min_depth,
+                                const bool collect_vc_data);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,

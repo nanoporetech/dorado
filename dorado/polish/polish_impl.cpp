@@ -946,7 +946,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
                                 const int32_t num_threads,
-                                const int32_t min_depth) {
+                                const int32_t min_depth,
+                                const bool collect_vc_data) {
     auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
                                                              const int32_t tid) {
         utils::ScopedProfileRange scope_decode("decode", 1);
@@ -985,6 +986,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 
             std::vector<Interval> good_intervals{Interval{0, static_cast<int32_t>(num_positions)}};
 
+            // Break on low coverage.
             if (min_depth > 0) {
                 good_intervals.clear();
 
@@ -1092,7 +1094,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                   std::make_move_iterator(std::end(results_samples)));
 
             // Separate the logits for each sample.
-            {
+            if (collect_vc_data) {
                 // Split logits for each input sample in the batch, and check that the number matches.
                 const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
                 if (std::size(item.samples) != std::size(split_logits)) {
