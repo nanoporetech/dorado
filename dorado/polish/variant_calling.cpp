@@ -688,7 +688,7 @@ std::vector<Variant> call_variants(
     std::vector<std::vector<Variant>> thread_results(std::size(groups));
 
     // Add worker tasks.
-    for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
+    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
         futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
                                        std::ref(thread_results), std::ref(polish_stats)));
