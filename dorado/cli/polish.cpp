@@ -388,7 +388,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
     opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
 
-    // Write the consensus sequence only if: (1) to a folder, or (2) to stdout but no VC options were specified.
+    // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
         opt.write_consensus = true;
     }
@@ -969,8 +969,8 @@ void run_polishing(const Options& opt,
     // Open the output stream to a file/stdout for the variant calls.
     const std::filesystem::path out_vcf_fn =
             (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
-    // auto ofs_vcf = get_output_stream(out_vcf_fn);
 
+    // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<polisher::VCFWriter> vcf_writer;
 
     if (opt.run_variant_calling) {
