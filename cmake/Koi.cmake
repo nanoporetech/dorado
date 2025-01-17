@@ -5,7 +5,7 @@ function(get_best_compatible_koi_version KOI_CUDA)
         # Koi only provides binaries for 11.4 and 10.2 when targeting aarch64
         set(SUPPORTED_VERSIONS 11.4 10.2)
     else()
-        set(SUPPORTED_VERSIONS 12.0 11.8 11.7 11.3)
+        set(SUPPORTED_VERSIONS 12.4 12.0 11.8 11.7 11.3)
     endif()
 
     list(SORT SUPPORTED_VERSIONS COMPARE NATURAL ORDER DESCENDING)
@@ -20,7 +20,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.5.2)
+    set(KOI_VERSION 0.5.3)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
