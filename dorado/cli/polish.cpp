@@ -577,11 +577,19 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
     };
+    const std::unordered_map<std::string, std::string> legacy_bc_models {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},
+    };
     // clang-format on
 
     const auto determine_model_name = [&bacteria, &compatible_bacterial_bc_models,
+                                       &legacy_bc_models,
                                        &bam_info](const std::string& basecaller_model) {
         if (bacteria) {
+            // Resolve a bacterial model.
             const auto it = compatible_bacterial_bc_models.find(basecaller_model);
             if (it == std::cend(compatible_bacterial_bc_models)) {
                 throw std::runtime_error(
@@ -590,6 +598,13 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
             }
             return it->second;
         } else {
+            // First check if this is a legacy model.
+            const auto it_legacy = legacy_bc_models.find(basecaller_model);
+            if (it_legacy != std::cend(legacy_bc_models)) {
+                return it_legacy->second;
+            }
+
+            // Otherwise, this is a current model.
             const std::string polish_model_suffix =
                     std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
             return basecaller_model + polish_model_suffix;
@@ -689,6 +704,9 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                            ? (it_dwells->second == "true")
                                            : false;
 
+    const bool run_dwell_check =
+            !bacteria && (legacy_bc_models.count(model_config.basecaller_model) == 0);
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
         if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
@@ -696,7 +714,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         }
 
         // Fail if the dwell information in the model and the data does not match.
-        if (!bacteria && bam_info.has_dwells && !model_uses_dwells) {
+        if (run_dwell_check && bam_info.has_dwells && !model_uses_dwells) {
             throw std::runtime_error{
                     "Input data has move tables, but a model without move table support has been "
                     "chosen."};
@@ -715,7 +733,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         }
 
         // Allow to use a mismatched model, but emit a warning.
-        if (!bacteria && bam_info.has_dwells && !model_uses_dwells) {
+        if (run_dwell_check && bam_info.has_dwells && !model_uses_dwells) {
             spdlog::warn(
                     "Input data has move tables, but a model without move table support has been "
                     "chosen. This may produce inferior results.");
