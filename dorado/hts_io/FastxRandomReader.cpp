@@ -1,5 +1,7 @@
 #include "FastxRandomReader.h"
 
+#include "utils/string_utils.h"
+
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
@@ -16,12 +18,19 @@ namespace dorado::hts_io {
 void FaidxDestructor::operator()(faidx_t* faidx) { fai_destroy(faidx); }
 
 FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
-    // Attempt to load a FASTQ style .fai index.
-    faidx_t* faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTQ);
+    // Convert the string to lowercase.
+    std::string path_str = fastx_path.string();
+    std::transform(std::begin(path_str), std::end(path_str), std::begin(path_str),
+                   [](unsigned char c) { return std::tolower(c); });
 
-    // Alternatively, attempt to load a FASTA style .fai index.
-    if (!faidx_ptr) {
+    faidx_t* faidx_ptr = nullptr;
+
+    if (utils::ends_with(path_str, ".fasta") || utils::ends_with(path_str, ".fa") ||
+        utils::ends_with(path_str, ".fasta.gz") || utils::ends_with(path_str, ".fa.gz")) {
         faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTA);
+    } else if (utils::ends_with(path_str, ".fastq") || utils::ends_with(path_str, ".fq") ||
+               utils::ends_with(path_str, ".fastq.gz") || utils::ends_with(path_str, ".fq.gz")) {
+        faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTQ);
     }
 
     // Both attempts failed.
