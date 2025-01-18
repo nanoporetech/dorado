@@ -37,6 +37,8 @@ void ModelTorchScript::to_half() {
     m_half_precision = true;
 }
 
+void ModelTorchScript::set_normalise(const bool val) { m_normalise = val; }
+
 void ModelTorchScript::set_eval() {
     this->eval();
     m_module.eval();

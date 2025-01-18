@@ -27,6 +27,11 @@ public:
     virtual void to_half();
 
     /**
+     * \brief Changes the state of normalisation.
+     */
+    virtual void set_normalise(const bool val);
+
+    /**
      * \brief Runs the eval() function, but also allows to abstract the functionality
      *          for derived types, in case they utilize composition.
      */
@@ -44,6 +49,7 @@ public:
     virtual at::Tensor predict_on_batch(at::Tensor x);
 
 protected:
+    bool m_normalise = true;
     bool m_half_precision = false;
 };
 
