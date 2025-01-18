@@ -1,10 +1,15 @@
 
 #include "modbase_parameters.h"
 
+#include "utils/dev_utils.h"
+
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
+#include <toml/get.hpp>
 
+#include <exception>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 
 namespace dorado::utils::modbase {
@@ -35,9 +40,14 @@ ModelType model_type_from_string(const std::string& model_type) noexcept {
     return ModelType::UNKNOWN;
 }
 
-ModelType get_modbase_model_type(const std::filesystem::path& path) {
-    const auto config_toml = toml::parse(path / "config.toml");
-    return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
+    try {
+        const auto config_toml = toml::parse(path / "config.toml");
+        return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+    } catch (std::exception& e) {
+        spdlog::trace("get_modbase_model_type caught exception: {}", e.what());
+        return ModelType::UNKNOWN;
+    }
 }
 
 bool is_modbase_model(const std::filesystem::path& path) {

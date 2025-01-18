@@ -403,7 +403,8 @@ void check_modbase_multi_model_compatibility(
             const auto& query_motif = query_params.motif[query_params.motif_offset];
 
             if (ref_motif == query_motif) {
-                err_msg += modbase_models[i].string() + " and " + modbase_models[j].string() +
+                err_msg += modbase_models[i].parent_path().filename().string() + " and " +
+                           modbase_models[j].parent_path().filename().string() +
                            " have overlapping canonical motif: " + ref_motif;
             }
         }
@@ -412,7 +413,7 @@ void check_modbase_multi_model_compatibility(
     if (!err_msg.empty()) {
         throw std::runtime_error(
                 "Following are incompatible modbase models. Please select only one of them to "
-                "run:\n" +
+                "run: " +
                 err_msg);
     }
 }
