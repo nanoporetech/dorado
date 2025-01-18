@@ -1278,7 +1278,7 @@ ModelInfo get_simplex_model_info(const std::string& model_name) {
                  std::back_inserter(matches), is_name_match);
 
     if (matches.empty()) {
-        throw std::runtime_error("Could not find information on simplex model: " + model_name);
+        throw std::runtime_error("Could not find simplex model information from: " + model_name);
     } else if (matches.size() > 1) {
         throw std::logic_error("Found multiple simplex models with name: " + model_name);
     }
