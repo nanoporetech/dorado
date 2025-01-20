@@ -1,14 +1,11 @@
 #include "torch_utils/gpu_monitor.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
 #define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)

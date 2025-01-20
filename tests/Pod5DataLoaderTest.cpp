@@ -5,8 +5,6 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "utils/fs_utils.h"
 
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 
 #define TEST_GROUP "[dorado::DataLoader::pod5]"

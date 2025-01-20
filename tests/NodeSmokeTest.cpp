@@ -45,8 +45,6 @@
 #include <unistd.h>
 #endif
 
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/internal/catch_run_context.hpp>

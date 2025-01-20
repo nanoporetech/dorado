@@ -6,6 +6,9 @@
 #include "read_pipeline/PolyACalculatorNode.h"
 #include "utils/sequence_utils.h"
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 #include <torch/torch.h>
@@ -15,12 +18,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
-#include <catch2/matchers/catch_matchers_all.hpp>
 
 #define TEST_GROUP "[poly_a_estimator]"
 

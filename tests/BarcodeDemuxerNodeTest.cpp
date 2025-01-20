@@ -9,6 +9,8 @@
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
@@ -16,11 +18,6 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_all.hpp>
 
 #define TEST_GROUP "[barcode_demux]"
 

@@ -4,12 +4,10 @@
 #include "basecall/CRFModelConfig.h"
 #include "utils/parameters.h"
 
-#include <optional>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
+
+#include <optional>
 
 #define CUT_TAG "[BasecallerParams]"
 

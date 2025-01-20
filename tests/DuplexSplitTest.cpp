@@ -9,15 +9,12 @@
 #include "splitter/DuplexReadSplitter.h"
 #include "splitter/ReadSplitter.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <vector>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
 
 #define TEST_GROUP "[DuplexSplitTest]"
 

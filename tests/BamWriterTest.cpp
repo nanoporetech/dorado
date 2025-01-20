@@ -6,15 +6,12 @@
 #include "utils/hts_file.h"
 #include "utils/stats.h"
 
-#include <htslib/sam.h>
-
-#include <filesystem>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
+#include <htslib/sam.h>
+
+#include <filesystem>
 
 #define TEST_GROUP "[bam_utils][hts_writer]"
 

@@ -1,16 +1,13 @@
 #include "torch_utils/tensor_utils.h"
 
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #include <cstdlib>
 #include <random>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/benchmark/catch_benchmark.hpp>
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
 
 #define CUT_TAG "[TensorUtils]"
 

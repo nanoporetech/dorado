@@ -1,9 +1,6 @@
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 
 using Slice = at::indexing::Slice;

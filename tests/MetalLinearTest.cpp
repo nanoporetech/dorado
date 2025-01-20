@@ -1,13 +1,10 @@
 #include "torch_utils/metal_utils.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
 
 #include <cstdint>
 #include <vector>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
 
 using namespace dorado::utils;
 

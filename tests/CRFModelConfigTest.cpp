@@ -4,16 +4,13 @@
 #include "models/kits.h"
 #include "utils/parameters.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <random>
 #include <string>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
-#include <catch2/catch_test_macros.hpp>
 
 #define CUT_TAG "[CRFModelConfig]"
 

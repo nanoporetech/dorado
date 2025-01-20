@@ -11,8 +11,6 @@
 #include <ATen/ops/scaled_dot_product_attention.h>
 #endif
 
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
 

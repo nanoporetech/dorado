@@ -2,12 +2,9 @@
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
-#include <htslib/sam.h>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
+#include <htslib/sam.h>
 
 #define TEST_GROUP "[ReadTest]"
 

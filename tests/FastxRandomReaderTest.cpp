@@ -5,11 +5,8 @@
 #include "utils/bam_utils.h"
 #include "utils/hts_file.h"
 
-#include <htslib/sam.h>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_test_macros.hpp>
+#include <htslib/sam.h>
 
 using namespace dorado;
 

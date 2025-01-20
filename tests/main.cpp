@@ -2,13 +2,10 @@
 #include "torch_utils/torch_utils.h"
 #include "utils/locale_utils.h"
 
-#include <nvtx3/nvtx3.hpp>
-#include <torch/utils.h>
-
-// Catch must come last so we can undo torch defining CHECK.
-#undef CHECK
 #include <catch2/catch_session.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nvtx3/nvtx3.hpp>
+#include <torch/utils.h>
 
 int main(int argc, char* argv[]) {
     // global setup...
