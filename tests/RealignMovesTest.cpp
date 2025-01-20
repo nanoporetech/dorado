@@ -29,7 +29,7 @@ CATCH_TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
     CATCH_REQUIRE_NOTHROW(utils::realign_moves(query_sequence, target_sequence, moves));
 
     // Call the function and store the result
-    int move_offset, target_start;
+    int move_offset = 0, target_start = 0;
     std::vector<uint8_t> new_moves;
 
     CATCH_CHECK_NOTHROW(std::tie(move_offset, target_start, new_moves) =
