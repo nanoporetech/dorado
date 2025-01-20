@@ -136,9 +136,10 @@ DEFINE_CATCH_SCENARIO("Popping tasks") {
 
             CATCH_THEN("Popping explicit priorities match their priority") {
                 // Check both orderings
+                const auto high_first = GENERATE(false, true);
                 const auto pop_order =
-                        GENERATE(std::pair(TaskPriority::normal, TaskPriority::high),
-                                 std::pair(TaskPriority::high, TaskPriority::normal));
+                        high_first ? std::pair(TaskPriority::high, TaskPriority::normal)
+                                   : std::pair(TaskPriority::normal, TaskPriority::high);
                 CATCH_CAPTURE(pop_order.first, pop_order.second);
 
                 CATCH_CHECK(queue.pop(pop_order.first).priority == pop_order.first);
