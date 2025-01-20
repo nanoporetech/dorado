@@ -39,7 +39,7 @@ A        C        G     T     C           G        C     G  T           C       
 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0
 */
 // clang-format on
-TEST_CASE("Test stitch_chunks", TEST_GROUP) {
+CATCH_TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     constexpr size_t CHUNK_SIZE = 10;
     constexpr size_t OVERLAP = 3;
 
@@ -68,7 +68,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.model_stride = static_cast<int>(dorado::utils::div_round_closest(
             called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size()));
-    REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, called_chunks));
+    CATCH_REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, called_chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";
     const std::string expected_qstring = "!&.-&.&.-&.-&.-&&.-";
@@ -76,7 +76,7 @@ TEST_CASE("Test stitch_chunks", TEST_GROUP) {
                                                  1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0,
                                                  1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1};
 
-    REQUIRE(read_common.seq == expected_sequence);
-    REQUIRE(read_common.qstring == expected_qstring);
-    REQUIRE(read_common.moves == expected_moves);
+    CATCH_REQUIRE(read_common.seq == expected_sequence);
+    CATCH_REQUIRE(read_common.qstring == expected_qstring);
+    CATCH_REQUIRE(read_common.moves == expected_moves);
 }

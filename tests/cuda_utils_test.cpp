@@ -9,7 +9,7 @@
 #include <tuple>
 
 #define CUT_TAG "[cuda_utils]"
-#define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
 using namespace Catch::Matchers;
 
@@ -47,7 +47,7 @@ DEFINE_TEST("matmul_f16") {
     // ~3 decimal digits, so we need to reduce the tolerances a bit.
     const double rtol = 1e-3;
     const double atol = 0;
-    REQUIRE(torch::allclose(C1, C2, rtol, atol));
+    CATCH_REQUIRE(torch::allclose(C1, C2, rtol, atol));
 }
 
 DEFINE_TEST("try_parse_device_ids parameterised test cases") {
@@ -70,14 +70,14 @@ DEFINE_TEST("try_parse_device_ids parameterised test cases") {
                     {"cuda:1-3", 4, false, {}},
                     {"cuda:1.3", 4, false, {}},
             }));
-    CAPTURE(device_string);
-    CAPTURE(num_devices);
+    CATCH_CAPTURE(device_string);
+    CATCH_CAPTURE(num_devices);
     std::vector<int> device_ids{};
     std::string error_message{};
 
-    CHECK(try_parse_device_ids(device_string, num_devices, device_ids, error_message) ==
-          expected_result);
-    CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
+    CATCH_CHECK(try_parse_device_ids(device_string, num_devices, device_ids, error_message) ==
+                expected_result);
+    CATCH_CHECK_THAT(device_ids, UnorderedEquals(expected_ids));
 }
 
 }  // namespace dorado::utils::cuda_utils

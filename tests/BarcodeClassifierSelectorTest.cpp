@@ -8,28 +8,28 @@
 
 namespace {
 
-TEST_CASE(TEST_GROUP " constructor does not throw", TEST_GROUP) {
-    REQUIRE_NOTHROW(dorado::demux::BarcodeClassifierSelector{});
+CATCH_TEST_CASE(TEST_GROUP " constructor does not throw", TEST_GROUP) {
+    CATCH_REQUIRE_NOTHROW(dorado::demux::BarcodeClassifierSelector{});
 }
 
-TEST_CASE(TEST_GROUP " get_barcoder with valid kit does not throw", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " get_barcoder with valid kit does not throw", TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
     dorado::demux::BarcodingInfo info;
     info.kit_name = "SQK-RAB201";
-    REQUIRE_NOTHROW(cut.get_barcoder(info));
+    CATCH_REQUIRE_NOTHROW(cut.get_barcoder(info));
 }
 
-TEST_CASE(TEST_GROUP " get_barcoder with invalid kit throws", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " get_barcoder with invalid kit throws", TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
     dorado::demux::BarcodingInfo info;
     info.kit_name = "ABSOLUTE-RUBBISH";
-    REQUIRE_THROWS(cut.get_barcoder(info));
+    CATCH_REQUIRE_THROWS(cut.get_barcoder(info));
 }
 
-TEST_CASE(TEST_GROUP " get_barcoder twice with same kit returns same barcoder instance",
-          TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " get_barcoder twice with same kit returns same barcoder instance",
+                TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
     dorado::demux::BarcodingInfo info;
@@ -40,11 +40,12 @@ TEST_CASE(TEST_GROUP " get_barcoder twice with same kit returns same barcoder in
     info2.kit_name = "SQK-RAB201";
     auto barcoder_second = cut.get_barcoder(info2);
 
-    REQUIRE(barcoder_first == barcoder_second);
+    CATCH_REQUIRE(barcoder_first == barcoder_second);
 }
 
-TEST_CASE(TEST_GROUP " get_barcoder twice with different kits returns different barcoder instances",
-          TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP
+                " get_barcoder twice with different kits returns different barcoder instances",
+                TEST_GROUP) {
     dorado::demux::BarcodeClassifierSelector cut{};
 
     dorado::demux::BarcodingInfo info;
@@ -55,7 +56,7 @@ TEST_CASE(TEST_GROUP " get_barcoder twice with different kits returns different 
     info2.kit_name = "SQK-LWB001";
     auto barcoder_second = cut.get_barcoder(info2);
 
-    REQUIRE(barcoder_first != barcoder_second);
+    CATCH_REQUIRE(barcoder_first != barcoder_second);
 }
 
 }  // namespace

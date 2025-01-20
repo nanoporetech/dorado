@@ -38,7 +38,7 @@ void test_chunking(const Params & p) {
             p.signal_len, p.hits_to_sig, p.chunk_size, p.context_samples_before,
             p.context_samples_after, p.end_align_last_chunk);
 
-    CHECK(p.expected_chunks == result_chunk_starts);
+    CATCH_CHECK(p.expected_chunks == result_chunk_starts);
 
     // Resolve the modbase output indexes
     ScoreIdxs result_scores{p.expected_scores.size()};
@@ -57,14 +57,14 @@ void test_chunking(const Params & p) {
         ++chunk_idx;
     }
 
-    CHECK(p.expected_scores.size() == result_scores.size());
+    CATCH_CHECK(p.expected_scores.size() == result_scores.size());
     for (size_t chunk_i = 0; chunk_i < result_scores.size(); ++chunk_i) {
-        CAPTURE(chunk_i);
-        CHECK(p.expected_scores.at(chunk_i) == result_scores.at(chunk_i));
+        CATCH_CAPTURE(chunk_i);
+        CATCH_CHECK(p.expected_scores.at(chunk_i) == result_scores.at(chunk_i));
     }
 }
 
-TEST_CASE(TEST_GROUP ": chunking not stride-aligned", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": chunking not stride-aligned", TEST_GROUP) {
     // Setting modbase stride to 1 allows us to use "easy" un-normalised values which would otherwise
     // be invalid as they're not stride aligned.
     constexpr int64_t no_stride = 1;
@@ -128,10 +128,10 @@ TEST_CASE(TEST_GROUP ": chunking not stride-aligned", TEST_GROUP) {
             },
     }));
     // clang-format on
-    SECTION(p.description) { test_chunking(p); }
+    CATCH_SECTION(p.description) { test_chunking(p); }
 }
 
-TEST_CASE(TEST_GROUP ": chunking not stride-aligned end-aligned", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": chunking not stride-aligned end-aligned", TEST_GROUP) {
     // Setting modbase stride to 1 allows us to use "easy" un-normalised values which would otherwise
     // be invalid as they're not stride aligned.
     constexpr int64_t no_stride = 1;
@@ -195,10 +195,10 @@ TEST_CASE(TEST_GROUP ": chunking not stride-aligned end-aligned", TEST_GROUP) {
             },
     }));
     // clang-format on
-    SECTION(p.description) { test_chunking(p); }
+    CATCH_SECTION(p.description) { test_chunking(p); }
 }
 
-TEST_CASE(TEST_GROUP ": chunking stride-aligned", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": chunking stride-aligned", TEST_GROUP) {
     // clang-format off
     // Use the modbase stride correctly
     constexpr int64_t stride = 3;
@@ -217,10 +217,10 @@ TEST_CASE(TEST_GROUP ": chunking stride-aligned", TEST_GROUP) {
             },
     }));
     // clang-format on
-    SECTION(p.description) { test_chunking(p); }
+    CATCH_SECTION(p.description) { test_chunking(p); }
 }
 
-TEST_CASE(TEST_GROUP ": chunking context-centered", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": chunking context-centered", TEST_GROUP) {
     // clang-format off
     constexpr int64_t stride = 3;
     constexpr bool no_align = false;
@@ -239,10 +239,10 @@ TEST_CASE(TEST_GROUP ": chunking context-centered", TEST_GROUP) {
             },
     }));
     // clang-format on
-    SECTION(p.description) { test_chunking(p); }
+    CATCH_SECTION(p.description) { test_chunking(p); }
 }
 
-TEST_CASE(TEST_GROUP ": resolve_score_index", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": resolve_score_index", TEST_GROUP) {
     auto [expected, hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
           context_samples_before, context_samples_after, modbase_stride] =
             // clang-format off
@@ -276,12 +276,12 @@ TEST_CASE(TEST_GROUP ": resolve_score_index", TEST_GROUP) {
             hit_sig_abs, chunk_signal_start, scores_states, chunk_size, context_samples_before,
             context_samples_after, modbase_stride);
 
-    CAPTURE(result, expected, hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
-            context_samples_before, context_samples_after, modbase_stride);
-    CHECK(expected == result);
+    CATCH_CAPTURE(result, expected, hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
+                  context_samples_before, context_samples_after, modbase_stride);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE(TEST_GROUP ": resolve_score_index exceptions", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": resolve_score_index exceptions", TEST_GROUP) {
     const std::string hit_before_start = "Modbase hit before chunk start.";
     const std::string not_stride_aligned = "Modbase score did not align to canonical base.";
 
@@ -296,10 +296,10 @@ TEST_CASE(TEST_GROUP ": resolve_score_index exceptions", TEST_GROUP) {
                 std::make_tuple(3, 1, 1, 10, 0, 1, 3, not_stride_aligned),
             }));
     
-    CAPTURE(hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
+    CATCH_CAPTURE(hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
             context_samples_before, context_samples_after, modbase_stride);
     
-    CHECK_THROWS_WITH(dorado::ModBaseChunkCallerNode::resolve_score_index(
+    CATCH_CHECK_THROWS_WITH(dorado::ModBaseChunkCallerNode::resolve_score_index(
             hit_sig_abs, chunk_signal_start, scores_states, chunk_size, context_samples_before,
             context_samples_after, modbase_stride), expected_msg);
 

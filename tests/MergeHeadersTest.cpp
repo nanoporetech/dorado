@@ -10,7 +10,7 @@
 using namespace dorado;
 using dorado::utils::MergeHeaders;
 
-TEST_CASE("MergeHeadersTest: incompatible RG lines", TEST_GROUP) {
+CATCH_TEST_CASE("MergeHeadersTest: incompatible RG lines", TEST_GROUP) {
     std::string hdr1_txt =
             "@HD\tVN:1.6\tSO:coordinate\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
@@ -28,12 +28,12 @@ TEST_CASE("MergeHeadersTest: incompatible RG lines", TEST_GROUP) {
 
     MergeHeaders merger(true);
     auto res1 = merger.add_header(header1.get(), "header1");
-    CHECK(res1.empty());
+    CATCH_CHECK(res1.empty());
     auto res2 = merger.add_header(header2.get(), "header2");
-    CHECK(res2 == std::string("Error merging header header2. RG lines are incompatible."));
+    CATCH_CHECK(res2 == std::string("Error merging header header2. RG lines are incompatible."));
 }
 
-TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
+CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
     std::string hdr1_txt =
             "@HD\tVN:1.6\tSO:coordinate\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
@@ -51,12 +51,12 @@ TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
 
     MergeHeaders merger(false);
     auto res1 = merger.add_header(header1.get(), "header1");
-    CHECK(res1.empty());
+    CATCH_CHECK(res1.empty());
     auto res2 = merger.add_header(header2.get(), "header2");
-    CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
+    CATCH_CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
 }
 
-TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP) {
+CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP) {
     std::string hdr1_txt =
             "@HD\tVN:1.6\tSO:coordinate\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
@@ -74,9 +74,9 @@ TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP
 
     MergeHeaders merger(true);
     auto res1 = merger.add_header(header1.get(), "header1");
-    CHECK(res1.empty());
+    CATCH_CHECK(res1.empty());
     auto res2 = merger.add_header(header2.get(), "header2");
-    CHECK(res2.empty());
+    CATCH_CHECK(res2.empty());
 
     merger.finalize_merge();
     auto merged_hdr = merger.get_merged_header();
@@ -86,10 +86,10 @@ TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
             "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
             "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n";
-    CHECK(merged_hdr_txt == expected_hdr_txt);
+    CATCH_CHECK(merged_hdr_txt == expected_hdr_txt);
 }
 
-TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
+CATCH_TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
     std::string hdr1_txt =
             "@HD\tVN:1.6\tSO:coordinate\n"
             "@PG\tID:aligner\tPN:minimap2\tVN:2.26\n"
@@ -115,11 +115,11 @@ TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
 
     MergeHeaders merger(false);
     auto res1 = merger.add_header(header1.get(), "header1");
-    CHECK(res1.empty());
+    CATCH_CHECK(res1.empty());
     auto res2 = merger.add_header(header2.get(), "header2");
-    CHECK(res2.empty());
+    CATCH_CHECK(res2.empty());
     auto res3 = merger.add_header(header3.get(), "header3");
-    CHECK(res3.empty());
+    CATCH_CHECK(res3.empty());
 
     merger.finalize_merge();
     auto merged_hdr = merger.get_merged_header();
@@ -138,13 +138,13 @@ TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
             "@SQ\tSN:ref1\tLN:1000\n"
             "@SQ\tSN:ref2\tLN:3000\n"
             "@SQ\tSN:ref3\tLN:2000\n";
-    CHECK(merged_hdr_txt == expected_hdr_txt);
-    REQUIRE(sq_mapping.size() == 3);
-    REQUIRE(sq_mapping[0].size() == 1);
-    CHECK(sq_mapping[0][0] == 0);
-    REQUIRE(sq_mapping[1].size() == 1);
-    CHECK(sq_mapping[1][0] == 1);
-    REQUIRE(sq_mapping[2].size() == 2);
-    CHECK(sq_mapping[2][0] == 0);
-    CHECK(sq_mapping[2][1] == 2);
+    CATCH_CHECK(merged_hdr_txt == expected_hdr_txt);
+    CATCH_REQUIRE(sq_mapping.size() == 3);
+    CATCH_REQUIRE(sq_mapping[0].size() == 1);
+    CATCH_CHECK(sq_mapping[0][0] == 0);
+    CATCH_REQUIRE(sq_mapping[1].size() == 1);
+    CATCH_CHECK(sq_mapping[1][0] == 1);
+    CATCH_REQUIRE(sq_mapping[2].size() == 2);
+    CATCH_CHECK(sq_mapping[2][0] == 0);
+    CATCH_CHECK(sq_mapping[2][1] == 2);
 }

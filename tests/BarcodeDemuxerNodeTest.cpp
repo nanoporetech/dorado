@@ -39,7 +39,7 @@ std::vector<BamPtr> create_bam_reader(const std::string& bc) {
 }
 }  // namespace
 
-TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     auto tmp_dir = make_temp_dir("dorado_demuxer");
@@ -86,7 +86,7 @@ TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TEST_GRO
         }
 
         for (const auto& expected : expected_files) {
-            CHECK(actual_files.find(expected) != actual_files.end());
+            CATCH_CHECK(actual_files.find(expected) != actual_files.end());
         }
     }
 }

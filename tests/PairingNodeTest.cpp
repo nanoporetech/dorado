@@ -47,7 +47,7 @@ auto make_read(int delay_ms, size_t seq_len) {
 
 }  // namespace
 
-TEST_CASE("Split read pairing", TEST_GROUP) {
+CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     // the second read must start within 1000ms of the end of the first read
     // and min/max length ratio must be greater than 0.2
     // expected pairs: {2, 3} and {5, 6}
@@ -85,15 +85,15 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     pipeline.reset();
 
     // the 4 split reads generate one additional readpair
-    CHECK(messages.size() == 9);
+    CATCH_CHECK(messages.size() == 9);
     auto num_reads =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
                 return std::holds_alternative<dorado::SimplexReadPtr>(message);
             });
-    CHECK(num_reads == 7);
+    CATCH_CHECK(num_reads == 7);
     auto num_pairs =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
                 return std::holds_alternative<dorado::ReadPair>(message);
             });
-    CHECK(num_pairs == 2);
+    CATCH_CHECK(num_pairs == 2);
 }

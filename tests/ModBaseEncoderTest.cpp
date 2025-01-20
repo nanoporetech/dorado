@@ -89,8 +89,8 @@ std::string decode_bases(const std::vector<int8_t>& encoded_bases, size_t kmer_l
 
 }  // namespace
 
-TEST_CASE("Test kmer encoder helper", TEST_GROUP) {
-    SECTION("Happy path") {
+CATCH_TEST_CASE("Test kmer encoder helper", TEST_GROUP) {
+    CATCH_SECTION("Happy path") {
         auto [sequence, encoded] = GENERATE(table<std::string, std::vector<int8_t>>(
                 {{"N", {0, 0, 0, 0}},
                  {"A", {1, 0, 0, 0}},
@@ -102,18 +102,18 @@ TEST_CASE("Test kmer encoder helper", TEST_GROUP) {
                  {"NNN", std::vector<int8_t>(4 * 3, 0)},
                  {"TTAGCT",
                   {0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1}}}));
-        CAPTURE(sequence);
-        CHECK(encoded == encode_bases(sequence));
+        CATCH_CAPTURE(sequence);
+        CATCH_CHECK(encoded == encode_bases(sequence));
     }
-    SECTION("Invalid input") {
+    CATCH_SECTION("Invalid input") {
         auto bad_sequence = GENERATE("X", "a", "AC  x  GT");
-        CAPTURE(bad_sequence);
-        CHECK_THROWS(encode_bases(bad_sequence));
+        CATCH_CAPTURE(bad_sequence);
+        CATCH_CHECK_THROWS(encode_bases(bad_sequence));
     }
 }
 
-TEST_CASE("Test kmer decoder helper", TEST_GROUP) {
-    SECTION("Happy path") {
+CATCH_TEST_CASE("Test kmer decoder helper", TEST_GROUP) {
+    CATCH_SECTION("Happy path") {
         auto [sequence, kmer_len, encoded] = GENERATE(table<std::string, int, std::vector<int8_t>>(
                 {{"N", 0, {0, 0, 0, 0}},
                  {"A", 0, {1, 0, 0, 0}},
@@ -126,20 +126,20 @@ TEST_CASE("Test kmer decoder helper", TEST_GROUP) {
                  {"A C G T", 1, {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}},
                  {"TT AG CT", 2, {0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0,
                                   0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1}}}));
-        CAPTURE(sequence, kmer_len);
-        CHECK(sequence == decode_bases(encoded, kmer_len));
+        CATCH_CAPTURE(sequence, kmer_len);
+        CATCH_CHECK(sequence == decode_bases(encoded, kmer_len));
     }
-    SECTION("Invalid inputs caught") {
+    CATCH_SECTION("Invalid inputs caught") {
         auto [bad_input] = GENERATE(table<std::vector<int8_t>>({
                 {{0}},
                 {{0, 0, 0, 0, 0}},
         }));
-        CAPTURE(bad_input);
-        CHECK_THROWS(decode_bases(bad_input, 1));
+        CATCH_CAPTURE(bad_input);
+        CATCH_CHECK_THROWS(decode_bases(bad_input, 1));
     }
 }
 
-TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
+CATCH_TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     constexpr size_t BLOCK_STRIDE = 2;
     constexpr size_t SLICE_BLOCKS = 6;
     constexpr size_t CONTEXT_SAMPLES = BLOCK_STRIDE * SLICE_BLOCKS;
@@ -191,7 +191,7 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     std::string exp_cent_seq_9 = "GTA TAC TAC ACN ACN ACN ACN ACN ACN ACN ACN ACN";
     std::string exp_just_seq_9 = "GTA GTA GTA GTA TAC TAC ACN ACN ACN ACN ACN ACN";
 
-    CHECK(expected_slice0 == encode_bases(exp_cent_seq_0));
+    CATCH_CHECK(expected_slice0 == encode_bases(exp_cent_seq_0));
 
     using EncCtx = ModBaseEncoder::Context;
     auto [justified, seq_pos, ctx] = GENERATE_COPY(table<bool, size_t, EncCtx>({
@@ -206,19 +206,19 @@ TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
             std::make_tuple(kIsJustified, 9, EncCtx{encode_bases(exp_just_seq_9), 28, 12, 0, 0}),
     }));
 
-    CAPTURE(seq_pos, justified, decode_bases(ctx.data, 3), ctx.first_sample,
-            ctx.num_existing_samples, ctx.lead_samples_needed, ctx.tail_samples_needed);
+    CATCH_CAPTURE(seq_pos, justified, decode_bases(ctx.data, 3), ctx.first_sample,
+                  ctx.num_existing_samples, ctx.lead_samples_needed, ctx.tail_samples_needed);
 
     auto res = justified ? justified_encoder.get_context(seq_pos) : encoder.get_context(seq_pos);
-    CHECK(res.data == ctx.data);
-    CHECK(decode_bases(res.data, 3) == decode_bases(ctx.data, 3));
-    CHECK(res.first_sample == ctx.first_sample);
-    CHECK(res.num_existing_samples == ctx.num_existing_samples);
-    CHECK(res.lead_samples_needed == ctx.lead_samples_needed);
-    CHECK(res.tail_samples_needed == ctx.tail_samples_needed);
+    CATCH_CHECK(res.data == ctx.data);
+    CATCH_CHECK(decode_bases(res.data, 3) == decode_bases(ctx.data, 3));
+    CATCH_CHECK(res.first_sample == ctx.first_sample);
+    CATCH_CHECK(res.num_existing_samples == ctx.num_existing_samples);
+    CATCH_CHECK(res.lead_samples_needed == ctx.lead_samples_needed);
+    CATCH_CHECK(res.tail_samples_needed == ctx.tail_samples_needed);
 }
 
-TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
+CATCH_TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 2;
     std::string sequence{"TATTCAGTAC"};
     auto seq_ints = dorado::utils::sequence_to_ints(sequence);
@@ -234,13 +234,13 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, kmer_len, whole_context, padding,
                                         is_centered);
 
-        CAPTURE(seq_ints, seq_to_sig_map, whole_context);
-        CAPTURE(kmer_len, padding, is_centered);
-        CHECK(result.size() == (whole_context + 2 * padding) * 4 * kmer_len);
-        CHECK(decode_bases(result, kmer_len) == expected_bases);
+        CATCH_CAPTURE(seq_ints, seq_to_sig_map, whole_context);
+        CATCH_CAPTURE(kmer_len, padding, is_centered);
+        CATCH_CHECK(result.size() == (whole_context + 2 * padding) * 4 * kmer_len);
+        CATCH_CHECK(decode_bases(result, kmer_len) == expected_bases);
     };
 
-    SECTION("1mer not centered") {
+    CATCH_SECTION("1mer not centered") {
         const size_t kmer_len = 1, padding = 0;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -248,7 +248,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer not centered") {
+    CATCH_SECTION("3-mer not centered") {
         const size_t kmer_len = 3, padding = 0;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -265,7 +265,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer not centered with padding") {
+    CATCH_SECTION("3-mer not centered with padding") {
         const size_t kmer_len = 3, padding = 3;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -284,7 +284,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer centered") {
+    CATCH_SECTION("3-mer centered") {
         const size_t kmer_len = 3, padding = 0;
         const bool is_centered = true;
         std::string kmer_bases =
@@ -301,7 +301,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer centered with padding") {
+    CATCH_SECTION("3-mer centered with padding") {
         const size_t kmer_len = 3, padding = 1;
         const bool is_centered = true;
         std::string kmer_bases =
@@ -320,7 +320,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("5-mer centered") {
+    CATCH_SECTION("5-mer centered") {
         const size_t kmer_len = 5, padding = 0;
         const bool is_centered = true;
         std::string kmer_bases =
@@ -337,7 +337,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("5-mer centered with padding") {
+    CATCH_SECTION("5-mer centered with padding") {
         const size_t kmer_len = 5, padding = 2;
         const bool is_centered = true;
         std::string kmer_bases =
@@ -356,7 +356,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("9-mer not centered") {
+    CATCH_SECTION("9-mer not centered") {
         // Although this seems excessive, the 9-mer has a SIMD fast-path for AVX platforms
         const size_t kmer_len = 9, padding = 0;
         const bool is_centered = false;
@@ -384,7 +384,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("9-mer not centered with padding") {
+    CATCH_SECTION("9-mer not centered with padding") {
         // Although this seems excessive, the 9-mer has a SIMD fast-path for AVX platforms
         const size_t kmer_len = 9, padding = 2;
         const bool is_centered = false;
@@ -414,7 +414,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("9-mer centered") {
+    CATCH_SECTION("9-mer centered") {
         const size_t kmer_len = 9, padding = 0;
         const bool is_centered = true;
         std::string kmer_bases =
@@ -442,7 +442,7 @@ TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
     }
 }
 
-TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
+CATCH_TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 5;
     std::string sequence{"TAGTCA"};
     auto seq_ints = dorado::utils::sequence_to_ints(sequence);
@@ -458,13 +458,13 @@ TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
         auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, kmer_len, whole_context, padding,
                                         is_centered);
 
-        CAPTURE(seq_ints, seq_to_sig_map, whole_context);
-        CAPTURE(kmer_len, padding, is_centered);
-        CHECK(result.size() == (whole_context + 2 * padding) * 4 * kmer_len);
-        CHECK(decode_bases(result, kmer_len) == expected_bases);
+        CATCH_CAPTURE(seq_ints, seq_to_sig_map, whole_context);
+        CATCH_CAPTURE(kmer_len, padding, is_centered);
+        CATCH_CHECK(result.size() == (whole_context + 2 * padding) * 4 * kmer_len);
+        CATCH_CHECK(decode_bases(result, kmer_len) == expected_bases);
     };
 
-    SECTION("1mer not centered") {
+    CATCH_SECTION("1mer not centered") {
         const size_t kmer_len = 1, padding = 0;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -477,7 +477,7 @@ TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer not centered") {
+    CATCH_SECTION("3-mer not centered") {
         const size_t kmer_len = 3, padding = 0;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -490,7 +490,7 @@ TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer not centered with padding") {
+    CATCH_SECTION("3-mer not centered with padding") {
         const size_t kmer_len = 3, padding = 3;
         const bool is_centered = false;
         std::string kmer_bases =
@@ -505,7 +505,7 @@ TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
         test_chunk_enc(kmer_len, padding, is_centered, kmer_bases);
     }
 
-    SECTION("3-mer centered with padding") {
+    CATCH_SECTION("3-mer centered with padding") {
         const size_t kmer_len = 3, padding = 5;
         const bool is_centered = true;
         std::string kmer_bases =

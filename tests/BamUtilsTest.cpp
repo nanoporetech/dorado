@@ -18,20 +18,21 @@
 namespace fs = std::filesystem;
 using namespace dorado;
 
-TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: fetch keys from PG header", TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
     auto sam = aligner_test_dir / "basecall.sam";
 
     auto keys =
             utils::extract_pg_keys_from_hdr(sam.string(), {"PN", "CL", "VN"}, "ID", "basecaller");
-    CHECK(keys["PN"] == "dorado");
-    CHECK(keys["VN"] == "0.5.0+5fa4de73+dirty");
-    CHECK(keys["CL"] ==
-          "dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -x cpu --modified-bases "
-          "5mCG --emit-sam");
+    CATCH_CHECK(keys["PN"] == "dorado");
+    CATCH_CHECK(keys["VN"] == "0.5.0+5fa4de73+dirty");
+    CATCH_CHECK(
+            keys["CL"] ==
+            "dorado basecaller dna_r9.4.1_e8_hac@v3.3 ./tests/data/pod5 -x cpu --modified-bases "
+            "5mCG --emit-sam");
 }
 
-TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
     auto has_read_group_header = [](sam_hdr_t *ptr, const char *id) {
         return sam_hdr_line_index(ptr, "RG", id) >= 0;
     };
@@ -45,11 +46,11 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
         return tag;
     };
 
-    SECTION("No read groups generate no headers") {
+    CATCH_SECTION("No read groups generate no headers") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
+        CATCH_CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
         dorado::utils::add_rg_headers(sam_header.get(), {});
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
+        CATCH_CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == 0);
     }
 
     const std::unordered_map<std::string, dorado::ReadGroup> read_groups{
@@ -61,20 +62,20 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
               "exp_start_1", "sample_1", "", ""}},
     };
 
-    SECTION("Read groups") {
+    CATCH_SECTION("Read groups") {
         dorado::SamHdrPtr sam_header(sam_hdr_init());
         dorado::utils::add_rg_headers(sam_header.get(), read_groups);
 
         // Check the IDs of the groups are all there.
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(read_groups.size()));
+        CATCH_CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(read_groups.size()));
         for (auto &&[id, read_group] : read_groups) {
-            CHECK(has_read_group_header(sam_header.get(), id.c_str()));
+            CATCH_CHECK(has_read_group_header(sam_header.get(), id.c_str()));
             // None of the read groups should have a barcode.
-            CHECK(get_barcode_tag(sam_header.get(), id.c_str()) == std::nullopt);
+            CATCH_CHECK(get_barcode_tag(sam_header.get(), id.c_str()) == std::nullopt);
         }
     }
 
-    SECTION("Read groups with barcode kit") {
+    CATCH_SECTION("Read groups with barcode kit") {
         const std::string CUSTOM_BARCODE_NAME{"CUSTOM-BC01"};
         const std::string CUSTOM_BARCODE_SEQUENCE{"AAA"};
         const std::string KIT_NAME{"CUSTOM-SQK-RAB204"};
@@ -99,13 +100,13 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
 
         // Check the IDs of the groups are all there.
         const size_t total_groups = read_groups.size() * (kit_info.barcodes.size() + 1);
-        CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(total_groups));
+        CATCH_CHECK(sam_hdr_count_lines(sam_header.get(), "RG") == int(total_groups));
 
         // Check that the IDs match the expected format.
         const auto &barcode_seqs = dorado::barcode_kits::get_barcodes();
         for (auto &&[id, read_group] : read_groups) {
-            CHECK(has_read_group_header(sam_header.get(), id.c_str()));
-            CHECK(get_barcode_tag(sam_header.get(), id.c_str()) == std::nullopt);
+            CATCH_CHECK(has_read_group_header(sam_header.get(), id.c_str()));
+            CATCH_CHECK(get_barcode_tag(sam_header.get(), id.c_str()) == std::nullopt);
 
             // The headers with barcodes should contain those barcodes.
             for (const auto &barcode_name : kit_info.barcodes) {
@@ -113,9 +114,9 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
                                      dorado::barcode_kits::generate_standard_barcode_name(
                                              KIT_NAME, barcode_name);
                 const auto &barcode_seq = barcode_seqs.at(barcode_name);
-                CHECK(has_read_group_header(sam_header.get(), full_id.c_str()));
+                CATCH_CHECK(has_read_group_header(sam_header.get(), full_id.c_str()));
                 if (barcode_name != CUSTOM_BARCODE_NAME) {
-                    CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);
+                    CATCH_CHECK(get_barcode_tag(sam_header.get(), full_id.c_str()) == barcode_seq);
                 }
             }
 
@@ -125,30 +126,34 @@ TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
                                                 KIT_NAME, CUSTOM_BARCODE_NAME);
             auto actual_barcode_tag_sequence =
                     get_barcode_tag(sam_header.get(), custom_full_id.c_str());
-            CHECK(actual_barcode_tag_sequence == CUSTOM_BARCODE_SEQUENCE);
+            CATCH_CHECK(actual_barcode_tag_sequence == CUSTOM_BARCODE_SEQUENCE);
         }
     }
 }
 
-TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
     fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
     auto sam = bam_utils_test_dir / "test.sam";
 
     HtsReader reader(sam.string(), std::nullopt);
-    REQUIRE(reader.read());  // Parse first and only record.
+    CATCH_REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 
-    SECTION("Test sequence extraction") {
+    CATCH_SECTION("Test sequence extraction") {
         std::string seq = utils::extract_sequence(record);
-        CHECK(seq ==
-              "AATAAACCGAAGACAATTTAGAAGCCAGCGAGGTATGTGCGTCTACTTCGTTCGGTTATGCGAAGCCGATATAACCTGCAGGAC"
-              "AACACAACATTTCCACTGTTTTCGTTCATTCGTAAACGCTTTCGCGTTCATCACACTCAACCATAGGCTTTAGCCAGAACGTTA"
-              "TGAACCCCAGCGACTTCCAGAACGGCGCGCGTGCCACCACCGGCGATGATACCGGTTCCTTCGGAAGCCGGCTGCATGAATACG"
-              "CGAGAACCCGTGTGAACACCTTTAACAGGGTGTTGCAGAGTGCCGTTGCTGCGGCACGATAGTTAAGTCGTATTGCTGAAGCGA"
-              "CACTGTCCATCGCTTTCTGGATGGCT");
+        CATCH_CHECK(seq ==
+                    "AATAAACCGAAGACAATTTAGAAGCCAGCGAGGTATGTGCGTCTACTTCGTTCGGTTATGCGAAGCCGATATAACCTG"
+                    "CAGGAC"
+                    "AACACAACATTTCCACTGTTTTCGTTCATTCGTAAACGCTTTCGCGTTCATCACACTCAACCATAGGCTTTAGCCAGA"
+                    "ACGTTA"
+                    "TGAACCCCAGCGACTTCCAGAACGGCGCGCGTGCCACCACCGGCGATGATACCGGTTCCTTCGGAAGCCGGCTGCATG"
+                    "AATACG"
+                    "CGAGAACCCGTGTGAACACCTTTAACAGGGTGTTGCAGAGTGCCGTTGCTGCGGCACGATAGTTAAGTCGTATTGCTG"
+                    "AAGCGA"
+                    "CACTGTCCATCGCTTTCTGGATGGCT");
     }
 
-    SECTION("Test quality extraction") {
+    CATCH_SECTION("Test quality extraction") {
         const std::string qual =
                 "%$%&%$####%'%%$&'(1/...022.+%%%%%%$$%%&%$%%%&&+)()./"
                 "0%$$'&'&'%$###$&&&'*(()()%%%%(%%'))(('''3222276<BAAABE:+''&)**%(/"
@@ -157,46 +162,46 @@ TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
                 "0,(%%&(*-55EBEB>@;??>>@BBDC?><<98-,,BGHEGFFGIIJFFDBB;6AJ>===KB:::<70/"
                 "..--,++,))+*)&&'*-,+*)))(%%&'&''%%%$&%$###$%%$$%'%%$$+1.--.7969....*)))";
         auto qual_vector = utils::extract_quality(record);
-        CHECK(qual_vector.size() == qual.length());
+        CATCH_CHECK(qual_vector.size() == qual.length());
         for (size_t i = 0; i < qual.length(); i++) {
-            CHECK(qual[i] == qual_vector[i] + 33);
+            CATCH_CHECK(qual[i] == qual_vector[i] + 33);
         }
     }
 
-    SECTION("Test move table extraction") {
+    CATCH_SECTION("Test move table extraction") {
         auto [stride, move_table] = utils::extract_move_table(record);
         int seqlen = record->core.l_qseq;
-        REQUIRE(!move_table.empty());
-        CHECK(stride == 6);
-        CHECK(seqlen == std::accumulate(move_table.begin(), move_table.end(), 0));
+        CATCH_REQUIRE(!move_table.empty());
+        CATCH_CHECK(stride == 6);
+        CATCH_CHECK(seqlen == std::accumulate(move_table.begin(), move_table.end(), 0));
     }
 
-    SECTION("Test mod base info extraction") {
+    CATCH_SECTION("Test mod base info extraction") {
         auto [modbase_str, modbase_probs] = utils::extract_modbase_info(record);
         const std::vector<int8_t> expected_modbase_probs = {5, 1};
-        CHECK(modbase_str == "C+h?,1;C+m?,1;");
-        CHECK(modbase_probs.size() == expected_modbase_probs.size());
+        CATCH_CHECK(modbase_str == "C+h?,1;C+m?,1;");
+        CATCH_CHECK(modbase_probs.size() == expected_modbase_probs.size());
         for (size_t i = 0; i < expected_modbase_probs.size(); i++) {
-            CHECK(modbase_probs[i] == expected_modbase_probs[i]);
+            CATCH_CHECK(modbase_probs[i] == expected_modbase_probs[i]);
         }
     }
 }
 
-TEST_CASE("BamUtilsTest: cigar2str utility", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: cigar2str utility", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
     char *end = NULL;
     int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
     std::string converted_str = utils::cigar2str(n_cigar, a_cigar);
-    CHECK(cigar == converted_str);
+    CATCH_CHECK(cigar == converted_str);
 
     if (a_cigar) {
         hts_free(a_cigar);
     }
 }
 
-TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
@@ -204,52 +209,52 @@ TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
     int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
     const uint32_t qlen = uint32_t(bam_cigar2qlen(n_cigar, a_cigar));
 
-    SECTION("Trim nothing") {
+    CATCH_SECTION("Trim nothing") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+        CATCH_CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
     }
 
-    SECTION("Trim from first op") {
+    CATCH_SECTION("Trim from first op") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {1, qlen});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "11S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+        CATCH_CHECK(converted_str == "11S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
     }
 
-    SECTION("Trim entire first op") {
+    CATCH_SECTION("Trim entire first op") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {12, qlen});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
+        CATCH_CHECK(converted_str == "17M1D296M2D21M1D3M2D10M1I320M1D2237M41S");
     }
 
-    SECTION("Trim several ops from the front") {
+    CATCH_SECTION("Trim several ops from the front") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {29, qlen});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "296M2D21M1D3M2D10M1I320M1D2237M41S");
+        CATCH_CHECK(converted_str == "296M2D21M1D3M2D10M1I320M1D2237M41S");
     }
 
-    SECTION("Trim from last op") {
+    CATCH_SECTION("Trim from last op") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 20});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M21S");
+        CATCH_CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M21S");
     }
 
-    SECTION("Trim entire last op") {
+    CATCH_SECTION("Trim entire last op") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 41});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M");
+        CATCH_CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M");
     }
 
-    SECTION("Trim several ops from the end") {
+    CATCH_SECTION("Trim several ops from the end") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {0, qlen - 2278});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M");
+        CATCH_CHECK(converted_str == "12S17M1D296M2D21M1D3M2D10M1I320M");
     }
 
-    SECTION("Trim from the middle") {
+    CATCH_SECTION("Trim from the middle") {
         auto ops = utils::trim_cigar(n_cigar, a_cigar, {29, qlen - 2278});
         std::string converted_str = utils::cigar2str(uint32_t(ops.size()), ops.data());
-        CHECK(converted_str == "296M2D21M1D3M2D10M1I320M");
+        CATCH_CHECK(converted_str == "296M2D21M1D3M2D10M1I320M");
     }
 
     if (a_cigar) {
@@ -257,31 +262,31 @@ TEST_CASE("BamUtilsTest: Test trim CIGAR", TEST_GROUP) {
     }
 }
 
-TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     const std::string cigar = "12S17M1D296M2D21M1D3M2D10M1I320M1D2237M41S";
     size_t m = 0;
     uint32_t *a_cigar = NULL;
     char *end = NULL;
     int n_cigar = int(sam_parse_cigar(cigar.c_str(), &end, &a_cigar, &m));
 
-    SECTION("No positions consumed") {
+    CATCH_SECTION("No positions consumed") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 0);
-        CHECK(pos_consumed == 0);
+        CATCH_CHECK(pos_consumed == 0);
     }
 
-    SECTION("No positions consumed with soft clipping") {
+    CATCH_SECTION("No positions consumed with soft clipping") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 12);
-        CHECK(pos_consumed == 0);
+        CATCH_CHECK(pos_consumed == 0);
     }
 
-    SECTION("Match positions consumed") {
+    CATCH_SECTION("Match positions consumed") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 25);
-        CHECK(pos_consumed == 13);
+        CATCH_CHECK(pos_consumed == 13);
     }
 
-    SECTION("Match and delete positions consumed") {
+    CATCH_SECTION("Match and delete positions consumed") {
         auto pos_consumed = utils::ref_pos_consumed(n_cigar, a_cigar, 29);
-        CHECK(pos_consumed == 18);
+        CATCH_CHECK(pos_consumed == 18);
     }
 
     if (a_cigar) {
@@ -289,16 +294,16 @@ TEST_CASE("BamUtilsTest: Ref positions consumed", TEST_GROUP) {
     }
 }
 
-TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
+CATCH_TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
     fs::path bam_utils_test_dir = fs::path(get_data_dir("bam_utils"));
     auto sam = bam_utils_test_dir / "aligned_record.bam";
 
     HtsReader reader(sam.string(), std::nullopt);
     reader.set_add_filename_tag(false);
-    REQUIRE(reader.read());  // Parse first and only record.
+    CATCH_REQUIRE(reader.read());  // Parse first and only record.
     auto record = reader.record.get();
 
     utils::remove_alignment_tags_from_record(record);
 
-    CHECK(bam_aux_first(record) == nullptr);
+    CATCH_CHECK(bam_aux_first(record) == nullptr);
 }

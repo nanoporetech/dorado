@@ -12,12 +12,12 @@ using dorado::NullNode;
 using dorado::Pipeline;
 using dorado::PipelineDescriptor;
 
-TEST_CASE("Creation", TEST_GROUP) {
+CATCH_TEST_CASE("Creation", TEST_GROUP) {
     {
         // Empty pipelines are not allowed.
         PipelineDescriptor pipeline_desc;
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline == nullptr);
+        CATCH_CHECK(pipeline == nullptr);
     }
 
     {
@@ -25,7 +25,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         PipelineDescriptor pipeline_desc;
         pipeline_desc.add_node<NullNode>({});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline != nullptr);
+        CATCH_CHECK(pipeline != nullptr);
     }
 
     {
@@ -34,7 +34,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline == nullptr);
+        CATCH_CHECK(pipeline == nullptr);
     }
 
     {
@@ -43,7 +43,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({sink});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline != nullptr);
+        CATCH_CHECK(pipeline != nullptr);
     }
 
     {
@@ -53,7 +53,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto source = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node_sink(source, sink);
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline != nullptr);
+        CATCH_CHECK(pipeline != nullptr);
     }
 
     {
@@ -64,7 +64,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         pipeline_desc.add_node_sink(a, b);
         pipeline_desc.add_node<NullNode>({a});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline == nullptr);
+        CATCH_CHECK(pipeline == nullptr);
     }
 
     {
@@ -74,7 +74,7 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink_b = pipeline_desc.add_node<NullNode>({});
         pipeline_desc.add_node<NullNode>({sink_a, sink_b});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline != nullptr);
+        CATCH_CHECK(pipeline != nullptr);
     }
 
     {
@@ -85,12 +85,12 @@ TEST_CASE("Creation", TEST_GROUP) {
         auto sink_b = pipeline_desc.add_node<NullNode>({sink_c});
         pipeline_desc.add_node<NullNode>({sink_a, sink_b});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
-        CHECK(pipeline != nullptr);
+        CATCH_CHECK(pipeline != nullptr);
     }
 }
 
 // Tests destruction order of a random linear pipeline.
-TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
+CATCH_TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     // Node that records destruction order.
     class OrderTestNode : public MessageSink {
     public:
@@ -136,11 +136,11 @@ TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     pipeline.reset();
 
     // Verify that nodes were destroyed in source-to-sink order.
-    CHECK(std::equal(destruction_order.cbegin(), destruction_order.cend(), indices.cbegin()));
+    CATCH_CHECK(std::equal(destruction_order.cbegin(), destruction_order.cend(), indices.cbegin()));
 }
 
 // Test inputs flow in the expected way from the source node.
-TEST_CASE("PipelineFlow", TEST_GROUP) {
+CATCH_TEST_CASE("PipelineFlow", TEST_GROUP) {
     // NullNode passes nothing on, so the sink should get no messages
     // if they are sent to that node first.
     {
@@ -150,10 +150,10 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node<NullNode>({sink});
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
-        REQUIRE(pipeline != nullptr);
+        CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
-        CHECK(messages.size() == 0);
+        CATCH_CHECK(messages.size() == 0);
     }
 
     {
@@ -164,27 +164,27 @@ TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
         pipeline_desc.add_node_sink(null_node, sink);
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
-        REQUIRE(pipeline != nullptr);
+        CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
         pipeline.reset();
-        CHECK(messages.size() == 0);
+        CATCH_CHECK(messages.size() == 0);
     }
 }
 
 // Test reads make it through after the pipeline has been restarted.
-TEST_CASE("TerminateRestart", TEST_GROUP) {
+CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
     PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
-    REQUIRE(pipeline != nullptr);
+    CATCH_REQUIRE(pipeline != nullptr);
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
     pipeline->terminate(dorado::DefaultFlushOptions());
     // Messages should get through as soon as we have terminated.
-    CHECK(messages.size() == 1);
+    CATCH_CHECK(messages.size() == 1);
     // If we restart we should be able to get another message through.
     pipeline->restart();
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
     pipeline.reset();
-    CHECK(messages.size() == 2);
+    CATCH_CHECK(messages.size() == 2);
 }

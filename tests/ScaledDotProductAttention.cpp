@@ -18,7 +18,7 @@
 
 using namespace dorado::basecall::nn;
 
-TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
+CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2
     spdlog::warn("Test skipped - Scaled Dot Product Attention");
 
@@ -34,7 +34,7 @@ TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
     };
     const auto device_type = GENERATE(
             Catch::Generators::from_range(std::begin(valid_devices), std::end(valid_devices)));
-    CAPTURE(device_type);
+    CATCH_CAPTURE(device_type);
 
     if ((device_type == c10::kCUDA && !torch::hasCUDA()) ||
         (device_type == c10::kMPS && !torch::hasMPS())) {
@@ -45,24 +45,24 @@ TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 
     auto options = at::TensorOptions().dtype(torch::kFloat32).device(device_type);
 
-    SECTION("No Mask") {
+    CATCH_SECTION("No Mask") {
         torch::manual_seed(0);
 
         torch::Tensor no_mask;
         std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);
         const auto naive_res = scaled_dot_product_attention_naive(qkv[0], qkv[1], qkv[2], no_mask);
         const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2]);
-        CHECK(at::allclose(naive_res, torch_res));
+        CATCH_CHECK(at::allclose(naive_res, torch_res));
     }
 
-    SECTION("Masked") {
+    CATCH_SECTION("Masked") {
         torch::manual_seed(123);
 
         torch::Tensor mask = torch::rand({8, 8}, options).gt(0.5);
         std::vector<at::Tensor> qkv = torch::rand({8, 8, 8, 3}, options).chunk(3, -1);
         const auto naive_res = scaled_dot_product_attention_naive(qkv[0], qkv[1], qkv[2], mask);
         const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2], mask);
-        CHECK(at::allclose(naive_res, torch_res));
+        CATCH_CHECK(at::allclose(naive_res, torch_res));
     }
 #endif  // #if TORCH_VERSION_MAJOR < 2
 }

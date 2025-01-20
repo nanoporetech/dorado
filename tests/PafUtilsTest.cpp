@@ -13,40 +13,40 @@
 
 #define TEST_GROUP "[paf_utils]"
 
-TEST_CASE("PafUtilsTest: Test round trip PAF loading and writing", TEST_GROUP) {
+CATCH_TEST_CASE("PafUtilsTest: Test round trip PAF loading and writing", TEST_GROUP) {
     const std::filesystem::path paf_utils_test_dir = get_data_dir("paf_utils");
     const std::filesystem::path paf = paf_utils_test_dir / "test.paf";
 
     std::ifstream file(paf.string());
-    REQUIRE(file.is_open());
+    CATCH_REQUIRE(file.is_open());
 
     std::string line;
     while (std::getline(file, line)) {
         const dorado::utils::PafEntry paf_entry = dorado::utils::parse_paf(line);
         const std::string serialized_paf = dorado::utils::serialize_paf(paf_entry);
-        CHECK(line == serialized_paf);
+        CATCH_CHECK(line == serialized_paf);
     }
 }
 
-TEST_CASE("PafUtilsTest: Test aux loading", TEST_GROUP) {
+CATCH_TEST_CASE("PafUtilsTest: Test aux loading", TEST_GROUP) {
     const std::filesystem::path paf_utils_test_dir = get_data_dir("paf_utils");
     const std::filesystem::path paf = paf_utils_test_dir / "test.paf";
 
     std::ifstream file(paf.string());
-    REQUIRE(file.is_open());
+    CATCH_REQUIRE(file.is_open());
 
     std::string line;
     while (std::getline(file, line)) {
         const dorado::utils::PafEntry paf_entry = dorado::utils::parse_paf(line);
         const std::string_view cg = dorado::utils::paf_aux_get(paf_entry, "cg", 'Z');
-        CHECK_FALSE(cg.empty());
+        CATCH_CHECK_FALSE(cg.empty());
         const std::vector<dorado::CigarOp> ops = dorado::parse_cigar_from_string(cg);
-        CHECK_FALSE(ops.empty());
+        CATCH_CHECK_FALSE(ops.empty());
     }
 }
 
-TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
-    SECTION("Record with forward strand mapping.") {
+CATCH_TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
+    CATCH_SECTION("Record with forward strand mapping.") {
         dorado::utils::Overlap ovl;
         ovl.qstart = 0;
         ovl.qend = 100;
@@ -68,10 +68,10 @@ TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
         const std::string expected =
                 "query01\t200\t0\t100\t+\ttarget02\t500\t300\t400\t1\t2\t3\tcg:Z:50=1D50=";
 
-        CHECK(expected == oss.str());
+        CATCH_CHECK(expected == oss.str());
     }
 
-    SECTION("Reverse complement record.") {
+    CATCH_SECTION("Reverse complement record.") {
         dorado::utils::Overlap ovl;
         ovl.qstart = 0;
         ovl.qend = 100;
@@ -93,6 +93,6 @@ TEST_CASE("PafUtilsTest: Test serialize_to_paf", TEST_GROUP) {
         const std::string expected =
                 "query3\t200\t0\t100\t-\ttarget4\t500\t300\t400\t1\t2\t3\tcg:Z:50=1I49X";
 
-        CHECK(expected == oss.str());
+        CATCH_CHECK(expected == oss.str());
     }
 }

@@ -112,6 +112,8 @@ target_link_libraries(dorado_tests_common
 target_compile_definitions(dorado_tests_common
     PUBLIC
         DORADO_ENABLE_BENCHMARK_TESTS=$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>
+        # Workaround torch defining a CATCH_CHECK() macro that conflicts with catch2
+        CATCH_CONFIG_PREFIX_ALL=1
 )
 
 # Finish setting up each target and add them as tests.

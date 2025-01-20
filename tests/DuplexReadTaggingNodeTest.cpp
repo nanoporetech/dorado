@@ -6,7 +6,7 @@
 
 #define TEST_GROUP "[read_pipeline][DuplexReadTaggingNode]"
 
-TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
+CATCH_TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
@@ -59,28 +59,28 @@ TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     for (auto& read : reads) {
         if (read->read_common.read_id == "1;2") {
-            CHECK(read->read_common.is_duplex == true);
+            CATCH_CHECK(read->read_common.is_duplex == true);
         }
         if (read->read_common.read_id == "1") {
-            CHECK(read->is_duplex_parent == true);
+            CATCH_CHECK(read->is_duplex_parent == true);
         }
         if (read->read_common.read_id == "2") {
-            CHECK(read->is_duplex_parent == true);
+            CATCH_CHECK(read->is_duplex_parent == true);
         }
         if (read->read_common.read_id == "3") {
-            CHECK(read->is_duplex_parent == false);
+            CATCH_CHECK(read->is_duplex_parent == false);
         }
         if (read->read_common.read_id == "4") {
-            CHECK(read->read_common.is_duplex == false);
+            CATCH_CHECK(read->read_common.is_duplex == false);
         }
         if (read->read_common.read_id == "5") {
-            CHECK(read->is_duplex_parent == true);
+            CATCH_CHECK(read->is_duplex_parent == true);
         }
         if (read->read_common.read_id == "6") {
-            CHECK(read->is_duplex_parent == true);
+            CATCH_CHECK(read->is_duplex_parent == true);
         }
         if (read->read_common.read_id == "5;6") {
-            CHECK(read->read_common.is_duplex == true);
+            CATCH_CHECK(read->read_common.is_duplex == true);
         }
     }
 }

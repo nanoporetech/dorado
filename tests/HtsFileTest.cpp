@@ -75,17 +75,17 @@ struct Tester {
         size_t index = 0;
         uint64_t last_sorting_key = 0;
         while (sam_read1(file_in.get(), header_in.get(), record.get()) >= 0) {
-            REQUIRE(index < records.size());
+            CATCH_REQUIRE(index < records.size());
             if (is_sorted) {
                 auto sorting_key = HtsFile::calculate_sorting_key(record.get());
-                REQUIRE(sorting_key >= last_sorting_key);
+                CATCH_REQUIRE(sorting_key >= last_sorting_key);
                 last_sorting_key = sorting_key;
             } else {
                 // Output records should be in the order they were written.
                 auto expected_record = records[indices[index]].get();
                 std::string qname(bam_get_qname(record.get()));
                 std::string expected_qname(bam_get_qname(expected_record));
-                REQUIRE(qname == expected_qname);
+                CATCH_REQUIRE(qname == expected_qname);
             }
             ++index;
             record.reset(bam_init1());
@@ -114,57 +114,59 @@ std::string filepath(const std::string& folder, const std::string& filename) {
 
 }  // namespace
 
-TEST_CASE("HtsFileTest: Write to unsorted file", TEST_GROUP) {
+CATCH_TEST_CASE("HtsFileTest: Write to unsorted file", TEST_GROUP) {
     Tester tester;
     tester.read_input_records();
 
     int callback_calls = tester.write_output_records(0);
-    REQUIRE(callback_calls == 2);
+    CATCH_REQUIRE(callback_calls == 2);
 
     tester.check_output(false);
 }
 
-TEST_CASE("HtsFileTest: Write to single sorted file", TEST_GROUP) {
+CATCH_TEST_CASE("HtsFileTest: Write to single sorted file", TEST_GROUP) {
     Tester tester;
     tester.read_input_records();
 
     // A 5 MB buffer should make sure only a single temp file is written.
     int callback_calls = tester.write_output_records(5000000);
-    REQUIRE(callback_calls == 3);
+    CATCH_REQUIRE(callback_calls == 3);
 
     tester.check_output(true);
 }
 
-TEST_CASE("HtsFileTest: Write to multiple sorted files, and merge", TEST_GROUP) {
+CATCH_TEST_CASE("HtsFileTest: Write to multiple sorted files, and merge", TEST_GROUP) {
     Tester tester;
     tester.read_input_records();
 
     // A 200 KB buffer should make sure multiple temp files are written.
     int callback_calls = tester.write_output_records(200000);
-    REQUIRE(callback_calls > 4);
+    CATCH_REQUIRE(callback_calls > 4);
 
     tester.check_output(true);
 }
 
-TEST_CASE("HtsFileTest: construct with zero threads for sorted BAM does not throw", TEST_GROUP) {
+CATCH_TEST_CASE("HtsFileTest: construct with zero threads for sorted BAM does not throw",
+                TEST_GROUP) {
     Tester tester;
     std::unique_ptr<HtsFile> cut{};
     auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
 
-    REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
-                                                    HtsFile::OutputMode::BAM, 0, true));
+    CATCH_REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
+                                                          HtsFile::OutputMode::BAM, 0, true));
 }
 
-TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does not throw", TEST_GROUP) {
+CATCH_TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does not throw",
+                TEST_GROUP) {
     Tester tester;
     std::unique_ptr<HtsFile> cut{};
     auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
 
-    REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
-                                                    HtsFile::OutputMode::BAM, 0, false));
+    CATCH_REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
+                                                          HtsFile::OutputMode::BAM, 0, false));
 }
 
-TEST_CASE(
+CATCH_TEST_CASE(
         "HtsFileTest: set_num_threads with 2 after constructed with zero threads for unsorted BAM "
         "does not throw",
         TEST_GROUP) {
@@ -177,110 +179,110 @@ TEST_CASE(
     cut->set_num_threads(2);
 }
 
-TEST_CASE("FileMergeBatcher: Single batch", TEST_GROUP) {
+CATCH_TEST_CASE("FileMergeBatcher: Single batch", TEST_GROUP) {
     auto files = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 0);
     utils::FileMergeBatcher batcher(files, filepath("folder", "merged.bam"), 4);
-    REQUIRE(batcher.num_batches() == 1);
-    CHECK(batcher.get_recursion_level() == 1);
-    CHECK(batcher.get_merge_filename(0) == filepath("folder", "merged.bam"));
+    CATCH_REQUIRE(batcher.num_batches() == 1);
+    CATCH_CHECK(batcher.get_recursion_level() == 1);
+    CATCH_CHECK(batcher.get_merge_filename(0) == filepath("folder", "merged.bam"));
     const auto& batch = batcher.get_batch(0);
-    REQUIRE(batch.size() == 4);
-    CHECK(batch == files);
+    CATCH_REQUIRE(batch.size() == 4);
+    CATCH_CHECK(batch == files);
 }
 
-TEST_CASE("FileMergeBatcher: Five batches, 2 recursions", TEST_GROUP) {
+CATCH_TEST_CASE("FileMergeBatcher: Five batches, 2 recursions", TEST_GROUP) {
     auto files = get_dummy_filenames(filepath("folder", "file_"), ".bam", 13, 0);
     utils::FileMergeBatcher batcher(files, filepath("folder", "merged.bam"), 4);
-    REQUIRE(batcher.num_batches() == 5);
-    CHECK(batcher.get_recursion_level() == 2);
-    CHECK(batcher.get_merge_filename(0) == filepath("folder", "batch_0.tmp"));
-    CHECK(batcher.get_merge_filename(1) == filepath("folder", "batch_1.tmp"));
-    CHECK(batcher.get_merge_filename(2) == filepath("folder", "batch_2.tmp"));
-    CHECK(batcher.get_merge_filename(3) == filepath("folder", "batch_3.tmp"));
-    CHECK(batcher.get_merge_filename(4) == filepath("folder", "merged.bam"));
+    CATCH_REQUIRE(batcher.num_batches() == 5);
+    CATCH_CHECK(batcher.get_recursion_level() == 2);
+    CATCH_CHECK(batcher.get_merge_filename(0) == filepath("folder", "batch_0.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(1) == filepath("folder", "batch_1.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(2) == filepath("folder", "batch_2.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(3) == filepath("folder", "batch_3.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(4) == filepath("folder", "merged.bam"));
 
     // First recursion, 13 files in 2 batches of 4, 1 batch of 3, and 1 batch of 2.
     auto expected_files0 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 0);
     const auto& batch0 = batcher.get_batch(0);
-    REQUIRE(batch0.size() == 4);
-    CHECK(batch0 == expected_files0);
+    CATCH_REQUIRE(batch0.size() == 4);
+    CATCH_CHECK(batch0 == expected_files0);
 
     auto expected_files1 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 4);
     const auto& batch1 = batcher.get_batch(1);
-    REQUIRE(batch1.size() == 4);
-    CHECK(batch1 == expected_files1);
+    CATCH_REQUIRE(batch1.size() == 4);
+    CATCH_CHECK(batch1 == expected_files1);
 
     auto expected_files2 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 3, 8);
     const auto& batch2 = batcher.get_batch(2);
-    REQUIRE(batch2.size() == 3);
-    CHECK(batch2 == expected_files2);
+    CATCH_REQUIRE(batch2.size() == 3);
+    CATCH_CHECK(batch2 == expected_files2);
 
     auto expected_files3 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 2, 11);
     const auto& batch3 = batcher.get_batch(3);
-    REQUIRE(batch3.size() == 2);
-    CHECK(batch3 == expected_files3);
+    CATCH_REQUIRE(batch3.size() == 2);
+    CATCH_CHECK(batch3 == expected_files3);
 
     // Second recursion, 1 batch with the 4 merged files from the 1st 4 batches.
     auto expected_files4 = get_dummy_filenames(filepath("folder", "batch_"), ".tmp", 4, 0);
     const auto& batch4 = batcher.get_batch(4);
-    REQUIRE(batch4.size() == 4);
-    CHECK(batch4 == expected_files4);
+    CATCH_REQUIRE(batch4.size() == 4);
+    CATCH_CHECK(batch4 == expected_files4);
 }
 
-TEST_CASE("FileMergeBatcher: Eight batches, 3 recursions", TEST_GROUP) {
+CATCH_TEST_CASE("FileMergeBatcher: Eight batches, 3 recursions", TEST_GROUP) {
     auto files = get_dummy_filenames(filepath("folder", "file_"), ".bam", 20, 0);
     utils::FileMergeBatcher batcher(files, filepath("folder", "merged.bam"), 4);
-    REQUIRE(batcher.num_batches() == 8);
-    CHECK(batcher.get_recursion_level() == 3);
-    CHECK(batcher.get_merge_filename(0) == filepath("folder", "batch_0.tmp"));
-    CHECK(batcher.get_merge_filename(1) == filepath("folder", "batch_1.tmp"));
-    CHECK(batcher.get_merge_filename(2) == filepath("folder", "batch_2.tmp"));
-    CHECK(batcher.get_merge_filename(3) == filepath("folder", "batch_3.tmp"));
-    CHECK(batcher.get_merge_filename(4) == filepath("folder", "batch_4.tmp"));
-    CHECK(batcher.get_merge_filename(5) == filepath("folder", "batch_5.tmp"));
-    CHECK(batcher.get_merge_filename(6) == filepath("folder", "batch_6.tmp"));
-    CHECK(batcher.get_merge_filename(7) == filepath("folder", "merged.bam"));
+    CATCH_REQUIRE(batcher.num_batches() == 8);
+    CATCH_CHECK(batcher.get_recursion_level() == 3);
+    CATCH_CHECK(batcher.get_merge_filename(0) == filepath("folder", "batch_0.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(1) == filepath("folder", "batch_1.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(2) == filepath("folder", "batch_2.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(3) == filepath("folder", "batch_3.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(4) == filepath("folder", "batch_4.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(5) == filepath("folder", "batch_5.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(6) == filepath("folder", "batch_6.tmp"));
+    CATCH_CHECK(batcher.get_merge_filename(7) == filepath("folder", "merged.bam"));
 
     // First recursion: 20 files in 5 batches of 4.
     auto expected_files0 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 0);
     const auto& batch0 = batcher.get_batch(0);
-    REQUIRE(batch0.size() == 4);
-    CHECK(batch0 == expected_files0);
+    CATCH_REQUIRE(batch0.size() == 4);
+    CATCH_CHECK(batch0 == expected_files0);
 
     auto expected_files1 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 4);
     const auto& batch1 = batcher.get_batch(1);
-    REQUIRE(batch1.size() == 4);
-    CHECK(batch1 == expected_files1);
+    CATCH_REQUIRE(batch1.size() == 4);
+    CATCH_CHECK(batch1 == expected_files1);
 
     auto expected_files2 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 8);
     const auto& batch2 = batcher.get_batch(2);
-    REQUIRE(batch2.size() == 4);
-    CHECK(batch2 == expected_files2);
+    CATCH_REQUIRE(batch2.size() == 4);
+    CATCH_CHECK(batch2 == expected_files2);
 
     auto expected_files3 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 12);
     const auto& batch3 = batcher.get_batch(3);
-    REQUIRE(batch3.size() == 4);
-    CHECK(batch3 == expected_files3);
+    CATCH_REQUIRE(batch3.size() == 4);
+    CATCH_CHECK(batch3 == expected_files3);
 
     auto expected_files4 = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 16);
     const auto& batch4 = batcher.get_batch(4);
-    REQUIRE(batch4.size() == 4);
-    CHECK(batch4 == expected_files4);
+    CATCH_REQUIRE(batch4.size() == 4);
+    CATCH_CHECK(batch4 == expected_files4);
 
     // Second recursion: 1 batch with 3 files, and 1 batch with 2 files.
     auto expected_files5 = get_dummy_filenames(filepath("folder", "batch_"), ".tmp", 3, 0);
     const auto& batch5 = batcher.get_batch(5);
-    REQUIRE(batch5.size() == 3);
-    CHECK(batch5 == expected_files5);
+    CATCH_REQUIRE(batch5.size() == 3);
+    CATCH_CHECK(batch5 == expected_files5);
 
     auto expected_files6 = get_dummy_filenames(filepath("folder", "batch_"), ".tmp", 2, 3);
     const auto& batch6 = batcher.get_batch(6);
-    REQUIRE(batch6.size() == 2);
-    CHECK(batch6 == expected_files6);
+    CATCH_REQUIRE(batch6.size() == 2);
+    CATCH_CHECK(batch6 == expected_files6);
 
     // Third recursion: 1 batch with 2 files.
     auto expected_files7 = get_dummy_filenames(filepath("folder", "batch_"), ".tmp", 2, 5);
     const auto& batch7 = batcher.get_batch(7);
-    REQUIRE(batch7.size() == 2);
-    CHECK(batch7 == expected_files7);
+    CATCH_REQUIRE(batch7.size() == 2);
+    CATCH_CHECK(batch7 == expected_files7);
 }

@@ -24,7 +24,7 @@ const std::string SEQ = "AACCGGTTACGTGGACTGACACTAAA";
 // clang-format on
 }  // namespace
 
-TEST_CASE(TEST_GROUP ": test motifs", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": test motifs", TEST_GROUP) {
     auto [motif, motif_offset, expected_results] =
             GENERATE(table<std::string, size_t, std::vector<size_t>>({
                     // clang-format off
@@ -37,9 +37,9 @@ TEST_CASE(TEST_GROUP ": test motifs", TEST_GROUP) {
                     // clang-format on
             }));
 
-    CAPTURE(motif);
-    CAPTURE(motif_offset);
+    CATCH_CAPTURE(motif);
+    CATCH_CAPTURE(motif_offset);
     dorado::modbase::MotifMatcher matcher(motif, motif_offset);
     auto hits = matcher.get_motif_hits(SEQ);
-    CHECK(hits == expected_results);
+    CATCH_CHECK(hits == expected_results);
 }

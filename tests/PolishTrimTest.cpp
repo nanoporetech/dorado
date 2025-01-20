@@ -11,7 +11,7 @@ namespace {
 
 #define TEST_GROUP "[PolishTrimSamples]"
 
-TEST_CASE("trim_samples tests", TEST_GROUP) {
+CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
     using namespace dorado::polisher;
 
     // The actual Sample struct is complicated, but the only thing needed
@@ -324,7 +324,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
     }));
     // clang-format on
 
-    INFO(TEST_GROUP << " Test name: " << test_case.name);
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.name);
     std::vector<Sample> samples;
     for (const auto& mock_sample : test_case.samples) {
         Sample new_sample;
@@ -335,10 +335,10 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
     }
 
     if (test_case.expect_throw) {
-        CHECK_THROWS(trim_samples(samples, test_case.region));
+        CATCH_CHECK_THROWS(trim_samples(samples, test_case.region));
     } else {
         const std::vector<TrimInfo> result = trim_samples(samples, test_case.region);
-        CHECK(test_case.expected == result);
+        CATCH_CHECK(test_case.expected == result);
     }
 }
 
@@ -354,7 +354,7 @@ TEST_CASE("trim_samples tests", TEST_GROUP) {
  *          Since this function is essentially a backbone of the other overload, more detailed tests from the
  *          previous fixture will also test all the other edge cases here.
  */
-TEST_CASE("trim_samples via pointers", TEST_GROUP) {
+CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     using namespace dorado::polisher;
 
     // The actual Sample struct is complicated, but the only thing needed
@@ -424,7 +424,7 @@ TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     // clang-format on
 
     // Create the actual Sample objects. This would not be needed if we had C++20 designated initializers.
-    INFO(TEST_GROUP << " Test name: " << test_case.name);
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.name);
     std::vector<Sample> samples;
     for (const auto& mock_sample : all_mock_samples) {
         Sample new_sample;
@@ -447,10 +447,10 @@ TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     }
 
     if (test_case.expect_throw) {
-        CHECK_THROWS(trim_samples(input, std::nullopt));
+        CATCH_CHECK_THROWS(trim_samples(input, std::nullopt));
     } else {
         const std::vector<TrimInfo> result = trim_samples(input, std::nullopt);
-        CHECK(test_case.expected == result);
+        CATCH_CHECK(test_case.expected == result);
     }
 }
 

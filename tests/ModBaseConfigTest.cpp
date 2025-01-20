@@ -23,7 +23,7 @@ const auto _pseU_j = get_data_dir("model_configs/rna004_130bps_sup@v5.0.1_pseU@v
 const auto _5mCG_5hmCG_v3 =
         get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mCG_5hmCG@v3");
 const auto _6mA_v3 = get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v3");
-TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     using Gen = ModelGeneralParams;
     using Mod = ModificationParams;
     using Ctx = ContextParams;
@@ -81,46 +81,46 @@ TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     // clang-format on
     const auto model = test::load_modbase_model_config(path, refined_kmer_levels);
 
-    SECTION("general model parameters") {
+    CATCH_SECTION("general model parameters") {
         const auto& g = model.general;
-        CAPTURE(path, to_string(g.model_type), g.size, g.kmer_len, g.num_out);
-        CHECK(g.model_type == general.model_type);
-        CHECK(g.size == general.size);
-        CHECK(g.kmer_len == general.kmer_len);
-        CHECK(g.num_out == general.num_out);
+        CATCH_CAPTURE(path, to_string(g.model_type), g.size, g.kmer_len, g.num_out);
+        CATCH_CHECK(g.model_type == general.model_type);
+        CATCH_CHECK(g.size == general.size);
+        CATCH_CHECK(g.kmer_len == general.kmer_len);
+        CATCH_CHECK(g.num_out == general.num_out);
     }
 
-    SECTION("modification parameters") {
+    CATCH_SECTION("modification parameters") {
         const auto& m = model.mods;
-        CAPTURE(path, m.codes, m.long_names, m.count, m.motif, m.motif_offset);
-        CHECK(m.codes == mods.codes);
-        CHECK(m.long_names == mods.long_names);
-        CHECK(m.count == mods.count);
-        CHECK(m.motif == mods.motif);
-        CHECK(m.motif_offset == mods.motif_offset);
+        CATCH_CAPTURE(path, m.codes, m.long_names, m.count, m.motif, m.motif_offset);
+        CATCH_CHECK(m.codes == mods.codes);
+        CATCH_CHECK(m.long_names == mods.long_names);
+        CATCH_CHECK(m.count == mods.count);
+        CATCH_CHECK(m.motif == mods.motif);
+        CATCH_CHECK(m.motif_offset == mods.motif_offset);
     }
 
-    SECTION("context parameters") {
+    CATCH_SECTION("context parameters") {
         const auto& c = model.context;
-        CAPTURE(path, c.samples_before, c.samples_after, c.samples, c.bases_before, c.bases_after,
-                c.kmer_len, c.reverse, c.base_start_justify);
-        CHECK(c.samples_before == context.samples_before);
-        CHECK(c.samples_after == context.samples_after);
-        CHECK(c.samples == context.samples);
-        CHECK(c.bases_before == context.bases_before);
-        CHECK(c.bases_after == context.bases_after);
-        CHECK(c.kmer_len == context.kmer_len);
-        CHECK(c.reverse == context.reverse);
-        CHECK(c.base_start_justify == context.base_start_justify);
-        CHECK(c.chunk_size == context.chunk_size);
+        CATCH_CAPTURE(path, c.samples_before, c.samples_after, c.samples, c.bases_before,
+                      c.bases_after, c.kmer_len, c.reverse, c.base_start_justify);
+        CATCH_CHECK(c.samples_before == context.samples_before);
+        CATCH_CHECK(c.samples_after == context.samples_after);
+        CATCH_CHECK(c.samples == context.samples);
+        CATCH_CHECK(c.bases_before == context.bases_before);
+        CATCH_CHECK(c.bases_after == context.bases_after);
+        CATCH_CHECK(c.kmer_len == context.kmer_len);
+        CATCH_CHECK(c.reverse == context.reverse);
+        CATCH_CHECK(c.base_start_justify == context.base_start_justify);
+        CATCH_CHECK(c.chunk_size == context.chunk_size);
     }
 
-    SECTION("refinement parameters") {
+    CATCH_SECTION("refinement parameters") {
         const auto& r = model.refine;
-        CAPTURE(path, r.do_rough_rescale, r.kmer_len, r.center_idx);
-        CHECK(r.do_rough_rescale == refine.do_rough_rescale);
-        CHECK(r.kmer_len == refine.kmer_len);
-        CHECK(r.center_idx == refine.center_idx);
-        CHECK(r.levels.size() == refine.levels.size());
+        CATCH_CAPTURE(path, r.do_rough_rescale, r.kmer_len, r.center_idx);
+        CATCH_CHECK(r.do_rough_rescale == refine.do_rough_rescale);
+        CATCH_CHECK(r.kmer_len == refine.kmer_len);
+        CATCH_CHECK(r.center_idx == refine.center_idx);
+        CATCH_CHECK(r.levels.size() == refine.levels.size());
     }
 }
