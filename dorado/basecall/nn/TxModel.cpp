@@ -286,6 +286,8 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
                                                bool qkv_bias_,
                                                bool out_bias_,
                                                const std::pair<int, int> &attn_window_,
+                                               float theta_,
+                                               int max_seq_len_,
                                                const at::TensorOptions &options_)
         : d_model(d_model_),
           nhead(nhead_),
@@ -293,11 +295,11 @@ MultiHeadAttentionImpl::MultiHeadAttentionImpl(int d_model_,
           // TODO: this may benefit from fine-tuning. 8 gives good performance at chunk size 12k
           num_splits(utils::get_dev_opt<int>("mha_num_splits", 12)),
           attn_window(attn_window_),
+          theta(theta_),
+          max_seq_len(max_seq_len_),
           options(options_) {
     wqkv = register_module("wqkv", Linear(LinearOptions(d_model, 3 * d_model).bias(qkv_bias_)));
     out_proj = register_module("out_proj", Linear(LinearOptions(d_model, d_model).bias(out_bias_)));
-    const float theta = 10000.0f;
-    const int64_t max_seq_len = 2048;
     rotary_emb =
             register_module("rotary_emb", RotaryEmbedding(head_dim, theta, max_seq_len, options));
 };
@@ -434,8 +436,10 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 
 TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_, const at::TensorOptions &options)
         : params(params_) {
-    self_attn = register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
-                                                                true, params.attn_window, options));
+    self_attn =
+            register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
+                                                            true, params.attn_window, params.theta,
+                                                            params.max_seq_len, options));
     ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
     norm1 = register_module("norm1", RMSNorm(params.d_model));
     norm2 = register_module("norm2", RMSNorm(params.d_model));
