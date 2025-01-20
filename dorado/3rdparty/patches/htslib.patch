@@ -1,0 +1,13 @@
+diff --git a/simd.c b/simd.c
+index 865dd887..b287a7d1 100644
+--- a/simd.c
++++ b/simd.c
+@@ -191,7 +191,7 @@ static void nibble2base_neon(uint8_t *nib, char *seq0, int len) {
+         uint8x16_t low_nucleotides = vcombine_u8(low_low, low_high);
+ #endif
+ 
+-#ifdef __aarch64__
++#if defined(__aarch64__) && (!(defined(__GNUC__) && __GNUC__ < 9) || defined(__clang__))
+         vst1q_u8_x2(seq, vzipq_u8(high_nucleotides, low_nucleotides));
+ #else
+         // Avoid vst1q_u8_x2 as GCC erroneously omits it on 32-bit ARM

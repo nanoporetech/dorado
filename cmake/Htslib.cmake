@@ -35,21 +35,22 @@ if(NOT TARGET htslib) # lazy include guard
 
         include(ExternalProject)
         ExternalProject_Add(htslib_project
-                PREFIX ${HTSLIB_BUILD}
-                SOURCE_DIR ${HTSLIB_BUILD}/htslib
-                BUILD_IN_SOURCE 1
-                CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
-                COMMAND ${AUTOCONF_COMMAND}
-                COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${CONFIGURE_FLAGS}
-                BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
-                COMMAND ${INSTALL_NAME}
-                INSTALL_COMMAND ""
-                BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
-                LOG_CONFIGURE 0
-                LOG_BUILD 0
-                LOG_TEST 0
-                LOG_INSTALL 0
-                )
+            PREFIX ${HTSLIB_BUILD}
+            SOURCE_DIR ${HTSLIB_BUILD}/htslib
+            BUILD_IN_SOURCE 1
+            PATCH_COMMAND patch < ${DORADO_3RD_PARTY_SOURCE}/patches/htslib.patch
+            CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
+            COMMAND ${AUTOCONF_COMMAND}
+            COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${CONFIGURE_FLAGS}
+            BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
+            COMMAND ${INSTALL_NAME}
+            INSTALL_COMMAND ""
+            BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
+            LOG_CONFIGURE 0
+            LOG_BUILD 0
+            LOG_TEST 0
+            LOG_INSTALL 0
+        )
 
         add_library(htslib STATIC IMPORTED)
         # Need to ensure this directory exists before we can add it to INTERFACE_INCLUDE_DIRECTORIES
