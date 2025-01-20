@@ -1027,8 +1027,8 @@ void run_polishing(const Options& opt,
             total_input_bases *= 2;
         }
 
-        polish_stats.update("total", static_cast<double>(total_input_bases));
-        polish_stats.update("processed", 0.0);
+        polish_stats.set("total", static_cast<double>(total_input_bases));
+        polish_stats.set("processed", 0.0);
     }
 
     int64_t total_batch_bases = 0;

@@ -12,8 +12,6 @@ class PolishStats {
 public:
     PolishStats() = default;
 
-    void update(const std::string& name, const double value) { m_stats[name] = value; }
-
     void increment(const std::string& name) {
         std::unique_lock<std::mutex> lock(m_mtx);
         m_stats[name] += 1.0;
