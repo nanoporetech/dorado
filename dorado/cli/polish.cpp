@@ -194,9 +194,12 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Output with per-base quality scores (FASTQ).")
                 .flag();
         parser->visible.add_argument("--vcf")
-                .help("Output a VCF file with variant calls to stdout.")
+                .help("Output a VCF file with variant calls to stdout, only if output-dir is not "
+                      "specified.")
                 .flag();
-        parser->visible.add_argument("--gvcf").help("Output a gVCF file to stdout.").flag();
+        parser->visible.add_argument("--gvcf")
+                .help("Output a gVCF file to stdout, only if output-dir is not specified.")
+                .flag();
         parser->visible.add_argument("--ambig-ref")
                 .help("Decode variants at ambiguous reference positions.")
                 .flag();
@@ -1112,9 +1115,8 @@ void run_polishing(const Options& opt,
                 std::size(region_batch), batch_bases / (1000.0 * 1000.0),
                 std::size(all_results_cons));
 
-        spdlog::debug(
-                "Data for variant calling: vc_input_data.size() = {}, all_results_cons.size() = {}",
-                std::size(vc_input_data), std::size(all_results_cons));
+        spdlog::debug("Data for variant calling: num elements = {}, num consensus results = {}",
+                      std::size(vc_input_data), std::size(all_results_cons));
 
         // Construct the consensus sequences, only if they will be written.
         if (opt.write_consensus) {
