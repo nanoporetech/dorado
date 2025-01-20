@@ -184,13 +184,6 @@ void ScalerNode::input_thread_fn() {
                 scale = 1.f / read->scaling;
                 shift = -1.f * read->offset;
             }
-
-            read->read_common.raw_data =
-                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                            .to(at::ScalarType::Half);
-
-            read->read_common.scale = scale;
-            read->read_common.shift = shift;
         } else {
             // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
             auto scaling_data = read->read_common.raw_data.index(
@@ -199,16 +192,16 @@ void ScalerNode::input_thread_fn() {
                     m_scaling_params.strategy == ScalingStrategy::QUANTILE
                             ? normalisation(m_scaling_params.quantile, scaling_data)
                             : med_mad(scaling_data);
-
-            // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
-            // shifting/scaling in float32 form.
-            read->read_common.raw_data =
-                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                            .to(at::ScalarType::Half);
-            // move the shift and scale into pA.
-            read->read_common.scale = read->scaling * scale;
-            read->read_common.shift = read->scaling * (shift + read->offset);
         }
+
+        // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
+        // shifting/scaling in float32 form.
+        read->read_common.raw_data = ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
+                                             .to(at::ScalarType::Half);
+
+        // move the shift and scale into pA.
+        read->read_common.scale = read->scaling * scale;
+        read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna_model) {
