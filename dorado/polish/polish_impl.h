@@ -4,12 +4,14 @@
 #include "polish/architectures/model_factory.h"
 #include "polish/features/decoder_factory.h"
 #include "polish/features/encoder_factory.h"
+#include "polish_stats.h"
 #include "sample.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
 #include "utils/stats.h"
 #include "utils/timer_high_res.h"
+#include "variant_calling_sample.h"
 #include "window.h"
 
 #include <cstdint>
@@ -66,29 +68,6 @@ struct DecodeData {
     std::vector<Sample> samples;
     torch::Tensor logits;
     std::vector<TrimInfo> trims;
-};
-
-class PolishStats {
-public:
-    PolishStats() = default;
-
-    void update(const std::string& name, const double value) { m_stats[name] = value; }
-
-    void increment(const std::string& name) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += 1.0;
-    }
-
-    void add(const std::string& name, const double value) {
-        std::unique_lock<std::mutex> lock(m_mtx);
-        m_stats[name] += value;
-    }
-
-    stats::NamedStats get_stats() const { return m_stats; }
-
-private:
-    stats::NamedStats m_stats;
-    std::mutex m_mtx;
 };
 
 /**
@@ -181,12 +160,26 @@ std::vector<Window> create_windows_from_regions(
         const int32_t bam_chunk_len,
         const int32_t window_overlap);
 
-void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
+/**
+ * \brief Fetches the decode data from an async queue, decodes the consensus and collects
+ *          the consensus results. It also returns a vector of the decode data taken off of the queue
+ *          (i.e. the input used for decoding). This will be needed downstream for variant calling.
+ * \param results Return vector of consensus results.
+ * \param decode_data Return vector of input data used for decoding, taken from the queue.
+ * \param decode_queue Queue where messages will be received.
+ * \param polish_stats Stats object, for the progress bar.
+ * \param decoder Decoder to convert integers to bases.
+ * \param num_threads Number of threads for processing.
+ * \param min_depth Consensus sequences will be split in regions of insufficient depth.
+ */
+void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
+                                std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
                                 const int32_t num_threads,
-                                const int32_t min_depth);
+                                const int32_t min_depth,
+                                const bool collect_vc_data);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
