@@ -553,6 +553,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
     // Mock the Sample objects. Trimming works on Sample objects only, but
     // it only needs positions, not the actual tensors.
     std::vector<Sample> local_samples;
+    local_samples.reserve(std::size(group));
     for (const auto& [start, id] : group) {
         const auto& vc_sample = vc_input_data[id];
         local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
