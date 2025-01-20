@@ -194,11 +194,11 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Output with per-base quality scores (FASTQ).")
                 .flag();
         parser->visible.add_argument("--vcf")
-                .help("Output a VCF file with variant calls to stdout, only if output-dir is not "
-                      "specified.")
+                .help("Output a VCF file with variant calls to --output-dir if specified, "
+                      "otherwise to stdout.")
                 .flag();
         parser->visible.add_argument("--gvcf")
-                .help("Output a gVCF file to stdout, only if output-dir is not specified.")
+                .help("Output a gVCF file to --output-dir if specified, otherwise to stdout.")
                 .flag();
         parser->visible.add_argument("--ambig-ref")
                 .help("Decode variants at ambiguous reference positions.")
@@ -379,16 +379,16 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     // Variant calling setup.
     const bool vcf = parser.visible.get<bool>("vcf");
     const bool gvcf = parser.visible.get<bool>("gvcf");
-    if (!std::empty(opt.output_dir) || vcf || gvcf) {
-        opt.run_variant_calling = true;
-    }
+    opt.run_variant_calling = false;
     if (vcf && gvcf) {
-        spdlog::warn("Both --vcf and --gvcf are specified. gVCF will be output.");
-        opt.vc_type = VariantCallingEnum::GVCF;
+        throw std::runtime_error{
+                "Both --vcf and --gvcf are specified. Only one of these options can be used."};
     } else if (vcf) {
         opt.vc_type = VariantCallingEnum::VCF;
+        opt.run_variant_calling = true;
     } else if (gvcf) {
         opt.vc_type = VariantCallingEnum::GVCF;
+        opt.run_variant_calling = true;
     }
     opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
 
