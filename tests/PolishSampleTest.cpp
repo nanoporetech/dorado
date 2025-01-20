@@ -48,13 +48,13 @@ TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
         const std::vector<int64_t> expected_positions_minor{12, 13, 14, 15, 16};
 
         // Evaluate.
-        REQUIRE(sliced_sample.seq_id == sample.seq_id);
-        REQUIRE(sliced_sample.features.equal(expected_features));
-        REQUIRE(sliced_sample.depth.equal(expected_depth));
-        REQUIRE(sliced_sample.positions_major == expected_positions_major);
-        REQUIRE(sliced_sample.positions_minor == expected_positions_minor);
-        REQUIRE(sliced_sample.read_ids_left.empty());
-        REQUIRE(sliced_sample.read_ids_right.empty());
+        CHECK(sliced_sample.seq_id == sample.seq_id);
+        CHECK(sliced_sample.features.equal(expected_features));
+        CHECK(sliced_sample.depth.equal(expected_depth));
+        CHECK(sliced_sample.positions_major == expected_positions_major);
+        CHECK(sliced_sample.positions_minor == expected_positions_minor);
+        CHECK(std::empty(sliced_sample.read_ids_left));
+        CHECK(std::empty(sliced_sample.read_ids_right));
     }
 
     SECTION("Slice entire range") {
@@ -64,13 +64,13 @@ TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
         const Sample sliced_sample = slice_sample(sample, idx_start, idx_end);
 
         // Evaluate.
-        REQUIRE(sliced_sample.seq_id == sample.seq_id);
-        REQUIRE(sliced_sample.features.equal(sample.features));
-        REQUIRE(sliced_sample.depth.equal(sample.depth));
-        REQUIRE(sliced_sample.positions_major == sample.positions_major);
-        REQUIRE(sliced_sample.positions_minor == sample.positions_minor);
-        REQUIRE(sliced_sample.read_ids_left.empty());
-        REQUIRE(sliced_sample.read_ids_right.empty());
+        CHECK(sliced_sample.seq_id == sample.seq_id);
+        CHECK(sliced_sample.features.equal(sample.features));
+        CHECK(sliced_sample.depth.equal(sample.depth));
+        CHECK(sliced_sample.positions_major == sample.positions_major);
+        CHECK(sliced_sample.positions_minor == sample.positions_minor);
+        CHECK(std::empty(sliced_sample.read_ids_left));
+        CHECK(std::empty(sliced_sample.read_ids_right));
     }
 
     SECTION("Slice single row") {
@@ -86,13 +86,13 @@ TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
         const std::vector<int64_t> expected_positions_minor{14};
 
         // Evaluate.
-        REQUIRE(sliced_sample.seq_id == sample.seq_id);
-        REQUIRE(sliced_sample.features.equal(expected_features));
-        REQUIRE(sliced_sample.depth.equal(expected_depth));
-        REQUIRE(sliced_sample.positions_major == expected_positions_major);
-        REQUIRE(sliced_sample.positions_minor == expected_positions_minor);
-        REQUIRE(sliced_sample.read_ids_left.empty());
-        REQUIRE(sliced_sample.read_ids_right.empty());
+        CHECK(sliced_sample.seq_id == sample.seq_id);
+        CHECK(sliced_sample.features.equal(expected_features));
+        CHECK(sliced_sample.depth.equal(expected_depth));
+        CHECK(sliced_sample.positions_major == expected_positions_major);
+        CHECK(sliced_sample.positions_minor == expected_positions_minor);
+        CHECK(std::empty(sliced_sample.read_ids_left));
+        CHECK(std::empty(sliced_sample.read_ids_right));
     }
 }
 
@@ -106,14 +106,14 @@ TEST_CASE("slice_sample: Error conditions", TEST_GROUP) {
     sample.depth = torch::rand({10});
 
     SECTION("Invalid range: idx_start >= idx_end") {
-        REQUIRE_THROWS_AS(slice_sample(sample, 5, 5), std::out_of_range);
-        REQUIRE_THROWS_AS(slice_sample(sample, 6, 5), std::out_of_range);
+        CHECK_THROWS_AS(slice_sample(sample, 5, 5), std::out_of_range);
+        CHECK_THROWS_AS(slice_sample(sample, 6, 5), std::out_of_range);
     }
 
     SECTION("Invalid range: idx_start or idx_end out of bounds") {
-        REQUIRE_THROWS_AS(slice_sample(sample, -1, 5), std::out_of_range);
-        REQUIRE_THROWS_AS(slice_sample(sample, 0, 11), std::out_of_range);
-        REQUIRE_THROWS_AS(slice_sample(sample, 10, 11), std::out_of_range);
+        CHECK_THROWS_AS(slice_sample(sample, -1, 5), std::out_of_range);
+        CHECK_THROWS_AS(slice_sample(sample, 0, 11), std::out_of_range);
+        CHECK_THROWS_AS(slice_sample(sample, 10, 11), std::out_of_range);
     }
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("slice_sample: features tensor in sample not defined", TEST_GROUP) {
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
     sample.depth = torch::rand({10});
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 TEST_CASE("slice_sample: depth tensor in sample not defined", TEST_GROUP) {
@@ -136,7 +136,7 @@ TEST_CASE("slice_sample: depth tensor in sample not defined", TEST_GROUP) {
     sample.positions_major = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 TEST_CASE("slice_sample: error, wrong length of the features tensor.", TEST_GROUP) {
@@ -148,7 +148,7 @@ TEST_CASE("slice_sample: error, wrong length of the features tensor.", TEST_GROU
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
     sample.depth = torch::rand({10});
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 TEST_CASE("slice_sample: error, wrong length of the depth tensor.", TEST_GROUP) {
@@ -160,7 +160,7 @@ TEST_CASE("slice_sample: error, wrong length of the depth tensor.", TEST_GROUP) 
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
     sample.depth = torch::rand({20});
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 TEST_CASE("slice_sample: error, wrong length of the positions_major vector.", TEST_GROUP) {
@@ -172,7 +172,7 @@ TEST_CASE("slice_sample: error, wrong length of the positions_major vector.", TE
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
     sample.depth = torch::rand({10});
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 TEST_CASE("slice_sample: error, wrong length of the positions_minor vector.", TEST_GROUP) {
@@ -184,7 +184,7 @@ TEST_CASE("slice_sample: error, wrong length of the positions_minor vector.", TE
     sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18};
     sample.depth = torch::rand({10});
 
-    REQUIRE_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+    CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
 }  // namespace dorado::polisher::sample::tests
