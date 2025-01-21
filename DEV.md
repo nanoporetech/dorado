@@ -23,7 +23,6 @@ $ apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libhdf5-dev \
         libssl-dev \
-        libzstd-dev \
         autoconf \
         automake
 $ apt install gcc-9 g++-9 --no-install-recommends
