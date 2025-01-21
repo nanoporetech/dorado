@@ -384,10 +384,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            results.emplace_back(Sample{
-                    sample.features.slice(0, start, end), std::move(new_major_pos),
-                    std::move(new_minor_pos), sample.depth.slice(0, start, end), sample.seq_id,
-                    sample.region_id, std::move(read_ids_left), placeholder_ids});
+            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start, end),
+                                        std::move(new_major_pos), std::move(new_minor_pos),
+                                        sample.depth.slice(0, start, end), std::move(read_ids_left),
+                                        placeholder_ids});
             start = end;
         }
 
@@ -396,9 +396,9 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
                                                std::end(sample.positions_major));
             std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
                                                std::end(sample.positions_minor));
-            results.emplace_back(Sample{sample.features.slice(0, start), std::move(new_major_pos),
-                                        std::move(new_minor_pos), sample.depth.slice(0, start),
-                                        sample.seq_id, sample.region_id, placeholder_ids,
+            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start),
+                                        std::move(new_major_pos), std::move(new_minor_pos),
+                                        sample.depth.slice(0, start), placeholder_ids,
                                         sample.read_ids_right});
         }
     }
@@ -429,12 +429,11 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
         return Sample{
+                sample.seq_id,
                 std::move(new_features),
                 std::move(new_major),
                 std::move(new_minor),
                 std::move(new_depth),
-                sample.seq_id,
-                sample.region_id,
                 {},
                 {},
         };
@@ -941,12 +940,14 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
     spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
 }
 
-void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
+void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
+                                std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
                                 const DecoderBase& decoder,
                                 const int32_t num_threads,
-                                const int32_t min_depth) {
+                                const int32_t min_depth,
+                                const bool collect_vc_data) {
     auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
                                                              const int32_t tid) {
         utils::ScopedProfileRange scope_decode("decode", 1);
@@ -985,6 +986,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
 
             std::vector<Interval> good_intervals{Interval{0, static_cast<int32_t>(num_positions)}};
 
+            // Break on low coverage.
             if (min_depth > 0) {
                 good_intervals.clear();
 
@@ -1056,7 +1058,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
         return final_results;
     };
 
-    const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results) {
+    const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results,
+                            std::vector<VariantCallingSample>& thread_vc_data) {
         at::InferenceMode infer_guard;
 
         while (true) {
@@ -1089,10 +1092,33 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
             thread_results.insert(std::end(thread_results),
                                   std::make_move_iterator(std::begin(results_samples)),
                                   std::make_move_iterator(std::end(results_samples)));
+
+            // Separate the logits for each sample.
+            if (collect_vc_data) {
+                // Split logits for each input sample in the batch, and check that the number matches.
+                const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
+                if (std::size(item.samples) != std::size(split_logits)) {
+                    spdlog::error(
+                            "The number of logits produced by the batch inference does not match "
+                            "the "
+                            "input batch size! Variant calling for this batch will not be "
+                            "possible. "
+                            "samples.size = {}, split_logits.size = {}",
+                            std::size(item.samples), std::size(split_logits));
+                    continue;
+                }
+                // Create the variant calling data. Clone the tensor to convert the view to actual data.
+                for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
+                    thread_vc_data.emplace_back(VariantCallingSample{
+                            item.samples[i].seq_id, std::move(item.samples[i].positions_major),
+                            std::move(item.samples[i].positions_minor), split_logits[i].clone()});
+                }
+            }
         }
     };
 
     std::vector<std::vector<ConsensusResult>> thread_results(num_threads);
+    std::vector<std::vector<VariantCallingSample>> thread_vc_data(num_threads);
 
     cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
 
@@ -1100,7 +1126,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid, std::ref(thread_results[tid])));
+        futures.emplace_back(pool.push(worker, tid, std::ref(thread_results[tid]),
+                                       std::ref(thread_vc_data[tid])));
     }
 
     try {
@@ -1108,19 +1135,34 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results,
             f.get();
         }
     } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inferencetask: ") + e.what()};
+        throw std::runtime_error{std::string("Caught exception from inference task: ") + e.what()};
     }
 
     // Flatten the results.
-    size_t total_size = 0;
-    for (const auto& vals : thread_results) {
-        total_size += std::size(vals);
+    {
+        size_t total_size = 0;
+        for (const auto& vals : thread_results) {
+            total_size += std::size(vals);
+        }
+        results_cons.clear();
+        results_cons.reserve(total_size);
+        for (auto& vals : thread_results) {
+            results_cons.insert(std::end(results_cons), std::make_move_iterator(std::begin(vals)),
+                                std::make_move_iterator(std::end(vals)));
+        }
     }
-    results.clear();
-    results.reserve(total_size);
-    for (auto& vals : thread_results) {
-        results.insert(std::end(results), std::make_move_iterator(std::begin(vals)),
-                       std::make_move_iterator(std::end(vals)));
+    {
+        size_t total_size = 0;
+        for (const auto& vals : thread_vc_data) {
+            total_size += std::size(vals);
+        }
+        results_vc_data.clear();
+        results_vc_data.reserve(total_size);
+        for (auto& vals : thread_vc_data) {
+            results_vc_data.insert(std::end(results_vc_data),
+                                   std::make_move_iterator(std::begin(vals)),
+                                   std::make_move_iterator(std::end(vals)));
+        }
     }
 
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
