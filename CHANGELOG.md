@@ -2,6 +2,27 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.9.1] (21 Jan 2025)
+
+This release of Dorado brings significant basecalling speed improvements for Nvidia GPUs with compute capabilities 8.6 (Ampere – e.g., RTX A6000), 8.7 (Ampere – e.g., Orin family), and 8.9 (Ada Lovelace). Additionally, `dorado polish` receives major enhancements, including the introduction of the `--bacteria` flag, which optimizes basecalling for native bacterial and methylated DNA. The updated `dorado polish` is now compatible with data basecalled using v4.3 and v4.2 models and serves as a beta-stage replacement for Medaka.
+
+* d46286e9e9f549b2f776f2d86e5bf01810d6998d - Upgraded to Koi v0.5.3 for optimised basecalling on CC 8.6, 8.7 & 8.9
+* 6de083d977a0f33398fb1f82e9e0df621ea5360b - Added VCF output to the Dorado `polish`
+* d8599772fdc2e7c3374cb618cde9bf6d35d6f1ef - Improve messaging when an unrecognised model complex is specified
+* 06f62390bdd5cbbf024bff53a190b3381aa8cb32 - Support for legacy count models in Dorado `polish`
+* e51d64fe88aa9dee99829de9cc181a280037fbff - Fixed precision issue with Dorado `polish` qscore normalisation
+* d50494d16c27d3e40228b32bca0e91c1a46d87bb - Added `--bacteria` support for Dorado `polish`
+* f3fa4473a6eec4224be69e538907a30f3b9ca07a - Added ULK114 kits to adapter/primer trimming LUT
+* 1a4316efc3d589ebfa5e0705007e40a702914a2a - Dorado `polish` algorithm improvements and refactoring
+* a0fc96001862ac751b23b03842c69effb125b465 - Dorado `polish` option `-o` now writes to a directory
+* 7ae31a85018287fdf407e090dbad5fdaca271253 - Dorado `polish` fix for parsing FASTA file inputs
+* b382344de58bf10ed07ed4ea6f6be1290fa9c2b0 - Dorado `polish` models are now included in Dorado `download` `--list`, `--list-yaml`, and `--list-structured`
+* adebcc5346c209888d3236ecfc9b727d1b450493 - Ensure Q-score and read length filters are applied to reads *after* trimming
+* 96d574d9658c0096811338c9d4071a47f8fc51f7 - Enforce use of `--kit-name` for Dorado `demux` custom barcodes to prevent unclassified reads
+* 62c86d08a4cceee470f2cd87131353fc1a00b5b6 - Support `CUDA_VISIBLE_DEVICES` for UUIDs or integers
+* c39f9064f200ca4cc9f2afbfc4b1e593b40b7c47 - Prevent crashing in auto batchsize due to short chunksizes
+
+
 # [0.9.0] (16 Dec 2024)
 
 This major release of Dorado introduces several new features and enhancements. The `polish` command, currently experimental, is optimised for refining draft assemblies of human genomes. This release also adds faster DNA modification calling models and improved 6mA false positive rate (FPR) in native human samples. Barcode demultiplexing accuracy has been significantly enhanced for kits with barcodes at both ends, including `SQK-NBD114`. Note that using custom barcode kits now requires the `--kit-name` option. A feature has been added to enable running `dorado correct` in blocks, allowing work to be divided into smaller pieces for easy submission to a compute cluster. Additional updates include the `qs` tag for mean basecall Q-scores in FASTQ output, an upgrade to POD5 to support systems with large page sizes, improvements to Poly(A) tail length estimation, and various bug fixes to enhance stability and functionality.
