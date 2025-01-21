@@ -41,8 +41,8 @@ function(add_hdf_vbz_plugin)
         set(CONAN_LIB_DIRS_RELEASE ${ZSTD_BUILD_DIR}/lib/Release)
         set(CONAN_LIB_DIRS_DEBUG ${ZSTD_BUILD_DIR}/lib/Debug)
 
-    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-        # The GCC8 CI build needs a newer version of zstd than provided by the docker image.
+    elseif (LINUX)
+        # All Linux builds should use our own build of zstd.
         set(ZSTD_BUILD_DIR ${CMAKE_BINARY_DIR}/cmake-build-zstd)
         set(ZSTD_INSTALL_DIR ${CMAKE_BINARY_DIR}/cmake-install-zstd)
         execute_process(COMMAND
