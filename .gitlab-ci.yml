@@ -397,6 +397,15 @@ build:windows_koi_from_source:
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   artifacts: null
 
+build:windows:no_ccache:
+  extends:
+    - build:windows
+    - .on_nightly_or_manual
+  before_script:
+    - !reference ["build:windows", before_script]
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
+  artifacts: null
+
 build:macos:arm:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
