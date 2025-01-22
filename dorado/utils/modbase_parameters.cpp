@@ -43,6 +43,9 @@ ModelType model_type_from_string(const std::string& model_type) noexcept {
 ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
     try {
         const auto config_toml = toml::parse(path / "config.toml");
+        if (!config_toml.contains("general")) {
+            return ModelType::UNKNOWN;
+        }
         return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
     } catch (std::exception& e) {
         spdlog::trace("get_modbase_model_type caught exception: {}", e.what());
