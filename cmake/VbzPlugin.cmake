@@ -24,25 +24,27 @@ function(add_hdf_vbz_plugin)
     # All builds should use our own build of zstd.
     set(ZSTD_BUILD_DIR ${CMAKE_BINARY_DIR}/cmake-build-zstd)
     set(ZSTD_INSTALL_DIR ${CMAKE_BINARY_DIR}/cmake-install-zstd)
-    execute_process(COMMAND
-        cmake
-            -S ${DORADO_3RD_PARTY_SOURCE}/zstd/build/cmake
-            -B ${ZSTD_BUILD_DIR}
-            -D CMAKE_CONFIGURATION_TYPES=Release
-            -D CMAKE_INSTALL_PREFIX=${ZSTD_INSTALL_DIR}
-            -D ZSTD_BUILD_SHARED=OFF
-            -G ${CMAKE_GENERATOR}
-            ${_extra_zstd_cmake_flags}
-        COMMAND_ERROR_IS_FATAL ANY
-    )
-    execute_process(COMMAND
-        cmake
-            --build ${ZSTD_BUILD_DIR}
-            --config Release
-            --target install
-            --parallel
-        COMMAND_ERROR_IS_FATAL ANY
-    )
+    if (NOT EXISTS ${ZSTD_INSTALL_DIR})
+        execute_process(COMMAND
+            cmake
+                -S ${DORADO_3RD_PARTY_SOURCE}/zstd/build/cmake
+                -B ${ZSTD_BUILD_DIR}
+                -D CMAKE_CONFIGURATION_TYPES=Release
+                -D CMAKE_INSTALL_PREFIX=${ZSTD_INSTALL_DIR}
+                -D ZSTD_BUILD_SHARED=OFF
+                -G ${CMAKE_GENERATOR}
+                ${_extra_zstd_cmake_flags}
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+        execute_process(COMMAND
+            cmake
+                --build ${ZSTD_BUILD_DIR}
+                --config Release
+                --target install
+                --parallel
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+    endif()
 
     # Add the install folder to cmake's search paths so that it gets picked over the system.
     list(PREPEND CMAKE_PREFIX_PATH ${ZSTD_INSTALL_DIR})
