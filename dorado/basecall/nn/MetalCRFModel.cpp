@@ -269,7 +269,7 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         kernel_simd_groups = 32;
         break;
     case 384:
-        kernel_simd_groups = TARGET_OS_IPHONE ? 32 : 24;
+        kernel_simd_groups = 24;
         break;
     case 512:
         kernel_simd_groups = 32;

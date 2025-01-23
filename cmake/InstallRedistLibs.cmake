@@ -100,7 +100,7 @@ elseif(WIN32)
     file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
     install(FILES ${HTSLIB_DLLS} DESTINATION bin COMPONENT redist_libs)
 
-elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
     install(FILES ${TORCH_DLLS} DESTINATION lib COMPONENT redist_libs)
 

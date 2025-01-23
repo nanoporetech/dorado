@@ -33,14 +33,6 @@ if(NOT TARGET htslib) # lazy include guard
         set(HTSLIB_BUILD ${CMAKE_BINARY_DIR}/htslib_build)
         file(COPY ${HTSLIB_DIR} DESTINATION ${HTSLIB_BUILD})
 
-        if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-            # We need cross-compilation mode for iOS builds.  Otherwise we end up trying to link a MacOS library
-            # into an iOS target.
-            set(CONFIGURE_FLAGS --host=aarch64-apple-darwin "CFLAGS=-isysroot ${CMAKE_OSX_SYSROOT}" "CC=${CMAKE_C_COMPILER}" "LDFLAGS=-isysroot ${CMAKE_OSX_SYSROOT}")
-            # By default the dylib install name will be some local path that won't work on the device.
-            set(INSTALL_NAME ${CMAKE_INSTALL_NAME_TOOL} -id "@executable_path/Frameworks/libhts.3.dylib" ${htslib_PREFIX}/lib/libhts.3.dylib)
-        endif()
-
         include(ExternalProject)
         ExternalProject_Add(htslib_project
                 PREFIX ${HTSLIB_BUILD}
