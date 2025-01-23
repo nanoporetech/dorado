@@ -25,8 +25,5 @@ int main(int argc, char* argv[]) {
 
     int result = Catch::Session().run(argc, argv);
 
-    if (result == 0) {
-        printf("ALL TESTS RAN SUCCESSFULLY\n");
-    }
     return result;
 }
