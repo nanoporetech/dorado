@@ -1,7 +1,7 @@
 #include "sys_stats.h"
 #ifdef __linux__
 #include <sys/resource.h>
-#elif __APPLE__ && (!defined(TARGET_OS_IPHONE) || TARGET_OS_IPHONE == 0)
+#elif __APPLE__
 #include <mach/mach_init.h>
 #include <mach/task.h>
 #include <sys/sysctl.h>
@@ -19,7 +19,7 @@ ReportedStats sys_stats_report() {
         named_stats["maxrss_mb"] =
                 static_cast<double>(usage.ru_maxrss) / 1024.0;  // We are given this in KB.
     }
-#elif __APPLE__ && (!defined(TARGET_OS_IPHONE) || TARGET_OS_IPHONE == 0)
+#elif __APPLE__
     task_basic_info info;
     mach_msg_type_number_t info_count = TASK_BASIC_INFO_COUNT;
     // task_info's third parameter is of type task_info_t, an alias for integer_t.

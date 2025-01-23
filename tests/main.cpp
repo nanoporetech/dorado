@@ -25,10 +25,5 @@ int main(int argc, char* argv[]) {
 
     int result = Catch::Session().run(argc, argv);
 
-    if (result == 0) {
-        // We print this so that we can check for it on iOS.
-        // See run_ios_test.py.
-        printf("ALL TESTS RAN SUCCESSFULLY\n");
-    }
     return result;
 }

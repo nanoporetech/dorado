@@ -31,7 +31,9 @@ add_executable(dorado_tests
     DuplexSplitTest.cpp
     fasta_reader_test.cpp
     fastq_reader_test.cpp
+    Fast5DataLoaderTest.cpp
     FastxRandomReaderTest.cpp
+    FileInfoTest.cpp
     gpu_monitor_test.cpp
     gzip_reader_test.cpp
     HtsFileTest.cpp
@@ -51,6 +53,7 @@ add_executable(dorado_tests
     multi_queue_thread_pool_test.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
+    Pod5DataLoaderTest.cpp
     PolyACalculatorTest.cpp
     PostConditionTest.cpp
     priority_task_queue_test.cpp
@@ -77,15 +80,7 @@ add_executable(dorado_tests
     PolishWindowTest.cpp
     RleTest.cpp
 )
-if (NOT IOS)
-    target_sources(dorado_tests
-        PRIVATE
-            # No FAST5 or POD5 on iOS
-            Fast5DataLoaderTest.cpp
-            Pod5DataLoaderTest.cpp
-            FileInfoTest.cpp
-    )
-endif()
+
 if (DORADO_GPU_BUILD)
     if(APPLE)
         target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
@@ -119,37 +114,8 @@ target_include_directories(dorado_tests_common
 )
 target_compile_definitions(dorado_tests_common
     PUBLIC
-        DORADO_IOS_BUILD=$<BOOL:${IOS}>
         $<$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>:CATCH_CONFIG_ENABLE_BENCHMARKING>
 )
-
-
-# Setup/teardown for iOS tests
-if (IOS AND DORADO_RUN_TESTS)
-    set(IOS_TEST_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ios_test.py)
-    # I'm assuming that these tests will only be run in the sim on CI, so they
-    # depend on the sim being launched.
-    # Note: The test targets can still be built, but you'll need to install+launch
-    # them manually on a real device.
-    add_test(
-        NAME launch_simulator
-        COMMAND ${IOS_TEST_SCRIPT} --setup
-    )
-    set_tests_properties(launch_simulator
-        PROPERTIES
-            FIXTURES_SETUP interacting_with_device
-    )
-    # Kill the sim after so that it's not just hanging around.
-    add_test(
-        NAME kill_simulator_after
-        COMMAND ${IOS_TEST_SCRIPT} --teardown
-    )
-    set_tests_properties(kill_simulator_after
-        PROPERTIES
-            FIXTURES_CLEANUP interacting_with_device
-    )
-endif()
-
 
 # Finish setting up each target and add them as tests.
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
@@ -167,14 +133,9 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_modbase
             minimap2
             ${ZLIB_LIBRARIES}
+            dorado_io_lib
+            dorado_file_info
     )
-    if (NOT IOS)
-        target_link_libraries(${TEST_BIN}
-            PRIVATE
-                dorado_io_lib
-                dorado_file_info
-        )
-    endif()
 
     enable_warnings_as_errors(${TEST_BIN})
     if (MSVC)
@@ -184,61 +145,17 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
         target_compile_options(${TEST_BIN} PRIVATE "-Wno-trigraphs")
     endif()
 
-    if (IOS)
-        # default.metallib is generated, but we need it as a source file to package it,
-        # so create it if it doesn't exist.
-        set(METALLIB_PATH ${CMAKE_BINARY_DIR}/lib/default.metallib)
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-        file(TOUCH ${METALLIB_PATH})
-
-        # Grab all the data files that we want to package.
-        set(DATA_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/data;${METALLIB_PATH}")
-
-        # To package data into the app we need to make it a source file.
-        target_sources(${TEST_BIN} PRIVATE ${DATA_RESOURCES})
-
-        # iOS bundle names can't contain underscores.
-        string(REPLACE "_" "-" IOS_BUNDLE_NAME "${TEST_BIN}")
-
-        set_target_properties(${TEST_BIN} PROPERTIES
-            BUNDLE TRUE
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.ont.${IOS_BUNDLE_NAME}"
-            MACOSX_BUNDLE_BUNDLE_NAME ${IOS_BUNDLE_NAME}
-            MACOSX_BUNDLE_BUNDLE_VERSION "0.1"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
-            RESOURCE "${DATA_RESOURCES}"
-        )
-    endif()
-
     # Don't add the test if we can't run it
     if (NOT DORADO_RUN_TESTS)
         continue()
     endif()
 
     # Add the test.
-    if (IOS)
-        add_test(
-            NAME ${TEST_BIN}
-            COMMAND
-                ${IOS_TEST_SCRIPT}
-                    --run
-                    # This should be $<TARGET_FILE_DIR:${TEST_BIN}> but that's broken
-                    # when building for the sim.
-                    --app_path ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}-iphonesimulator/${TEST_BIN}.app
-                    --identifier com.ont.${IOS_BUNDLE_NAME}
-                    --device booted
-        )
-        set_tests_properties(${TEST_BIN}
-            PROPERTIES
-                FIXTURES_REQUIRED interacting_with_device
-        )
-    else()
-        add_test(
-            NAME ${TEST_BIN}
-            COMMAND ${TEST_BIN}
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        )
-    endif()
+    add_test(
+        NAME ${TEST_BIN}
+        COMMAND ${TEST_BIN}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
 
     # The tests need to be able to find the libs in order to run.
     # We also want these libs to take priority over any installed on the system, so prepend them.

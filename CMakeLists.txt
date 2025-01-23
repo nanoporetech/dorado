@@ -470,11 +470,8 @@ if(NOT DORADO_DISABLE_DORADO)
     install(TARGETS dorado RUNTIME)
 endif()
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    add_subdirectory(dorado/data_loader)
-    add_subdirectory(dorado/file_info)
-endif()
-
+add_subdirectory(dorado/data_loader)
+add_subdirectory(dorado/file_info)
 add_subdirectory(tests)
 
 include(cmake/InstallRedistLibs.cmake)

@@ -44,10 +44,6 @@ elseif(WIN32)
 
     install(FILES ${HDF5_ZLIB_INSTALL_DIR}/bin/zlib.dll DESTINATION bin)
 
-elseif (IOS)
-    # iOS doesn't make use of HDF5.
-    return()
-
 elseif (APPLE)
     set(HDF_VER 1.14.3)
     if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
