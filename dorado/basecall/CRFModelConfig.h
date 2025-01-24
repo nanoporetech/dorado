@@ -85,6 +85,10 @@ struct TxEncoderParams {
     std::pair<int, int> attn_window{-1, -1};
     // The deepnorm normalisation alpha parameter
     float deepnorm_alpha{1.0};
+    // MHA RoPE theta value
+    float theta{10000.0f};
+    // MHA RoPE maximum sequence length
+    int max_seq_len{2048};
     std::string to_string() const;
 };
 
