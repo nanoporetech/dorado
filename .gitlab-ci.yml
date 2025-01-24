@@ -79,7 +79,7 @@ variables:
 .linux_dependencies:
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
     - pip install gcovr
 
 .set_parallel_jobs:

@@ -27,7 +27,7 @@ jobs:
         cuda: '11.8.0'
     - name: Install dependencies from apt
       if: matrix.os == 'ubuntu-20.04'
-      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev libzstd-dev autoconf
+      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev autoconf
     - name: Set up Windows path
       uses: myci-actions/export-env-var-powershell@1
       if: matrix.os == 'windows-2019-large'
