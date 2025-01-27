@@ -146,7 +146,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto& mod_bases = toml::find(params, "mod_bases");
     if (mod_bases.is_string()) {
         // style: mod_bases = "hm" - does not accept chebi codes
-        auto mod_base_string = mod_bases.as_string().str;
+        auto mod_base_string = mod_bases.as_string();
         for (const auto& mod_base : mod_base_string) {
             codes.push_back(std::string(1, mod_base));
         }
@@ -155,7 +155,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
         auto mod_base_array = mod_bases.as_array();
         for (const auto& mod_base : mod_base_array) {
             assert(mod_base.is_string());
-            codes.push_back(mod_base.as_string().str);
+            codes.push_back(mod_base.as_string());
         }
     }
 

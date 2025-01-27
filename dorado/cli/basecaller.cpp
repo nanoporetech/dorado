@@ -39,7 +39,7 @@
 #include "utils/modbase_parameters.h"
 #include "utils/string_utils.h"
 
-#include <argparse.hpp>
+#include <argparse/argparse.hpp>
 #include <cxxpool.h>
 
 #include <stdexcept>

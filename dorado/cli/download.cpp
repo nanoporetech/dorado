@@ -8,7 +8,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 
-#include <argparse.hpp>
+#include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>

@@ -21,7 +21,7 @@ FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
     // Convert the string to lowercase.
     std::string path_str = fastx_path.string();
     std::transform(std::begin(path_str), std::end(path_str), std::begin(path_str),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     faidx_t* faidx_ptr = nullptr;
 
@@ -69,7 +69,7 @@ std::vector<uint8_t> FastxRandomReader::fetch_qual(const std::string& read_id) c
         std::vector<uint8_t> qscores;
         qscores.reserve(len);
         std::transform(qual.get(), qual.get() + len, std::back_inserter(qscores),
-                       [](char c) { return static_cast<uint8_t>(c) - 33; });
+                       [](char c) { return static_cast<uint8_t>(c - 33); });
         return qscores;
     }
 }

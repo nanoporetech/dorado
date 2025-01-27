@@ -2,15 +2,15 @@
 argparse:
     description: >
         C++ argument parser
-    version: "3.1.0"
+    version: "v3.1"
     url: http://github.com/p-ranav/argparse
-    license: argparse/argparse.hpp
+    license: argparse/LICENSE
     files:
         - argparse
 cpp-httplib:
     description: >
         A C++11 single-file header-only cross platform HTTP/HTTPS library
-    version: "0.13.3"
+    version: "v0.18.3"
     url: https://github.com/yhirose/cpp-httplib
     license: cpp-httplib/LICENSE
     files:
@@ -35,7 +35,7 @@ cutlass:
 cxxpool:
     description: >
         A header-only thread pool for C++
-    version: "4d8526e93771c4728cbdcd238369e434bad58d32"
+    version: "2.0.0"
     url: https://github.com/bloomen/cxxpool
     license: cxxpool/LICENSE
     files:
@@ -43,7 +43,7 @@ cxxpool:
 date:
     description: >
         Date and time handling libraries
-    version: "cc4685a21e4a4fdae707ad1233c61bbaff241f93"
+    version: "v3.0.3"
     url: https://github.com/HowardHinnant/date
     license: date/LICENSE.txt
     files:
@@ -51,7 +51,7 @@ date:
 edlib:
     description: >
         C/C++ library for sequence alignment using edit distance
-    version: "18794ae1e74b64ff13975239a96417dfba63997b"
+    version: "1.3.9.post1"
     url: https://github.com/martinsos/edlib
     license: edlib/LICENSE
     files:
@@ -75,7 +75,7 @@ gsl-lite:
 HighFive:
     description: >
         Header-only C++11 friendly interface for libhdf5.
-    version: "c59464737afb8cc8d0042d2d9e495967860797d1"
+    version: "v2.10.1"
     url: https://github.com/BlueBrain/HighFive
     license: HighFive/LICENSE
     files:
@@ -83,7 +83,7 @@ HighFive:
 htslib:
     description: >
         C library for accessing common file formats, such as SAM, CRAM and VCF
-    version: "3c6f83f11e6e99cdcbed3541ae7d8d5f7786578d"
+    version: "1.21"
     url: https://github.com/samtools/htslib
     license: htslib/LICENSE
     files:
@@ -115,7 +115,7 @@ minimap2:
 NVTX:
     description: >
         API for annotating source code to provide contextual information to developer tools.
-    version: "61372b7a4cf1da41e9df4a1cb5a7a6e2c62113a8"
+    version: "v3.1.0"
     url: https://github.com/NVIDIA/NVTX
     license: NVTX/LICENSE.txt
     files:
@@ -141,7 +141,7 @@ pytorch:
 spdlog:
     description: >
         C++ logging library.
-    version: "7e635fca68d014934b4af8a1cf874f63989352b7"
+    version: "v1.15.0"
     url: https://github.com/gabime/spdlog
     license: spdlog/LICENSE
     files:
@@ -157,7 +157,7 @@ streamvbyte:
 toml11:
     description: >
         TOML for Modern C++
-    version: "59243256528d4133321e845c3193db2d2725e6ee"
+    version: "v4.2.0"
     url: https://github.com/ToruNiina/toml11
     license: toml11/LICENSE
     files:
@@ -173,7 +173,7 @@ zlib-ng:
 zstd:
     description: >
         Fast lossless compression algorithm.
-    version: "v1.4.8"
+    version: "v1.5.6"
     url: https://github.com/facebook/zstd
     license: zstd/LICENSE
     files:

@@ -60,10 +60,14 @@ using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
 // sliding window heuristic.
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
-    static const std::unordered_map<SampleType, int> kOffsetMap = {{SampleType::RNA002, 3500},
-                                                                   {SampleType::RNA004, 1000}};
+    static const std::unordered_map<SampleType, int> kOffsetMap = {
+            {SampleType::RNA002, 3500},
+            {SampleType::RNA004, 1000},
+    };
     static const std::unordered_map<SampleType, int16_t> kAdapterCutoff = {
-            {SampleType::RNA002, 550}, {SampleType::RNA004, 700}};
+            {SampleType::RNA002, static_cast<int16_t>(550)},
+            {SampleType::RNA004, static_cast<int16_t>(700)},
+    };
 
     const int kWindowSize = 250;
     const int kStride = 50;

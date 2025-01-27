@@ -96,7 +96,7 @@ std::string ModelComplexParser::parse_version(const std::string& version) {
     auto ver = version;
     // to lower
     std::transform(ver.begin(), ver.end(), ver.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     // assert starts with v/V
     if (!utils::starts_with(ver, "v")) {

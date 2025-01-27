@@ -1,7 +1,6 @@
 #include "model_config.h"
 
 #include <toml.hpp>
-#include <toml/value.hpp>
 
 #include <cstddef>
 #include <ostream>

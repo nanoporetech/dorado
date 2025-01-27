@@ -5,8 +5,6 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/get.hpp>
-#include <toml/value.hpp>
 
 #include <cstddef>
 #include <optional>

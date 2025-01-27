@@ -135,6 +135,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             ${ZLIB_LIBRARIES}
             dorado_io_lib
             dorado_file_info
+            toml11::toml11
     )
 
     enable_warnings_as_errors(${TEST_BIN})

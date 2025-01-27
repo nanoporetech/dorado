@@ -55,7 +55,7 @@ inline std::string_view rtrim_view(const std::string& s) {
 
 inline std::string to_uppercase(std::string in) {
     std::transform(in.begin(), in.end(), in.begin(),
-                   [](unsigned char c) { return std::toupper(c); });
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return in;
 }
 

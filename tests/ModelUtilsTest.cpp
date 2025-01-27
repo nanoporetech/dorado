@@ -23,50 +23,49 @@ TEST_CASE(TEST_TAG " Get model sample rate by name") {
     }
 
     SECTION("Spot checks") {
-        auto [model_name, sampling_rate] =
-                GENERATE(table<std::string, dorado::models::SamplingRate>({
-                        std::make_tuple("dna_r9.4.1_e8_fast@v3.4", 4000),
-                        std::make_tuple("dna_r9.4.1_e8_hac@v3.3", 4000),
-                        std::make_tuple("dna_r9.4.1_e8_sup@v3.3", 4000),
-                        std::make_tuple("dna_r9.4.1_e8_sup@v3.6", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v3.5.2", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.0.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v4.1.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v4.1.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v4.1.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.1.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.1.0", 4000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.1.0", 4000),
-                        // v4.2.0+ 5Khz
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.2.0", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.3.0", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.3.0", 5000),
-                        std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.3.0", 5000),
-                        // RNA2 3Khz
-                        std::make_tuple("rna002_70bps_fast@v3", 3000),
-                        std::make_tuple("rna002_70bps_hac@v3", 3000),
-                        // RNA4 4Khz
-                        std::make_tuple("rna004_130bps_fast@v3.0.1", 4000),
-                        std::make_tuple("rna004_130bps_hac@v3.0.1", 4000),
-                        std::make_tuple("rna004_130bps_sup@v3.0.1", 4000),
-                }));
+        auto [model_name, sampling_rate] = GENERATE(table<std::string, int>({
+                std::make_tuple("dna_r9.4.1_e8_fast@v3.4", 4000),
+                std::make_tuple("dna_r9.4.1_e8_hac@v3.3", 4000),
+                std::make_tuple("dna_r9.4.1_e8_sup@v3.3", 4000),
+                std::make_tuple("dna_r9.4.1_e8_sup@v3.6", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v3.5.2", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.0.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_fast@v4.1.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_hac@v4.1.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_260bps_sup@v4.1.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.1.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.1.0", 4000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.1.0", 4000),
+                // v4.2.0+ 5Khz
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", 5000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.2.0", 5000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.2.0", 5000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_fast@v4.3.0", 5000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_hac@v4.3.0", 5000),
+                std::make_tuple("dna_r10.4.1_e8.2_400bps_sup@v4.3.0", 5000),
+                // RNA2 3Khz
+                std::make_tuple("rna002_70bps_fast@v3", 3000),
+                std::make_tuple("rna002_70bps_hac@v3", 3000),
+                // RNA4 4Khz
+                std::make_tuple("rna004_130bps_fast@v3.0.1", 4000),
+                std::make_tuple("rna004_130bps_hac@v3.0.1", 4000),
+                std::make_tuple("rna004_130bps_sup@v3.0.1", 4000),
+        }));
 
         CAPTURE(model_name);
         CAPTURE(sampling_rate);
         const auto result = dorado::models::get_sample_rate_by_model_name(model_name);
-        CHECK(sampling_rate == result);
+        CHECK(static_cast<dorado::models::SamplingRate>(sampling_rate) == result);
     }
 }
 
