@@ -1,7 +1,7 @@
 if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib")
-        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/htslib-win.tar.gz htslib-win)
+        download_and_extract(${DORADO_CDN_URL}/htslib-win.tar.gz htslib-win)
         set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
         add_library(htslib SHARED IMPORTED)

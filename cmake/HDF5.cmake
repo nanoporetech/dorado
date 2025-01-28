@@ -4,7 +4,7 @@ if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "aa
     # download the pacakge for arm, we want to package this due to hdf5's dependencies
     set(DYNAMIC_HDF ON)
     set(HDF_VER hdf5-1.10.0-aarch64)
-    download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}.zip ${HDF_VER})
+    download_and_extract(${DORADO_CDN_URL}/${HDF_VER}.zip ${HDF_VER})
     list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY_DOWNLOAD}/${HDF_VER}/${HDF_VER})
 
 elseif(WIN32)
@@ -36,7 +36,7 @@ elseif(WIN32)
         )
 
         # HDF5 itself
-        download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/${HDF_VER}-win.zip ${HDF_VER})
+        download_and_extract(${DORADO_CDN_URL}/${HDF_VER}-win.zip ${HDF_VER})
     endif()
 
     list(APPEND CMAKE_PREFIX_PATH ${HDF5_ZLIB_INSTALL_DIR})
@@ -51,7 +51,7 @@ elseif (APPLE)
     else()
         set(HDF_ARCH "armv8")
     endif()
-    download_and_extract(https://cdn.oxfordnanoportal.com/software/analysis/hdf5-${HDF_VER}-${HDF_ARCH}.zip hdf5-${HDF_VER}-${HDF_ARCH})
+    download_and_extract(${DORADO_CDN_URL}/hdf5-${HDF_VER}-${HDF_ARCH}.zip hdf5-${HDF_VER}-${HDF_ARCH})
     list(PREPEND CMAKE_PREFIX_PATH ${DORADO_3RD_PARTY_DOWNLOAD}/hdf5-${HDF_VER}-${HDF_ARCH}/${HDF_VER}_${HDF_ARCH})
 
 endif()

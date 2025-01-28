@@ -75,6 +75,13 @@ if(${CUDAToolkit_FOUND})
   message(STATUS "Found CUDA ${CUDAToolkit_VERSION} (${CUDAToolkit_TARGET_DIR} -> ${CUDAToolkit_REAL_DIR})")
 endif()
 
+if(DEFINED ENV{DORADO_CDN_URL_OVERRIDE})
+    set(DORADO_CDN_URL "$ENV{DORADO_CDN_URL_OVERRIDE}")
+else()
+    set(DORADO_CDN_URL "https://cdn.oxfordnanoportal.com/software/analysis")
+endif()
+message(STATUS "Using CDN URL ${DORADO_CDN_URL} for downloads")
+
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
