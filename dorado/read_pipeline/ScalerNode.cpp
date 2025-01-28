@@ -25,6 +25,10 @@ static constexpr float EPS = 1e-9f;
 
 using Slice = at::indexing::Slice;
 
+// Set this to 1 if you want the per-read spdlog::trace calls.
+// Note that under high read-throughput this could cause slowdowns.
+#define PER_READ_LOGGING 0
+
 namespace {
 
 std::pair<float, float> med_mad(const at::Tensor& x) {
@@ -106,8 +110,12 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
         int16_t max_median = *minmax.second;
         auto min_pos = std::distance(medians.begin(), minmax.first);
         auto max_pos = std::distance(medians.begin(), minmax.second);
+
+#if PER_READ_LOGGING
         spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
                       max_median, (max_median - min_median));
+#endif
+
         if ((median_pos >= static_cast<int>(medians.size()) &&
              window_pos[max_pos] > window_pos[min_pos]) &&
             (((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) ||
@@ -235,8 +243,10 @@ void ScalerNode::input_thread_fn() {
 
         read->read_common.num_trimmed_samples = trim_start;
 
+#if PER_READ_LOGGING
         spdlog::trace("ScalerNode: {} shift: {} scale: {} trim: {}", read->read_common.read_id,
                       shift, scale, trim_start);
+#endif
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));

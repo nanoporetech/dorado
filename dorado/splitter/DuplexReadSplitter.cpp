@@ -626,7 +626,7 @@ std::vector<DuplexReadSplitter::ExtRead> DuplexReadSplitter::apply_split_finders
 
 template <typename SplitFinder>
 void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
-                                            const char* description,
+                                            [[maybe_unused]] const char* description,
                                             const SplitFinder& split_finder) const {
 #if PER_READ_LOGGING
     spdlog::trace("Running {}", description);

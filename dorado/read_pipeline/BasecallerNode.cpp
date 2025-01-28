@@ -340,9 +340,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                         worker_id);
                 first_chunk_reserve_time = std::chrono::system_clock::now();
             }
-            spdlog::trace(
-                    "Resetting last_chunk_reserve_time for worker {} after adding chunk to batch.",
-                    worker_id);
             last_chunk_reserve_time = std::chrono::system_clock::now();
         }
 
