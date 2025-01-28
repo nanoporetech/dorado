@@ -1,3 +1,29 @@
+
+# Helper to apply patches to 3rdparty libs.
+function (apply_3rdparty_patch NAME)
+    find_package(Git REQUIRED QUIET)
+    set(PATCH_FILE ${CMAKE_CURRENT_LIST_DIR}/patches/${NAME}.patch)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} apply --reverse --check ${PATCH_FILE}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/${NAME}
+        RESULT_VARIABLE NOT_ALREADY_APPLIED
+        ERROR_QUIET
+    )
+    if (NOT_ALREADY_APPLIED)
+        message(STATUS "Applying patch ${PATCH_FILE}")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} apply ${PATCH_FILE}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/${NAME}
+            RESULT_VARIABLE PATCH_FAILED
+        )
+        if (PATCH_FAILED)
+            message(FATAL_ERROR "Failed to apply patch ${PATCH_FILE}")
+        endif()
+    endif()
+endfunction()
+
+
+
 # argparse
 add_subdirectory(argparse EXCLUDE_FROM_ALL)
 
@@ -36,6 +62,7 @@ set(BUILD_TESTING ON)
 add_subdirectory(date EXCLUDE_FROM_ALL)
 
 # HighFive
+apply_3rdparty_patch(HighFive)
 # There isn't a nice target to link to until 3.X, which isn't released yet.
 #add_subdirectory(HighFive EXCLUDE_FROM_ALL)
 # For now make our own target and set some defines to control how it behaves.
