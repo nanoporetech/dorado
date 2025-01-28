@@ -216,8 +216,24 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
         auto length_tensor =
                 at::from_blob(lengths.data(), {(int)lengths.size()},
                               at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
-        const at::Tensor batched_bases = collate<int>(bases_batch, (int)11, torch::kInt32);
-        const at::Tensor batched_quals = collate<float>(quals_batch, 0.f, torch::kFloat32);
+
+        // Collate bases.
+        at::Tensor batched_bases;
+        std::thread thread_bases = std::thread([&bases_batch, &batched_bases]() {
+            batched_bases = correction::collate<int32_t>(bases_batch, static_cast<int32_t>(11),
+                                                         torch::kInt32);
+            bases_batch.clear();
+        });
+
+        // Collate quals.
+        at::Tensor batched_quals;
+        std::thread thread_quals = std::thread([&quals_batch, &batched_quals]() {
+            batched_quals = correction::collate<float>(quals_batch, 0.0f, torch::kFloat32);
+            quals_batch.clear();
+        });
+
+        thread_bases.join();
+        thread_quals.join();
 
         std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
