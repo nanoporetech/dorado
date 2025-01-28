@@ -40,7 +40,7 @@ variables:
 .macos_arm_runner:
   tags:
     - osx_arm64
-    - xcode-15.0.1
+    - xcode-15.3
   variables:
     MACOSX_DEPLOYMENT_TARGET: "11.0"
 
