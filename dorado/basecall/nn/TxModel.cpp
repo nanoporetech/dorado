@@ -144,7 +144,7 @@ GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_)
 
 at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     at::Tensor t;
-#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+#if DORADO_CUDA_BUILD && !DORADO_TX2
     auto use_koi_swiglu = x.is_cuda() && utils::get_dev_opt<bool>("use_koi_swiglu", true) &&
                           koi_can_use_cutlass();
     if (use_koi_swiglu) {
@@ -375,7 +375,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         }
     }
     attn_output_ntc = at::empty({N, T, C}, x.options());
-#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+#if DORADO_CUDA_BUILD && !DORADO_TX2
     int res = KOI_NOT_SUPPORTED;
     bool use_koi_attention = x.is_cuda() && utils::get_dev_opt<bool>("use_koi_attention", true) &&
                              koi_can_use_cutlass();
@@ -451,7 +451,7 @@ TxEncoderImpl::TxEncoderImpl(const tx::TxEncoderParams &params_, const at::Tenso
 void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
     (void)scaled_tensor;
     (void)x_f16;
-#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+#if DORADO_CUDA_BUILD && !DORADO_TX2
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
     const int C = params.d_model;
@@ -670,7 +670,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 
 TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
                                        const at::TensorOptions &options) {
-#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+#if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
     use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
                     (params.nhead == 8) && (params.attn_window.first == 127) &&
@@ -688,7 +688,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
 };
 
 at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
-#if DORADO_CUDA_BUILD && !defined(DORADO_TX2)
+#if DORADO_CUDA_BUILD && !DORADO_TX2
     if (use_koi_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));

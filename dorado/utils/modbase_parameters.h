@@ -13,7 +13,7 @@ ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept;
 bool is_modbase_model(const std::filesystem::path& path);
 
 struct DefaultModBaseParameters {
-#ifdef DORADO_TX2
+#if DORADO_TX2
     int batchsize{128};
     int batchsize_conv_lstm_v2{128};
 #else

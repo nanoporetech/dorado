@@ -30,9 +30,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     size_t num_devices = 1;
 
     if (params.device == "cpu") {
-#ifdef DORADO_TX2
+#if DORADO_TX2
         spdlog::warn("CPU basecalling is not supported on this platform. Results may be incorrect");
-#endif  // #ifdef DORADO_TX2
+#endif  // DORADO_TX2
 
         if (num_cpu_runners == 0) {
             num_cpu_runners = basecall::auto_calculate_num_runners(params.model_config,

@@ -129,14 +129,6 @@ else()
     set(DORADO_ENABLE_PCH TRUE)
 endif()
 
-if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*"))
-    if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
-        add_compile_definitions(DORADO_TX2)
-    else()
-        add_compile_definitions(DORADO_ORIN)
-    endif()
-endif()
-
 # Bring in 3rdparty libs
 add_subdirectory(dorado/3rdparty)
 
