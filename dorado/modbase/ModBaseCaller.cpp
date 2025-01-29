@@ -7,6 +7,10 @@
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
 
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -16,14 +20,6 @@
 #include <c10/cuda/CUDAStream.h>
 #include <torch/cuda.h>
 #endif
-#include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
-
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#include <chrono>
 
 using namespace std::chrono_literals;
 

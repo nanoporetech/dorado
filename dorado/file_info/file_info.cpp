@@ -7,6 +7,8 @@
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
+#include <set>
+
 namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(

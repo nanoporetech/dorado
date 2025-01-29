@@ -10,7 +10,6 @@
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
-#include "dorado_version.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
@@ -29,32 +28,22 @@
 #include "read_pipeline/ResumeLoader.h"
 #include "read_pipeline/TrimmerNode.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
-#include "utils/dev_utils.h"
 #include "utils/fs_utils.h"
+#include "utils/log_utils.h"
 #include "utils/modbase_parameters.h"
+#include "utils/parameters.h"
+#include "utils/stats.h"
 #include "utils/string_utils.h"
+#include "utils/sys_stats.h"
 
 #include <argparse/argparse.hpp>
 #include <cxxpool.h>
-
-#include <stdexcept>
-#include <string>
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "torch_utils/torch_utils.h"
-#include "utils/fs_utils.h"
-#include "utils/log_utils.h"
-#include "utils/parameters.h"
-#include "utils/stats.h"
-#include "utils/sys_stats.h"
-#include "utils/tty_utils.h"
-
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/utils.h>
@@ -67,8 +56,14 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
 
 using dorado::utils::default_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;

@@ -1,19 +1,11 @@
 #pragma once
 
-#include "utils/bam_utils.h"
-#include "utils/dev_utils.h"
 #include "utils/modbase_parameters.h"
-#include "utils/sequence_utils.h"
 #include "utils/types.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <filesystem>
-#include <optional>
-#include <stdexcept>
 #include <string>
-#include <string_view>
-#include <utility>
 #include <vector>
 
 namespace dorado::modbase {

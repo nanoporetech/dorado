@@ -6,9 +6,7 @@
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "data_loader/DataLoader.h"
-#include "dorado_version.h"
 #include "file_info/file_info.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "model_downloader/model_downloader.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
@@ -22,23 +20,19 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/duplex_utils.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
-#include "utils/modbase_parameters.h"
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "torch_utils/duplex_utils.h"
-#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
+#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
-#include "utils/tty_utils.h"
 #include "utils/types.h"
 
 #include <cxxpool.h>
@@ -55,6 +49,10 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 namespace fs = std::filesystem;
