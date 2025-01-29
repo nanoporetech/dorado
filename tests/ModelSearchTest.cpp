@@ -3,7 +3,8 @@
 #include "models/model_complex.h"
 #include "models/models.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <stdexcept>
 
@@ -21,20 +22,20 @@ using ModsVP = ModsVariantPair;
 using VV = ModelVersion;
 using CC = Chemistry;
 
-TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG) {
-    SECTION("get_simplex_model_name all") {
+CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG) {
+    CATCH_SECTION("get_simplex_model_name all") {
         // given the model definitions the same model can be found
         for (const auto& mi : simplex_models()) {
             const auto complex =
                     to_string(mi.simplex.variant).append("@").append(to_string(mi.simplex.ver));
             const auto mf = MCS{MC{complex, mi.simplex}, mi.chemistry, false};
-            CAPTURE(mi.name);
-            CAPTURE(complex);
-            CHECK(mf.simplex().name == mi.name);
+            CATCH_CAPTURE(mi.name);
+            CATCH_CAPTURE(complex);
+            CATCH_CHECK(mf.simplex().name == mi.name);
         }
     }
 
-    SECTION("get_simplex_model_name simplex spot checks") {
+    CATCH_SECTION("get_simplex_model_name simplex spot checks") {
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected] = GENERATE(table<CC, MVP, std::string>({
                 std::make_tuple(CC::DNA_R9_4_1_E8, MVP{MV::FAST, VV::v3_4_0},
@@ -62,19 +63,19 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG) {
                                 "rna004_130bps_hac@v3.0.1"),
         }));
 
-        CAPTURE(expected);
-        CAPTURE(to_string(chemistry));
+        CATCH_CAPTURE(expected);
+        CATCH_CAPTURE(to_string(chemistry));
         const auto variant = to_string(mvp.variant);
         const auto ver = to_string(mvp.ver);
         const auto complex = variant + "@" + ver;
         const auto mf = MCS{MC{complex, mvp}, chemistry, false};
-        CAPTURE(complex);
-        CHECK(mf.simplex().name == expected);
+        CATCH_CAPTURE(complex);
+        CATCH_CHECK(mf.simplex().name == expected);
     }
 }
 
-TEST_CASE(TEST_TAG "  ModelComplexSearch get_stereo_model_name", TEST_TAG) {
-    SECTION("get_stereo_model_name all") {
+CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_stereo_model_name", TEST_TAG) {
+    CATCH_SECTION("get_stereo_model_name all") {
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected_simplex, expected_stereo] =
                 GENERATE(table<CC, MVP, std::string, std::string>({
@@ -112,22 +113,22 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch get_stereo_model_name", TEST_TAG) {
                                         "dna_r10.4.1_e8.2_5khz_stereo@v1.3"),
                 }));
 
-        CAPTURE(expected_simplex);
-        CAPTURE(expected_stereo);
-        CAPTURE(to_string(chemistry));
+        CATCH_CAPTURE(expected_simplex);
+        CATCH_CAPTURE(expected_stereo);
+        CATCH_CAPTURE(to_string(chemistry));
         const auto variant = to_string(mvp.variant);
         const auto ver = to_string(mvp.ver);
         const auto complex = variant + "@" + ver;
         const auto mf = MCS{MC{complex, mvp}, chemistry, false};
-        CAPTURE(complex);
-        CHECK(mf.simplex().name == expected_simplex);
-        CHECK(mf.stereo().name == expected_stereo);
+        CATCH_CAPTURE(complex);
+        CATCH_CHECK(mf.simplex().name == expected_simplex);
+        CATCH_CHECK(mf.stereo().name == expected_stereo);
     }
 }
 
-TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
+CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
     // const auto foo = MS{}
-    SECTION("ModelComplexParser parse expected") {
+    CATCH_SECTION("ModelComplexParser parse expected") {
         auto [input, expected] = GENERATE(table<std::string, MC>({
                 // No version
                 std::make_tuple("auto", MC{"auto", MVP{MV::AUTO}}),
@@ -187,29 +188,29 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
                                     ModsVP{ModsV::M_5mC_5hmC, VV::v4_0_0}}}),
         }));
 
-        CAPTURE(input);
+        CATCH_CAPTURE(input);
         auto result = ModelComplexParser::parse(input);
-        CAPTURE(to_string(result.model.variant));
-        CAPTURE(to_string(result.model.ver));
-        CAPTURE(result.mods.size());
-        CHECK(result.model.variant == expected.model.variant);
+        CATCH_CAPTURE(to_string(result.model.variant));
+        CATCH_CAPTURE(to_string(result.model.ver));
+        CATCH_CAPTURE(result.mods.size());
+        CATCH_CHECK(result.model.variant == expected.model.variant);
 
-        CHECK(result.model.ver == expected.model.ver);
-        CHECK(result.mods.size() == expected.mods.size());
+        CATCH_CHECK(result.model.ver == expected.model.ver);
+        CATCH_CHECK(result.mods.size() == expected.mods.size());
 
-        CHECK_FALSE(result.is_path());
-        CHECK(result.has_model_variant());
+        CATCH_CHECK_FALSE(result.is_path());
+        CATCH_CHECK(result.has_model_variant());
 
         for (size_t i = 0; i < result.mods.size(); ++i) {
             const auto& res = result.mods.at(i);
             const auto& ex = expected.mods.at(i);
-            CHECK(res.variant == ex.variant);
-            CHECK(res.ver == ex.ver);
-            CHECK(result.has_mods_variant());
+            CATCH_CHECK(res.variant == ex.variant);
+            CATCH_CHECK(res.ver == ex.ver);
+            CATCH_CHECK(result.has_mods_variant());
         }
     }
 
-    SECTION("ModelComplexParser parse expected path") {
+    CATCH_SECTION("ModelComplexParser parse expected path") {
         auto [input] = GENERATE(table<std::string>({
                 // No version
                 std::make_tuple("dna_r10.4.1_e8.2_260bps@4.2.0"),
@@ -229,18 +230,18 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
                 std::make_tuple("./sup"),
         }));
 
-        CAPTURE(input);
+        CATCH_CAPTURE(input);
         auto result = ModelComplexParser::parse(input);
-        CHECK(result.raw == input);
-        CHECK(result.model.variant == ModelVariant::NONE);
-        CHECK(result.model.ver == ModelVersion::NONE);
-        CHECK(result.mods.size() == 0);
-        CHECK(result.is_path());
-        CHECK_FALSE(result.has_model_variant());
-        CHECK_FALSE(result.has_mods_variant());
+        CATCH_CHECK(result.raw == input);
+        CATCH_CHECK(result.model.variant == ModelVariant::NONE);
+        CATCH_CHECK(result.model.ver == ModelVersion::NONE);
+        CATCH_CHECK(result.mods.size() == 0);
+        CATCH_CHECK(result.is_path());
+        CATCH_CHECK_FALSE(result.has_model_variant());
+        CATCH_CHECK_FALSE(result.has_mods_variant());
     }
 
-    SECTION("ModelComplexParser parse_version expected") {
+    CATCH_SECTION("ModelComplexParser parse_version expected") {
         // If a model version is parsed ok, but is not a recognised version then a different
         // error is raised explaining this
 
@@ -261,12 +262,12 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
         }));
         // clang-format on
 
-        CAPTURE(input);
+        CATCH_CAPTURE(input);
         auto result = ModelComplexParser::parse_version(input);
-        CHECK(result == expected);
+        CATCH_CHECK(result == expected);
     }
 
-    SECTION("ModelComplexParser parse_version unexpected values") {
+    CATCH_SECTION("ModelComplexParser parse_version unexpected values") {
         auto [input] = GENERATE(table<std::string>({
                 "",
                 "n",
@@ -277,7 +278,7 @@ TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
                 "v1. 1a",
                 "v. 1a . t",
         }));
-        CAPTURE(input);
-        CHECK_THROWS_AS(ModelComplexParser::parse_version(input), std::runtime_error);
+        CATCH_CAPTURE(input);
+        CATCH_CHECK_THROWS_AS(ModelComplexParser::parse_version(input), std::runtime_error);
     }
 }

@@ -101,20 +101,19 @@ add_library(dorado_tests_common STATIC
     main.cpp
     TestUtils.cpp
 )
+enable_warnings_as_errors(dorado_tests_common)
 target_link_libraries(dorado_tests_common
     PUBLIC
         dorado_torch_utils
         dorado_utils
         dorado_compat
-)
-target_include_directories(dorado_tests_common
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/catch2
+        Catch2::Catch2
 )
 target_compile_definitions(dorado_tests_common
     PUBLIC
-        $<$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>:CATCH_CONFIG_ENABLE_BENCHMARKING>
+        DORADO_ENABLE_BENCHMARK_TESTS=$<BOOL:${DORADO_ENABLE_BENCHMARK_TESTS}>
+        # Workaround torch defining a CATCH_CHECK() macro that conflicts with catch2
+        CATCH_CONFIG_PREFIX_ALL=1
 )
 
 # Finish setting up each target and add them as tests.
@@ -195,6 +194,7 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # If this fails to link then we're not providing all of the libs for the symbols
     # that we use.
     add_library(dorado_symbol_test SHARED symbol_test.cpp)
+    enable_warnings_as_errors(dorado_symbol_test)
     target_link_libraries(dorado_symbol_test PUBLIC dorado_lib dorado_models_lib)
     if(MSVC)
         set_property(TARGET dorado_symbol_test APPEND PROPERTY LINK_OPTIONS "/ignore:4099")

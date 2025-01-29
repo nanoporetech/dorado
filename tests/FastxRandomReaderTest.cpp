@@ -5,7 +5,7 @@
 #include "utils/bam_utils.h"
 #include "utils/hts_file.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>
 
 using namespace dorado;
@@ -23,7 +23,7 @@ BamPtr generate_bam_entry(const std::string& read_id,
     return rec;
 }
 
-TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "FastxRandomReader") {
+CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "FastxRandomReader") {
     auto temp_dir = tests::make_temp_dir("fastx_random_reader_test");
     auto temp_input_file = temp_dir.m_path / "input.fasta";
 
@@ -41,11 +41,11 @@ TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "FastxRan
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string());
-    CHECK(reader.num_entries() == 1);
-    CHECK(reader.fetch_seq(read_id) == seq);
+    CATCH_CHECK(reader.num_entries() == 1);
+    CATCH_CHECK(reader.fetch_seq(read_id) == seq);
 }
 
-TEST_CASE("Check if a read can be loaded correctly from FASTQ input.", "FastxRandomReader") {
+CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTQ input.", "FastxRandomReader") {
     auto temp_dir = tests::make_temp_dir("fastx_random_reader_test");
     auto temp_input_file = temp_dir.m_path / "input.fq";
 
@@ -64,7 +64,7 @@ TEST_CASE("Check if a read can be loaded correctly from FASTQ input.", "FastxRan
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string());
-    CHECK(reader.num_entries() == 1);
-    CHECK(reader.fetch_seq(read_id) == seq);
-    CHECK(reader.fetch_qual(read_id) == qscore);
+    CATCH_CHECK(reader.num_entries() == 1);
+    CATCH_CHECK(reader.fetch_seq(read_id) == seq);
+    CATCH_CHECK(reader.fetch_qual(read_id) == qscore);
 }

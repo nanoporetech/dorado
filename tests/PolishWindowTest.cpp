@@ -1,13 +1,14 @@
 #include "polish/window.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <cstdint>
 #include <vector>
 
 #define TEST_GROUP "[PolishCreateWindows]"
 
-TEST_CASE("create_windows tests", TEST_GROUP) {
+CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
     using namespace dorado::polisher;
 
     struct TestCase {
@@ -100,9 +101,9 @@ TEST_CASE("create_windows tests", TEST_GROUP) {
     }));
     // clang-format on
 
-    INFO(TEST_GROUP << " Test name: " << test_case.name);
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.name);
     const std::vector<Window> result =
             create_windows(test_case.seq_id, test_case.seq_start, test_case.seq_end,
                            test_case.seq_len, test_case.window_len, test_case.window_overlap);
-    CHECK(result == test_case.expected);
+    CATCH_CHECK(result == test_case.expected);
 }

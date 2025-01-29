@@ -1,86 +1,89 @@
 #include "torch_utils/tensor_utils.h"
 
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <spdlog/spdlog.h>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdlib>
 #include <random>
 
 #define CUT_TAG "[TensorUtils]"
 
-TEST_CASE(CUT_TAG ": test quartiles", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test quartiles", CUT_TAG) {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.25, 0.5, 0.75}, {torch::kFloat});
 
     auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile(in, q);
 
-    REQUIRE(torch::equal(computed, expected));
+    CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-TEST_CASE(CUT_TAG ": test quartiles reversed", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test quartiles reversed", CUT_TAG) {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.75, 0.5, 0.25}, {torch::kFloat});
 
     auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile(in, q);
 
-    REQUIRE(torch::equal(computed, expected));
+    CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-TEST_CASE(CUT_TAG ": test quantiles", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test quantiles", CUT_TAG) {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.2, 0.9}, {torch::kFloat});
 
     auto expected = torch::quantile(in, q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile(in, q);
 
-    REQUIRE(torch::equal(computed, expected));
+    CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-TEST_CASE(CUT_TAG ": test quartiles_counting", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test quartiles_counting", CUT_TAG) {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.25, 0.5, 0.75}, {torch::kFloat});
 
     auto expected = torch::quantile(in.to(torch::kFloat), q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile_counting(in.to(torch::kI16), q);
 
-    REQUIRE(torch::equal(computed, expected));
+    CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.2, 0.9}, {torch::kFloat});
 
     auto expected = torch::quantile(in.to(torch::kFloat), q, 0, false, c10::string_view("lower"));
     auto computed = dorado::utils::quantile_counting(in.to(torch::kI16), q);
 
-    REQUIRE(torch::equal(computed, expected));
+    CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
-TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
+#if DORADO_ENABLE_BENCHMARK_TESTS
+CATCH_TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
     const auto size = GENERATE(1000, 5000, 10000, 100000);
-    CAPTURE(size);
+    CATCH_CAPTURE(size);
 
     const auto x_int = at::randint(0, 2047, size);
     const auto x_float = x_int.to(at::ScalarType::Float);
     const auto x_short = x_int.to(at::ScalarType::Short);
     const auto q = at::tensor({0.2, 0.9}, {at::ScalarType::Float});
 
-    BENCHMARK(fmt::format("torch quantile (float/{})", size)) { return at::quantile(x_float, q); };
-    BENCHMARK(fmt::format("our quantile (float/{})", size)) {
+    CATCH_BENCHMARK(fmt::format("torch quantile (float/{})", size)) {
+        return at::quantile(x_float, q);
+    };
+    CATCH_BENCHMARK(fmt::format("our quantile (float/{})", size)) {
         return dorado::utils::quantile(x_float, q);
     };
-    BENCHMARK(fmt::format("our quantile (short/{})", size)) {
+    CATCH_BENCHMARK(fmt::format("our quantile (short/{})", size)) {
         return dorado::utils::quantile_counting(x_short, q);
     };
 }
-#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
 
-TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
     torch::manual_seed(42);
     srand(42);
 
@@ -93,26 +96,29 @@ TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
                                           elems_f32.data_ptr<float>(), num_elems);
         const float kRelTolerance = 0.0f;
         const float kAbsTolerance = 0.0f;
-        CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance, kAbsTolerance));
+        CATCH_CHECK(torch::allclose(elems_torch_f16, elems_converted_f16, kRelTolerance,
+                                    kAbsTolerance));
     }
 
-#ifdef CATCH_CONFIG_ENABLE_BENCHMARKING
+#if DORADO_ENABLE_BENCHMARK_TESTS
     {
         const auto num_elems = GENERATE(1'000, 100'000, 10'000'000);
         const auto elems_f32 = torch::rand({num_elems}, torch::kFloat32);
         auto elems_converted_f16 = torch::zeros({num_elems}, torch::kHalf);
 
-        BENCHMARK("torch convert " + std::to_string(num_elems)) { elems_f32.to(torch::kHalf); };
+        CATCH_BENCHMARK("torch convert " + std::to_string(num_elems)) {
+            elems_f32.to(torch::kHalf);
+        };
 
-        BENCHMARK("our convert " + std::to_string(num_elems)) {
+        CATCH_BENCHMARK("our convert " + std::to_string(num_elems)) {
             dorado::utils::convert_f32_to_f16(elems_converted_f16.data_ptr<c10::Half>(),
                                               elems_f32.data_ptr<float>(), num_elems);
         };
     }
-#endif  // CATCH_CONFIG_ENABLE_BENCHMARKING
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }
 
-TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
     torch::manual_seed(42);
     srand(42);
 
@@ -139,8 +145,8 @@ TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
                                                  src_offset, count);
                 const float kRelTolerance = 0.0f;
                 const float kAbsTolerance = 0.0f;
-                CHECK(torch::allclose(torch_result, copy_elems_result, kRelTolerance,
-                                      kAbsTolerance));
+                CATCH_CHECK(torch::allclose(torch_result, copy_elems_result, kRelTolerance,
+                                            kAbsTolerance));
             }
         }
     }

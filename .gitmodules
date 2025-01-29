@@ -43,3 +43,6 @@
 [submodule "dorado/3rdparty/argparse"]
 	path = dorado/3rdparty/argparse
 	url = https://github.com/p-ranav/argparse.git
+[submodule "dorado/3rdparty/catch2"]
+	path = dorado/3rdparty/catch2
+	url = https://github.com/catchorg/Catch2.git

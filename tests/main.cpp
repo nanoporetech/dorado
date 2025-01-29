@@ -1,12 +1,11 @@
-#define CATCH_CONFIG_RUNNER
 
 #include "torch_utils/torch_utils.h"
 #include "utils/locale_utils.h"
 
+#include <catch2/catch_session.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <nvtx3/nvtx3.hpp>
 #include <torch/utils.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 int main(int argc, char* argv[]) {
     // global setup...

@@ -2,9 +2,8 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "read_pipeline/StereoDuplexEncoderNode.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -29,7 +28,7 @@ void generate_raw_data(dorado::DuplexReadPtr& duplex_read_ptr) {
 }  // namespace
 
 // Tests stereo encoder output for a real sample signal against known good output.
-TEST_CASE(TEST_GROUP "Encoder") {
+CATCH_TEST_CASE(TEST_GROUP "Encoder") {
     dorado::ReadPair::ReadData template_read{};
     {
         template_read.read_common.seq = ReadFileIntoString(DataPath("template_seq"));
@@ -69,11 +68,11 @@ TEST_CASE(TEST_GROUP "Encoder") {
     read_pair.complement_read = complement_read;
     auto stereo_read = stereo_node.stereo_encode(read_pair);
     generate_raw_data(stereo_read);
-    REQUIRE(torch::equal(stereo_raw_data, stereo_read->read_common.raw_data));
+    CATCH_REQUIRE(torch::equal(stereo_raw_data, stereo_read->read_common.raw_data));
 
     // Check that the duplex tag and run id is set correctly.
-    REQUIRE(stereo_read->read_common.is_duplex);
-    REQUIRE(stereo_read->read_common.run_id == template_read.read_common.run_id);
+    CATCH_REQUIRE(stereo_read->read_common.is_duplex);
+    CATCH_REQUIRE(stereo_read->read_common.run_id == template_read.read_common.run_id);
 
     // Encode with swapped template and complement reads
     std::swap(read_pair.template_read, read_pair.complement_read);
@@ -84,5 +83,5 @@ TEST_CASE(TEST_GROUP "Encoder") {
     generate_raw_data(swapped_stereo_read);
 
     // Check if the encoded signal is NOT equal to the expected stereo_raw_data
-    REQUIRE(!torch::equal(stereo_raw_data, swapped_stereo_read->read_common.raw_data));
+    CATCH_REQUIRE(!torch::equal(stereo_raw_data, swapped_stereo_read->read_common.raw_data));
 }
