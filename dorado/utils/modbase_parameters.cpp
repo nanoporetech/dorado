@@ -88,20 +88,17 @@ std::string ModBaseParams::to_string() const {
     return str;
 }
 
-ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                 int batch_size_arg) {
-    bool is_conv_lstm_v2 =
+ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths) {
+    const bool is_conv_lstm_v2 =
             !paths.empty() && get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V2;
-    std::size_t batch_size = is_conv_lstm_v2 ? DefaultModBaseParameters::batchsize_conv_lstm_v2
-                                             : DefaultModBaseParameters::batchsize;
-    if (batch_size_arg > 0) {
-        batch_size = batch_size_arg;
-    }
+    const std::size_t batch_size = is_conv_lstm_v2
+                                           ? DefaultModBaseParameters::batchsize_conv_lstm_v2
+                                           : DefaultModBaseParameters::batchsize;
 
-    std::size_t threads = utils::get_dev_opt(
+    const std::size_t threads = utils::get_dev_opt(
             "modbase_threads", is_conv_lstm_v2 ? DefaultModBaseParameters::threads_conv_lstm_v2
                                                : DefaultModBaseParameters::threads);
-    std::size_t runners_per_caller = utils::get_dev_opt(
+    const std::size_t runners_per_caller = utils::get_dev_opt(
             "modbase_runners", is_conv_lstm_v2
                                        ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2
                                        : DefaultModBaseParameters::runners_per_caller);

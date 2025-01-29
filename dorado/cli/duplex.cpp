@@ -259,6 +259,39 @@ DuplexModels load_models(const std::string& model_arg,
                         mods_model_paths,    downloader.temporary_models()};
 }
 
+utils::modbase::ModBaseParams validate_modbase_params(
+        const std::vector<std::filesystem::path>& paths,
+        utils::arg_parse::ArgParser& parser) {
+    // Convert path to params.
+    auto params = utils::modbase::get_modbase_params(paths);
+
+    // Allow user to override batchsize.
+    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+        modbase_batchsize.has_value()) {
+        params.batchsize = *modbase_batchsize;
+    }
+
+    // Allow user to override threshold.
+    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+        methylation_threshold.has_value()) {
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
+        }
+        params.threshold = *methylation_threshold;
+    }
+
+    // Check that the paths are all valid.
+    for (const auto& mb_path : paths) {
+        if (!utils::modbase::is_modbase_model(mb_path)) {
+            throw std::runtime_error("Modified bases model not found in the model path at " +
+                                     std::filesystem::weakly_canonical(mb_path).string());
+        }
+    }
+
+    // All looks good.
+    return params;
+}
+
 }  // namespace
 
 using namespace std::chrono_literals;
@@ -609,9 +642,7 @@ int duplex(int argc, char* argv[]) {
             auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
 
-            const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
-                    models.mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
-                    methylation_threshold);
+            const auto modbase_params = validate_modbase_params(models.mods_model_paths, parser);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,

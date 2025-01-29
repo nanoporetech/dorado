@@ -206,7 +206,6 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(0)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
@@ -280,6 +279,39 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     cli::add_internal_arguments(parser);
 }
 
+utils::modbase::ModBaseParams validate_modbase_params(
+        const std::vector<std::filesystem::path>& paths,
+        utils::arg_parse::ArgParser& parser) {
+    // Convert path to params.
+    auto params = utils::modbase::get_modbase_params(paths);
+
+    // Allow user to override batchsize.
+    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+        modbase_batchsize.has_value()) {
+        params.batchsize = *modbase_batchsize;
+    }
+
+    // Allow user to override threshold.
+    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+        methylation_threshold.has_value()) {
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
+        }
+        params.threshold = *methylation_threshold;
+    }
+
+    // Check that the paths are all valid.
+    for (const auto& mb_path : paths) {
+        if (!utils::modbase::is_modbase_model(mb_path)) {
+            throw std::runtime_error("Modified bases model not found in the model path at " +
+                                     std::filesystem::weakly_canonical(mb_path).string());
+        }
+    }
+
+    // All looks good.
+    return params;
+}
+
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
@@ -288,7 +320,7 @@ void setup(const std::vector<std::string>& args,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           const utils::modbase::ModBaseParams modbase_params,
+           const utils::modbase::ModBaseParams& modbase_params,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
@@ -677,12 +709,6 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
-    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
-        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-        return EXIT_FAILURE;
-    }
-
     if (parser.visible.get<std::string>("--reference").empty() &&
         !parser.visible.get<std::string>("--bed-file").empty()) {
         spdlog::error("--bed-file cannot be used without --reference.");
@@ -880,20 +906,10 @@ int basecaller(int argc, char* argv[]) {
     }
 
     // Force on running of batchsize benchmarks if emission is on
-    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
-                                    parser.hidden.get<bool>("--run-batchsize-benchmarks");
+    const bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
+                                          parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
-            mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
-            methylation_threshold);
-
-    for (const auto& mb_path : mods_model_paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
-            spdlog::error("Modified bases model not found in the model path at '{}'.",
-                          std::filesystem::weakly_canonical(mb_path).string());
-            return EXIT_FAILURE;
-        }
-    }
+    const auto modbase_params = validate_modbase_params(mods_model_paths, parser);
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,

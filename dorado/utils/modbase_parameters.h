@@ -21,7 +21,6 @@ struct ModBaseParams {
     std::string to_string() const;
 };
 
-ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                 int batch_size_arg);
+ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths);
 
 }  // namespace dorado::utils::modbase
