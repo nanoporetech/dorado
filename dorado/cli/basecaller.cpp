@@ -118,8 +118,6 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
     model_config.normalise_basecaller_params();
 }
 
-}  // namespace
-
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
             "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
@@ -661,6 +659,8 @@ void setup(const std::vector<std::string>& args,
                                           : std::optional<std::regex>(dump_stats_filter));
     }
 }
+
+}  // namespace
 
 int basecaller(int argc, char* argv[]) {
     utils::set_torch_allocator_max_split_size();
