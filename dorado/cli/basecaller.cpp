@@ -71,7 +71,6 @@
 #include <vector>
 
 using dorado::utils::default_parameters;
-using dorado::utils::modbase::default_modbase_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
 using namespace dorado::models;
@@ -203,7 +202,6 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(std::string{})
                 .help("A comma separated list of modified base model paths.");
         parser.visible.add_argument("--modified-bases-threshold")
-                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>()
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");

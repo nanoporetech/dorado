@@ -12,44 +12,16 @@ ModelType model_type_from_string(const std::string& model_type) noexcept;
 ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept;
 bool is_modbase_model(const std::filesystem::path& path);
 
-struct DefaultModBaseParameters {
-#if DORADO_TX2
-    int batchsize{128};
-    int batchsize_conv_lstm_v2{128};
-#else
-    int batchsize{1024};
-    int batchsize_conv_lstm_v2{2048};
-#endif
-    int threads{4};
-    int threads_conv_lstm_v2{8};
-
-    int runners_per_caller{2};
-    int runners_per_caller_conv_lstm_v2{4};
-
-    float methylation_threshold{0.05f};
-};
-
-static const DefaultModBaseParameters default_modbase_parameters{};
-
 struct ModBaseParams {
-    size_t batchsize{static_cast<size_t>(default_modbase_parameters.batchsize)};
-    size_t runners_per_caller{static_cast<size_t>(default_modbase_parameters.runners_per_caller)};
-    int threads{default_modbase_parameters.threads};
-    float threshold{default_modbase_parameters.methylation_threshold};
+    std::size_t batchsize;
+    std::size_t runners_per_caller;
+    std::size_t threads;
+    float threshold;
 
-    std::string to_string() const {
-        std::string str = "ModBaseParams {";
-        str += "batchsize:" + std::to_string(batchsize);
-        str += ", runners_per_caller:" + std::to_string(runners_per_caller);
-        str += ", threads:" + std::to_string(threads);
-        str += ", threshold:" + std::to_string(threshold);
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                 int batch_size_arg,
-                                 float threshold_arg);
+                                 int batch_size_arg);
 
 }  // namespace dorado::utils::modbase

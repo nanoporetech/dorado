@@ -254,7 +254,6 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    const auto& default_modbase_params = dorado::utils::modbase::default_modbase_parameters;
     const char modbase_model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2";
     const auto modbase_model_dir = download_model(modbase_model_name);
     const auto modbase_model = modbase_model_dir.m_path / modbase_model_name;
@@ -273,9 +272,13 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const std::size_t model_stride =
             dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
 
+    // Grab the modbase parameters from the models.
+    const std::vector<std::filesystem::path> modbase_paths{modbase_model, modbase_model_6mA};
+    const auto modbase_params = dorado::utils::modbase::get_modbase_params(modbase_paths, 0);
+
     // Create runners
     std::string device;
-    int batch_size = default_modbase_params.batchsize;
+    int batch_size = modbase_params.batchsize;
     if (gpu) {
 #if DORADO_METAL_BUILD
         device = "metal";
@@ -315,8 +318,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     });
 
     auto modbase_runners = dorado::api::create_modbase_runners(
-            {modbase_model, modbase_model_6mA}, device, default_modbase_params.runners_per_caller,
-            batch_size);
+            modbase_paths, device, modbase_params.runners_per_caller, batch_size);
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(modbase_runners), 2, model_stride, 1000);
 }
@@ -329,9 +331,8 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    run_smoke_test<dorado::ReadToBamTypeNode>(
-            emit_moves, 2, dorado::utils::modbase::default_modbase_parameters.methylation_threshold,
-            nullptr, 1000);
+    const auto modbase_threshold = dorado::utils::modbase::get_modbase_params({}, 0).threshold;
+    run_smoke_test<dorado::ReadToBamTypeNode>(emit_moves, 2, modbase_threshold, nullptr, 1000);
 }
 
 struct BarcodeKitInputs {

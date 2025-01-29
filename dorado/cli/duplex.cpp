@@ -261,12 +261,10 @@ DuplexModels load_models(const std::string& model_arg,
 
 }  // namespace
 
-using dorado::utils::default_parameters;
 using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
-    using dorado::utils::modbase::default_modbase_parameters;
     utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
@@ -368,10 +366,8 @@ int duplex(int argc, char* argv[]) {
         parser.visible.add_argument("--modified-bases-threshold")
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].")
-                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>();
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(default_modbase_parameters.batchsize)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
