@@ -60,7 +60,6 @@ target_include_directories(dorado_basecall
     SYSTEM
     PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 
@@ -71,6 +70,7 @@ target_link_libraries(dorado_basecall
         dorado_utils
     PRIVATE
         spdlog::spdlog
+        toml11::toml11
 )
 
 if (TARGET koi)

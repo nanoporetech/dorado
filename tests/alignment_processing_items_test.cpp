@@ -67,7 +67,6 @@ TEST_CASE("initialise with input file and no output folder returns true", CUT_TA
     CHECK(cut.initialise());
 }
 
-#if !DORADO_IOS_BUILD
 TEST_CASE("initialise with input file in current directory returns true", CUT_TAG) {
     // Create basic SAM file in a temp directory and change curdir to that temp directory.
     auto tmp_dir = tests::make_temp_dir("aligner_input_from_curdir");
@@ -85,7 +84,6 @@ TEST_CASE("initialise with input file in current directory returns true", CUT_TA
     AlignmentProcessingItems cut{tmp_filename, false, OUT_FOLDER.string(), false};
     CHECK(cut.initialise());
 }
-#endif  // !DORADO_IOS_BUILD
 
 TEST_CASE("initialise with invalid input file and no output folder returns false", CUT_TAG) {
     AlignmentProcessingItems cut{(ROOT_IN_FOLDER / NON_HTS_FILE).string(), false, "", false};

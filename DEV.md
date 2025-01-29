@@ -23,7 +23,6 @@ $ apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libhdf5-dev \
         libssl-dev \
-        libzstd-dev \
         autoconf \
         automake
 $ apt install gcc-9 g++-9 --no-install-recommends
@@ -75,7 +74,7 @@ $ brew link autoconf@2.69
 
 The following other packages need to be available as well
 ```bash
-$ brew install openssl zstd
+$ brew install openssl
 ```
 
 ### Clone and build

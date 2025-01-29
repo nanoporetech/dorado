@@ -146,7 +146,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto& mod_bases = toml::find(params, "mod_bases");
     if (mod_bases.is_string()) {
         // style: mod_bases = "hm" - does not accept chebi codes
-        auto mod_base_string = mod_bases.as_string().str;
+        auto mod_base_string = mod_bases.as_string();
         for (const auto& mod_base : mod_base_string) {
             codes.push_back(std::string(1, mod_base));
         }
@@ -155,7 +155,7 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
         auto mod_base_array = mod_bases.as_array();
         for (const auto& mod_base : mod_base_array) {
             assert(mod_base.is_string());
-            codes.push_back(mod_base.as_string().str);
+            codes.push_back(mod_base.as_string());
         }
     }
 
@@ -403,7 +403,8 @@ void check_modbase_multi_model_compatibility(
             const auto& query_motif = query_params.motif[query_params.motif_offset];
 
             if (ref_motif == query_motif) {
-                err_msg += modbase_models[i].string() + " and " + modbase_models[j].string() +
+                err_msg += modbase_models[i].parent_path().filename().string() + " and " +
+                           modbase_models[j].parent_path().filename().string() +
                            " have overlapping canonical motif: " + ref_motif;
             }
         }
@@ -412,7 +413,7 @@ void check_modbase_multi_model_compatibility(
     if (!err_msg.empty()) {
         throw std::runtime_error(
                 "Following are incompatible modbase models. Please select only one of them to "
-                "run:\n" +
+                "run: " +
                 err_msg);
     }
 }

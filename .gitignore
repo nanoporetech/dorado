@@ -21,4 +21,4 @@ log*
 *.t.err
 out*
 Makefile
-models/
+/models

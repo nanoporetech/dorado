@@ -157,15 +157,9 @@ void MetalCaller::metal_thread_fn() {
 
             // We retry the entire set of kernels up to 5 times, to deal with seemingly
             // random intermittent errors with command buffer submissions.
-            // On iOS we can't bail here, so we need to keep retrying.
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             bool cb_success = false;
-#if TARGET_OS_IPHONE
-            for (int try_count = 0; !cb_success; ++try_count)
-#else   // TARGET_OS_IPHONE
-            for (int try_count = 0; try_count < 5; ++try_count)
-#endif  // TARGET_OS_IPHONE
-            {
+            for (int try_count = 0; try_count < 5; ++try_count) {
                 cb_success = call_task(*task, inter_caller_mutex, try_count);
                 if (cb_success) {
                     break;

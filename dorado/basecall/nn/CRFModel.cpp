@@ -74,7 +74,7 @@ KoiActivation get_koi_activation(Activation act) {
 // TODO: These should really be part of Koi
 bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-    return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
+    return (prop->major >= 8);
 }
 bool koi_can_use_quantised_lstm() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();

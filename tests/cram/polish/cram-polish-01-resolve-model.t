@@ -38,7 +38,7 @@ SUP, with dwells. Auto-resolve the `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl
 Replace the hac model with the sup model in the BAM to mock the SUP model.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > ### Create the synthetic data with no dwells.
+  > ### Create the synthetic data with mocked model name.
   > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_sup@v5.0.0/g' | samtools view -Sb > out/in.sup.bam
   > samtools index out/in.sup.bam
   > ### Run the unit under test.
@@ -66,6 +66,37 @@ Create the SUP no-dwell data first by stripping the input BAM of custom tags and
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  1
+  1
+
+Bacterial model. Auto-resolve the `dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0` model.
+Current bacterial model does not use dwells. This should not raise a warning nor fail because of this.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ${DORADO_BIN} polish --bacteria --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 -v > out/out.fasta 2> out/out.fasta.stderr
+  > echo "Exit code: $?"
+  > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[warning\] //g'
+  Exit code: 0
+  1
+  1
+
+Legacy HAC model for version 4.2.0 of the basecaller: "dna_r10.4.1_e8.2_400bps_hac@v4.2.0".
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ### Create the synthetic data with mocked model name.
+  > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v4.2.0/g' | samtools view -Sb > out/in.bam
+  > samtools index out/in.bam
+  > ### Run the unit under test.
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 -v > out/out.fasta 2> out/out.fasta.stderr
+  > ### Eval.
+  > echo "Exit code: $?"
+  > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
@@ -116,6 +147,21 @@ Resolve the model from a local path.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model from user-specified polishing model name: " out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  Exit code: 0
+  1
+  1
+
+Resolve the bacterial model from a Basecaller model name `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
+  > ### Run the unit under test.
+  > ${DORADO_BIN} polish --bacteria --model "${model}" --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -v > out/out.fasta 2> out/out.fasta.stderr
+  > ### Eval.
+  > echo "Exit code: $?"
+  > grep "Resolved model from user-specified basecaller model name: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
@@ -174,7 +220,22 @@ Negative test: Basecaller model specified in the BAM does not match the Basecall
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Caught exception: Polishing model was trained for the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0' which is not compatible with the input BAM!
+  [error] Caught exception: Polishing model is not compatible with the input BAM!
+
+Negative test: no bacterial model is compatible with the model listed in the input BAM file.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ### Create the mocked data for a non-supported basecaller version (1.0.0).
+  > samtools view -h ${in_dir}/calls_to_draft.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
+  > samtools index out/in.bam
+  > ### Run the unit under test.
+  > ${DORADO_BIN} polish --bacteria --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ### Eval.
+  > echo "Exit code: $?"
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  Exit code: 1
+  [error] Caught exception: There are no bacterial models compatible with basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
 
 Passing test with warnings: data has dwells, but the model does not support them.
 Using `--skip-model-compatibility-check`.
@@ -228,12 +289,27 @@ Using `--skip-model-compatibility-check`.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  [warning] Polishing model was trained for the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0' which is not compatible with the input BAM. This may produce inferior results.
+  [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.
+
+Passing test: bacterial model is not compatible with the model listed in the input BAM file, but still runs.
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ### Create the mocked data for a non-supported basecaller version (1.0.0).
+  > samtools view -h ${in_dir}/calls_to_draft.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
+  > samtools index out/in.bam
+  > ### Run the unit under test.
+  > ${DORADO_BIN} polish --bacteria --skip-model-compatibility-check --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0" --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ### Eval.
+  > echo "Exit code: $?"
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  Exit code: 0
+  [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.
 
 ##############################################
 ### Negative tests.                        ###
 ##############################################
-Negative test: Cannot resolve the model, it does not match a Bascealler model, a Polishing model, a path nor is it 'auto'.
+Negative test: Cannot resolve the model, it does not match a Basecaller model, a Polishing model, a path nor is it 'auto'.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > model="unknown"

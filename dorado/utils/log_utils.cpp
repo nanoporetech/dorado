@@ -66,9 +66,8 @@ bool is_safe_to_log() {
 
 void InitLogging() {
     // Without modification, the default logger will write to stdout.
-    // Replace the default logger with a (color, multi-threaded) stderr logger
-    // (but first replace it with an arbitrarily-named logger to prevent a name clash)
-    spdlog::set_default_logger(spdlog::stderr_color_mt("unused_name"));
+    // Replace the default logger with a (color, multi-threaded) stderr logger.
+    spdlog::drop_all();
     spdlog::set_default_logger(spdlog::stderr_color_mt(""));
     if (!is_safe_to_log()) {
         spdlog::set_level(spdlog::level::off);

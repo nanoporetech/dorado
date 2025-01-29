@@ -25,6 +25,10 @@ static constexpr float EPS = 1e-9f;
 
 using Slice = at::indexing::Slice;
 
+// Set this to 1 if you want the per-read spdlog::trace calls.
+// Note that under high read-throughput this could cause slowdowns.
+#define PER_READ_LOGGING 0
+
 namespace {
 
 std::pair<float, float> med_mad(const at::Tensor& x) {
@@ -60,10 +64,14 @@ using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
 // sliding window heuristic.
 int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_type) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
-    static const std::unordered_map<SampleType, int> kOffsetMap = {{SampleType::RNA002, 3500},
-                                                                   {SampleType::RNA004, 1000}};
+    static const std::unordered_map<SampleType, int> kOffsetMap = {
+            {SampleType::RNA002, 3500},
+            {SampleType::RNA004, 1000},
+    };
     static const std::unordered_map<SampleType, int16_t> kAdapterCutoff = {
-            {SampleType::RNA002, 550}, {SampleType::RNA004, 700}};
+            {SampleType::RNA002, static_cast<int16_t>(550)},
+            {SampleType::RNA004, static_cast<int16_t>(700)},
+    };
 
     const int kWindowSize = 250;
     const int kStride = 50;
@@ -102,8 +110,12 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
         int16_t max_median = *minmax.second;
         auto min_pos = std::distance(medians.begin(), minmax.first);
         auto max_pos = std::distance(medians.begin(), minmax.second);
+
+#if PER_READ_LOGGING
         spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
                       max_median, (max_median - min_median));
+#endif
+
         if ((median_pos >= static_cast<int>(medians.size()) &&
              window_pos[max_pos] > window_pos[min_pos]) &&
             (((max_median > kMinMedianForRNASignal) && (max_median - min_median > kMedianDiff)) ||
@@ -184,13 +196,6 @@ void ScalerNode::input_thread_fn() {
                 scale = 1.f / read->scaling;
                 shift = -1.f * read->offset;
             }
-
-            read->read_common.raw_data =
-                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                            .to(at::ScalarType::Half);
-
-            read->read_common.scale = scale;
-            read->read_common.shift = shift;
         } else {
             // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
             auto scaling_data = read->read_common.raw_data.index(
@@ -199,16 +204,16 @@ void ScalerNode::input_thread_fn() {
                     m_scaling_params.strategy == ScalingStrategy::QUANTILE
                             ? normalisation(m_scaling_params.quantile, scaling_data)
                             : med_mad(scaling_data);
-
-            // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
-            // shifting/scaling in float32 form.
-            read->read_common.raw_data =
-                    ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
-                            .to(at::ScalarType::Half);
-            // move the shift and scale into pA.
-            read->read_common.scale = read->scaling * scale;
-            read->read_common.shift = read->scaling * (shift + read->offset);
         }
+
+        // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
+        // shifting/scaling in float32 form.
+        read->read_common.raw_data = ((read->read_common.raw_data.to(at::kFloat) - shift) / scale)
+                                             .to(at::ScalarType::Half);
+
+        // move the shift and scale into pA.
+        read->read_common.scale = read->scaling * scale;
+        read->read_common.shift = read->scaling * (shift + read->offset);
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna_model) {
@@ -238,8 +243,10 @@ void ScalerNode::input_thread_fn() {
 
         read->read_common.num_trimmed_samples = trim_start;
 
+#if PER_READ_LOGGING
         spdlog::trace("ScalerNode: {} shift: {} scale: {} trim: {}", read->read_common.read_id,
                       shift, scale, trim_start);
+#endif
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));

@@ -82,7 +82,7 @@ std::optional<std::vector<std::filesystem::directory_entry>> filter_fast5_for_mi
         auto entry_path = std::filesystem::path(entry);
         std::string ext = entry_path.extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".fast5") {
             fast5_entries.push_back(entry);
         } else if (ext == ".pod5") {
@@ -296,7 +296,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             auto entry_path = std::filesystem::path(entry);
             std::string ext = entry_path.extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
             if (ext == ".fast5") {
                 throw std::runtime_error(
                         "Traversing reads by channel is only available for POD5. "
@@ -324,7 +324,7 @@ void DataLoader::load_reads_unrestricted(
         spdlog::debug("Load reads from file {}", entry.path().string());
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".fast5") {
             load_fast5_reads_from_file(entry.path().string());
         } else if (ext == ".pod5") {
@@ -352,7 +352,7 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
         auto file_path = std::filesystem::path(entry);
         std::string ext = file_path.extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext != ".pod5") {
             continue;
         }

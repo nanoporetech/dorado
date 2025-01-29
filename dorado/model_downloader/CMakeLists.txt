@@ -9,15 +9,14 @@ add_library(dorado_model_downloader_lib STATIC
 if (APPLE)
     target_sources(dorado_model_downloader_lib PRIVATE downloader_foundation.mm)
 endif()
-if (NOT IOS)
-    target_link_libraries(dorado_model_downloader_lib PRIVATE OpenSSL::SSL)
-endif()
+
+target_link_libraries(dorado_model_downloader_lib PRIVATE OpenSSL::SSL)
 
 target_compile_definitions(dorado_model_downloader_lib
     PRIVATE
         DORADO_MODELS_HAS_FOUNDATION=$<BOOL:${APPLE}>
-        DORADO_MODELS_HAS_HTTPLIB=$<NOT:$<BOOL:${IOS}>>
-        DORADO_MODELS_HAS_CURL_EXE=$<NOT:$<BOOL:${IOS}>>
+        DORADO_MODELS_HAS_HTTPLIB=1
+        DORADO_MODELS_HAS_CURL_EXE=1
 )
 
 

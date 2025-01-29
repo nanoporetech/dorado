@@ -1120,6 +1120,7 @@ const std::vector<ModelInfo> models = {
 namespace polisher {
 
 const std::vector<ModelInfo> models = {
+        // Read-level models.
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl",
                 "d343b4394b904d219257ad188c82ece63b935f15d78f09f551e591b2275da4b9",
@@ -1146,6 +1147,45 @@ const std::vector<ModelInfo> models = {
                 "0e0cb175aa41636de835d2abb5330b91fed14a00f811804edf983bc086cf477a",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{},
+        },
+
+        // Bacterial models.
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0",
+                "56e3763638677adb32de783e648dd721aa1ec04504d0328db70be208822aef6e",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+
+        // Legacy models, counts based.
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish",
+                "8092073ee021ac94e94a18000c97ac0e26dbf37f0cb16a706d583c2a374de33b",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish",
+                "91ff09a711162b116c898f39831228d53e5e11981f6a16e08a7ef9575b911dc6",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish",
+                "9bc24d9cd8c2247e472c3e5cbd6248cd00cf9547537bd3e2e6cac6334005700a",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish",
+                "378f2e407f14bb2c4ec77e73b1b8ea86d3f4c47007d8ffb21f82fe6e89df7631",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
                 ModsVariantPair{},
         },
 };
@@ -1271,7 +1311,7 @@ ModelInfo get_simplex_model_info(const std::string& model_name) {
                  std::back_inserter(matches), is_name_match);
 
     if (matches.empty()) {
-        throw std::runtime_error("Could not find information on simplex model: " + model_name);
+        throw std::runtime_error("Could not find simplex model information from: " + model_name);
     } else if (matches.size() > 1) {
         throw std::logic_error("Found multiple simplex models with name: " + model_name);
     }

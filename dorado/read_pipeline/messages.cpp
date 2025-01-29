@@ -326,7 +326,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     // Convert string qscore to phred vector.
     std::vector<uint8_t> qscore;
     std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
-                   [](char c) { return (uint8_t)(c)-33; });
+                   [](char c) { return static_cast<uint8_t>(c - 33); });
 
     bam_set1(aln, read_id.length(), read_id.c_str(), uint16_t(flags), -1, leftmost_pos,
              uint8_t(map_q), 0, nullptr, -1, next_pos, 0, seq.length(), seq.c_str(),

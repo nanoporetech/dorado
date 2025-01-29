@@ -5,8 +5,6 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/get.hpp>
-#include <toml/value.hpp>
 
 #include <cstddef>
 #include <optional>
@@ -243,7 +241,7 @@ std::string SignalNormalisationParams::to_string() const {
     } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
         str += " " + standarisation.to_string();
     }
-    str += "}";
+    str += " }";
     return str;
 }
 
@@ -254,7 +252,7 @@ std::string ConvParams::to_string() const {
     str += " winlen:" + std::to_string(winlen);
     str += " stride:" + std::to_string(stride);
     str += " activation:" + dorado::basecall::to_string(activation);
-    str += "}";
+    str += " }";
     return str;
 };
 
@@ -280,7 +278,7 @@ std::string CRFModelConfig::to_string() const {
     for (size_t c = 0; c < convs.size(); c++) {
         str += " " + std::to_string(c) + ": " + convs[c].to_string();
     }
-    str += "}";  // convs
+    str += " }";  // convs
     if (is_lstm_model()) {
         str += " model_type: lstm {";
         str += " bias:" + std::to_string(bias);
@@ -292,8 +290,9 @@ std::string CRFModelConfig::to_string() const {
         str += " model_type: tx {";
         str += " crf_encoder: " + tx->crf.to_string();
         str += " transformer: " + tx->tx.to_string();
+        str += " upsample: " + tx->upsample.to_string();
     }
-    str += "}}";  // model_type & CRFModelConfig
+    str += " }}";  // model_type & CRFModelConfig
     return str;
 };
 
@@ -475,8 +474,12 @@ std::string TxEncoderParams::to_string() const {
     str += " nhead:" + std::to_string(nhead);
     str += " depth:" + std::to_string(depth);
     str += " dim_feedforward:" + std::to_string(dim_feedforward);
+    str += " theta:" + std::to_string(theta);
+    str += " max_seq_len:" + std::to_string(max_seq_len);
+    str += " attn_window: [" + std::to_string(attn_window.first) + ", " +
+           std::to_string(attn_window.second) + "]";
     str += " deepnorm_alpha:" + std::to_string(deepnorm_alpha);
-    str += "}";
+    str += " }";
     return str;
 }
 
@@ -484,7 +487,7 @@ std::string EncoderUpsampleParams::to_string() const {
     std::string str = "EncoderUpsampleParams {";
     str += " d_model:" + std::to_string(d_model);
     str += " scale_factor:" + std::to_string(scale_factor);
-    str += "}";
+    str += " }";
     return str;
 }
 
@@ -497,7 +500,7 @@ std::string CRFEncoderParams::to_string() const {
     str += " blank_score:" + std::to_string(blank_score);
     str += " expand_blanks:" + std::to_string(expand_blanks);
     str += " permute:" + std::to_string(!permute.empty());
-    str += "}";
+    str += " }";
     return str;
 }
 
@@ -505,11 +508,25 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     const auto &enc = toml::find(cfg, "model", "encoder", "transformer_encoder");
     TxEncoderParams params;
     params.depth = toml::find<int>(enc, "depth");
-    params.d_model = toml::find<int>(enc, "layer", "d_model");
-    params.nhead = toml::find<int>(enc, "layer", "nhead");
-    params.dim_feedforward = toml::find<int>(enc, "layer", "dim_feedforward");
-    params.deepnorm_alpha = toml::find<float>(enc, "layer", "deepnorm_alpha");
-    const auto attn_window_ = toml::find(enc, "layer", "attn_window").as_array();
+
+    const auto &layer = toml::find(enc, "layer");
+    params.d_model = toml::find<int>(layer, "d_model");
+    params.nhead = toml::find<int>(layer, "nhead");
+    params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
+    params.deepnorm_alpha = toml::find<float>(layer, "deepnorm_alpha");
+    params.max_seq_len = toml::find_or(layer, "max_seq_len", params.max_seq_len);
+
+    if (layer.contains("rotary_base") && layer.contains("theta")) {
+        throw std::runtime_error(
+                "Model Config Error. [model.encoder.transformer_encoder] 'rotary_base' and 'theta' "
+                "are mutually exclusive.");
+    } else if (layer.contains("theta")) {
+        params.theta = toml::find<float>(layer, "theta");
+    } else if (layer.contains("rotary_base")) {
+        params.theta = toml::find<float>(layer, "rotary_base");
+    }
+
+    const auto attn_window_ = toml::find(layer, "attn_window").as_array();
     params.attn_window = {static_cast<int>(attn_window_[0].as_integer()),
                           static_cast<int>(attn_window_[1].as_integer())};
     return params;

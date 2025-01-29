@@ -7,6 +7,8 @@
 #include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
+#include "polish/variant_calling.h"
+#include "polish/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/AsyncQueue.h"
@@ -57,6 +59,11 @@ enum class OutputFormat {
     FASTQ,
 };
 
+enum class VariantCallingEnum {
+    VCF,
+    GVCF,
+};
+
 /// \brief All options for this tool.
 struct Options {
     // Positional parameters.
@@ -94,6 +101,11 @@ struct Options {
     int32_t min_depth = 0;
     bool any_bam = false;
     bool any_model = false;
+    bool bacteria = false;
+    VariantCallingEnum vc_type = VariantCallingEnum::VCF;
+    bool ambig_ref = false;
+    bool run_variant_calling = false;
+    bool write_consensus = false;
 };
 
 /// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
@@ -175,8 +187,21 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("-m", "--model")
                 .help("Path to correction model folder.")
                 .default_value("auto");
+        parser->visible.add_argument("--bacteria")
+                .help("Optimise polishing for plasmids and bacterial genomes.")
+                .flag();
         parser->visible.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
+                .flag();
+        parser->visible.add_argument("--vcf")
+                .help("Output a VCF file with variant calls to --output-dir if specified, "
+                      "otherwise to stdout.")
+                .flag();
+        parser->visible.add_argument("--gvcf")
+                .help("Output a gVCF file to --output-dir if specified, otherwise to stdout.")
+                .flag();
+        parser->visible.add_argument("--ambig-ref")
+                .help("Decode variants at ambiguous reference positions.")
                 .flag();
     }
     {
@@ -287,6 +312,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.output_dir = parser.visible.get<std::string>("output-dir");
     opt.model_str = parser.visible.get<std::string>("model");
+    opt.bacteria = parser.visible.get<bool>("bacteria");
 
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
@@ -348,6 +374,27 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
                 "bam_subchunk = {}, bam_chunk = {}",
                 opt.bam_chunk, opt.bam_subchunk);
         opt.bam_subchunk = opt.bam_chunk;
+    }
+
+    // Variant calling setup.
+    const bool vcf = parser.visible.get<bool>("vcf");
+    const bool gvcf = parser.visible.get<bool>("gvcf");
+    opt.run_variant_calling = false;
+    if (vcf && gvcf) {
+        throw std::runtime_error{
+                "Both --vcf and --gvcf are specified. Only one of these options can be used."};
+    } else if (vcf) {
+        opt.vc_type = VariantCallingEnum::VCF;
+        opt.run_variant_calling = true;
+    } else if (gvcf) {
+        opt.vc_type = VariantCallingEnum::GVCF;
+        opt.run_variant_calling = true;
+    }
+    opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
+
+    // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
+    if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
+        opt.write_consensus = true;
     }
 
     return opt;
@@ -454,10 +501,10 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
 std::vector<std::vector<polisher::ConsensusResult>> construct_consensus_seqs(
         const dorado::polisher::Interval& region_batch,
         const std::vector<polisher::ConsensusResult>& all_results_cons,
-        const hts_io::FastxRandomReader& draft_reader,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
-        const std::optional<char>& fill_char) {
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
@@ -550,6 +597,7 @@ std::filesystem::path download_model(const std::string& model_name) {
 const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                           const std::string& model_str,
                                           const bool load_scripted_model,
+                                          const bool bacteria,
                                           const bool any_model) {
     const auto count_model_hits = [](const dorado::models::ModelList& model_list,
                                      const std::string& model_name) {
@@ -560,6 +608,58 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
             }
         }
         return num_found;
+    };
+
+    // clang-format off
+    const std::unordered_map<std::string, std::string> compatible_bacterial_bc_models {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    };
+    const std::unordered_map<std::string, std::string> legacy_bc_models {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},
+    };
+    // clang-format on
+
+    const auto determine_model_name = [&bacteria, &compatible_bacterial_bc_models,
+                                       &legacy_bc_models,
+                                       &bam_info](const std::string& basecaller_model) {
+        if (bacteria) {
+            // Resolve a bacterial model.
+            const auto it = compatible_bacterial_bc_models.find(basecaller_model);
+            if (it == std::cend(compatible_bacterial_bc_models)) {
+                throw std::runtime_error(
+                        "There are no bacterial models compatible with basecaller model: '" +
+                        basecaller_model + "'.");
+            }
+            return it->second;
+        } else {
+            // First check if this is a legacy model.
+            const auto it_legacy = legacy_bc_models.find(basecaller_model);
+            if (it_legacy != std::cend(legacy_bc_models)) {
+                return it_legacy->second;
+            }
+
+            // Otherwise, this is a current model.
+            const std::string polish_model_suffix =
+                    std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
+            return basecaller_model + polish_model_suffix;
+        }
+    };
+    const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
+                                   const std::unordered_set<std::string>& set2) {
+        for (const auto& val : set1) {
+            if (set2.count(val) > 0) {
+                return true;
+            }
+        }
+        return false;
     };
 
     std::filesystem::path model_dir;
@@ -587,9 +687,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         }
     }
 
-    const std::string polish_model_suffix =
-            std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
-
     if (model_str == "auto") {
         spdlog::info("Auto resolving the model.");
 
@@ -604,7 +701,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = determine_model_name(basecaller_model);
 
         spdlog::debug("Resolved model from input data: {}", model_name);
 
@@ -627,7 +724,7 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
         const std::string& basecaller_model = model_str;
 
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = basecaller_model + polish_model_suffix;
+        const std::string model_name = determine_model_name(basecaller_model);
 
         spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
@@ -649,16 +746,17 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
                                            ? (it_dwells->second == "true")
                                            : false;
 
+    const bool run_dwell_check =
+            !bacteria && (legacy_bc_models.count(model_config.basecaller_model) == 0);
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
-        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
-            throw std::runtime_error{"Polishing model was trained for the basecaller model '" +
-                                     model_config.basecaller_model +
-                                     "' which is not compatible with the input BAM!"};
+        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+            throw std::runtime_error{"Polishing model is not compatible with the input BAM!"};
         }
 
         // Fail if the dwell information in the model and the data does not match.
-        if (bam_info.has_dwells && !model_uses_dwells) {
+        if (run_dwell_check && bam_info.has_dwells && !model_uses_dwells) {
             throw std::runtime_error{
                     "Input data has move tables, but a model without move table support has been "
                     "chosen."};
@@ -670,15 +768,14 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
 
     } else {
         // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
-        if (bam_info.basecaller_models.count(model_config.basecaller_model) == 0) {
+        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
             spdlog::warn(
-                    "Polishing model was trained for the basecaller model '{}' which is not "
-                    "compatible with the input BAM. This may produce inferior results.",
-                    model_config.basecaller_model);
+                    "Polishing model is not compatible with the input BAM. This may produce "
+                    "inferior results.");
         }
 
         // Allow to use a mismatched model, but emit a warning.
-        if (bam_info.has_dwells && !model_uses_dwells) {
+        if (run_dwell_check && bam_info.has_dwells && !model_uses_dwells) {
             spdlog::warn(
                     "Input data has move tables, but a model without move table support has been "
                     "chosen. This may produce inferior results.");
@@ -769,6 +866,16 @@ void validate_regions(const std::vector<polisher::Region>& regions,
     }
 }
 
+/**
+ * \brief Groups input regions into bins of sequence IDs.
+ * \param draft_lens Vector of sequence names and their lengths.
+ * \param user_regions Vector of user-provided regions. Optional, can be empty.
+ * \param draft_batch_size Split draft regions into batches of roughly this size. Each element is an interval
+ *                          of draft sequences.
+ * \returns Pair of two objects: (1) vector of sequence IDs (0 to len(draft_lens)), with the internal vector containing
+ *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
+ *          These intervals are indices of the first return vector in this pair.
+ */
 std::pair<std::vector<std::vector<polisher::Region>>, std::vector<polisher::Interval>>
 prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                        const std::vector<polisher::Region>& user_regions,
@@ -849,8 +956,16 @@ void run_polishing(const Options& opt,
 
     validate_regions(opt.regions, draft_lens);
 
-    // Open the draft FASTA file.
-    const hts_io::FastxRandomReader draft_reader(opt.in_draft_fastx_fn);
+    // Open the draft FASTA file. One reader per thread.
+    std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
+    draft_readers.reserve(opt.threads);
+    for (int32_t i = 0; i < opt.threads; ++i) {
+        draft_readers.emplace_back(
+                std::make_unique<hts_io::FastxRandomReader>(opt.in_draft_fastx_fn));
+    }
+    if (std::empty(draft_readers)) {
+        throw std::runtime_error("Could not create draft readers!");
+    }
 
     // Create the output folder if needed.
     if (!std::empty(opt.output_dir)) {
@@ -873,13 +988,30 @@ void run_polishing(const Options& opt,
             (std::empty(opt.output_dir)) ? "" : (opt.output_dir / bn);
     auto ofs_consensus = get_output_stream(out_consensus_fn);
 
+    // Open the output stream to a file/stdout for the variant calls.
+    const std::filesystem::path out_vcf_fn =
+            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
+
+    // VCF writer, nullptr unless variant calling is run.
+    std::unique_ptr<polisher::VCFWriter> vcf_writer;
+
+    if (opt.run_variant_calling) {
+        // These are the only available FILTER options.
+        const std::vector<std::pair<std::string, std::string>> filters{
+                {"PASS", "All filters passed"},
+                {".", "Non-variant position"},
+        };
+
+        vcf_writer = std::make_unique<polisher::VCFWriter>(out_vcf_fn, filters, draft_lens);
+    }
+
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
             prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
 
     // Update the progress tracker.
     {
-        const int64_t total_input_bases =
+        int64_t total_input_bases =
                 std::accumulate(std::begin(input_regions), std::end(input_regions),
                                 static_cast<int64_t>(0), [](const int64_t a, const auto& b) {
                                     int64_t sum = 0;
@@ -888,9 +1020,18 @@ void run_polishing(const Options& opt,
                                     }
                                     return a + sum;
                                 });
-        polish_stats.update("total", static_cast<double>(total_input_bases));
-        polish_stats.update("processed", 0.0);
+
+        // Variant calling likely takes much less time than consensus,
+        // but we need an estimate.
+        if (opt.run_variant_calling) {
+            total_input_bases *= 2;
+        }
+
+        polish_stats.set("total", static_cast<double>(total_input_bases));
+        polish_stats.set("processed", 0.0);
     }
+
+    int64_t total_batch_bases = 0;
 
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
@@ -901,6 +1042,7 @@ void run_polishing(const Options& opt,
                                 std::end(input_regions[i]));
         }
 
+        // Total number of bases in this batch.
         const int64_t batch_bases = std::accumulate(
                 std::begin(region_batch), std::end(region_batch), static_cast<int64_t>(0),
                 [](const int64_t a, const auto& b) { return a + b.end - b.start; });
@@ -939,16 +1081,17 @@ void run_polishing(const Options& opt,
         utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
         utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
         std::vector<polisher::ConsensusResult> all_results_cons;
+        std::vector<polisher::VariantCallingSample> vc_input_data;
 
         std::thread thread_sample_producer =
                 std::thread(&polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
                             std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
                             opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
 
-        std::thread thread_sample_decoder =
-                std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                            std::ref(decode_queue), std::ref(polish_stats),
-                            std::cref(*resources.decoder), opt.threads, opt.min_depth);
+        std::thread thread_sample_decoder = std::thread(
+                &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
+                std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
+                std::cref(*resources.decoder), opt.threads, opt.min_depth, opt.run_variant_calling);
 
         polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                             *resources.encoder);
@@ -961,6 +1104,10 @@ void run_polishing(const Options& opt,
             thread_sample_decoder.join();
         }
 
+        // Round the counter, in case some samples were dropped.
+        total_batch_bases += batch_bases;
+        polish_stats.set("processed", static_cast<double>(total_batch_bases));
+
         spdlog::debug(
                 "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
                 "length: {:.2f} Mbp), parts: {}",
@@ -968,15 +1115,42 @@ void run_polishing(const Options& opt,
                 std::size(region_batch), batch_bases / (1000.0 * 1000.0),
                 std::size(all_results_cons));
 
-        // Stitch the sample consensus sequences.
-        const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                construct_consensus_seqs(batch_interval, all_results_cons, draft_reader, draft_lens,
-                                         opt.fill_gaps, opt.fill_char);
+        spdlog::debug("Data for variant calling: num elements = {}, num consensus results = {}",
+                      std::size(vc_input_data), std::size(all_results_cons));
 
-        // Write out the consensus.
-        for (const auto& consensus : consensus_seqs) {
-            write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
-                                    (opt.out_format == OutputFormat::FASTQ));
+        // Construct the consensus sequences, only if they will be written.
+        if (opt.write_consensus) {
+            const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
+                    construct_consensus_seqs(batch_interval, all_results_cons, draft_lens,
+                                             opt.fill_gaps, opt.fill_char, *draft_readers.front());
+
+            // Write the consensus file.
+            for (const auto& consensus : consensus_seqs) {
+                write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
+                                        (opt.out_format == OutputFormat::FASTQ));
+            }
+        }
+
+        // Run variant calling, optionally.
+        if (opt.run_variant_calling) {
+            std::vector<polisher::Variant> variants = call_variants(
+                    batch_interval, vc_input_data, draft_readers, draft_lens, *resources.decoder,
+                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
+                    polish_stats);
+
+            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+            });
+
+            // Write the VCF file.
+            for (const auto& variant : variants) {
+                vcf_writer->write_variant(variant);
+            }
+
+            // We approximate the progress by expecting 2x bases to be processed
+            // when doing variant calling.
+            total_batch_bases += batch_bases;
+            polish_stats.set("processed", static_cast<double>(total_batch_bases));
         }
     }
 }
@@ -1048,8 +1222,8 @@ int polish(int argc, char* argv[]) {
         torch::set_num_threads(1);
 
         // Resolve the model for polishing.
-        const polisher::ModelConfig model_config =
-                resolve_model(bam_info, opt.model_str, opt.load_scripted_model, opt.any_model);
+        const polisher::ModelConfig model_config = resolve_model(
+                bam_info, opt.model_str, opt.load_scripted_model, opt.bacteria, opt.any_model);
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(

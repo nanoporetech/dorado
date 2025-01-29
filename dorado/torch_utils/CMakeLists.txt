@@ -48,7 +48,6 @@ target_include_directories(dorado_torch_utils
     PUBLIC
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
     ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
-    ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_torch_utils
@@ -61,6 +60,7 @@ target_link_libraries(dorado_torch_utils
         dorado_compat
         minimap2
         htslib
+        toml11::toml11
 )
 
 if (DORADO_ENABLE_PCH)

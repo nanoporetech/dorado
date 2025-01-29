@@ -84,6 +84,8 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
                            bool qkv_bias_,
                            bool out_bias_,
                            const std::pair<int, int> &attn_window_,
+                           float theta_,
+                           int max_seq_len_,
                            const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
@@ -93,6 +95,8 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 
     const int d_model, nhead, head_dim, num_splits;
     const std::pair<int, int> attn_window;
+    const float theta;
+    const int max_seq_len;
     const at::TensorOptions options;
     bool wqkv_transposed = false;
 

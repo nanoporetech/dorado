@@ -40,7 +40,7 @@ variables:
 .macos_arm_runner:
   tags:
     - osx_arm64
-    - xcode-15.0.1
+    - xcode-15.3
   variables:
     MACOSX_DEPLOYMENT_TARGET: "11.0"
 
@@ -79,7 +79,7 @@ variables:
 .linux_dependencies:
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
     - pip install gcovr
 
 .set_parallel_jobs:
@@ -397,6 +397,15 @@ build:windows_koi_from_source:
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   artifacts: null
 
+build:windows:no_ccache:
+  extends:
+    - build:windows
+    - .on_nightly_or_manual
+  before_script:
+    - !reference ["build:windows", before_script]
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
+  artifacts: null
+
 build:macos:arm:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
@@ -425,44 +434,6 @@ build:macos:x64:no_ccache:
   extends:
     - build:macos:x64
     - .on_nightly_or_manual
-  artifacts: null
-
-build:ios:m1:
-  variables:
-    BUILD_TARGET: "ALL_BUILD"
-    PLATFORM: "OS64"
-    SDK_NAME: "iphoneos"
-    DORADO_RUN_TESTS: "OFF"
-  extends:
-    - .macos_arm_runner
-    - .build_and_test_dorado
-  script:
-    # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
-    - unset MACOSX_DEPLOYMENT_TARGET
-    - export SDKROOT=$(xcrun --sdk ${SDK_NAME} --show-sdk-path)
-    - echo "SDKROOT=${SDKROOT}"
-    - export BUILD_OPTIONS="
-      -G Xcode
-      -D CMAKE_TOOLCHAIN_FILE=$(pwd)/cmake/ios-cmake/ios.toolchain.cmake
-      -D PLATFORM=${PLATFORM}
-      -D ENABLE_BITCODE=OFF
-      -D SKIP_HDF_PLUGINS=ON
-      -D DEPLOYMENT_TARGET=16.0
-      -D DORADO_DISABLE_DORADO=ON
-      -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
-      -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
-    - !reference [.build_and_test_dorado, script]
-  artifacts: null
-
-build:ios_sim:m1:
-  variables:
-    PLATFORM: "SIMULATORARM64"
-    SDK_NAME: "iphonesimulator"
-    DORADO_RUN_TESTS: "ON"
-  extends:
-    # Note that we don't technically need CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED
-    # disabled for simulator builds, but it doesn't hurt.
-    - build:ios:m1
   artifacts: null
 
 build_archive:linux:x86:focal:
