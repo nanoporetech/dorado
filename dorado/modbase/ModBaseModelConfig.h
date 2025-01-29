@@ -21,29 +21,29 @@ namespace dorado::modbase {
 using ModelType = utils::modbase::ModelType;
 
 struct ModelGeneralParams {
-    const ModelType model_type{ModelType::UNKNOWN};
-    const int size{0};
-    const int kmer_len{0};
-    const int num_out{0};
-    const int stride{0};
+    const ModelType model_type;
+    const int size;
+    const int kmer_len;
+    const int num_out;
+    const int stride;
 
     ModelGeneralParams(ModelType model_type_, int size_, int kmer_len_, int num_out_, int stride_);
 };
 
 struct LinearParams {
-    const int in{0};
-    const int out{0};
+    const int in;
+    const int out;
 
     LinearParams(int in_, int out_);
 };
 
 struct RefinementParams {
-    const bool do_rough_rescale{false};  ///< Whether to perform rough rescaling
-    const size_t kmer_len;               ///< Length of the kmers for the specified kmer_levels
-    const size_t center_idx;             ///< The position in the kmer at which to check the levels
-    const std::vector<float> levels;     ///< Expected kmer levels for rough rescaling
+    const bool do_rough_rescale;      ///< Whether to perform rough rescaling
+    const size_t kmer_len;            ///< Length of the kmers for the specified kmer_levels
+    const size_t center_idx;          ///< The position in the kmer at which to check the levels
+    const std::vector<float> levels;  ///< Expected kmer levels for rough rescaling
 
-    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0), levels({}) {}
+    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0) {}
     RefinementParams(const int kmer_len_,
                      const int center_idx_,
                      std::vector<float> refine_kmer_levels_);
@@ -54,8 +54,8 @@ struct ModificationParams {
     const std::vector<std::string> long_names;  ///< The long names of the modified bases.
     const size_t count;                         ///< Number of mods
 
-    const std::string motif;      ///< The motif to look for modified bases within.
-    const size_t motif_offset{};  ///< The position of the canonical base within the motif.
+    const std::string motif;    ///< The motif to look for modified bases within.
+    const size_t motif_offset;  ///< The position of the canonical base within the motif.
 
     const char base;    ///< The canonical base 'ACGT'
     const int base_id;  ///< The canonical base id 0-3
@@ -70,17 +70,17 @@ private:
 };
 
 struct ContextParams {
-    const int64_t samples_before{0};  ///< Number of context signal samples before a context hit.
-    const int64_t samples_after{1};   ///< Number of context signal samples after a context hit.
-    const int64_t samples{1};         ///< The total context samples (before + after)
-    const int64_t chunk_size{1};      ///< The total samples in a chunk
+    const int64_t samples_before;  ///< Number of context signal samples before a context hit.
+    const int64_t samples_after;   ///< Number of context signal samples after a context hit.
+    const int64_t samples;         ///< The total context samples (before + after)
+    const int64_t chunk_size;      ///< The total samples in a chunk
 
-    const int bases_before{0};  ///< Number of bases before the primary base of a kmer.
-    const int bases_after{1};   ///< Number of bases after the primary base of a kmer.
-    const int kmer_len{1};      ///< The kmer length given by `bases_before + bases_after + 1`
+    const int bases_before;  ///< Number of bases before the primary base of a kmer.
+    const int bases_after;   ///< Number of bases after the primary base of a kmer.
+    const int kmer_len;      ///< The kmer length given by `bases_before + bases_after + 1`
 
-    const bool reverse{false};             ///< Reverse model data before processing (rna model)
-    const bool base_start_justify{false};  ///< Justify the kmer encoding to start the context hit
+    const bool reverse;             ///< Reverse model data before processing (rna model)
+    const bool base_start_justify;  ///< Justify the kmer encoding to start the context hit
 
     ContextParams(int64_t samples_before_,
                   int64_t samples_after_,
