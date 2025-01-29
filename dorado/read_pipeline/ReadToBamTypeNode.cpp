@@ -48,17 +48,26 @@ void ReadToBamTypeNode::input_thread_fn() {
 
 ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
                                      size_t num_worker_threads,
-                                     float modbase_threshold_frac,
+                                     std::optional<float> modbase_threshold_frac,
                                      std::unique_ptr<const utils::SampleSheet> sample_sheet,
                                      size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
           m_emit_moves(emit_moves),
-          m_modbase_threshold(
-                  static_cast<uint8_t>(std::min(modbase_threshold_frac * 256.0f, 255.0f))),
-          m_sample_sheet(std::move(sample_sheet)) {}
+          m_sample_sheet(std::move(sample_sheet)) {
+    if (modbase_threshold_frac) {
+        set_modbase_threshold(*modbase_threshold_frac);
+    }
+}
 
 ReadToBamTypeNode::~ReadToBamTypeNode() { stop_input_processing(); }
 
 stats::NamedStats ReadToBamTypeNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+
+void ReadToBamTypeNode::set_modbase_threshold(float threshold) {
+    if (threshold < 0.f || threshold > 1.f) {
+        throw std::runtime_error("modbase threshold must be between 0 and 1.");
+    }
+    m_modbase_threshold = static_cast<uint8_t>(std::min(threshold * 256.0f, 255.0f));
+}
 
 }  // namespace dorado

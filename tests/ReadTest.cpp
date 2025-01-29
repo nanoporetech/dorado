@@ -33,7 +33,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.split_point = 0;
 
     CATCH_SECTION("Basic") {
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         bam1_t* aln = alignments[0].get();
 
@@ -65,7 +65,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         // Update read to be duplex
         auto was_duplex = std::exchange(read_common.is_duplex, true);
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -78,7 +78,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 
     CATCH_SECTION("Duplex Parent") {
         // Update read to be duplex parent
-        auto alignments = read_common.extract_sam_lines(false, 0, true);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, true);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -88,7 +88,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CATCH_SECTION("No model") {
         auto old_model = std::exchange(read_common.model_name, "");
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -101,7 +101,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
         auto old_model = std::exchange(read_common.model_name, "");
         auto old_run_id = std::exchange(read_common.run_id, "");
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -114,7 +114,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CATCH_SECTION("Barcode") {
         auto old_barcode = std::exchange(read_common.barcode, "kit_barcode02");
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -127,7 +127,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CATCH_SECTION("Barcode unclassified") {
         auto old_barcode = std::exchange(read_common.barcode, dorado::UNCLASSIFIED);
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -140,7 +140,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     CATCH_SECTION("PolyA tail length") {
         auto old_tail_length = std::exchange(read_common.rna_poly_tail_length, 20);
 
-        auto alignments = read_common.extract_sam_lines(false, 0, false);
+        auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
@@ -153,17 +153,17 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
 CATCH_TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
     dorado::SimplexRead test_read{};
     CATCH_SECTION("Generating sam record for empty read throws") {
-        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, 0, false));
+        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, std::nullopt, false));
     }
     CATCH_SECTION("Generating sam record for empty seq and qstring throws") {
         test_read.read_common.read_id = "test_read";
-        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, 0, false));
+        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, std::nullopt, false));
     }
     CATCH_SECTION("Generating sam record for mismatched seq and qstring throws") {
         test_read.read_common.read_id = "test_read";
         test_read.read_common.seq = "ACGTACGT";
         test_read.read_common.qstring = "!!!!";
-        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, 0, false));
+        CATCH_REQUIRE_THROWS(test_read.read_common.extract_sam_lines(false, std::nullopt, false));
     }
 
     CATCH_SECTION("Generated sam record for unaligned read is correct") {
@@ -181,7 +181,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         test_read.read_common.attributes.filename = "batch_0.fast5";
 
-        auto lines = test_read.read_common.extract_sam_lines(false, 0, false);
+        auto lines = test_read.read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(!lines.empty());
         auto& rec = lines[0];
         CATCH_CHECK(rec->core.pos == -1);

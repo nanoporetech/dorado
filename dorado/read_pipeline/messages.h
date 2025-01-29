@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -80,7 +81,7 @@ public:
     float calculate_mean_qscore() const;
 
     std::vector<BamPtr> extract_sam_lines(bool emit_moves,
-                                          uint8_t modbase_threshold,
+                                          std::optional<uint8_t> modbase_threshold,
                                           bool is_duplex_parent) const;
 
     // Barcode.
@@ -133,7 +134,7 @@ public:
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent) const;
-    void generate_modbase_tags(bam1_t* aln, uint8_t threshold) const;
+    void generate_modbase_tags(bam1_t* aln, std::optional<uint8_t> threshold) const;
     std::string generate_read_group() const;
 };
 
