@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <numeric>
 #include <optional>
 #include <random>
 
@@ -272,11 +273,12 @@ CATCH_TEST_CASE(TEST_GROUP "reverse_seq_to_sig_map", TEST_GROUP) {
     // Generate a fake map.
     std::minstd_rand rng(Catch::rngSeed());
     std::uniform_int_distribution<uint64_t> dist;
+    using Range = decltype(dist)::param_type;
     auto generate_map = [&rng, &dist](uint64_t signal_length) {
         std::vector<uint64_t> map;
         uint64_t current_idx = 0;
         while (current_idx < signal_length) {
-            const auto range = decltype(dist)::param_type(1, signal_length - current_idx);
+            const auto range = Range(1, signal_length - current_idx);
             const auto step = dist(rng, range);
             current_idx += step;
             map.push_back(current_idx);
