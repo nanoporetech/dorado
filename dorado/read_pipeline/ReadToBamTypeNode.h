@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace dorado {
 
@@ -21,7 +20,7 @@ public:
                       float modbase_threshold_frac,
                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
                       size_t max_reads);
-    ~ReadToBamTypeNode() { stop_input_processing(); }
+    ~ReadToBamTypeNode();
     std::string get_name() const override { return "ReadToBamType"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { stop_input_processing(); };
