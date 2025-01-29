@@ -16,11 +16,11 @@ namespace dorado::utils::modbase {
 namespace {
 
 namespace DefaultModBaseParameters {
+constexpr std::size_t batchsize{1024};
+
 #if DORADO_TX2
-constexpr std::size_t batchsize{128};
 constexpr std::size_t batchsize_conv_lstm_v2{128};
 #else
-constexpr std::size_t batchsize{1024};
 constexpr std::size_t batchsize_conv_lstm_v2{2048};
 #endif
 
