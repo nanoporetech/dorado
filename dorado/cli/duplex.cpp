@@ -552,15 +552,10 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner;
         }
 
-        const auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
-        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
-            spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-            return EXIT_FAILURE;
-        }
-
-        auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, methylation_threshold, nullptr, 1000);
-        auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
+        const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
+                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000);
+        const auto duplex_read_tagger =
+                pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
@@ -772,6 +767,10 @@ int duplex(int argc, char* argv[]) {
                 spdlog::error("Failed to create pipeline");
                 return EXIT_FAILURE;
             }
+
+            // Set modbase threshold now that we have the params.
+            pipeline->get_node_ref<ReadToBamTypeNode>(read_converter)
+                    .set_modbase_threshold(modbase_params.threshold);
 
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
