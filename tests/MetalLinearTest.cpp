@@ -1,8 +1,7 @@
 #include "torch_utils/metal_utils.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -17,22 +16,22 @@ namespace F = torch::nn::functional;
 #define TEST_GROUP "Metal: "
 
 float MeanAbsDiff(const at::Tensor &a, const at::Tensor &b) {
-    REQUIRE(a.numel() == b.numel());
+    CATCH_REQUIRE(a.numel() == b.numel());
     return torch::sum(torch::abs(a - b)).item<float>() / a.numel();
 }
 
 // 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
 constexpr int kSimdGroupSize = 32;
 
-TEST_CASE(TEST_GROUP "Linear") {
+CATCH_TEST_CASE(TEST_GROUP "Linear") {
     // Basic device setup.
     // get_mtl_device sets up an allocator that provides GPU/CPU shared memory
     // launch_kernel will create a MTL::CommandBuffer for us.
     const NS::SharedPtr<MTL::Device> device = get_mtl_device();
-    REQUIRE(device);
+    CATCH_REQUIRE(device);
     const NS::SharedPtr<MTL::CommandQueue> command_queue =
             NS::TransferPtr(device->newCommandQueue());
-    REQUIRE(command_queue);
+    CATCH_REQUIRE(command_queue);
 
     // Example values for HAC model run.
     const int layer_size = 384;       // Typical LSTM layer size for HAC model.
@@ -67,7 +66,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     const NS::SharedPtr<MTL::ComputePipelineState> reorder_input_cps =
             make_cps(device.get(), "reorder_input_to_rev_lstm_output",
                      {{"kLstmLayerSize", layer_size}}, std::nullopt);
-    REQUIRE(reorder_input_cps);
+    CATCH_REQUIRE(reorder_input_cps);
 
     // Order in LstmArgs struct (which is also used by reorder_input):
     // batch_tiles
@@ -76,7 +75,7 @@ TEST_CASE(TEST_GROUP "Linear") {
     // time_step_end
     const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size, 0, 0};
     const NS::SharedPtr<MTL::Buffer> args_reorder = create_vec_buffer(device.get(), args_reorder_);
-    REQUIRE(args_reorder);
+    CATCH_REQUIRE(args_reorder);
 
     // Ensure we get the same random values for each run.
     torch::manual_seed(42);
@@ -129,8 +128,9 @@ TEST_CASE(TEST_GROUP "Linear") {
                                 : out_cpu_tanh_f32;
 
                 for (bool input_from_lstm : {false, true}) {
-                    DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
-                                                          << output_as_byte << input_from_lstm) {
+                    CATCH_DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
+                                                                << output_as_byte
+                                                                << input_from_lstm) {
                         const NS::SharedPtr<MTL::ComputePipelineState> linear_cps = make_cps(
                                 device.get(), input_from_lstm ? "linear_from_rev_lstm" : "linear",
                                 {{"kLinearInSize", layer_size},
@@ -140,7 +140,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                                  {"kLinearOutputTanh", output_tanh},
                                  {"kLinearOutputAsByte", output_as_byte}},
                                 threads_per_thread_group);
-                        REQUIRE(linear_cps);
+                        CATCH_REQUIRE(linear_cps);
 
                         auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size},
                                                         torch::kF32);
@@ -156,7 +156,7 @@ TEST_CASE(TEST_GROUP "Linear") {
                                     lstm_chunk_size};
                             const NS::SharedPtr<MTL::Buffer> args_linear =
                                     create_vec_buffer(device.get(), args_linear_);
-                            REQUIRE(args_linear);
+                            CATCH_REQUIRE(args_linear);
 
                             auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;
                             auto out_gpu_partial = torch::zeros(
@@ -184,8 +184,9 @@ TEST_CASE(TEST_GROUP "Linear") {
                         const float kMeanAbsDiffTolerance = output_as_byte ? 0.15f : 0.008f;
 
                         auto out_gpu_2d = out_gpu_f32.view({-1, out_size});
-                        CHECK(torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
-                        CHECK(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
+                        CATCH_CHECK(
+                                torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
+                        CATCH_CHECK(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
                     }
                 }
             }

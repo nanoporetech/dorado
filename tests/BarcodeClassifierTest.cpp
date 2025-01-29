@@ -16,7 +16,9 @@
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
@@ -46,7 +48,7 @@ std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
 
 }  // namespace
 
-TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
     using Catch::Matchers::Contains;
 
     auto barcoding_kits = barcode_kits::barcode_kits_list_str();
@@ -59,18 +61,18 @@ TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
         kit_names.push_back(s);
     }
 
-    CHECK(kit_names.size() > 0);
+    CATCH_CHECK(kit_names.size() > 0);
 
     for (auto& kit_name : kit_names) {
-        CHECK_NOTHROW(demux::BarcodeClassifier(kit_name));
+        CATCH_CHECK_NOTHROW(demux::BarcodeClassifier(kit_name));
     }
 }
 
-TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP) {
-    CHECK_THROWS(demux::BarcodeClassifier("MY_RANDOM_KIT"));
+CATCH_TEST_CASE("BarcodeClassifier: instantiate barcode with unknown kit", TEST_GROUP) {
+    CATCH_CHECK_THROWS(demux::BarcodeClassifier("MY_RANDOM_KIT"));
 }
 
-TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::BarcodeClassifier classifier("SQK-RBK114-96");
@@ -84,20 +86,20 @@ TEST_CASE("BarcodeClassifier: test single ended barcode", TEST_GROUP) {
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == dorado::UNCLASSIFIED) {
-                CHECK(bc == res.barcode_name);
+                CATCH_CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.barcode_name));
-                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
-                CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second <= seqlen);
-                CHECK(res.bottom_barcode_pos.first == -1);
-                CHECK(res.bottom_barcode_pos.second == -1);
+                CATCH_CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CATCH_CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CATCH_CHECK(res.top_barcode_pos.first >= 0);
+                CATCH_CHECK(res.top_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.bottom_barcode_pos.first == -1);
+                CATCH_CHECK(res.bottom_barcode_pos.second == -1);
             }
         }
     }
 }
 
-TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
 
     demux::BarcodeClassifier classifier("SQK-RPB004");
@@ -111,22 +113,23 @@ TEST_CASE("BarcodeClassifier: test double ended barcode", TEST_GROUP) {
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == dorado::UNCLASSIFIED) {
-                CHECK(bc == res.barcode_name);
+                CATCH_CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.barcode_name));
-                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
-                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
-                CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second <= seqlen);
-                CHECK(res.bottom_barcode_pos.first >= 0);
-                CHECK(res.bottom_barcode_pos.second <= seqlen);
-                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
+                CATCH_CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CATCH_CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CATCH_CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CATCH_CHECK(res.top_barcode_pos.first >= 0);
+                CATCH_CHECK(res.top_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.bottom_barcode_pos.first >= 0);
+                CATCH_CHECK(res.bottom_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
     }
 }
 
-TEST_CASE("BarcodeClassifier: test double ended barcode with different variants", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: test double ended barcode with different variants",
+                TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier classifier("EXP-PBC096");
@@ -140,22 +143,22 @@ TEST_CASE("BarcodeClassifier: test double ended barcode with different variants"
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == dorado::UNCLASSIFIED) {
-                CHECK(bc == res.barcode_name);
+                CATCH_CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.barcode_name));
-                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
-                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
-                CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second <= seqlen);
-                CHECK(res.bottom_barcode_pos.first >= 0);
-                CHECK(res.bottom_barcode_pos.second <= seqlen);
-                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
+                CATCH_CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CATCH_CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CATCH_CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CATCH_CHECK(res.top_barcode_pos.first >= 0);
+                CATCH_CHECK(res.top_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.bottom_barcode_pos.first >= 0);
+                CATCH_CHECK(res.bottom_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
     }
 }
 
-TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier classifier("EXP-PBC096");
@@ -167,12 +170,12 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - failing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.barcode_name == dorado::UNCLASSIFIED);
-        CHECK(single_end_res.barcode_name == "BC01");
+        CATCH_CHECK(double_end_res.barcode_name == dorado::UNCLASSIFIED);
+        CATCH_CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 
-TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier classifier("EXP-PBC096");
@@ -184,12 +187,13 @@ TEST_CASE("BarcodeClassifier: check barcodes on both ends - passing case", TEST_
         std::string seq = utils::extract_sequence(reader.record.get());
         auto single_end_res = classifier.barcode(seq, false, std::nullopt);
         auto double_end_res = classifier.barcode(seq, true, std::nullopt);
-        CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
-        CHECK(single_end_res.barcode_name == "BC01");
+        CATCH_CHECK(double_end_res.barcode_name == single_end_res.barcode_name);
+        CATCH_CHECK(single_end_res.barcode_name == "BC01");
     }
 }
 
-TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended kit", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended kit",
+                TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end_variant"));
 
     demux::BarcodeClassifier classifier("EXP-PBC096");
@@ -200,12 +204,13 @@ TEST_CASE("BarcodeClassifier: check presence of midstrand barcode double ended k
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto res = classifier.barcode(seq, false, std::nullopt);
-        CHECK(res.barcode_name == dorado::UNCLASSIFIED);
-        CHECK(res.found_midstrand);
+        CATCH_CHECK(res.barcode_name == dorado::UNCLASSIFIED);
+        CATCH_CHECK(res.found_midstrand);
     }
 }
 
-TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended kit", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended kit",
+                TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::BarcodeClassifier classifier("SQK-RBK114-96");
@@ -216,12 +221,12 @@ TEST_CASE("BarcodeClassifier: check presence of midstrand barcode single ended k
     while (reader.read()) {
         std::string seq = utils::extract_sequence(reader.record.get());
         auto res = classifier.barcode(seq, false, std::nullopt);
-        CHECK(res.barcode_name == dorado::UNCLASSIFIED);
-        CHECK(res.found_midstrand);
+        CATCH_CHECK(res.barcode_name == dorado::UNCLASSIFIED);
+        CATCH_CHECK(res.found_midstrand);
     }
 }
 
-TEST_CASE(
+CATCH_TEST_CASE(
         "BarcodeClassifierNode: check read messages are correctly updated after classification and "
         "trimming",
         TEST_GROUP) {
@@ -232,7 +237,7 @@ TEST_CASE(
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
     std::string kit = "SQK-RPB004";
     const bool barcode_both_ends = GENERATE(true, false);
-    CAPTURE(barcode_both_ends);
+    CATCH_CAPTURE(barcode_both_ends);
     constexpr bool no_trim = false;
     auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
     pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, 8);
@@ -311,7 +316,7 @@ TEST_CASE(
     pipeline->terminate(DefaultFlushOptions());
 
     constexpr size_t num_expected_messages = 3;
-    CHECK(messages.size() == num_expected_messages);
+    CATCH_CHECK(messages.size() == num_expected_messages);
 
     const std::string expected_bc = "SQK-RPB004_barcode01";
     std::vector<uint8_t> expected_move_vals;
@@ -328,51 +333,51 @@ TEST_CASE(
             bam1_t* rec = bam_message.bam_ptr.get();
 
             // Check trimming on the bam1_t struct.
-            CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
+            CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
 
             auto seq = dorado::utils::extract_sequence(rec);
-            CHECK(nonbc_seq == seq);
+            CATCH_CHECK(nonbc_seq == seq);
 
             auto qual = dorado::utils::extract_quality(rec);
-            CHECK(qual.size() == seq.length());
+            CATCH_CHECK(qual.size() == seq.length());
 
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
-            CHECK(move_vals == expected_move_vals);
+            CATCH_CHECK(move_vals == expected_move_vals);
 
             // The mod should now be at the very first base.
             const std::string expected_mod_str = "A+a.,0;";
             const std::vector<uint8_t> expected_mod_probs = {235};
             auto [mod_str, mod_probs] = dorado::utils::extract_modbase_info(rec);
-            CHECK(mod_str == expected_mod_str);
-            CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
+            CATCH_CHECK(mod_str == expected_mod_str);
+            CATCH_CHECK_THAT(mod_probs, Equals(std::vector<uint8_t>{235}));
 
-            CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
+            CATCH_CHECK(bam_aux2i(bam_aux_get(rec, "ts")) == additional_trimmed_samples);
             // 100 is trimmed sequence length. 51 is leading flank length.
             // * 2 is number of moves per base.
             // ns is shorter than the number of raw samples because the signal
             // corresponding to the trimmed trailing flank needs to be removed from the end
             // of the original signal.
-            CHECK(bam_aux2i(bam_aux_get(rec, "ns")) == ((100 + 51) * 2 * stride));
+            CATCH_CHECK(bam_aux2i(bam_aux_get(rec, "ns")) == ((100 + 51) * 2 * stride));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
             // Check trimming on the Read type.
             auto msg_read = std::get<SimplexReadPtr>(std::move(message));
             const ReadCommon& read_common = msg_read->read_common;
 
-            CHECK(read_common.barcode == expected_bc);
+            CATCH_CHECK(read_common.barcode == expected_bc);
 
-            CHECK(read_common.seq == nonbc_seq);
+            CATCH_CHECK(read_common.seq == nonbc_seq);
 
-            CHECK(read_common.moves == expected_move_vals);
+            CATCH_CHECK(read_common.moves == expected_move_vals);
 
             // The mod probabilities table should not start mod at the first base.
-            CHECK(read_common.base_mod_probs.size() ==
-                  read_common.seq.size() * mod_alphabet.size());
-            CHECK(read_common.base_mod_probs[0] == 20);
-            CHECK(read_common.base_mod_probs[1] == 235);
+            CATCH_CHECK(read_common.base_mod_probs.size() ==
+                        read_common.seq.size() * mod_alphabet.size());
+            CATCH_CHECK(read_common.base_mod_probs[0] == 20);
+            CATCH_CHECK(read_common.base_mod_probs[1] == 235);
 
-            CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
+            CATCH_CHECK(read_common.num_trimmed_samples == uint64_t(additional_trimmed_samples));
             // Number of trimmed bases is 100, so number of moves should be 2 * 100.
-            CHECK(read_common.get_raw_data_samples() == 100 * 2 * stride);
+            CATCH_CHECK(read_common.get_raw_data_samples() == 100 * 2 * stride);
 
             auto bams = read_common.extract_sam_lines(0, 10, false);
             auto& rec = bams[0];
@@ -381,8 +386,8 @@ TEST_CASE(
     }
 }
 
-TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data stripping",
-          TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data stripping",
+                TEST_GROUP) {
     using Catch::Matchers::Equals;
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -420,7 +425,7 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
 
     pipeline->terminate(DefaultFlushOptions());
 
-    CHECK(messages.size() == 2);
+    CATCH_CHECK(messages.size() == 2);
 
     auto bam_message = std::get<BamMessage>(std::move(messages[0]));
     read1 = std::move(bam_message.bam_ptr);
@@ -436,20 +441,20 @@ TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment data st
 
     // First read should be unclassified and untrimmed.
     auto seq1 = dorado::utils::extract_sequence(read1.get());
-    CHECK(seq1 == orig_seq1);
-    CHECK_THAT(bam_aux2Z(bam_aux_get(read1.get(), "BC")), Equals(dorado::UNCLASSIFIED));
+    CATCH_CHECK(seq1 == orig_seq1);
+    CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(read1.get(), "BC")), Equals(dorado::UNCLASSIFIED));
 
     // Second read should be classified and trimmed.
     auto seq2 = dorado::utils::extract_sequence(read2.get());
-    CHECK(seq2 ==
-          seq1);  // Sequence 2 is just sequence 1 plus the barcode, which should be trimmed.
-    CHECK_THAT(bam_aux2Z(bam_aux_get(read2.get(), "BC")), Equals("SQK-16S024_barcode01"));
+    CATCH_CHECK(seq2 ==
+                seq1);  // Sequence 2 is just sequence 1 plus the barcode, which should be trimmed.
+    CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(read2.get(), "BC")), Equals("SQK-16S024_barcode01"));
 
     // Check to make sure alignment data has been stripped from both reads.
-    CHECK(read1->core.tid == -1);
-    CHECK(bam_aux_get(read1.get(), "bh") == nullptr);
-    CHECK(read2->core.tid == -1);
-    CHECK(bam_aux_get(read2.get(), "bh") == nullptr);
+    CATCH_CHECK(read1->core.tid == -1);
+    CATCH_CHECK(bam_aux_get(read1.get(), "bh") == nullptr);
+    CATCH_CHECK(read2->core.tid == -1);
+    CATCH_CHECK(bam_aux_get(read2.get(), "bh") == nullptr);
 }
 
 struct CustomDoubleEndedKitInput {
@@ -457,7 +462,7 @@ struct CustomDoubleEndedKitInput {
     std::string seqs_file;
 };
 
-TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
+CATCH_TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/double_end"));
     auto [kit_file, seqs_file] = GENERATE(CustomDoubleEndedKitInput{
             (fs::path(get_data_dir("barcode_demux/custom_barcodes")) / "RPB004.toml").string(),
@@ -489,16 +494,16 @@ TEST_CASE("BarcodeClassifier: test custom kit with double ended barcode", TEST_G
             std::string seq = utils::extract_sequence(reader.record.get());
             auto res = classifier.barcode(seq, false, std::nullopt);
             if (res.barcode_name == dorado::UNCLASSIFIED) {
-                CHECK(bc == res.barcode_name);
+                CATCH_CHECK(bc == res.barcode_name);
             } else {
-                CHECK(bc == (res.kit + "_" + res.barcode_name));
-                CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
-                CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
-                CHECK(res.top_barcode_pos.first >= 0);
-                CHECK(res.top_barcode_pos.second <= seqlen);
-                CHECK(res.bottom_barcode_pos.first >= 0);
-                CHECK(res.bottom_barcode_pos.second <= seqlen);
-                CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
+                CATCH_CHECK(bc == (res.kit + "_" + res.barcode_name));
+                CATCH_CHECK(res.top_barcode_pos.second > res.top_barcode_pos.first);
+                CATCH_CHECK(res.bottom_barcode_pos.second > res.bottom_barcode_pos.first);
+                CATCH_CHECK(res.top_barcode_pos.first >= 0);
+                CATCH_CHECK(res.top_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.bottom_barcode_pos.first >= 0);
+                CATCH_CHECK(res.bottom_barcode_pos.second <= seqlen);
+                CATCH_CHECK(res.top_barcode_pos.second < res.bottom_barcode_pos.first);
             }
         }
     }

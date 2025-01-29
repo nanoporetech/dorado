@@ -3,16 +3,16 @@
 #include "utils/PostCondition.h"
 #include "utils/concurrency/synchronisation.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <utility>
 
 #define CUT_TAG "[dorado::utils::concurrency::MultiQueueThreadPool]"
-#define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 #define DEFINE_TEST_FIXTURE_METHOD(name) \
-    TEST_CASE_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
-#define DEFINE_SCENARIO_METHOD(name) \
-    SCENARIO_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
+    CATCH_TEST_CASE_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
+#define DEFINE_CATCH_SCENARIO_METHOD(name) \
+    CATCH_SCENARIO_METHOD(NoQueueThreadPoolTestFixture, CUT_TAG " " name, CUT_TAG)
 
 using namespace std::chrono_literals;
 
@@ -86,14 +86,14 @@ public:
 DEFINE_TEST("create_task_queue doesn't throw") {
     MultiQueueThreadPool cut{1, "test_executor"};
 
-    CHECK_NOTHROW(cut.create_task_queue(TaskPriority::normal));
+    CATCH_CHECK_NOTHROW(cut.create_task_queue(TaskPriority::normal));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue does not throw") {
     MultiQueueThreadPool cut{2, "test_executor"};
     auto& task_queue = cut.create_task_queue(TaskPriority::normal);
 
-    REQUIRE_NOTHROW(task_queue.push([] {}));
+    CATCH_REQUIRE_NOTHROW(task_queue.push([] {}));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue invokes the task") {
@@ -103,7 +103,7 @@ DEFINE_TEST("ThreadPoolQueue::push() with valid task_queue invokes the task") {
     Flag invoked{};
     task_queue.push([&invoked] { invoked.signal(); });
 
-    REQUIRE(invoked.wait_for(TIMEOUT));
+    CATCH_REQUIRE(invoked.wait_for(TIMEOUT));
 }
 
 DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
@@ -119,8 +119,8 @@ DEFINE_TEST("ThreadPoolQueue::push() invokes task on separate thread") {
         thread_id_assigned.signal();
     });
 
-    CHECK(thread_id_assigned.wait_for(TIMEOUT));
-    REQUIRE(invocation_thread != std::this_thread::get_id());
+    CATCH_CHECK(thread_id_assigned.wait_for(TIMEOUT));
+    CATCH_REQUIRE(invocation_thread != std::this_thread::get_id());
 }
 
 DEFINE_TEST("MultiQueueThreadPool::join() with 2 active threads completes") {
@@ -152,11 +152,11 @@ DEFINE_TEST("MultiQueueThreadPool::join() with 2 active threads completes") {
     });
 
     // Check the join is blocked waiting on the busy threads
-    CHECK_FALSE(joined_flag.wait_for(FAST_TIMEOUT));
+    CATCH_CHECK_FALSE(joined_flag.wait_for(FAST_TIMEOUT));
 
     release_busy_tasks.signal();
 
-    REQUIRE(joined_flag.wait_for(TIMEOUT));
+    CATCH_REQUIRE(joined_flag.wait_for(TIMEOUT));
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -170,7 +170,7 @@ DEFINE_TEST_FIXTURE_METHOD(
     auto& high_task_queue = cut->create_task_queue(TaskPriority::high);
     high_task_queue.push(create_task(2));
 
-    REQUIRE(task_started_flags[2]->wait_for(TIMEOUT));
+    CATCH_REQUIRE(task_started_flags[2]->wait_for(TIMEOUT));
 }
 
 }  // namespace dorado::utils::concurrency::multi_queue_thread_pool

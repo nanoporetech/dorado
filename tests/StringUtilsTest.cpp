@@ -1,6 +1,7 @@
 #include "utils/string_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #define CUT_TAG "[dorado::utils::string_utils]"
 
@@ -9,7 +10,7 @@
 
 namespace dorado::utils::string_view {
 
-TEST_CASE(CUT_TAG " split", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " split", CUT_TAG) {
     // clang-format off
     auto [input, delimiter, expected_results] = GENERATE(
         table<std::string, char, std::vector<std::string>>({
@@ -21,13 +22,13 @@ TEST_CASE(CUT_TAG " split", CUT_TAG) {
     );
     // clang-format on
 
-    CAPTURE(input);
-    CAPTURE(delimiter);
+    CATCH_CAPTURE(input);
+    CATCH_CAPTURE(delimiter);
     auto tokens = dorado::utils::split(input, delimiter);
-    CHECK(tokens == expected_results);
+    CATCH_CHECK(tokens == expected_results);
 }
 
-TEST_CASE(CUT_TAG " join", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " join", CUT_TAG) {
     // clang-format off
     auto [inputs, separator, expected_result] = GENERATE(
             table<std::vector<std::string>, std::string, std::string >({
@@ -40,13 +41,13 @@ TEST_CASE(CUT_TAG " join", CUT_TAG) {
     }));
     // clang-format on
 
-    CAPTURE(inputs);
-    CAPTURE(separator);
+    CATCH_CAPTURE(inputs);
+    CATCH_CAPTURE(separator);
     auto joined = dorado::utils::join(inputs, separator);
-    CHECK(joined == expected_result);
+    CATCH_CHECK(joined == expected_result);
 }
 
-TEST_CASE(CUT_TAG " starts_with") {
+CATCH_TEST_CASE(CUT_TAG " starts_with") {
     // clang-format off
     auto [input, prefix, expected_results] = GENERATE(
         table<std::string, std::string, bool>({
@@ -61,13 +62,13 @@ TEST_CASE(CUT_TAG " starts_with") {
     );
     // clang-format on
 
-    CAPTURE(input);
-    CAPTURE(prefix);
+    CATCH_CAPTURE(input);
+    CATCH_CAPTURE(prefix);
     auto starts_with = dorado::utils::starts_with(input, prefix);
-    CHECK(starts_with == expected_results);
+    CATCH_CHECK(starts_with == expected_results);
 }
 
-TEST_CASE(CUT_TAG " ends_with") {
+CATCH_TEST_CASE(CUT_TAG " ends_with") {
     // clang-format off
     auto [input, suffix, expected_results] = GENERATE(
         table<std::string, std::string, bool>({
@@ -82,13 +83,13 @@ TEST_CASE(CUT_TAG " ends_with") {
     );
     // clang-format on
 
-    CAPTURE(input);
-    CAPTURE(suffix);
+    CATCH_CAPTURE(input);
+    CATCH_CAPTURE(suffix);
     auto starts_with = dorado::utils::ends_with(input, suffix);
-    CHECK(starts_with == expected_results);
+    CATCH_CHECK(starts_with == expected_results);
 }
 
-TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
     // clang-format off
     auto [input, expected] = GENERATE(
             table<std::string, std::string_view>({
@@ -102,11 +103,11 @@ TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
             {"abc  \t\n  z  ", "abc  \t\n  z"},
     }));
     // clang-format on
-    CAPTURE(input);
+    CATCH_CAPTURE(input);
 
     auto actual = rtrim_view(input);
 
-    REQUIRE(expected == actual);
+    CATCH_REQUIRE(expected == actual);
 }
 
 }  // namespace dorado::utils::string_view

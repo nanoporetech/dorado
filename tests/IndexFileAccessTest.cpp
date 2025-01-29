@@ -5,7 +5,7 @@
 #include "alignment/minimap2_wrappers.h"
 #include "utils/stream_utils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
@@ -66,41 +66,42 @@ dorado::alignment::IndexLoadResult load_index_no_stderr(
 
 namespace dorado::alignment::index_file_access {
 
-TEST_CASE(TEST_GROUP " constructor does not throw", TEST_GROUP) {
-    REQUIRE_NOTHROW(IndexFileAccess{});
+CATCH_TEST_CASE(TEST_GROUP " constructor does not throw", TEST_GROUP) {
+    CATCH_REQUIRE_NOTHROW(IndexFileAccess{});
 }
 
-TEST_CASE(TEST_GROUP " load_index with invalid file return reference_file_not_found ", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " load_index with invalid file return reference_file_not_found ",
+                TEST_GROUP) {
     IndexFileAccess cut{};
 
-    REQUIRE(cut.load_index("invalid_file_path", create_dflt_options(), 1) ==
-            IndexLoadResult::reference_file_not_found);
+    CATCH_REQUIRE(cut.load_index("invalid_file_path", create_dflt_options(), 1) ==
+                  IndexLoadResult::reference_file_not_found);
 }
 
-TEST_CASE(TEST_GROUP " load_index with valid arguments returns success", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " load_index with valid arguments returns success", TEST_GROUP) {
     IndexFileAccess cut{};
 
-    REQUIRE(cut.load_index(valid_reference_file(), create_dflt_options(), 1) ==
-            IndexLoadResult::success);
+    CATCH_REQUIRE(cut.load_index(valid_reference_file(), create_dflt_options(), 1) ==
+                  IndexLoadResult::success);
 }
 
-SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
+CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
     IndexFileAccess cut{};
 
-    GIVEN("No index loaded") {
-        THEN("is_index_loaded returns false") {
-            REQUIRE_FALSE(cut.is_index_loaded("blah", create_dflt_options()));
+    CATCH_GIVEN("No index loaded") {
+        CATCH_THEN("is_index_loaded returns false") {
+            CATCH_REQUIRE_FALSE(cut.is_index_loaded("blah", create_dflt_options()));
         }
     }
 
-    GIVEN("load_index called with valid file but invalid options") {
+    CATCH_GIVEN("load_index called with valid file but invalid options") {
         load_index_no_stderr(cut, valid_reference_file(), invalid_options());
-        THEN("is_index_loaded returns false") {
-            REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), invalid_options()));
+        CATCH_THEN("is_index_loaded returns false") {
+            CATCH_REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), invalid_options()));
         }
     }
 
-    GIVEN("load_index called with valid file and options") {
+    CATCH_GIVEN("load_index called with valid file and options") {
         auto original_options{create_dflt_options()};
         original_options.mapping_options->get().best_n = 7;
 
@@ -109,114 +110,121 @@ SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
         compatible_options.mapping_options->get().best_n = compatible_best_n;
 
         cut.load_index(valid_reference_file(), original_options, 1);
-        THEN("is_index_loaded returns true") {
-            REQUIRE(cut.is_index_loaded(valid_reference_file(), original_options));
+        CATCH_THEN("is_index_loaded returns true") {
+            CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), original_options));
         }
-        THEN("get_index returns non null index") {
-            REQUIRE(cut.get_index(valid_reference_file(), original_options) != nullptr);
+        CATCH_THEN("get_index returns non null index") {
+            CATCH_REQUIRE(cut.get_index(valid_reference_file(), original_options) != nullptr);
         }
-        THEN("is_index_loaded with compatible mapping options returns false") {
-            REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+        CATCH_THEN("is_index_loaded with compatible mapping options returns false") {
+            CATCH_REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), compatible_options));
         }
-        AND_GIVEN("load_index called with same file and other valid indexing options") {
+        CATCH_AND_GIVEN("load_index called with same file and other valid indexing options") {
             Minimap2Options other_options{create_dflt_options()};
             other_options.index_options->get().k = original_options.index_options->get().k + 1;
             cut.load_index(valid_reference_file(), other_options, 1);
-            THEN("is_index_loaded with other options returns true") {
-                REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
+            CATCH_THEN("is_index_loaded with other options returns true") {
+                CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
             }
-            THEN("get_index with other options returns a non-null index") {
-                REQUIRE(cut.get_index(valid_reference_file(), other_options) != nullptr);
+            CATCH_THEN("get_index with other options returns a non-null index") {
+                CATCH_REQUIRE(cut.get_index(valid_reference_file(), other_options) != nullptr);
             }
-            THEN("get_index with other options returns a different index") {
+            CATCH_THEN("get_index with other options returns a different index") {
                 auto default_options_index =
                         cut.get_index(valid_reference_file(), original_options);
-                REQUIRE(cut.get_index(valid_reference_file(), other_options) !=
-                        default_options_index);
+                CATCH_REQUIRE(cut.get_index(valid_reference_file(), other_options) !=
+                              default_options_index);
             }
-            AND_GIVEN("unload_index called with original options") {
+            CATCH_AND_GIVEN("unload_index called with original options") {
                 cut.unload_index(valid_reference_file(), original_options);
-                THEN("is_index_loaded with other options returns true") {
-                    REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
+                CATCH_THEN("is_index_loaded with other options returns true") {
+                    CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
                 }
-                THEN("is_index_loaded with original options returns false") {
-                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), original_options));
+                CATCH_THEN("is_index_loaded with original options returns false") {
+                    CATCH_REQUIRE_FALSE(
+                            cut.is_index_loaded(valid_reference_file(), original_options));
                 }
             }
         }
 
-        AND_GIVEN("load_index called with same file and compatible mapping options") {
-            CHECK(cut.load_index(valid_reference_file(), compatible_options, 1) ==
-                  IndexLoadResult::success);
-            THEN("get_index with compatible options returns a non-null index") {
-                REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
+        CATCH_AND_GIVEN("load_index called with same file and compatible mapping options") {
+            CATCH_CHECK(cut.load_index(valid_reference_file(), compatible_options, 1) ==
+                        IndexLoadResult::success);
+            CATCH_THEN("get_index with compatible options returns a non-null index") {
+                CATCH_REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
             }
-            THEN("is_index_loaded with compatible options returns true") {
-                REQUIRE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+            CATCH_THEN("is_index_loaded with compatible options returns true") {
+                CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), compatible_options));
             }
-            THEN("is_index_loaded with original options returns true") {
-                REQUIRE(cut.is_index_loaded(valid_reference_file(), original_options));
+            CATCH_THEN("is_index_loaded with original options returns true") {
+                CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), original_options));
             }
-            THEN("get_index with compatible options returns a Minimap2Index with updated mapping "
-                 "options") {
+            CATCH_THEN(
+                    "get_index with compatible options returns a Minimap2Index with updated "
+                    "mapping "
+                    "options") {
                 auto compatible_index = cut.get_index(valid_reference_file(), compatible_options);
-                CHECK(compatible_index);
+                CATCH_CHECK(compatible_index);
 
-                REQUIRE(compatible_index->mapping_options().best_n == compatible_best_n);
+                CATCH_REQUIRE(compatible_index->mapping_options().best_n == compatible_best_n);
             }
-            THEN("get_index with original options returns a Minimap2Index with original mapping "
-                 "options") {
+            CATCH_THEN(
+                    "get_index with original options returns a Minimap2Index with original mapping "
+                    "options") {
                 auto original_index = cut.get_index(valid_reference_file(), original_options);
-                CHECK(original_index);
+                CATCH_CHECK(original_index);
 
-                REQUIRE(original_index->mapping_options().best_n ==
-                        original_options.mapping_options->get().best_n);
+                CATCH_REQUIRE(original_index->mapping_options().best_n ==
+                              original_options.mapping_options->get().best_n);
             }
-            THEN("get_index with compatible options returns a Minimap2Index with the same "
-                 "underlying minimap index") {
+            CATCH_THEN(
+                    "get_index with compatible options returns a Minimap2Index with the same "
+                    "underlying minimap index") {
                 auto original_index = cut.get_index(valid_reference_file(), original_options);
-                CHECK(original_index);
+                CATCH_CHECK(original_index);
                 auto compatible_index = cut.get_index(valid_reference_file(), compatible_options);
-                CHECK(compatible_index);
+                CATCH_CHECK(compatible_index);
 
-                REQUIRE(compatible_index->index() == original_index->index());
+                CATCH_REQUIRE(compatible_index->index() == original_index->index());
             }
-            AND_GIVEN("unload_index called with original options") {
+            CATCH_AND_GIVEN("unload_index called with original options") {
                 cut.unload_index(valid_reference_file(), original_options);
-                THEN("is_index_loaded with compatible options returns false") {
-                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), compatible_options));
+                CATCH_THEN("is_index_loaded with compatible options returns false") {
+                    CATCH_REQUIRE_FALSE(
+                            cut.is_index_loaded(valid_reference_file(), compatible_options));
                 }
-                THEN("is_index_loaded with original options returns false") {
-                    REQUIRE_FALSE(cut.is_index_loaded(valid_reference_file(), original_options));
+                CATCH_THEN("is_index_loaded with original options returns false") {
+                    CATCH_REQUIRE_FALSE(
+                            cut.is_index_loaded(valid_reference_file(), original_options));
                 }
             }
         }
     }
 }
 
-TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
     bool result{};
     SuppressStderr::invoke([&result] { result = validate_options(invalid_options()); });
 
-    REQUIRE_FALSE(result);
+    CATCH_REQUIRE_FALSE(result);
 }
 
-TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST_GROUP) {
-    REQUIRE(validate_options(create_dflt_options()));
+CATCH_TEST_CASE(TEST_GROUP " validate_options with default options returns true", TEST_GROUP) {
+    CATCH_REQUIRE(validate_options(create_dflt_options()));
 }
 
-TEST_CASE(TEST_GROUP " get_index called with compatible index returns non-null Minimap2Index",
-          TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " get_index called with compatible index returns non-null Minimap2Index",
+                TEST_GROUP) {
     IndexFileAccess cut{};
     Minimap2Options original_options{create_dflt_options()};
     cut.load_index(valid_reference_file(), original_options, 1);
     Minimap2Options compatible_options{create_dflt_options()};
     ++compatible_options.mapping_options->get().best_n;
 
-    REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
+    CATCH_REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
 }
 
-TEST_CASE(
+CATCH_TEST_CASE(
         TEST_GROUP
         " get_index called with compatible index returns index with the compatible mapping options",
         TEST_GROUP) {
@@ -228,42 +236,45 @@ TEST_CASE(
 
     auto index = cut.get_index(valid_reference_file(), compatible_options);
 
-    REQUIRE(index->get_options() == compatible_options);
+    CATCH_REQUIRE(index->get_options() == compatible_options);
 }
 
-TEST_CASE(TEST_GROUP
-          " generate_sequence_records_header with index for loaded index returns non-empty string",
-          TEST_GROUP) {
+CATCH_TEST_CASE(
+        TEST_GROUP
+        " generate_sequence_records_header with index for loaded index returns non-empty string",
+        TEST_GROUP) {
     IndexFileAccess cut{};
     cut.load_index(valid_reference_file(), create_dflt_options(), 1);
     auto header =
             cut.generate_sequence_records_header(valid_reference_file(), create_dflt_options());
-    REQUIRE(!header.empty());
+    CATCH_REQUIRE(!header.empty());
 }
 
-TEST_CASE(TEST_GROUP
-          " generate_sequence_records_header with single read reference index returns expected "
-          "header",
-          TEST_GROUP) {
+CATCH_TEST_CASE(
+        TEST_GROUP
+        " generate_sequence_records_header with single read reference index returns expected "
+        "header",
+        TEST_GROUP) {
     IndexFileAccess cut{};
     cut.load_index(valid_reference_file(), create_dflt_options(), 1);
 
     auto header =
             cut.generate_sequence_records_header(valid_reference_file(), create_dflt_options());
 
-    REQUIRE(header == EXPECTED_REF_FILE_HEADER);
+    CATCH_REQUIRE(header == EXPECTED_REF_FILE_HEADER);
 }
 
-TEST_CASE(TEST_GROUP
-          " generate_sequence_records_header with two read reference index returns expected header",
-          TEST_GROUP) {
+CATCH_TEST_CASE(
+        TEST_GROUP
+        " generate_sequence_records_header with two read reference index returns expected header",
+        TEST_GROUP) {
     IndexFileAccess cut{};
     cut.load_index(valid_2read_reference_file(), create_dflt_options(), 1);
 
     auto header = cut.generate_sequence_records_header(valid_2read_reference_file(),
                                                        create_dflt_options());
 
-    REQUIRE(header == EXPECTED_2READ_REF_FILE_HEADER);
+    CATCH_REQUIRE(header == EXPECTED_2READ_REF_FILE_HEADER);
 }
 
 }  // namespace dorado::alignment::index_file_access

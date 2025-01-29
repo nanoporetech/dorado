@@ -3,9 +3,8 @@
 #include "read_pipeline/ReadPipeline.h"
 #include "splitter/RNAReadSplitter.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/serialize.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -13,7 +12,7 @@
 
 #define TEST_GROUP "[RNASplitTest]"
 
-TEST_CASE("2 subread split", TEST_GROUP) {
+CATCH_TEST_CASE("2 subread split", TEST_GROUP) {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
     read->read_common.sample_rate = 4000;
@@ -35,13 +34,13 @@ TEST_CASE("2 subread split", TEST_GROUP) {
     dorado::splitter::RNAReadSplitter splitter_node(splitter_settings);
 
     const auto split_res = splitter_node.split(std::move(read));
-    REQUIRE(split_res.size() == 2);
+    CATCH_REQUIRE(split_res.size() == 2);
 
-    CHECK(split_res[0]->read_common.attributes.num_samples == 4833);
-    CHECK(split_res[0]->read_common.split_point == 0);
-    CHECK(split_res[0]->read_common.scaling_method == "test");
+    CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 4833);
+    CATCH_CHECK(split_res[0]->read_common.split_point == 0);
+    CATCH_CHECK(split_res[0]->read_common.scaling_method == "test");
 
-    CHECK(split_res[1]->read_common.attributes.num_samples == 5657);
-    CHECK(split_res[1]->read_common.split_point == 4837);
-    CHECK(split_res[1]->read_common.scaling_method == "test");
+    CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 5657);
+    CATCH_CHECK(split_res[1]->read_common.split_point == 4837);
+    CATCH_CHECK(split_res[1]->read_common.scaling_method == "test");
 }

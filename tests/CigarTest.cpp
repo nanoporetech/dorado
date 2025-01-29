@@ -2,7 +2,7 @@
 
 #include "TestUtils.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
 #include <filesystem>
@@ -17,14 +17,14 @@
 namespace dorado {
 namespace cigartests {
 
-TEST_CASE("CigarTest: parse_cigar_from_string - empty input", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: parse_cigar_from_string - empty input", TEST_GROUP) {
     const std::string_view in_cigar{""};
     const std::vector<CigarOp> expected{};
     const std::vector<CigarOp> result = parse_cigar_from_string(in_cigar);
-    CHECK(expected == result);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE("CigarTest: parse_cigar_from_string - non-cigar", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: parse_cigar_from_string - non-cigar", TEST_GROUP) {
     const std::string_view in_cigar{"wrong"};
     // clang-format off
     const std::vector<CigarOp> expected{
@@ -36,10 +36,10 @@ TEST_CASE("CigarTest: parse_cigar_from_string - non-cigar", TEST_GROUP) {
     };
     // clang-format on
     const std::vector<CigarOp> result = parse_cigar_from_string(in_cigar);
-    CHECK(expected == result);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE("CigarTest: parse_cigar_from_string - all ops", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: parse_cigar_from_string - all ops", TEST_GROUP) {
     const std::string_view in_cigar{"1M2I3D4N5S6H7P8=9X10Y11m12x13i14d"};
     // clang-format off
     const std::vector<CigarOp> expected{
@@ -60,19 +60,19 @@ TEST_CASE("CigarTest: parse_cigar_from_string - all ops", TEST_GROUP) {
     };
     // clang-format on
     const std::vector<CigarOp> result = parse_cigar_from_string(in_cigar);
-    CHECK(expected == result);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE("CigarTest: convert_mm2_cigar - empty input", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: convert_mm2_cigar - empty input", TEST_GROUP) {
     const std::vector<uint32_t> in_cigar{};
 
     const std::vector<CigarOp> expected{};
     const std::vector<CigarOp> result =
             convert_mm2_cigar(std::data(in_cigar), static_cast<uint32_t>(std::size(in_cigar)));
-    CHECK(expected == result);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE("CigarTest: convert_mm2_cigar - all combos", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: convert_mm2_cigar - all combos", TEST_GROUP) {
     // Note: lower 4 bits encode the CIGAR operation, and only values 0-9 (non-inclusive) are used.
     // The rest are undefined.
     const std::vector<uint32_t> in_cigar{
@@ -103,34 +103,34 @@ TEST_CASE("CigarTest: convert_mm2_cigar - all combos", TEST_GROUP) {
 
     const std::vector<CigarOp> result =
             convert_mm2_cigar(std::data(in_cigar), static_cast<uint32_t>(std::size(in_cigar)));
-    CHECK(expected == result);
+    CATCH_CHECK(expected == result);
 }
 
-TEST_CASE("CigarTest: serialize_cigar - empty input", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: serialize_cigar - empty input", TEST_GROUP) {
     const std::vector<CigarOp> in_cigar{};
 
     const std::string_view expected{""};
 
     // Check that writing to stream works fine.
-    SECTION("Writing to a stream") {
+    CATCH_SECTION("Writing to a stream") {
         // Run unit under test.
         std::ostringstream oss;
         oss << in_cigar;
         const std::string result = oss.str();
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 
     // Check that the conversion to string works fine.
-    SECTION("Conversion to std::string") {
+    CATCH_SECTION("Conversion to std::string") {
         // Run unit under test.
         const std::string result = serialize_cigar(in_cigar);
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 }
 
-TEST_CASE("CigarTest: serialize_cigar - normal input", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: serialize_cigar - normal input", TEST_GROUP) {
     // clang-format off
     const std::vector<CigarOp> in_cigar{
         {CigarOpType::M, 1},
@@ -148,25 +148,25 @@ TEST_CASE("CigarTest: serialize_cigar - normal input", TEST_GROUP) {
     const std::string_view expected{"1M2I3D4N5S6H7P8=9X"};
 
     // Check that writing to stream works fine.
-    SECTION("Writing to a stream") {
+    CATCH_SECTION("Writing to a stream") {
         // Run unit under test.
         std::ostringstream oss;
         oss << in_cigar;
         const std::string result = oss.str();
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 
     // Check that the conversion to string works fine.
-    SECTION("Conversion to std::string") {
+    CATCH_SECTION("Conversion to std::string") {
         // Run unit under test.
         const std::string result = serialize_cigar(in_cigar);
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 }
 
-TEST_CASE("CigarTest: serialize_cigar - malformed input, unknown ops", TEST_GROUP) {
+CATCH_TEST_CASE("CigarTest: serialize_cigar - malformed input, unknown ops", TEST_GROUP) {
     // IMPORTANT: Malformed CIGAR ops do not throw by design for the sake of speed (simple lookup table is used).
 
     // clang-format off
@@ -185,21 +185,21 @@ TEST_CASE("CigarTest: serialize_cigar - malformed input, unknown ops", TEST_GROU
     const std::string_view expected{"1M2I3D4U5U6U7=8X"};
 
     // Check that writing to stream works fine.
-    SECTION("Writing to a stream") {
+    CATCH_SECTION("Writing to a stream") {
         // Run unit under test.
         std::ostringstream oss;
         oss << in_cigar;
         const std::string result = oss.str();
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 
     // Check that the conversion to string works fine.
-    SECTION("Conversion to std::string") {
+    CATCH_SECTION("Conversion to std::string") {
         // Run unit under test.
         const std::string result = serialize_cigar(in_cigar);
 
-        CHECK(expected == result);
+        CATCH_CHECK(expected == result);
     }
 }
 

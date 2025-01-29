@@ -2,11 +2,11 @@
 
 #include "read_pipeline/ReadPipeline.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #define TEST_GROUP "[ReadForwarderNodeTest]"
 
-TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
+CATCH_TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     auto add_to_vec_callback = [&messages](dorado::Message&& message) {
         messages.push_back(std::move(message));
@@ -24,5 +24,5 @@ TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
     pipeline->push_message(std::make_unique<dorado::DuplexRead>());
     pipeline.reset();
 
-    CHECK(messages.size() == 2);
+    CATCH_CHECK(messages.size() == 2);
 }

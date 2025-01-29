@@ -27,6 +27,9 @@ endfunction()
 # argparse
 add_subdirectory(argparse EXCLUDE_FROM_ALL)
 
+# catch2
+add_subdirectory(catch2 EXCLUDE_FROM_ALL)
+
 # Bring in spdlog
 add_subdirectory(spdlog EXCLUDE_FROM_ALL)
 # Avoid namespace clashes with static torch.
