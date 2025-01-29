@@ -105,22 +105,21 @@ $ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 
 ### DNA adapter and primer trimming
 
-Dorado can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demultiplex the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could interfere with correct demultiplexing.
+Dorado can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demultiplex the reads at some later time, trimming primers will likely result in some portions of the flanking regions of the barcodes being removed, which could prevent demultiplexing from working properly.
 
 #### In-line with basecalling
 
-By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence. Additionally, dorado will attempt to use the detected primers to determine whether the DNA went through the pore in the 5'-to-3' direction, or the 3'-to-5' direction. If this can be inferred, then the TS:A tag will be included in the BAM output for the read, with a value of "+" or "-" respectively. If it cannot be inferred, then this tag will not be included in the output. This is primarily useful for cDNA protocols, as most other current sequencing protocols do not include primers.
+By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence. Additionally, dorado will attempt to use the detected primers to determine whether the DNA went through the pore in the 5'-to-3' direction, or the 3'-to-5' direction. If this can be inferred, then the `TS:A` tag will be included in the BAM output for the read, with a value of `+` or `-` respectively. If it cannot be inferred, then this tag will not be included in the output. This is primarily useful for cDNA protocols, as most other current sequencing protocols do not include primers.
 
 This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences. Note that if primer trimming is not enabled, then no attempt will be made to detect primers, or to classify the orientation of the strand based on them.
 
 The `--trim` option takes as its argument one of the following values:
 
 * `all` This is the the same as the default behavior. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
-* `primers` This will result in any detected adapters or primers being trimmed, but if barcoding is enabled the barcode sequences will not be trimmed.
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
-Dorado determines which adapter and primer sequences to search for and trim based on the sequencing-kit specified in the input file. If the sequencing-kit is not specified in the file, or is not a recognized and supported kit, then no adapter or primer trimming will be done. Note that the dorado software only supports adapter and primer trimming for kit14 sequencing kits.
+Dorado determines which adapter and primer sequences to search for and trim based on the sequencing-kit specified in the input file. If the sequencing-kit is not specified in the file, or is not a recognized and supported kit, then no adapter or primer trimming will be done. Note that by default the dorado software only supports adapter and primer trimming for kit14 sequencing kits.
 
 If adapter/primer trimming is done in-line with basecalling in combination with demultiplexing, then the software will automatically ensure that the trimming of adapters and primers does not interfere with the demultiplexing process. However, if you intend to do demultiplexing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to ensure that any barcode sequences remain completely intact in the reads.
 
@@ -138,7 +137,7 @@ $ dorado trim <reads> --sequencing-kit <kit_name> trimmed.bam
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
 
-If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification.
+If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification. It is also recommended in this case that you turn off trimming when you demultiplex, otherwise the trimming of the barcodes may prevent the proper detection of primers, resulting in partial primers remaining after trimming.
 
 The output of `dorado trim` will always be unaligned records, regardless of whether the input is aligned/sorted or not.
 

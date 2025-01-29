@@ -457,32 +457,6 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     CATCH_CHECK(bam_aux_get(read2.get(), "bh") == nullptr);
 }
 
-CATCH_TEST_CASE("BarcodeClassifierNode: test primer/barcode overlap correction", TEST_GROUP) {
-    BarcodeScoreResult bc_res;
-    bc_res.top_barcode_pos = {10, 30};
-    bc_res.bottom_barcode_pos = {70, 90};
-    auto primer_trim_interval = std::make_pair(20, 90);
-    int seqlen = 100;
-    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, true);
-    CATCH_CHECK(primer_trim_interval.first == 10);
-    CATCH_CHECK(primer_trim_interval.second == 90);
-
-    primer_trim_interval = std::make_pair(20, 90);
-    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, false);
-    CATCH_CHECK(primer_trim_interval.first == 0);
-    CATCH_CHECK(primer_trim_interval.second == 90);
-
-    primer_trim_interval = std::make_pair(10, 80);
-    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, true);
-    CATCH_CHECK(primer_trim_interval.first == 10);
-    CATCH_CHECK(primer_trim_interval.second == 90);
-
-    primer_trim_interval = std::make_pair(10, 80);
-    BarcodeClassifierNode::fix_misidentified_primers(bc_res, primer_trim_interval, seqlen, false);
-    CATCH_CHECK(primer_trim_interval.first == 10);
-    CATCH_CHECK(primer_trim_interval.second == 100);
-}
-
 struct CustomDoubleEndedKitInput {
     std::string kit_file;
     std::string seqs_file;

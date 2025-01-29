@@ -105,11 +105,6 @@ void BarcodeClassifierNode::barcode(BamMessage& read, const demux::BarcodingInfo
         read.barcode_trim_interval =
                 Trimmer::determine_trim_interval(*read.barcoding_result, seqlen);
     }
-
-    auto adapter_primer_info = read.client_info->contexts().get_ptr<const demux::AdapterInfo>();
-    bool trim_primers = adapter_primer_info ? adapter_primer_info->trim_primers : false;
-    fix_misidentified_primers(*read.barcoding_result, read.adapter_trim_interval, seqlen,
-                              trim_primers);
 }
 
 void BarcodeClassifierNode::barcode(SimplexRead& read) {
@@ -130,51 +125,10 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
         read.read_common.barcode_trim_interval =
                 Trimmer::determine_trim_interval(*read.read_common.barcoding_result, seqlen);
     }
-    auto adapter_primer_info =
-            read.read_common.client_info->contexts().get_ptr<const demux::AdapterInfo>();
-    bool trim_primers = adapter_primer_info ? adapter_primer_info->trim_primers : false;
-    fix_misidentified_primers(*read.read_common.barcoding_result,
-                              read.read_common.adapter_trim_interval, seqlen, trim_primers);
-
     m_num_records++;
     {
         std::lock_guard lock(m_barcode_count_mutex);
         m_barcode_count[read.read_common.barcode]++;
-    }
-}
-
-void BarcodeClassifierNode::fix_misidentified_primers(const BarcodeScoreResult& bc_res,
-                                                      std::pair<int, int>& primer_trim_interval,
-                                                      int seqlen,
-                                                      bool trim_primers) {
-    if (primer_trim_interval.second == 0 ||
-        (primer_trim_interval.first == 0 && primer_trim_interval.second == seqlen)) {
-        // No adapters or primers were found and/or trimmed, so we have nothing to do here.
-        return;
-    }
-    // Some barcodes may be mistaken for primers during adapter/primer detection. If the trim-interval for adapters/primers
-    // overlaps the trim-interval for barcodes, we must assume this is what has happened.
-    if (bc_res.top_barcode_pos != std::make_pair(-1, -1)) {
-        if (bc_res.top_barcode_pos.first < primer_trim_interval.first) {
-            // Overlap detected. If we're trimming primers, then trim up to the beginning of the barcode.
-            if (trim_primers) {
-                primer_trim_interval.first = bc_res.top_barcode_pos.first;
-            } else {
-                // If we're not trimming primers, we don't know anymore whether a front adapter was found, or where. So don't trim from the beginning at all.
-                primer_trim_interval.first = 0;
-            }
-        }
-    }
-    if (bc_res.bottom_barcode_pos != std::make_pair(-1, -1)) {
-        if (bc_res.bottom_barcode_pos.second > primer_trim_interval.second) {
-            // Overlap detected. If we're trimming primers, then trim from the end of the barcode.
-            if (trim_primers) {
-                primer_trim_interval.second = bc_res.bottom_barcode_pos.second;
-            } else {
-                // If we're not trimming primers, we don't know anymore whether a rear adapter was found, or where. So don't trim from the end at all.
-                primer_trim_interval.second = seqlen;
-            }
-        }
     }
 }
 
