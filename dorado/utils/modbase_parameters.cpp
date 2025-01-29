@@ -102,7 +102,7 @@ ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths
             "modbase_runners", is_conv_lstm_v2
                                        ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2
                                        : DefaultModBaseParameters::runners_per_caller);
-    if (batch_size < 0 || runners_per_caller < 0 || threads < 0) {
+    if (runners_per_caller <= 0 || threads <= 0) {
         throw std::runtime_error("Modbase parameters must be positive integers.");
     }
     return ModBaseParams{batch_size, runners_per_caller, threads,
