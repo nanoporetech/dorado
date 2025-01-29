@@ -85,8 +85,8 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
                 {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
         },
         {PC::RAD,
-         {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_RBK114_24, KC::SQK_RBK114_24_260,
-          KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
+         {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260, KC::SQK_RBK114_24,
+          KC::SQK_RBK114_24_260, KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
 
 class AdapterPrimerManager {
 public:
