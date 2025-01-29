@@ -44,7 +44,7 @@ protected:
         reader.read(*pipeline, 1000);
         pipeline->terminate(DefaultFlushOptions());
 
-        auto& writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(writer));
+        auto& writer_ref = pipeline->get_node_ref<HtsWriter>(writer);
         stats = writer_ref.sample_stats();
 
         hts_file.finalise([](size_t) { /* noop */ });

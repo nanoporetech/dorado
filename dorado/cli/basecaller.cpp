@@ -559,9 +559,9 @@ void setup(const std::vector<std::string>& args,
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_file->set_header(hdr.get());

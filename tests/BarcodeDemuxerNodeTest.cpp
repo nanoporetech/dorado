@@ -58,7 +58,7 @@ CATCH_TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TE
         SamHdrPtr hdr(sam_hdr_init());
         sam_hdr_add_line(hdr.get(), "SQ", "ID", "foo", "LN", "100", "SN", "ref", NULL);
 
-        auto& demux_writer_ref = dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demuxer));
+        auto& demux_writer_ref = pipeline->get_node_ref<BarcodeDemuxerNode>(demuxer);
         demux_writer_ref.set_header(hdr.get());
 
         auto client_info = std::make_shared<dorado::DefaultClientInfo>();

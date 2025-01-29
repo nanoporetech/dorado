@@ -776,8 +776,7 @@ int duplex(int argc, char* argv[]) {
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
             if (!ref.empty()) {
-                const auto& aligner_ref =
-                        dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+                const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
             hts_file->set_header(hdr.get());
