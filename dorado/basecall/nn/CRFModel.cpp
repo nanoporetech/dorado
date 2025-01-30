@@ -362,7 +362,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                                      std::to_string(params.insize));
         }
     } else if (cutlass_conv) {
-#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
         throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
 #else
         utils::ScopedProfileRange spr2("linear conv", 3);
@@ -380,7 +380,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
             throw std::runtime_error(std::string("Koi convolution failed with in size ") +
                                      std::to_string(params.insize));
         }
-#endif  // ifdef DORADO_TX2 else
+#endif  // DORADO_TX2
     } else {
         utils::ScopedProfileRange spr2("window conv", 3);
         // The window tensor is either NTC or TNC, depending on whether the first two
@@ -485,7 +485,7 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
             out_2D += linear->bias;
         }
     } else {
-#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
         throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
 #else
         utils::ScopedProfileRange spr("koi_linear", 2);
@@ -609,7 +609,7 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
 }
 
 void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
-#ifdef DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
+#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
     (void)wm;
     throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
 #else
@@ -681,7 +681,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
 
         wm.is_input_to_rev_lstm = !reverse;
     }
-#endif  // ifdef DORADO_TX2 else
+#endif  // DORADO_TX2
 }
 
 void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {

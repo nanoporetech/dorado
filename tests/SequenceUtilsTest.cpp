@@ -1,12 +1,18 @@
 #include "utils/sequence_utils.h"
 
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/internal/catch_run_context.hpp>
+#include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <numeric>
 #include <optional>
+#include <random>
 
 #define TEST_GROUP "[seq_utils]"
 
@@ -110,7 +116,7 @@ CATCH_TEST_CASE(TEST_GROUP "mean_q_score", TEST_GROUP) {
             {"464887/55.519;@=>?0..,-./*)+$&&/00)*++-//-20?@===@D:9/=<:<E@AB;98(&$%&+*", 11.61238f},
             {"33B<87ESEA41GDDSGHDC?=>:84:<?568@", 23.70278f},
             {"%$$')*(,*+78665;3378H@=>A42004.", 10.62169f}};
-    for (const auto& [str, score] : kExamples) {
+    for (const auto & [str, score] : kExamples) {
         CATCH_CHECK(dorado::utils::mean_qscore_from_qstring(str) == Catch::Approx(score));
     }
 }
@@ -255,4 +261,56 @@ CATCH_TEST_CASE("Test sequence to move table index", TEST_GROUP) {
         const auto res = sequence_to_move_table_index(move, 0, bad_seq_size);
         CATCH_CHECK(res < 0);
     }
+}
+
+CATCH_TEST_CASE(TEST_GROUP "reverse_seq_to_sig_map", TEST_GROUP) {
+    auto reverse_2_passes = [](std::vector<uint64_t> & map, size_t signal_length) {
+        std::reverse(map.begin(), map.end());
+        std::transform(map.begin(), map.end(), map.begin(),
+                       [signal_length](uint64_t v) { return signal_length - v; });
+    };
+
+    // Generate a fake map.
+    std::minstd_rand rng(Catch::rngSeed());
+    std::uniform_int_distribution<uint64_t> dist;
+    using Range = decltype(dist)::param_type;
+    auto generate_map = [&rng, &dist](uint64_t signal_length) {
+        std::vector<uint64_t> map;
+        uint64_t current_idx = 0;
+        while (current_idx < signal_length) {
+            const auto range = Range(1, signal_length - current_idx);
+            const auto step = dist(rng, range);
+            current_idx += step;
+            map.push_back(current_idx);
+        }
+        if (signal_length != 0) {
+            CATCH_REQUIRE(!map.empty());
+            CATCH_REQUIRE(map.back() == signal_length);
+        }
+        return map;
+    };
+
+    // Check that both approaches match.
+    for (size_t length = 0; length < 100; length++) {
+        CATCH_CAPTURE(length);
+        // Both act in-place.
+        auto seq_to_sig_map = generate_map(length);
+        auto reversed_map = seq_to_sig_map;
+        reverse_2_passes(reversed_map, length);
+        reverse_seq_to_sig_map(seq_to_sig_map, length);
+        CATCH_CHECK(seq_to_sig_map == reversed_map);
+    }
+
+    // Benchmark it.
+#if DORADO_ENABLE_BENCHMARK_TESTS
+    const auto length = GENERATE(100, 10'000, 1'000'000);
+    std::vector<uint64_t> fake_map(length);
+    std::iota(fake_map.begin(), fake_map.end(), 0);
+    CATCH_BENCHMARK(fmt::format("reverse_2_passes, {} bases", length)) {
+        reverse_2_passes(fake_map, length);
+    };
+    CATCH_BENCHMARK(fmt::format("reverse_seq_to_sig_map, {} bases", length)) {
+        reverse_seq_to_sig_map(fake_map, length);
+    };
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }

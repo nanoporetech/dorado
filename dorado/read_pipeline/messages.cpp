@@ -134,9 +134,12 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     }
 }
 
-void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
+void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> threshold) const {
     if (!mod_base_info) {
         return;
+    }
+    if (!threshold.has_value()) {
+        throw std::logic_error("Cannot generate modbase tags without a valid threshold.");
     }
 
     const size_t num_channels = mod_base_info->alphabet.size();
@@ -168,7 +171,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     }
     auto modbase_mask = context_handler.get_sequence_mask(seq);
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
-                                threshold);
+                                *threshold);
 
     if (is_duplex) {
         // If this is a duplex read, we need to compute the reverse complement mask and combine it
@@ -195,7 +198,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         // Update the context mask using the reversed sequence
         context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
                                     mod_base_info->alphabet,
-                                    reverseMatrix(base_mod_probs, num_states), threshold);
+                                    reverseMatrix(base_mod_probs, num_states), *threshold);
 
         // Reverse the mask in-place
         std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
@@ -303,7 +306,7 @@ float ReadCommon::calculate_mean_qscore() const {
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
-                                                  uint8_t modbase_threshold,
+                                                  std::optional<uint8_t> modbase_threshold,
                                                   bool is_duplex_parent) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");

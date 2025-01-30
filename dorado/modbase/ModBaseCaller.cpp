@@ -7,6 +7,10 @@
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
 
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -16,14 +20,6 @@
 #include <c10/cuda/CUDAStream.h>
 #include <torch/cuda.h>
 #endif
-#include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
-
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#include <chrono>
 
 using namespace std::chrono_literals;
 
@@ -79,13 +75,11 @@ int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
 
-    const size_t cs_ = params.is_chunked_input_model()
-                               ? static_cast<int64_t>(params.context.chunk_size)
-                               : static_cast<int64_t>(params.context.samples);
-    const int64_t cs = static_cast<int64_t>(cs_);
+    const int64_t cs =
+            params.is_chunked_input_model() ? params.context.chunk_size : params.context.samples;
     if (cs < 0) {
         throw std::runtime_error("Integer conversion error in ModBaseData::get_sig_len value: '" +
-                                 std::to_string(cs_) + "'.");
+                                 std::to_string(cs) + "'.");
     }
     return cs;
 }

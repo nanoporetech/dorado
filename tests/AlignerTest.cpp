@@ -133,8 +133,7 @@ protected:
 
     std::string get_sam_line_from_bam(dorado::BamPtr bam_record) {
         dorado::SamHdrPtr header(sam_hdr_init());
-        const auto& aligner_ref =
-                dynamic_cast<dorado::AlignerNode&>(pipeline->get_node_ref(aligner_node_handle));
+        const auto& aligner_ref = pipeline->get_node_ref<dorado::AlignerNode>(aligner_node_handle);
         dorado::utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
 
         dorado::KString line_wrapper(1000000);

@@ -13,6 +13,28 @@
 
 namespace dorado::utils::modbase {
 
+namespace {
+
+namespace DefaultModBaseParameters {
+constexpr std::size_t batchsize{1024};
+
+#if DORADO_TX2
+constexpr std::size_t batchsize_conv_lstm_v2{128};
+#else
+constexpr std::size_t batchsize_conv_lstm_v2{2048};
+#endif
+
+constexpr std::size_t threads{4};
+constexpr std::size_t threads_conv_lstm_v2{8};
+
+constexpr std::size_t runners_per_caller{2};
+constexpr std::size_t runners_per_caller_conv_lstm_v2{4};
+
+constexpr float methylation_threshold{0.05f};
+};  // namespace DefaultModBaseParameters
+
+}  // namespace
+
 std::string to_string(const ModelType& model_type) noexcept {
     switch (model_type) {
     case CONV_LSTM_V1:
@@ -56,28 +78,35 @@ bool is_modbase_model(const std::filesystem::path& path) {
     return get_modbase_model_type(path) != ModelType::UNKNOWN;
 }
 
-ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                 int batch_size_arg,
-                                 float threshold_arg) {
-    bool is_conv_lstm_v2 =
+std::string ModBaseParams::to_string() const {
+    std::string str = "ModBaseParams {";
+    str += "batchsize:" + std::to_string(batchsize);
+    str += ", runners_per_caller:" + std::to_string(runners_per_caller);
+    str += ", threads:" + std::to_string(threads);
+    str += ", threshold:" + std::to_string(threshold);
+    str += "}";
+    return str;
+}
+
+ModBaseParams get_modbase_params(const std::vector<std::filesystem::path>& paths) {
+    const bool is_conv_lstm_v2 =
             !paths.empty() && get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V2;
-    int batch_size = is_conv_lstm_v2 ? default_modbase_parameters.batchsize_conv_lstm_v2
-                                     : default_modbase_parameters.batchsize;
-    if (batch_size_arg > 0) {
-        batch_size = batch_size_arg;
-    }
-    const int threads = utils::get_dev_opt<int>(
-            "modbase_threads", is_conv_lstm_v2 ? default_modbase_parameters.threads_conv_lstm_v2
-                                               : default_modbase_parameters.threads);
-    const int runners_per_caller = utils::get_dev_opt<int>(
+    const std::size_t batch_size = is_conv_lstm_v2
+                                           ? DefaultModBaseParameters::batchsize_conv_lstm_v2
+                                           : DefaultModBaseParameters::batchsize;
+
+    const std::size_t threads = utils::get_dev_opt(
+            "modbase_threads", is_conv_lstm_v2 ? DefaultModBaseParameters::threads_conv_lstm_v2
+                                               : DefaultModBaseParameters::threads);
+    const std::size_t runners_per_caller = utils::get_dev_opt(
             "modbase_runners", is_conv_lstm_v2
-                                       ? default_modbase_parameters.runners_per_caller_conv_lstm_v2
-                                       : default_modbase_parameters.runners_per_caller);
-    if (batch_size < 0 || runners_per_caller < 0 || threads < 0 || threshold_arg < 0) {
-        throw std::runtime_error("Modbase CLI parameters must be positive integers.");
+                                       ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2
+                                       : DefaultModBaseParameters::runners_per_caller);
+    if (runners_per_caller <= 0 || threads <= 0) {
+        throw std::runtime_error("Modbase parameters must be positive integers.");
     }
-    return ModBaseParams{static_cast<size_t>(batch_size), static_cast<size_t>(runners_per_caller),
-                         threads, threshold_arg};
+    return ModBaseParams{batch_size, runners_per_caller, threads,
+                         DefaultModBaseParameters::methylation_threshold};
 }
 
 }  // namespace dorado::utils::modbase

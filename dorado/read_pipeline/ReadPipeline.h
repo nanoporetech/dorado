@@ -97,7 +97,12 @@ public:
 
     // Returns a reference to the node associated with the given handle.
     // Exists to accommodate situations where client code avoids using the pipeline framework.
-    MessageSink& get_node_ref(NodeHandle node_handle) { return *m_nodes.at(node_handle); }
+    template <typename NodeType>
+    NodeType& get_node_ref(NodeHandle node_handle) {
+        // .at() will throw if the index is bad.
+        // dynamic_cast<&> will throw if this isn't the right type.
+        return dynamic_cast<NodeType&>(*m_nodes.at(node_handle));
+    }
 
 private:
     // Constructor is private to ensure instances of this class are created

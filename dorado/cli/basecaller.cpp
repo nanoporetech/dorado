@@ -10,7 +10,6 @@
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
-#include "dorado_version.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
@@ -29,32 +28,22 @@
 #include "read_pipeline/ResumeLoader.h"
 #include "read_pipeline/TrimmerNode.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
-#include "utils/dev_utils.h"
 #include "utils/fs_utils.h"
+#include "utils/log_utils.h"
 #include "utils/modbase_parameters.h"
+#include "utils/parameters.h"
+#include "utils/stats.h"
 #include "utils/string_utils.h"
+#include "utils/sys_stats.h"
 
 #include <argparse/argparse.hpp>
 #include <cxxpool.h>
-
-#include <stdexcept>
-#include <string>
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "torch_utils/torch_utils.h"
-#include "utils/fs_utils.h"
-#include "utils/log_utils.h"
-#include "utils/parameters.h"
-#include "utils/stats.h"
-#include "utils/sys_stats.h"
-#include "utils/tty_utils.h"
-
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/utils.h>
@@ -67,11 +56,16 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
+
 using dorado::utils::default_parameters;
-using dorado::utils::modbase::default_modbase_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
 using namespace dorado::models;
@@ -118,8 +112,6 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
 
     model_config.normalise_basecaller_params();
 }
-
-}  // namespace
 
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
@@ -203,12 +195,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(std::string{})
                 .help("A comma separated list of modified base model paths.");
         parser.visible.add_argument("--modified-bases-threshold")
-                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>()
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(0)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
@@ -282,6 +272,39 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     cli::add_internal_arguments(parser);
 }
 
+utils::modbase::ModBaseParams validate_modbase_params(
+        const std::vector<std::filesystem::path>& paths,
+        utils::arg_parse::ArgParser& parser) {
+    // Convert path to params.
+    auto params = utils::modbase::get_modbase_params(paths);
+
+    // Allow user to override batchsize.
+    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+        modbase_batchsize.has_value()) {
+        params.batchsize = *modbase_batchsize;
+    }
+
+    // Allow user to override threshold.
+    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+        methylation_threshold.has_value()) {
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
+        }
+        params.threshold = *methylation_threshold;
+    }
+
+    // Check that the paths are all valid.
+    for (const auto& mb_path : paths) {
+        if (!utils::modbase::is_modbase_model(mb_path)) {
+            throw std::runtime_error("Modified bases model not found in the model path at " +
+                                     std::filesystem::weakly_canonical(mb_path).string());
+        }
+    }
+
+    // All looks good.
+    return params;
+}
+
 void setup(const std::vector<std::string>& args,
            const basecall::CRFModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
@@ -290,7 +313,7 @@ void setup(const std::vector<std::string>& args,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           const utils::modbase::ModBaseParams modbase_params,
+           const utils::modbase::ModBaseParams& modbase_params,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
@@ -529,9 +552,9 @@ void setup(const std::vector<std::string>& args,
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_file->set_header(hdr.get());
@@ -632,6 +655,8 @@ void setup(const std::vector<std::string>& args,
     }
 }
 
+}  // namespace
+
 int basecaller(int argc, char* argv[]) {
     utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
@@ -676,12 +701,6 @@ int basecaller(int argc, char* argv[]) {
     const ModelComplex model_complex = parse_model_argument(model_arg);
 
     if (!mods_model_arguments_valid(model_complex, mod_bases, mod_bases_models)) {
-        return EXIT_FAILURE;
-    }
-
-    auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
-    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
-        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
         return EXIT_FAILURE;
     }
 
@@ -882,20 +901,10 @@ int basecaller(int argc, char* argv[]) {
     }
 
     // Force on running of batchsize benchmarks if emission is on
-    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
-                                    parser.hidden.get<bool>("--run-batchsize-benchmarks");
+    const bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
+                                          parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
-            mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
-            methylation_threshold);
-
-    for (const auto& mb_path : mods_model_paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
-            spdlog::error("Modified bases model not found in the model path at '{}'.",
-                          std::filesystem::weakly_canonical(mb_path).string());
-            return EXIT_FAILURE;
-        }
-    }
+    const auto modbase_params = validate_modbase_params(mods_model_paths, parser);
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,

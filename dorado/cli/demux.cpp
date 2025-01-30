@@ -322,8 +322,7 @@ int demuxer(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& demux_writer_ref =
-            dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
+    auto& demux_writer_ref = pipeline->get_node_ref<BarcodeDemuxerNode>(demux_writer);
     demux_writer_ref.set_header(header.get());
 
     // All progress reporting is in the post-processing part.

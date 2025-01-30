@@ -41,14 +41,14 @@ public:
     ModuleWrapper(torch::jit::Module&& jit_module) : m_module(std::move(jit_module)) {}
 
     // Currently assumes there is a single output tensor.
-    template <typename... T>
-    at::Tensor forward(const at::Tensor& input0, const T&... other_inputs) {
+    template <typename... Inputs>
+    at::Tensor forward(Inputs&&... inputs) {
         if (std::holds_alternative<torch::nn::ModuleHolder<torch::nn::AnyModule>>(m_module)) {
             auto& nn_module = std::get<torch::nn::ModuleHolder<torch::nn::AnyModule>>(m_module);
-            return nn_module->forward(input0, other_inputs...);
+            return nn_module->forward(std::forward<Inputs>(inputs)...);
         } else if (std::holds_alternative<torch::jit::Module>(m_module)) {
             auto& jit_module = std::get<torch::jit::Module>(m_module);
-            std::vector<torch::jit::IValue> jit_inputs{input0, other_inputs...};
+            std::vector<torch::jit::IValue> jit_inputs{std::forward<Inputs>(inputs)...};
             return jit_module.forward(jit_inputs).toTensor();
         } else {
             throw std::runtime_error("Forward called on invalid module");

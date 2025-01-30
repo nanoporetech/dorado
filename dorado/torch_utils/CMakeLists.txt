@@ -58,6 +58,7 @@ target_link_libraries(dorado_torch_utils
         spdlog::spdlog
     PRIVATE
         dorado_compat
+        dorado_utils
         minimap2
         htslib
         toml11::toml11

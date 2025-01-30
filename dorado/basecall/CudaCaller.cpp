@@ -154,7 +154,7 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
     int64_t T_in = m_batch_dims[batch_dims_idx].T_in;
     int64_t T_out = m_batch_dims[batch_dims_idx].T_out;
     int64_t C_in = m_num_input_features;
-#ifdef DORADO_TX2
+#if DORADO_TX2
     // The libtorch version on TX2 doesn't support `Tensor::view()` with a dtype of a different
     // size, so we use separate tensors here.
     auto input = torch::empty({N, C_in, T_in}, opts.dtype(m_options.dtype()));
@@ -240,7 +240,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     // First set of batch dimensions.
     std::set<int> T_outs({calculate_T_out(requested_chunk_size)});
-#ifdef DORADO_TX2
+#if DORADO_TX2
     requested_batch_size = (requested_batch_size == 0) ? 256 : requested_batch_size;
     requested_batch_size = std::min(256, utils::pad_to(requested_batch_size, batch_granularity));
     int T_out = *(T_outs.begin());

@@ -70,7 +70,7 @@ DEFINE_TEST("get_nvidia_driver_version does not have value on Apple") {
 }
 #endif  // __APPLE__
 
-#if defined(DORADO_TX2)
+#if DORADO_TX2
 DEFINE_TEST("get_nvidia_driver_version always has a value on Jetson") {
     auto driver_version = get_nvidia_driver_version();
     CATCH_CHECK(driver_version.has_value());

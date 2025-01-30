@@ -26,7 +26,7 @@ dorado::NodeHandle insert_modbase_node(dorado::PipelineDescriptor& pipeline_desc
     if (modbase_runners.empty()) {
         throw std::runtime_error("No modbase runners to insert");
     }
-    const auto& takes_chunked_inputs = modbase_runners.at(0)->takes_chunk_inputs();
+    const bool takes_chunked_inputs = modbase_runners.at(0)->takes_chunk_inputs();
     constexpr int kMaxReads = 1000;
     if (takes_chunked_inputs) {
         spdlog::trace("Using Modbase Chunk Caller");

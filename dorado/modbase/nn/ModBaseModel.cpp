@@ -18,7 +18,7 @@ using namespace torch::indexing;
 namespace {
 
 template <class Model>
-ModuleHolder<AnyModule> populate_model(Model& model,
+ModuleHolder<AnyModule> populate_model(Model&& model,
                                        const std::filesystem::path& path,
                                        const at::TensorOptions& options) {
     auto state_dict = model->load_weights(path);
@@ -27,8 +27,8 @@ ModuleHolder<AnyModule> populate_model(Model& model,
     model->to(options.device_opt().value());
     model->eval();
 
-    auto module = AnyModule(model);
-    auto holder = ModuleHolder<AnyModule>(module);
+    auto module = AnyModule(std::move(model));
+    auto holder = ModuleHolder<AnyModule>(std::move(module));
     return holder;
 }
 }  // namespace
@@ -279,16 +279,16 @@ dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config
     case ModelType::CONV_LSTM_V1: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, false,
                                               params.stride);
-        return populate_model(model, config.model_path, options);
+        return populate_model(std::move(model), config.model_path, options);
     }
     case ModelType::CONV_LSTM_V2: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
                                               params.stride);
-        return populate_model(model, config.model_path, options);
+        return populate_model(std::move(model), config.model_path, options);
     }
     case ModelType::CONV_V1: {
         auto model = nn::ModBaseConvModel(params.size, params.kmer_len, params.num_out);
-        return populate_model(model, config.model_path, options);
+        return populate_model(std::move(model), config.model_path, options);
     }
     default:
         throw std::runtime_error("Unknown modbase model type in config file.");
