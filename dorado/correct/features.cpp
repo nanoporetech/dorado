@@ -3,7 +3,7 @@
 #include "conversions.h"
 #include "correct/types.h"
 #include "read_pipeline/messages.h"
-#include "utils/cigar.cpp"
+#include "utils/cigar.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -19,18 +19,21 @@
 #define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
 #endif
 
-const int TOP_K = 30;
+constexpr int32_t TOP_K = 30;
+constexpr int32_t MAX_INDEL_LEN = 30;
 
 namespace dorado::correction {
 
 namespace {
 
-bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
+bool overlap_has_long_indel(const OverlapWindow& overlap,
+                            const CorrectionAlignments& alignments,
+                            const int32_t max_indel_len) {
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
-    size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
+    const size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
     for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
-        if (cigar[i].len >= 30 &&
-            (cigar[i].op == CigarOpType::I || cigar[i].op == CigarOpType::D)) {
+        if ((static_cast<int32_t>(cigar[i].len) >= max_indel_len) &&
+            ((cigar[i].op == CigarOpType::I) || (cigar[i].op == CigarOpType::D))) {
             LOG_TRACE("filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
                       overlap.qstart, overlap.qend, cigar[i].len);
             return true;
@@ -95,25 +98,28 @@ void calculate_accuracy(OverlapWindow& overlap, const CorrectionAlignments& alig
 // target sequence. This is done by looking at all aligned queries at each position
 // and picking the longest insertion size.
 std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
-                                        const CorrectionAlignments& alignments,
-                                        int tstart,
-                                        int win_len) {
+                                        const CorrectionAlignments& alignments) {
+    if (std::empty(overlaps)) {
+        return {};
+    }
+    const int32_t win_len = overlaps.front().win_tend - overlaps.front().win_tstart;
     std::vector<int> max_ins(win_len, 0);
     for (const auto& overlap : overlaps) {
-        auto tpos = overlap.tstart - tstart;
+        int32_t tpos = overlap.tstart - overlap.win_tstart;
 
         const auto& cigar = alignments.cigars[overlap.overlap_idx];
-        int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
+        const int32_t cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
 
-        for (int i = overlap.cigar_start_idx;
-             i <= std::min(overlap.cigar_end_idx, int(cigar.size()) - 1); i++) {
-            CigarOpType op = cigar[i].op;
-            int len = cigar[i].len;
+        for (int32_t i = overlap.cigar_start_offset;
+             i <= std::min(overlap.cigar_end_idx, static_cast<int32_t>(std::size(cigar)) - 1);
+             i++) {
+            const CigarOpType op = cigar[i].op;
+            const int32_t len = cigar[i].len;
 
-            int l = -1;
-            if (op == CigarOpType::EQ || op == CigarOpType::X || op == CigarOpType::D) {
+            int32_t l = 0;
+            if ((op == CigarOpType::EQ) || (op == CigarOpType::X) || (op == CigarOpType::D)) {
                 l = len;
-            } else if (op == CigarOpType::I) {
+            } else if ((op == CigarOpType::I) && (tpos > 0)) {
                 max_ins[tpos - 1] = std::max(len, max_ins[tpos - 1]);
                 continue;
             }
@@ -394,7 +400,7 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
         // Filter overlaps with very large indels
         std::vector<OverlapWindow> filtered_overlaps;
         for (auto& ovlp : overlap_windows) {
-            if (!overlap_has_long_indel(ovlp, alignments)) {
+            if (!overlap_has_long_indel(ovlp, alignments, MAX_INDEL_LEN)) {
                 filtered_overlaps.push_back(std::move(ovlp));
             }
         }
