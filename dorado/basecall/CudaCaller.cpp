@@ -25,7 +25,46 @@ using namespace std::chrono_literals;
 
 namespace dorado::basecall {
 
-static constexpr float GB = 1.0e9f;
+namespace {
+
+constexpr float GB = 1.0e9f;
+
+void emit_benchmark_file(const std::string &gpu_name,
+                         const std::string &model,
+                         const std::vector<std::pair<float, int>> &times_and_batch_sizes,
+                         const std::vector<std::pair<float, int>> &all_times_and_batch_sizes) {
+    // Prevent multiple devices outputting at once.
+    static std::mutex batch_output_mutex;
+    std::lock_guard<std::mutex> batch_output_lock(batch_output_mutex);
+
+    std::string cpp_filename = std::string("chunk_benchmarks__")
+                                       .append(gpu_name)
+                                       .append("__")
+                                       .append(model)
+                                       .append(".txt");
+    std::ofstream cpp_bench_file(cpp_filename);
+    // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
+    cpp_bench_file << "    chunk_benchmarks[{\"" << gpu_name << "\", \"" << model << "\"}] = {\n";
+    for (const auto &[batchsize, time] : times_and_batch_sizes) {
+        cpp_bench_file << "        { " << time << ", " << batchsize << "f },\n";
+    }
+    cpp_bench_file << "    };\n";
+
+    // Report out the batch sizes as a CSV file, for visualisation
+    // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
+    std::string csv_filename = std::string("chunk_benchmarks__")
+                                       .append(gpu_name)
+                                       .append("__")
+                                       .append(model)
+                                       .append(".csv");
+    std::ofstream csv_bench_file(csv_filename);
+    csv_bench_file << "batch_size,time_per_chunk\n";
+    for (const auto &[batchsize, time] : all_times_and_batch_sizes) {
+        csv_bench_file << time << "," << batchsize << "\n";
+    }
+}
+
+}  // namespace
 
 // If 5 minutes has passed since the first chunk was added to a batch, we will
 // dispatch the batch even if it is not full. This is to prevent issues with
@@ -421,36 +460,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     }
 
     if (params.emit_batchsize_benchmarks) {
-        static std::mutex batch_output_mutex;
-        std::unique_lock<std::mutex> batch_output_lock(
-                batch_output_mutex);  // Prevent multiple devices outputting at once.
-
-        // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
-        std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + model_name + "\"}] = {\n";
-        for (const auto &batch_time : times_and_batch_sizes) {
-            cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
-                                    std::to_string(batch_time.first) + "f },\n";
-        }
-        cpp_autobatch_output += "    };\n";
-
-        std::string cpp_filename =
-                std::string("chunk_benchmarks__") + prop->name + "__" + model_name + ".txt";
-        std::ofstream cpp_bench_file(cpp_filename);
-        cpp_bench_file << cpp_autobatch_output;
-
-        // Report out the batch sizes as a CSV file, for visualisation
-        std::string csv_autobatch_output = "batch_size,time_per_chunk\n";
-        // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
-        for (const auto &batch_time : all_times_and_batch_sizes) {
-            csv_autobatch_output += std::to_string(batch_time.second) + "," +
-                                    std::to_string(batch_time.first) + "\n";
-        }
-
-        std::string csv_filename =
-                std::string("chunk_benchmarks__") + prop->name + "__" + model_name + ".csv";
-        std::ofstream csv_bench_file(csv_filename);
-        csv_bench_file << csv_autobatch_output;
+        emit_benchmark_file(prop->name, model_name, times_and_batch_sizes,
+                            all_times_and_batch_sizes);
     }
 
     if (!chunk_benchmarks) {
