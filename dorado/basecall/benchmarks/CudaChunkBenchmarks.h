@@ -13,6 +13,9 @@ namespace dorado::basecall {
 class CudaChunkBenchmarks final {
 private:
     CudaChunkBenchmarks();
+    CudaChunkBenchmarks(const CudaChunkBenchmarks&) = delete;
+    CudaChunkBenchmarks& operator=(const CudaChunkBenchmarks&) = delete;
+
     using ChunkTimings = std::unordered_map<int, float>;
     using ModelName = std::string;
     using GPUName = std::string;
