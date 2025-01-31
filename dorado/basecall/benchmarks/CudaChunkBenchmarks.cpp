@@ -1,11 +1,11 @@
 #include "CudaChunkBenchmarks.h"
 
-#include "benchmarks/NVIDIA_A100_80GB_PCIe.h"
-#include "benchmarks/NVIDIA_H100_PCIe.h"
-#include "benchmarks/NVIDIA_RTX_A6000.h"
-#include "benchmarks/Orin.h"
-#include "benchmarks/Quadro_GV100.h"
-#include "benchmarks/Tesla_V100-PCIE-16GB.h"
+#include "NVIDIA_A100_80GB_PCIe.h"
+#include "NVIDIA_H100_PCIe.h"
+#include "NVIDIA_RTX_A6000.h"
+#include "Orin.h"
+#include "Quadro_GV100.h"
+#include "Tesla_V100-PCIE-16GB.h"
 
 #include <filesystem>
 

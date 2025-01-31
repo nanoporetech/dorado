@@ -1,6 +1,6 @@
 #include "CudaCaller.h"
 
-#include "CudaChunkBenchmarks.h"
+#include "benchmarks/CudaChunkBenchmarks.h"
 #include "crf_utils.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
