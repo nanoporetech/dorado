@@ -1,6 +1,5 @@
 #include "cli/cli.h"
 #include "dorado_version.h"
-#include "utils/PostCondition.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -10,7 +9,6 @@
 #include <spdlog/spdlog.h>
 #include <torch/version.h>
 
-#include <functional>
 #include <iostream>
 #include <map>
 #include <string>
@@ -38,7 +36,7 @@ int dlclose(void*) { return 0; };
 }
 #endif  // __linux__
 
-using entry_ptr = std::function<int(int, char**)>;
+using entry_ptr = int (*)(int, char**);
 
 namespace {
 
