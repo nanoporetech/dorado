@@ -8,6 +8,7 @@
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
+#include <torch/version.h>
 
 #include <functional>
 #include <iostream>
@@ -101,7 +102,7 @@ int main(int argc, char* argv[]) {
 #else
         std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
 #endif
-        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << '\n';
+        std::cerr << "libtorch: " << TORCH_VERSION << '\n';
         std::cerr << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-h" || subcommand == "--help") {
