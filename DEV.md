@@ -64,17 +64,10 @@ $ cmake -DDORADO_LIBTORCH_DIR=/usr/local/libtorch -S . -B cmake-build
 
 ### OSX dependencies
 
-On OSX, version 2.69 of autoconf is required:
+On OSX, the following packages need to be available:
 
 ```bash
-$ brew uninstall autoconf # not necessary if autoconf is not already installed
-$ brew install autoconf@2.69
-$ brew link autoconf@2.69
-```
-
-The following other packages need to be available as well
-```bash
-$ brew install openssl
+$ brew install autoconf openssl
 ```
 
 ### Clone and build
