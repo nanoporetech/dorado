@@ -43,8 +43,7 @@ for model_name in \
 done
 
 # Extract the GPU name from the benchmark filenames
-benchmark_filenames="chunk_benchmarks__*"
-benchmark_files=( $benchmark_filenames )
+benchmark_files=(chunk_benchmarks__*)
 gpu_name="${benchmark_files[0]}"
 # strip off beginning "chunk_benchmarks__"
 gpu_name=${gpu_name#*__}
