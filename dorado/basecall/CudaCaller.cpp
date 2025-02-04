@@ -404,12 +404,13 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     const std::string model_name = m_config.model_path.filename().string();
 
     // See if we can find cached values for the chunk timings for this run condition
-    const auto &chunk_benchmarks =
+    const auto chunk_benchmarks =
             CudaChunkBenchmarks::instance().get_chunk_timings(prop->name, model_name);
-    if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
-        spdlog::info(std::string("Calculating optimized batch size for GPU \"") + prop->name +
-                     "\" and model " + model_name +
-                     ". Full benchmarking will run for this device, which may take some time.");
+    if (!chunk_benchmarks || params.run_batchsize_benchmarks) {
+        spdlog::info(
+                "Calculating optimized batch size for GPU \"{}\" and model {}. Full benchmarking "
+                "will run for this device, which may take some time.",
+                prop->name, model_name);
     }
 
     for (int batch_size = batch_granularity; batch_size <= max_batch_size;
