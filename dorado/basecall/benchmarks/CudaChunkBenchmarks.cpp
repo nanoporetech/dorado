@@ -20,7 +20,7 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings>
 CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
-                                                const std::string& model_name) const {
+                                                const ModelName& model_name) const {
     // Try looking up the specified gpu name directly
     auto iter = m_chunk_benchmarks.find({gpu_name, model_name});
     if (iter != m_chunk_benchmarks.cend()) {
@@ -46,13 +46,13 @@ CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         const GPUName& gpu_name,
-        const std::string& model_name) const {
+        const ModelName& model_name) const {
     std::lock_guard guard(m_chunk_benchmarks_mutex);
     return get_chunk_timings_internal(gpu_name, model_name);
 }
 
 bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
-                                            const std::string& model_name,
+                                            const ModelName& model_name,
                                             const std::vector<std::pair<float, int>>& timings) {
     std::lock_guard guard(m_chunk_benchmarks_mutex);
 

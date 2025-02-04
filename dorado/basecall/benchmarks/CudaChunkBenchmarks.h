@@ -17,9 +17,8 @@ public:
     using GPUName = std::string;
 
     // Must be called with m_chunk_benchmarks_mutex already locked.
-    std::optional<const ChunkTimings> get_chunk_timings_internal(
-            const GPUName& gpu_name,
-            const std::string& model_name) const;
+    std::optional<const ChunkTimings> get_chunk_timings_internal(const GPUName& gpu_name,
+                                                                 const ModelName& model_name) const;
 
 public:
     static CudaChunkBenchmarks& instance() {
@@ -28,10 +27,10 @@ public:
     }
 
     std::optional<const ChunkTimings> get_chunk_timings(const GPUName& gpu_name,
-                                                        const std::string& model_name) const;
+                                                        const ModelName& model_name) const;
 
     bool add_chunk_timings(const GPUName& gpu_name,
-                           const std::string& model_name,
+                           const ModelName& model_name,
                            const std::vector<std::pair<float, int>>& timings);
 
 private:
