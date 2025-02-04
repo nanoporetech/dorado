@@ -19,8 +19,9 @@
 
 namespace {
 
-const int ADAPTER_TRIM_LENGTH = 75;
-const int PRIMER_TRIM_LENGTH = 150;
+constexpr int ADAPTER_TRIM_LENGTH = 75;
+constexpr int PRIMER_TRIM_LENGTH = 150;
+constexpr float UMI_SCORE_THRESHOLD = 0.8f;
 
 // Create edlib configuration for detecting adapters and primers.
 EdlibAlignConfig init_edlib_config_for_adapters() {
@@ -32,6 +33,17 @@ EdlibAlignConfig init_edlib_config_for_adapters() {
             {'N', 'A'}, {'N', 'T'}, {'N', 'C'}, {'N', 'G'}};
     placement_config.additionalEqualities = additionalEqualities;
     placement_config.additionalEqualitiesLength = 4;
+    return placement_config;
+}
+
+// Create edlib configuration for detecting umi tags.
+EdlibAlignConfig init_edlib_config_for_umi_tags() {
+    EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
+    placement_config.mode = EDLIB_MODE_HW;
+    placement_config.task = EDLIB_TASK_LOC;
+    static const EdlibEqualityPair additionalEqualities[4] = {{'V', 'A'}, {'V', 'C'}, {'V', 'G'}};
+    placement_config.additionalEqualities = additionalEqualities;
+    placement_config.additionalEqualitiesLength = 3;
     return placement_config;
 }
 
@@ -50,21 +62,19 @@ dorado::SingleEndResult copy_results(const EdlibAlignResult& source,
     return dest;
 }
 
-void align(std::string_view q,
-           std::string_view t,
-           const std::string& name,
-           std::vector<dorado::SingleEndResult>& results,
-           const int rear_start,
-           const EdlibAlignConfig& config) {
+dorado::SingleEndResult align(std::string_view q,
+                              std::string_view t,
+                              const int rear_start,
+                              const EdlibAlignConfig& config) {
     auto result = edlibAlign(q.data(), int(q.length()), t.data(), int(t.length()), config);
-    results.emplace_back(copy_results(result, name, q.length()));
+    dorado::SingleEndResult se_result(copy_results(result, "", q.length()));
 
     if (rear_start >= 0) {
-        results.back().position.first += rear_start;
-        results.back().position.second += rear_start;
+        se_result.position.first += rear_start;
+        se_result.position.second += rear_start;
     }
-
     edlibFreeAlignResult(result);
+    return se_result;
 }
 
 dorado::SingleEndResult get_best_result(const std::vector<dorado::SingleEndResult>& results) {
@@ -124,6 +134,21 @@ AdapterScoreResult AdapterDetector::find_primers(const std::string& seq,
     return detect(seq, primer_sequences, PRIMER);
 }
 
+SingleEndResult AdapterDetector::find_umi_tag(const std::string& seq) {
+    // This function assumes that you have reverse-complemented the sequence
+    // if you are looking for the UMI tag at the end of the read. The passed
+    // sequence should be just the bit of the read you expect to find the
+    // tag in.
+    EdlibAlignConfig placement_config = init_edlib_config_for_umi_tags();
+    auto result = align(adapter_primer_kits::umi_search_pattern, seq, -1, placement_config);
+    if (result.score > 0.f) {
+        auto umi_start = result.position.first;
+        auto umi_len = result.position.second - umi_start + 1;
+        result.name = seq.substr(umi_start, umi_len);
+    }
+    return result;
+}
+
 std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences(
         const std::string& kit_name) {
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -180,18 +205,22 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         spdlog::trace("Checking adapter/primer {}", name);
 
         if (!query_seq_front.empty()) {
-            align(query_seq_front, read_front, name + "_FRONT", front_results, IS_FRONT,
-                  placement_config);
+            auto result = align(query_seq_front, read_front, IS_FRONT, placement_config);
+            result.name = name + "_FRONT";
+            front_results.emplace_back(std::move(result));
         }
         if (!query_seq_rear.empty()) {
-            align(query_seq_rear, read_rear, name + "_REAR", rear_results, rear_start,
-                  placement_config);
+            auto result = align(query_seq_rear, read_rear, rear_start, placement_config);
+            result.name = name + "_REAR";
+            rear_results.emplace_back(std::move(result));
         }
     }
     return {get_best_result(front_results), get_best_result(rear_results)};
 }
 
-PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult& result) {
+PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult& result,
+                                                       std::pair<int, int>& trim_interval,
+                                                       const std::string& sequence) {
     PrimerClassification classification;
     auto strip_suffix = [](const std::string& name, const std::string& suffix) {
         auto k = name.find(suffix);
@@ -226,7 +255,54 @@ PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult&
         classification.primer_name = rear_name;
         classification.orientation = get_dir(rear_name);
     }
+    // For the PCS110 primer, we need to check for a UMI tag after the SSP primer.
+    if (classification.primer_name.substr(0, 6) == "PCS110") {
+        check_for_umi_tags(result, classification, sequence, trim_interval);
+    }
     return classification;
+}
+
+void AdapterDetector::check_for_umi_tags(const AdapterScoreResult& primer_results,
+                                         PrimerClassification& classification,
+                                         const std::string& sequence,
+                                         std::pair<int, int>& trim_interval) {
+    std::string search_window;
+    if (classification.orientation == StrandOrientation::FORWARD &&
+        primer_results.front.name != UNCLASSIFIED) {
+        auto a = trim_interval.first - adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP;
+        auto b = a + adapter_primer_kits::UMI_WINDOW_LENGTH;
+        if (a >= 0 && b < int(sequence.size())) {
+            search_window = sequence.substr(a, adapter_primer_kits::UMI_WINDOW_LENGTH);
+        }
+    } else if (classification.orientation == StrandOrientation::REVERSE &&
+               primer_results.rear.name != UNCLASSIFIED) {
+        // We will search for the UMI pattern within the RC of the search window.
+        auto b = trim_interval.second + adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP;
+        auto a = b - adapter_primer_kits::UMI_WINDOW_LENGTH;
+        if (a >= 0 && b < int(sequence.size())) {
+            search_window = utils::reverse_complement(
+                    sequence.substr(a, adapter_primer_kits::UMI_WINDOW_LENGTH));
+        }
+    }
+    if (search_window.empty()) {
+        return;
+    }
+    auto result = find_umi_tag(search_window);
+    if (result.name.empty() || result.score < UMI_SCORE_THRESHOLD) {
+        return;
+    }
+    // Regardless of strand orientation, we return the UMI sequence as if it were a forward read.
+    classification.umi_tag_sequence = result.name;
+    // We need to update the trim interval so that the UMI sequence is trimmed.
+    if (classification.orientation == StrandOrientation::FORWARD) {
+        auto new_pos = trim_interval.first - adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP +
+                       result.position.second + 1;
+        trim_interval.first = new_pos;
+    } else if (classification.orientation == StrandOrientation::REVERSE) {
+        auto new_pos = trim_interval.second + adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP -
+                       result.position.second - 1;
+        trim_interval.second = new_pos;
+    }
 }
 
 }  // namespace demux

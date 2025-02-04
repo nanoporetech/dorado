@@ -109,9 +109,11 @@ Dorado can detect and remove any adapter and/or primer sequences from the beginn
 
 #### In-line with basecalling
 
-By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence. Additionally, dorado will attempt to use the detected primers to determine whether the DNA went through the pore in the 5'-to-3' direction, or the 3'-to-5' direction. If this can be inferred, then the `TS:A` tag will be included in the BAM output for the read, with a value of `+` or `-` respectively. If it cannot be inferred, then this tag will not be included in the output. This is primarily useful for cDNA protocols, as most other current sequencing protocols do not include primers.
+By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence. Additionally, dorado will attempt to use any detected primers to determine whether the DNA went through the pore in the 5'-to-3' direction, or the 3'-to-5' direction. If this can be inferred, then the `TS:A` tag will be included in the BAM output for the read, with a value of `+` or `-` respectively. If it cannot be inferred, then this tag will not be included in the output.
 
-This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences. Note that if primer trimming is not enabled, then no attempt will be made to detect primers, or to classify the orientation of the strand based on them.
+In the specific cases of the SQK-PCS114 and SQK-PCB sequencing kits, if a UMI tag is present, it will also be detected and trimmed. Additionally, the UMI tag, if found, will be included in the BAM output for the read using the `RX:Z` tag.
+
+This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences. Note that if primer trimming is not enabled, then no attempt will be made to detect primers, or to classify the orientation of the strand based on them, or to detect UMI tags.
 
 The `--trim` option takes as its argument one of the following values:
 

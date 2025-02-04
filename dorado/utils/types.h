@@ -137,6 +137,7 @@ inline char to_char(const StrandOrientation orientation) {
 
 struct PrimerClassification {
     std::string primer_name = UNCLASSIFIED;
+    std::string umi_tag_sequence{};
     StrandOrientation orientation = StrandOrientation::UNKNOWN;
 };
 

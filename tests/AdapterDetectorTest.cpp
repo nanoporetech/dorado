@@ -24,7 +24,8 @@
 #define TEST_GROUP "[adapter_detect]"
 
 namespace {
-const std::string TEST_KIT = "SQK-LSK114";
+const std::string TEST_KIT1 = "SQK-LSK114";
+const std::string TEST_KIT2 = "SQK-PCS114";
 
 using Query = dorado::demux::AdapterDetector::Query;
 
@@ -40,12 +41,15 @@ namespace fs = std::filesystem;
 using namespace dorado;
 
 CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
-    dorado::AdapterScoreResult res;
+    demux::AdapterDetector detector(std::nullopt);
+    AdapterScoreResult res;
+    std::string dummy_sequence{};
+    std::pair<int, int> dummy_interval{};
 
     // Consistent 5' primer at front and 3' primer at rear
     res.front.name = "test_FWD_FRONT";
     res.rear.name = "test_FWD_REAR";
-    auto classification = demux::AdapterDetector::classify_primers(res);
+    auto classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_FWD");
     CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
     CATCH_CHECK(to_char(classification.orientation) == '+');
@@ -53,7 +57,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Only 5' primer at front
     res.front.name = "test_FWD_FRONT";
     res.rear.name = UNCLASSIFIED;
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_FWD");
     CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
     CATCH_CHECK(to_char(classification.orientation) == '+');
@@ -61,7 +65,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Only 3' primer at rear
     res.front.name = UNCLASSIFIED;
     res.rear.name = "test_FWD_REAR";
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_FWD");
     CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
     CATCH_CHECK(to_char(classification.orientation) == '+');
@@ -69,7 +73,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Consistent 3' primer at front and 5' primer at rear
     res.front.name = "test_REV_FRONT";
     res.rear.name = "test_REV_REAR";
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_REV");
     CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
     CATCH_CHECK(to_char(classification.orientation) == '-');
@@ -77,7 +81,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Only 3' primer at front
     res.front.name = "test_REV_FRONT";
     res.rear.name = UNCLASSIFIED;
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_REV");
     CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
     CATCH_CHECK(to_char(classification.orientation) == '-');
@@ -85,7 +89,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Only 5' primer at rear
     res.front.name = UNCLASSIFIED;
     res.rear.name = "test_REV_REAR";
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == "test_REV");
     CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
     CATCH_CHECK(to_char(classification.orientation) == '-');
@@ -93,7 +97,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // No primers found at either end
     res.front.name = UNCLASSIFIED;
     res.rear.name = UNCLASSIFIED;
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == UNCLASSIFIED);
     CATCH_CHECK(classification.orientation == StrandOrientation::UNKNOWN);
     CATCH_CHECK(to_char(classification.orientation) == '?');
@@ -101,7 +105,7 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // Inconsistent 5' primer at front and 3' primer at rear
     res.front.name = "test1_FWD_FRONT";
     res.rear.name = "test2_FWD_REAR";
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == UNCLASSIFIED);
     CATCH_CHECK(classification.orientation == StrandOrientation::UNKNOWN);
     CATCH_CHECK(to_char(classification.orientation) == '?');
@@ -109,17 +113,59 @@ CATCH_TEST_CASE("AdapterDetector: test classification", TEST_GROUP) {
     // 5' primer found at both front and rear
     res.front.name = "test1_FWD_FRONT";
     res.rear.name = "test1_REV_REAR";
-    classification = demux::AdapterDetector::classify_primers(res);
+    classification = detector.classify_primers(res, dummy_interval, dummy_sequence);
     CATCH_CHECK(classification.primer_name == UNCLASSIFIED);
     CATCH_CHECK(classification.orientation == StrandOrientation::UNKNOWN);
     CATCH_CHECK(to_char(classification.orientation) == '?');
+}
+
+CATCH_TEST_CASE("AdapterDetector: test UMI detection", TEST_GROUP) {
+    // Create new read that is [PCS110_SSP_FWD] - [UMI_TAG] - 200 As - [PCS110_VNP_REV].
+    demux::AdapterDetector detector(std::nullopt);
+    const std::string nonbc_seq = std::string(200, 'A');
+    const auto& primers = detector.get_primer_sequences(TEST_KIT2);
+    const auto& front_primer = primers[0].front_sequence;
+    const auto& rear_primer = primers[0].rear_sequence;
+    const std::string umi_partial = "AAAATTCCCCTTGGGGTTACGATTT";
+    const auto sequence = front_primer + umi_partial + nonbc_seq + rear_primer;
+    const std::string umi_full = "TTT" + umi_partial;
+    auto trim_start = int(front_primer.size());
+    auto trim_end = int(front_primer.size() + umi_partial.size()) + 200;
+    auto trim_interval = std::make_pair(trim_start, trim_end);
+    AdapterScoreResult res;
+    res.front.name = "PCS110_FWD_FRONT";
+    res.front.position = {0, trim_start - 1};
+    res.front.score = 1.0f;
+    res.rear.name = "PCS110_FWD_REAR";
+    res.rear.position = {trim_end, int(sequence.size() - 1)};
+    res.rear.score = 1.0f;
+    auto classification = detector.classify_primers(res, trim_interval, sequence);
+    CATCH_CHECK(to_char(classification.orientation) == '+');
+    CATCH_CHECK(trim_interval.first == trim_start + int(umi_partial.size()));
+    CATCH_CHECK(trim_interval.second == trim_end);
+    CATCH_CHECK(classification.umi_tag_sequence == umi_full);
+
+    // Do the same for a reverse strand.
+    auto rev_sequence = utils::reverse_complement(sequence);
+    trim_start = int(rear_primer.size());
+    trim_end = int(rear_primer.size() + umi_partial.size()) + 200;
+    trim_interval = std::make_pair(trim_start, trim_end);
+    res.front.name = "PCS110_REV_FRONT";
+    res.front.position = {0, trim_start - 1};
+    res.rear.name = "PCS110_REV_REAR";
+    res.rear.position = {trim_end, int(rev_sequence.size() - 1)};
+    classification = detector.classify_primers(res, trim_interval, rev_sequence);
+    CATCH_CHECK(to_char(classification.orientation) == '-');
+    CATCH_CHECK(trim_interval.first == trim_start);
+    CATCH_CHECK(trim_interval.second == trim_end - int(umi_partial.size()));
+    CATCH_CHECK(classification.umi_tag_sequence == umi_full);
 }
 
 CATCH_TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::AdapterDetector detector(std::nullopt);
-    const auto& adapters = detector.get_adapter_sequences(TEST_KIT);
+    const auto& adapters = detector.get_adapter_sequences(TEST_KIT1);
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
     HtsReader reader(test_file.string(), std::nullopt);
@@ -129,7 +175,7 @@ CATCH_TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
         // First put the front adapter only at the beginning, with 6 bases in front of it.
         const auto& adapter = adapters[i];
         auto new_sequence1 = "ACGTAC" + adapter.front_sequence + seq;
-        auto res1 = detector.find_adapters(new_sequence1, TEST_KIT);
+        auto res1 = detector.find_adapters(new_sequence1, TEST_KIT1);
         CATCH_CHECK(res1.front.name == adapter.name + "_FRONT");
         CATCH_CHECK(res1.front.position ==
                     std::make_pair(6, int(adapter.front_sequence.length()) + 5));
@@ -138,7 +184,7 @@ CATCH_TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
 
         // Now put the rear adapter at the end, with 3 bases after it.
         auto new_sequence2 = seq + adapter.rear_sequence + "TTT";
-        auto res2 = detector.find_adapters(new_sequence2, TEST_KIT);
+        auto res2 = detector.find_adapters(new_sequence2, TEST_KIT1);
         CATCH_CHECK(res2.front.score < 0.7f);
         CATCH_CHECK(res2.rear.name == adapter.name + "_REAR");
         CATCH_CHECK(res2.rear.position ==
@@ -148,7 +194,7 @@ CATCH_TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
 
         // Now put them both in.
         auto new_sequence3 = "TGCA" + adapter.front_sequence + seq + adapter.rear_sequence + "GTA";
-        auto res3 = detector.find_adapters(new_sequence3, TEST_KIT);
+        auto res3 = detector.find_adapters(new_sequence3, TEST_KIT1);
         CATCH_CHECK(res3.front.name == adapter.name + "_FRONT");
         CATCH_CHECK(res3.front.position ==
                     std::make_pair(4, int(adapter.front_sequence.length()) + 3));
@@ -167,7 +213,7 @@ CATCH_TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::AdapterDetector detector(std::nullopt);
-    auto primers = detector.get_primer_sequences(TEST_KIT);
+    auto primers = detector.get_primer_sequences(TEST_KIT1);
     sort_queries(primers);
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
@@ -178,7 +224,7 @@ CATCH_TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     for (size_t i = 0; i < primers.size(); ++i) {
         const auto& primer = primers[i];
         auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
-        auto res = detector.find_primers(new_sequence1, TEST_KIT);
+        auto res = detector.find_primers(new_sequence1, TEST_KIT1);
         CATCH_CHECK(res.front.name == primer.name + "_FRONT");
         CATCH_CHECK(res.front.position ==
                     std::make_pair(6, int(primer.front_sequence.length()) + 5));
@@ -190,7 +236,8 @@ CATCH_TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
                                        primer.rear_sequence.length()) +
                                            5));
         CATCH_CHECK(res.rear.score == 1.0f);
-        auto classification = demux::AdapterDetector::classify_primers(res);
+        std::pair<int, int> dummy_interval{};
+        auto classification = detector.classify_primers(res, dummy_interval, seq);
         CATCH_CHECK(classification.primer_name == primer.name);
         StrandOrientation expected_orientation =
                 (i == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
@@ -247,7 +294,8 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_G
                                        primer.rear_sequence.length()) +
                                            5));
         CATCH_CHECK(res.rear.score == 1.0f);
-        auto classification = demux::AdapterDetector::classify_primers(res);
+        std::pair<int, int> dummy_interval{};
+        auto classification = detector.classify_primers(res, dummy_interval, seq);
         CATCH_CHECK(classification.primer_name == primers[i].name);
         StrandOrientation expected_orientation =
                 (i == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
@@ -302,7 +350,8 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
                                        primers[i].rear_sequence.length()) +
                                            5));
         CATCH_CHECK(res.rear.score == 1.0f);
-        auto classification = demux::AdapterDetector::classify_primers(res);
+        std::pair<int, int> dummy_interval{};
+        auto classification = detector.classify_primers(res, dummy_interval, seq);
         CATCH_CHECK(classification.primer_name == primers[i].name);
         StrandOrientation expected_orientation =
                 (i % 2 == 0) ? StrandOrientation::FORWARD : StrandOrientation::REVERSE;
@@ -316,9 +365,9 @@ void detect_and_trim(SimplexRead& read) {
     std::pair<int, int> adapter_trim_interval = {0, seqlen};
     std::pair<int, int> primer_trim_interval = {0, seqlen};
 
-    auto adapter_res = detector.find_adapters(read.read_common.seq, TEST_KIT);
+    auto adapter_res = detector.find_adapters(read.read_common.seq, TEST_KIT1);
     adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
-    auto primer_res = detector.find_primers(read.read_common.seq, TEST_KIT);
+    auto primer_res = detector.find_primers(read.read_common.seq, TEST_KIT1);
     primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
     std::pair<int, int> trim_interval = adapter_trim_interval;
     trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
@@ -342,22 +391,25 @@ CATCH_TEST_CASE(
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
-    // Create new read that is [LSK110_FWD] - [cDNA_VNP_FWD] - 200 As - [cDNA_VNP_REV] [LSK110_REV].
+    // Create new read that is [LSK110_FWD] - [PCS110_SSP_FWD] - [UMI_TAG] - 200 As - [PCS110_VNP_REV] [LSK110_REV].
+    const std::string umi_partial = "AAAATTCCCCTTGGGGTTACGATTT";
+    const std::string umi_full = "TTT" + umi_partial;
     auto read = std::make_unique<SimplexRead>();
     const std::string nonbc_seq = std::string(200, 'A');
     demux::AdapterDetector detector(std::nullopt);
-    const auto& adapters = detector.get_adapter_sequences(TEST_KIT);
-    const auto& primers = detector.get_primer_sequences(TEST_KIT);
+    const auto& adapters = detector.get_adapter_sequences(TEST_KIT2);
+    const auto& primers = detector.get_primer_sequences(TEST_KIT2);
     const auto& front_adapter = adapters[0].front_sequence;
     const auto& front_primer = primers[0].front_sequence;
     const auto& rear_adapter = adapters[0].rear_sequence;
     const auto& rear_primer = primers[0].rear_sequence;
     const int stride = 6;
-    read->read_common.seq = front_adapter + front_primer + nonbc_seq + rear_primer + rear_adapter;
+    read->read_common.seq =
+            front_adapter + front_primer + umi_partial + nonbc_seq + rear_primer + rear_adapter;
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.read_id = "read_id";
     read->read_common.model_stride = stride;
-    read->read_common.sequencing_kit = TEST_KIT;
+    read->read_common.sequencing_kit = TEST_KIT2;
 
     std::vector<uint8_t> moves;
     for (size_t i = 0; i < read->read_common.seq.length(); i++) {
@@ -390,7 +442,7 @@ CATCH_TEST_CASE(
             break;
         }
     }
-    auto flank_size = front_adapter.length() + front_primer.length();
+    auto flank_size = front_adapter.length() + front_primer.length() + umi_partial.length();
     read->read_common.base_mod_probs[flank_size * mod_alphabet.size()] = 20;         // A
     read->read_common.base_mod_probs[(flank_size * mod_alphabet.size()) + 1] = 235;  // 6mA
     read->read_common.num_trimmed_samples = 0;
@@ -406,7 +458,7 @@ CATCH_TEST_CASE(
     read->read_common.client_info = std::move(client_info);
 
     BamMessage bam_read{std::move(record_copy), read->read_common.client_info};
-    bam_read.sequencing_kit = TEST_KIT;
+    bam_read.sequencing_kit = TEST_KIT2;
 
     // Push a Symplex read type.
     pipeline->push_message(std::move(read));
@@ -443,10 +495,18 @@ CATCH_TEST_CASE(
             auto qual = dorado::utils::extract_quality(rec);
             CATCH_CHECK(qual.size() == seq.length());
 
-            CATCH_CHECK(bam_message.primer_classification.primer_name == "cDNA_FWD");
+            CATCH_CHECK(bam_message.primer_classification.primer_name == "PCS110_FWD");
             CATCH_CHECK(bam_message.primer_classification.orientation ==
                         StrandOrientation::FORWARD);
             CATCH_CHECK(bam_aux2A(bam_aux_get(rec, "TS")) == '+');
+            std::string expected_umi_tag = "RX:Z:" + umi_full;
+            kstring_t umi_buffer = KS_INITIALIZE;
+            CATCH_CHECK(bam_aux_get_str(rec, "RX", &umi_buffer) == 1);
+            CATCH_CHECK(umi_buffer.l == expected_umi_tag.size());
+            auto umi_tag = (umi_buffer.s != nullptr) ? std::string(umi_buffer.s, umi_buffer.l)
+                                                     : std::string{};
+            CATCH_CHECK(umi_tag == expected_umi_tag);
+            ks_free(&umi_buffer);
 
             auto [_, move_vals] = dorado::utils::extract_move_table(rec);
             CATCH_CHECK(move_vals == expected_move_vals);
@@ -468,9 +528,10 @@ CATCH_TEST_CASE(
 
             CATCH_CHECK(read_common.moves == expected_move_vals);
 
-            CATCH_CHECK(read_common.primer_classification.primer_name == "cDNA_FWD");
+            CATCH_CHECK(read_common.primer_classification.primer_name == "PCS110_FWD");
             CATCH_CHECK(read_common.primer_classification.orientation ==
                         StrandOrientation::FORWARD);
+            CATCH_CHECK(read_common.primer_classification.umi_tag_sequence == umi_full);
 
             // The mod probabilities table should now start mod at the first base.
             CATCH_CHECK(read_common.base_mod_probs.size() ==

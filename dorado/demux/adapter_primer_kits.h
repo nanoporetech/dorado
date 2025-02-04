@@ -82,11 +82,24 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
         },
         {
                 PC::PCS110,
-                {KC::SQK_PCS114, KC::SQK_PCS114_260},
+                {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
         },
         {PC::RAD,
          {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260, KC::SQK_RBK114_24,
           KC::SQK_RBK114_24_260, KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
+
+// The PCS114 and PCB114_24 kits can include UMI tag sequences.
+// When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning
+// of the read, or its RC will immediately precede the RC of the PCS110 SSP sequence near the end
+// of the read. Note that the Vs are wildcards, which could be any of "A", "C", or "G".
+const std::string umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+
+// This indicates how many bases before the end of the detected SSP primer the UMI search window
+// should begin. Note that the first 3 bases of the UMI tag are also the last 3 bases of the primer.
+constexpr int UMI_WINDOW_FRONT_OVERLAP = 6;
+
+// The total length of the window used to search for the UMI tag.
+constexpr int UMI_WINDOW_LENGTH = 40;
 
 class AdapterPrimerManager {
 public:
