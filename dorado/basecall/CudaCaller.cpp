@@ -471,13 +471,13 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
         // If we have just generated benchmarks that didn't previously exist, add them to the in-memory cache. This
         // will be of benefit to basecall servers which won't have to keep re-generating the benchmarks each time a
         // runner is created.
-        CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, m_config.model_path.string(),
+        CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, model_name,
                                                           times_and_batch_sizes);
 
         spdlog::debug(
                 "Adding chunk timings to internal cache for GPU {}, model {} ({} "
                 "entries)",
-                prop->name, m_config.model_path.string(), times_and_batch_sizes.size());
+                prop->name, model_name, times_and_batch_sizes.size());
     }
 
     // Find the first batch size that was under the threshold.

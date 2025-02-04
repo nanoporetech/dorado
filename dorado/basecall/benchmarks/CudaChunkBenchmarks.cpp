@@ -7,8 +7,6 @@
 #include "Quadro_GV100.h"
 #include "Tesla_V100-PCIE-16GB.h"
 
-#include <filesystem>
-
 namespace dorado::basecall {
 
 CudaChunkBenchmarks::CudaChunkBenchmarks() {
@@ -22,10 +20,7 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings>
 CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
-                                                const std::string& model_path) const {
-    // Strip any extra path elements from the model folder name
-    ModelName model_name = std::filesystem::path(model_path).filename().string();
-
+                                                const std::string& model_name) const {
     // Try looking up the specified gpu name directly
     auto iter = m_chunk_benchmarks.find({gpu_name, model_name});
     if (iter != m_chunk_benchmarks.cend()) {
@@ -51,18 +46,15 @@ CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
 
 std::optional<const CudaChunkBenchmarks::ChunkTimings> CudaChunkBenchmarks::get_chunk_timings(
         const GPUName& gpu_name,
-        const std::string& model_path) const {
+        const std::string& model_name) const {
     std::lock_guard guard(m_chunk_benchmarks_mutex);
-    return get_chunk_timings_internal(gpu_name, model_path);
+    return get_chunk_timings_internal(gpu_name, model_name);
 }
 
 bool CudaChunkBenchmarks::add_chunk_timings(const GPUName& gpu_name,
-                                            const std::string& model_path,
+                                            const std::string& model_name,
                                             const std::vector<std::pair<float, int>>& timings) {
     std::lock_guard guard(m_chunk_benchmarks_mutex);
-
-    // Strip any extra path elements from the model folder name
-    ModelName model_name = std::filesystem::path(model_path).filename().string();
 
     if (get_chunk_timings_internal(gpu_name, model_name)) {
         return false;
