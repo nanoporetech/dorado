@@ -41,17 +41,14 @@ EdlibAlignConfig init_edlib_config_for_umi_tags() {
     EdlibAlignConfig placement_config = edlibDefaultAlignConfig();
     placement_config.mode = EDLIB_MODE_HW;
     placement_config.task = EDLIB_TASK_LOC;
-    static const EdlibEqualityPair additionalEqualities[4] = {{'V', 'A'}, {'V', 'C'}, {'V', 'G'}};
+    static const EdlibEqualityPair additionalEqualities[3] = {{'V', 'A'}, {'V', 'C'}, {'V', 'G'}};
     placement_config.additionalEqualities = additionalEqualities;
     placement_config.additionalEqualitiesLength = 3;
     return placement_config;
 }
 
-dorado::SingleEndResult copy_results(const EdlibAlignResult& source,
-                                     const std::string& name,
-                                     size_t length) {
+dorado::SingleEndResult copy_results(const EdlibAlignResult& source, size_t length) {
     dorado::SingleEndResult dest{};
-    dest.name = name;
 
     if (source.status != EDLIB_STATUS_OK || !source.startLocations || !source.endLocations) {
         return dest;
@@ -67,7 +64,7 @@ dorado::SingleEndResult align(std::string_view q,
                               const int rear_start,
                               const EdlibAlignConfig& config) {
     auto result = edlibAlign(q.data(), int(q.length()), t.data(), int(t.length()), config);
-    dorado::SingleEndResult se_result(copy_results(result, "", q.length()));
+    dorado::SingleEndResult se_result(copy_results(result, q.length()));
 
     if (rear_start >= 0) {
         se_result.position.first += rear_start;
