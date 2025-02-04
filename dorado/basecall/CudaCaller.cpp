@@ -43,6 +43,7 @@ void emit_benchmark_file(const std::string &gpu_name,
                                        .append(model)
                                        .append(".txt");
     std::ofstream cpp_bench_file(cpp_filename);
+    assert(cpp_bench_file);
     // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
     cpp_bench_file << "    chunk_benchmarks[{\"" << gpu_name << "\", \"" << model << "\"}] = {\n";
     for (const auto &[batchsize, time] : times_and_batch_sizes) {
@@ -58,6 +59,7 @@ void emit_benchmark_file(const std::string &gpu_name,
                                        .append(model)
                                        .append(".csv");
     std::ofstream csv_bench_file(csv_filename);
+    assert(csv_bench_file);
     csv_bench_file << "batch_size,time_per_chunk\n";
     for (const auto &[batchsize, time] : all_times_and_batch_sizes) {
         csv_bench_file << time << "," << batchsize << "\n";
