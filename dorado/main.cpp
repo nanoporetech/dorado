@@ -36,6 +36,12 @@ int dlclose(void*) { return 0; };
 }
 #endif  // __linux__
 
+#if TORCH_VERSION_MAJOR < 2 && !defined(TORCH_VERSION)
+// One of our static builds doesn't define this, so do it ourself.
+#define TORCH_VERSION \
+    TORCH_VERSION_MAJOR << '.' << TORCH_VERSION_MINOR << '.' << TORCH_VERSION_PATCH
+#endif  // TORCH_VERSION_MAJOR < 2
+
 using entry_ptr = int (*)(int, char**);
 
 namespace {
