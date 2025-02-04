@@ -88,7 +88,7 @@ std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& r
     return trim_interval;
 }
 
-std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& res, int seqlen) {
+std::pair<int, int> Trimmer::determine_trim_interval(AdapterScoreResult& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval
     // defines which portion of the read to retain.
     std::pair<int, int> trim_interval = {0, seqlen};
@@ -97,15 +97,17 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
 
     if (res.front.name == UNCLASSIFIED || res.front.score < score_thres) {
         trim_interval.first = 0;
+        res.front.name = UNCLASSIFIED;
     } else {
         trim_interval.first = res.front.position.second + 1;
         spdlog::trace("Detected front interval adapter/primer - {}", res.front.name);
     }
     if (res.rear.name == UNCLASSIFIED || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
+        res.rear.name = UNCLASSIFIED;
     } else {
-        spdlog::trace("Detected rear interval adapter/primer - {}", res.rear.name);
         trim_interval.second = res.rear.position.first;
+        spdlog::trace("Detected rear interval adapter/primer - {}", res.rear.name);
     }
 
     if (trim_interval.second <= trim_interval.first) {
@@ -113,6 +115,8 @@ std::pair<int, int> Trimmer::determine_trim_interval(const AdapterScoreResult& r
         // algorithm determines the barcode interval to be the entire read.
         // In that case, skip trimming.
         trim_interval = {0, seqlen};
+        res.front.name = UNCLASSIFIED;
+        res.rear.name = UNCLASSIFIED;
     }
 
     return trim_interval;
