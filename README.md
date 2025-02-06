@@ -500,10 +500,10 @@ dorado basecaller <model> pod5s/ --emit-moves > calls.bam
 samtools fastq calls.bam > calls.fastq
 
 # Apply dorado correct to a set of reads that can be used as input in an assembly program.
-dorado correct calls.fastq > corrected.fastq
+dorado correct calls.fastq > corrected.fasta
 
 # Assemble the genome using those corrected reads
-<some_assembler> --input corrected.fastq > draft_assembly.fasta
+<some_assembler> --input corrected.fasta > draft_assembly.fasta
 
 # Align original calls to the draft assembly
 dorado aligner calls.bam draft_assembly.fasta > aligned_calls.bam
