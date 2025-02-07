@@ -70,6 +70,11 @@ variables:
     - linux-arm64-gpu
     - nvidia-docker
 
+.linux_orin_cuda_12_runner:
+  tags:
+    - linux-arm64-gpu-12.6
+    - nvidia-docker
+
 .windows_runner:
   tags:
     - windows-10
@@ -623,14 +628,14 @@ test:linux:arm64:focal:
   needs:
     - build:linux:arm64:focal
 
-# test:linux:arm64:jammy:
-#   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
-#   extends:
-#     - .linux_dependencies
-#     - .linux_orin_runner
-#     - .test_dorado
-#   needs:
-#     - build:linux:arm64:jammy
+test:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  extends:
+    - .linux_dependencies
+    - .linux_orin_cuda_12_runner
+    - .test_dorado
+  needs:
+    - build:linux:arm64:jammy
 
 test:macos:arm:
   extends:
@@ -700,14 +705,14 @@ test_archive:linux:arm64:20.04:
   needs:
     - build_archive:linux:arm64:focal
 
-# test_archive:linux:arm64:22.04:
-#   image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
-#   extends:
-#     - .linux_dependencies
-#     - .linux_orin_runner
-#     - .test_archive
-#   needs:
-#     - build_archive:linux:arm64:jammy
+test_archive:linux:arm64:22.04:
+  image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
+  extends:
+    - .linux_dependencies
+    - .linux_orin_cuda_12_runner
+    - .test_archive
+  needs:
+    - build_archive:linux:arm64:jammy
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
