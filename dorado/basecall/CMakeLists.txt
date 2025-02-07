@@ -52,6 +52,8 @@ if (DORADO_GPU_BUILD)
             benchmarks/Quadro_GV100.h
             benchmarks/Tesla_V100-PCIE-16GB.cpp
             benchmarks/Tesla_V100-PCIE-16GB.h
+            benchmarks/Orin.cpp
+            benchmarks/Orin.h
         )
     endif()
 endif()

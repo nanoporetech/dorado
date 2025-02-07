@@ -514,7 +514,9 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     params.nhead = toml::find<int>(layer, "nhead");
     params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
     params.deepnorm_alpha = toml::find<float>(layer, "deepnorm_alpha");
-    params.max_seq_len = toml::find_or(layer, "max_seq_len", params.max_seq_len);
+    if (layer.contains("max_seq_len")) {
+        params.max_seq_len = toml::find<int>(layer, "max_seq_len");
+    }
 
     if (layer.contains("rotary_base") && layer.contains("theta")) {
         throw std::runtime_error(

@@ -47,11 +47,20 @@ ModelComplex ModelComplexParser::parse(const std::string& arg) {
     }
 
     // If the path doesn't exist then issue a warning. The error is caught and handled downstream.
-    if (selection.is_path() && !std::filesystem::exists(std::filesystem::path(selection.raw))) {
-        spdlog::warn(
-                "Model argument '{}' did not satisfy the model complex syntax and is assumed to be "
-                "a path.",
-                selection.raw);
+    if (selection.is_path()) {
+        // Remove any directory separators from the end
+        while (!selection.raw.empty() &&
+               (selection.raw.back() == '/' || selection.raw.back() == '\\')) {
+            selection.raw.pop_back();
+        }
+
+        if (!std::filesystem::exists(std::filesystem::path(selection.raw))) {
+            spdlog::warn(
+                    "Model argument '{}' did not satisfy the model complex syntax and is assumed "
+                    "to be "
+                    "a path.",
+                    selection.raw);
+        }
     }
 
     return selection;
