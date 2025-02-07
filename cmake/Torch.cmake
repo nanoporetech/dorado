@@ -311,11 +311,15 @@ if (USING_STATIC_TORCH_LIB)
             )
         else()
             set(ont_torch_extra_cuda_libs
-                # cusolver is missing this and I don't know why
-                ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
                 CUDA::curand_static
                 CUDA::nvrtc
             )
+            if(CUDAToolkit_VERSION VERSION_LESS 12.6)
+                # cusolver is missing this and I don't know why
+                list(APPEND ont_torch_extra_cuda_libs
+                    ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
+                )
+            endif()            
             set(ont_torch_extra_platform_libs
                 ${TORCH_LIB}/lib/libopenblas.a
                 ${TORCH_LIB}/lib/libgfortran.so.5
