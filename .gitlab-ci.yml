@@ -538,6 +538,7 @@ build_archive:macos:x64:
     MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 384
     NO_TEST_DORADO_CORRECT: 0
+    NO_TEST_DORADO_POLISH: 0
     NO_TEST_DUPLEX: 0
   script:
     # Do everything inside a newly created folder, since some runners only run
@@ -608,11 +609,7 @@ test:linux:arm64:bionic:
     - .linux_tegra_runner
     - .test_dorado
   variables:
-    GIT_STRATEGY: none
-    MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 0
-    MODEL_SPEED: hac
-    MODEL_VERSION: v4.2.0
     NO_TEST_DORADO_CORRECT: 1
     NO_TEST_DORADO_POLISH: 1
     NO_TEST_DUPLEX: 1
@@ -634,6 +631,8 @@ test:linux:arm64:jammy:
     - .linux_dependencies
     - .linux_orin_cuda_12_runner
     - .test_dorado
+  variables:
+    NO_TEST_DORADO_POLISH: 1
   needs:
     - build:linux:arm64:jammy
 
@@ -651,11 +650,8 @@ test:macos:x64:
   needs:
     - build:macos:x64
   variables:
-    GIT_STRATEGY: none
     MODEL: dna_r10.4.1_e8.2_400bps_fast@v4.1.0
     BATCH: 0
-    MODEL_SPEED: hac
-    MODEL_VERSION: v4.2.0
     NO_TEST_DORADO_CORRECT: 1
     NO_TEST_DUPLEX: 1
   timeout: 1h 30m
