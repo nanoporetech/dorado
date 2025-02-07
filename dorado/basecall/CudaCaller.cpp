@@ -539,7 +539,7 @@ void CudaCaller::cuda_thread_fn() {
         auto device_stats =
                 c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
-        auto print_stat = [](c10::cuda::CUDACachingAllocator::StatArray &st) {
+        auto print_stat = [](const auto &st) {
             return "aggregate current " + std::to_string(st[0].current);
         };
         spdlog::trace(
