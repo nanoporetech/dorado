@@ -88,6 +88,8 @@ bool operator==(const CigarOp& a, const CigarOp& b);
 // Needed for the unit tests.
 std::ostream& operator<<(std::ostream& os, const CigarOp& a);
 
+std::string cigar_op_to_string(const CigarOp& a);
+
 std::ostream& operator<<(std::ostream& os, const std::vector<CigarOp>& cigar);
 
 std::vector<CigarOp> parse_cigar_from_string(const std::string_view cigar);
