@@ -363,6 +363,15 @@ build:linux:arm64:focal:no_ccache:
     - .on_nightly_or_manual
   artifacts: null
 
+build:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  extends:
+    - .linux_dependencies
+    - .linux_arm64_runner
+    - .build_and_test_dorado
+
 build:linux:x86:focal:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
@@ -468,6 +477,14 @@ build_archive:linux:arm64:focal:
     - .linux_arm64_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
+
+build_archive:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  extends:
+    - .linux_dependencies
+    - .linux_arm64_runner
+    - .build_dorado_archive
+    - .on_nightly_or_manual    
 
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
@@ -606,6 +623,15 @@ test:linux:arm64:focal:
   needs:
     - build:linux:arm64:focal
 
+# test:linux:arm64:jammy:
+#   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+#   extends:
+#     - .linux_dependencies
+#     - .linux_orin_runner
+#     - .test_dorado
+#   needs:
+#     - build:linux:arm64:jammy
+
 test:macos:arm:
   extends:
     - .macos_arm_runner
@@ -673,6 +699,15 @@ test_archive:linux:arm64:20.04:
     - .test_archive
   needs:
     - build_archive:linux:arm64:focal
+
+# test_archive:linux:arm64:22.04:
+#   image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
+#   extends:
+#     - .linux_dependencies
+#     - .linux_orin_runner
+#     - .test_archive
+#   needs:
+#     - build_archive:linux:arm64:jammy
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
@@ -933,6 +968,7 @@ deploy:all:
     - build_archive:linux:x86:centos7
     - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:focal
+    - build_archive:linux:arm64:jammy
     - build_archive:macos:arm
     - build_archive:macos:x64
     - build_archive:windows
