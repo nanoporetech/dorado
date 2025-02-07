@@ -94,6 +94,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     file(GLOB ZSTD_DLLS "${ZSTD_LIBRARY_PATH}/*zstd.so*")
     install(FILES ${ZSTD_DLLS} DESTINATION lib COMPONENT redist_libs)
 
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*" AND ${TORCH_VERSION} VERSION_GREATER_EQUAL 2.0)
+        find_library(NUMA_DLL numa REQUIRED)
+        get_filename_component(NUMA_DLL_PATH ${NUMA_DLL} DIRECTORY)
+        file(GLOB NUMA_DLLS "${NUMA_DLL_PATH}/libnuma.so*")
+        install(FILES ${NUMA_DLLS} DESTINATION lib COMPONENT redist_libs)
+    endif()
+
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin COMPONENT redist_libs)
