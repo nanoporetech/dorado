@@ -362,12 +362,20 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     std::vector<std::pair<float, int>> all_times_and_batch_sizes;
     times_and_batch_sizes.reserve(max_batch_size / batch_granularity);
 
+    const std::string model_name = [this] {
+        std::string filename = m_config.model_path.string();
+        if (!filename.empty() && (filename.back() == '/' || filename.back() == '\\')) {
+            filename.pop_back();
+        }
+        return std::filesystem::path(filename).filename().string();
+    }();
+
     // See if we can find cached values for the chunk timings for this run condition
-    const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
-            prop->name, m_config.model_path.string());
+    const auto &chunk_benchmarks =
+            CudaChunkBenchmarks::instance().get_chunk_timings(prop->name, model_name);
     if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
         spdlog::info(std::string("Calculating optimized batch size for GPU \"") + prop->name +
-                     "\" and model " + m_config.model_path.string() +
+                     "\" and model " + model_name +
                      ". Full benchmarking will run for this device, which may take some time.");
     }
 
@@ -425,14 +433,15 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
         // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
         std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + m_config.model_path.string() + "\"}] = {\n";
+                                           "\", \"" + model_name + "\"}] = {\n";
         for (const auto &batch_time : times_and_batch_sizes) {
             cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
                                     std::to_string(batch_time.first) + "f },\n";
         }
         cpp_autobatch_output += "    };\n";
-        std::string cpp_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + ".txt";
+
+        std::string cpp_filename =
+                std::string("chunk_benchmarks__") + prop->name + "__" + model_name + ".txt";
         std::ofstream cpp_bench_file(cpp_filename);
         cpp_bench_file << cpp_autobatch_output;
 
@@ -443,8 +452,9 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
             csv_autobatch_output += std::to_string(batch_time.second) + "," +
                                     std::to_string(batch_time.first) + "\n";
         }
-        std::string csv_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + ".csv";
+
+        std::string csv_filename =
+                std::string("chunk_benchmarks__") + prop->name + "__" + model_name + ".csv";
         std::ofstream csv_bench_file(csv_filename);
         csv_bench_file << csv_autobatch_output;
     }
