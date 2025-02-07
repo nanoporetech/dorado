@@ -29,13 +29,13 @@ $ apt install gcc-9 g++-9 --no-install-recommends
 $ update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 ```
 
-This project requires `cmake 3.23` or higher. This can be installed via binary download from [cmake.org](https://cmake.org/download/) or using `python3-venv`: 
+This project requires `cmake 3.25` or higher. This can be installed via binary download from [cmake.org](https://cmake.org/download/) or using `python3-venv`: 
 
 ```
 $ apt install python3-venv
 $ python3 -m venv venv
 $ . venv/bin/activate
-$ pip install "cmake>=3.23"
+$ pip install "cmake>=3.25"
 ```
 
 Dorado requires CUDA 11.8 on Linux platforms. If the system you are running on does not have CUDA 11.8 installed, and you do not have sudo privileges, you can install locally from a run file as follows:
