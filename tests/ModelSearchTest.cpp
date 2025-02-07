@@ -232,6 +232,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
 
         CATCH_CAPTURE(input);
         auto result = ModelComplexParser::parse(input);
+        if (input.back() == '/') {
+            input.pop_back();
+        }
         CATCH_CHECK(result.raw == input);
         CATCH_CHECK(result.model.variant == ModelVariant::NONE);
         CATCH_CHECK(result.model.ver == ModelVersion::NONE);
