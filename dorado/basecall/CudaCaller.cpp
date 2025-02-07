@@ -362,13 +362,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     std::vector<std::pair<float, int>> all_times_and_batch_sizes;
     times_and_batch_sizes.reserve(max_batch_size / batch_granularity);
 
-    const std::string model_name = [this] {
-        std::string filename = m_config.model_path.string();
-        if (!filename.empty() && (filename.back() == '/' || filename.back() == '\\')) {
-            filename.pop_back();
-        }
-        return std::filesystem::path(filename).filename().string();
-    }();
+    const std::string model_name = m_config.model_path.filename().string();
 
     // See if we can find cached values for the chunk timings for this run condition
     const auto &chunk_benchmarks =
