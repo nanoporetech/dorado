@@ -59,7 +59,6 @@ if(DEFINED DORADO_LIBTORCH_DIR)
     # Use the existing libtorch we have been pointed at
     message(STATUS "Using existing libtorch at ${DORADO_LIBTORCH_DIR}")
     set(TORCH_LIB ${DORADO_LIBTORCH_DIR})
-
 else()
     # Otherwise download a new one
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -75,6 +74,16 @@ else()
                     set(TORCH_URL ${DORADO_CDN_URL}/torch-1.10.2-Linux-aarch64.zip)
                     set(TORCH_PATCH_SUFFIX -ont)
                     set(TORCH_LIB_SUFFIX "/torch")
+                endif()
+            elseif(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.0)
+                if (TRY_USING_STATIC_TORCH_LIB)
+                    set(TORCH_VERSION 2.6.0)
+                    set(TORCH_URL ${DORADO_CDN_URL}/torch-2.6.0-linux-aarch64-ont.zip)
+                    set(TORCH_PATCH_SUFFIX -ont)
+                    set(TORCH_LIB_SUFFIX "/libtorch")
+                    set(USING_STATIC_TORCH_LIB TRUE)
+                else()
+                    message(FATAL_ERROR "CUDA-12 builds on aarch64 only support static torch")            
                 endif()
             else()
                 if (TRY_USING_STATIC_TORCH_LIB)
@@ -329,21 +338,47 @@ if (USING_STATIC_TORCH_LIB)
         endif()
 
         # Link to the cuDNN libs
-        list(APPEND TORCH_LIBRARIES
-            # Note: the order of the cuDNN libs matter
-            # We aren't going to do any training, so these don't need to be whole-archived
-            ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
-            ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
-            # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
-            -Wl,--whole-archive
+        if (TORCH_BUILD_VERSION VERSION_GREATER_EQUAL 2.6)
+            # a second helper library due to more relocation errors
+            add_library(dorado_cudnn_lib SHARED
+                ${CMAKE_CURRENT_LIST_DIR}/../dorado/cudnn_dummy.cpp
+            )
+            target_link_libraries(dorado_cudnn_lib PRIVATE
                 # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
                 # though that shouldn't be a problem on Linux
-                ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
-                ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
-            -Wl,--no-whole-archive
-        )
+                $<LINK_LIBRARY:WHOLE_ARCHIVE,
+                    ${TORCH_LIB}/lib/libCaffe2_perfkernels_sve.a
+                    ${TORCH_LIB}/lib/libcudnn_adv_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_cnn_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_ops_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_graph_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_heuristic_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_engines_precompiled_static_v9.a
+                    ${TORCH_LIB}/lib/libcudnn_engines_runtime_compiled_static_v9.a
+                >
+                CUDA::cudart_static
+                CUDA::nvrtc
+            )
+            list(APPEND TORCH_LIBRARIES dorado_cudnn_lib)
+            # Don't forget to install it
+            install(TARGETS dorado_cudnn_lib LIBRARY)        
+        else()
+            list(APPEND TORCH_LIBRARIES
+                # Note: the order of the cuDNN libs matter
+                # We aren't going to do any training, so these don't need to be whole-archived
+                ${TORCH_LIB}/lib/libcudnn_adv_train_static.a
+                ${TORCH_LIB}/lib/libcudnn_cnn_train_static.a
+                ${TORCH_LIB}/lib/libcudnn_ops_train_static.a
+                # I'm assuming we need this for https://github.com/pytorch/pytorch/issues/50153
+                $<LINK_LIBRARY:WHOLE_ARCHIVE,
+                    # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
+                    # though that shouldn't be a problem on Linux
+                    ${TORCH_LIB}/lib/libcudnn_adv_infer_static.a
+                    ${TORCH_LIB}/lib/libcudnn_cnn_infer_static.a
+                    ${TORCH_LIB}/lib/libcudnn_ops_infer_static.a
+                >
+            )
+        endif()
 
         # Currently we need to make use of a separate lib to avoid getting relocation errors at link time
         # because the final binary would end up too big.
