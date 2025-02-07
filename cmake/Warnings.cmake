@@ -19,7 +19,7 @@ function(enable_warnings_as_errors TARGET_NAME)
         )
     elseif(CMAKE_COMPILER_IS_GNUCXX)
         target_compile_options(${TARGET_NAME} PRIVATE
-            -Wall -Wextra -Werror -Wundef -Wshadow
+            -Wall -Wextra -Werror -Wundef -Wshadow -Wno-psabi
         )
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_options(${TARGET_NAME} PRIVATE
