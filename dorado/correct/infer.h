@@ -19,7 +19,10 @@ namespace dorado::correction {
 // Custom collate function. Replacement for torch::utils::rnn::pad_sequence
 // because that was running much slower than this version.
 template <typename T>
-torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::ScalarType type) {
+torch::Tensor collate(std::vector<torch::Tensor>& tensors,
+                      T fill_val,
+                      torch::ScalarType type,
+                      const bool pinned_memory) {
     dorado::utils::ScopedProfileRange spr("collate", 1);
     auto max_length = std::max_element(tensors.begin(), tensors.end(),
                                        [](const torch::Tensor& a, const torch::Tensor& b) {
@@ -31,18 +34,24 @@ torch::Tensor collate(std::vector<torch::Tensor>& tensors, T fill_val, torch::Sc
                                           return a.sizes()[1] < b.sizes()[1];
                                       })
                              ->sizes()[1];
-    auto options = torch::TensorOptions().dtype(type).device(torch::kCPU);
+
+    auto options =
+            torch::TensorOptions().dtype(type).device(torch::kCPU).pinned_memory(pinned_memory);
     torch::Tensor batch = torch::empty({(int)tensors.size(), max_length, max_reads}, options);
+
     T* ptr = batch.data_ptr<T>();
     std::fill(ptr, ptr + batch.numel(), fill_val);
+
     // Copy over data for each tensor
     for (size_t i = 0; i < tensors.size(); i++) {
         torch::Tensor slice = batch.index({(int)i, torch::indexing::Slice(0, tensors[i].sizes()[0]),
                                            torch::indexing::Slice(0, tensors[i].sizes()[1])});
         slice.copy_(tensors[i]);
     }
+
     LOG_TRACE("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
               batch.numel(), batch.sum().item<T>());
+
     return batch;
 }
 

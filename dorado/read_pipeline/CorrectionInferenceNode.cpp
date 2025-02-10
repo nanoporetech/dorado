@@ -39,6 +39,12 @@
 #include <unordered_map>
 #include <vector>
 
+#if DORADO_CUDA_BUILD
+constexpr bool USING_DORADO_CUDA_BUILD = true;
+#else
+constexpr bool USING_DORADO_CUDA_BUILD = false;
+#endif
+
 using namespace dorado::correction;
 
 // #define DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
@@ -226,31 +232,33 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
         at::Tensor batched_bases;
         std::thread thread_bases = std::thread([&bases_batch, &batched_bases]() {
             batched_bases = correction::collate<int32_t>(bases_batch, static_cast<int32_t>(11),
-                                                         torch::kInt32);
+                                                         torch::kInt32, USING_DORADO_CUDA_BUILD);
             bases_batch.clear();
         });
 
         // Collate quals.
         at::Tensor batched_quals;
         std::thread thread_quals = std::thread([&quals_batch, &batched_quals]() {
-            batched_quals = correction::collate<float>(quals_batch, 0.0f, torch::kFloat32);
+            batched_quals = correction::collate<float>(quals_batch, 0.0f, torch::kFloat32,
+                                                       USING_DORADO_CUDA_BUILD);
             quals_batch.clear();
         });
 
         thread_bases.join();
         thread_quals.join();
 
-        std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
         std::vector<torch::jit::IValue> inputs;
         {
             utils::ScopedProfileRange move_to_device("move_to_device", 1);
-            inputs.push_back(batched_bases.to(device));
-            inputs.push_back(batched_quals.to(device));
-            inputs.push_back(length_tensor.to(device));
+            inputs.push_back(batched_bases.to(device, /*non_blocking=*/true));
+            inputs.push_back(batched_quals.to(device, /*non_blocking=*/true));
+            inputs.push_back(length_tensor.to(device, /*non_blocking=*/true));
             std::for_each(indices_batch.begin(), indices_batch.end(),
-                          [device](at::Tensor& t) { t.to(device); });
+                          [device](at::Tensor& t) { t.to(device, /*non_blocking=*/true); });
             inputs.push_back(indices_batch);
         }
+
+        std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
 
         c10::IValue output;
         try {
