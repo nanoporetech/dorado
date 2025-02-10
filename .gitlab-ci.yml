@@ -81,11 +81,16 @@ variables:
     - VS2019
     - cuda-${CUDA}
 
-.linux_dependencies:
+.linux_build_dependencies:
   before_script:
     - echo Dorado dependency stage
     - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
     - pip install gcovr
+
+.linux_test_dependencies:
+  before_script:
+    - echo Dorado dependency stage
+    - apt-get update && apt-get install -y --no-install-recommends samtools curl
 
 .set_parallel_jobs:
   - |
@@ -214,7 +219,7 @@ pre-commit:
 build:linux:x86:focal:install_deps:
   image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
     - .on_nightly_or_manual
@@ -225,7 +230,7 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
 
@@ -234,7 +239,7 @@ build:linux:x86:focal_koi_from_source:
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
     - .on_nightly_or_manual
@@ -245,7 +250,7 @@ build:linux:x86:jammy:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
   artifacts: null
@@ -266,7 +271,7 @@ build:linux:x86:focal_coverage:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .on_nightly_or_manual
   script:
@@ -356,7 +361,7 @@ build:linux:arm64:focal:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_and_test_dorado
 
@@ -373,7 +378,7 @@ build:linux:arm64:jammy:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_and_test_dorado
 
@@ -463,7 +468,7 @@ build_archive:linux:x86:cuda12:
     # Note: the linker flag is a workaround for the provided torch forgetting to link to cublas.
     BUILD_OPTIONS: "-D DORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch -D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--copy-dt-needed-entries'"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
@@ -478,7 +483,7 @@ build_archive:linux:arm64:bionic:
 build_archive:linux:arm64:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
@@ -486,7 +491,7 @@ build_archive:linux:arm64:focal:
 build_archive:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_dorado_archive
     - .on_nightly_or_manual    
@@ -591,7 +596,7 @@ test:windows:
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_runner
     - .test_dorado
   needs:
@@ -605,7 +610,7 @@ test:linux:x86:focal:
 test:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_tegra_runner
     - .test_dorado
   variables:
@@ -619,7 +624,7 @@ test:linux:arm64:bionic:
 test:linux:arm64:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_orin_runner
     - .test_dorado
   needs:
@@ -628,7 +633,7 @@ test:linux:arm64:focal:
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_orin_cuda_12_runner
     - .test_dorado
   variables:
@@ -692,19 +697,19 @@ test_archive:linux:arm64:18.04:
   needs:
     - build_archive:linux:arm64:bionic
 
+# Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:20.04:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
   extends:
-    - .linux_dependencies
     - .linux_orin_runner
     - .test_archive
   needs:
     - build_archive:linux:arm64:focal
 
+# Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:22.04:
   image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
   extends:
-    - .linux_dependencies
     - .linux_orin_cuda_12_runner
     - .test_archive
   needs:
@@ -714,7 +719,7 @@ test_archive:linux:arm64:22.04:
 test:model_download:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_runner
     - .on_nightly_or_manual
   stage: test
@@ -738,7 +743,7 @@ test:model_download:macos:arm:
 generate_auto_benchmarks:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
   tags:
     - ubuntu-20.04
     - nvidia-docker
