@@ -1,7 +1,11 @@
 if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib")
-        download_and_extract(${DORADO_CDN_URL}/htslib-win.tar.gz htslib-win)
+        download_and_extract(
+            ${DORADO_CDN_URL}/htslib-win.tar.gz
+            htslib-win
+            "7b1719da1ae3d2ea059bb1e7f02e5e3aac57aa41e4fc38d3ab0c20fd68143d08"
+        )
         set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
         add_library(htslib SHARED IMPORTED)
