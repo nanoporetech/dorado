@@ -5,7 +5,7 @@ function(get_best_compatible_koi_version KOI_CUDA)
         # Koi only provides binaries for 11.4 and 10.2 when targeting aarch64
         set(SUPPORTED_VERSIONS 11.4 10.2)
     else()
-        set(SUPPORTED_VERSIONS 12.4 12.0 11.8 11.7 11.3)
+        set(SUPPORTED_VERSIONS 12.4 12.0 11.8)
     endif()
 
     list(SORT SUPPORTED_VERSIONS COMPARE NATURAL ORDER DESCENDING)
