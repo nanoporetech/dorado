@@ -26,13 +26,13 @@ bool has_write_permission(const fs::path& directory) {
         }
     }
 
-    const std::string fname = "tmp-write-test";
+    const std::string fname = ".dorado-write-test";
     std::ofstream tmp(directory / fname);
     tmp << "test";
     tmp.close();
 
-    if (tmp.fail()) {
-        spdlog::error("Insufficient permissions to download models into {}", directory.u8string());
+    if (!tmp) {
+        spdlog::error("Insufficient permissions or drive is full: {}", directory.u8string());
         return false;
     }
 
