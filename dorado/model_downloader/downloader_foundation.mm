@@ -31,7 +31,17 @@ bool Downloader::download_foundation(const models::ModelInfo& model,
 
         // Save it.
         NSString* output = [NSString stringWithUTF8String:archive.string().c_str()];
-        [data writeToFile:output atomically:YES];
+        if ([data writeToFile:output atomically:YES] == NO) {
+            spdlog::error("Failed to save downloaded file to disk");
+            return false;
+        }
+
+        // Check that all of it was saved.
+        if (std::filesystem::file_size(archive) != data.length) {
+            spdlog::error("Size mismatch between file in memory and file on disk");
+            return false;
+        }
+
         return true;
     }
 }
