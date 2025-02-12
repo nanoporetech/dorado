@@ -2,8 +2,8 @@ OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        # Koi only provides binaries for 11.4 and 10.2 when targeting aarch64
-        set(SUPPORTED_VERSIONS 11.4 10.2)
+        # Koi provides binaries for these cuda versions when targeting aarch64
+        set(SUPPORTED_VERSIONS 12.6 11.4 10.2)
     else()
         set(SUPPORTED_VERSIONS 12.4 12.0 11.8)
     endif()
@@ -22,6 +22,7 @@ function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
     set(hash__libkoi__0_5_3__Linux__aarch64__cuda__10_2 "4a3c495e73a1880fb7154bdc79a4150e00d00e8c765ea87909a121f3b29c5c54")
     set(hash__libkoi__0_5_3__Linux__aarch64__cuda__11_4 "6f5a8c3f683f46a414b77565eccc0e04c0824830ee491c5320c1699324b02cc3")
+    set(hash__libkoi__0_5_3__Linux__aarch64__cuda__12_6 "7821b8021d26b0e985fac6fd09f7dc4db70031b7dc918038a110d2154a670f28")
     set(hash__libkoi__0_5_3__Linux__x86_64__cuda__11_8 "b6da7003d61a0cab9c30a3114b145a7866f983e4b5a0c36a086b4bf882125326")
     set(hash__libkoi__0_5_3__Linux__x86_64__cuda__12_0 "202a64e27706929f3ccf1c2efd0fdb98950deb98f39014d6c38d518e8012ccf8")
     set(hash__libkoi__0_5_3__Linux__x86_64__cuda__12_4 "6cad7dbb730927d10987fd34844901d535c4f323248ca488081e24053e0ea23b")
