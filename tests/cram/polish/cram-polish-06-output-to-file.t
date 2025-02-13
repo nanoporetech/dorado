@@ -71,6 +71,8 @@ Output file is the same as the input BAM file. This should fail.
   1
 
 FASTQ output to stdout.
+Checking only the number of lines in the output and the bases.
+IMPORTANT: not comparing the qualities because they may vary with Torch versions and architectures.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
@@ -81,13 +83,17 @@ FASTQ output to stdout.
   > echo "Exit code: $?"
   > gunzip -d --stdout ${expected} > out/expected.fastq
   > wc -l out/out.fastq | awk '{ print $1 }'
-  > diff out/expected.fastq out/out.fastq
+  > samtools fasta out/expected.fastq 1>out/expected.fasta 2>/dev/null
+  > samtools fasta out/out.fastq 1>out/out.fasta 2>/dev/null
+  > diff out/expected.fasta out/out.fasta
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   4
   0
 
 FASTQ output to file.
+Checking only the number of lines in the output and the bases.
+IMPORTANT: not comparing the qualities because they may vary with Torch versions and architectures.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
@@ -98,7 +104,9 @@ FASTQ output to file.
   > echo "Exit code: $?"
   > gunzip -d --stdout ${expected} > out/expected.fastq
   > wc -l out/consensus.fastq | awk '{ print $1 }'
-  > diff out/expected.fastq out/consensus.fastq
+  > samtools fasta out/expected.fastq 1>out/expected.fasta 2>/dev/null
+  > samtools fasta out/consensus.fastq 1>out/consensus.fasta 2>/dev/null
+  > diff out/expected.fasta out/consensus.fasta
   > grep "Copying contig verbatim from input" out/stderr | wc -l | awk '{ print $1 }'
   Exit code: 0
   4
