@@ -210,6 +210,7 @@ bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path
         return false;
     }
 
+    // Validate it.
     if (!validate_checksum(res->body, model)) {
         return false;
     }
@@ -218,6 +219,17 @@ bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path
     std::ofstream output(archive.string(), std::ofstream::binary);
     output << res->body;
     output.close();
+    if (!output) {
+        spdlog::error("Failed to save downloaded file to disk");
+        return false;
+    }
+
+    // Check that all of it was saved.
+    if (fs::file_size(archive) != res->body.size()) {
+        spdlog::error("Size mismatch between file in memory and file on disk");
+        return false;
+    }
+
     return true;
 }
 #endif  // DORADO_MODELS_HAS_HTTPLIB
