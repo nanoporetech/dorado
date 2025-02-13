@@ -88,7 +88,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--infer-threads")
                 .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
-                .default_value(2)
+                .default_value(3)
 #else
                 .default_value(1)
 #endif
