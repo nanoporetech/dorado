@@ -19,8 +19,6 @@
     - osx_arm64
     - xcode-15.3
     - m2
-  variables:
-    MACOSX_DEPLOYMENT_TARGET: "12.3"
 
 .run_dorado_benchmark: &run_dorado_benchmark
   variables:
