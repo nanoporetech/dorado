@@ -7,7 +7,7 @@ Detailed information about Dorado and its features is available in the [Dorado D
 ## Features
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
-* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
+* Runs on Apple silicon (M series) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
 * [Modified basecalling](#modified-basecalling).
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
@@ -56,7 +56,7 @@ Dorado has been tested extensively and supported on the following systems:
 | Linux arm64 | Jetson Orin | Linux for Tegra ≥34.1.1 |
 | Windows x86_64 | (G)V100, A100 | CUDA Driver ≥452.39 |
 | | H100 | CUDA Driver ≥520 |
-| Apple | Apple Silicon (M1/M2) | |
+| Apple | Apple Silicon (M series) | macOS ≥13 |
 
 Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
