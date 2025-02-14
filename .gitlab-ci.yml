@@ -636,9 +636,6 @@ test:linux:arm64:jammy:
     - .linux_test_dependencies
     - .linux_orin_cuda_12_runner
     - .test_dorado
-  variables:
-    # DOR-1077
-    NO_TEST_DORADO_POLISH: 1
   needs:
     - build:linux:arm64:jammy
 
@@ -646,9 +643,6 @@ test:macos:arm:
   extends:
     - .macos_arm_runner
     - .test_dorado
-  variables:
-    # DOR-1077
-    NO_TEST_DORADO_POLISH: 1
   needs:
     - build:macos:arm
 
