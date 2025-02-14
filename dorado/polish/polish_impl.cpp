@@ -893,13 +893,11 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
 
         // Debug output.
         {
-            std::ostringstream oss;
-            print_tensor_shape(oss, batch_features_tensor);
             spdlog::trace(
-                    "[consumer {}] About to call forward(): batch_features_tensor.size() = {}, "
+                    "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, oss.str(),
+                    tid, tensor_shape_as_string(batch_features_tensor),
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }

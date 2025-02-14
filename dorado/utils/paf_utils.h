@@ -50,6 +50,8 @@ void serialize_to_paf(std::ostream& os,
                       int mapq,
                       const std::vector<CigarOp>& cigar);
 
+std::ostream& operator<<(std::ostream& os, const Overlap& overlap);
+
 std::string_view paf_aux_get(const PafEntry& paf_entry, const char tag[2], char type);
 
 }  // namespace dorado::utils

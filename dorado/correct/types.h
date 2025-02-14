@@ -3,22 +3,29 @@
 #include <ATen/Tensor.h>
 
 #include <filesystem>
+#include <iosfwd>
 #include <vector>
 
 namespace dorado::correction {
 
+// clang-format off
 struct OverlapWindow {
     // CorrectionAlignments overlap vector index
     int overlap_idx = -1;
-    int tstart = -1;
-    int qstart = -1;
-    int qend = -1;
-    int cigar_start_idx = -1;
-    int cigar_start_offset = -1;
-    int cigar_end_idx = -1;
-    int cigar_end_offset = -1;
-    float accuracy = 0.f;
+    int win_tstart = -1;            // Window target start position.
+    int win_tend = -1;              // Window target end position.
+    int tstart = -1;                // Absolute alignment target start position for this window.
+    int tend = -1;                  // Absolute alignment target end position for this window.
+    int qstart = -1;                // Absolute alignment query start position for this window. (Does not include the absolute qstart from the alignment due to legacy reasons).
+    int qend = -1;                  // Absolute alignment query end position for this window. (Does not include the absolute qstart from the alignment due to legacy reasons).
+    int cigar_start_idx = -1;       // CIGAR start operation for the alignment within this window.
+    int cigar_start_offset = -1;    // Offset within the CIGAR start operation where the alignment for this window begins.
+    int cigar_end_idx = -1;         // CIGAR end operation for the alignment within this window. Can be inclusive or exclusive, depending on cigar_end_offset.
+    int cigar_end_offset = -1;      // Offset within the CIGAR end operation where the alignment for this window ends. Non-inclusive.
+    float accuracy = 0.f;           // Alignment accuracy within this window.
+    int columns = 0;                // Number of pileup columns that the alignment in this window requires (M+EQ+X+I+D).
 };
+// clang-format on
 
 struct WindowFeatures {
     at::Tensor bases;
@@ -52,5 +59,7 @@ struct ModelConfig {
     std::string weights_file;
     std::filesystem::path model_dir;
 };
+
+std::ostream& operator<<(std::ostream& os, const OverlapWindow& ovl);
 
 }  // namespace dorado::correction

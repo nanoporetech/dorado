@@ -3,6 +3,7 @@
 #include "types.h"
 
 #include <unordered_set>
+#include <vector>
 
 namespace dorado {
 struct CorrectionAlignments;
@@ -15,7 +16,6 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
                                         const CorrectionAlignments& alignments);
 
 std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                             const CorrectionAlignments& alignments,
-                                             int window_size);
+                                             const CorrectionAlignments& alignments);
 
 }  // namespace dorado::correction
