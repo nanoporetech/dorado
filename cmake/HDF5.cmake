@@ -58,13 +58,8 @@ elseif(WIN32)
 
 elseif (APPLE)
     set(HDF_VER 1.14.3)
-    if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-        set(HDF_ARCH "x86_64")
-        set(HDF_HASH "0b95a50b824eba64aeede416e68243bbc708653ffdf17d7635b074058e38797a")
-    else()
-        set(HDF_ARCH "armv8")
-        set(HDF_HASH "1f4dab9ac68129968cc5777fd62836686c2496af02f13cdbec6b82e030092466")
-    endif()
+    set(HDF_ARCH "armv8")
+    set(HDF_HASH "1f4dab9ac68129968cc5777fd62836686c2496af02f13cdbec6b82e030092466")
     download_and_extract(
         ${DORADO_CDN_URL}/hdf5-${HDF_VER}-${HDF_ARCH}.zip
         hdf5-${HDF_VER}-${HDF_ARCH}

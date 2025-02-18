@@ -70,8 +70,3 @@ sanitize:macos:arm:
   extends:
     - build:macos:arm
     - .sanitizer_common
-
-sanitize:macos:x64:
-  extends:
-    - build:macos:x64
-    - .sanitizer_common

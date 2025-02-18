@@ -44,6 +44,10 @@ if(WIN32)
     add_compile_options("$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/MP${WIN_THREADS}>")
 endif()
 
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message(FATAL_ERROR "MacOS x86_64 builds are no longer supported.")
+endif()
+
 if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
     # Prefer static libs if they exist so that we don't run into issues
     # linking to dynamic libraries that live in brew.
@@ -61,12 +65,8 @@ set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
     CACHE PATH "Location to download 3rdparty libraries into")
 
-# We don't support GPU builds on macOS/x64
-if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(DORADO_GPU_BUILD FALSE)
-else()
-    set(DORADO_GPU_BUILD TRUE)
-endif()
+# All builds are now GPU builds
+set(DORADO_GPU_BUILD TRUE)
 
 find_package(CUDAToolkit QUIET)
 
