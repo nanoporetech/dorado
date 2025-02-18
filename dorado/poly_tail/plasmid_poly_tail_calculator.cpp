@@ -120,4 +120,15 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     return {fwd, signal_anchor, static_cast<int>(trailing_tail_bases), split_tail};
 }
 
+std::pair<int, int> PlasmidPolyTailCalculator::signal_range(int signal_anchor,
+                                                            int signal_len,
+                                                            float samples_per_base,
+                                                            [[maybe_unused]] bool fwd) const {
+    // We don't know if we found the front or rear flank as the anchor,
+    // so search the signal space in both directions
+    const int kSpread = int(std::round(samples_per_base * max_tail_length()));
+    return {std::max(0, static_cast<int>(signal_anchor - kSpread)),
+            std::min(signal_len, static_cast<int>(signal_anchor + kSpread))};
+}
+
 }  // namespace dorado::poly_tail
