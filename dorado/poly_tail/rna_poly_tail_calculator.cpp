@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 namespace {
@@ -112,6 +113,14 @@ std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int
                 interval.second - interval.first};
     }
     return {interval.second - interval.first, interval.second - interval.first};
+}
+
+std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
+                                                        int signal_len,
+                                                        float samples_per_base,
+                                                        bool fwd) const {
+    assert(!fwd);  // RNA should always be treated as a reverse strand
+    return PolyTailCalculator::signal_range(signal_anchor, signal_len, samples_per_base, fwd);
 }
 
 }  // namespace dorado::poly_tail
