@@ -6,11 +6,7 @@ endif()
 
 if(NOT DEFINED OPENSSL_ROOT_DIR)
     if(APPLE)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-            set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl@3")
-        else()
-            set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
-        endif()
+        set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl@3")
     elseif(WIN32)
         download_and_extract(
             ${DORADO_CDN_URL}/openssl3-win.zip

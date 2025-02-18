@@ -130,32 +130,18 @@ else()
         endif()
 
     elseif(APPLE)
-        if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-            if (TRY_USING_STATIC_TORCH_LIB)
-                set(TORCH_URL ${DORADO_CDN_URL}/torch-2.0.0-macos-x64-ont.zip)
-                set(TORCH_PATCH_SUFFIX -ont)
-                set(TORCH_HASH "f3995b2cfc88731ae8bf0fac257820f10d9f6f826d75b2ee002a47332e25d35d")
-                set(TORCH_LIB_SUFFIX "/libtorch")
-                set(USING_STATIC_TORCH_LIB TRUE)
-            else()
-                set(TORCH_URL https://download.pytorch.org/whl/cpu/torch-${TORCH_VERSION}-cp39-none-macosx_10_9_x86_64.whl)
-                set(TORCH_HASH "6e0b97beb037a165669c312591f242382e9109a240e20054d5a5782d9236cad0")
-                set(TORCH_LIB_SUFFIX "/torch")
-            endif()
+        set(TORCH_VERSION 2.6.0)
+        if (TRY_USING_STATIC_TORCH_LIB)
+            set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.1-macos-m1-ont.zip)
+            set(TORCH_PATCH_SUFFIX -ont.1)
+            set(TORCH_HASH "37dd00a4d1137ca890f50afb0d9a930e3153fc68df0cbec42ba043cc202ad089")
+            set(TORCH_LIB_SUFFIX "/libtorch")
+            set(USING_STATIC_TORCH_LIB TRUE)
         else()
-            set(TORCH_VERSION 2.6.0)
-            if (TRY_USING_STATIC_TORCH_LIB)
-                set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.1-macos-m1-ont.zip)
-                set(TORCH_PATCH_SUFFIX -ont.1)
-                set(TORCH_HASH "37dd00a4d1137ca890f50afb0d9a930e3153fc68df0cbec42ba043cc202ad089")
-                set(TORCH_LIB_SUFFIX "/libtorch")
-                set(USING_STATIC_TORCH_LIB TRUE)
-            else()
-                # Taken from https://pypi.org/project/torch/#files
-                set(TORCH_URL https://files.pythonhosted.org/packages/b3/17/41f681b87290a1d2f1394f943e470f8b0b3c2987b7df8dc078d8831fce5b/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
-                set(TORCH_HASH "265f70de5fd45b864d924b64be1797f86e76c8e48a02c2a3a6fc7ec247d2226c")
-                set(TORCH_LIB_SUFFIX "/torch")
-            endif()
+            # Taken from https://pypi.org/project/torch/#files
+            set(TORCH_URL https://files.pythonhosted.org/packages/b3/17/41f681b87290a1d2f1394f943e470f8b0b3c2987b7df8dc078d8831fce5b/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
+            set(TORCH_HASH "265f70de5fd45b864d924b64be1797f86e76c8e48a02c2a3a6fc7ec247d2226c")
+            set(TORCH_LIB_SUFFIX "/torch")
         endif()
     elseif(WIN32)
         if (TRY_USING_STATIC_TORCH_LIB)
@@ -195,26 +181,6 @@ endif()
 
 # Our libtorch should be chosen over any others on the system
 list(PREPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
-
-if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    # For some reason the RPATHs of the dylibs are pointing to the libiomp5.dylib in functools rather
-    # than the one that's next to them, so correct that here before we import the package.
-    file(GLOB TORCH_DYLIBS "${TORCH_LIB}/lib/*.dylib")
-    foreach(TORCH_DYLIB IN LISTS TORCH_DYLIBS)
-        execute_process(
-            COMMAND
-                ${CMAKE_INSTALL_NAME_TOOL}
-                -change "@loader_path/../../functorch/.dylibs/libiomp5.dylib" "@loader_path/libiomp5.dylib"
-                ${TORCH_DYLIB}
-            RESULT_VARIABLE RETVAL
-            OUTPUT_VARIABLE OUTPUT
-            ERROR_VARIABLE ERRORS
-        )
-        if (NOT RETVAL EQUAL 0)
-            message(FATAL_ERROR "Error running ${CMAKE_INSTALL_NAME_TOOL}: ${RETVAL}\nOUTPUT=${OUTPUT}\nERRORS=${ERRORS}")
-        endif()
-    endforeach()
-endif()
 
 find_package(Torch REQUIRED)
 
@@ -261,16 +227,14 @@ if (USING_STATIC_TORCH_LIB)
             ${ACCELERATE_FRAMEWORK}
             ${FOUNDATION_FRAMEWORK}
         )
-        if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-            find_library(METAL_FRAMEWORK Metal REQUIRED)
-            find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
-            find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
-            list(APPEND TORCH_LIBRARIES
-                ${METAL_FRAMEWORK}
-                ${MPS_FRAMEWORK}
-                ${MPSG_FRAMEWORK}
-            )
-        endif()
+        find_library(METAL_FRAMEWORK Metal REQUIRED)
+        find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
+        find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
+        list(APPEND TORCH_LIBRARIES
+            ${METAL_FRAMEWORK}
+            ${MPS_FRAMEWORK}
+            ${MPSG_FRAMEWORK}
+        )
 
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
         list(APPEND TORCH_LIBRARIES
