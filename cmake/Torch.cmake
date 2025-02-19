@@ -86,7 +86,7 @@ else()
                     set(TORCH_LIB_SUFFIX "/libtorch")
                     set(USING_STATIC_TORCH_LIB TRUE)
                 else()
-                    message(FATAL_ERROR "CUDA-12 builds on aarch64 only support static torch")            
+                    message(FATAL_ERROR "CUDA-12 builds on aarch64 only support static torch")
                 endif()
             else()
                 if (TRY_USING_STATIC_TORCH_LIB)
@@ -106,24 +106,25 @@ else()
         else()
             if (TRY_USING_STATIC_TORCH_LIB)
                 if(DORADO_USING_OLD_CPP_ABI)
-                    set(TORCH_URL ${DORADO_CDN_URL}/torch-2.0.0.2-linux-x64-ont-pre-cxx11.zip)
+                    set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-linux-x64-ont-pre-cxx11.zip)
                     set(TORCH_PATCH_SUFFIX -ont.2-pre-cxx11)
                     set(TORCH_HASH "295cb3eb15236f2331ff4da7609c5c6c2a6bfb650432d46282cfb759b5080293")
                 else()
-                    set(TORCH_URL ${DORADO_CDN_URL}/torch-2.0.0.2-linux-x64-ont-cxx11-abi.zip)
+                    set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-linux-x64-ont-cxx11-abi.zip)
                     set(TORCH_PATCH_SUFFIX -ont.2-cxx11-abi)
                     set(TORCH_HASH "6cbeaa5db3e85a13302fae0729fe266a31ac6c9d626d879f51a02020df9e2359")
                 endif()
                 set(USING_STATIC_TORCH_LIB TRUE)
             else()
+                set(TORCH_VERSION 2.6.0)
                 if(DORADO_USING_OLD_CPP_ABI)
                     set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
                     set(TORCH_PATCH_SUFFIX -pre-cxx11)
-                    set(TORCH_HASH "f3cbd7e9593f0c64b8671d02a21d562c98b60ef1abf5898c0ee9acfbc5a6b5d2")
+                    set(TORCH_HASH "b2af1a32e7fa8bc39c24bdcdf374c3e8cc3439efc6ec9319fcfb34c395a30501")
                 else()
                     set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
                     set(TORCH_PATCH_SUFFIX -cxx11-abi)
-                    set(TORCH_HASH "292b3f81e7c857fc102be93e2e44c40cdb4d8ef03d98121bc6af434c66e8490b")
+                    set(TORCH_HASH "36835d6c6315d741ad687632516f7bcd8efb6de3b57b61ca66b96f98e5ea30e8")
                 endif()
             endif()
             set(TORCH_LIB_SUFFIX "/libtorch")
@@ -282,22 +283,33 @@ if (USING_STATIC_TORCH_LIB)
 
         # Setup differences between platforms
         if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-            list(APPEND TORCH_LIBRARIES
-                # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
-                # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
-                ${TORCH_LIB}/lib/libdnnl_graph.a
-                ${TORCH_LIB}/lib/libdnnl.a
-            )
+            if (TORCH_VERSION VERSION_LESS 2.6)
+                list(APPEND TORCH_LIBRARIES
+                    # These 2 libs depend on each other, but only libdnnl.a is added to Torch's install cmake, so we
+                    # need to add it again after bringing in libdnnl_graph.a to fill in the missing symbols.
+                    ${TORCH_LIB}/lib/libdnnl_graph.a
+                    ${TORCH_LIB}/lib/libdnnl.a
+                )
+                set(ont_torch_extra_platform_libs
+                    ${TORCH_LIB}/lib/libnccl_static.a
+                    ${TORCH_LIB}/lib/libiomp5.so
+                )
+            else()
+                list(APPEND TORCH_LIBRARIES
+                    ${TORCH_LIB}/lib/libdnnl.a
+                )
+                set(ont_torch_extra_platform_libs
+                    ${TORCH_LIB}/lib/libnccl_static.a
+                    ${TORCH_LIB}/lib/libcusparseLt_static.a
+                    ${TORCH_LIB}/lib/libiomp5.a
+                )
+            endif()
             set(ont_torch_extra_cuda_libs
                 # I don't know why the MKL libs need to be part of the CUDA group, but having them in a
                 # separate group causes missing symbol errors
                 ${TORCH_LIB}/lib/libmkl_core.a
                 ${TORCH_LIB}/lib/libmkl_intel_lp64.a
                 ${TORCH_LIB}/lib/libmkl_intel_thread.a
-            )
-            set(ont_torch_extra_platform_libs
-                ${TORCH_LIB}/lib/libnccl_static.a
-                ${TORCH_LIB}/lib/libiomp5.so
             )
         else()
             set(ont_torch_extra_cuda_libs
@@ -309,7 +321,7 @@ if (USING_STATIC_TORCH_LIB)
                 list(APPEND ont_torch_extra_cuda_libs
                     ${CUDAToolkit_TARGET_DIR}/lib64/liblapack_static.a
                 )
-            endif()            
+            endif()
             set(ont_torch_extra_platform_libs
                 ${TORCH_LIB}/lib/libopenblas.a
                 ${TORCH_LIB}/lib/libgfortran.so.5
@@ -319,16 +331,22 @@ if (USING_STATIC_TORCH_LIB)
         endif()
 
         # Link to the cuDNN libs
-        if (TORCH_BUILD_VERSION VERSION_GREATER_EQUAL 2.6)
+        if (TORCH_VERSION VERSION_GREATER_EQUAL 2.6)
             # a second helper library due to more relocation errors
             add_library(dorado_cudnn_lib SHARED
                 ${CMAKE_CURRENT_LIST_DIR}/../dorado/cudnn_dummy.cpp
             )
+            if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+                # These appear to be linked in elsewhere.
+                set(caffe2_perfkernels)
+            else()
+                set(caffe2_perfkernels ${TORCH_LIB}/lib/libCaffe2_perfkernels_sve.a)
+            endif()
             target_link_libraries(dorado_cudnn_lib PRIVATE
                 # Note: libtorch is still setup to link to these dynamically (https://github.com/pytorch/pytorch/issues/81692)
                 # though that shouldn't be a problem on Linux
                 $<LINK_LIBRARY:WHOLE_ARCHIVE,
-                    ${TORCH_LIB}/lib/libCaffe2_perfkernels_sve.a
+                    ${caffe2_perfkernels}
                     ${TORCH_LIB}/lib/libcudnn_adv_static_v9.a
                     ${TORCH_LIB}/lib/libcudnn_cnn_static_v9.a
                     ${TORCH_LIB}/lib/libcudnn_ops_static_v9.a
@@ -342,7 +360,7 @@ if (USING_STATIC_TORCH_LIB)
             )
             list(APPEND TORCH_LIBRARIES dorado_cudnn_lib)
             # Don't forget to install it
-            install(TARGETS dorado_cudnn_lib LIBRARY)        
+            install(TARGETS dorado_cudnn_lib LIBRARY)
         else()
             list(APPEND TORCH_LIBRARIES
                 # Note: the order of the cuDNN libs matter
@@ -408,6 +426,9 @@ if (USING_STATIC_TORCH_LIB)
             )
         endif()
     endif()
+elseif (TORCH_VERSION VERSION_EQUAL 2.6 AND LINUX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    # For some reason cublas is missing in non-static Linux builds (ie sanitized), so do that here.
+    list(APPEND TORCH_LIBRARIES ${TORCH_LIB}/lib/libcublas-3b81d170.so.11)
 endif()
 
 # Create the target which other libraries can link to
