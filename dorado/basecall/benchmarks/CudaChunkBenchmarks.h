@@ -16,10 +16,6 @@ public:
     using ModelName = std::string;
     using GPUName = std::string;
 
-    // Must be called with m_chunk_benchmarks_mutex already locked.
-    std::optional<const ChunkTimings> get_chunk_timings_internal(const GPUName& gpu_name,
-                                                                 const ModelName& model_name) const;
-
 public:
     static CudaChunkBenchmarks& instance() {
         static CudaChunkBenchmarks chunk_benchmarks;
@@ -37,6 +33,10 @@ private:
     CudaChunkBenchmarks();
     CudaChunkBenchmarks(const CudaChunkBenchmarks&) = delete;
     CudaChunkBenchmarks& operator=(const CudaChunkBenchmarks&) = delete;
+
+    // Must be called with m_chunk_benchmarks_mutex already locked.
+    std::optional<const ChunkTimings> get_chunk_timings_internal(const GPUName& gpu_name,
+                                                                 const ModelName& model_name) const;
 
 private:
     mutable std::mutex m_chunk_benchmarks_mutex;
