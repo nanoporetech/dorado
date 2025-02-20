@@ -23,7 +23,7 @@ For single-ended barcodes with the `rear_only_barcodes` flag set (see below), e.
 
 ## Specification Format
 
-The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTQ` file.
+The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTA` file.
 
 ### Arrangement File
 
@@ -123,7 +123,7 @@ For `flank_left_pad` and `flank_right_pad`, something in the range of 5-10 bases
 
 ### Custom Sequences File 
 
-In addition to specifying a custom barcode arrangement, new barcode sequences can also be specified in a FASTQ format. There are only 2 requirements -
+In addition to specifying a custom barcode arrangement, new barcode sequences can also be specified in a FASTA format. There are only 2 requirements -
 * The sequence names to follow the `prefix%\d+i` format (e.g. `MY-BC%02i` for barcodes needing 2 digit indexing, or `MY-NB%04i` for barcodes with 4 digit indexing, etc.).
 * All barcode sequence lengths must match.
 * All barcode names must differ from those pre-defined in dorado.
