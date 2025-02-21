@@ -32,6 +32,10 @@ add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
 # cxxpool
 apply_3rdparty_patch(cxxpool)
+add_library(cxxpool INTERFACE)
+target_include_directories(cxxpool SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
+)
 
 # Bring in spdlog
 add_subdirectory(spdlog EXCLUDE_FROM_ALL)
