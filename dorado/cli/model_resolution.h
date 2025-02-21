@@ -62,7 +62,8 @@ inline bool check_model_path(const std::filesystem::path& model_path) noexcept {
             return false;
         }
     } catch (std::exception& e) {
-        spdlog::error("Exception while checking model path at: '{}' - {}", e.what());
+        spdlog::error("Exception while checking model path at: '{}' - {}", model_path.string(),
+                      e.what());
         return false;
     }
     return true;
