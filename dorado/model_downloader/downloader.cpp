@@ -189,7 +189,7 @@ bool Downloader::validate_checksum(std::string_view data, const models::ModelInf
 }
 
 void Downloader::extract(const fs::path& archive) const {
-    spdlog::trace("Extracting model archive: '{}'.", archive.u8string());
+    spdlog::trace("Extracting model archive: '{}'.", archive.string());
 
     try {
         elz::extractZip(archive, m_directory);

@@ -79,11 +79,11 @@ inline std::optional<std::filesystem::path> get_models_directory(
     if (models_directory_arg.has_value()) {
         auto path = std::filesystem::path(models_directory_arg.value());
         if (!std::filesystem::exists(path)) {
-            spdlog::error("--models-directory path does not exist at: '{}'", path.u8string());
+            spdlog::error("--models-directory path does not exist at: '{}'", path.string());
             std::exit(EXIT_FAILURE);
         }
         path = std::filesystem::canonical(path);
-        spdlog::debug("Set models directory to: '{}'.", path.u8string());
+        spdlog::debug("Set models directory to: '{}'.", path.string());
         return path;
     } else if (env_path != nullptr) {
         auto path = std::filesystem::path(env_path);
@@ -91,13 +91,13 @@ inline std::optional<std::filesystem::path> get_models_directory(
             spdlog::warn(
                     "ignoring environment variable 'DORADO_MODELS_DIRECTORY' - path does not exist "
                     "at: '{}'",
-                    path.u8string());
+                    path.string());
         } else {
             path = std::filesystem::canonical(path);
             spdlog::debug(
                     "set models directory to: '{}' from 'DORADO_MODELS_DIRECTORY' "
                     "environment variable",
-                    path.u8string());
+                    path.string());
             return path;
         }
     }

@@ -1243,12 +1243,12 @@ ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path
     if (!fs::exists(simplex_model_path)) {
         throw std::runtime_error{
                 "Cannot find modification model for '" + modification +
-                "' reason: simplex model doesn't exist at: " + simplex_model_path.u8string()};
+                "' reason: simplex model doesn't exist at: " + simplex_model_path.string()};
     }
 
     ModelInfo modification_model;
     bool model_found = false;
-    auto simplex_name = simplex_model_path.filename().u8string();
+    auto simplex_name = simplex_model_path.filename().string();
 
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";

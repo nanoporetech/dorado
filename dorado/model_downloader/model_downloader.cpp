@@ -48,36 +48,35 @@ std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::st
     /*const*/ fs::path model_dir = parent_dir / model.name;
 
     if (fs::exists(model_dir)) {
-        spdlog::trace("Found existing model at '{}'.", model_dir.u8string());
+        spdlog::trace("Found existing model at '{}'.", model_dir.string());
         return model_dir;
     }
 
     if (m_models_dir.has_value()) {
-        spdlog::trace("Model does not exist at '{}' - downloading it instead.",
-                      model_dir.u8string());
+        spdlog::trace("Model does not exist at '{}' - downloading it instead.", model_dir.string());
     }
 
     if (!utils::has_write_permission(parent_dir)) {
         throw std::runtime_error("Failed to prepare model download directory");
     }
 
-    if (!download_models(parent_dir.u8string(), model.name)) {
+    if (!download_models(parent_dir.string(), model.name)) {
         throw std::runtime_error("Failed to download + " + description + " model: '" + model.name +
                                  "'.");
     }
 
     if (is_temporary()) {
         // Check parent_dir is temp preventing unintentionally deleting work
-        if (parent_dir.filename().u8string().find(utils::TEMP_MODELS_DIR_PREFIX) == 0) {
+        if (parent_dir.filename().string().find(utils::TEMP_MODELS_DIR_PREFIX) == 0) {
             m_temp_models.emplace(parent_dir);
         } else {
             spdlog::warn(
                     "Temporary {} model directory does not have the expected name '{}' at: '{}'",
-                    description, utils::TEMP_MODELS_DIR_PREFIX, parent_dir.u8string());
+                    description, utils::TEMP_MODELS_DIR_PREFIX, parent_dir.string());
         }
     }
 
-    spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.u8string());
+    spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.string());
     return model_dir;
 }
 
