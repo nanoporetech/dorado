@@ -1,7 +1,11 @@
 #include "time_utils.h"
 
+#if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
+namespace date = std::chrono;
+#else
 #include <date/date.h>
 #include <date/tz.h>
+#endif
 
 #include <chrono>
 #include <sstream>
@@ -12,7 +16,7 @@ std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
     auto tp = std::chrono::system_clock::from_time_t(time_stamp_ms / 1000);
     tp += std::chrono::milliseconds(time_stamp_ms % 1000);
     auto dp = date::floor<date::days>(tp);
-    auto time = date::make_time(std::chrono::duration_cast<std::chrono::milliseconds>(tp - dp));
+    auto time = date::hh_mm_ss(std::chrono::duration_cast<std::chrono::milliseconds>(tp - dp));
     auto ymd = date::year_month_day{dp};
 
     std::ostringstream date_time_ss;
@@ -53,7 +57,7 @@ std::string adjust_time(const std::string & time_stamp, uint32_t offset) {
     time_s += std::chrono::seconds(offset);
 
     auto dp = date::floor<date::days>(time_s);
-    auto time = date::make_time(time_s - dp);
+    auto time = date::hh_mm_ss(time_s - dp);
     auto ymd = date::year_month_day{dp};
 
     std::ostringstream date_time_ss;
@@ -62,26 +66,24 @@ std::string adjust_time(const std::string & time_stamp, uint32_t offset) {
 }
 
 double time_difference_seconds(const std::string & timestamp1, const std::string & timestamp2) {
-    using namespace date;
-    using namespace std::chrono;
     try {
         std::istringstream ss1(timestamp1);
         std::istringstream ss2(timestamp2);
-        sys_time<microseconds> time1, time2;
-        ss1 >> parse("%FT%T%Ez", time1);
-        ss2 >> parse("%FT%T%Ez", time2);
+        date::sys_time<std::chrono::microseconds> time1, time2;
+        ss1 >> date::parse("%FT%T%Ez", time1);
+        ss2 >> date::parse("%FT%T%Ez", time2);
         // If parsing with timezone offset failed, try parsing with 'Z' format
         if (ss1.fail()) {
             ss1.clear();
             ss1.str(timestamp1);
-            ss1 >> parse("%FT%TZ", time1);
+            ss1 >> date::parse("%FT%TZ", time1);
         }
         if (ss2.fail()) {
             ss2.clear();
             ss2.str(timestamp2);
-            ss2 >> parse("%FT%TZ", time2);
+            ss2 >> date::parse("%FT%TZ", time2);
         }
-        duration<double> diff = time1 - time2;
+        std::chrono::duration<double> diff = time1 - time2;
         return diff.count();
     } catch (const std::exception & e) {
         throw std::runtime_error(std::string("Failed to parse timestamps: ") + e.what());
