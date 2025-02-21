@@ -99,11 +99,12 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
 ModBaseChunkCallerNode::~ModBaseChunkCallerNode() { terminate_impl(); }
 
 void ModBaseChunkCallerNode::start_threads() {
-    m_output_workers.emplace_back([=] { output_thread_fn(); });
+    m_output_workers.emplace_back([this] { output_thread_fn(); });
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_models(); ++model_id) {
-            m_runner_workers.emplace_back([=] { chunk_caller_thread_fn(worker_id, model_id); });
+            m_runner_workers.emplace_back(
+                    [=, this] { chunk_caller_thread_fn(worker_id, model_id); });
             ++m_num_active_runner_workers;
         }
     }

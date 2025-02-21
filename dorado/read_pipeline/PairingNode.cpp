@@ -495,7 +495,7 @@ void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
-        m_workers.emplace_back([=] { (this->*m_pairing_func)(i); });
+        m_workers.emplace_back([=, this] { (this->*m_pairing_func)(i); });
         ++m_num_active_worker_threads;
     }
 }

@@ -221,7 +221,7 @@ stats::NamedStats ModBaseCaller::sample_stats() const {
 
 void ModBaseCaller::start_threads() {
     for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
-        m_task_threads.emplace_back([=] { modbase_task_thread_fn(model_id); });
+        m_task_threads.emplace_back([=, this] { modbase_task_thread_fn(model_id); });
     }
 }
 
