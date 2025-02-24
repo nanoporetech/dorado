@@ -11,19 +11,10 @@
 namespace dorado::basecall {
 
 class CudaChunkBenchmarks final {
-private:
-    CudaChunkBenchmarks();
+public:
     using ChunkTimings = std::unordered_map<int, float>;
     using ModelName = std::string;
     using GPUName = std::string;
-
-    mutable std::mutex m_chunk_benchmarks_mutex;
-    std::map<std::pair<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
-
-    // Must be called with m_chunk_benchmarks_mutex already locked.
-    std::optional<const ChunkTimings> get_chunk_timings_internal(
-            const GPUName& gpu_name,
-            const std::string& model_path) const;
 
 public:
     static CudaChunkBenchmarks& instance() {
@@ -32,11 +23,24 @@ public:
     }
 
     std::optional<const ChunkTimings> get_chunk_timings(const GPUName& gpu_name,
-                                                        const std::string& model_path) const;
+                                                        const ModelName& model_name) const;
 
     bool add_chunk_timings(const GPUName& gpu_name,
-                           const std::string& model_path,
+                           const ModelName& model_name,
                            const std::vector<std::pair<float, int>>& timings);
+
+private:
+    CudaChunkBenchmarks();
+    CudaChunkBenchmarks(const CudaChunkBenchmarks&) = delete;
+    CudaChunkBenchmarks& operator=(const CudaChunkBenchmarks&) = delete;
+
+    // Must be called with m_chunk_benchmarks_mutex already locked.
+    std::optional<const ChunkTimings> get_chunk_timings_internal(const GPUName& gpu_name,
+                                                                 const ModelName& model_name) const;
+
+private:
+    mutable std::mutex m_chunk_benchmarks_mutex;
+    std::map<std::pair<GPUName, ModelName>, ChunkTimings> m_chunk_benchmarks;
 };
 
 }  // namespace dorado::basecall

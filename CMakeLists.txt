@@ -143,11 +143,6 @@ add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
 
-configure_file(
-    dorado/dorado_version.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated/dorado_version.h
-)
-
 add_library(dorado_lib
     dorado/alignment/alignment_info.h
     dorado/alignment/alignment_processing_items.cpp
@@ -379,7 +374,6 @@ set_target_properties(dorado_lib
 
 target_include_directories(dorado_lib
     PUBLIC
-        ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
 )
 # 3rdparty libs should be considered SYSTEM headers
@@ -411,6 +405,7 @@ target_link_libraries(dorado_lib
         edlib
         dorado_basecall
         dorado_modbase
+        dorado_version
     PRIVATE
         minimap2
         toml11::toml11

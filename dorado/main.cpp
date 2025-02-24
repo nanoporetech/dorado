@@ -1,6 +1,5 @@
 #include "cli/cli.h"
 #include "dorado_version.h"
-#include "utils/PostCondition.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -8,8 +7,8 @@
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/spdlog.h>
+#include <torch/version.h>
 
-#include <functional>
 #include <iostream>
 #include <map>
 #include <string>
@@ -37,7 +36,13 @@ int dlclose(void*) { return 0; };
 }
 #endif  // __linux__
 
-using entry_ptr = std::function<int(int, char**)>;
+#if TORCH_VERSION_MAJOR < 2 && !defined(TORCH_VERSION)
+// One of our static builds doesn't define this, so do it ourself.
+#define TORCH_VERSION \
+    TORCH_VERSION_MAJOR << '.' << TORCH_VERSION_MINOR << '.' << TORCH_VERSION_PATCH
+#endif  // TORCH_VERSION_MAJOR < 2
+
+using entry_ptr = int (*)(int, char**);
 
 namespace {
 
@@ -101,7 +106,7 @@ int main(int argc, char* argv[]) {
 #else
         std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
 #endif
-        std::cerr << "libtorch: " << TORCH_BUILD_VERSION << '\n';
+        std::cerr << "libtorch: " << TORCH_VERSION << '\n';
         std::cerr << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-h" || subcommand == "--help") {
