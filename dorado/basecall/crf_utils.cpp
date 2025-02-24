@@ -6,6 +6,10 @@
 #include "torch_utils/tensor_utils.h"
 #include "utils/memory_utils.h"
 
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAGuard.h>
+#endif
+
 #include <algorithm>
 #include <cstddef>
 #include <stdexcept>
@@ -151,6 +155,13 @@ ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
 
 ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
                                        const torch::TensorOptions &options) {
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Device> device;
+    if (options.device().is_cuda()) {
+        device = options.device();
+    }
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+#endif
     if (model_config.is_tx_model()) {
         return load_tx_model(model_config, options);
     }
