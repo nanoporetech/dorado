@@ -672,9 +672,10 @@ TxEncoderStackImpl::TxEncoderStackImpl(const tx::TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
-    use_koi_tiled = (koi_tc_is_available(KOI_F16) == KOI_SUCCESS) && (params.d_model == 512) &&
-                    (params.nhead == 8) && (params.attn_window.first == 127) &&
-                    (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    use_koi_tiled = (options.device().is_cuda() && koi_tc_is_available(KOI_F16) == KOI_SUCCESS) &&
+                    (params.d_model == 512) && (params.nhead == 8) &&
+                    (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
+                    (params.dim_feedforward == 2048);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 #endif
 
