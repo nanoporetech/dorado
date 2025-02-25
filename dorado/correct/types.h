@@ -62,4 +62,8 @@ struct ModelConfig {
 
 std::ostream& operator<<(std::ostream& os, const OverlapWindow& ovl);
 
+std::ostream& operator<<(std::ostream& os, const WindowFeatures& wf);
+
+bool operator==(const OverlapWindow& lhs, const OverlapWindow& rhs);
+
 }  // namespace dorado::correction
