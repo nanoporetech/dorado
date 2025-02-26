@@ -440,7 +440,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     auto pipeline_restart = GENERATE(false, true);
     auto is_rna = GENERATE(false, true);
     auto is_rna_adapter = false;
-    auto speed_calibration = GENERATE(1.f, 1.3);
+    auto speed_calibration = GENERATE(1.f, 1.3f);
     auto offset_calibration = GENERATE(0.f, 10.f);
     if (is_rna) {
         is_rna_adapter = GENERATE(false, true);
