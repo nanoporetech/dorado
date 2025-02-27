@@ -57,15 +57,6 @@ sanitize:linux:x86:focal:
     #   detect_leaks - LeakSanitizer errors out for some reason
     - export ASAN_OPTIONS=${ASAN_OPTIONS}:protect_shadow_gap=0:detect_leaks=0
 
-sanitize:linux:arm64:focal:
-  extends:
-    - build:linux:arm64:focal
-    - .sanitizer_common_linux
-  before_script:
-    # Run both base setups
-    - !reference ["build:linux:arm64:focal", before_script]
-    - !reference [.sanitizer_common_linux, before_script]
-
 sanitize:macos:arm:
   extends:
     - build:macos:arm
