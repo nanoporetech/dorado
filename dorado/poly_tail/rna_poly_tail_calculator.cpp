@@ -24,8 +24,9 @@ namespace dorado::poly_tail {
 
 RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config,
                                              bool is_rna_adapter,
-                                             const std::vector<float>& calibration_coeffs)
-        : PolyTailCalculator(std::move(config), calibration_coeffs),
+                                             float speed_calibration,
+                                             float offset_calibration)
+        : PolyTailCalculator(std::move(config), speed_calibration, offset_calibration),
           m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {

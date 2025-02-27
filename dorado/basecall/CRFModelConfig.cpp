@@ -80,17 +80,16 @@ void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml)
 void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("poly_a")) {
         const auto &polya = toml::find(config_toml, "poly_a");
-        const auto &coeffs = toml::find(polya, "calibration_coefficients");
-        if (coeffs.is_array()) {
-            for (const auto &coeff : coeffs.as_array()) {
-                config.polya_coeffs.push_back(static_cast<float>(coeff.as_floating()));
-            }
-        } else if (coeffs.is_floating() || coeffs.is_integer()) {
-            config.polya_coeffs.push_back(static_cast<float>(coeffs.as_floating()));
-        } else {
-            throw std::runtime_error("Invalid type for polyA calibration coefficients in " +
-                                     config.model_path.u8string());
+        if (polya.contains("calibration_coefficients")) {
+            throw std::runtime_error(
+                    "This version of dorado does not support use of "
+                    "'polya.calibration_coefficients'.");
         }
+        config.polya_speed_correction = toml::find<float>(polya, "speed_correction");
+        config.polya_offset_correction = toml::find<float>(polya, "offset_correction");
+    }
+    if (config.polya_speed_correction == 0) {
+        throw std::runtime_error("model config error - poly_a.speed_correction cannot be <= 0");
     }
 }
 
