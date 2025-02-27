@@ -45,6 +45,9 @@ const std::string LWB_1st_REAR = "ACTTGCCTGTCGCTCTATCTTC";
 const std::string LWB_2nd_FRONT = "CCGTGAC";
 const std::string LWB_2nd_REAR = "TTTCTGTTGGTGCTGATATTGC";
 
+const std::string MAB_FRONT = "GCTTGGGTGTTTAACC";
+const std::string MAB_REAR = "CCATATCCGTGTCGCCCTT";
+
 // Predefined collection of barcode sequences that are used by various kits.
 // Since some of the collections are used in multiple barcoding kits, it made
 // sense to pull them out separately.
@@ -108,11 +111,29 @@ const std::vector<std::string> RBK_1_96 = {
         "BC78", "BC79", "BC80", "BC81",  "BC82",  "BC83",  "BC84",  "BC85", "BC86", "BC87",  "BC88",
         "BC89", "BC90", "BC91", "BC92",  "BC93",  "BC94",  "BC95",  "BC96"};
 
+const std::vector<std::string> TP_1_24 = {"TP01", "TP02", "TP03", "TP04", "TP05", "TP06",
+                                          "TP07", "TP08", "TP09", "TP10", "TP11", "TP12",
+                                          "TP13", "TP14", "TP15", "TP16", "TP17", "TP18",
+                                          "TP19", "TP20", "TP21", "TP22", "TP23", "TP24"};
+
 // Kit specific scoring parameters.
 
 const BarcodeKitScoringParams DEFAULT_PARAMS{};
 
 const BarcodeKitScoringParams RBK114_PARAMS{
+        /*max_barcode_penalty*/ 12,
+        /*barcode_end_proximity*/ 75,
+        /*min_barcode_penalty_dist*/ 3,
+        /*min_separation_only_dist*/ 6,
+        /*flank_left_pad*/ 5,
+        /*flank_right_pad*/ 10,
+        /*front_barcode_window*/ 175,
+        /*rear_barcode_window*/ 175,
+        /*min_flank_score*/ 0.0f,
+        /*midstrand_flank_score*/ 0.95f,
+};
+
+const BarcodeKitScoringParams MAB114_PARAMS{
         /*max_barcode_penalty*/ 12,
         /*barcode_end_proximity*/ 75,
         /*min_barcode_penalty_dist*/ 3,
@@ -192,6 +213,21 @@ std::unordered_map<std::string, KitInfo> kit_info_map = {
         // SQK-16S024 && SQK-16S114-24
         {"SQK-16S024", kit_16S},
         {"SQK-16S114-24", kit_16S},
+        // MAB114
+        {"SQK-MAB114-24",
+         {
+                 "MAB114",
+                 false,
+                 false,
+                 false,
+                 MAB_FRONT,
+                 MAB_REAR,
+                 "",
+                 "",
+                 TP_1_24,
+                 {},
+                 MAB114_PARAMS,
+         }},
         // LWB
         {"SQK-PBK004", kit_lwb},
         {"SQK-LWB001", kit_lwb},
@@ -669,6 +705,31 @@ std::unordered_map<std::string, std::string> barcodes = {
         {"NB94", "GATTGTCCTCAAACTGCCACCTAC"},
         {"NB95", "CCTGTCTGGAAGAAGAATGGACTT"},
         {"NB96", "CTGAACGGTCATAGAGTCCACCAT"},
+        // MAB114 barcodes
+        {"TP01", "GCACCTGGAACTTGTGCCTTCCAC"},
+        {"TP02", "CCGAAATAGGTTATCTGTTGTTGT"},
+        {"TP03", "ATCAATCGCTGGACGATGGATTAG"},
+        {"TP04", "CCACCCGCTCCTGCCGGTGGGCGT"},
+        {"TP05", "AGACTCTTGGGCTCGCCACGTCCC"},
+        {"TP06", "TCTGTATCCGGAGACGGGATGGAC"},
+        {"TP07", "TTTCGGATCAATCGACCGCAAACG"},
+        {"TP08", "ACTCAAACATTCTGTTAGATCGCG"},
+        {"TP09", "AAATGGAACCCGGATATGTTTACT"},
+        {"TP10", "TAAATCGACCTATGATGAACACAG"},
+        {"TP11", "ACATGTTGGAGTGAAAGTCGGGTA"},
+        {"TP12", "CCTGGACCACGATCATTGTAACAT"},
+        {"TP13", "TATGGTGGATCTCCCTCTATCTTC"},
+        {"TP14", "AAGTAAATGGGACGCCCACTCCGA"},
+        {"TP15", "TGTTCGCGGCTTGATCTAATATTA"},
+        {"TP16", "AGAGAGCTTCCCGGGAGGGTGGTC"},
+        {"TP17", "TTGTGAATATCTGTCACAAACACC"},
+        {"TP18", "CAATCGTACCAGGGAACATAAAGT"},
+        {"TP19", "CACACCCAAACAATATGGACCCGT"},
+        {"TP20", "AATAACCACATCCGCCCTCCGCAC"},
+        {"TP21", "TCCTAATAATGTGTAGATCGGTCC"},
+        {"TP22", "AGTCGATGGAACAAGAGAAGTTAT"},
+        {"TP23", "AAACTCACTGTATGTCGTTTCTAT"},
+        {"TP24", "TGACATCACTGATCGAGGAAGATC"},
         // Twist 96x A-plate barcodes
         {"AA01F_01", "GCTGAAGATA"},
         {"AA01R_01", "CCAATATTCG"},
