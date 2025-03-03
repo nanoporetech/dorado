@@ -22,8 +22,10 @@ void initialise_torch() {
     // on one of our 44 core CI machine from ~4mins to ~20sec.
     torch::set_num_threads(1);
 
+#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR > 0
     // We don't want empty tensors to be initialised with data since we always overwrite them.
     torch::globalContext().setDeterministicFillUninitializedMemory(false);
+#endif
 }
 
 void make_torch_deterministic() {
