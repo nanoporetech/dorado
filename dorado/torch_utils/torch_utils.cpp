@@ -21,6 +21,9 @@ void initialise_torch() {
     // them, significantly hurting performance. Limiting this to the minimum number of threads (1) reduces runtime
     // on one of our 44 core CI machine from ~4mins to ~20sec.
     torch::set_num_threads(1);
+
+    // We don't want empty tensors to be initialised with data since we always overwrite them.
+    torch::globalContext().setDeterministicFillUninitializedMemory(false);
 }
 
 void make_torch_deterministic() {
