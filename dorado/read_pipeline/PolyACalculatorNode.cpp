@@ -35,6 +35,9 @@ void PolyACalculatorNode::input_thread_fn() {
             continue;
         }
 
+        // Poly-tail selection is enabled, so adjust default value of poly-tail length.
+        read->read_common.rna_poly_tail_length = ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND;
+
         auto calculator = selector->get_calculator(read->read_common.barcode);
         if (!calculator) {
             send_message_to_sink(std::move(read));
@@ -64,6 +67,8 @@ void PolyACalculatorNode::input_thread_fn() {
                 // Set tail length property in the read.
                 read->read_common.rna_poly_tail_length = num_bases;
             } else {
+                // On failure, set tail length to 0 to distinguish from the anchor not having been found.
+                read->read_common.rna_poly_tail_length = 0;
                 num_not_called++;
             }
         } else {
