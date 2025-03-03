@@ -658,9 +658,9 @@ void setup(const std::vector<std::string>& args,
 }  // namespace
 
 int basecaller(int argc, char* argv[]) {
+    utils::initialise_torch();
     utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
-    torch::set_num_threads(1);
 
     utils::arg_parse::ArgParser parser("dorado");
     int verbosity = 0;

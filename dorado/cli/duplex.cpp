@@ -296,6 +296,7 @@ using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
+    utils::initialise_torch();
     utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
@@ -316,7 +317,6 @@ int duplex(int argc, char* argv[]) {
     // inference and decode step because of the fragmentation caused by the
     // cached CUBLAS workspace from the stero model. This causes OOM.
     //utils::make_torch_deterministic();
-    torch::set_num_threads(1);
 
     utils::arg_parse::ArgParser parser("dorado");
 

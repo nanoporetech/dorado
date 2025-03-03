@@ -15,6 +15,14 @@
 
 namespace dorado::utils {
 
+void initialise_torch() {
+    // By default Torch spins up a thread per core for every operation that might benefit from OMP. A lot of these
+    // operations are small and the threads don't appear to be pooled and so torch continuously spawns and destroys
+    // them, significantly hurting performance. Limiting this to the minimum number of threads (1) reduces runtime
+    // on one of our 44 core CI machine from ~4mins to ~20sec.
+    torch::set_num_threads(1);
+}
+
 void make_torch_deterministic() {
 #if DORADO_CUDA_BUILD
     setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8", true);

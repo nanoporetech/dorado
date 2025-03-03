@@ -12,8 +12,8 @@ int main(int argc, char* argv[]) {
 
     dorado::utils::ensure_user_locale_may_be_set();
 
+    dorado::utils::initialise_torch();
     dorado::utils::make_torch_deterministic();
-    torch::set_num_threads(1);
 
     // Initialize NVTX first before any tests are run. This is
     // needed because the NVTX initialization is not thread safe,
