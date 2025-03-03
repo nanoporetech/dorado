@@ -138,12 +138,24 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     }
 
     CATCH_SECTION("PolyA tail length") {
-        auto old_tail_length = std::exchange(read_common.rna_poly_tail_length, 20);
-
+        auto old_tail_length = std::exchange(read_common.rna_poly_tail_length,
+                                             dorado::ReadCommon::POLY_TAIL_NOT_ENABLED);
         auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
+        CATCH_CHECK(bam_aux_get(aln, "pt") == nullptr);
 
+        read_common.rna_poly_tail_length = dorado::ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND;
+        alignments = read_common.extract_sam_lines(false, std::nullopt, false);
+        CATCH_REQUIRE(alignments.size() == 1);
+        aln = alignments[0].get();
+        CATCH_CHECK(bam_aux2i(bam_aux_get(aln, "pt")) ==
+                    dorado::ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND);
+
+        read_common.rna_poly_tail_length = 20;
+        alignments = read_common.extract_sam_lines(false, std::nullopt, false);
+        CATCH_REQUIRE(alignments.size() == 1);
+        aln = alignments[0].get();
         CATCH_CHECK(bam_aux2i(bam_aux_get(aln, "pt")) == 20);
 
         read_common.rna_poly_tail_length = old_tail_length;
