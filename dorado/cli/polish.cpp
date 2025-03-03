@@ -925,8 +925,6 @@ prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft
     return std::make_pair(std::move(ret), std::move(region_batches));
 }
 
-}  // namespace
-
 void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
@@ -1155,6 +1153,8 @@ void run_polishing(const Options& opt,
         }
     }
 }
+
+}  // namespace
 
 int polish(int argc, char* argv[]) {
     try {
