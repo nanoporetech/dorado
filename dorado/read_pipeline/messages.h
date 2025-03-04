@@ -40,6 +40,8 @@ class ClientInfo;
 
 class ReadCommon {
 public:
+    static constexpr int POLY_TAIL_NO_ANCHOR_FOUND = -1;
+    static constexpr int POLY_TAIL_NOT_ENABLED = -2;
     at::Tensor raw_data;  // Loaded from source file
 
     int model_stride{-1};  // The down sampling factor of the model
@@ -114,7 +116,7 @@ public:
     models::RapidChemistry rapid_chemistry{models::RapidChemistry::UNKNOWN};
 
     // Track length of estimated polyA tail in bases.
-    int rna_poly_tail_length{-1};
+    int rna_poly_tail_length{POLY_TAIL_NOT_ENABLED};
     // Track position of end of RNA adapter in signal space. If the RNA adapter is
     // trimmed, this will be 0. Otherwise it will be the position in the signal
     // where the adapter ends.
