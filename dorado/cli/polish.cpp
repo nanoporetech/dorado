@@ -11,6 +11,7 @@
 #include "polish/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/fai_utils.h"
@@ -924,8 +925,6 @@ prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft
     return std::make_pair(std::move(ret), std::move(region_batches));
 }
 
-}  // namespace
-
 void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
@@ -1155,6 +1154,8 @@ void run_polishing(const Options& opt,
     }
 }
 
+}  // namespace
+
 int polish(int argc, char* argv[]) {
     try {
         // Initialize CLI options. The parse_args below requires a non-const reference.
@@ -1218,8 +1219,7 @@ int polish(int argc, char* argv[]) {
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
-        // at::set_num_interop_threads(opt.threads);
-        torch::set_num_threads(1);
+        utils::initialise_torch();
 
         // Resolve the model for polishing.
         const polisher::ModelConfig model_config = resolve_model(
