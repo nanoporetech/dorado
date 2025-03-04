@@ -128,12 +128,12 @@ pthread-win32:
     license: ont-minimap2/src/3rdparty/pthread-win32/docs/LICENSE.md
     files:
         - ont-minimap2/src/3rdparty/pthread-win32
-# For pytorch builds see https://git.oxfordnanolabs.local/blawrence/pytorch-build-scripts/-/blob/master/setup.linux.sh
+# For pytorch builds see https://git.oxfordnanolabs.local/machine-learning/torch-builds
 # pytorch is not in the source tree as it's downloaded from the CDN
 pytorch:
     description: >
         Tensor computation (like NumPy) with strong GPU acceleration and Deep neural networks.
-    version: "v2.0.0"
+    version: "v2.6.0"
     url: https://github.com/pytorch/pytorch
     license: PATH_NOT_AVAILABLE
     files:
