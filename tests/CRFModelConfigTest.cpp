@@ -1,6 +1,5 @@
-#include "config/CRFModelConfig.h"
-
 #include "TestUtils.h"
+#include "config/BasecallModelConfig.h"
 #include "models/kits.h"
 #include "utils/parameters.h"
 

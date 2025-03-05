@@ -1,6 +1,6 @@
 #include "crf_utils.h"
 
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "nn/CRFModel.h"
 #include "nn/TxModel.h"
 #include "torch_utils/tensor_utils.h"

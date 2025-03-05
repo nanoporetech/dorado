@@ -6,7 +6,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/ModelRunner.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
 #include "modbase/ModBaseModelConfig.h"

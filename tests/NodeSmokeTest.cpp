@@ -1,7 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "api/runner_creation.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "nn/MetalCRFModel.h"
 #include "nn/TxModel.h"

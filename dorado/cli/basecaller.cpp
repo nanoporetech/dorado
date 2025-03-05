@@ -4,7 +4,7 @@
 #include "basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"

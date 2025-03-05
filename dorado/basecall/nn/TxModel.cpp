@@ -1,7 +1,7 @@
 #include "basecall/nn/TxModel.h"
 
 #include "basecall/nn/CRFModel.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/dev_utils.h"
 #include "utils/math_utils.h"

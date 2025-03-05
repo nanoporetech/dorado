@@ -4,7 +4,7 @@
 #include "cli/basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"

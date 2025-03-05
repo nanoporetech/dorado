@@ -2,7 +2,7 @@
 #include "config/BasecallerParams.h"
 
 #include "TestUtils.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "utils/parameters.h"
 
 #include <catch2/catch_test_macros.hpp>

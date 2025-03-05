@@ -1,4 +1,4 @@
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include "models/kits.h"
 #include "models/models.h"

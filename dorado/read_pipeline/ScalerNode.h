@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MessageSink.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "utils/stats.h"
 
 #include <atomic>

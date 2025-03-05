@@ -1,7 +1,7 @@
 #pragma once
 
 #include "basecall/nn/CRFModel.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"

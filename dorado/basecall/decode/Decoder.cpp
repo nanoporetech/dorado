@@ -5,7 +5,7 @@
 #endif
 
 #include "CPUDecoder.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include <c10/core/Device.h>
 

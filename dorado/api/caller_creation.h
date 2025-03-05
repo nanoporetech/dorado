@@ -1,8 +1,8 @@
 #pragma once
 
 #include "basecall/ModelRunnerBase.h"
+#include "config/BasecallModelConfig.h"
 #include "config/BasecallerParams.h"
-#include "config/CRFModelConfig.h"
 
 #include <filesystem>
 #include <memory>

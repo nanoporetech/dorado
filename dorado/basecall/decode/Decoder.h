@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include <ATen/core/TensorBody.h>
 

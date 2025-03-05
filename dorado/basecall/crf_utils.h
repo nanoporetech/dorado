@@ -1,7 +1,7 @@
 #pragma once
 
 #include "basecall/ModelRunnerBase.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include <torch/nn.h>
 

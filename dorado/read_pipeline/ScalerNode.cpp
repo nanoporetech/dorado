@@ -1,6 +1,6 @@
 #include "ScalerNode.h"
 
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "demux/adapter_info.h"
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"

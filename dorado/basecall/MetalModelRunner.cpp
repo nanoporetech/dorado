@@ -4,7 +4,7 @@
 #include "MetalModelRunner.h"
 
 #include "MetalCaller.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>

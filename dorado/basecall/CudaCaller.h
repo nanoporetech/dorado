@@ -2,7 +2,7 @@
 #pragma once
 
 #include "ModelRunnerBase.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "utils/stats.h"
 

@@ -1,7 +1,7 @@
 #include "pipeline_creation.h"
 
 #include "basecall/ModelRunnerBase.h"
-#include "config/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/BasecallerNode.h"
 #include "read_pipeline/ModBaseCallerNode.h"

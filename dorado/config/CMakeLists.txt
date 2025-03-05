@@ -1,8 +1,8 @@
 add_library(dorado_config STATIC
     BasecallerParams.cpp
     BasecallerParams.h
-    CRFModelConfig.cpp
-    CRFModelConfig.h
+    BasecallModelConfig.cpp
+    BasecallModelConfig.h
 )
 
 target_link_libraries(dorado_config
