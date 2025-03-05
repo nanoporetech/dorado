@@ -70,8 +70,6 @@ struct ConvParams {
     std::string to_string() const;
 };
 
-namespace tx {
-
 struct TxEncoderParams {
     // The number of expected features in the encoder/decoder inputs
     int d_model{-1};
@@ -124,7 +122,7 @@ struct CRFEncoderParams {
     std::string to_string() const;
 };
 
-struct Params {
+struct TxStack {
     TxEncoderParams tx;
     EncoderUpsampleParams upsample;
     CRFEncoderParams crf;
@@ -132,8 +130,6 @@ struct Params {
     // Self consistency check
     void check() const;
 };
-
-}  // namespace tx
 
 // Values extracted from config.toml used in construction of the model module.
 struct CRFModelConfig {
@@ -172,7 +168,7 @@ struct CRFModelConfig {
     std::vector<ConvParams> convs;
 
     // Tx Model Params
-    std::optional<tx::Params> tx = std::nullopt;
+    std::optional<TxStack> tx = std::nullopt;
 
     BasecallerParams basecaller;
 

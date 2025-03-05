@@ -434,7 +434,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const config::tx::TxEncoderParams &params_,
+TxEncoderImpl::TxEncoderImpl(const config::TxEncoderParams &params_,
                              const at::TensorOptions &options)
         : params(params_) {
     self_attn =
@@ -669,7 +669,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const config::tx::TxEncoderParams &params,
+TxEncoderStackImpl::TxEncoderStackImpl(const config::TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
@@ -730,7 +730,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
     return stack->forward(x);
 }
 
-LinearUpsampleImpl::LinearUpsampleImpl(const config::tx::EncoderUpsampleParams &params)
+LinearUpsampleImpl::LinearUpsampleImpl(const config::EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
     linear = register_module(
             "linear",
@@ -745,7 +745,7 @@ at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     return out;
 };
 
-LinearScaledCRFImpl::LinearScaledCRFImpl(const config::tx::CRFEncoderParams &params) {
+LinearScaledCRFImpl::LinearScaledCRFImpl(const config::CRFEncoderParams &params) {
     m_params = params;
     linear = register_module(
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));

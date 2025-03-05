@@ -465,8 +465,6 @@ ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
     throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
 }
 
-namespace tx {
-
 std::string TxEncoderParams::to_string() const {
     std::string str = "TxEncoderParams {";
     str += " d_model:" + std::to_string(d_model);
@@ -570,7 +568,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
     const CRFEncoderParams crf_encoder = parse_crf_encoder_params(config_toml);
 
-    config.tx = tx::Params{tx_encoder, upsample, crf_encoder};
+    config.tx = TxStack{tx_encoder, upsample, crf_encoder};
     config.tx->check();
 
     const auto &convs = toml::find(model_toml, "encoder", "conv");
@@ -604,7 +602,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     return config;
 }
 
-void Params::check() const {
+void TxStack::check() const {
     const auto eq = [](const int a, const int b, const std::string &msg) {
         if (a != b) {
             spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
@@ -613,8 +611,6 @@ void Params::check() const {
     eq(crf.insize, tx.d_model, "linearcrfencoder.insize == transformer_encoder.layer.d_model");
     eq(upsample.d_model, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
 }
-
-}  // namespace tx
 
 bool CRFModelConfig::has_normalised_basecaller_params() const {
     bool is_normalised = true;
@@ -640,7 +636,7 @@ bool CRFModelConfig::has_normalised_basecaller_params() const {
 }
 
 CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
-    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
+    return is_tx_model_config(path) ? load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
 }  // namespace dorado::config
