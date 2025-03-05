@@ -51,7 +51,7 @@ void force_reference(T* sym) {
 }
 
 template <typename Obj, typename T>
-void force_reference(T Obj::*sym) {
+void force_reference(T Obj::* sym) {
     // Storing to volatile ensures the value is read, which forces a reference.
     volatile auto ptr = sym;
     (void)ptr;
