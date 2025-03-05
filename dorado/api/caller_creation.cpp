@@ -18,7 +18,7 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
 }
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const config::CRFModelConfig& model_config,
+        const config::BasecallModelConfig& model_config,
         float memory_limit_fraction) {
     if (model_config.is_tx_model()) {
         return std::make_shared<basecall::MetalTxCaller>(model_config);

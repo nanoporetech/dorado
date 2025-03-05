@@ -132,7 +132,7 @@ struct TxStack {
 };
 
 // Values extracted from config.toml used in construction of the model module.
-struct CRFModelConfig {
+struct BasecallModelConfig {
     float qscale = 1.0f;
     float qbias = 0.0f;
     int lstm_size = 0;
@@ -199,10 +199,10 @@ struct CRFModelConfig {
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
+BasecallModelConfig load_model_config(const std::filesystem::path& path);
 
-bool is_rna_model(const CRFModelConfig& model_config);
-bool is_duplex_model(const CRFModelConfig& model_config);
+bool is_rna_model(const BasecallModelConfig& model_config);
+bool is_duplex_model(const BasecallModelConfig& model_config);
 
 models::Chemistry parse_model_chemistry(const std::filesystem::path& path);
 

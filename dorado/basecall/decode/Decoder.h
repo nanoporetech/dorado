@@ -42,6 +42,7 @@ public:
     virtual at::ScalarType dtype() const = 0;
 };
 
-std::unique_ptr<Decoder> create_decoder(c10::Device device, const config::CRFModelConfig& config);
+std::unique_ptr<Decoder> create_decoder(c10::Device device,
+                                        const config::BasecallModelConfig& config);
 
 }  // namespace dorado::basecall::decode

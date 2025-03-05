@@ -78,10 +78,10 @@ config::BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    config::CRFModelConfig model_config;
+    config::BasecallModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    config::CRFModelConfig stereo_model_config;
+    config::BasecallModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -173,7 +173,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = config::load_crf_model_config(model_path);
+            const auto model_config = config::load_model_config(model_path);
             const auto model_name = model_path.filename().string();
             const auto model_sample_rate = model_config.sample_rate < 0
                                                    ? get_sample_rate_by_model_name(model_name)
@@ -214,7 +214,7 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_path.filename().string();
-    auto model_config = config::load_crf_model_config(model_path);
+    auto model_config = config::load_model_config(model_path);
     model_config.basecaller.update(basecaller_params);
     model_config.normalise_basecaller_params();
 
@@ -231,7 +231,7 @@ DuplexModels load_models(const std::string& model_arg,
 #endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = config::load_crf_model_config(stereo_model_path);
+    auto stereo_model_config = config::load_model_config(stereo_model_path);
     stereo_model_config.basecaller.update(basecaller_params);
     stereo_model_config.normalise_basecaller_params();
 

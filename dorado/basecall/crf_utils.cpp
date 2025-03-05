@@ -58,7 +58,7 @@ std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir
     return utils::load_tensors(dir, tensors);
 }
 
-std::vector<torch::Tensor> load_tx_model_weights(const config::CRFModelConfig &cfg) {
+std::vector<torch::Tensor> load_tx_model_weights(const config::BasecallModelConfig &cfg) {
     if (!cfg.is_tx_model()) {
         throw std::runtime_error(
                 "load_tx_model_weights expected a transformer model config from: '" +
@@ -117,7 +117,7 @@ std::vector<torch::Tensor> load_tx_model_weights(const config::CRFModelConfig &c
     return utils::load_tensors(cfg.model_path, tensors);
 }
 
-std::vector<at::Tensor> load_crf_model_weights(const config::CRFModelConfig &model_config) {
+std::vector<at::Tensor> load_crf_model_weights(const config::BasecallModelConfig &model_config) {
     if (model_config.is_tx_model()) {
         return load_tx_model_weights(model_config);
     }
@@ -125,7 +125,7 @@ std::vector<at::Tensor> load_crf_model_weights(const config::CRFModelConfig &mod
                                    model_config.bias);
 }
 
-ModuleHolder<AnyModule> load_lstm_model(const config::CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_lstm_model(const config::BasecallModelConfig &model_config,
                                         const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
     auto state_dict = load_crf_model_weights(model_config);
@@ -139,7 +139,7 @@ ModuleHolder<AnyModule> load_lstm_model(const config::CRFModelConfig &model_conf
     return holder;
 }
 
-ModuleHolder<AnyModule> load_tx_model(const config::CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_tx_model(const config::BasecallModelConfig &model_config,
                                       const at::TensorOptions &options) {
     auto model = nn::TxModel(model_config, options);
     auto state_dict = load_crf_model_weights(model_config);
@@ -153,7 +153,7 @@ ModuleHolder<AnyModule> load_tx_model(const config::CRFModelConfig &model_config
     return holder;
 }
 
-ModuleHolder<AnyModule> load_crf_model(const config::CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_crf_model(const config::BasecallModelConfig &model_config,
                                        const torch::TensorOptions &options) {
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Device> device;
@@ -168,7 +168,7 @@ ModuleHolder<AnyModule> load_crf_model(const config::CRFModelConfig &model_confi
     return load_lstm_model(model_config, options);
 }
 
-size_t auto_calculate_num_runners(const config::CRFModelConfig &model_config,
+size_t auto_calculate_num_runners(const config::BasecallModelConfig &model_config,
                                   float memory_fraction) {
     auto model_name = std::filesystem::canonical(model_config.model_path).filename().string();
 

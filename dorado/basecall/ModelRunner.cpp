@@ -6,7 +6,7 @@
 
 namespace dorado::basecall {
 
-ModelRunner::ModelRunner(const config::CRFModelConfig &model_config, const std::string &device)
+ModelRunner::ModelRunner(const config::BasecallModelConfig &model_config, const std::string &device)
         : m_config(model_config),
           m_decoder(decode::create_decoder(device, model_config)),
           // TODO: m_options.dtype() depends on the device as TxModel uses kHalf in cuda which is not supported on CPU

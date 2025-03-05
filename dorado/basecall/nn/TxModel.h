@@ -165,7 +165,8 @@ struct LinearScaledCRFImpl : torch::nn::Module {
 TORCH_MODULE(LinearScaledCRF);
 
 struct TxModelImpl : torch::nn::Module {
-    explicit TxModelImpl(const config::CRFModelConfig &config, const at::TensorOptions &options);
+    explicit TxModelImpl(const config::BasecallModelConfig &config,
+                         const at::TensorOptions &options);
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights);

@@ -725,7 +725,7 @@ at::Tensor ClampImpl::forward(at::Tensor x) {
     return x;
 }
 
-CRFModelImpl::CRFModelImpl(const CRFModelConfig &config) {
+CRFModelImpl::CRFModelImpl(const BasecallModelConfig &config) {
     const auto cv = config.convs;
     const auto lstm_size = config.lstm_size;
     convs = register_module("convs", ConvStack(cv));

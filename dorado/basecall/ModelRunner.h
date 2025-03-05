@@ -14,10 +14,10 @@ namespace dorado::basecall {
 
 class ModelRunner final : public ModelRunnerBase {
 public:
-    ModelRunner(const config::CRFModelConfig &model_config, const std::string &device);
+    ModelRunner(const config::BasecallModelConfig &model_config, const std::string &device);
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
-    const config::CRFModelConfig &config() const final { return m_config; };
+    const config::BasecallModelConfig &config() const final { return m_config; };
     size_t chunk_size() const final { return m_input_NCT.size(2); }
     size_t batch_size() const final { return m_input_NCT.size(0); }
     void terminate() final {}
@@ -26,7 +26,7 @@ public:
     stats::NamedStats sample_stats() const final;
 
 private:
-    const config::CRFModelConfig m_config;
+    const config::BasecallModelConfig m_config;
     std::unique_ptr<decode::Decoder> m_decoder;
     at::TensorOptions m_options;
     decode::DecoderOptions m_decoder_options;

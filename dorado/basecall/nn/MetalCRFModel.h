@@ -51,7 +51,7 @@ TORCH_MODULE(MetalLSTM);
 struct MetalBlockImpl : torch::nn::Module {
     MetalBlockImpl(int chunk_size_,
                    int batch_size_,
-                   const config::CRFModelConfig &config_,
+                   const config::BasecallModelConfig &config_,
                    int out_split_,
                    MTL::Device *const device);
 
@@ -75,7 +75,7 @@ struct MetalBlockImpl : torch::nn::Module {
     std::vector<NS::SharedPtr<MTL::Buffer>> m_args_lstm;
     std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
     int in_chunk_size, lstm_chunk_size, batch_size, kernel_thread_groups, kernel_simd_groups;
-    config::CRFModelConfig config;
+    config::BasecallModelConfig config;
     MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
     MetalConv1d conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
     MetalLinear linear1{nullptr}, linear2{nullptr};
@@ -84,7 +84,7 @@ struct MetalBlockImpl : torch::nn::Module {
 TORCH_MODULE(MetalBlock);
 
 struct MetalCRFModelImpl : torch::nn::Module {
-    MetalCRFModelImpl(const config::CRFModelConfig &config,
+    MetalCRFModelImpl(const config::BasecallModelConfig &config,
                       int chunk_size,
                       int batch_size,
                       int out_split,

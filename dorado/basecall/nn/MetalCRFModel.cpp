@@ -215,7 +215,7 @@ MetalLSTMImpl::MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) 
 
 MetalBlockImpl::MetalBlockImpl(int chunk_size_,
                                int batch_size_,
-                               const config::CRFModelConfig &config_,
+                               const config::BasecallModelConfig &config_,
                                int out_split_,
                                MTL::Device *const device)
         : m_device(device), in_chunk_size(chunk_size_), batch_size(batch_size_), config(config_) {
@@ -559,7 +559,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     return command_buffer;
 }
 
-MetalCRFModelImpl::MetalCRFModelImpl(const config::CRFModelConfig &config,
+MetalCRFModelImpl::MetalCRFModelImpl(const config::BasecallModelConfig &config,
                                      int chunk_size,
                                      int batch_size,
                                      int out_split,

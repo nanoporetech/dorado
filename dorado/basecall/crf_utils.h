@@ -11,13 +11,13 @@
 
 namespace dorado::basecall {
 
-std::vector<at::Tensor> load_crf_model_weights(const config::CRFModelConfig& model_config);
+std::vector<at::Tensor> load_crf_model_weights(const config::BasecallModelConfig& model_config);
 
 torch::nn::ModuleHolder<torch::nn::AnyModule> load_crf_model(
-        const config::CRFModelConfig& model_config,
+        const config::BasecallModelConfig& model_config,
         const torch::TensorOptions& options);
 
-size_t auto_calculate_num_runners(const config::CRFModelConfig& model_config,
+size_t auto_calculate_num_runners(const config::BasecallModelConfig& model_config,
                                   float memory_fraction);
 
 }  // namespace dorado::basecall

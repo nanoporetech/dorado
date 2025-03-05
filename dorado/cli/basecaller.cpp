@@ -91,7 +91,7 @@ public:
 };
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
-                           config::CRFModelConfig& model_config,
+                           config::BasecallModelConfig& model_config,
                            const std::string& device) {
     model_config.basecaller.update(config::BatchParams::Priority::CLI_ARG,
                                    cli::get_optional_argument<int>("--chunksize", arg),
@@ -306,7 +306,7 @@ utils::modbase::ModBaseParams validate_modbase_params(
 }
 
 void setup(const std::vector<std::string>& args,
-           const config::CRFModelConfig& model_config,
+           const config::BasecallModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
            const std::vector<fs::path>& modbase_models,
            const std::string& device,
@@ -888,7 +888,7 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = config::load_crf_model_config(model_path);
+    auto model_config = config::load_model_config(model_path);
     set_basecaller_params(parser.visible, model_config, device);
 
     spdlog::info("> Creating basecall pipeline");

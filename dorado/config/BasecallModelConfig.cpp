@@ -55,7 +55,7 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }  // namespace
 namespace dorado::config {
 
-void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml) {
+void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
         config.qbias = toml::find<float>(qscore, "bias");
@@ -76,7 +76,7 @@ void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml)
     }
 }
 
-void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_toml) {
+void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("poly_a")) {
         const auto &polya = toml::find(config_toml, "poly_a");
         if (polya.contains("calibration_coefficients")) {
@@ -92,7 +92,7 @@ void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_
     }
 }
 
-void parse_run_info(CRFModelConfig &config,
+void parse_run_info(BasecallModelConfig &config,
                     const std::string &model_name,
                     const toml::value &config_toml) {
     // Fetch run_info parameters.
@@ -254,8 +254,8 @@ std::string ConvParams::to_string() const {
     return str;
 };
 
-std::string CRFModelConfig::to_string() const {
-    std::string str = "CRFModelConfig {";
+std::string BasecallModelConfig::to_string() const {
+    std::string str = "BasecallModelConfig {";
     str += " qscale:" + std::to_string(qscale);
     str += " qbias:" + std::to_string(qbias);
     str += " stride:" + std::to_string(stride);
@@ -290,14 +290,14 @@ std::string CRFModelConfig::to_string() const {
         str += " transformer: " + tx->tx.to_string();
         str += " upsample: " + tx->upsample.to_string();
     }
-    str += " }}";  // model_type & CRFModelConfig
+    str += " }}";  // model_type & BasecallModelConfig
     return str;
 };
 
-CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
+BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     const toml::value config_toml = toml::parse(path / "config.toml");
 
-    CRFModelConfig config;
+    BasecallModelConfig config;
     config.model_path = path;
     config.basecaller.update(path);
 
@@ -408,7 +408,7 @@ bool is_tx_model_config(const std::filesystem::path &path) {
     return res.has_value();
 }
 
-bool is_rna_model(const CRFModelConfig &model_config) {
+bool is_rna_model(const BasecallModelConfig &model_config) {
     switch (model_config.sample_type) {
     case models::SampleType::DNA:
         return false;
@@ -423,7 +423,9 @@ bool is_rna_model(const CRFModelConfig &model_config) {
     throw std::logic_error("Model config sample type is not recognised!");
 }
 
-bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
+bool is_duplex_model(const BasecallModelConfig &model_config) {
+    return model_config.num_features > 1;
+}
 
 std::string to_string(const Activation &activation) {
     switch (activation) {
@@ -552,11 +554,11 @@ CRFEncoderParams parse_crf_encoder_params(const toml::value &cfg) {
     return params;
 }
 
-CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
+BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
     const auto model_toml = toml::find(config_toml, "model");
 
-    CRFModelConfig config;
+    BasecallModelConfig config;
 
     config.model_path = path;
     config.basecaller.update(path);
@@ -611,7 +613,7 @@ void TxStack::check() const {
     eq(upsample.d_model, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
 }
 
-bool CRFModelConfig::has_normalised_basecaller_params() const {
+bool BasecallModelConfig::has_normalised_basecaller_params() const {
     bool is_normalised = true;
     const auto cs = basecaller.chunk_size();
     const auto csg = chunk_size_granularity();
@@ -634,7 +636,7 @@ bool CRFModelConfig::has_normalised_basecaller_params() const {
     return is_normalised;
 }
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
+BasecallModelConfig load_model_config(const std::filesystem::path &path) {
     return is_tx_model_config(path) ? load_tx_model_config(path) : load_lstm_model_config(path);
 }
 

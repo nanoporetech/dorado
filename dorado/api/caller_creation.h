@@ -31,7 +31,7 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const basecall::BasecallerCreationParams& params);
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const config::CRFModelConfig& model_config,
+        const config::BasecallModelConfig& model_config,
         float memory_limit_fraction);
 #endif
 

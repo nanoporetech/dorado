@@ -14,14 +14,14 @@ class Tensor;
 
 namespace dorado::basecall {
 
-bool is_duplex_model(const config::CRFModelConfig &model_config);
+bool is_duplex_model(const config::BasecallModelConfig &model_config);
 
 class ModelRunnerBase {
 public:
     virtual ~ModelRunnerBase() = default;
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
     virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
-    virtual const config::CRFModelConfig &config() const = 0;
+    virtual const config::BasecallModelConfig &config() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
 
@@ -43,7 +43,7 @@ using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 enum class PipelineType { simplex_low_latency, simplex, duplex };
 
 struct BasecallerCreationParams {
-    const config::CRFModelConfig &model_config;
+    const config::BasecallModelConfig &model_config;
     const std::string &device;
     float memory_limit_fraction;
     PipelineType pipeline_type;
