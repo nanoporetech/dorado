@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 
 #include <torch/nn.h>
 
@@ -14,7 +14,7 @@ enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C
 #endif
 
 struct ConvStackImpl : torch::nn::Module {
-    explicit ConvStackImpl(const std::vector<ConvParams> &layer_params);
+    explicit ConvStackImpl(const std::vector<config::ConvParams> &layer_params);
 #if DORADO_CUDA_BUILD
     void reserve_working_memory(WorkingMemory &wm);
     void run_koi(WorkingMemory &wm);
@@ -23,8 +23,8 @@ struct ConvStackImpl : torch::nn::Module {
     at::Tensor forward(at::Tensor x);
 
     struct ConvLayer {
-        explicit ConvLayer(const ConvParams &params);
-        const ConvParams params;
+        explicit ConvLayer(const config::ConvParams &params);
+        const config::ConvParams params;
         torch::nn::Conv1d conv{nullptr};
 #if DORADO_CUDA_BUILD
         TensorLayout output_layout{TensorLayout::NTC};
@@ -91,7 +91,7 @@ TORCH_MODULE(ConvStack);
 TORCH_MODULE(Clamp);
 
 struct CRFModelImpl : torch::nn::Module {
-    explicit CRFModelImpl(const CRFModelConfig &config);
+    explicit CRFModelImpl(const config::CRFModelConfig &config);
     void load_state_dict(const std::vector<at::Tensor> &weights);
 #if DORADO_CUDA_BUILD
     at::Tensor run_koi(const at::Tensor &in);

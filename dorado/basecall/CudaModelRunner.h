@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModelRunnerBase.h"
+#include "config/CRFModelConfig.h"
 
 #include <ATen/core/TensorBody.h>
 #include <c10/cuda/CUDAStream.h>
@@ -13,7 +14,6 @@
 
 namespace dorado::basecall {
 
-struct CRFModelConfig;
 class CudaCaller;
 
 class CudaModelRunner final : public ModelRunnerBase {
@@ -21,7 +21,7 @@ public:
     explicit CudaModelRunner(std::shared_ptr<CudaCaller> caller, size_t batch_dims_idx);
     void accept_chunk(int chunk_idx, const at::Tensor& chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
-    const CRFModelConfig& config() const final;
+    const config::CRFModelConfig& config() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
     std::pair<int, int> batch_timeouts_ms() const final;

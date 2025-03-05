@@ -8,7 +8,7 @@
 #include <optional>
 #include <stdexcept>
 
-namespace dorado::basecall {
+namespace dorado::config {
 
 bool BasecallerParams::set_value(Value &self, const Value &other) {
     if (other.priority != Priority::FORCE && other.priority <= self.priority) {
@@ -108,4 +108,4 @@ void BasecallerParams::normalise(int chunk_size_granularity, int stride) {
     }
 }
 
-}  // namespace dorado::basecall
+}  // namespace dorado::config

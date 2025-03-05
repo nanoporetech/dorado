@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ModelRunnerBase.h"
 #include "utils/parameters.h"
 
 #include <cmath>
@@ -8,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace dorado::basecall {
+namespace dorado::config {
 
 // Stores basecaller parameters and manages the overwrite priority from various setters
 // where Default < Config < CLI Argument < Forced.
@@ -84,16 +83,4 @@ protected:
     bool set_value(Value& self, const Value& other);
 };
 
-struct CRFModelConfig;
-
-struct BasecallerCreationParams {
-    const basecall::CRFModelConfig& model_config;
-    const std::string& device;
-    float memory_limit_fraction;
-    PipelineType pipeline_type;
-    float batch_size_time_penalty;
-    bool run_batchsize_benchmarks;
-    bool emit_batchsize_benchmarks;
-};
-
-}  // namespace dorado::basecall
+}  // namespace dorado::config

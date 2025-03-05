@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MessageSink.h"
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 #include "utils/stats.h"
 
 #include <atomic>
@@ -11,7 +11,7 @@ namespace dorado {
 
 class ScalerNode : public MessageSink {
 public:
-    ScalerNode(const basecall::SignalNormalisationParams& config,
+    ScalerNode(const config::SignalNormalisationParams& config,
                models::SampleType model_type,
                int num_worker_threads,
                size_t max_reads);
@@ -26,7 +26,7 @@ public:
 private:
     void input_thread_fn();
 
-    const basecall::SignalNormalisationParams m_scaling_params;
+    const config::SignalNormalisationParams m_scaling_params;
     const models::SampleType m_model_type;
 
     // A flag to warn only once if the basecall model and read SampleType differ

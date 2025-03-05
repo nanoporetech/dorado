@@ -1,6 +1,6 @@
 #include "ScalerNode.h"
 
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 #include "demux/adapter_info.h"
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
@@ -41,7 +41,7 @@ std::pair<float, float> med_mad(const at::Tensor& x) {
     return {med.item<float>(), mad.item<float>()};
 }
 
-std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingParams& params,
+std::pair<float, float> normalisation(const dorado::config::QuantileScalingParams& params,
                                       const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles =
@@ -54,8 +54,8 @@ std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingPar
 }
 
 using SampleType = dorado::models::SampleType;
-using ScalingStrategy = dorado::basecall::ScalingStrategy;
-using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
+using ScalingStrategy = dorado::config::ScalingStrategy;
+using SignalNormalisationParams = dorado::config::SignalNormalisationParams;
 
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking

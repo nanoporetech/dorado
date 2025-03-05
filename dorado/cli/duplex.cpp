@@ -1,10 +1,10 @@
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
 #include "cli/basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
+#include "config/CRFModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
@@ -66,9 +66,9 @@ using namespace dorado::model_resolution;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    basecall::BasecallerParams basecaller{};
-    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+config::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
+    config::BasecallerParams basecaller{};
+    basecaller.update(config::BasecallerParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
                       cli::get_optional_argument<int>("--overlap", arg),
                       cli::get_optional_argument<int>("--batchsize", arg));
@@ -78,10 +78,10 @@ basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) 
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    basecall::CRFModelConfig model_config;
+    config::CRFModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    basecall::CRFModelConfig stereo_model_config;
+    config::CRFModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -132,7 +132,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const basecall::BasecallerParams& basecaller_params,
+                         const config::BasecallerParams& basecaller_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
@@ -173,7 +173,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = basecall::load_crf_model_config(model_path);
+            const auto model_config = config::load_crf_model_config(model_path);
             const auto model_name = model_path.filename().string();
             const auto model_sample_rate = model_config.sample_rate < 0
                                                    ? get_sample_rate_by_model_name(model_name)
@@ -214,7 +214,7 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_path.filename().string();
-    auto model_config = basecall::load_crf_model_config(model_path);
+    auto model_config = config::load_crf_model_config(model_path);
     model_config.basecaller.update(basecaller_params);
     model_config.normalise_basecaller_params();
 
@@ -231,7 +231,7 @@ DuplexModels load_models(const std::string& model_arg,
 #endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
+    auto stereo_model_config = config::load_crf_model_config(stereo_model_path);
     stereo_model_config.basecaller.update(basecaller_params);
     stereo_model_config.normalise_basecaller_params();
 

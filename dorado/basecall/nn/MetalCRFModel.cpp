@@ -43,7 +43,7 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
                                  int out_size_,
                                  int win_size_,
                                  int stride_,
-                                 Activation activation,
+                                 config::Activation activation,
                                  int chunk_size_,
                                  int batch_size_,
                                  MTL::Device *const device)
@@ -145,8 +145,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     kernel_thread_groups = get_mtl_device_core_count() * 4;
 
     std::vector<std::tuple<std::string, MetalConstant>> metal_constants = {
-            {"kConvOutputClamp", activation == Activation::SWISH_CLAMP},
-            {"kConvTanhActivation", activation == Activation::TANH},
+            {"kConvOutputClamp", activation == config::Activation::SWISH_CLAMP},
+            {"kConvTanhActivation", activation == config::Activation::TANH},
     };
     const int kernel_threads = kSIMDGroupWidth * kernel_simd_groups;
     std::string kernel_name = "conv" + std::to_string(layer);
@@ -215,7 +215,7 @@ MetalLSTMImpl::MetalLSTMImpl(int layer_size, bool reverse_) : reverse(reverse_) 
 
 MetalBlockImpl::MetalBlockImpl(int chunk_size_,
                                int batch_size_,
-                               const CRFModelConfig &config_,
+                               const config::CRFModelConfig &config_,
                                int out_split_,
                                MTL::Device *const device)
         : m_device(device), in_chunk_size(chunk_size_), batch_size(batch_size_), config(config_) {
@@ -559,7 +559,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     return command_buffer;
 }
 
-MetalCRFModelImpl::MetalCRFModelImpl(const CRFModelConfig &config,
+MetalCRFModelImpl::MetalCRFModelImpl(const config::CRFModelConfig &config,
                                      int chunk_size,
                                      int batch_size,
                                      int out_split,

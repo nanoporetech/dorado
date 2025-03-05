@@ -1,12 +1,8 @@
 add_subdirectory(benchmarks)
 
 add_library(dorado_basecall STATIC
-    BasecallerParams.cpp
-    BasecallerParams.h
     crf_utils.cpp
     crf_utils.h
-    CRFModelConfig.cpp
-    CRFModelConfig.h
     ModelRunner.cpp
     ModelRunner.h
     ModelRunnerBase.h
@@ -59,9 +55,9 @@ target_link_libraries(dorado_basecall
         torch_lib
         dorado_torch_utils
         dorado_utils
+        dorado_config
     PRIVATE
         spdlog::spdlog
-        toml11::toml11
 )
 
 if (TARGET koi)

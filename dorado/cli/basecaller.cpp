@@ -1,10 +1,10 @@
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
 #include "basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
+#include "config/CRFModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
@@ -91,9 +91,9 @@ public:
 };
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
-                           basecall::CRFModelConfig& model_config,
+                           config::CRFModelConfig& model_config,
                            const std::string& device) {
-    model_config.basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+    model_config.basecaller.update(config::BasecallerParams::Priority::CLI_ARG,
                                    cli::get_optional_argument<int>("--chunksize", arg),
                                    cli::get_optional_argument<int>("--overlap", arg),
                                    cli::get_optional_argument<int>("--batchsize", arg));
@@ -306,7 +306,7 @@ utils::modbase::ModBaseParams validate_modbase_params(
 }
 
 void setup(const std::vector<std::string>& args,
-           const basecall::CRFModelConfig& model_config,
+           const config::CRFModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
            const std::vector<fs::path>& modbase_models,
            const std::string& device,
@@ -888,7 +888,7 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = basecall::load_crf_model_config(model_path);
+    auto model_config = config::load_crf_model_config(model_path);
     set_basecaller_params(parser.visible, model_config, device);
 
     spdlog::info("> Creating basecall pipeline");

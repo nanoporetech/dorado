@@ -1,4 +1,4 @@
-#include "CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 
 #include "models/kits.h"
 #include "models/models.h"
@@ -54,7 +54,7 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }
 
 }  // namespace
-namespace dorado::basecall {
+namespace dorado::config {
 
 void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("qscore")) {
@@ -234,7 +234,7 @@ void warn_unrecognised_sublayers(const std::vector<toml::value> &sublayers) {
 
 std::string SignalNormalisationParams::to_string() const {
     std::string str = "SignalNormalisationParams {";
-    str += " strategy:" + dorado::basecall::to_string(strategy);
+    str += " strategy:" + config::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
         str += " " + quantile.to_string();
     } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
@@ -250,7 +250,7 @@ std::string ConvParams::to_string() const {
     str += " size:" + std::to_string(size);
     str += " winlen:" + std::to_string(winlen);
     str += " stride:" + std::to_string(stride);
-    str += " activation:" + dorado::basecall::to_string(activation);
+    str += " activation:" + config::to_string(activation);
     str += " }";
     return str;
 };
@@ -643,4 +643,4 @@ CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
     return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
-}  // namespace dorado::basecall
+}  // namespace dorado::config

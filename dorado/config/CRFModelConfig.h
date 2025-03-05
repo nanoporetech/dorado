@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::config {
 
 enum class Activation { SWISH, SWISH_CLAMP, TANH };
 std::string to_string(const Activation& activation);
@@ -210,4 +210,4 @@ bool is_duplex_model(const CRFModelConfig& model_config);
 
 models::Chemistry parse_model_chemistry(const std::filesystem::path& path);
 
-}  // namespace dorado::basecall
+}  // namespace dorado::config

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 #include "decode/Decoder.h"
 #include "nn/MetalCRFModel.h"
 #include "nn/TxModel.h"
@@ -23,7 +23,7 @@ using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
 class MetalCaller {
 protected:
-    MetalCaller(const CRFModelConfig &model_config) : m_config(model_config) {}
+    MetalCaller(const config::CRFModelConfig &model_config) : m_config(model_config) {}
 
 public:
     virtual ~MetalCaller();
@@ -36,7 +36,7 @@ public:
     void terminate();
     void restart();
 
-    const CRFModelConfig &config() const { return m_config; }
+    const config::CRFModelConfig &config() const { return m_config; }
 
     struct NNTask;
 
@@ -48,7 +48,7 @@ protected:
     virtual DecodedData decode(int chunk_idx) const = 0;
     virtual bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) = 0;
 
-    const CRFModelConfig m_config;
+    const config::CRFModelConfig m_config;
 
     std::atomic<bool> m_terminate{false};
     std::atomic<bool> m_terminate_decode{false};
@@ -71,7 +71,7 @@ protected:
 
 class MetalLSTMCaller : public MetalCaller {
 public:
-    MetalLSTMCaller(const CRFModelConfig &model_config, float memory_limit_fraction);
+    MetalLSTMCaller(const config::CRFModelConfig &model_config, float memory_limit_fraction);
 
     at::Tensor create_input_tensor() const override {
         // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
@@ -82,11 +82,11 @@ public:
     }
 
 private:
-    void set_chunk_batch_size(const CRFModelConfig &model_config,
+    void set_chunk_batch_size(const config::CRFModelConfig &model_config,
                               const std::vector<at::Tensor> &state_dict,
                               int chunk_size,
                               int batch_size);
-    int benchmark_batch_sizes(const CRFModelConfig &model_config,
+    int benchmark_batch_sizes(const config::CRFModelConfig &model_config,
                               const std::vector<at::Tensor> &state_dict,
                               float memory_limit_fraction);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
@@ -119,7 +119,7 @@ private:
 
 class MetalTxCaller : public MetalCaller {
 public:
-    MetalTxCaller(const CRFModelConfig &model_config);
+    MetalTxCaller(const config::CRFModelConfig &model_config);
 
     at::Tensor create_input_tensor() const override {
         // NCT
@@ -127,7 +127,7 @@ public:
     }
 
 private:
-    void load_tx_model(const CRFModelConfig &model_config);
+    void load_tx_model(const config::CRFModelConfig &model_config);
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;

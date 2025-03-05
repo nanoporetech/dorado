@@ -24,6 +24,8 @@ using Slice = torch::indexing::Slice;
 
 namespace dorado::basecall::nn {
 
+using namespace dorado::config;
+
 #if DORADO_CUDA_BUILD
 namespace {
 

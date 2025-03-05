@@ -135,6 +135,7 @@ add_subdirectory(dorado/3rdparty)
 enable_testing()
 
 add_subdirectory(dorado/compat)
+add_subdirectory(dorado/config)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/models)
@@ -456,6 +457,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_file_info
         dorado_models_lib
         dorado_model_downloader_lib
+        dorado_config
         dorado_compat
         minimap2
     )

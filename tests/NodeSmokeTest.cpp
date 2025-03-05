@@ -1,7 +1,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
@@ -180,8 +180,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
         read->read_common.is_rna_model = model_type != SampleType::DNA;
     });
 
-    dorado::basecall::SignalNormalisationParams config;
-    config.strategy = dorado::basecall::ScalingStrategy::QUANTILE;
+    dorado::config::SignalNormalisationParams config;
+    config.strategy = dorado::config::ScalingStrategy::QUANTILE;
     config.quantile.quantile_a = 0.2f;
     config.quantile.quantile_b = 0.9f;
     config.quantile.shift_multiplier = 0.51f;
@@ -204,7 +204,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     const auto& default_params = dorado::utils::default_parameters;
     const auto model_dir = download_model(model_name);
     const auto model_path = (model_dir.m_path / model_name).string();
-    auto model_config = dorado::basecall::load_crf_model_config(model_path);
+    auto model_config = dorado::config::load_crf_model_config(model_path);
 
     // Use a fixed batch size otherwise we slow down CI autobatchsizing.
     int batch_size = 128;
@@ -270,7 +270,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     const char model_name[] = "dna_r10.4.1_e8.2_400bps_fast@v4.2.0";
     const auto model_dir = download_model(model_name);
     const std::size_t model_stride =
-            dorado::basecall::load_crf_model_config(model_dir.m_path / model_name).stride;
+            dorado::config::load_crf_model_config(model_dir.m_path / model_name).stride;
 
     // Grab the modbase parameters from the models.
     const std::vector<std::filesystem::path> modbase_paths{modbase_model, modbase_model_6mA};

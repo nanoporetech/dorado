@@ -1,4 +1,4 @@
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 
 #include "TestUtils.h"
 #include "models/kits.h"
@@ -14,7 +14,7 @@
 
 #define CUT_TAG "[CRFModelConfig]"
 
-using namespace dorado::basecall;
+using namespace dorado::config;
 using SampleType = dorado::models::SampleType;
 
 namespace fs = std::filesystem;

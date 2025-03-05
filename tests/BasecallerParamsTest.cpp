@@ -1,7 +1,8 @@
-#include "basecall/BasecallerParams.h"
+
+#include "config/BasecallerParams.h"
 
 #include "TestUtils.h"
-#include "basecall/CRFModelConfig.h"
+#include "config/CRFModelConfig.h"
 #include "utils/parameters.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -12,7 +13,7 @@
 #define CUT_TAG "[BasecallerParams]"
 
 namespace fs = std::filesystem;
-using dorado::basecall::BasecallerParams;
+using dorado::config::BasecallerParams;
 using dorado::utils::default_parameters;
 
 CATCH_TEST_CASE(CUT_TAG ": test default constructor", CUT_TAG) {
