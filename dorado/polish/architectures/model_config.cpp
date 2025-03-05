@@ -79,10 +79,14 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     ModelConfig cfg;
 
     // Parse the config version.
-    { cfg.version = toml::find<int>(config_toml, "config_version"); }
+    {
+        cfg.version = toml::find<int>(config_toml, "config_version");
+    }
 
     // Parse the config version.
-    { cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model"); }
+    {
+        cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model");
+    }
 
     // Check if the "supported_basecallers" key exists
     {

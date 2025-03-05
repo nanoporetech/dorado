@@ -20,7 +20,9 @@ int main(int argc, char* argv[]) {
     // and some of the tests launch multiple threads each
     // of which trigger an NVTX init which causes the thread
     // sanitizers to fail.
-    { nvtx3::scoped_range loop{__func__}; }
+    {
+        nvtx3::scoped_range loop{__func__};
+    }
 
     int result = Catch::Session().run(argc, argv);
 
