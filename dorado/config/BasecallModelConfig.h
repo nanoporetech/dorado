@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BasecallerParams.h"
+#include "BatchParams.h"
 #include "models/kits.h"
 
 #include <cmath>
@@ -170,7 +170,7 @@ struct CRFModelConfig {
     // Tx Model Params
     std::optional<TxStack> tx = std::nullopt;
 
-    BasecallerParams basecaller;
+    BatchParams basecaller;
 
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }

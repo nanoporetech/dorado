@@ -1,6 +1,6 @@
 add_library(dorado_config STATIC
-    BasecallerParams.cpp
-    BasecallerParams.h
+    BatchParams.cpp
+    BatchParams.h
     BasecallModelConfig.cpp
     BasecallModelConfig.h
 )

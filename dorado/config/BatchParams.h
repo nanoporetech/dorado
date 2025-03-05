@@ -11,7 +11,7 @@ namespace dorado::config {
 
 // Stores basecaller parameters and manages the overwrite priority from various setters
 // where Default < Config < CLI Argument < Forced.
-class BasecallerParams {
+class BatchParams {
 public:
     // Overwrite priority
     enum class Priority : int {
@@ -21,9 +21,9 @@ public:
         FORCE = 3,
     };
 
-    BasecallerParams() {}
-    BasecallerParams(const std::filesystem::path& path) { update(path); };
-    ~BasecallerParams() {}
+    BatchParams() {}
+    BatchParams(const std::filesystem::path& path) { update(path); };
+    ~BatchParams() {}
 
     // Number of signal samples in a chunk
     int chunk_size() const { return m_chunk_size.val; }
@@ -53,14 +53,14 @@ public:
                 std::optional<int> batch_size);
 
     // Update values from other basecaller params, self takes priory if tied unless forced
-    void update(const BasecallerParams& other);
+    void update(const BatchParams& other);
 
     // Normalise `chunk_size` and `overlap` so that `overlap` is a multiple of `stride`, and
     // `chunk_size` is both greater than `overlap` and a multiple of `chunk_size_granularity`.
     void normalise(int chunk_size_granularity, int stride);
 
     std::string to_string() const {
-        std::string str = "BasecallerParams {";
+        std::string str = "BatchParams {";
         str += " chunk_size:" + std::to_string(m_chunk_size.val);
         str += " overlap:" + std::to_string(m_overlap.val);
         str += " batch_size:" + std::to_string(m_batch_size.val);

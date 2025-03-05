@@ -18,7 +18,7 @@ using SampleType = dorado::models::SampleType;
 
 namespace fs = std::filesystem;
 
-CATCH_TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test normalise BatchParams", CUT_TAG) {
     CATCH_SECTION("test on defaults") {
         const fs::path path =
                 fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));

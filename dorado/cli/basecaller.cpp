@@ -93,7 +93,7 @@ public:
 void set_basecaller_params(const argparse::ArgumentParser& arg,
                            config::CRFModelConfig& model_config,
                            const std::string& device) {
-    model_config.basecaller.update(config::BasecallerParams::Priority::CLI_ARG,
+    model_config.basecaller.update(config::BatchParams::Priority::CLI_ARG,
                                    cli::get_optional_argument<int>("--chunksize", arg),
                                    cli::get_optional_argument<int>("--overlap", arg),
                                    cli::get_optional_argument<int>("--batchsize", arg));

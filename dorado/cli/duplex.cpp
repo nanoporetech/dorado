@@ -66,9 +66,9 @@ using namespace dorado::model_resolution;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-config::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    config::BasecallerParams basecaller{};
-    basecaller.update(config::BasecallerParams::Priority::CLI_ARG,
+config::BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
+    config::BatchParams basecaller{};
+    basecaller.update(config::BatchParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
                       cli::get_optional_argument<int>("--overlap", arg),
                       cli::get_optional_argument<int>("--batchsize", arg));
@@ -132,7 +132,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const config::BasecallerParams& basecaller_params,
+                         const config::BatchParams& basecaller_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);

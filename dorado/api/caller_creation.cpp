@@ -2,7 +2,7 @@
 
 #if DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
-#include "config/BasecallerParams.h"
+#include "config/BatchParams.h"
 #elif DORADO_METAL_BUILD
 #include "basecall/MetalCaller.h"
 #endif
