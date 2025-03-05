@@ -1,7 +1,6 @@
 #include "config/BasecallModelConfig.h"
 
 #include "models/kits.h"
-#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
@@ -197,21 +196,21 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
 
     if (config_toml.contains("standardisation")) {
         const auto &norm = toml::find(config_toml, "standardisation");
-        params.standarisation.standardise = toml::find<int>(norm, "standardise") > 0;
-        if (params.standarisation.standardise) {
-            params.standarisation.mean = toml::find<float>(norm, "mean");
-            params.standarisation.stdev = toml::find<float>(norm, "stdev");
+        params.standardisation.standardise = toml::find<int>(norm, "standardise") > 0;
+        if (params.standardisation.standardise) {
+            params.standardisation.mean = toml::find<float>(norm, "mean");
+            params.standardisation.stdev = toml::find<float>(norm, "stdev");
         }
 
-        if (params.standarisation.standardise && params.strategy != ScalingStrategy::PA) {
+        if (params.standardisation.standardise && params.strategy != ScalingStrategy::PA) {
             throw std::runtime_error(
                     "Signal standardisation is implemented only for `scaling.strategy = pa`");
         }
 
-        if (params.standarisation.stdev <= 0.0f) {
+        if (params.standardisation.stdev <= 0.0f) {
             throw std::runtime_error(
                     "Config error: `standardisation.stdev` must be greater than 0, got: " +
-                    std::to_string(params.standarisation.stdev));
+                    std::to_string(params.standardisation.stdev));
         }
     }
 
@@ -237,8 +236,8 @@ std::string SignalNormalisationParams::to_string() const {
     str += " strategy:" + config::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
         str += " " + quantile.to_string();
-    } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
-        str += " " + standarisation.to_string();
+    } else if (strategy == ScalingStrategy::PA && standardisation.standardise) {
+        str += " " + standardisation.to_string();
     }
     str += " }";
     return str;

@@ -72,9 +72,9 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
 
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::PA;
-    sig.standarisation.standardise = true;
-    sig.standarisation.mean = 93.6376f;
-    sig.standarisation.stdev = 22.6004f;
+    sig.standardisation.standardise = true;
+    sig.standardisation.mean = 93.6376f;
+    sig.standardisation.stdev = 22.6004f;
 
     CATCH_CHECK(config.signal_norm_params.strategy == sig.strategy);
 
@@ -84,10 +84,10 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     CATCH_CHECK(config.convs.size() == 5);
 
@@ -187,11 +187,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -248,11 +248,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -309,11 +309,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH_CLAMP);
@@ -369,7 +369,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) 
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == true);
     CATCH_CHECK(ssp.mean == 91.88f);
     CATCH_CHECK(ssp.stdev == 22.65f);
@@ -428,11 +428,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -487,11 +487,11 @@ CATCH_TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == 0.59f);
     CATCH_CHECK(qsp.shift_multiplier == 0.48f);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -547,11 +547,11 @@ CATCH_TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == 0.595f);
     CATCH_CHECK(qsp.shift_multiplier == 0.485f);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);

@@ -183,7 +183,7 @@ void ScalerNode::input_thread_fn() {
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
             // We want to keep the scaling formula `(x - shift) / scale` consistent between
             // quantile and pA methods as this affects downstream tools.
-            const auto& stdn = m_scaling_params.standarisation;
+            const auto& stdn = m_scaling_params.standardisation;
             if (stdn.standardise) {
                 // Standardise from scaled pa
                 // 1. x_pa  = (Scale)*(x + Offset)
@@ -217,7 +217,7 @@ void ScalerNode::input_thread_fn() {
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna_model) {
-            if (trim_start == 0 && m_scaling_params.standarisation.standardise) {
+            if (trim_start == 0 && m_scaling_params.standardisation.standardise) {
                 // Constant trimming level for standardised scaling
                 // In most cases kit14 trim algorithm returns 10, so bypassing the heuristic
                 // and applying 10 for pA scaled data.

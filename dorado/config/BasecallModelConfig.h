@@ -55,7 +55,7 @@ struct SignalNormalisationParams {
     ScalingStrategy strategy = ScalingStrategy::QUANTILE;
 
     QuantileScalingParams quantile;
-    StandardisationScalingParams standarisation;
+    StandardisationScalingParams standardisation;
 
     std::string to_string() const;
 };
