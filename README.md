@@ -131,7 +131,7 @@ If adapter/primer trimming is done in-line with basecalling in combination with 
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim <reads> --sequencing-kit <kit_name> trimmed.bam
+$ dorado trim <reads> --sequencing-kit <kit_name> > trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
