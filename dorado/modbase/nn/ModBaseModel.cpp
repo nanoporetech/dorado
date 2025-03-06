@@ -6,7 +6,6 @@
 #include "torch_utils/tensor_utils.h"
 
 #include <ATen/core/TensorBody.h>
-#include <toml.hpp>
 #include <torch/csrc/autograd/generated/variable_factories.h>
 #include <torch/torch.h>
 

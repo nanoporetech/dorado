@@ -31,7 +31,6 @@ target_link_libraries(dorado_modbase
         dorado_utils
         dorado_torch_utils
         spdlog::spdlog
-        toml11::toml11
 )
 
 enable_warnings_as_errors(dorado_modbase)
