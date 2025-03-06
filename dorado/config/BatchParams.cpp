@@ -1,7 +1,5 @@
 #include "BatchParams.h"
 
-#include "utils/parameters.h"
-
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
