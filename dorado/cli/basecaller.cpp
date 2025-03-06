@@ -5,6 +5,7 @@
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
@@ -36,7 +37,6 @@
 #include "utils/basecaller_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
@@ -272,11 +272,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     cli::add_internal_arguments(parser);
 }
 
-utils::modbase::ModBaseParams validate_modbase_params(
-        const std::vector<std::filesystem::path>& paths,
-        utils::arg_parse::ArgParser& parser) {
+config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                                   utils::arg_parse::ArgParser& parser) {
     // Convert path to params.
-    auto params = utils::modbase::get_modbase_params(paths);
+    auto params = config::get_modbase_params(paths);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -295,7 +294,7 @@ utils::modbase::ModBaseParams validate_modbase_params(
 
     // Check that the paths are all valid.
     for (const auto& mb_path : paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
+        if (!config::is_modbase_model(mb_path)) {
             throw std::runtime_error("Modified bases model not found in the model path at " +
                                      std::filesystem::weakly_canonical(mb_path).string());
         }
@@ -313,7 +312,7 @@ void setup(const std::vector<std::string>& args,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           const utils::modbase::ModBaseParams& modbase_params,
+           const config::ModBaseBatchParams& modbase_params,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
@@ -844,7 +843,7 @@ int basecaller(int argc, char* argv[]) {
         if (!check_model_path(model_path)) {
             return EXIT_FAILURE;
         }
-        if (utils::modbase::is_modbase_model(model_path)) {
+        if (config::is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",

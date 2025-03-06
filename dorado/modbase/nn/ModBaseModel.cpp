@@ -273,22 +273,22 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 
 }  // namespace nn
 
-dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config,
+dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig& config,
                                                 const at::TensorOptions& options) {
     c10::InferenceMode guard;
     const auto params = config.general;
     switch (params.model_type) {
-    case ModelType::CONV_LSTM_V1: {
+    case config::ModelType::CONV_LSTM_V1: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, false,
                                               params.stride);
         return populate_model(std::move(model), config.model_path, options);
     }
-    case ModelType::CONV_LSTM_V2: {
+    case config::ModelType::CONV_LSTM_V2: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
                                               params.stride);
         return populate_model(std::move(model), config.model_path, options);
     }
-    case ModelType::CONV_V1: {
+    case config::ModelType::CONV_V1: {
         auto model = nn::ModBaseConvModel(params.size, params.kmer_len, params.num_out);
         return populate_model(std::move(model), config.model_path, options);
     }
@@ -297,7 +297,7 @@ dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config
     }
 }
 
-std::vector<float> load_kmer_refinement_levels(const ModBaseModelConfig& config) {
+std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
     std::vector<float> levels;
     if (!config.refine.do_rough_rescale) {
         return levels;

@@ -7,9 +7,9 @@
 
 namespace dorado::modbase {
 
-dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config,
+dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig& config,
                                                 const at::TensorOptions& options);
 
-std::vector<float> load_kmer_refinement_levels(const ModBaseModelConfig& config);
+std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config);
 
 }  // namespace dorado::modbase

@@ -13,7 +13,7 @@
 
 namespace fs = std::filesystem;
 
-using namespace dorado::modbase;
+using namespace dorado::config;
 
 const auto _5mCG = get_data_dir("model_configs/dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1");
 const auto _5mCG_5hmCG =

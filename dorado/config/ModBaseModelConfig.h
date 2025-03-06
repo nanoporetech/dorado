@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utils/modbase_parameters.h"
 #include "utils/types.h"
 
 #include <cstddef>
@@ -8,9 +7,14 @@
 #include <string>
 #include <vector>
 
-namespace dorado::modbase {
+namespace dorado::config {
 
-using ModelType = utils::modbase::ModelType;
+enum ModelType { CONV_LSTM_V1, CONV_LSTM_V2, CONV_V1, UNKNOWN };
+std::string to_string(const ModelType& model_type) noexcept;
+ModelType model_type_from_string(const std::string& model_type) noexcept;
+ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept;
+
+bool is_modbase_model(const std::filesystem::path& path);
 
 struct ModelGeneralParams {
     const ModelType model_type;
@@ -115,4 +119,4 @@ ModBaseInfo get_modbase_info(
 void check_modbase_multi_model_compatibility(
         const std::vector<std::filesystem::path>& modbase_models);
 
-}  // namespace dorado::modbase
+}  // namespace dorado::config

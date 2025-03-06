@@ -1,7 +1,6 @@
 #include "ModBaseModelConfig.h"
 
 #include "utils/bam_utils.h"
-#include "utils/modbase_parameters.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -39,7 +38,50 @@ int get_int_in_range(const toml::value& p,
 }
 }  // namespace
 
-namespace dorado::modbase {
+namespace dorado::config {
+
+std::string to_string(const ModelType& model_type) noexcept {
+    switch (model_type) {
+    case CONV_LSTM_V1:
+        return std::string("conv_lstm");
+    case CONV_LSTM_V2:
+        return std::string("conv_lstm_v2");
+    case CONV_V1:
+        return std::string("conv_v1");
+    default:
+        return std::string("__UNKNOWN__");
+    }
+};
+
+ModelType model_type_from_string(const std::string& model_type) noexcept {
+    if (model_type == "conv_lstm") {
+        return ModelType::CONV_LSTM_V1;
+    }
+    if (model_type == "conv_lstm_v2") {
+        return ModelType::CONV_LSTM_V2;
+    }
+    if (model_type == "conv_only" || model_type == "conv_v1") {
+        return ModelType::CONV_V1;
+    }
+    return ModelType::UNKNOWN;
+}
+
+ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
+    try {
+        const auto config_toml = toml::parse(path / "config.toml");
+        if (!config_toml.contains("general")) {
+            return ModelType::UNKNOWN;
+        }
+        return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+    } catch (std::exception& e) {
+        spdlog::trace("get_modbase_model_type caught exception: {}", e.what());
+        return ModelType::UNKNOWN;
+    }
+}
+
+bool is_modbase_model(const std::filesystem::path& path) {
+    return get_modbase_model_type(path) != ModelType::UNKNOWN;
+}
 
 ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
                                        int size_,
@@ -70,8 +112,7 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     constexpr int MAX_FEATURES = 10;
     constexpr int MAX_STRIDE = 6;
     ModelGeneralParams params{
-            utils::modbase::model_type_from_string(
-                    toml::find<std::string>(config_toml, "general", "model")),
+            model_type_from_string(toml::find<std::string>(config_toml, "general", "model")),
             get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
             get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
             get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED),
@@ -370,4 +411,4 @@ void check_modbase_multi_model_compatibility(
     }
 }
 
-}  // namespace dorado::modbase
+}  // namespace dorado::config

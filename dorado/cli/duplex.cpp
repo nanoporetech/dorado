@@ -5,6 +5,7 @@
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
@@ -28,7 +29,6 @@
 #include "utils/basecaller_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
@@ -102,7 +102,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
             std::exit(EXIT_FAILURE);
         };
 
-        if (utils::modbase::is_modbase_model(model_path)) {
+        if (config::is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -257,11 +257,10 @@ DuplexModels load_models(const std::string& model_arg,
                         mods_model_paths,    downloader.temporary_models()};
 }
 
-utils::modbase::ModBaseParams validate_modbase_params(
-        const std::vector<std::filesystem::path>& paths,
-        utils::arg_parse::ArgParser& parser) {
+config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                                   utils::arg_parse::ArgParser& parser) {
     // Convert path to params.
-    auto params = utils::modbase::get_modbase_params(paths);
+    auto params = config::get_modbase_params(paths);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -280,7 +279,7 @@ utils::modbase::ModBaseParams validate_modbase_params(
 
     // Check that the paths are all valid.
     for (const auto& mb_path : paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
+        if (!config::is_modbase_model(mb_path)) {
             throw std::runtime_error("Modified bases model not found in the model path at " +
                                      std::filesystem::weakly_canonical(mb_path).string());
         }

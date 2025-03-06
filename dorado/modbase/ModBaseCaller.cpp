@@ -41,7 +41,7 @@ struct ModBaseCaller::ModBaseTask {
     int num_chunks;
 };
 
-ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
+ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config,
                                         const at::TensorOptions& opts,
                                         const int batch_size_)
         : params(config),
@@ -120,7 +120,7 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     m_task_threads.reserve(m_num_models);
 
     for (size_t i = 0; i < m_num_models; ++i) {
-        const auto& config = load_modbase_model_config(model_paths[i]);
+        const auto& config = config::load_modbase_model_config(model_paths[i]);
         at::InferenceMode guard;
         auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
         m_model_data.emplace_back(std::move(caller_data));

@@ -120,7 +120,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         return {};
     }
 
-    modbase::check_modbase_multi_model_compatibility(modbase_models);
+    config::check_modbase_multi_model_compatibility(modbase_models);
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> runners;

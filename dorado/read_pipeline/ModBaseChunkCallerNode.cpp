@@ -158,7 +158,7 @@ void ModBaseChunkCallerNode::restart() {
 }
 
 void ModBaseChunkCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
+    std::vector<std::reference_wrapper<const config::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners.at(0);
     modbase::ModBaseContext context_handler;
     for (size_t model_id = 0; model_id < runner->num_models(); ++model_id) {
@@ -170,7 +170,7 @@ void ModBaseChunkCallerNode::init_modbase_info() {
         m_num_states += params.count;
     }
 
-    ModBaseInfo mod_info = modbase::get_modbase_info(base_mod_params);
+    ModBaseInfo mod_info = config::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(mod_info.alphabet), std::move(mod_info.long_names), context_handler.encode());
     m_base_prob_offsets = mod_info.base_probs_offsets();

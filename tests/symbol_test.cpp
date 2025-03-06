@@ -85,7 +85,7 @@ void reference_all_public_functions() {
     // demux/parse_custom_sequences.h
     force_reference(&dorado::demux::parse_custom_sequences);
     // modbase/ModBaseModelConfig.h
-    force_reference(&dorado::modbase::load_modbase_model_config);
+    force_reference(&dorado::config::load_modbase_model_config);
     // modbase/ModBaseRunner.h
     force_reference(&dorado::modbase::ModBaseRunner::accept_chunk);
     // models/models.h
