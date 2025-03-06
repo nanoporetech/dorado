@@ -107,11 +107,6 @@ struct ModBaseModelConfig {
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
-namespace test {
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path,
-                                             const std::vector<float>& test_kmer_levels);
-}
-
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
 ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params);

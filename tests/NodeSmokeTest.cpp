@@ -2,6 +2,7 @@
 #include "TestUtils.h"
 #include "api/runner_creation.h"
 #include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
@@ -22,7 +23,6 @@
 #include "read_pipeline/ScalerNode.h"
 #include "utils/PostCondition.h"
 #include "utils/SampleSheet.h"
-#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 
 #include <torch/cuda.h>
@@ -274,7 +274,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Grab the modbase parameters from the models.
     const std::vector<std::filesystem::path> modbase_paths{modbase_model, modbase_model_6mA};
-    const auto modbase_params = dorado::utils::modbase::get_modbase_params(modbase_paths);
+    const auto modbase_params = dorado::config::get_modbase_params(modbase_paths);
 
     // Create runners
     std::string device;
@@ -331,7 +331,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    const auto modbase_threshold = dorado::utils::modbase::get_modbase_params({}).threshold;
+    const auto modbase_threshold = dorado::config::get_modbase_params({}).threshold;
     run_smoke_test<dorado::ReadToBamTypeNode>(emit_moves, 2, modbase_threshold, nullptr, 1000);
 }
 
