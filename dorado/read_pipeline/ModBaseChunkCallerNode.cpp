@@ -1,8 +1,8 @@
 #include "ModBaseChunkCallerNode.h"
 
+#include "config/ModBaseModelConfig.h"
 #include "messages.h"
 #include "modbase/ModBaseContext.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "modbase/encode_kmer.h"
 #include "utils/dev_utils.h"
 #include "utils/sequence_utils.h"

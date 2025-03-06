@@ -2,7 +2,7 @@
 
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"

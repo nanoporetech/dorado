@@ -1,11 +1,13 @@
 #include "ModBaseModel.h"
 
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 
+#include <ATen/core/TensorBody.h>
 #include <toml.hpp>
+#include <torch/csrc/autograd/generated/variable_factories.h>
 #include <torch/torch.h>
 
 #include <stdexcept>
@@ -293,6 +295,18 @@ dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config
     default:
         throw std::runtime_error("Unknown modbase model type in config file.");
     }
+}
+
+std::vector<float> load_kmer_refinement_levels(const ModBaseModelConfig& config) {
+    std::vector<float> levels;
+    if (!config.refine.do_rough_rescale) {
+        return levels;
+    }
+
+    auto t = utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
+    levels.reserve(t.numel());
+    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
+    return levels;
 }
 
 }  // namespace dorado::modbase

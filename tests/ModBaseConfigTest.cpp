@@ -1,5 +1,5 @@
 #include "TestUtils.h"
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -31,7 +31,6 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
 
     // For _5mCG_5hmCG kmer center index 6 to pass tests need: Log(X)/Log(4) > 7
     // -> Log(X) > 7*1.387 -> X := Exp(9.71) = 16482
-    std::vector<float> refined_kmer_levels(16482, 0);
     auto [path, general, mods, context, refine] =
             // clang-format off
             GENERATE_COPY(table<fs::path, Gen, Mod, Ctx, Rmt>({
@@ -47,39 +46,39 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
                 Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, 3},
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0,},                
                 Ctx{50, 50, 100, 4, 4, false, false}, 
-                Rmt{7, 6, refined_kmer_levels}
+                Rmt{6}
             ),
             std::make_tuple(
                 _pseU,
                 Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
                 Ctx{150, 150, 300, 4, 4, true, false},
-                Rmt{7, 3, refined_kmer_levels}
+                Rmt{3}
             ),
             std::make_tuple(
                 _pseU_j,
                 Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
                 Ctx{150, 150, 300, 4, 4, true, true},
-                Rmt{7, 3, refined_kmer_levels}
+                Rmt{3}
             ),
             std::make_tuple(
                 _5mCG_5hmCG_v3,
                 Gen{ModelType::CONV_LSTM_V2, 256, 9, 3, 6},
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0},            
                 Ctx{96, 96, 192, 4, 4, false, true},
-                Rmt{7, 6, refined_kmer_levels}
+                Rmt{6}
             ),
             std::make_tuple(
                 _6mA_v3,
                 Gen{ModelType::CONV_LSTM_V2, 256, 9, 2, 3},
                 Mod{{"a"}, {"6mA"}, "A", 0},            
                 Ctx{150, 150, 600, 4, 4, false, true},
-                Rmt{7, 6, refined_kmer_levels}
+                Rmt{6}
             ),
             }));
     // clang-format on
-    const auto model = test::load_modbase_model_config(path, refined_kmer_levels);
+    const auto model = load_modbase_model_config(path);
 
     CATCH_SECTION("general model parameters") {
         const auto& g = model.general;
@@ -117,10 +116,9 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
 
     CATCH_SECTION("refinement parameters") {
         const auto& r = model.refine;
-        CATCH_CAPTURE(path, r.do_rough_rescale, r.kmer_len, r.center_idx);
+        CATCH_CAPTURE(path, r.do_rough_rescale, r.center_idx);
         CATCH_CHECK(r.do_rough_rescale == refine.do_rough_rescale);
-        CATCH_CHECK(r.kmer_len == refine.kmer_len);
         CATCH_CHECK(r.center_idx == refine.center_idx);
-        CATCH_CHECK(r.levels.size() == refine.levels.size());
+        CATCH_CHECK(r.center_idx < static_cast<size_t>(model.general.kmer_len));
     }
 }

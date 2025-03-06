@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ModBaseModelConfig.h"
 #include "MotifMatcher.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/module_utils.h"
 #include "utils/stats.h"
 #if DORADO_CUDA_BUILD
@@ -39,6 +39,7 @@ public:
         int64_t get_seq_len() const;
 
         const ModBaseModelConfig params;
+        const std::vector<float> kmer_refinement_levels;
         std::unique_ptr<ModBaseScaler> scaler;
 
     private:

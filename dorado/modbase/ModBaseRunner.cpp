@@ -1,8 +1,8 @@
 #include "ModBaseRunner.h"
 
 #include "ModBaseCaller.h"
-#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/sequence_utils.h"
 

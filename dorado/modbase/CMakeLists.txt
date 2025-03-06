@@ -7,8 +7,6 @@ add_library(dorado_modbase STATIC
     ModBaseContext.h
     ModbaseEncoder.cpp
     ModbaseEncoder.h
-    ModBaseModelConfig.cpp
-    ModBaseModelConfig.h    
     ModBaseRunner.cpp
     ModBaseRunner.h
     ModbaseScaler.cpp

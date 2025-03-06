@@ -1,6 +1,6 @@
 #include "MotifMatcher.h"
 
-#include "ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #include <nvtx3/nvtx3.hpp>
 

@@ -1,7 +1,7 @@
 #include "ModBaseCallerNode.h"
 
+#include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseContext.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "modbase/ModbaseEncoder.h"
 #include "torch_utils/tensor_utils.h"

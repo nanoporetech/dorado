@@ -3,11 +3,13 @@ add_library(dorado_config STATIC
     BatchParams.h
     BasecallModelConfig.cpp
     BasecallModelConfig.h
+    ModBaseModelConfig.cpp
+    ModBaseModelConfig.h
 )
 
 target_link_libraries(dorado_config
     PUBLIC
-        dorado_models_lib    
+        dorado_models_lib
     PRIVATE
         dorado_utils
         spdlog::spdlog

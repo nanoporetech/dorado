@@ -1,6 +1,6 @@
 #pragma once
 
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/MessageSink.h"
 #include "utils/AsyncQueue.h"

@@ -30,15 +30,11 @@ struct LinearParams {
 };
 
 struct RefinementParams {
-    const bool do_rough_rescale;      ///< Whether to perform rough rescaling
-    const size_t kmer_len;            ///< Length of the kmers for the specified kmer_levels
-    const size_t center_idx;          ///< The position in the kmer at which to check the levels
-    const std::vector<float> levels;  ///< Expected kmer levels for rough rescaling
+    const bool do_rough_rescale;  ///< Whether to perform rough rescaling
+    const size_t center_idx;      ///< The position in the kmer at which to check the levels
 
-    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0) {}
-    RefinementParams(const int kmer_len_,
-                     const int center_idx_,
-                     std::vector<float> refine_kmer_levels_);
+    RefinementParams() : do_rough_rescale(false), center_idx(0) {}
+    RefinementParams(int center_idx_);
 };
 
 struct ModificationParams {

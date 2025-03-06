@@ -1,6 +1,5 @@
 #include "ModBaseModelConfig.h"
 
-#include "torch_utils/tensor_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/modbase_parameters.h"
 #include "utils/sequence_utils.h"
@@ -8,7 +7,6 @@
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
-#include <cmath>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -242,30 +240,14 @@ ContextParams ContextParams::normalised(const int stride) const {
     return ContextParams(sb, sa, cs, bases_before, bases_after, reverse, base_start_justify);
 }
 
-RefinementParams::RefinementParams(const int kmer_len_,
-                                   const int center_idx_,
-                                   std::vector<float> refine_kmer_levels_)
-        : do_rough_rescale(true),
-          kmer_len(static_cast<size_t>(kmer_len_)),
-          center_idx(static_cast<size_t>(center_idx_)),
-          levels(std::move(refine_kmer_levels_)) {
-    if (kmer_len < 1 || kmer_len_ < 1) {
-        throw std::runtime_error(ERR_STR + "refinement params: 'negative or zero kmer len'.");
-    }
+RefinementParams::RefinementParams(int center_idx_)
+        : do_rough_rescale(true), center_idx(static_cast<size_t>(center_idx_)) {
     if (center_idx_ < 0) {
         throw std::runtime_error(ERR_STR + "refinement params: 'negative center index'.");
     }
-    if (kmer_len < center_idx) {
-        throw std::runtime_error(ERR_STR + "refinement params: 'invalid center index'.");
-    }
-    if (levels.empty()) {
-        throw std::runtime_error(ERR_STR + "refinement params: 'missing levels'.");
-    }
 }
 
-RefinementParams parse_refinement_params(const toml::value& config_toml,
-                                         const std::filesystem::path& model_path,
-                                         const std::vector<float>& _test_levels) {
+RefinementParams parse_refinement_params(const toml::value& config_toml) {
     if (!config_toml.contains("refinement")) {
         return RefinementParams{};
     }
@@ -277,23 +259,8 @@ RefinementParams parse_refinement_params(const toml::value& config_toml,
         return RefinementParams{};
     }
 
-    std::vector<float> kmer_levels;
-    // allow us to avoid adding tensors to the repo just for testing
-    if (_test_levels.empty()) {
-        auto kmer_levels_tensor =
-                utils::load_tensors(model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
-        std::copy(kmer_levels_tensor.data_ptr<float>(),
-                  kmer_levels_tensor.data_ptr<float>() + kmer_levels_tensor.numel(),
-                  std::back_inserter(kmer_levels));
-    } else {
-        kmer_levels = _test_levels;
-    }
-
-    const int kmer_len = static_cast<int>(std::round(std::log(kmer_levels.size()) / std::log(4)));
-    const int center_index =
-            get_int_in_range(segment, "refine_kmer_center_idx", 0, kmer_len - 1, REQUIRED);
-
-    return RefinementParams(kmer_len, center_index, std::move(kmer_levels));
+    const int center_index = get_int_in_range(segment, "refine_kmer_center_idx", 0, 19, REQUIRED);
+    return RefinementParams(center_index);
 }
 
 ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
@@ -317,28 +284,13 @@ ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
     }
 }
 
-ModBaseModelConfig load_modbase_model_config_impl(const std::filesystem::path& model_path,
-                                                  const std::vector<float>& test_kmer_levels) {
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     const auto config_toml = toml::parse(model_path / "config.toml");
 
-    ModBaseModelConfig config{model_path, parse_general_params(config_toml),
-                              parse_modification_params(config_toml),
-                              parse_context_params(config_toml),
-                              parse_refinement_params(config_toml, model_path, test_kmer_levels)};
-
-    return config;
+    return ModBaseModelConfig{
+            model_path, parse_general_params(config_toml), parse_modification_params(config_toml),
+            parse_context_params(config_toml), parse_refinement_params(config_toml)};
 }
-
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
-    return load_modbase_model_config_impl(model_path, {});
-}
-
-namespace test {
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path,
-                                             const std::vector<float>& test_kmer_levels) {
-    return load_modbase_model_config_impl(model_path, test_kmer_levels);
-}
-}  // namespace test
 
 ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params) {
