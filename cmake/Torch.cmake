@@ -374,8 +374,22 @@ if (USING_STATIC_TORCH_LIB)
                     ${TORCH_LIB}/lib/libcudnn_engines_runtime_compiled_static_v9.a
                 >
                 CUDA::cudart_static
-                CUDA::nvrtc
             )
+            if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+                # CUDA::nvrtc_static depends on CUDA::nvrtc_builtins_static which depends on
+                # CUDA::cuda_driver which we shouldn't be linking to. Depending on the OS and
+                # version of LD, sometimes the linker is smart enough to realise that the link
+                # to the driver is unnecessary and drops the dependency, but other times it
+                # doesn't and we end up with builds that require CUDA to be installed.
+                # Instead find the libs and manage the dependencies ourselves.
+                # Workaround taken from here: https://discourse.cmake.org/t/cmake-incorrectly-links-to-nvrtc-builtins/12723
+                find_library(ont_nvrtc_lib nvrtc_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                find_library(ont_nvrtc_builtins_lib nvrtc-builtins_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                find_library(ont_nvptxcompiler_lib nvptxcompiler_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                target_link_libraries(dorado_cudnn_lib PRIVATE ${ont_nvrtc_lib} ${ont_nvrtc_builtins_lib} ${ont_nvptxcompiler_lib})
+            else()
+                target_link_libraries(dorado_cudnn_lib PRIVATE CUDA::nvrtc)
+            endif()
             list(APPEND TORCH_LIBRARIES dorado_cudnn_lib)
             # Don't forget to install it
             install(TARGETS dorado_cudnn_lib LIBRARY)
