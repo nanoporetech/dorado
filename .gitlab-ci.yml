@@ -49,6 +49,11 @@ variables:
     - ubuntu-20.04
     - nvidia-docker
 
+.linux_cpu_runner:
+  tags:
+    - ubuntu-20.04
+    - docker-as
+
 .linux_arm64_runner:
   tags:
     - linux_aarch64
@@ -592,7 +597,7 @@ test_archive:linux:x86:20.04_nvidia:
 test_archive:linux:x86:18.04:
   image: ${DORADO_DOCKER_EXT}/ubuntu:18.04
   extends:
-    - .linux_runner
+    - .linux_cpu_runner
     - .test_archive
   needs:
     - build_archive:linux:x86:centos7
@@ -601,7 +606,7 @@ test_archive:linux:x86:18.04:
 test_archive:linux:x86:20.04:
   image: ${DORADO_DOCKER_EXT}/ubuntu:20.04
   extends:
-    - .linux_runner
+    - .linux_cpu_runner
     - .test_archive
   needs:
     - build_archive:linux:x86:centos7
