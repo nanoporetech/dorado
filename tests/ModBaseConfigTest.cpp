@@ -29,8 +29,6 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     using Ctx = ContextParams;
     using Rmt = RefinementParams;
 
-    // For _5mCG_5hmCG kmer center index 6 to pass tests need: Log(X)/Log(4) > 7
-    // -> Log(X) > 7*1.387 -> X := Exp(9.71) = 16482
     auto [path, general, mods, context, refine] =
             // clang-format off
             GENERATE_COPY(table<fs::path, Gen, Mod, Ctx, Rmt>({

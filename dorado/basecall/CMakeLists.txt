@@ -5,6 +5,7 @@ add_library(dorado_basecall STATIC
     crf_utils.h
     ModelRunner.cpp
     ModelRunner.h
+    ModelRunnerBase.cpp
     ModelRunnerBase.h
     decode/beam_search.cpp
     decode/beam_search.h

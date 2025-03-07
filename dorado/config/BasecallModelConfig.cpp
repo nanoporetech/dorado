@@ -549,7 +549,7 @@ std::string StandardisationScalingParams::to_string() const {
         << " stdev:"       << stdev << "}";
     return oss.str();
     // clang-format on
-};
+}
 
 std::string QuantileScalingParams::to_string() const {
     std::ostringstream oss;
@@ -561,7 +561,7 @@ std::string QuantileScalingParams::to_string() const {
         << " scale_multiplier:" << scale_multiplier << "}";
     return oss.str();
     // clang-format on
-};
+}
 
 std::string SignalNormalisationParams::to_string() const {
     std::ostringstream oss;
@@ -587,7 +587,7 @@ std::string ConvParams::to_string() const {
         << " activation:" << config::to_string(activation) << " }";
     return oss.str();
     // clang-format on
-};
+}
 
 std::string TxEncoderParams::to_string() const {
     std::ostringstream oss;
@@ -666,6 +666,6 @@ std::string BasecallModelConfig::to_string() const {
     oss << "}}";
     return oss.str();
     // clang-format on
-};
+}
 
 }  // namespace dorado::config

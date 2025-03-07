@@ -6,6 +6,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall/ModelRunner.h"
+#include "basecall/crf_utils.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfig.h"
 #include "demux/parse_custom_kit.h"
@@ -82,10 +83,10 @@ void reference_all_public_functions() {
     force_reference(&dorado::config::load_model_config);
     // basecall/ModelRunner.h
     force_reference(&dorado::basecall::ModelRunner::accept_chunk);
-    // demux/parse_custom_sequences.h
-    force_reference(&dorado::demux::parse_custom_sequences);
     // modbase/ModBaseModelConfig.h
     force_reference(&dorado::config::load_modbase_model_config);
+    // demux/parse_custom_sequences.h
+    force_reference(&dorado::demux::parse_custom_sequences);
     // modbase/ModBaseRunner.h
     force_reference(&dorado::modbase::ModBaseRunner::accept_chunk);
     // models/models.h

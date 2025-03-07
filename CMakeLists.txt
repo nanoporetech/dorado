@@ -457,7 +457,6 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_file_info
         dorado_models_lib
         dorado_model_downloader_lib
-        dorado_config
         dorado_compat
         minimap2
     )
