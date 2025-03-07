@@ -1,7 +1,6 @@
 #pragma once
 
 #include "basecall/ModelRunnerBase.h"
-#include "config/BasecallModelConfig.h"
 
 #include <filesystem>
 #include <memory>
@@ -20,6 +19,10 @@ class MetalCaller;
 
 namespace dorado::modbase {
 class ModBaseCaller;
+}
+
+namespace dorado::config {
+struct BasecallModelConfig;
 }
 
 namespace dorado::api {

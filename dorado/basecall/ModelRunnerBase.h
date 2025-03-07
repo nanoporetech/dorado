@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "utils/stats.h"
 
@@ -11,6 +10,11 @@
 namespace at {
 class Tensor;
 }
+
+namespace dorado::config {
+struct BasecallModelConfig;
+bool is_duplex_model(const BasecallModelConfig &model_config);
+}  // namespace dorado::config
 
 namespace dorado::basecall {
 
@@ -26,8 +30,7 @@ public:
     // Timeout is short for simplex, longer for duplex which gets a subset of reads.
     // Note that these values are overridden for CUDA basecalling.
     virtual std::pair<int, int> batch_timeouts_ms() const {
-        return config::is_duplex_model(config()) ? std::make_pair(5000, 5000)
-                                                 : std::make_pair(100, 100);
+        return is_duplex_model(config()) ? std::make_pair(5000, 5000) : std::make_pair(100, 100);
     }
 
     virtual bool is_low_latency() const { return false; }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ModelRunnerBase.h"
-#include "config/BasecallModelConfig.h"
 
 #include <ATen/core/TensorBody.h>
 #include <c10/cuda/CUDAStream.h>
@@ -13,7 +12,6 @@
 #include <vector>
 
 namespace dorado::basecall {
-
 class CudaCaller;
 
 class CudaModelRunner final : public ModelRunnerBase {

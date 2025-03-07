@@ -1,13 +1,15 @@
 #pragma once
 
-#include "config/BasecallModelConfig.h"
-
 #include <ATen/core/TensorBody.h>
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
 namespace dorado::basecall::decode {
 

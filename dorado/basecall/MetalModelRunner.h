@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ModelRunnerBase.h"
-#include "config/BasecallModelConfig.h"
 
 #include <ATen/core/TensorBody.h>
 
@@ -11,8 +10,11 @@
 #include <memory>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
+namespace dorado::basecall {
 class MetalCaller;
 
 class MetalModelRunner final : public ModelRunnerBase {

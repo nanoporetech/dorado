@@ -67,7 +67,7 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
+BatchParams get_batch_params(argparse::ArgumentParser& arg) {
     BatchParams basecaller{};
     basecaller.update(BatchParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
@@ -133,7 +133,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const BatchParams& basecaller_params,
+                         const BatchParams& batch_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
@@ -216,7 +216,7 @@ DuplexModels load_models(const std::string& model_arg,
 
     const auto model_name = model_path.filename().string();
     auto model_config = load_model_config(model_path);
-    model_config.basecaller.update(basecaller_params);
+    model_config.basecaller.update(batch_params);
     model_config.normalise_basecaller_params();
 
     if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
@@ -233,7 +233,7 @@ DuplexModels load_models(const std::string& model_arg,
 
     const auto stereo_model_name = stereo_model_path.filename().string();
     auto stereo_model_config = load_model_config(stereo_model_path);
-    stereo_model_config.basecaller.update(basecaller_params);
+    stereo_model_config.basecaller.update(batch_params);
     stereo_model_config.normalise_basecaller_params();
 
 #if DORADO_METAL_BUILD
@@ -620,14 +620,14 @@ int duplex(int argc, char* argv[]) {
             }
 
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
-            const auto basecaller_params = get_basecaller_params(parser.visible);
+            const auto batch_params = get_batch_params(parser.visible);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
             const DuplexModels models = load_models(
                     model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
-                    input_files->get(), basecaller_params, skip_model_compatibility_check, device);
+                    input_files->get(), batch_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 

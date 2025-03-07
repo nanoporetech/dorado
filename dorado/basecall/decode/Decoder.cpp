@@ -5,7 +5,6 @@
 #endif
 
 #include "CPUDecoder.h"
-#include "config/BasecallModelConfig.h"
 
 #include <c10/core/Device.h>
 
