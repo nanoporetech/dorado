@@ -19,6 +19,9 @@
 using namespace torch::nn;
 
 namespace dorado::basecall {
+
+using namespace config;
+
 std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir,
                                                 bool decomposition,
                                                 bool linear_layer_bias) {
@@ -58,7 +61,7 @@ std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir
     return utils::load_tensors(dir, tensors);
 }
 
-std::vector<torch::Tensor> load_tx_model_weights(const config::BasecallModelConfig &cfg) {
+std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg) {
     if (!cfg.is_tx_model()) {
         throw std::runtime_error(
                 "load_tx_model_weights expected a transformer model config from: '" +
@@ -117,7 +120,7 @@ std::vector<torch::Tensor> load_tx_model_weights(const config::BasecallModelConf
     return utils::load_tensors(cfg.model_path, tensors);
 }
 
-std::vector<at::Tensor> load_crf_model_weights(const config::BasecallModelConfig &model_config) {
+std::vector<at::Tensor> load_crf_model_weights(const BasecallModelConfig &model_config) {
     if (model_config.is_tx_model()) {
         return load_tx_model_weights(model_config);
     }
@@ -125,7 +128,7 @@ std::vector<at::Tensor> load_crf_model_weights(const config::BasecallModelConfig
                                    model_config.bias);
 }
 
-ModuleHolder<AnyModule> load_lstm_model(const config::BasecallModelConfig &model_config,
+ModuleHolder<AnyModule> load_lstm_model(const BasecallModelConfig &model_config,
                                         const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
     auto state_dict = load_crf_model_weights(model_config);
@@ -139,7 +142,7 @@ ModuleHolder<AnyModule> load_lstm_model(const config::BasecallModelConfig &model
     return holder;
 }
 
-ModuleHolder<AnyModule> load_tx_model(const config::BasecallModelConfig &model_config,
+ModuleHolder<AnyModule> load_tx_model(const BasecallModelConfig &model_config,
                                       const at::TensorOptions &options) {
     auto model = nn::TxModel(model_config, options);
     auto state_dict = load_crf_model_weights(model_config);
@@ -153,7 +156,7 @@ ModuleHolder<AnyModule> load_tx_model(const config::BasecallModelConfig &model_c
     return holder;
 }
 
-ModuleHolder<AnyModule> load_crf_model(const config::BasecallModelConfig &model_config,
+ModuleHolder<AnyModule> load_crf_model(const BasecallModelConfig &model_config,
                                        const torch::TensorOptions &options) {
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Device> device;
@@ -168,8 +171,7 @@ ModuleHolder<AnyModule> load_crf_model(const config::BasecallModelConfig &model_
     return load_lstm_model(model_config, options);
 }
 
-size_t auto_calculate_num_runners(const config::BasecallModelConfig &model_config,
-                                  float memory_fraction) {
+size_t auto_calculate_num_runners(const BasecallModelConfig &model_config, float memory_fraction) {
     auto model_name = std::filesystem::canonical(model_config.model_path).filename().string();
 
     // very hand-wavy determination

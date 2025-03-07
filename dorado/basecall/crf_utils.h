@@ -1,12 +1,9 @@
 #pragma once
 
-#include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
 
 #include <torch/nn.h>
 
-#include <filesystem>
-#include <string>
 #include <vector>
 
 namespace dorado::basecall {

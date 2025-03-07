@@ -31,6 +31,8 @@ using Slice = at::indexing::Slice;
 
 namespace {
 
+using namespace dorado::config;
+
 std::pair<float, float> med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
@@ -41,8 +43,7 @@ std::pair<float, float> med_mad(const at::Tensor& x) {
     return {med.item<float>(), mad.item<float>()};
 }
 
-std::pair<float, float> normalisation(const dorado::config::QuantileScalingParams& params,
-                                      const at::Tensor& x) {
+std::pair<float, float> normalisation(const QuantileScalingParams& params, const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles =
             dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
@@ -54,8 +55,6 @@ std::pair<float, float> normalisation(const dorado::config::QuantileScalingParam
 }
 
 using SampleType = dorado::models::SampleType;
-using ScalingStrategy = dorado::config::ScalingStrategy;
-using SignalNormalisationParams = dorado::config::SignalNormalisationParams;
 
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking

@@ -96,6 +96,7 @@ namespace dorado::basecall {
 
 namespace nn {
 
+using namespace config;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
@@ -434,8 +435,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const config::TxEncoderParams &params_,
-                             const at::TensorOptions &options)
+TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOptions &options)
         : params(params_) {
     self_attn =
             register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
@@ -669,7 +669,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const config::TxEncoderParams &params,
+TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
@@ -730,7 +730,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
     return stack->forward(x);
 }
 
-LinearUpsampleImpl::LinearUpsampleImpl(const config::EncoderUpsampleParams &params)
+LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
     linear = register_module(
             "linear",
@@ -745,7 +745,7 @@ at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     return out;
 };
 
-LinearScaledCRFImpl::LinearScaledCRFImpl(const config::CRFEncoderParams &params) {
+LinearScaledCRFImpl::LinearScaledCRFImpl(const CRFEncoderParams &params) {
     m_params = params;
     linear = register_module(
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
@@ -759,8 +759,7 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
     return linear(x);
 }
 
-TxModelImpl::TxModelImpl(const config::BasecallModelConfig &config,
-                         const at::TensorOptions &options)
+TxModelImpl::TxModelImpl(const BasecallModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));

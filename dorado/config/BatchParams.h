@@ -2,7 +2,6 @@
 
 #include "utils/parameters.h"
 
-#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -59,14 +58,7 @@ public:
     // `chunk_size` is both greater than `overlap` and a multiple of `chunk_size_granularity`.
     void normalise(int chunk_size_granularity, int stride);
 
-    std::string to_string() const {
-        std::string str = "BatchParams {";
-        str += " chunk_size:" + std::to_string(m_chunk_size.val);
-        str += " overlap:" + std::to_string(m_overlap.val);
-        str += " batch_size:" + std::to_string(m_batch_size.val);
-        str += "}";
-        return str;
-    }
+    std::string to_string() const;
 
 protected:
     struct Value {

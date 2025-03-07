@@ -14,8 +14,6 @@ class Tensor;
 
 namespace dorado::basecall {
 
-bool is_duplex_model(const config::BasecallModelConfig &model_config);
-
 class ModelRunnerBase {
 public:
     virtual ~ModelRunnerBase() = default;

@@ -63,12 +63,13 @@ namespace {
 
 using namespace dorado::models;
 using namespace dorado::model_resolution;
+using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-config::BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    config::BatchParams basecaller{};
-    basecaller.update(config::BatchParams::Priority::CLI_ARG,
+BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
+    BatchParams basecaller{};
+    basecaller.update(BatchParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
                       cli::get_optional_argument<int>("--overlap", arg),
                       cli::get_optional_argument<int>("--batchsize", arg));
@@ -78,10 +79,10 @@ config::BatchParams get_basecaller_params(argparse::ArgumentParser& arg) {
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    config::BasecallModelConfig model_config;
+    BasecallModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    config::BasecallModelConfig stereo_model_config;
+    BasecallModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -102,7 +103,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
             std::exit(EXIT_FAILURE);
         };
 
-        if (config::is_modbase_model(model_path)) {
+        if (is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -132,7 +133,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const config::BatchParams& basecaller_params,
+                         const BatchParams& basecaller_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
@@ -173,7 +174,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = config::load_model_config(model_path);
+            const auto model_config = load_model_config(model_path);
             const auto model_name = model_path.filename().string();
             const auto model_sample_rate = model_config.sample_rate < 0
                                                    ? get_sample_rate_by_model_name(model_name)
@@ -214,7 +215,7 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_path.filename().string();
-    auto model_config = config::load_model_config(model_path);
+    auto model_config = load_model_config(model_path);
     model_config.basecaller.update(basecaller_params);
     model_config.normalise_basecaller_params();
 
@@ -231,7 +232,7 @@ DuplexModels load_models(const std::string& model_arg,
 #endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = config::load_model_config(stereo_model_path);
+    auto stereo_model_config = load_model_config(stereo_model_path);
     stereo_model_config.basecaller.update(basecaller_params);
     stereo_model_config.normalise_basecaller_params();
 
@@ -257,10 +258,10 @@ DuplexModels load_models(const std::string& model_arg,
                         mods_model_paths,    downloader.temporary_models()};
 }
 
-config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                                   utils::arg_parse::ArgParser& parser) {
+ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                           utils::arg_parse::ArgParser& parser) {
     // Convert path to params.
-    auto params = config::get_modbase_params(paths);
+    auto params = get_modbase_params(paths);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -279,7 +280,7 @@ config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesy
 
     // Check that the paths are all valid.
     for (const auto& mb_path : paths) {
-        if (!config::is_modbase_model(mb_path)) {
+        if (!is_modbase_model(mb_path)) {
             throw std::runtime_error("Modified bases model not found in the model path at " +
                                      std::filesystem::weakly_canonical(mb_path).string());
         }

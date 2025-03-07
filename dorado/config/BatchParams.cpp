@@ -106,4 +106,15 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     }
 }
 
+std::string BatchParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "BatchParams {"
+        << " chunk_size:" << m_chunk_size.val 
+        << " overlap:" << m_overlap.val
+        << " batch_size:" << m_batch_size.val << "}";
+    return oss.str();
+    // clang-format on
+}
+
 }  // namespace dorado::config

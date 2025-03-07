@@ -70,6 +70,7 @@ using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
 using namespace dorado::models;
 using namespace dorado::model_resolution;
+using namespace dorado::config;
 namespace fs = std::filesystem;
 
 namespace dorado {
@@ -91,9 +92,9 @@ public:
 };
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
-                           config::BasecallModelConfig& model_config,
+                           BasecallModelConfig& model_config,
                            const std::string& device) {
-    model_config.basecaller.update(config::BatchParams::Priority::CLI_ARG,
+    model_config.basecaller.update(BatchParams::Priority::CLI_ARG,
                                    cli::get_optional_argument<int>("--chunksize", arg),
                                    cli::get_optional_argument<int>("--overlap", arg),
                                    cli::get_optional_argument<int>("--batchsize", arg));
@@ -272,10 +273,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     cli::add_internal_arguments(parser);
 }
 
-config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                                   utils::arg_parse::ArgParser& parser) {
+ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                           utils::arg_parse::ArgParser& parser) {
     // Convert path to params.
-    auto params = config::get_modbase_params(paths);
+    auto params = get_modbase_params(paths);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -294,7 +295,7 @@ config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesy
 
     // Check that the paths are all valid.
     for (const auto& mb_path : paths) {
-        if (!config::is_modbase_model(mb_path)) {
+        if (!is_modbase_model(mb_path)) {
             throw std::runtime_error("Modified bases model not found in the model path at " +
                                      std::filesystem::weakly_canonical(mb_path).string());
         }
@@ -305,14 +306,14 @@ config::ModBaseBatchParams validate_modbase_params(const std::vector<std::filesy
 }
 
 void setup(const std::vector<std::string>& args,
-           const config::BasecallModelConfig& model_config,
+           const BasecallModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
            const std::vector<fs::path>& modbase_models,
            const std::string& device,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           const config::ModBaseBatchParams& modbase_params,
+           const ModBaseBatchParams& modbase_params,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
@@ -843,7 +844,7 @@ int basecaller(int argc, char* argv[]) {
         if (!check_model_path(model_path)) {
             return EXIT_FAILURE;
         }
-        if (config::is_modbase_model(model_path)) {
+        if (is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -887,7 +888,7 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = config::load_model_config(model_path);
+    auto model_config = load_model_config(model_path);
     set_basecaller_params(parser.visible, model_config, device);
 
     spdlog::info("> Creating basecall pipeline");

@@ -32,6 +32,8 @@ CREATE_POINT_OF_INTEREST_ID(MetalCaller);
 
 namespace dorado::basecall {
 
+using namespace config;
+
 struct MetalCaller::NNTask {
     NNTask(at::Tensor *input_, int num_chunks_, std::vector<decode::DecodedChunk> *out_chunks_)
             : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
@@ -223,7 +225,7 @@ void MetalCaller::decode_thread_fn() {
     }
 }
 
-MetalLSTMCaller::MetalLSTMCaller(const config::BasecallModelConfig &model_config,
+MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
                                  float memory_limit_fraction)
         : MetalCaller(model_config) {
     ScopedAutoReleasePool autorelease_pool;
@@ -258,7 +260,7 @@ MetalLSTMCaller::MetalLSTMCaller(const config::BasecallModelConfig &model_config
     start_threads();
 }
 
-void MetalLSTMCaller::set_chunk_batch_size(const config::BasecallModelConfig &model_config,
+void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_config,
                                            const std::vector<at::Tensor> &state_dict,
                                            int chunk_size,
                                            int batch_size) {
@@ -337,7 +339,7 @@ void MetalLSTMCaller::set_chunk_batch_size(const config::BasecallModelConfig &mo
     }
 }
 
-int MetalLSTMCaller::benchmark_batch_sizes(const config::BasecallModelConfig &model_config,
+int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_config,
                                            const std::vector<at::Tensor> &state_dict,
                                            float memory_limit_fraction) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
@@ -475,8 +477,7 @@ DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
             m_decoder_options.q_shift, m_decoder_options.q_scale, m_score_scale);
 }
 
-MetalTxCaller::MetalTxCaller(const config::BasecallModelConfig &model_config)
-        : MetalCaller(model_config) {
+MetalTxCaller::MetalTxCaller(const BasecallModelConfig &model_config) : MetalCaller(model_config) {
     ScopedAutoReleasePool autorelease_pool;
 
     if (!model_config.is_tx_model()) {
@@ -532,7 +533,7 @@ MetalTxCaller::MetalTxCaller(const config::BasecallModelConfig &model_config)
     start_threads();
 }
 
-void MetalTxCaller::load_tx_model(const config::BasecallModelConfig &model_config) {
+void MetalTxCaller::load_tx_model(const BasecallModelConfig &model_config) {
     const auto device_type = torch::kMPS;
     const auto scalar_type = torch::kFloat16;
     const auto options = at::TensorOptions().device(device_type).dtype(scalar_type);
