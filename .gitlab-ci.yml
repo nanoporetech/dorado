@@ -82,13 +82,15 @@ variables:
 .linux_build_dependencies:
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
+    - apt-get update
+    - apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
     - pip install gcovr
 
 .linux_test_dependencies:
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl
+    - apt-get update
+    - apt-get install -y --no-install-recommends samtools curl
 
 .set_parallel_jobs:
   - |
@@ -284,7 +286,8 @@ build:linux:x86:focal:clang_tidy:
   extends:
     - .linux_runner
   script:
-    - apt update && apt install -y clang clang-tidy
+    - apt update
+    - apt install -y clang clang-tidy
     - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
   artifacts: null
@@ -299,7 +302,8 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - !reference [.set_parallel_jobs]
-    - apt update && apt install -y autoconf autotools-dev automake wget libc6-dbg
+    - apt update
+    - apt install -y autoconf autotools-dev automake wget libc6-dbg
     # We need a recent valgrind that includes https://bugs.kde.org/show_bug.cgi?id=402833.
     - VALGRIND_VERSION="3.22.0"
     - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
@@ -495,7 +499,9 @@ build_archive:macos:arm:
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
@@ -511,7 +517,9 @@ build_archive:macos:arm:
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
@@ -523,7 +531,9 @@ build_archive:macos:arm:
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../archive .
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
