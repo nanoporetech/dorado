@@ -302,7 +302,13 @@ std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig&
         return levels;
     }
 
-    auto t = utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"})[0].contiguous();
+    std::vector<at::Tensor> tensors =
+            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
+    if (tensors.empty()) {
+        throw std::runtime_error("Failed to load modbase refinement tensors.");
+    }
+    auto& t = tensors.front();
+    t.contiguous();
     levels.reserve(t.numel());
     std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
     return levels;

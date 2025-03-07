@@ -511,9 +511,8 @@ std::string to_string(const Activation &activation) {
         return std::string("swish_clamp");
     case Activation::TANH:
         return std::string("tanh");
-    default:
-        return std::string("UNKNOWN");
     };
+    throw std::runtime_error("Unknown activation function");
 }
 
 std::string to_string(const ScalingStrategy &strategy) {
@@ -524,9 +523,8 @@ std::string to_string(const ScalingStrategy &strategy) {
         return std::string("quantile");
     case ScalingStrategy::PA:
         return std::string("pa");
-    default:
-        throw std::runtime_error("Unknown scaling strategy");
     };
+    throw std::runtime_error("Unknown scaling strategy");
 }
 
 ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {

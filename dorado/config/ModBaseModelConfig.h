@@ -10,9 +10,9 @@
 namespace dorado::config {
 
 enum ModelType { CONV_LSTM_V1, CONV_LSTM_V2, CONV_V1, UNKNOWN };
-std::string to_string(const ModelType& model_type) noexcept;
-ModelType model_type_from_string(const std::string& model_type) noexcept;
-ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept;
+std::string to_string(const ModelType& model_type);
+ModelType model_type_from_string(const std::string& model_type);
+ModelType get_modbase_model_type(const std::filesystem::path& path);
 
 bool is_modbase_model(const std::filesystem::path& path);
 

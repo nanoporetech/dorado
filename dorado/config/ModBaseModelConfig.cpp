@@ -40,7 +40,7 @@ int get_int_in_range(const toml::value& p,
 
 namespace dorado::config {
 
-std::string to_string(const ModelType& model_type) noexcept {
+std::string to_string(const ModelType& model_type) {
     switch (model_type) {
     case CONV_LSTM_V1:
         return std::string("conv_lstm");
@@ -48,12 +48,13 @@ std::string to_string(const ModelType& model_type) noexcept {
         return std::string("conv_lstm_v2");
     case CONV_V1:
         return std::string("conv_v1");
-    default:
-        return std::string("__UNKNOWN__");
+    case UNKNOWN:
+        return std::string("UNKNOWN");
     }
+    throw std::runtime_error("Invalid modbase model type");
 };
 
-ModelType model_type_from_string(const std::string& model_type) noexcept {
+ModelType model_type_from_string(const std::string& model_type) {
     if (model_type == "conv_lstm") {
         return ModelType::CONV_LSTM_V1;
     }
@@ -66,7 +67,7 @@ ModelType model_type_from_string(const std::string& model_type) noexcept {
     return ModelType::UNKNOWN;
 }
 
-ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
+ModelType get_modbase_model_type(const std::filesystem::path& path) {
     try {
         const auto config_toml = toml::parse(path / "config.toml");
         if (!config_toml.contains("general")) {
@@ -74,7 +75,6 @@ ModelType get_modbase_model_type(const std::filesystem::path& path) noexcept {
         }
         return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
     } catch (std::exception& e) {
-        spdlog::trace("get_modbase_model_type caught exception: {}", e.what());
         return ModelType::UNKNOWN;
     }
 }
