@@ -37,13 +37,15 @@ constexpr float methylation_threshold{0.05f};
 }  // namespace
 
 std::string ModBaseBatchParams::to_string() const {
-    std::string str = "ModBaseParams {";
-    str += "batchsize:" + std::to_string(batchsize);
-    str += ", runners_per_caller:" + std::to_string(runners_per_caller);
-    str += ", threads:" + std::to_string(threads);
-    str += ", threshold:" + std::to_string(threshold);
-    str += "}";
-    return str;
+    std::ostringstream oss;
+    // clang-format off
+    oss << "ModBaseBatchParams {"
+        << " batchsize:" << batchsize
+        << " runners_per_caller:" << runners_per_caller
+        << " threads:" << threads
+        << " threshold:" << threshold << " }";
+    return oss.str();
+    // clang-format on
 }
 
 ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths) {
