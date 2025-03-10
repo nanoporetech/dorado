@@ -282,12 +282,16 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 }
 
 Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
-    if (variant.alt == variant.ref) {
+    if (std::empty(variant.alts)) {
+        throw std::runtime_error{"The variant.alts member cannot be empty!"};
+    }
+
+    if (variant.alts.front() == variant.ref) {
         return variant;
     }
 
     const auto trim_start = [](Variant& var, const bool rev) {
-        std::array<std::string, 2> seqs{var.ref, var.alt};
+        std::array<std::string, 2> seqs{var.ref, var.alts.front()};
         if (rev) {
             std::reverse(std::begin(seqs[0]), std::end(seqs[0]));
             std::reverse(std::begin(seqs[1]), std::end(seqs[1]));
@@ -301,17 +305,17 @@ Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
             ++start_pos;
         }
         var.ref = seqs[0].substr(start_pos);
-        var.alt = seqs[1].substr(start_pos);
+        var.alts[0] = seqs[1].substr(start_pos);
         if (rev) {
             std::reverse(std::begin(var.ref), std::end(var.ref));
-            std::reverse(std::begin(var.alt), std::end(var.alt));
+            std::reverse(std::begin(var.alts[0]), std::end(var.alts[0]));
         } else {
             var.pos += start_pos;
         }
     };
 
     const auto trim_end_and_align = [](Variant& var, const std::string& reference) {
-        std::array<std::string, 2> seqs{var.ref, var.alt};
+        std::array<std::string, 2> seqs{var.ref, var.alts[0]};
         bool changed = true;
         while (changed) {
             changed = false;
@@ -338,7 +342,7 @@ Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
             }
         }
         var.ref = seqs[0];
-        var.alt = seqs[1];
+        var.alts[0] = seqs[1];
     };
 
     Variant ret = variant;
@@ -500,7 +504,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             var_pred.insert(0, 1, draft[var_pos]);
         }
         Variant variant{
-                vc_sample.seq_id,     var_pos,  var_ref, var_pred, "PASS", {},
+                vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
                 round_float(qual, 3), genotype,
         };
         variant = normalize_variant(variant, draft);
@@ -532,7 +536,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                 vc_sample.seq_id,
                 pos,
                 ref,
-                ".",
+                {"."},
                 ".",
                 {},
                 round_float(qual, 3),

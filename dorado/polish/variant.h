@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace dorado::polisher {
@@ -12,7 +13,7 @@ struct Variant {
     int32_t seq_id = -1;
     int64_t pos = -1;
     std::string ref;
-    std::string alt;
+    std::vector<std::string> alts;
     std::string filter;
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
