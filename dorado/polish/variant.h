@@ -21,4 +21,6 @@ struct Variant {
 
 std::ostream& operator<<(std::ostream& os, const Variant& v);
 
+bool operator==(const Variant& lhs, const Variant& rhs);
+
 }  // namespace dorado::polisher
