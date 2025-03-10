@@ -74,7 +74,7 @@ ModelType get_modbase_model_type(const std::filesystem::path& path) {
             return ModelType::UNKNOWN;
         }
         return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
-    } catch (std::exception& e) {
+    } catch (std::exception&) {
         return ModelType::UNKNOWN;
     }
 }
