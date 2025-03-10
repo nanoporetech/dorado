@@ -6,6 +6,7 @@
 #include "cli/model_resolution.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"

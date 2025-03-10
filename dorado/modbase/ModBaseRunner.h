@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config/ModBaseModelConfig.h"
 #include "utils/stats.h"
 
 #include <ATen/core/TensorBody.h>
@@ -10,6 +9,10 @@
 #include <atomic>
 #include <string>
 #include <vector>
+
+namespace dorado::config {
+struct ModBaseModelConfig;
+}
 
 namespace dorado::modbase {
 

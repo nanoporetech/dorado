@@ -4,7 +4,6 @@
 #include "ModbaseScaler.h"
 #include "config/ModBaseModelConfig.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 

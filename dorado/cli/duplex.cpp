@@ -6,6 +6,7 @@
 #include "cli/model_resolution.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"

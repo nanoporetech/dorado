@@ -1,10 +1,12 @@
 #pragma once
 
-#include "config/ModBaseModelConfig.h"
-
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace dorado::config {
+struct ModBaseModelConfig;
+}
 
 namespace dorado::modbase {
 
