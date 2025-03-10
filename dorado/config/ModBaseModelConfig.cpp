@@ -42,13 +42,13 @@ namespace dorado::config {
 
 std::string to_string(const ModelType& model_type) {
     switch (model_type) {
-    case CONV_LSTM_V1:
+    case ModelType::CONV_LSTM_V1:
         return std::string("conv_lstm");
-    case CONV_LSTM_V2:
+    case ModelType::CONV_LSTM_V2:
         return std::string("conv_lstm_v2");
-    case CONV_V1:
+    case ModelType::CONV_V1:
         return std::string("conv_v1");
-    case UNKNOWN:
+    case ModelType::UNKNOWN:
         return std::string("UNKNOWN");
     }
     throw std::runtime_error("Invalid modbase model type");
