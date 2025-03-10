@@ -1,5 +1,7 @@
 #include "Decoder.h"
 
+#include "config/BasecallModelConfig.h"
+
 #if DORADO_CUDA_BUILD
 #include "CUDADecoder.h"
 #endif
