@@ -113,10 +113,6 @@ else()
                     else()
                         set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}-CUDA-11.8-linux-x64-ont-pre-cxx11.zip)
                         set(TORCH_HASH "ed861d7aa538e68f1fe6f936e46293eed66a45d996497882698a70c91837e6f6")
-                         # DOR-1119 - replace with 2.0 for now
-                        set(TORCH_VERSION 2.0.0)
-                        set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-linux-x64-ont-pre-cxx11.zip)
-                        set(TORCH_HASH "295cb3eb15236f2331ff4da7609c5c6c2a6bfb650432d46282cfb759b5080293")
                     endif()
                     set(TORCH_PATCH_SUFFIX -ont-pre-cxx11)
                 else()
@@ -126,10 +122,6 @@ else()
                     else()
                         set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}-CUDA-11.8-linux-x64-ont-cxx11-abi.zip)
                         set(TORCH_HASH "8fde510fa2df1e559ebc37be9d747119ff798c047bfe5dc947694f9c9909cc63")
-                        # DOR-1119 - replace with 2.0 for now
-                        set(TORCH_VERSION 2.0.0)
-                        set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-linux-x64-ont-cxx11-abi.zip)
-                        set(TORCH_HASH "6cbeaa5db3e85a13302fae0729fe266a31ac6c9d626d879f51a02020df9e2359")
                     endif()
                     set(TORCH_PATCH_SUFFIX -ont-cxx11-abi)
                 endif()
@@ -374,8 +366,22 @@ if (USING_STATIC_TORCH_LIB)
                     ${TORCH_LIB}/lib/libcudnn_engines_runtime_compiled_static_v9.a
                 >
                 CUDA::cudart_static
-                CUDA::nvrtc
             )
+            if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+                # CUDA::nvrtc_static depends on CUDA::nvrtc_builtins_static which depends on
+                # CUDA::cuda_driver which we shouldn't be linking to. Depending on the OS and
+                # version of LD, sometimes the linker is smart enough to realise that the link
+                # to the driver is unnecessary and drops the dependency, but other times it
+                # doesn't and we end up with builds that require CUDA to be installed.
+                # Instead find the libs and manage the dependencies ourselves.
+                # Workaround taken from here: https://discourse.cmake.org/t/cmake-incorrectly-links-to-nvrtc-builtins/12723
+                find_library(ont_nvrtc_lib nvrtc_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                find_library(ont_nvrtc_builtins_lib nvrtc-builtins_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                find_library(ont_nvptxcompiler_lib nvptxcompiler_static PATHS "${CUDAToolkit_LIBRARY_DIR}" REQUIRED)
+                target_link_libraries(dorado_cudnn_lib PRIVATE ${ont_nvrtc_lib} ${ont_nvrtc_builtins_lib} ${ont_nvptxcompiler_lib})
+            else()
+                target_link_libraries(dorado_cudnn_lib PRIVATE CUDA::nvrtc)
+            endif()
             list(APPEND TORCH_LIBRARIES dorado_cudnn_lib)
             # Don't forget to install it
             install(TARGETS dorado_cudnn_lib LIBRARY)
