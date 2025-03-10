@@ -1,9 +1,12 @@
 #pragma once
 
-#include "config/ModBaseModelConfig.h"
 #include "torch_utils/module_utils.h"
 
 #include <torch/nn.h>
+
+namespace dorado::config {
+struct ModBaseModelConfig;
+}
 
 namespace dorado::modbase {
 
