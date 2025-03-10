@@ -18,6 +18,8 @@ struct Variant {
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
     std::vector<std::pair<std::string, int32_t>> genotype;
+    int64_t rstart = 0;
+    int64_t rend = 0;
 };
 
 std::ostream& operator<<(std::ostream& os, const Variant& v);

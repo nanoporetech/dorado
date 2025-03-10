@@ -8,10 +8,10 @@
 #include "variant.h"
 #include "variant_calling_sample.h"
 
-#include <ATen/ATen.h>
-
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -28,5 +28,11 @@ std::vector<Variant> call_variants(
         const bool gvcf,
         const int32_t num_threads,
         PolishStats& polish_stats);
+
+Variant normalize_variant(const std::string_view ref_with_gaps,
+                          const std::vector<std::string_view>& cons_seqs_with_gaps,
+                          const std::vector<int64_t>& positions_major,
+                          const std::vector<int64_t>& positions_minor,
+                          const Variant& variant);
 
 }  // namespace dorado::polisher
