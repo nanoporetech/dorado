@@ -59,6 +59,16 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
                    (uint8_t *)attributes.start_time.c_str());
 
+    if (primer_classification.orientation != StrandOrientation::UNKNOWN) {
+        auto sense_data = uint8_t(to_char(primer_classification.orientation));
+        bam_aux_append(aln, "TS", 'A', 1, &sense_data);
+    }
+    if (!primer_classification.umi_tag_sequence.empty()) {
+        auto len = int(primer_classification.umi_tag_sequence.size()) + 1;
+        auto data = (const uint8_t *)primer_classification.umi_tag_sequence.c_str();
+        bam_aux_append(aln, "RX", 'Z', len, data);
+    }
+
     // For reads which are the result of read splitting, the read number will be set to -1
     int rn = attributes.read_number;
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
