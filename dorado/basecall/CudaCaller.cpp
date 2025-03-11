@@ -66,6 +66,11 @@ void emit_benchmark_file(const std::string &gpu_name,
     }
 }
 
+c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
+    c10::cuda::CUDAGuard device_guard(device);
+    return c10::cuda::getStreamFromPool(false, device.index());
+}
+
 }  // namespace
 
 // If 5 minutes has passed since the first chunk was added to a batch, we will
@@ -103,7 +108,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
-          m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
+          m_stream(get_stream_for_device(m_options.device())) {
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
