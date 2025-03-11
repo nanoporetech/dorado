@@ -947,10 +947,11 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                 results.begin(), results.end(),
                 [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
 
-        if (((out.barcode_name != best_top_result->barcode_name) &&
-             (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
-            ((out.barcode_name != best_bottom_result->barcode_name) &&
-             (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty))) {
+        if (out.barcode_name != UNCLASSIFIED.barcode_name &&
+            (((out.barcode_name != best_top_result->barcode_name) &&
+              (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
+             ((out.barcode_name != best_bottom_result->barcode_name) &&
+              (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty)))) {
             spdlog::trace(
                     "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
                     out.barcode_name, best_top_result->barcode_name,
