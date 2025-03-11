@@ -55,12 +55,13 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
 
 #if DORADO_CUDA_BUILD
     if (opts.device().is_cuda()) {
+        c10::cuda::CUDAGuard device_guard(opts.device());
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
         const int channels = utils::BaseInfo::NUM_BASES * params.general.kmer_len;
 
         // Warmup
-        c10::cuda::OptionalCUDAStreamGuard guard(stream);
+        c10::cuda::CUDAStreamGuard guard(*stream);
         auto input_sigs = torch::empty({batch_size, 1, get_sig_len()}, opts);
         auto input_seqs = torch::empty({batch_size, get_seq_len(), channels}, opts);
         module_holder.forward(input_sigs, input_seqs);

@@ -9,6 +9,10 @@
 #include <torch/csrc/autograd/generated/variable_factories.h>
 #include <torch/torch.h>
 
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAGuard.h>
+#endif
+
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -274,7 +278,14 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 
 dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig& config,
                                                 const at::TensorOptions& options) {
-    c10::InferenceMode guard;
+    at::InferenceMode guard;
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Device> device;
+    if (options.device().is_cuda()) {
+        device = options.device();
+    }
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+#endif
     const auto params = config.general;
     switch (params.model_type) {
     case config::ModelType::CONV_LSTM_V1: {
