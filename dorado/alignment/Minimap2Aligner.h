@@ -15,20 +15,39 @@ extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
 
 class Minimap2Aligner {
 public:
+    /// Construct with a single index.
     Minimap2Aligner(std::shared_ptr<const Minimap2Index> minimap_index)
-            : m_minimap_index(std::move(minimap_index)) {}
+            : m_minimap_indexes({std::move(minimap_index)}) {}
 
-    void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*);
+    /** Construct with multiple indexes.
+     *  Each index should be one block of a single split index.
+     */
+    Minimap2Aligner(std::vector<std::shared_ptr<const Minimap2Index>> minimap_indexes)
+            : m_minimap_indexes(std::move(minimap_indexes)) {}
+
+    /// Align to the full reference (and merge results if index is split).
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
+
+    /// Align to the full reference (and merge results if index is split).
     void align(dorado::ReadCommon& read_common,
                const std::string& alignment_header,
                mm_tbuf_t* buf);
+
+    /// Get the mapping details from a single alignment. This should only be
     std::tuple<mm_reg1_t*, int> get_mapping(bam1_t* record, mm_tbuf_t* buf);
 
+    /// This will combine the sequence records from all blocks of a split-index.
     HeaderSequenceRecords get_sequence_records_for_header() const;
 
 private:
-    std::shared_ptr<const Minimap2Index> m_minimap_index;
+    std::vector<std::shared_ptr<const Minimap2Index>> m_minimap_indexes;
+
+    std::vector<BamPtr> align_impl(bam1_t* record, mm_tbuf_t* buf, int idx_no);
+    std::vector<AlignmentResult> align_impl(dorado::ReadCommon& read_common,
+                                            const std::string& alignment_header,
+                                            mm_tbuf_t* buf,
+                                            int idx_no);
+    void add_tags(bam1_t*, const mm_reg1_t*, const std::string&, const mm_tbuf_t*, int idx_no);
 };
 
 }  // namespace dorado::alignment

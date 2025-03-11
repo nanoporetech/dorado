@@ -80,6 +80,13 @@ namespace dorado::alignment {
 const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
 
 std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbuf_t* buf) {
+    // This function should only be used when either the index is not split, or a split
+    // index is being loaded incrementally. In either case, the Minimap2Aligner object will
+    // contain only a single entry in m_minimap_indexes.
+    if (m_minimap_indexes.size() != 1) {
+        throw std::logic_error(
+                "Minimap2Aligner::get_mapping() called on fully-loaded split index.");
+    }
     std::string_view qname(bam_get_qname(irecord));
 
     // get the sequence to map from the record
@@ -87,14 +94,29 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
 
     // do the mapping
     int hits = 0;
-    auto mm_index = m_minimap_index->index();
-    const auto& mm_map_opts = m_minimap_index->mapping_options();
+    auto mm_index = m_minimap_indexes[0]->index();
+    const auto& mm_map_opts = m_minimap_indexes[0]->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
                             &mm_map_opts, qname.data());
     return {reg, hits};
 }
 
 std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
+    std::vector<BamPtr> all_records{};
+
+    // strip any existing alignment metadata from the read
+    utils::remove_alignment_tags_from_record(irecord);
+
+    for (size_t i = 0; i < m_minimap_indexes.size(); ++i) {
+        auto records = align_impl(irecord, buf, int(i));
+        for (size_t j = 0; j < records.size(); ++j) {
+            all_records.emplace_back(std::move(records[j]));
+        }
+    }
+    return all_records;
+}
+
+std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf, int idx_no) {
     // some where for the hits
     std::vector<BamPtr> results;
 
@@ -128,13 +150,10 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         qual_rev = std::vector<uint8_t>(qual.rbegin(), qual.rend());
     }
 
-    // strip any existing alignment metadata from the read
-    utils::remove_alignment_tags_from_record(irecord);
-
     // do the mapping
     int hits = 0;
-    auto mm_index = m_minimap_index->index();
-    const auto& mm_map_opts = m_minimap_index->mapping_options();
+    auto mm_index = m_minimap_indexes.at(idx_no)->index();
+    const auto& mm_map_opts = m_minimap_indexes.at(idx_no)->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
                             &mm_map_opts, qname.data());
 
@@ -252,7 +271,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
         record->l_data += bam_get_l_aux(irecord);
 
         // Add new tags to match minimap2.
-        add_tags(record, aln, seq, buf);
+        add_tags(record, aln, seq, buf, idx_no);
         if (!skip_seq_qual) {
             // Here pass the original query length before any hard clip because the
             // the CIGAR string in SA tag only makes use of soft clip. And for that to be
@@ -287,17 +306,28 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
+    for (size_t i = 0; i < m_minimap_indexes.size(); ++i) {
+        auto results = align_impl(read_common, alignment_header, buffer, int(i));
+        for (size_t j = 0; j < results.size(); ++j) {
+            read_common.alignment_results.emplace_back(std::move(results[j]));
+        }
+    }
+}
+
+std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& read_common,
+                                                         const std::string& alignment_header,
+                                                         mm_tbuf_t* buffer,
+                                                         int idx_no) {
     mm_bseq1_t query{};
     query.seq = const_cast<char*>(read_common.seq.c_str());
     query.name = const_cast<char*>(read_common.read_id.c_str());
     query.l_seq = static_cast<int>(read_common.seq.length());
 
     int n_regs{};
-    mm_reg1_t* regs = mm_map(m_minimap_index->index(), query.l_seq, query.seq, &n_regs, buffer,
-                             &m_minimap_index->mapping_options(), nullptr);
+    mm_reg1_t* regs = mm_map(m_minimap_indexes.at(idx_no)->index(), query.l_seq, query.seq, &n_regs,
+                             buffer, &m_minimap_indexes.at(idx_no)->mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
-    std::vector<AlignmentResult> alignment_results{};
     std::string alignment_string{};
     if (!alignment_header.empty()) {
         alignment_string += alignment_header + "\n";
@@ -308,18 +338,22 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam3(&alignment_line, m_minimap_index->index(), &query, 0, reg_idx, 1, &n_regs,
-                      &regs, NULL, MM_F_OUT_MD, buffer->rep_len);
+        mm_write_sam3(&alignment_line, m_minimap_indexes.at(idx_no)->index(), &query, 0, reg_idx, 1,
+                      &n_regs, &regs, NULL, MM_F_OUT_MD, buffer->rep_len);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
         free(regs[reg_idx].p);
     }
-    read_common.alignment_results =
-            parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
+    return parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
 }
 
 HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
-    return m_minimap_index->get_sequence_records_for_header();
+    HeaderSequenceRecords sequence_records{};
+    for (const auto& idx : m_minimap_indexes) {
+        auto records = idx->get_sequence_records_for_header();
+        sequence_records.insert(sequence_records.end(), records.begin(), records.end());
+    }
+    return sequence_records;
 }
 
 // Function to add auxiliary tags to the alignment record.
@@ -327,7 +361,8 @@ HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
 void Minimap2Aligner::add_tags(bam1_t* record,
                                const mm_reg1_t* aln,
                                const std::string& seq,
-                               const mm_tbuf_t* buf) {
+                               const mm_tbuf_t* buf,
+                               int idx_no) {
     if (aln->p) {
         // NM
         int32_t nm = aln->blen - aln->mlen + aln->p->n_ambi;
@@ -383,7 +418,8 @@ void Minimap2Aligner::add_tags(bam1_t* record,
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len = mm_gen_MD(NULL, &md, &max_len, m_minimap_index->index(), aln, seq.c_str());
+    int md_len =
+            mm_gen_MD(NULL, &md, &max_len, m_minimap_indexes.at(idx_no)->index(), aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }
