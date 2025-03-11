@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BasecallerParams.h"
+#include "BatchParams.h"
 #include "models/kits.h"
 
 #include <cmath>
@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::config {
 
 enum class Activation { SWISH, SWISH_CLAMP, TANH };
 std::string to_string(const Activation& activation);
@@ -24,14 +24,7 @@ struct StandardisationScalingParams {
     float mean = 0.0f;
     float stdev = 1.0f;
 
-    std::string to_string() const {
-        std::string str = "StandardisationScalingParams {";
-        str += " standardise:" + std::to_string(standardise);
-        str += " mean:" + std::to_string(mean);
-        str += " stdev:" + std::to_string(stdev);
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 struct QuantileScalingParams {
@@ -40,22 +33,14 @@ struct QuantileScalingParams {
     float shift_multiplier = 0.51f;
     float scale_multiplier = 0.53f;
 
-    std::string to_string() const {
-        std::string str = "QuantileScalingParams {";
-        str += " quantile_a:" + std::to_string(quantile_a);
-        str += " quantile_b:" + std::to_string(quantile_b);
-        str += " shift_multiplier:" + std::to_string(shift_multiplier);
-        str += " scale_multiplier:" + std::to_string(scale_multiplier);
-        str += "}";
-        return str;
-    };
+    std::string to_string() const;
 };
 
 struct SignalNormalisationParams {
     ScalingStrategy strategy = ScalingStrategy::QUANTILE;
 
     QuantileScalingParams quantile;
-    StandardisationScalingParams standarisation;
+    StandardisationScalingParams standardisation;
 
     std::string to_string() const;
 };
@@ -69,8 +54,6 @@ struct ConvParams {
 
     std::string to_string() const;
 };
-
-namespace tx {
 
 struct TxEncoderParams {
     // The number of expected features in the encoder/decoder inputs
@@ -124,7 +107,7 @@ struct CRFEncoderParams {
     std::string to_string() const;
 };
 
-struct Params {
+struct TxStack {
     TxEncoderParams tx;
     EncoderUpsampleParams upsample;
     CRFEncoderParams crf;
@@ -133,10 +116,8 @@ struct Params {
     void check() const;
 };
 
-}  // namespace tx
-
 // Values extracted from config.toml used in construction of the model module.
-struct CRFModelConfig {
+struct BasecallModelConfig {
     float qscale = 1.0f;
     float qbias = 0.0f;
     int lstm_size = 0;
@@ -172,9 +153,9 @@ struct CRFModelConfig {
     std::vector<ConvParams> convs;
 
     // Tx Model Params
-    std::optional<tx::Params> tx = std::nullopt;
+    std::optional<TxStack> tx = std::nullopt;
 
-    BasecallerParams basecaller;
+    BatchParams basecaller;
 
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }
@@ -203,11 +184,9 @@ struct CRFModelConfig {
 // True if this config at path describes a transformer model
 bool is_tx_model_config(const std::filesystem::path& path);
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path& path);
+BasecallModelConfig load_model_config(const std::filesystem::path& path);
 
-bool is_rna_model(const CRFModelConfig& model_config);
-bool is_duplex_model(const CRFModelConfig& model_config);
+bool is_rna_model(const BasecallModelConfig& model_config);
+bool is_duplex_model(const BasecallModelConfig& model_config);
 
-models::Chemistry parse_model_chemistry(const std::filesystem::path& path);
-
-}  // namespace dorado::basecall
+}  // namespace dorado::config

@@ -1,6 +1,4 @@
-#include "BasecallerParams.h"
-
-#include "utils/parameters.h"
+#include "BatchParams.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
@@ -8,9 +6,9 @@
 #include <optional>
 #include <stdexcept>
 
-namespace dorado::basecall {
+namespace dorado::config {
 
-bool BasecallerParams::set_value(Value &self, const Value &other) {
+bool BatchParams::set_value(Value &self, const Value &other) {
     if (other.priority != Priority::FORCE && other.priority <= self.priority) {
         return false;
     }
@@ -18,7 +16,7 @@ bool BasecallerParams::set_value(Value &self, const Value &other) {
         return false;
     }
     if (other.val < 0) {
-        throw std::runtime_error("BasecallerParams::set_value value must be positive integer");
+        throw std::runtime_error("BatchParams::set_value value must be positive integer");
     }
 
     self.val = other.val;
@@ -26,7 +24,7 @@ bool BasecallerParams::set_value(Value &self, const Value &other) {
     return true;
 };
 
-void BasecallerParams::update(const std::filesystem::path &path) {
+void BatchParams::update(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
     if (!config_toml.contains("basecaller")) {
         return;
@@ -58,10 +56,10 @@ void BasecallerParams::update(const std::filesystem::path &path) {
     update(Priority::CONFIG, parse("chunksize"), parse("overlap"), std::nullopt);
 };
 
-void BasecallerParams::update(Priority priority,
-                              std::optional<int> chunksize,
-                              std::optional<int> overlap,
-                              std::optional<int> batchsize) {
+void BatchParams::update(Priority priority,
+                         std::optional<int> chunksize,
+                         std::optional<int> overlap,
+                         std::optional<int> batchsize) {
     auto upd = [&](Value &self, const std::optional<int> val, const std::string &name) {
         if (!val.has_value()) {
             return;
@@ -77,7 +75,7 @@ void BasecallerParams::update(Priority priority,
     upd(m_batch_size, batchsize, "batchsize");
 }
 
-void BasecallerParams::update(const BasecallerParams &other) {
+void BatchParams::update(const BatchParams &other) {
     // Apply updated value with other.priority
     auto merge = [&](Value &self, const Value &oth, const std::string &name) {
         if (set_value(self, oth)) {
@@ -90,7 +88,7 @@ void BasecallerParams::update(const BasecallerParams &other) {
     merge(m_batch_size, other.m_batch_size, "batchsize");
 }
 
-void BasecallerParams::normalise(int chunk_size_granularity, int stride) {
+void BatchParams::normalise(int chunk_size_granularity, int stride) {
     // Make sure overlap is a multiple of `stride`, and greater than 0
     const int old_overlap = m_overlap.val;
     const int new_overlap = std::max(1, old_overlap / stride) * stride;
@@ -108,4 +106,15 @@ void BasecallerParams::normalise(int chunk_size_granularity, int stride) {
     }
 }
 
-}  // namespace dorado::basecall
+std::string BatchParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "BatchParams {"
+        << " chunk_size:" << m_chunk_size.val 
+        << " overlap:" << m_overlap.val
+        << " batch_size:" << m_batch_size.val << "}";
+    return oss.str();
+    // clang-format on
+}
+
+}  // namespace dorado::config

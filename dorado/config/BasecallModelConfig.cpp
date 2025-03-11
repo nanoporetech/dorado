@@ -1,7 +1,6 @@
-#include "CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include "models/kits.h"
-#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
@@ -9,6 +8,7 @@
 #include <cstddef>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -54,9 +54,9 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }
 
 }  // namespace
-namespace dorado::basecall {
+namespace dorado::config {
 
-void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml) {
+void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
         config.qbias = toml::find<float>(qscore, "bias");
@@ -77,7 +77,7 @@ void parse_qscore_params(CRFModelConfig &config, const toml::value &config_toml)
     }
 }
 
-void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_toml) {
+void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("poly_a")) {
         const auto &polya = toml::find(config_toml, "poly_a");
         if (polya.contains("calibration_coefficients")) {
@@ -93,7 +93,7 @@ void parse_polya_coefficients(CRFModelConfig &config, const toml::value &config_
     }
 }
 
-void parse_run_info(CRFModelConfig &config,
+void parse_run_info(BasecallModelConfig &config,
                     const std::string &model_name,
                     const toml::value &config_toml) {
     // Fetch run_info parameters.
@@ -197,21 +197,21 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
 
     if (config_toml.contains("standardisation")) {
         const auto &norm = toml::find(config_toml, "standardisation");
-        params.standarisation.standardise = toml::find<int>(norm, "standardise") > 0;
-        if (params.standarisation.standardise) {
-            params.standarisation.mean = toml::find<float>(norm, "mean");
-            params.standarisation.stdev = toml::find<float>(norm, "stdev");
+        params.standardisation.standardise = toml::find<int>(norm, "standardise") > 0;
+        if (params.standardisation.standardise) {
+            params.standardisation.mean = toml::find<float>(norm, "mean");
+            params.standardisation.stdev = toml::find<float>(norm, "stdev");
         }
 
-        if (params.standarisation.standardise && params.strategy != ScalingStrategy::PA) {
+        if (params.standardisation.standardise && params.strategy != ScalingStrategy::PA) {
             throw std::runtime_error(
                     "Signal standardisation is implemented only for `scaling.strategy = pa`");
         }
 
-        if (params.standarisation.stdev <= 0.0f) {
+        if (params.standardisation.stdev <= 0.0f) {
             throw std::runtime_error(
                     "Config error: `standardisation.stdev` must be greater than 0, got: " +
-                    std::to_string(params.standarisation.stdev));
+                    std::to_string(params.standardisation.stdev));
         }
     }
 
@@ -232,73 +232,10 @@ void warn_unrecognised_sublayers(const std::vector<toml::value> &sublayers) {
     }
 }
 
-std::string SignalNormalisationParams::to_string() const {
-    std::string str = "SignalNormalisationParams {";
-    str += " strategy:" + dorado::basecall::to_string(strategy);
-    if (strategy == ScalingStrategy::QUANTILE) {
-        str += " " + quantile.to_string();
-    } else if (strategy == ScalingStrategy::PA && standarisation.standardise) {
-        str += " " + standarisation.to_string();
-    }
-    str += " }";
-    return str;
-}
-
-std::string ConvParams::to_string() const {
-    std::string str = "ConvParams {";
-    str += " insize:" + std::to_string(insize);
-    str += " size:" + std::to_string(size);
-    str += " winlen:" + std::to_string(winlen);
-    str += " stride:" + std::to_string(stride);
-    str += " activation:" + dorado::basecall::to_string(activation);
-    str += " }";
-    return str;
-};
-
-std::string CRFModelConfig::to_string() const {
-    std::string str = "CRFModelConfig {";
-    str += " qscale:" + std::to_string(qscale);
-    str += " qbias:" + std::to_string(qbias);
-    str += " stride:" + std::to_string(stride);
-    str += " bias:" + std::to_string(bias);
-    str += " clamp:" + std::to_string(clamp);
-    str += " out_features:" + std::to_string(out_features.value_or(-1));
-    str += " state_len:" + std::to_string(state_len);
-    str += " outsize:" + std::to_string(outsize);
-    str += " blank_score:" + std::to_string(blank_score);
-    str += " scale:" + std::to_string(scale);
-    str += " num_features:" + std::to_string(num_features);
-    str += " sample_rate:" + std::to_string(sample_rate);
-    str += " sample_type:" + models::get_sample_type_info(sample_type).name;
-    str += " mean_qscore_start_pos:" + std::to_string(mean_qscore_start_pos);
-    str += " " + signal_norm_params.to_string();
-    str += " " + basecaller.to_string();
-    str += " convs: {";
-    for (size_t c = 0; c < convs.size(); c++) {
-        str += " " + std::to_string(c) + ": " + convs[c].to_string();
-    }
-    str += " }";  // convs
-    if (is_lstm_model()) {
-        str += " model_type: lstm {";
-        str += " bias:" + std::to_string(bias);
-        str += " outsize:" + std::to_string(outsize);
-        str += " blank_score:" + std::to_string(blank_score);
-        str += " scale:" + std::to_string(scale);
-    }
-    if (is_tx_model()) {
-        str += " model_type: tx {";
-        str += " crf_encoder: " + tx->crf.to_string();
-        str += " transformer: " + tx->tx.to_string();
-        str += " upsample: " + tx->upsample.to_string();
-    }
-    str += " }}";  // model_type & CRFModelConfig
-    return str;
-};
-
-CRFModelConfig load_lstm_model_config(const std::filesystem::path &path) {
+BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     const toml::value config_toml = toml::parse(path / "config.toml");
 
-    CRFModelConfig config;
+    BasecallModelConfig config;
     config.model_path = path;
     config.basecaller.update(path);
 
@@ -409,7 +346,7 @@ bool is_tx_model_config(const std::filesystem::path &path) {
     return res.has_value();
 }
 
-bool is_rna_model(const CRFModelConfig &model_config) {
+bool is_rna_model(const BasecallModelConfig &model_config) {
     switch (model_config.sample_type) {
     case models::SampleType::DNA:
         return false;
@@ -424,83 +361,8 @@ bool is_rna_model(const CRFModelConfig &model_config) {
     throw std::logic_error("Model config sample type is not recognised!");
 }
 
-bool is_duplex_model(const CRFModelConfig &model_config) { return model_config.num_features > 1; }
-
-std::string to_string(const Activation &activation) {
-    switch (activation) {
-    case Activation::SWISH:
-        return std::string("swish");
-    case Activation::SWISH_CLAMP:
-        return std::string("swish_clamp");
-    case Activation::TANH:
-        return std::string("tanh");
-    default:
-        return std::string("UNKNOWN");
-    };
-}
-
-std::string to_string(const ScalingStrategy &strategy) {
-    switch (strategy) {
-    case ScalingStrategy::MED_MAD:
-        return std::string("med_mad");
-    case ScalingStrategy::QUANTILE:
-        return std::string("quantile");
-    case ScalingStrategy::PA:
-        return std::string("pa");
-    default:
-        throw std::runtime_error("Unknown scaling strategy");
-    };
-}
-
-ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
-    if (strategy == "med_mad") {
-        return ScalingStrategy::MED_MAD;
-    }
-    if (strategy == "quantile") {
-        return ScalingStrategy::QUANTILE;
-    }
-    if (strategy == "pa") {
-        return ScalingStrategy::PA;
-    }
-    throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
-}
-
-namespace tx {
-
-std::string TxEncoderParams::to_string() const {
-    std::string str = "TxEncoderParams {";
-    str += " d_model:" + std::to_string(d_model);
-    str += " nhead:" + std::to_string(nhead);
-    str += " depth:" + std::to_string(depth);
-    str += " dim_feedforward:" + std::to_string(dim_feedforward);
-    str += " theta:" + std::to_string(theta);
-    str += " max_seq_len:" + std::to_string(max_seq_len);
-    str += " attn_window: [" + std::to_string(attn_window.first) + ", " +
-           std::to_string(attn_window.second) + "]";
-    str += " deepnorm_alpha:" + std::to_string(deepnorm_alpha);
-    str += " }";
-    return str;
-}
-
-std::string EncoderUpsampleParams::to_string() const {
-    std::string str = "EncoderUpsampleParams {";
-    str += " d_model:" + std::to_string(d_model);
-    str += " scale_factor:" + std::to_string(scale_factor);
-    str += " }";
-    return str;
-}
-
-std::string CRFEncoderParams::to_string() const {
-    std::string str = "CRFEncoderParams {";
-    str += " insize:" + std::to_string(insize);
-    str += " n_base:" + std::to_string(n_base);
-    str += " state_len:" + std::to_string(state_len);
-    str += " scale:" + std::to_string(scale);
-    str += " blank_score:" + std::to_string(blank_score);
-    str += " expand_blanks:" + std::to_string(expand_blanks);
-    str += " permute:" + std::to_string(!permute.empty());
-    str += " }";
-    return str;
+bool is_duplex_model(const BasecallModelConfig &model_config) {
+    return model_config.num_features > 1;
 }
 
 TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
@@ -555,11 +417,11 @@ CRFEncoderParams parse_crf_encoder_params(const toml::value &cfg) {
     return params;
 }
 
-CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
+BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     const auto config_toml = toml::parse(path / "config.toml");
     const auto model_toml = toml::find(config_toml, "model");
 
-    CRFModelConfig config;
+    BasecallModelConfig config;
 
     config.model_path = path;
     config.basecaller.update(path);
@@ -570,7 +432,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
     const CRFEncoderParams crf_encoder = parse_crf_encoder_params(config_toml);
 
-    config.tx = tx::Params{tx_encoder, upsample, crf_encoder};
+    config.tx = TxStack{tx_encoder, upsample, crf_encoder};
     config.tx->check();
 
     const auto &convs = toml::find(model_toml, "encoder", "conv");
@@ -604,7 +466,7 @@ CRFModelConfig load_tx_model_config(const std::filesystem::path &path) {
     return config;
 }
 
-void Params::check() const {
+void TxStack::check() const {
     const auto eq = [](const int a, const int b, const std::string &msg) {
         if (a != b) {
             spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
@@ -614,9 +476,7 @@ void Params::check() const {
     eq(upsample.d_model, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
 }
 
-}  // namespace tx
-
-bool CRFModelConfig::has_normalised_basecaller_params() const {
+bool BasecallModelConfig::has_normalised_basecaller_params() const {
     bool is_normalised = true;
     const auto cs = basecaller.chunk_size();
     const auto csg = chunk_size_granularity();
@@ -639,8 +499,173 @@ bool CRFModelConfig::has_normalised_basecaller_params() const {
     return is_normalised;
 }
 
-CRFModelConfig load_crf_model_config(const std::filesystem::path &path) {
-    return is_tx_model_config(path) ? tx::load_tx_model_config(path) : load_lstm_model_config(path);
+BasecallModelConfig load_model_config(const std::filesystem::path &path) {
+    return is_tx_model_config(path) ? load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
-}  // namespace dorado::basecall
+std::string to_string(const Activation &activation) {
+    switch (activation) {
+    case Activation::SWISH:
+        return std::string("swish");
+    case Activation::SWISH_CLAMP:
+        return std::string("swish_clamp");
+    case Activation::TANH:
+        return std::string("tanh");
+    };
+    throw std::runtime_error("Unknown activation function");
+}
+
+std::string to_string(const ScalingStrategy &strategy) {
+    switch (strategy) {
+    case ScalingStrategy::MED_MAD:
+        return std::string("med_mad");
+    case ScalingStrategy::QUANTILE:
+        return std::string("quantile");
+    case ScalingStrategy::PA:
+        return std::string("pa");
+    };
+    throw std::runtime_error("Unknown scaling strategy");
+}
+
+ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
+    if (strategy == "med_mad") {
+        return ScalingStrategy::MED_MAD;
+    }
+    if (strategy == "quantile") {
+        return ScalingStrategy::QUANTILE;
+    }
+    if (strategy == "pa") {
+        return ScalingStrategy::PA;
+    }
+    throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
+}
+
+std::string StandardisationScalingParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "StandardisationScalingParams {"
+        << " standardise:" << standardise
+        << " mean:"        << mean
+        << " stdev:"       << stdev << "}";
+    return oss.str();
+    // clang-format on
+}
+
+std::string QuantileScalingParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "QuantileScalingParams {"
+        << " quantile_a:"       << quantile_a
+        << " quantile_b:"       << quantile_b
+        << " shift_multiplier:" << shift_multiplier
+        << " scale_multiplier:" << scale_multiplier << "}";
+    return oss.str();
+    // clang-format on
+}
+
+std::string SignalNormalisationParams::to_string() const {
+    std::ostringstream oss;
+    oss << "SignalNormalisationParams {"
+        << " strategy:" + config::to_string(strategy);
+    if (strategy == ScalingStrategy::QUANTILE) {
+        oss << " " + quantile.to_string();
+    } else if (strategy == ScalingStrategy::PA && standardisation.standardise) {
+        oss << " " + standardisation.to_string();
+    }
+    oss << " }";
+    return oss.str();
+}
+
+std::string ConvParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "ConvParams {"
+        << " insize:"   << insize
+        << " size:"     << size
+        << " winlen:"   << winlen
+        << " stride:"   << stride
+        << " activation:" << config::to_string(activation) << " }";
+    return oss.str();
+    // clang-format on
+}
+
+std::string TxEncoderParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "TxEncoderParams {"
+        << " d_model:"          << d_model
+        << " nhead:"            << nhead
+        << " depth:"            << depth
+        << " dim_feedforward:"  << dim_feedforward
+        << " theta:"            << theta
+        << " max_seq_len:"      << max_seq_len
+        << " attn_window: ["    << attn_window.first << ", " << attn_window.second << "]"
+        << " deepnorm_alpha:"   << deepnorm_alpha    << " }";
+    return oss.str();
+    // clang-format on
+}
+
+std::string EncoderUpsampleParams::to_string() const {
+    std::ostringstream oss;
+    oss << "EncoderUpsampleParams {"
+        << " d_model:" << d_model << " scale_factor:" << scale_factor << " }";
+    return oss.str();
+}
+
+std::string CRFEncoderParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "CRFEncoderParams {"
+        << " insize:"        << insize
+        << " n_base:"        << n_base
+        << " state_len:"     << state_len
+        << " scale:"         << scale
+        << " blank_score:"   << blank_score
+        << " expand_blanks:" << expand_blanks
+        << " permute:"       << std::boolalpha << !permute.empty() << " }";
+    return oss.str();
+    // clang-format on
+}
+
+std::string BasecallModelConfig::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "BasecallModelConfig {"
+        << " qscale:"       << qscale
+        << " qbias:"        << qbias
+        << " stride:"       << stride
+        << " bias:"         << bias
+        << " clamp:"        << clamp
+        << " out_features:" << out_features.value_or(-1)
+        << " state_len:"    << state_len
+        << " outsize:"      << outsize
+        << " blank_score:"  << blank_score
+        << " scale:"        << scale
+        << " num_features:" << num_features
+        << " sample_rate:"  << sample_rate
+        << " sample_type:"  << models::get_sample_type_info(sample_type).name
+        << " mean_qscore_start_pos:" << mean_qscore_start_pos
+        << " " << signal_norm_params.to_string()
+        << " " << basecaller.to_string();
+    
+    oss << " convs: {";
+    for (size_t c = 0; c < convs.size(); c++) {
+        oss << " " << c <<  ": " << convs[c].to_string();
+    }
+    oss << " }"; 
+
+    if (is_lstm_model()) {
+        oss << " model_type: lstm {";
+    }
+    if (is_tx_model()) {
+        oss << " model_type: tx {" 
+            << " crf_encoder: " << tx->crf.to_string()
+            << " transformer: " << tx->tx.to_string()
+            << " upsample: " << tx->upsample.to_string();
+    }
+    oss << "}}";
+    return oss.str();
+    // clang-format on
+}
+
+}  // namespace dorado::config

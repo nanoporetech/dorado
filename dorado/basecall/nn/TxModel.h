@@ -1,7 +1,7 @@
 #pragma once
 
-#include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
@@ -109,13 +109,13 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderImpl(const config::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
 
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
 
-    tx::TxEncoderParams params;
+    config::TxEncoderParams params;
 
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
@@ -129,7 +129,7 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderStackImpl(const config::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(const at::Tensor &x);
 
@@ -142,7 +142,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const tx::EncoderUpsampleParams &params);
+    LinearUpsampleImpl(const config::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 
@@ -153,19 +153,20 @@ struct LinearUpsampleImpl : torch::nn::Module {
 TORCH_MODULE(LinearUpsample);
 
 struct LinearScaledCRFImpl : torch::nn::Module {
-    LinearScaledCRFImpl(const tx::CRFEncoderParams &params);
+    LinearScaledCRFImpl(const config::CRFEncoderParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 
     bool scale_applied = false;
     torch::nn::Linear linear{nullptr};
-    tx::CRFEncoderParams m_params;
+    config::CRFEncoderParams m_params;
 };
 
 TORCH_MODULE(LinearScaledCRF);
 
 struct TxModelImpl : torch::nn::Module {
-    explicit TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
+    explicit TxModelImpl(const config::BasecallModelConfig &config,
+                         const at::TensorOptions &options);
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights);

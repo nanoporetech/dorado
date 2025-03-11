@@ -1,4 +1,4 @@
-#include "basecall/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 
 #include "TestUtils.h"
 #include "models/kits.h"
@@ -7,23 +7,21 @@
 #include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
 
-#include <cstdlib>
 #include <filesystem>
-#include <random>
 #include <string>
 
-#define CUT_TAG "[CRFModelConfig]"
+#define CUT_TAG "[BasecallModelConfig]"
 
-using namespace dorado::basecall;
+using namespace dorado::config;
 using SampleType = dorado::models::SampleType;
 
 namespace fs = std::filesystem;
 
-CATCH_TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test normalise BatchParams", CUT_TAG) {
     CATCH_SECTION("test on defaults") {
         const fs::path path =
                 fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
-        CRFModelConfig config = load_crf_model_config(path);
+        BasecallModelConfig config = load_model_config(path);
         config.normalise_basecaller_params();
         CATCH_CHECK(config.has_normalised_basecaller_params());
     }
@@ -31,7 +29,7 @@ CATCH_TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
     CATCH_SECTION("test known non-normalised") {
         const fs::path path =
                 fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
-        CRFModelConfig config = load_crf_model_config(path);
+        BasecallModelConfig config = load_model_config(path);
 
         // Set chunksize to (12 * 16 * 10) + 1 to ensure it's not mod192
         config.basecaller.set_chunk_size(1921);
@@ -48,7 +46,7 @@ CATCH_TEST_CASE(CUT_TAG ": test normalise BasecallerParams", CUT_TAG) {
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_sup@v5.0.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == true);
@@ -73,9 +71,9 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
 
     SignalNormalisationParams sig;
     sig.strategy = ScalingStrategy::PA;
-    sig.standarisation.standardise = true;
-    sig.standarisation.mean = 93.6376f;
-    sig.standarisation.stdev = 22.6004f;
+    sig.standardisation.standardise = true;
+    sig.standardisation.mean = 93.6376f;
+    sig.standardisation.stdev = 22.6004f;
 
     CATCH_CHECK(config.signal_norm_params.strategy == sig.strategy);
 
@@ -85,10 +83,10 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     CATCH_CHECK(config.convs.size() == 5);
 
@@ -154,7 +152,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
 
 CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/dna_r9.4.1_e8_hac@v3.3"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == true);
@@ -188,11 +186,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -219,7 +217,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_260bps_fast@v4.0.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == false);
@@ -249,11 +247,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -280,7 +278,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.2.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == true);
@@ -310,11 +308,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH_CLAMP);
@@ -341,7 +339,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.3.0"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == false);
@@ -370,7 +368,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) 
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == true);
     CATCH_CHECK(ssp.mean == 91.88f);
     CATCH_CHECK(ssp.stdev == 22.65f);
@@ -400,7 +398,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 pa model load", CUT_TAG) 
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_400bps_hac@v4.3.0_quantile"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == false);
@@ -429,11 +427,11 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT
     CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
     CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -459,7 +457,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.3.0 quantile model load", CUT
 
 CATCH_TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/rna002_70bps_fast@v3"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == true);
@@ -488,11 +486,11 @@ CATCH_TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == 0.59f);
     CATCH_CHECK(qsp.shift_multiplier == 0.48f);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -518,7 +516,7 @@ CATCH_TEST_CASE(CUT_TAG ": test rna002 fast@v3 model load", CUT_TAG) {
 
 CATCH_TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/rna004_130bps_sup@v3.0.1"));
-    const CRFModelConfig config = load_crf_model_config(path);
+    const BasecallModelConfig config = load_model_config(path);
 
     CATCH_CHECK(config.model_path == path);
     CATCH_CHECK(config.bias == true);
@@ -548,11 +546,11 @@ CATCH_TEST_CASE(CUT_TAG ": test rna004 sup@v3.0.1 model load", CUT_TAG) {
     CATCH_CHECK(qsp.scale_multiplier == 0.595f);
     CATCH_CHECK(qsp.shift_multiplier == 0.485f);
 
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standarisation;
+    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
     CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standarisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standarisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standarisation.stdev);
+    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
+    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
+    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
 
     ConvParams conv1 = config.convs[0];
     CATCH_CHECK(conv1.activation == Activation::SWISH);
@@ -580,13 +578,13 @@ CATCH_TEST_CASE(CUT_TAG ": test sample_type", CUT_TAG) {
     CATCH_SECTION("test sample type dna") {
         const fs::path path =
                 fs::path(get_data_dir("model_configs/sample_type_d_e8.2_400bps_sup@v5.0.0"));
-        const CRFModelConfig config = load_crf_model_config(path);
+        const BasecallModelConfig config = load_model_config(path);
 
         CATCH_CHECK(config.sample_type == dorado::models::SampleType::DNA);
     }
     CATCH_SECTION("test sample type rna004") {
         const fs::path path = fs::path(get_data_dir("model_configs/sample_type_130bps_sup@v3.0.1"));
-        const CRFModelConfig config = load_crf_model_config(path);
+        const BasecallModelConfig config = load_model_config(path);
 
         CATCH_CHECK(config.sample_type == dorado::models::SampleType::RNA004);
     }

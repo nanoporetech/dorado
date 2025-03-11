@@ -1,8 +1,8 @@
 #include "ModBaseCaller.h"
 
-#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
 #include "MotifMatcher.h"
+#include "config/ModBaseModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
+#include <vector>
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
@@ -39,15 +40,16 @@ struct ModBaseCaller::ModBaseTask {
     int num_chunks;
 };
 
-ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
+ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config,
                                         const at::TensorOptions& opts,
                                         const int batch_size_)
         : params(config),
+          kmer_refinement_levels(load_kmer_refinement_levels(config)),
           module_holder(load_modbase_model(params, opts)),
           matcher(params),
           batch_size(batch_size_) {
     if (params.refine.do_rough_rescale) {
-        scaler = std::make_unique<ModBaseScaler>(params.refine.levels, params.refine.kmer_len,
+        scaler = std::make_unique<ModBaseScaler>(kmer_refinement_levels, params.general.kmer_len,
                                                  params.refine.center_idx);
     }
 
@@ -117,8 +119,7 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     m_task_threads.reserve(m_num_models);
 
     for (size_t i = 0; i < m_num_models; ++i) {
-        const auto& config = load_modbase_model_config(model_paths[i]);
-
+        const auto& config = config::load_modbase_model_config(model_paths[i]);
         at::InferenceMode guard;
         auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
         m_model_data.emplace_back(std::move(caller_data));

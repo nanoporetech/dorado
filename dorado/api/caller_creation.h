@@ -1,6 +1,5 @@
 #pragma once
 
-#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunnerBase.h"
 
 #include <filesystem>
@@ -9,7 +8,6 @@
 #include <vector>
 
 namespace dorado::basecall {
-struct CRFModelConfig;
 
 #if DORADO_CUDA_BUILD
 class CudaCaller;
@@ -23,6 +21,10 @@ namespace dorado::modbase {
 class ModBaseCaller;
 }
 
+namespace dorado::config {
+struct BasecallModelConfig;
+}
+
 namespace dorado::api {
 using dorado::basecall::PipelineType;
 
@@ -31,7 +33,7 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
         const basecall::BasecallerCreationParams& params);
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const basecall::CRFModelConfig& model_config,
+        const config::BasecallModelConfig& model_config,
         float memory_limit_fraction);
 #endif
 

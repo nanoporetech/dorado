@@ -20,12 +20,12 @@ add_executable(dorado_tests
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
     BarcodeDemuxerNodeTest.cpp
-    BasecallerParamsTest.cpp
+    BasecallModelConfigTest.cpp
+    BatchParamsTest.cpp
     bed_file_test.cpp
     CigarTest.cpp
     CliUtilsTest.cpp
     context_container_test.cpp
-    CRFModelConfigTest.cpp
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp

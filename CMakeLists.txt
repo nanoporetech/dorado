@@ -135,6 +135,7 @@ add_subdirectory(dorado/3rdparty)
 enable_testing()
 
 add_subdirectory(dorado/compat)
+add_subdirectory(dorado/config)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/models)

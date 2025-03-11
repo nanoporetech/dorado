@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utils/modbase_parameters.h"
 #include "utils/types.h"
 
 #include <cstddef>
@@ -8,9 +7,14 @@
 #include <string>
 #include <vector>
 
-namespace dorado::modbase {
+namespace dorado::config {
 
-using ModelType = utils::modbase::ModelType;
+enum class ModelType : std::uint8_t { CONV_LSTM_V1, CONV_LSTM_V2, CONV_V1, UNKNOWN };
+std::string to_string(const ModelType& model_type);
+ModelType model_type_from_string(const std::string& model_type);
+ModelType get_modbase_model_type(const std::filesystem::path& path);
+
+bool is_modbase_model(const std::filesystem::path& path);
 
 struct ModelGeneralParams {
     const ModelType model_type;
@@ -30,15 +34,11 @@ struct LinearParams {
 };
 
 struct RefinementParams {
-    const bool do_rough_rescale;      ///< Whether to perform rough rescaling
-    const size_t kmer_len;            ///< Length of the kmers for the specified kmer_levels
-    const size_t center_idx;          ///< The position in the kmer at which to check the levels
-    const std::vector<float> levels;  ///< Expected kmer levels for rough rescaling
+    const bool do_rough_rescale;  ///< Whether to perform rough rescaling
+    const size_t center_idx;      ///< The position in the kmer at which to check the levels
 
-    RefinementParams() : do_rough_rescale(false), kmer_len(0), center_idx(0) {}
-    RefinementParams(const int kmer_len_,
-                     const int center_idx_,
-                     std::vector<float> refine_kmer_levels_);
+    RefinementParams() : do_rough_rescale(false), center_idx(0) {}
+    RefinementParams(int center_idx_);
 };
 
 struct ModificationParams {
@@ -107,11 +107,6 @@ struct ModBaseModelConfig {
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
-namespace test {
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path,
-                                             const std::vector<float>& test_kmer_levels);
-}
-
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
 ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params);
@@ -119,4 +114,4 @@ ModBaseInfo get_modbase_info(
 void check_modbase_multi_model_compatibility(
         const std::vector<std::filesystem::path>& modbase_models);
 
-}  // namespace dorado::modbase
+}  // namespace dorado::config

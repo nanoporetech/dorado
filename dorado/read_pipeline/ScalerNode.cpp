@@ -1,6 +1,6 @@
 #include "ScalerNode.h"
 
-#include "basecall/CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "demux/adapter_info.h"
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
@@ -31,6 +31,8 @@ using Slice = at::indexing::Slice;
 
 namespace {
 
+using namespace dorado::config;
+
 std::pair<float, float> med_mad(const at::Tensor& x) {
     // See https://en.wikipedia.org/wiki/Median_absolute_deviation
     //  (specifically the "Relation to standard deviation" section)
@@ -41,8 +43,7 @@ std::pair<float, float> med_mad(const at::Tensor& x) {
     return {med.item<float>(), mad.item<float>()};
 }
 
-std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingParams& params,
-                                      const at::Tensor& x) {
+std::pair<float, float> normalisation(const QuantileScalingParams& params, const at::Tensor& x) {
     // Calculate shift and scale factors for normalisation.
     auto quantiles =
             dorado::utils::quantile_counting(x, at::tensor({params.quantile_a, params.quantile_b}));
@@ -54,8 +55,6 @@ std::pair<float, float> normalisation(const dorado::basecall::QuantileScalingPar
 }
 
 using SampleType = dorado::models::SampleType;
-using ScalingStrategy = dorado::basecall::ScalingStrategy;
-using SignalNormalisationParams = dorado::basecall::SignalNormalisationParams;
 
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking
@@ -183,7 +182,7 @@ void ScalerNode::input_thread_fn() {
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
             // We want to keep the scaling formula `(x - shift) / scale` consistent between
             // quantile and pA methods as this affects downstream tools.
-            const auto& stdn = m_scaling_params.standarisation;
+            const auto& stdn = m_scaling_params.standardisation;
             if (stdn.standardise) {
                 // Standardise from scaled pa
                 // 1. x_pa  = (Scale)*(x + Offset)
@@ -217,7 +216,7 @@ void ScalerNode::input_thread_fn() {
 
         // Don't perform DNA trimming on RNA since it looks too different and we lose useful signal.
         if (!is_rna_model) {
-            if (trim_start == 0 && m_scaling_params.standarisation.standardise) {
+            if (trim_start == 0 && m_scaling_params.standardisation.standardise) {
                 // Constant trimming level for standardised scaling
                 // In most cases kit14 trim algorithm returns 10, so bypassing the heuristic
                 // and applying 10 for pA scaled data.

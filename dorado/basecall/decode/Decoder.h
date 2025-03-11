@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-namespace dorado::basecall {
-struct CRFModelConfig;
+namespace dorado::config {
+struct BasecallModelConfig;
 }
 
 namespace dorado::basecall::decode {
@@ -44,6 +44,7 @@ public:
     virtual at::ScalarType dtype() const = 0;
 };
 
-std::unique_ptr<Decoder> create_decoder(c10::Device device, const CRFModelConfig& config);
+std::unique_ptr<Decoder> create_decoder(c10::Device device,
+                                        const config::BasecallModelConfig& config);
 
 }  // namespace dorado::basecall::decode

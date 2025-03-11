@@ -25,7 +25,6 @@
  */
 
 namespace dorado::modbase {
-struct ModBaseModelConfig;
 class MotifMatcher;
 
 class ModBaseContext {
