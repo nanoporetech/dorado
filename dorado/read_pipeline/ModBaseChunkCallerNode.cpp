@@ -339,16 +339,15 @@ void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
         nvtx3::scoped_range range{"pop_sig_rna"};
 
         // Pad the RNA signal by at most m_canonical_stride-1 samples.
-        const int64_t signal_len = raw_data.size(0);
-        const int64_t padding =
-                static_cast<int64_t>(utils::pad_to(signal_len, m_canonical_stride)) - signal_len;
+        const int64_t len = raw_data.size(0);
+        const int64_t padding = static_cast<int64_t>(utils::pad_to(len, m_canonical_stride)) - len;
 
         // Reverse the RNA signal and prepend a short mirrored slice of padding to ensure moves are
         // stride aligned.
-        at::Tensor rev = at::flip(raw_data, 0);
-        at::Tensor pad = at::flip(rev.index({at::indexing::Slice(0, padding)}), 0);
+        at::Tensor sig =
+                at::concat({raw_data.slice(0, len - padding, len), at::flip(raw_data, 0)}, 0);
 
-        signal = runner->scale_signal(0, at::concat({pad, rev}, 0), int_seq, seq_to_sig_map);
+        signal = runner->scale_signal(0, sig, int_seq, seq_to_sig_map);
         return;
     }
     nvtx3::scoped_range range{"pop_sig"};
@@ -464,7 +463,7 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
                                                    const std::vector<uint8_t>& moves,
                                                    const std::string& read_id) const {
     // For RNA: Pad signal length to be evenly divisible by the canonical stride so that the
-    // sequence to signal mapping is always stride aligned and not offset by any remainder 
+    // sequence to signal mapping is always stride aligned and not offset by any remainder
     // in the last move (which becomes the first move when reversed).
     const size_t signal_len =
             m_is_rna_model ? utils::pad_to(signal.size(0), m_canonical_stride) : signal.size(0);
