@@ -340,7 +340,7 @@ void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
 
         // Pad the RNA signal by at most m_canonical_stride-1 samples.
         const int64_t len = raw_data.size(0);
-        const int64_t padding = static_cast<int64_t>(utils::pad_to(len, m_canonical_stride)) - len;
+        const int64_t padding = utils::pad_to(len, m_canonical_stride) - len;
 
         // Reverse the RNA signal and prepend a short mirrored slice of padding to ensure moves are
         // stride aligned.
