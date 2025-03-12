@@ -389,14 +389,6 @@ void setup(const std::vector<std::string>& args,
     auto modbase_runners = api::create_modbase_runners(
             modbase_models, device, modbase_params.runners_per_caller, modbase_params.batchsize);
 
-    // Disable chunked modbase models for RNA until we have RNA models - See DOR-972 for details
-    if (!modbase_runners.empty() && is_rna_model(model_config) &&
-        modbase_runners.at(0)->takes_chunk_inputs()) {
-        throw std::runtime_error(
-                "`conv_lstm_v2` modified base models are not supported for RNA data in this "
-                "version of dorado.");
-    }
-
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
 #if DORADO_CUDA_BUILD
