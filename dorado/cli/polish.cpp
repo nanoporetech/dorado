@@ -162,8 +162,12 @@ ParserPtr create_cli(int& verbosity) {
                 .scan<'i', int>();
 
         parser->visible.add_argument("--infer-threads")
-                .help("Number of threads for CPU inference")
+                .help("Number of threads for inference")
+#if DORADO_CUDA_BUILD
+                .default_value(2)
+#else
                 .default_value(1)
+#endif
                 .scan<'i', int>();
 
         parser->visible.add_argument("-x", "--device")
