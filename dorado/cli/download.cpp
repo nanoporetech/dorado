@@ -1,3 +1,4 @@
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "dorado_version.h"
