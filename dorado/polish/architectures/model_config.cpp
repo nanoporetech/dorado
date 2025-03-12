@@ -79,7 +79,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     }
 
     // print_toml(config_toml, 0);
-    (void)print_toml;
+    (void)&print_toml;
 
     ModelConfig cfg;
 
