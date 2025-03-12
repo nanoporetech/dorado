@@ -131,13 +131,6 @@ LinearParams::LinearParams(int in_, int out_) : in(in_), out(out_) {
     }
 }
 
-LinearParams parse_linear_params(const toml::value& segment) {
-    constexpr int MAX_SIZE = 4096;
-    LinearParams params{get_int_in_range(segment, "in", 1, MAX_SIZE, REQUIRED),
-                        get_int_in_range(segment, "out", 1, MAX_SIZE, REQUIRED)};
-    return params;
-}
-
 ModificationParams::ModificationParams(std::vector<std::string> codes_,
                                        std::vector<std::string> long_names_,
                                        std::string motif_,

@@ -46,14 +46,6 @@ std::string extract_draft_with_gaps(const std::string& draft,
     return ret;
 }
 
-std::string extract_draft(const std::string& draft, const std::vector<int64_t>& positions_major) {
-    std::string ret(std::size(positions_major), '*');
-    for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
-        ret[i] = draft[positions_major[i]];
-    }
-    return ret;
-}
-
 VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                      const int64_t idx_start,
                                      const int64_t idx_end) {

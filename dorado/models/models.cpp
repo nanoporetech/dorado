@@ -1216,8 +1216,6 @@ std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
 std::vector<std::string> simplex_model_names() { return unpack_names(simplex_models()); };
 std::vector<std::string> stereo_model_names() { return unpack_names(stereo_models()); };
 std::vector<std::string> modified_model_names() { return unpack_names(modified_models()); };
-std::vector<std::string> correction_model_names() { return unpack_names(correction_models()); };
-std::vector<std::string> polish_model_names() { return unpack_names(polish_models()); };
 
 std::vector<std::string> modified_model_variants() {
     std::vector<std::string> variants;
@@ -1276,35 +1274,6 @@ ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path
     spdlog::debug("- matching modification model found: {}", modification_model.name);
 
     return modification_model;
-}
-
-ModelInfo get_modification_model(const ModelInfo& simplex_model_info,
-                                 const ModsVariantPair& mods_variant) {
-    bool is_model_found = false;
-    ModelInfo mods_model;
-    assert(mods_variant.has_variant());
-    for (const auto& m : modified_models()) {
-        if (m.simplex == simplex_model_info.simplex) {
-            assert(m.mods.has_variant() && m.mods.has_ver());
-            // There is an assumption that models with multiple versions
-            // are named in a way that picking the last one after lexicographically
-            // sorting them finds the latest version.
-            if (mods_variant.has_ver() && mods_variant.ver != m.mods.ver) {
-                continue;
-            }
-            if (mods_variant.variant == m.mods.variant) {
-                is_model_found = true;
-                mods_model = m;
-            }
-        }
-    }
-    if (!is_model_found) {
-        throw std::runtime_error{"Cannot find modification model for '" +
-                                 to_string(mods_variant.variant) + "' matching simplex model: '" +
-                                 simplex_model_info.name + "'"};
-    }
-    spdlog::debug("- matching modification model found: {}", mods_model.name);
-    return mods_model;
 }
 
 ModelInfo get_simplex_model_info(const std::string& model_name) {
