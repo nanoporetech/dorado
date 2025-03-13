@@ -114,6 +114,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     qname);
+            ++m_num_untrimmed_short_reads;
             return;
         }
         bam_message.adapter_trim_interval = trim_interval;
@@ -166,6 +167,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     read.read_common.read_id);
+            ++m_num_untrimmed_short_reads;
             return;
         }
         read.read_common.adapter_trim_interval = trim_interval;
@@ -175,6 +177,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
 stats::NamedStats AdapterDetectorNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["num_reads_processed"] = m_num_records.load();
+    stats["num_untrimmed_short_reads"] = m_num_untrimmed_short_reads.load();
     return stats;
 }
 
