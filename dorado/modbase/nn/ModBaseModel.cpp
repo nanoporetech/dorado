@@ -1,12 +1,17 @@
 #include "ModBaseModel.h"
 
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <toml.hpp>
+#include <ATen/core/TensorBody.h>
+#include <torch/csrc/autograd/generated/variable_factories.h>
 #include <torch/torch.h>
+
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAGuard.h>
+#endif
 
 #include <stdexcept>
 #include <string>
@@ -271,28 +276,53 @@ TORCH_MODULE(ModBaseConvLSTMModel);
 
 }  // namespace nn
 
-dorado::utils::ModuleWrapper load_modbase_model(const ModBaseModelConfig& config,
+dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig& config,
                                                 const at::TensorOptions& options) {
-    c10::InferenceMode guard;
+    at::InferenceMode guard;
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Device> device;
+    if (options.device().is_cuda()) {
+        device = options.device();
+    }
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+#endif
     const auto params = config.general;
     switch (params.model_type) {
-    case ModelType::CONV_LSTM_V1: {
+    case config::ModelType::CONV_LSTM_V1: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, false,
                                               params.stride);
         return populate_model(std::move(model), config.model_path, options);
     }
-    case ModelType::CONV_LSTM_V2: {
+    case config::ModelType::CONV_LSTM_V2: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
                                               params.stride);
         return populate_model(std::move(model), config.model_path, options);
     }
-    case ModelType::CONV_V1: {
+    case config::ModelType::CONV_V1: {
         auto model = nn::ModBaseConvModel(params.size, params.kmer_len, params.num_out);
         return populate_model(std::move(model), config.model_path, options);
     }
     default:
         throw std::runtime_error("Unknown modbase model type in config file.");
     }
+}
+
+std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
+    std::vector<float> levels;
+    if (!config.refine.do_rough_rescale) {
+        return levels;
+    }
+
+    std::vector<at::Tensor> tensors =
+            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
+    if (tensors.empty()) {
+        throw std::runtime_error("Failed to load modbase refinement tensors.");
+    }
+    auto& t = tensors.front();
+    t.contiguous();
+    levels.reserve(t.numel());
+    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
+    return levels;
 }
 
 }  // namespace dorado::modbase

@@ -1,7 +1,7 @@
 #include "BasecallerNode.h"
 
-#include "basecall/CRFModelConfig.h"
 #include "basecall/ModelRunnerBase.h"
+#include "config/BasecallModelConfig.h"
 #include "models/kits.h"
 #include "read_utils.h"
 #include "stitch.h"

@@ -1,9 +1,8 @@
 #include "runner_creation.h"
 
-#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
@@ -121,7 +120,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         return {};
     }
 
-    modbase::check_modbase_multi_model_compatibility(modbase_models);
+    config::check_modbase_multi_model_compatibility(modbase_models);
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> runners;

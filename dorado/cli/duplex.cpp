@@ -1,10 +1,12 @@
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
 #include "cli/basecall_output_args.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
+#include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
@@ -28,7 +30,6 @@
 #include "utils/basecaller_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/modbase_parameters.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
@@ -63,12 +64,13 @@ namespace {
 
 using namespace dorado::models;
 using namespace dorado::model_resolution;
+using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    basecall::BasecallerParams basecaller{};
-    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+BatchParams get_batch_params(argparse::ArgumentParser& arg) {
+    BatchParams basecaller{};
+    basecaller.update(BatchParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
                       cli::get_optional_argument<int>("--overlap", arg),
                       cli::get_optional_argument<int>("--batchsize", arg));
@@ -78,10 +80,10 @@ basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) 
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    basecall::CRFModelConfig model_config;
+    BasecallModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    basecall::CRFModelConfig stereo_model_config;
+    BasecallModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -102,7 +104,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
             std::exit(EXIT_FAILURE);
         };
 
-        if (utils::modbase::is_modbase_model(model_path)) {
+        if (is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -132,7 +134,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const basecall::BasecallerParams& basecaller_params,
+                         const BatchParams& batch_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
@@ -173,7 +175,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = basecall::load_crf_model_config(model_path);
+            const auto model_config = load_model_config(model_path);
             const auto model_name = model_path.filename().string();
             const auto model_sample_rate = model_config.sample_rate < 0
                                                    ? get_sample_rate_by_model_name(model_name)
@@ -214,8 +216,8 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_path.filename().string();
-    auto model_config = basecall::load_crf_model_config(model_path);
-    model_config.basecaller.update(basecaller_params);
+    auto model_config = load_model_config(model_path);
+    model_config.basecaller.update(batch_params);
     model_config.normalise_basecaller_params();
 
     if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
@@ -231,8 +233,8 @@ DuplexModels load_models(const std::string& model_arg,
 #endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
-    stereo_model_config.basecaller.update(basecaller_params);
+    auto stereo_model_config = load_model_config(stereo_model_path);
+    stereo_model_config.basecaller.update(batch_params);
     stereo_model_config.normalise_basecaller_params();
 
 #if DORADO_METAL_BUILD
@@ -257,11 +259,10 @@ DuplexModels load_models(const std::string& model_arg,
                         mods_model_paths,    downloader.temporary_models()};
 }
 
-utils::modbase::ModBaseParams validate_modbase_params(
-        const std::vector<std::filesystem::path>& paths,
-        utils::arg_parse::ArgParser& parser) {
+ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                           utils::arg_parse::ArgParser& parser) {
     // Convert path to params.
-    auto params = utils::modbase::get_modbase_params(paths);
+    auto params = get_modbase_params(paths);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -280,7 +281,7 @@ utils::modbase::ModBaseParams validate_modbase_params(
 
     // Check that the paths are all valid.
     for (const auto& mb_path : paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
+        if (!is_modbase_model(mb_path)) {
             throw std::runtime_error("Modified bases model not found in the model path at " +
                                      std::filesystem::weakly_canonical(mb_path).string());
         }
@@ -620,14 +621,14 @@ int duplex(int argc, char* argv[]) {
             }
 
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
-            const auto basecaller_params = get_basecaller_params(parser.visible);
+            const auto batch_params = get_batch_params(parser.visible);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
             const DuplexModels models = load_models(
                     model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
-                    input_files->get(), basecaller_params, skip_model_compatibility_check, device);
+                    input_files->get(), batch_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 

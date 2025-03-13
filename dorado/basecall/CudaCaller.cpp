@@ -30,6 +30,7 @@ namespace {
 constexpr float GB = 1.0e9f;
 
 void emit_benchmark_file(const std::string &gpu_name,
+                         int compute_major,
                          const std::string &model,
                          const std::vector<std::pair<float, int>> &times_and_batch_sizes,
                          const std::vector<std::pair<float, int>> &all_times_and_batch_sizes) {
@@ -37,8 +38,15 @@ void emit_benchmark_file(const std::string &gpu_name,
     static std::mutex batch_output_mutex;
     std::lock_guard<std::mutex> batch_output_lock(batch_output_mutex);
 
+    std::string gpu_cuda_variant_name = gpu_name;
+    // Hopper has specific optimizations that are only available if we are building with cuda12
+    if (compute_major == 9 || compute_major == 10) {
+        gpu_cuda_variant_name.append("_cuda");
+        gpu_cuda_variant_name.append(std::to_string(CUDA_VERSION / 1000));
+    }
+
     std::string cpp_filename = std::string("chunk_benchmarks__")
-                                       .append(gpu_name)
+                                       .append(gpu_cuda_variant_name)
                                        .append("__")
                                        .append(model)
                                        .append(".txt");
@@ -54,7 +62,7 @@ void emit_benchmark_file(const std::string &gpu_name,
     // Report out the batch sizes as a CSV file, for visualisation
     // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
     std::string csv_filename = std::string("chunk_benchmarks__")
-                                       .append(gpu_name)
+                                       .append(gpu_cuda_variant_name)
                                        .append("__")
                                        .append(model)
                                        .append(".csv");
@@ -64,6 +72,11 @@ void emit_benchmark_file(const std::string &gpu_name,
     for (const auto &[batchsize, time] : all_times_and_batch_sizes) {
         csv_bench_file << time << "," << batchsize << "\n";
     }
+}
+
+c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
+    c10::cuda::CUDAGuard device_guard(device);
+    return c10::cuda::getStreamFromPool(false, device.index());
 }
 
 }  // namespace
@@ -103,7 +116,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
-          m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
+          m_stream(get_stream_for_device(m_options.device())) {
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
@@ -463,7 +476,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     }
 
     if (params.emit_batchsize_benchmarks) {
-        emit_benchmark_file(prop->name, model_name, times_and_batch_sizes,
+        emit_benchmark_file(prop->name, prop->major, model_name, times_and_batch_sizes,
                             all_times_and_batch_sizes);
     }
 

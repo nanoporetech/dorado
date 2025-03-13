@@ -1,10 +1,9 @@
 #include "ModBaseRunner.h"
 
 #include "ModBaseCaller.h"
-#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -111,7 +110,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t model_id, const std::st
     return m_caller->modbase_model_data(model_id)->get_motif_hits(seq);
 }
 
-const ModBaseModelConfig& ModBaseRunner::model_params(size_t model_id) const {
+const config::ModBaseModelConfig& ModBaseRunner::model_params(size_t model_id) const {
     return m_caller->modbase_model_data(model_id)->params;
 }
 

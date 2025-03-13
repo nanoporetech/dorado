@@ -1,6 +1,5 @@
 #pragma once
 
-#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunnerBase.h"
 #include "caller_creation.h"
 #include "modbase/ModBaseRunner.h"

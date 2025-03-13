@@ -3,7 +3,6 @@
 
 #include "MetalModelRunner.h"
 
-#include "CRFModelConfig.h"
 #include "MetalCaller.h"
 
 #include <ATen/TensorIndexing.h>
@@ -32,7 +31,7 @@ std::vector<decode::DecodedChunk> MetalModelRunner::call_chunks(int num_chunks) 
     return out_chunks;
 }
 
-const CRFModelConfig &MetalModelRunner::config() const { return m_caller->config(); }
+const config::BasecallModelConfig &MetalModelRunner::config() const { return m_caller->config(); }
 
 size_t MetalModelRunner::chunk_size() const {
     return config().is_lstm_model() ? m_input.size(1) : m_input.size(2);
