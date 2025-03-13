@@ -34,10 +34,23 @@ void IndexReaderDeleter::operator()(mm_idx_reader_t* index_reader) {
     mm_idx_reader_close(index_reader);
 }
 
+const mm_idx_t* Minimap2Index::index() const {
+    if (m_indexes.size() != 1) {
+        throw std::range_error("Minimap2Index::index can only be called for non-split indexes.");
+    }
+    return m_indexes[0].get();
+}
+
+const mm_idx_t* Minimap2Index::index(size_t n) const {
+    if (n >= m_indexes.size()) {
+        throw std::range_error("Invalid index block requested.");
+    }
+    return m_indexes[n].get();
+}
+
 std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initial_index(
         const std::string& index_file,
-        int num_threads,
-        bool allow_split_index) {
+        int num_threads) {
     m_index_reader = create_index_reader(index_file, m_options.index_options->get());
     if (!m_index_reader) {
         // Reason could be not having permissions to open the file
@@ -47,24 +60,15 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
                                     IndexDeleter());
 
     if (!index) {
+        m_index_reader.reset();
         return {nullptr, IndexLoadResult::end_of_index};
     }
 
     if (index->n_seq == 0) {
         // An empty or improperly formatted file can result in an mm_idx_t object with
         // no indexes in it. Check for this, and treat it as a load failure.
+        m_index_reader.reset();
         return {nullptr, IndexLoadResult::end_of_index};
-    }
-
-    if (!allow_split_index) {
-        // If split index is not supported, then verify that the index doesn't
-        // have multiple parts by loading the index again and making sure
-        // the returned value is nullptr.
-        IndexUniquePtr split_index{};
-        split_index.reset(mm_idx_reader_read(m_index_reader.get(), num_threads));
-        if (split_index != nullptr) {
-            return {nullptr, IndexLoadResult::split_index_not_supported};
-        }
     }
 
     if (index->k != m_options.index_options->get().k ||
@@ -86,18 +90,26 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
 
 IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
     if (!m_index_reader) {
-        return IndexLoadResult::no_index_loaded;
+        if (m_indexes.empty()) {
+            return IndexLoadResult::no_index_loaded;
+        }
+        return IndexLoadResult::end_of_index;
     }
 
     std::shared_ptr<const mm_idx_t> next_idx(mm_idx_reader_read(m_index_reader.get(), num_threads),
                                              IndexDeleter());
     if (!next_idx) {
+        m_index_reader.reset();
         return IndexLoadResult::end_of_index;
     }
 
-    set_index(std::move(next_idx));
+    if (m_incremental_load) {
+        set_index(std::move(next_idx));
+    } else {
+        add_index(std::move(next_idx));
+    }
 
-    spdlog::debug("Loaded next index chunk with {} target seqs", m_index->n_seq);
+    spdlog::debug("Loaded next index chunk with {} target seqs", m_indexes.back()->n_seq);
     return IndexLoadResult::success;
 }
 
@@ -112,17 +124,19 @@ bool Minimap2Index::initialise(Minimap2Options options) {
 
 IndexLoadResult Minimap2Index::load(const std::string& index_file,
                                     int num_threads,
-                                    bool allow_split_index) {
+                                    bool incremental_load) {
     assert(m_options.index_options && m_options.mapping_options &&
            "Loading an index requires options have been initialised.");
-    assert(!m_index && "Loading an index requires it is not already loaded.");
+    assert(m_indexes.empty() && "Loading an index requires it is not already loaded.");
+
+    m_incremental_load = incremental_load;
 
     // Check if reference file exists.
     if (!std::filesystem::exists(index_file)) {
         return IndexLoadResult::reference_file_not_found;
     }
 
-    auto [index, result] = load_initial_index(index_file, num_threads, allow_split_index);
+    auto [index, result] = load_initial_index(index_file, num_threads);
     if (result != IndexLoadResult::success) {
         return result;
     }
@@ -132,6 +146,16 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
     }
 
     set_index(std::move(index));
+    if (!incremental_load) {
+        while (true) {
+            result = load_next_chunk(num_threads);
+            if (result == IndexLoadResult::end_of_index) {
+                break;
+            } else if (result != IndexLoadResult::success) {
+                return result;
+            }
+        }
+    }
 
     return IndexLoadResult::success;
 }
@@ -140,28 +164,37 @@ std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
         const Minimap2Options& options) const {
     assert(static_cast<const Minimap2IndexOptions&>(m_options) == options &&
            " create_compatible_index expects compatible indexing options");
-    assert(m_index && " create_compatible_index expects the index has been loaded.");
+    assert(!m_indexes.empty() && " create_compatible_index expects the index has been loaded.");
 
     auto compatible = std::make_shared<Minimap2Index>();
     if (!compatible->initialise(options)) {
         return {};
     }
 
-    compatible->set_index(m_index);
+    compatible->set_index(m_indexes[0]);
+    for (size_t i = 1; i < m_indexes.size(); ++i) {
+        compatible->add_index(m_indexes[i]);
+    }
 
     return compatible;
 }
 
 void Minimap2Index::set_index(std::shared_ptr<const mm_idx_t> index) {
+    m_indexes.clear();
     mm_mapopt_update(&m_options.mapping_options->get(), index.get());
-    m_index = std::move(index);
+    m_indexes.emplace_back(std::move(index));
+}
+
+void Minimap2Index::add_index(std::shared_ptr<const mm_idx_t> index) {
+    m_indexes.emplace_back(std::move(index));
 }
 
 HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {
     std::vector<std::pair<char*, uint32_t>> records;
-    records.reserve(m_index->n_seq);
-    for (uint32_t i = 0; i < m_index->n_seq; ++i) {
-        records.push_back(std::make_pair(m_index->seq[i].name, m_index->seq[i].len));
+    for (size_t i = 0; i < m_indexes.size(); ++i) {
+        for (uint32_t j = 0; j < m_indexes[i]->n_seq; ++j) {
+            records.push_back(std::make_pair(m_indexes[i]->seq[j].name, m_indexes[i]->seq[j].len));
+        }
     }
     return records;
 }

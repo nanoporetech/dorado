@@ -17,13 +17,7 @@ class Minimap2Aligner {
 public:
     /// Construct with a single index.
     Minimap2Aligner(std::shared_ptr<const Minimap2Index> minimap_index)
-            : m_minimap_indexes({std::move(minimap_index)}) {}
-
-    /** Construct with multiple indexes.
-     *  Each index should be one block of a single split index.
-     */
-    Minimap2Aligner(std::vector<std::shared_ptr<const Minimap2Index>> minimap_indexes)
-            : m_minimap_indexes(std::move(minimap_indexes)) {}
+            : m_minimap_index(std::move(minimap_index)) {}
 
     /// Align to the full reference (and merge results if index is split).
     std::vector<BamPtr> align(bam1_t* record, mm_tbuf_t* buf);
@@ -40,7 +34,7 @@ public:
     HeaderSequenceRecords get_sequence_records_for_header() const;
 
 private:
-    std::vector<std::shared_ptr<const Minimap2Index>> m_minimap_indexes;
+    std::shared_ptr<const Minimap2Index> m_minimap_index;
 
     std::vector<BamPtr> align_impl(bam1_t* record, mm_tbuf_t* buf, int idx_no);
     std::vector<AlignmentResult> align_impl(dorado::ReadCommon& read_common,

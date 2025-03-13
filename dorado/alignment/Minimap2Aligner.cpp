@@ -72,6 +72,28 @@ void add_sa_tag(bam1_t* record,
     }
 }
 
+void make_secondary(dorado::AlignmentResult& alignment) {
+    alignment.secondary_alignment = true;
+    // The flags field is the second one in the SAM string. We need to adjust it.
+    std::istringstream in(alignment.sam_string);
+    std::ostringstream out;
+    int k = 0;
+    std::string field;
+    while (std::getline(in, field, '\t')) {
+        if (k == 1) {
+            auto flags = unsigned(atoi(field.c_str()));
+            flags |= 0x100u;
+            field = std::to_string(flags);
+        }
+        if (k > 0) {
+            out << '\t';
+        }
+        out << field;
+        ++k;
+    }
+    alignment.sam_string = out.str();
+}
+
 }  // namespace
 
 namespace dorado::alignment {
@@ -83,7 +105,7 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
     // This function should only be used when either the index is not split, or a split
     // index is being loaded incrementally. In either case, the Minimap2Aligner object will
     // contain only a single entry in m_minimap_indexes.
-    if (m_minimap_indexes.size() != 1) {
+    if (m_minimap_index->split_level() != 1) {
         throw std::logic_error(
                 "Minimap2Aligner::get_mapping() called on fully-loaded split index.");
     }
@@ -94,8 +116,8 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
 
     // do the mapping
     int hits = 0;
-    auto mm_index = m_minimap_indexes[0]->index();
-    const auto& mm_map_opts = m_minimap_indexes[0]->mapping_options();
+    auto mm_index = m_minimap_index->index();
+    const auto& mm_map_opts = m_minimap_index->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
                             &mm_map_opts, qname.data());
     return {reg, hits};
@@ -107,13 +129,64 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // strip any existing alignment metadata from the read
     utils::remove_alignment_tags_from_record(irecord);
 
-    for (size_t i = 0; i < m_minimap_indexes.size(); ++i) {
+    int best_score = 0;
+    size_t best_index = 0;
+    std::vector<size_t> all_primaries;
+    bool alignment_found = false;
+    auto num_index_blocks = m_minimap_index->split_level();
+    for (size_t i = 0; i < num_index_blocks; ++i) {
         auto records = align_impl(irecord, buf, int(i));
         for (size_t j = 0; j < records.size(); ++j) {
+            auto score = records[j]->core.qual;
+            auto flags = records[j]->core.flag;
+            if ((flags & BAM_FUNMAP) == 0) {
+                alignment_found = true;
+            }
+            if ((flags & BAM_FSECONDARY) == 0 && (flags & BAM_FSUPPLEMENTARY) == 0) {
+                all_primaries.push_back(all_records.size());
+                if (score > best_score) {
+                    best_score = score;
+                    best_index = all_records.size();
+                }
+            }
             all_records.emplace_back(std::move(records[j]));
         }
     }
-    return all_records;
+    // We can only have one primary alignment. Set the secondary flag for
+    // all but the best primary alignments.
+    const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
+    for (auto i : all_primaries) {
+        if (i != best_index) {
+            all_records[i]->core.flag |= BAM_FSECONDARY;
+            if (!softclipping_on) {
+                // Remove MM/ML/MN tags
+                if (auto tag = bam_aux_get(all_records[i].get(), "MM"); tag != nullptr) {
+                    bam_aux_del(all_records[i].get(), tag);
+                }
+                if (auto tag = bam_aux_get(all_records[i].get(), "ML"); tag != nullptr) {
+                    bam_aux_del(all_records[i].get(), tag);
+                }
+                if (auto tag = bam_aux_get(all_records[i].get(), "MN"); tag != nullptr) {
+                    bam_aux_del(all_records[i].get(), tag);
+                }
+            }
+        }
+    }
+
+    // Get rid of any spurious unmapped records.
+    std::vector<BamPtr> filtered_records;
+    if (alignment_found) {
+        // Remove all unmapped records.
+        for (auto& record : all_records) {
+            if ((record->core.flag & BAM_FUNMAP) == 0) {
+                filtered_records.emplace_back(std::move(record));
+            }
+        }
+    } else {
+        // We can just keep the first record.
+        filtered_records.emplace_back(std::move(all_records[0]));
+    }
+    return filtered_records;
 }
 
 std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf, int idx_no) {
@@ -152,8 +225,8 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
 
     // do the mapping
     int hits = 0;
-    auto mm_index = m_minimap_indexes.at(idx_no)->index();
-    const auto& mm_map_opts = m_minimap_indexes.at(idx_no)->mapping_options();
+    auto mm_index = m_minimap_index->index(idx_no);
+    const auto& mm_map_opts = m_minimap_index->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
                             &mm_map_opts, qname.data());
 
@@ -306,11 +379,53 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
 void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
-    for (size_t i = 0; i < m_minimap_indexes.size(); ++i) {
+    auto num_index_blocks = m_minimap_index->split_level();
+    std::vector<std::pair<size_t, int>> primaries(num_index_blocks);
+    std::vector<AlignmentResult> all_results;
+    bool alignment_found = false;
+    for (size_t i = 0; i < num_index_blocks; ++i) {
         auto results = align_impl(read_common, alignment_header, buffer, int(i));
         for (size_t j = 0; j < results.size(); ++j) {
-            read_common.alignment_results.emplace_back(std::move(results[j]));
+            if (results[j].genome != "*") {
+                alignment_found = true;
+            }
+            if (j == 0) {
+                primaries[i] = {all_results.size(), results[j].mapping_quality};
+            }
+            all_results.emplace_back(std::move(results[j]));
         }
+    }
+
+    // We need to put the best primary alignment first, and make the others non-primary.
+    int best_score = 0;
+    size_t best_index = 0;
+    for (size_t i = 0; i < primaries.size(); ++i) {
+        if (primaries[i].second > best_score) {
+            best_score = primaries[i].second;
+            best_index = primaries[i].first;
+        }
+    }
+    if (best_index != 0) {
+        std::swap(all_results[0], all_results[best_index]);
+    }
+    for (size_t i = 0; i < primaries.size(); ++i) {
+        if (primaries[i].first == 0) {
+            continue;
+        }
+        make_secondary(all_results[primaries[i].first]);
+    }
+
+    // We need to remove any spurious unmapped results.
+    if (alignment_found) {
+        // We can skip any unmapped records.
+        for (size_t i = 0; i < all_results.size(); ++i) {
+            if (all_results[i].genome != "*") {
+                read_common.alignment_results.emplace_back(std::move(all_results[i]));
+            }
+        }
+    } else {
+        // We can just include the first record.
+        read_common.alignment_results.emplace_back(std::move(all_results[0]));
     }
 }
 
@@ -324,8 +439,8 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
     query.l_seq = static_cast<int>(read_common.seq.length());
 
     int n_regs{};
-    mm_reg1_t* regs = mm_map(m_minimap_indexes.at(idx_no)->index(), query.l_seq, query.seq, &n_regs,
-                             buffer, &m_minimap_indexes.at(idx_no)->mapping_options(), nullptr);
+    mm_reg1_t* regs = mm_map(m_minimap_index->index(idx_no), query.l_seq, query.seq, &n_regs,
+                             buffer, &m_minimap_index->mapping_options(), nullptr);
     auto post_condition = utils::PostCondition([regs] { free(regs); });
 
     std::string alignment_string{};
@@ -338,7 +453,7 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
     }
     for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
-        mm_write_sam3(&alignment_line, m_minimap_indexes.at(idx_no)->index(), &query, 0, reg_idx, 1,
+        mm_write_sam3(&alignment_line, m_minimap_index->index(idx_no), &query, 0, reg_idx, 1,
                       &n_regs, &regs, NULL, MM_F_OUT_MD, buffer->rep_len);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
@@ -348,12 +463,7 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
 }
 
 HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
-    HeaderSequenceRecords sequence_records{};
-    for (const auto& idx : m_minimap_indexes) {
-        auto records = idx->get_sequence_records_for_header();
-        sequence_records.insert(sequence_records.end(), records.begin(), records.end());
-    }
-    return sequence_records;
+    return m_minimap_index->get_sequence_records_for_header();
 }
 
 // Function to add auxiliary tags to the alignment record.
@@ -418,8 +528,7 @@ void Minimap2Aligner::add_tags(bam1_t* record,
     // MD
     char* md = NULL;
     int max_len = 0;
-    int md_len =
-            mm_gen_MD(NULL, &md, &max_len, m_minimap_indexes.at(idx_no)->index(), aln, seq.c_str());
+    int md_len = mm_gen_MD(NULL, &md, &max_len, m_minimap_index->index(idx_no), aln, seq.c_str());
     if (md_len > 0) {
         bam_aux_append(record, "MD", 'Z', md_len + 1, (uint8_t*)md);
     }

@@ -15,7 +15,6 @@ using HeaderSequenceRecords = std::vector<std::pair<char *, uint32_t>>;
 /// </summary>
 enum class IndexLoadResult {
     reference_file_not_found,
-    split_index_not_supported,
     validation_error,
     no_index_loaded,
     end_of_index,

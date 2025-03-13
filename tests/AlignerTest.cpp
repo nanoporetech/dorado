@@ -377,17 +377,6 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     }
 }
 
-CATCH_TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", TEST_GROUP) {
-    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
-    auto ref = aligner_test_dir / "long_target.fa";
-
-    auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5 -I 1K");
-    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
-    CATCH_CHECK_THROWS(
-            dorado::AlignerNode(index_file_access, bed_file_access, ref.string(), "", options, 1));
-}
-
 CATCH_SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GROUP) {
     CATCH_GIVEN("AlgnerNode constructed with populated index file collection") {
         const std::string READ_ID{"aligner_node_test"};

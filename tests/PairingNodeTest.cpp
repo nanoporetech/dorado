@@ -3,6 +3,7 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/DefaultClientInfo.h"
+#include "utils/fasta_reader.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
@@ -53,8 +54,11 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     // expected pairs: {2, 3} and {5, 6}
 
     // Load a pre-determined read to exercise the mapping pathway.
-    const std::string seq =
-            ReadFileIntoString(std::filesystem::path(get_aligner_data_dir()) / "long_target.fa");
+    auto fa_file = std::filesystem::path(get_aligner_data_dir()) / "long_target.fa";
+    dorado::utils::FastaReader fa_reader(fa_file);
+    auto record = fa_reader.try_get_next_record();
+    record = fa_reader.try_get_next_record();  // Skip the first sequence and use the second one.
+    const std::string seq = record->sequence();
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 
