@@ -594,32 +594,34 @@ test:macos:arm:
   needs:
     - build:macos:arm
 
-# Test that you can run dorado in a clean cuda 20.04 environment
-test_archive:linux:x86:20.04_nvidia:
-  image: nvidia/cuda:${CUDA}.0-devel-ubuntu20.04
+# Test that you can run dorado in clean environments
+.test_archive:linux:x86:
   extends:
-    - .linux_runner
     - .test_archive
+  tags:
+    - ubuntu-20.04
+    - ${RUNNER_TAG}
+  image: ${IMAGE}
+  parallel:
+    matrix:
+      # CUDA environment
+      - RUNNER_TAG: "nvidia-docker"
+        IMAGE: "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
+      # CPU environment
+      - RUNNER_TAG: "docker-as"
+        IMAGE: ["${DORADO_DOCKER_EXT}/ubuntu:18.04", "${DORADO_DOCKER_EXT}/ubuntu:20.04"]
+# CUDA 11 build
+test_archive:linux:x86:cuda11:
+  extends:
+    - .test_archive:linux:x86
   needs:
     - build_archive:linux:x86:centos7
-
-# Test that you can run dorado in a clean cpu 18.04 environment
-test_archive:linux:x86:18.04:
-  image: ${DORADO_DOCKER_EXT}/ubuntu:18.04
+# CUDA 12 build
+test_archive:linux:x86:cuda12:
   extends:
-    - .linux_cpu_runner
-    - .test_archive
+    - .test_archive:linux:x86
   needs:
-    - build_archive:linux:x86:centos7
-
-# Test that you can run dorado in a clean cpu 20.04 environment
-test_archive:linux:x86:20.04:
-  image: ${DORADO_DOCKER_EXT}/ubuntu:20.04
-  extends:
-    - .linux_cpu_runner
-    - .test_archive
-  needs:
-    - build_archive:linux:x86:centos7
+    - build_archive:linux:x86:cuda12
 
 # Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:18.04:
