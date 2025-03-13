@@ -107,6 +107,10 @@ void ProgressTracker::summarize() const {
         }
     }
 
+    if (m_num_untrimmed_short_reads > 0) {
+        spdlog::debug("> Untrimmed short reads: {}", m_num_untrimmed_short_reads);
+    }
+
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0) {
         // Visualize a distribution of the tail lengths called.
         int modal_poly_a_tail_length = 0;
@@ -160,6 +164,9 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
+
+    // Adapter/primer trimming
+    m_num_untrimmed_short_reads = int(fetch_stat("AdapterDetectorNode.num_untrimmed_short_reads"));
 
     // Modbase
     m_num_mods_samples_processed = int64_t(fetch_stat("ModBaseChunkCallerNode.samples_processed"));

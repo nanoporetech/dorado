@@ -54,6 +54,7 @@ private:
     int m_num_poly_a_called{0};
     int m_num_poly_a_not_called{0};
     int m_avg_poly_a_tail_lengths{0};
+    int m_num_untrimmed_short_reads{0};
 
     int64_t m_num_mods_samples_processed{0};
     int64_t m_num_mods_samples_incl_padding{0};
