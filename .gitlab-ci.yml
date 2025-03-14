@@ -898,6 +898,7 @@ deploy:all:
     expire_in: 1 day
   needs:
     - build_archive:linux:x86:centos7
+    - build_archive:linux:x86:cuda12
     - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:jammy
     - build_archive:macos:arm
