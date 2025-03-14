@@ -31,7 +31,8 @@ variables:
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
-  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
+  WIN_CUDA: "12.8"
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${WIN_CUDA}"
   MTL_DEBUG_LAYER: 1
   FF_TIMESTAMPS: true
 
@@ -77,7 +78,7 @@ variables:
   tags:
     - windows-10
     - VS2019
-    - cuda-${CUDA}
+    - cuda-${WIN_CUDA}
 
 .linux_build_dependencies:
   before_script:
@@ -381,7 +382,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
 
 build:windows:debug:
   variables:
