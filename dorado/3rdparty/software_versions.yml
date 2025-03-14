@@ -27,7 +27,7 @@ cuda-toolkit:
 cutlass:
     description: >
          CUDA C++ template abstractions for implementing high-performance matrix-multiplication (GEMM) and related computations.
-    version: "012c62c748bdd5b2badc3ebe83e0891dee7c4e31"
+    version: "v3.1.0"
     url: https://github.com/NVIDIA/cutlass
     license: PATH_NOT_AVAILABLE
     files:
