@@ -35,4 +35,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<int64_t>& positions_minor,
                           const Variant& variant);
 
+std::vector<VariantCallingSample> merge_vc_samples(
+        const std::vector<VariantCallingSample>& vc_samples);
+
 }  // namespace dorado::polisher
