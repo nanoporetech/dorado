@@ -254,6 +254,45 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
 }
 
 CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
+                       "AlignerTest: Check split-index alignment",
+                       TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    auto ref = aligner_test_dir / "split_reference_target.fa";
+    auto query = aligner_test_dir / "split_reference_query.fa";
+
+    auto options = dorado::alignment::create_preset_options("-I 4000");
+    dorado::HtsReader reader(query.string(), std::nullopt);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
+    CATCH_REQUIRE(bam_records.size() == 5);
+
+    std::unordered_map<std::string, std::vector<int>> flag_lut;
+    for (const auto& record : bam_records) {
+        flag_lut[std::string(bam_get_qname(record.get()))].push_back(record->core.flag);
+    }
+
+    std::vector<std::string> read_ids{"035f6ad7-78e2-4569-2492-3e8fe141afc4",
+                                      "3e8fe141-afc4-4569-78e2-035f6ad72567",
+                                      "4a9fe741-aecb-4569-6812-05474657756a"};
+
+    // First read should align to both segment1 and segment3.
+    const auto& flags1 = flag_lut.at(read_ids[0]);
+    CATCH_REQUIRE(flags1.size() == 2);
+    CATCH_CHECK(flags1[0] == 0);
+    CATCH_CHECK((flags1[1] & BAM_FSUPPLEMENTARY) != 0);
+
+    // Second read should align only to segment2.
+    const auto& flags2 = flag_lut.at(read_ids[1]);
+    CATCH_REQUIRE(flags2.size() == 1);
+    CATCH_CHECK(flags2[0] == 0);
+
+    // Third read should align to both segment1 and segement3.
+    const auto& flags3 = flag_lut.at(read_ids[2]);
+    CATCH_REQUIRE(flags3.size() == 2);
+    CATCH_CHECK(flags3[0] == 0);
+    CATCH_CHECK((flags3[1] & BAM_FSUPPLEMENTARY) != 0);
+}
+
+CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
                        "AlignerTest: Check reverse complement alignment",
                        TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());

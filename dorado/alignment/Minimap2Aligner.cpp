@@ -72,7 +72,7 @@ void add_sa_tag(bam1_t* record,
     }
 }
 
-void make_secondary(dorado::AlignmentResult& alignment) {
+void make_supplementary(dorado::AlignmentResult& alignment) {
     alignment.secondary_alignment = true;
     // The flags field is the second one in the SAM string. We need to adjust it.
     std::istringstream in(alignment.sam_string);
@@ -82,7 +82,7 @@ void make_secondary(dorado::AlignmentResult& alignment) {
     while (std::getline(in, field, '\t')) {
         if (k == 1) {
             auto flags = unsigned(atoi(field.c_str()));
-            flags |= 0x100u;
+            flags |= BAM_FSUPPLEMENTARY;
             field = std::to_string(flags);
         }
         if (k > 0) {
@@ -152,12 +152,12 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             all_records.emplace_back(std::move(records[j]));
         }
     }
-    // We can only have one primary alignment. Set the secondary flag for
+    // We can only have one primary alignment. Set the supplementary flag for
     // all but the best primary alignments.
     const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
     for (auto i : all_primaries) {
         if (i != best_index) {
-            all_records[i]->core.flag |= BAM_FSECONDARY;
+            all_records[i]->core.flag |= BAM_FSUPPLEMENTARY;
             if (!softclipping_on) {
                 // Remove MM/ML/MN tags
                 if (auto tag = bam_aux_get(all_records[i].get(), "MM"); tag != nullptr) {
@@ -396,7 +396,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
         }
     }
 
-    // We need to put the best primary alignment first, and make the others non-primary.
+    // We need to put the best primary alignment first, and make the others supplementary.
     int best_score = 0;
     size_t best_index = 0;
     for (size_t i = 0; i < primaries.size(); ++i) {
@@ -412,7 +412,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
         if (primaries[i].first == 0) {
             continue;
         }
-        make_secondary(all_results[primaries[i].first]);
+        make_supplementary(all_results[primaries[i].first]);
     }
 
     // We need to remove any spurious unmapped results.
