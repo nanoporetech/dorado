@@ -83,18 +83,6 @@ std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples) {
     const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
                                                     const VariantCallingSample& rh) {
-        if (lh.seq_id != rh.seq_id) {
-            std::ostringstream oss;
-            oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
-            throw std::runtime_error(oss.str());
-        }
-        if (lh.end() != (rh.start() + 1)) {
-            std::ostringstream oss;
-            oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh
-                << ", rh = " << rh;
-            throw std::runtime_error(oss.str());
-        }
-
         const size_t width = std::size(lh.positions_major);
 
         // Insert positions vectors.
@@ -115,8 +103,27 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
     std::vector<VariantCallingSample> ret{vc_samples.front()};
 
+    // Validate sample for sanity. This can throw.
+    vc_samples[0].validate();
+
     for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
-        if (ret.back().end() == (vc_samples[i].start() + 1)) {
+        const auto& last = ret.back();
+        const auto& curr = vc_samples[i];
+
+        // Validate sample for sanity. This can throw.
+        curr.validate();
+
+        // Should not happen, but sanity check.
+        if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
+            ret.emplace_back(vc_samples[i]);
+            continue;
+        }
+
+        // Merge if major coordinates are adjacent, or if major coordinates are equal but minor are adjacent.
+        if ((curr.seq_id == last.seq_id) &&
+            ((curr.positions_major[0] == (last.positions_major.back() + 1)) ||
+             ((curr.positions_major[0] == last.positions_major.back()) &&
+              (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
             merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
         } else {
             ret.emplace_back(vc_samples[i]);
