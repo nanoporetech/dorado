@@ -73,7 +73,7 @@ void add_sa_tag(bam1_t* record,
 }
 
 void make_supplementary(dorado::AlignmentResult& alignment) {
-    alignment.secondary_alignment = true;
+    alignment.supplementary_alignment = true;
     // The flags field is the second one in the SAM string. We need to adjust it.
     std::istringstream in(alignment.sam_string);
     std::ostringstream out;
