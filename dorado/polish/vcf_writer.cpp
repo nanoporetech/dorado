@@ -2,7 +2,9 @@
 
 #include <htslib/vcf.h>
 
+#include <sstream>
 #include <stdexcept>
+#include <string_view>
 
 namespace dorado::polisher {
 
@@ -82,11 +84,18 @@ void VCFWriter::write_variant(const Variant& variant) {
         throw std::runtime_error("Failed to create VCF record.");
     }
 
+    // Format the alleles for Bcftools.
+    std::ostringstream os_alleles;
+    os_alleles << variant.ref;
+    for (const std::string_view alt : variant.alts) {
+        os_alleles << ',' << alt;
+    }
+
     // Set the record fields.
     record->rid = variant.seq_id;
     record->pos = variant.pos;
     bcf_update_id(m_header.get(), record.get(), ".");
-    bcf_update_alleles_str(m_header.get(), record.get(), (variant.ref + "," + variant.alt).c_str());
+    bcf_update_alleles_str(m_header.get(), record.get(), os_alleles.str().c_str());
     record->qual = variant.qual;
 
     // Look up the FILTER ID in the header
