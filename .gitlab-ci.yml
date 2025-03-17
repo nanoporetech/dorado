@@ -606,10 +606,16 @@ test:macos:arm:
     matrix:
       # CUDA environment
       - RUNNER_TAG: "nvidia-docker"
-        IMAGE: "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
+        IMAGE:
+        - "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
+        - "nvidia/cuda:${CUDA}.0-devel-ubuntu22.04"
+        #- "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04" doesn't exist
       # CPU environment
       - RUNNER_TAG: "docker-as"
-        IMAGE: ["${DORADO_DOCKER_EXT}/ubuntu:18.04", "${DORADO_DOCKER_EXT}/ubuntu:20.04"]
+        IMAGE:
+        - "${DORADO_DOCKER_EXT}/ubuntu:20.04"
+        - "${DORADO_DOCKER_EXT}/ubuntu:22.04"
+        - "${DORADO_DOCKER_EXT}/ubuntu:24.04"
 # CUDA 11 build
 test_archive:linux:x86:cuda11:
   extends:
