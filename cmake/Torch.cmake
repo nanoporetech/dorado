@@ -155,6 +155,7 @@ else()
             set(TORCH_LIB_SUFFIX "/torch")
         endif()
     elseif(WIN32)
+        set(TORCH_VERSION 2.6.0)
         if (TRY_USING_STATIC_TORCH_LIB)
             set(TORCH_URL ${DORADO_CDN_URL}/torch-2.6.0.0-Windows-ont.zip)
             set(TORCH_PATCH_SUFFIX -ont.0)
@@ -173,6 +174,10 @@ else()
         add_compile_options(
             # from libtorch: destructor was implicitly defined as deleted
             $<$<COMPILE_LANGUAGE:CXX>:/wd4624>
+            # from libtorch: structure was padded due to alignment specifier
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4324>
+            # from libtorch: possible loss of data
+            $<$<COMPILE_LANGUAGE:CXX>:/wd4267>
             # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
             # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
             # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
@@ -229,6 +234,7 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cufft
             CUDA::cusolver
             CUDA::cusparse
+            ${TORCH_LIB}/lib/mimalloc-1.8/mimalloc-static.lib
         )
 
     elseif(APPLE)
