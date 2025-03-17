@@ -236,7 +236,6 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cufft
             CUDA::cusolver
             CUDA::cusparse
-            ${TORCH_LIB}/lib/mimalloc-1.8/mimalloc-static.lib
         )
 
     elseif(APPLE)
