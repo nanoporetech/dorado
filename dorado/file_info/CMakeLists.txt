@@ -4,12 +4,12 @@ add_library(dorado_file_info STATIC
 )
 
 target_link_libraries(dorado_file_info
-PUBLIC    
+PUBLIC
     dorado_models_lib
     dorado_utils
 PRIVATE
     pod5_libs
-    HDF5::HDF5
+    HDF5Wrapper
     vbz_hdf_plugin
     ${ZLIB_LIBRARIES}
     HighFive::Include
