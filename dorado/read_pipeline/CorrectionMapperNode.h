@@ -29,11 +29,16 @@ class Pipeline;
 class CorrectionMapperNode : public MessageSink {
 public:
     CorrectionMapperNode(const std::string& index_file,
-                         int threads,
+                         int32_t threads,
                          uint64_t index_size,
                          std::string furthest_skip_header,
                          std::unordered_set<std::string> skip_set,
-                         int run_block_id);
+                         int32_t run_block_id,
+                         int32_t kmer_size,
+                         int32_t window_size,
+                         int32_t min_chain_score,
+                         float mid_occ_frac);
+
     ~CorrectionMapperNode() = default;
     std::string get_name() const override { return "CorrectionMapperNode"; }
     stats::NamedStats sample_stats() const override;

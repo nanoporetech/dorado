@@ -291,11 +291,15 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
 }
 
 CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
-                                           int threads,
-                                           uint64_t index_size,
+                                           const int32_t threads,
+                                           const uint64_t index_size,
                                            std::string furthest_skip_header,
                                            std::unordered_set<std::string> skip_set,
-                                           const int run_block_id)
+                                           const int32_t run_block_id,
+                                           const int32_t kmer_size,
+                                           const int32_t window_size,
+                                           const int32_t min_chain_score,
+                                           const float mid_occ_frac)
         : MessageSink(10000, threads),
           m_index_file(index_file),
           m_num_threads(threads),
@@ -305,17 +309,22 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
           m_run_block_id{run_block_id} {
     auto options = alignment::create_preset_options("ava-ont");
     auto& index_options = options.index_options->get();
-    index_options.k = 25;
-    index_options.w = 17;
+    index_options.k = static_cast<int16_t>(kmer_size);
+    index_options.w = static_cast<int16_t>(window_size);
     index_options.batch_size = index_size;
     auto& mapping_options = options.mapping_options->get();
     mapping_options.bw = 150;
     mapping_options.bw_long = 2000;
-    mapping_options.min_chain_score = 4000;
+    mapping_options.min_chain_score = min_chain_score;
     mapping_options.zdrop = 200;
     mapping_options.zdrop_inv = 200;
     mapping_options.occ_dist = 200;
     mapping_options.flag |= MM_F_EQX;
+    mapping_options.mid_occ_frac = mid_occ_frac;
+
+    spdlog::trace(
+            "CorrectionMapperNode options: k = {}, w = {}, min_chain_score = {}, mid_occ_frac = {}",
+            kmer_size, window_size, min_chain_score, mid_occ_frac);
 
     // --cs short
     alignment::mm2::apply_cs_option(options, "short");
