@@ -48,7 +48,7 @@ public:
     const mm_mapopt_t& mapping_options() const;
 
     HeaderSequenceRecords get_sequence_records_for_header() const;
-    size_t split_level() const { return m_indexes.size(); }
+    size_t num_loaded_index_blocks() const { return m_indexes.size(); }
 
     // Testability
     const Minimap2Options& get_options() const;

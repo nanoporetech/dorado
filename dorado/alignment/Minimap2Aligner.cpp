@@ -105,7 +105,7 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
     // This function should only be used when either the index is not split, or a split
     // index is being loaded incrementally. In either case, the Minimap2Aligner object will
     // contain only a single entry in m_minimap_indexes.
-    if (m_minimap_index->split_level() != 1) {
+    if (m_minimap_index->num_loaded_index_blocks() != 1) {
         throw std::logic_error(
                 "Minimap2Aligner::get_mapping() called on fully-loaded split index.");
     }
@@ -133,7 +133,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     size_t best_index = 0;
     std::vector<size_t> all_primaries;
     bool alignment_found = false;
-    auto num_index_blocks = m_minimap_index->split_level();
+    auto num_index_blocks = m_minimap_index->num_loaded_index_blocks();
     for (size_t i = 0; i < num_index_blocks; ++i) {
         auto records = align_impl(irecord, buf, int(i));
         for (size_t j = 0; j < records.size(); ++j) {
@@ -379,7 +379,7 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
 void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
-    auto num_index_blocks = m_minimap_index->split_level();
+    auto num_index_blocks = m_minimap_index->num_loaded_index_blocks();
     std::vector<std::pair<size_t, int>> primaries(num_index_blocks);
     std::vector<AlignmentResult> all_results;
     bool alignment_found = false;
