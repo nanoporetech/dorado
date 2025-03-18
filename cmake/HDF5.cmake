@@ -81,3 +81,32 @@ endif()
 
 find_package(ZLIB REQUIRED)
 find_package(HDF5 COMPONENTS C REQUIRED)
+
+# Fix up HDF5 since it doesn't link to static libraries even if you tell it to.
+if (HDF5_USE_STATIC_LIBRARIES AND NOT WIN32)
+    # Search for static versions of these libs.
+    # Note that we can't do this for all libs since libm.a and libdl.a exist.
+    set(_old_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    find_library(STATIC_SZ_LIB NAMES "sz")
+    find_library(STATIC_AEC_LIB NAMES "aec")
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_old_suffixes})
+
+    # Make a wrapper lib that uses the static versions, if they exist.
+    add_library(HDF5Wrapper INTERFACE IMPORTED)
+    target_include_directories(HDF5Wrapper INTERFACE ${HDF5_INCLUDE_DIRS})
+    target_compile_definitions(HDF5Wrapper INTERFACE ${HDF5_DEFINITIONS})
+    foreach (_lib IN LISTS HDF5_C_LIBRARIES)
+        if (_lib MATCHES "sz" AND STATIC_SZ_LIB)
+            target_link_libraries(HDF5Wrapper INTERFACE ${STATIC_SZ_LIB})
+            # libsz.a depends on libaec.a, if it exists.
+            if (STATIC_AEC_LIB)
+                target_link_libraries(HDF5Wrapper INTERFACE ${STATIC_AEC_LIB})
+            endif()
+        else()
+            target_link_libraries(HDF5Wrapper INTERFACE ${_lib})
+        endif()
+    endforeach()
+else()
+    add_library(HDF5Wrapper ALIAS HDF5::HDF5)
+endif()

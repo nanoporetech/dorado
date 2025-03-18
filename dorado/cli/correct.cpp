@@ -60,6 +60,10 @@ struct Options {
     std::string resume_path_fn;
     bool compute_num_blocks = false;
     std::optional<int> run_block_id;
+    int32_t kmer_size = 25;
+    int32_t ovl_window_size = 17;
+    int32_t min_chain_score = 2500;
+    float mid_occ_frac = 0.05f;
 };
 
 /// \brief Define the CLI options.
@@ -134,6 +138,25 @@ ParserPtr create_cli(int& verbosity) {
                 .help("ID of the index block to run. If specified, only this block will be run.")
                 .scan<'i', int>();
     }
+    {
+        parser->hidden.add_argument("--kmer-size")
+                .help("Minimizer kmer size for overlapping.")
+                .default_value(25)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--ovl-window-size")
+                .help("Minimizer window size score for overlapping.")
+                .default_value(17)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--min-chain-score")
+                .help("Minimum chaining score for overlapping.")
+                .default_value(2500)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--mid-occ-frac")
+                .help("Filter out top FLOAT fraction of repetitive minimizers during the overlap "
+                      "process.")
+                .default_value(0.05f)
+                .scan<'g', float>();
+    }
 
     return parser;
 }
@@ -174,6 +197,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : opt.threads;
 
     opt.device = parser.visible.get<std::string>("device");
+
+    opt.kmer_size = parser.hidden.get<int>("kmer-size");
+    opt.ovl_window_size = parser.hidden.get<int>("ovl-window-size");
+    opt.min_chain_score = parser.hidden.get<int>("min-chain-score");
+    opt.mid_occ_frac = parser.hidden.get<float>("mid-occ-frac");
 
     if (opt.device == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
@@ -388,7 +416,9 @@ int correct(int argc, char* argv[]) {
         if (opt.compute_num_blocks) {
             spdlog::debug("Only computing the number of index blocks.");
 
-            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1);
+            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
+                                      opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
+                                      opt.mid_occ_frac);
 
             // Loop through all index blocks.
             while (node.load_next_index_block()) {
@@ -465,7 +495,8 @@ int correct(int argc, char* argv[]) {
             // 1. Alignment node that generates alignments per read to be corrected.
             aligner = std::make_unique<CorrectionMapperNode>(
                     in_reads_fn, aligner_threads, opt.index_size, furthest_skip_header,
-                    std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1);
+                    std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1, opt.kmer_size,
+                    opt.ovl_window_size, opt.min_chain_score, opt.mid_occ_frac);
         }
 
         // Set up stats counting.

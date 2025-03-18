@@ -9,7 +9,7 @@ PUBLIC
 PRIVATE
     spdlog::spdlog
     pod5_libs
-    HDF5::HDF5
+    HDF5Wrapper
     vbz_hdf_plugin
     ${ZLIB_LIBRARIES}
     HighFive::Include
