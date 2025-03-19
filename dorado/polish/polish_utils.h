@@ -1,6 +1,7 @@
 #pragma once
 
 #include "interval.h"
+#include "utils/region.h"
 
 #include <ATen/ATen.h>
 

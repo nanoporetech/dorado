@@ -3,8 +3,8 @@
 #include "hts_io/FastxRandomReader.h"
 #include "polish/interval.h"
 #include "polish/polish_utils.h"
-#include "polish/region.h"
 #include "torch_utils/gpu_profiling.h"
+#include "utils/region.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
@@ -582,7 +582,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             // Compute sample trimming coordinates.
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
-                    local_samples, std::optional<RegionInt>(
+                    local_samples, std::optional<utils::RegionInt>(
                                            {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
@@ -701,7 +701,7 @@ std::vector<Sample> encode_windows_in_parallel(
 }
 
 std::vector<Window> create_windows_from_regions(
-        const std::vector<Region>& regions,
+        const std::vector<utils::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap) {

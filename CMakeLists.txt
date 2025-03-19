@@ -317,8 +317,6 @@ add_library(dorado_lib
     dorado/polish/polish_stats.h
     dorado/polish/polish_utils.cpp
     dorado/polish/polish_utils.h
-    dorado/polish/region.cpp
-    dorado/polish/region.h
     dorado/polish/sample.cpp
     dorado/polish/sample.h
     dorado/polish/trim.cpp
@@ -362,6 +360,10 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_base.h
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
+    dorado/utils/io_utils.cpp
+    dorado/utils/io_utils.h
+    dorado/utils/region.cpp
+    dorado/utils/region.h
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h

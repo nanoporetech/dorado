@@ -309,7 +309,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 }  // namespace
 
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
-                                   const std::optional<const RegionInt>& region) {
+                                   const std::optional<const utils::RegionInt>& region) {
     std::vector<const Sample*> ptrs;
     ptrs.reserve(std::size(samples));
     for (const auto& sample : samples) {
@@ -319,7 +319,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
 }
 
 std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
-                                   const std::optional<const RegionInt>& region) {
+                                   const std::optional<const utils::RegionInt>& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {
