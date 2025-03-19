@@ -58,7 +58,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
-                                   const int32_t num_inference_cpu_threads,
+                                   const int32_t num_inference_threads,
                                    const bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
@@ -77,42 +77,62 @@ PolisherResources create_resources(const ModelConfig& model_config,
     spdlog::debug("[create_resources] Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<ModelTorchBase>> ret;
+        std::vector<c10::optional<c10::Stream>> ret_streams;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];
 
-            spdlog::debug("[create_resources] Creating a model from the config.");
-            auto model = model_factory(model_config);
+            {
+                c10::optional<c10::Stream> stream;
+#if DORADO_CUDA_BUILD
+                if (device_info.device.is_cuda()) {
+                    c10::cuda::CUDAGuard device_guard(device_info.device);
+                    stream = c10::cuda::getStreamFromPool(false, device_info.device.index());
+                }
+#endif
 
-            spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
-                          device_info.name);
-            model->to_device(device_info.device);
+                spdlog::debug("[create_resources] Creating a model from the config.");
+                auto model = model_factory(model_config);
 
-            // Half-precision if needed.
-            if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-                spdlog::debug("[create_resources] Converting the model to half.");
-                model->to_half();
-            } else {
-                spdlog::debug("[create_resources] Using full precision.");
+                spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
+                              device_info.name);
+                model->to_device(device_info.device);
+
+                // Half-precision if needed.
+                if ((device_info.type == DeviceType::CUDA) && !full_precision) {
+                    spdlog::debug("[create_resources] Converting the model to half.");
+                    model->to_half();
+                } else {
+                    spdlog::debug("[create_resources] Using full precision.");
+                }
+
+                spdlog::debug("[create_resources] Switching model to eval mode.");
+                model->set_eval();
+
+                ret.emplace_back(std::move(model));
+                ret_streams.emplace_back(std::move(stream));
+
+                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
             }
 
-            spdlog::debug("[create_resources] Switching model to eval mode.");
-            model->set_eval();
-
-            ret.emplace_back(std::move(model));
-
-            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
-        }
-        // In case the device is set to CPU, we add up to inference_threads models.
-        if ((std::size(resources.devices) == 1) &&
-            (resources.devices.front().type == DeviceType::CPU)) {
-            for (int32_t i = 1; i < num_inference_cpu_threads; ++i) {
-                ret.emplace_back(ret.front());
+            const int32_t last_model = static_cast<int32_t>(std::size(ret)) - 1;
+            for (int32_t i = 1; i < num_inference_threads; ++i) {
+                ret.emplace_back(ret[last_model]);
+                c10::optional<c10::Stream> stream;
+#if DORADO_CUDA_BUILD
+                if (device_info.device.is_cuda()) {
+                    c10::cuda::CUDAGuard device_guard(device_info.device);
+                    stream = c10::cuda::getStreamFromPool(false, device_info.device.index());
+                }
+#endif
+                ret_streams.emplace_back(std::move(stream));
+                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
             }
         }
-        return ret;
+
+        return std::make_pair(std::move(ret), std::move(ret_streams));
     };
-    resources.models = create_models();
+    std::tie(resources.models, resources.streams) = create_models();
 
     spdlog::info("Creating the encoder.");
     resources.encoder = encoder_factory(model_config, read_group, tag_name, tag_value,
@@ -493,9 +513,13 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     };
 #endif
 
+    utils::ScopedProfileRange spr1("merge_and_split_bam_regions_in_parallel", 3);
+
     const auto worker = [&](const int32_t start, const int32_t end,
                             std::vector<std::vector<Sample>>& results_samples,
                             std::vector<std::vector<TrimInfo>>& results_trims) {
+        utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
+
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
             // Get the interval of samples for this BAM region and subtract the offset due to batching.
             Interval interval = bam_region_intervals[bam_region_id];
@@ -614,9 +638,13 @@ std::vector<Sample> encode_windows_in_parallel(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads) {
+    utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
+
     // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<Sample>& results) {
+        utils::ScopedProfileRange spr2("encode_windows_in_parallel-worker", 4);
+
         for (int32_t i = start; i < end; ++i) {
             const auto& window = windows[i];
             const std::string& name = draft_lens[window.seq_id].first;
@@ -669,6 +697,8 @@ std::vector<Window> create_windows_from_regions(
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap) {
+    utils::ScopedProfileRange spr1("create_windows_from_regions", 2);
+
     std::vector<Window> windows;
 
     for (auto region : regions) {
@@ -715,6 +745,8 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data) {
+    utils::ScopedProfileRange spr1("sample_producer", 2);
+
     spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
@@ -823,25 +855,33 @@ void sample_producer(PolisherResources& resources,
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               const std::vector<c10::optional<c10::Stream>>& streams,
                                const EncoderBase& encoder) {
+    utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
+
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
     auto batch_infer = [&encoder](ModelTorchBase& model, const InferenceData& batch,
                                   const int32_t tid) {
-        utils::ScopedProfileRange infer("infer", 1);
+        utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         timer::TimerHighRes timer_collate;
-        std::vector<torch::Tensor> batch_features;
-        batch_features.reserve(std::size(batch.samples));
-        for (const auto& sample : batch.samples) {
-            batch_features.emplace_back(sample.features);
+        torch::Tensor batch_features_tensor;
+        int64_t time_collate = 0;
+        {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-collate", 4);
+            std::vector<torch::Tensor> batch_features;
+            batch_features.reserve(std::size(batch.samples));
+            for (const auto& sample : batch.samples) {
+                batch_features.emplace_back(sample.features);
+            }
+            batch_features_tensor = encoder.collate(std::move(batch_features));
+            time_collate = timer_collate.GetElapsedMilliseconds();
         }
-        torch::Tensor batch_features_tensor = encoder.collate(std::move(batch_features));
-        const int64_t time_collate = timer_collate.GetElapsedMilliseconds();
 
         // Debug output.
         {
@@ -857,30 +897,56 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         }
 
         // Inference.
-        timer::TimerHighRes timer_forward;
         torch::Tensor output;
-        try {
-            output = model.predict_on_batch(std::move(batch_features_tensor));
-        } catch (std::exception& e) {
-            spdlog::error("ERROR! Exception caught: {}", e.what());
-            throw;
+        timer::TimerHighRes timer_forward;
+
+        {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-infer", 4);
+
+            std::unique_lock<std::mutex> lock;
+
+#if DORADO_CUDA_BUILD
+            if (model.get_device() == torch::kCUDA) {
+                lock = dorado::utils::acquire_gpu_lock(model.get_device().index(), true);
+            }
+#endif
+
+            try {
+                output = model.predict_on_batch(std::move(batch_features_tensor));
+            } catch (std::exception& e) {
+                spdlog::error("ERROR! Exception caught: {}", e.what());
+                throw;
+            }
         }
-        const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
 
-        const int64_t time_total = timer_total.GetElapsedMilliseconds();
+        // Debug output.
+        {
+            const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
+            const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-        spdlog::trace(
-                "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} ms, "
-                "total = {}",
-                tid, time_collate, time_forward, time_total);
+            spdlog::trace(
+                    "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} "
+                    "ms, "
+                    "total = {}",
+                    tid, time_collate, time_forward, time_total);
+        }
 
         return output;
     };
 
-    const auto worker = [&](const int32_t tid) {
+    const auto worker = [&](const int32_t tid, ModelTorchBase& model,
+                            [[maybe_unused]] const c10::optional<c10::Stream>& stream) {
+        utils::ScopedProfileRange spr2("infer_samples_in_parallel-worker", 3);
+
+#if DORADO_CUDA_BUILD
+        c10::cuda::OptionalCUDAStreamGuard guard(stream);
+#endif
+
         at::InferenceMode infer_guard;
 
         while (true) {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-worker-while", 4);
+
             spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
                           std::size(batch_queue));
 
@@ -899,7 +965,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 
             // Inference.
-            torch::Tensor logits = batch_infer(*models[tid], item, tid);
+            torch::Tensor logits = batch_infer(model, item, tid);
 
             // One out_item contains samples for one inference batch.
             // No guarantees on any sort of logical ordering of the samples.
@@ -924,7 +990,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid));
+        futures.emplace_back(pool.push(worker, tid, std::ref(*models[tid]), streams[tid]));
     }
 
     try {
@@ -948,11 +1014,13 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data) {
+    utils::ScopedProfileRange spr1("decode_samples_in_parallel", 2);
+
     auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
                                                              const int32_t tid) {
-        utils::ScopedProfileRange scope_decode("decode", 1);
-        timer::TimerHighRes timer_total;
+        utils::ScopedProfileRange spr2("decode_samples_in_parallel-batch_decode", 3);
 
+        timer::TimerHighRes timer_total;
         timer::TimerHighRes timer_decode;
 
         // Decode output to bases and qualities.
@@ -1060,9 +1128,12 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 
     const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results,
                             std::vector<VariantCallingSample>& thread_vc_data) {
+        utils::ScopedProfileRange spr2("decode_samples_in_parallel-worker", 3);
         at::InferenceMode infer_guard;
 
         while (true) {
+            utils::ScopedProfileRange spr3("decode_samples_in_parallel-worker-while", 4);
+
             DecodeData item;
             const auto pop_status = decode_queue.try_pop(item);
 
