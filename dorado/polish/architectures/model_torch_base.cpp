@@ -31,13 +31,14 @@ torch::Tensor ModelTorchBase::predict_on_batch(torch::Tensor x) {
     if (m_half_precision) {
         x = x.to(torch::kHalf);
     }
-    x = forward(std::move(x)).detach().cpu();
+    x = forward(std::move(x));
     if (m_half_precision) {
         x = x.to(torch::kFloat);
     }
     if (m_normalise) {
         x = torch::softmax(x, -1);
     }
+    x = x.cpu();
     return x;
 }
 

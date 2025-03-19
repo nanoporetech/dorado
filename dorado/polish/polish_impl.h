@@ -42,6 +42,7 @@ struct PolisherResources {
     std::vector<BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<ModelTorchBase>> models;
+    std::vector<c10::optional<c10::Stream>> streams;
 };
 
 struct BamInfo {
@@ -77,7 +78,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
-                                   const int32_t num_inference_cpu_threads,
+                                   const int32_t num_inference_threads,
                                    const bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
@@ -184,6 +185,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               const std::vector<c10::optional<c10::Stream>>& streams,
                                const EncoderBase& encoder);
 
 void sample_producer(PolisherResources& resources,

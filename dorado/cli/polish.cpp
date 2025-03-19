@@ -78,7 +78,6 @@ struct Options {
     int32_t verbosity = 0;
     int32_t threads = 0;
     int32_t infer_threads = 1;
-    bool infer_threads_is_set = false;
     std::string device_str;
     int32_t batch_size = 16;
     int64_t draft_batch_size = 200'000'000;
@@ -163,8 +162,12 @@ ParserPtr create_cli(int& verbosity) {
                 .scan<'i', int>();
 
         parser->visible.add_argument("--infer-threads")
-                .help("Number of threads for CPU inference")
+                .help("Number of threads for inference")
+#if DORADO_CUDA_BUILD
+                .default_value(2)
+#else
                 .default_value(1)
+#endif
                 .scan<'i', int>();
 
         parser->visible.add_argument("-x", "--device")
@@ -321,7 +324,6 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : (opt.threads);
 
     opt.infer_threads = parser.visible.get<int>("infer-threads");
-    opt.infer_threads_is_set = parser.visible.is_used("--infer-threads");
 
     opt.device_str = parser.visible.get<std::string>("device");
 
@@ -453,13 +455,6 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
 
-    if ((opt.device_str != "cpu") && opt.infer_threads_is_set) {
-        spdlog::error(
-                "Specifying the number of CPU inference threads is only allowed when the device is "
-                "set to 'cpu'.");
-        std::exit(EXIT_FAILURE);
-    }
-
     if (opt.queue_size <= 0) {
         spdlog::error("Queue size needs to be > 0, given: {}.", opt.queue_size);
         std::exit(EXIT_FAILURE);
@@ -506,6 +501,8 @@ std::vector<std::vector<polisher::ConsensusResult>> construct_consensus_seqs(
         const bool fill_gaps,
         const std::optional<char>& fill_char,
         hts_io::FastxRandomReader& draft_reader) {
+    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
+
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
@@ -1055,101 +1052,119 @@ void run_polishing(const Options& opt,
                           polisher::region_to_string(region_batch[i]));
         }
 
-        // Split the sequences into larger BAM windows, like Medaka.
-        // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
-        spdlog::debug("Creating BAM windows.");
-        const std::vector<polisher::Window> bam_regions = polisher::create_windows_from_regions(
-                region_batch, draft_lookup, opt.bam_chunk, opt.window_overlap);
-
-        spdlog::debug(
-                "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
-                "(number: {}, total "
-                "length: {:.2f} Mbp)",
-                batch_interval.start, batch_interval.end, std::size(input_regions),
-                std::size(region_batch), batch_bases / (1000.0 * 1000.0));
-
-        // Update the tracker title.
-        {
-            std::ostringstream oss;
-            oss << batch_interval.start << "-" << batch_interval.end << "/"
-                << std::size(input_regions) << ", bases: " << batch_bases;
-            tracker.set_description("Polishing draft sequences: " + oss.str());
-        }
-
-        // Each item is one batch for inference.
-        utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
-        utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
         std::vector<polisher::ConsensusResult> all_results_cons;
         std::vector<polisher::VariantCallingSample> vc_input_data;
 
-        std::thread thread_sample_producer =
-                std::thread(&polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
-                            std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
-                            opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
+        // Profiling block.
+        {
+            utils::ScopedProfileRange spr1("run-prep_infer_decode", 1);
 
-        std::thread thread_sample_decoder = std::thread(
-                &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
-                std::cref(*resources.decoder), opt.threads, opt.min_depth, opt.run_variant_calling);
+            // Split the sequences into larger BAM windows, like Medaka.
+            // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
+            spdlog::debug("Creating BAM windows.");
+            const std::vector<polisher::Window> bam_regions = polisher::create_windows_from_regions(
+                    region_batch, draft_lookup, opt.bam_chunk, opt.window_overlap);
 
-        polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                            *resources.encoder);
+            spdlog::debug(
+                    "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
+                    "(number: {}, total "
+                    "length: {:.2f} Mbp)",
+                    batch_interval.start, batch_interval.end, std::size(input_regions),
+                    std::size(region_batch), batch_bases / (1000.0 * 1000.0));
 
-        if (thread_sample_producer.joinable()) {
-            thread_sample_producer.join();
-        }
+            // Update the tracker title.
+            {
+                std::ostringstream oss;
+                oss << batch_interval.start << "-" << batch_interval.end << "/"
+                    << std::size(input_regions) << ", bases: " << batch_bases;
+                tracker.set_description("Polishing draft sequences: " + oss.str());
+            }
 
-        if (thread_sample_decoder.joinable()) {
-            thread_sample_decoder.join();
-        }
+            // Each item is one batch for inference.
+            utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
+            utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
 
-        // Round the counter, in case some samples were dropped.
-        total_batch_bases += batch_bases;
-        polish_stats.set("processed", static_cast<double>(total_batch_bases));
+            std::thread thread_sample_producer = std::thread(
+                    &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
+                    std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
+                    opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
 
-        spdlog::debug(
-                "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
-                "length: {:.2f} Mbp), parts: {}",
-                batch_interval.start, batch_interval.end, std::size(input_regions),
-                std::size(region_batch), batch_bases / (1000.0 * 1000.0),
-                std::size(all_results_cons));
+            std::thread thread_sample_decoder =
+                    std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
+                                std::ref(vc_input_data), std::ref(decode_queue),
+                                std::ref(polish_stats), std::cref(*resources.decoder), opt.threads,
+                                opt.min_depth, opt.run_variant_calling);
 
-        spdlog::debug("Data for variant calling: num elements = {}, num consensus results = {}",
-                      std::size(vc_input_data), std::size(all_results_cons));
+            polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
+                                                resources.streams, *resources.encoder);
 
-        // Construct the consensus sequences, only if they will be written.
-        if (opt.write_consensus) {
-            const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                    construct_consensus_seqs(batch_interval, all_results_cons, draft_lens,
-                                             opt.fill_gaps, opt.fill_char, *draft_readers.front());
+            if (thread_sample_producer.joinable()) {
+                thread_sample_producer.join();
+            }
 
-            // Write the consensus file.
-            for (const auto& consensus : consensus_seqs) {
-                write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
-                                        (opt.out_format == OutputFormat::FASTQ));
+            if (thread_sample_decoder.joinable()) {
+                thread_sample_decoder.join();
             }
         }
 
-        // Run variant calling, optionally.
-        if (opt.run_variant_calling) {
-            std::vector<polisher::Variant> variants = call_variants(
-                    batch_interval, vc_input_data, draft_readers, draft_lens, *resources.decoder,
-                    opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
-                    polish_stats);
+        // Profiling block.
+        {
+            utils::ScopedProfileRange spr1("run-post_infer", 1);
 
-            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
-                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-            });
-
-            // Write the VCF file.
-            for (const auto& variant : variants) {
-                vcf_writer->write_variant(variant);
-            }
-
-            // We approximate the progress by expecting 2x bases to be processed
-            // when doing variant calling.
+            // Round the counter, in case some samples were dropped.
             total_batch_bases += batch_bases;
             polish_stats.set("processed", static_cast<double>(total_batch_bases));
+
+            spdlog::debug(
+                    "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
+                    "length: {:.2f} Mbp), parts: {}",
+                    batch_interval.start, batch_interval.end, std::size(input_regions),
+                    std::size(region_batch), batch_bases / (1000.0 * 1000.0),
+                    std::size(all_results_cons));
+
+            spdlog::debug("Data for variant calling: num elements = {}, num consensus results = {}",
+                          std::size(vc_input_data), std::size(all_results_cons));
+
+            // Construct the consensus sequences, only if they will be written.
+            if (opt.write_consensus) {
+                utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
+
+                const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
+                        construct_consensus_seqs(batch_interval, all_results_cons, draft_lens,
+                                                 opt.fill_gaps, opt.fill_char,
+                                                 *draft_readers.front());
+
+                // Write the consensus file.
+                for (const auto& consensus : consensus_seqs) {
+                    write_consensus_results(*ofs_consensus, consensus, opt.fill_gaps,
+                                            (opt.out_format == OutputFormat::FASTQ));
+                }
+            }
+
+            // Run variant calling, optionally.
+            if (opt.run_variant_calling) {
+                utils::ScopedProfileRange spr2("run-variant_calling", 2);
+
+                std::vector<polisher::Variant> variants = call_variants(
+                        batch_interval, vc_input_data, draft_readers, draft_lens,
+                        *resources.decoder, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
+                        opt.threads, polish_stats);
+
+                std::sort(std::begin(variants), std::end(variants),
+                          [](const auto& a, const auto& b) {
+                              return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+                          });
+
+                // Write the VCF file.
+                for (const auto& variant : variants) {
+                    vcf_writer->write_variant(variant);
+                }
+
+                // We approximate the progress by expecting 2x bases to be processed
+                // when doing variant calling.
+                total_batch_bases += batch_bases;
+                polish_stats.set("processed", static_cast<double>(total_batch_bases));
+            }
         }
     }
 }
