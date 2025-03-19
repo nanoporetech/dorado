@@ -190,7 +190,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         auto header_records = cut.get_sequence_records_for_header();
         CATCH_CHECK(header_records.size() == 5);
         for (size_t i = 0; i < header_records.size(); ++i) {
-            CATCH_CHECK(std::string(header_records[i].first) == "read" + std::to_string(i + 1));
+            CATCH_CHECK(header_records[i].first == ("read" + std::to_string(i + 1)));
             CATCH_CHECK(header_records[i].second == 10000u);
         }
     }
@@ -208,7 +208,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         for (int i = 2; i < 6; ++i) {
             CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
             header_records = cut.get_sequence_records_for_header();
-            CATCH_CHECK(std::string(header_records[0].first) == "read" + std::to_string(i));
+            CATCH_CHECK(header_records[0].first == ("read" + std::to_string(i)));
             CATCH_CHECK(header_records[0].second == 10000u);
         }
         CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::end_of_index);

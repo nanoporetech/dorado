@@ -72,26 +72,69 @@ void add_sa_tag(bam1_t* record,
     }
 }
 
-void make_supplementary(dorado::AlignmentResult& alignment) {
-    alignment.supplementary_alignment = true;
-    // The flags field is the second one in the SAM string. We need to adjust it.
-    std::istringstream in(alignment.sam_string);
-    std::ostringstream out;
-    int k = 0;
-    std::string field;
-    while (std::getline(in, field, '\t')) {
-        if (k == 1) {
-            auto flags = unsigned(atoi(field.c_str()));
-            flags |= BAM_FSUPPLEMENTARY;
-            field = std::to_string(flags);
-        }
-        if (k > 0) {
-            out << '\t';
-        }
-        out << field;
-        ++k;
+size_t find_next_tab(const std::string& str, size_t pos) {
+    auto p = str.find('\t', pos);
+    if (p == std::string::npos) {
+        throw std::runtime_error("Error parsing SAM string.");
     }
-    alignment.sam_string = out.str();
+    return p;
+}
+
+void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool first_block) {
+    if (!first_block) {
+        // All primary and supplemental alignments that aren't from the first block should
+        // be marked as secondary alignments.
+        alignment.supplementary_alignment = false;
+        alignment.secondary_alignment = true;
+    }
+    std::string out;
+    out.reserve(alignment.sam_string.size() +
+                3);  // flags field could potentially go from 1 digit to 4.
+
+    // The FLAG field is the 2nd field.
+    auto p1 = find_next_tab(alignment.sam_string, 0);
+    out = alignment.sam_string.substr(0, p1 + 1);
+    auto p2 = find_next_tab(alignment.sam_string, p1 + 1);
+    if (first_block) {
+        out += alignment.sam_string.substr(p1 + 1, p2 - p1 - 1);
+    } else {
+        auto flag_field = alignment.sam_string.substr(p1 + 1, p2 - p1 - 1);
+        auto flags = unsigned(atoi(flag_field.c_str()));
+        flags |= BAM_FSECONDARY;
+        flags &= ~BAM_FSUPPLEMENTARY;
+        out += std::to_string(flags);
+    }
+    if (new_mapq == -1) {
+        // Keep the existing mapq value.
+        out += alignment.sam_string.substr(p2);
+    } else {
+        // The MAPQ field is the 5th field.
+        auto p3 = find_next_tab(alignment.sam_string, p2 + 1);
+        auto p4 = find_next_tab(alignment.sam_string, p3 + 1);
+        auto p5 = find_next_tab(alignment.sam_string, p4 + 1);
+        out += alignment.sam_string.substr(p2, p4 - p2 + 1);
+        out += std::to_string(new_mapq);
+        out += alignment.sam_string.substr(p5);
+    }
+    alignment.sam_string.swap(out);
+}
+
+int compute_mapq(size_t num_alignments) {
+    // Return -1 if there is only 1 alignment. This means don't replace the mapq value.
+    if (num_alignments < 2) {
+        return -1;
+    }
+    // This gives -10*log(1 - 1/N), rounded to the nearest integer.
+    if (num_alignments == 2) {
+        return 3;
+    }
+    if (num_alignments < 4) {
+        return 2;
+    }
+    if (num_alignments < 10) {
+        return 1;
+    }
+    return 0;
 }
 
 }  // namespace
@@ -102,9 +145,6 @@ namespace dorado::alignment {
 const std::string UNMAPPED_SAM_LINE_STRIPPED{"\t4\t*\t0\t0\t*\t*\t0\t0\n"};
 
 std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbuf_t* buf) {
-    // This function should only be used when either the index is not split, or a split
-    // index is being loaded incrementally. In either case, the Minimap2Aligner object will
-    // contain only a single entry in m_minimap_indexes.
     if (m_minimap_index->num_loaded_index_blocks() != 1) {
         throw std::logic_error(
                 "Minimap2Aligner::get_mapping() called on fully-loaded split index.");
@@ -124,8 +164,6 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
 }
 
 std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
-    std::vector<BamPtr> all_records{};
-
     // strip any existing alignment metadata from the read
     utils::remove_alignment_tags_from_record(irecord);
 
@@ -133,60 +171,83 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     size_t best_index = 0;
     std::vector<size_t> all_primaries;
     bool alignment_found = false;
-    auto num_index_blocks = m_minimap_index->num_loaded_index_blocks();
+    const size_t num_index_blocks = m_minimap_index->num_loaded_index_blocks();
+    std::vector<std::vector<BamPtr>> block_records(num_index_blocks);
     for (size_t i = 0; i < num_index_blocks; ++i) {
         auto records = align_impl(irecord, buf, int(i));
-        for (size_t j = 0; j < records.size(); ++j) {
-            auto score = records[j]->core.qual;
-            auto flags = records[j]->core.flag;
+        for (auto& record : records) {
+            const uint16_t flags = record->core.flag;
             if ((flags & BAM_FUNMAP) == 0) {
                 alignment_found = true;
             }
-            if ((flags & BAM_FSECONDARY) == 0 && (flags & BAM_FSUPPLEMENTARY) == 0) {
-                all_primaries.push_back(all_records.size());
+            if (((flags & BAM_FSECONDARY) == 0) && ((flags & BAM_FSUPPLEMENTARY) == 0)) {
+                auto score_tag = bam_aux_get(record.get(), "AS");
+                const int score = (score_tag) ? bam_aux2i(score_tag) : 0;
                 if (score > best_score) {
                     best_score = score;
-                    best_index = all_records.size();
+                    best_index = i;
                 }
             }
-            all_records.emplace_back(std::move(records[j]));
         }
+        block_records[i].swap(records);
     }
-    // We can only have one primary alignment. Set the supplementary flag for
-    // all but the best primary alignments.
-    const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
-    for (auto i : all_primaries) {
-        if (i != best_index) {
-            all_records[i]->core.flag |= BAM_FSUPPLEMENTARY;
-            if (!softclipping_on) {
-                // Remove MM/ML/MN tags
-                if (auto tag = bam_aux_get(all_records[i].get(), "MM"); tag != nullptr) {
-                    bam_aux_del(all_records[i].get(), tag);
-                }
-                if (auto tag = bam_aux_get(all_records[i].get(), "ML"); tag != nullptr) {
-                    bam_aux_del(all_records[i].get(), tag);
-                }
-                if (auto tag = bam_aux_get(all_records[i].get(), "MN"); tag != nullptr) {
-                    bam_aux_del(all_records[i].get(), tag);
-                }
-            }
-        }
+    // Make the block with the best primary alignment the first one.
+    if (best_index != 0) {
+        block_records[0].swap(block_records[best_index]);
     }
 
     // Get rid of any spurious unmapped records.
-    std::vector<BamPtr> filtered_records;
+    size_t total_count = 0;
     if (alignment_found) {
-        // Remove all unmapped records.
-        for (auto& record : all_records) {
-            if ((record->core.flag & BAM_FUNMAP) == 0) {
-                filtered_records.emplace_back(std::move(record));
+        for (auto& records : block_records) {
+            std::vector<BamPtr> filtered_records;
+            for (auto& record : records) {
+                if ((record->core.flag & BAM_FUNMAP) == 0) {
+                    filtered_records.emplace_back(std::move(record));
+                    total_count++;
+                }
             }
+            records.swap(filtered_records);
         }
     } else {
-        // We can just keep the first record.
-        filtered_records.emplace_back(std::move(all_records[0]));
+        // Just keep the first block, which will only have one record.
+        block_records.resize(1);
+        total_count = 1;
     }
-    return filtered_records;
+
+    // We can only have one primary alignment. Make all other primary alignments, and all supplementary
+    // alignments that aren't in the first block, secondary.
+    std::vector<BamPtr> final_records;
+    const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
+    int new_mapq = compute_mapq(total_count);
+    bool first_block = true;
+    for (auto& records : block_records) {
+        for (auto& record : records) {
+            if (!first_block) {
+                record->core.flag |= BAM_FSECONDARY;
+                record->core.flag &= ~BAM_FSUPPLEMENTARY;
+                if (!softclipping_on) {
+                    // Remove MM/ML/MN tags
+                    if (auto tag = bam_aux_get(record.get(), "MM"); tag != nullptr) {
+                        bam_aux_del(record.get(), tag);
+                    }
+                    if (auto tag = bam_aux_get(record.get(), "ML"); tag != nullptr) {
+                        bam_aux_del(record.get(), tag);
+                    }
+                    if (auto tag = bam_aux_get(record.get(), "MN"); tag != nullptr) {
+                        bam_aux_del(record.get(), tag);
+                    }
+                }
+            }
+            if (new_mapq != -1) {
+                record->core.qual = uint8_t(new_mapq);
+            }
+            final_records.emplace_back(std::move(record));
+        }
+        first_block = false;
+    }
+
+    return final_records;
 }
 
 std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf, int idx_no) {
@@ -379,9 +440,9 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
 void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
-    auto num_index_blocks = m_minimap_index->num_loaded_index_blocks();
-    std::vector<std::pair<size_t, int>> primaries(num_index_blocks);
-    std::vector<AlignmentResult> all_results;
+    const size_t num_index_blocks = m_minimap_index->num_loaded_index_blocks();
+    std::vector<std::vector<AlignmentResult>> block_results(num_index_blocks);
+    std::vector<int> scores(num_index_blocks);
     bool alignment_found = false;
     for (size_t i = 0; i < num_index_blocks; ++i) {
         auto results = align_impl(read_common, alignment_header, buffer, int(i));
@@ -390,42 +451,59 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                 alignment_found = true;
             }
             if (j == 0) {
-                primaries[i] = {all_results.size(), results[j].mapping_quality};
+                scores[i] = results[j].strand_score;
             }
-            all_results.emplace_back(std::move(results[j]));
         }
+        block_results[i].swap(results);
     }
 
-    // We need to put the best primary alignment first, and make the others supplementary.
+    // We need to put the best primary alignment first.
     int best_score = 0;
     size_t best_index = 0;
-    for (size_t i = 0; i < primaries.size(); ++i) {
-        if (primaries[i].second > best_score) {
-            best_score = primaries[i].second;
-            best_index = primaries[i].first;
+    for (size_t i = 0; i < num_index_blocks; ++i) {
+        if (scores[i] > best_score) {
+            best_score = scores[i];
+            best_index = i;
         }
     }
     if (best_index != 0) {
-        std::swap(all_results[0], all_results[best_index]);
-    }
-    for (size_t i = 0; i < primaries.size(); ++i) {
-        if (primaries[i].first == 0) {
-            continue;
-        }
-        make_supplementary(all_results[primaries[i].first]);
+        std::swap(block_results[0], block_results[best_index]);
     }
 
     // We need to remove any spurious unmapped results.
+    size_t total_count = 0;
     if (alignment_found) {
-        // We can skip any unmapped records.
-        for (size_t i = 0; i < all_results.size(); ++i) {
-            if (all_results[i].genome != "*") {
-                read_common.alignment_results.emplace_back(std::move(all_results[i]));
+        for (auto& results : block_results) {
+            std::vector<AlignmentResult> filtered_results;
+            // We can skip any unmapped records.
+            for (auto& result : results) {
+                if (result.genome != "*") {
+                    filtered_results.emplace_back(std::move(result));
+                    total_count++;
+                }
             }
+            results.swap(filtered_results);
         }
     } else {
-        // We can just include the first record.
-        read_common.alignment_results.emplace_back(std::move(all_results[0]));
+        // We can just include the first block of results, which will only have 1 result.
+        block_results.resize(1);
+        total_count = 1;
+    }
+
+    // Mark all alignments that aren't from the first block as secondary.
+    bool first_block = true;
+    const int new_mapq = compute_mapq(total_count);
+    for (auto& results : block_results) {
+        for (auto& result : results) {
+            update_read_record(result, new_mapq, first_block);
+        }
+        first_block = false;
+    }
+
+    for (auto& results : block_results) {
+        for (auto& result : results) {
+            read_common.alignment_results.emplace_back(std::move(result));
+        }
     }
 }
 

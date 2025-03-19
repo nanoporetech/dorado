@@ -260,7 +260,7 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto ref = aligner_test_dir / "split_reference_target.fa";
     auto query = aligner_test_dir / "split_reference_query.fa";
 
-    auto options = dorado::alignment::create_preset_options("-I 4000");
+    auto options = dorado::alignment::create_options("-I 4K");
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     CATCH_REQUIRE(bam_records.size() == 5);
@@ -278,7 +278,7 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     const auto& flags1 = flag_lut.at(read_ids[0]);
     CATCH_REQUIRE(flags1.size() == 2);
     CATCH_CHECK(flags1[0] == 0);
-    CATCH_CHECK((flags1[1] & BAM_FSUPPLEMENTARY) != 0);
+    CATCH_CHECK((flags1[1] & BAM_FSECONDARY) != 0);
 
     // Second read should align only to segment2.
     const auto& flags2 = flag_lut.at(read_ids[1]);
@@ -289,7 +289,7 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     const auto& flags3 = flag_lut.at(read_ids[2]);
     CATCH_REQUIRE(flags3.size() == 2);
     CATCH_CHECK(flags3[0] == 0);
-    CATCH_CHECK((flags3[1] & BAM_FSUPPLEMENTARY) != 0);
+    CATCH_CHECK((flags3[1] & BAM_FSECONDARY) != 0);
 }
 
 CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,

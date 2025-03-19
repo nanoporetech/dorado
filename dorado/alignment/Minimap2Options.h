@@ -45,6 +45,7 @@ struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOpti
 bool operator==(const Minimap2Options& l, const Minimap2Options& r);
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r);
 
+Minimap2Options create_options(const std::string& opt_str);
 Minimap2Options create_dflt_options();  // the default preset is "lr:hq"
 Minimap2Options create_preset_options(const std::string& preset);
 

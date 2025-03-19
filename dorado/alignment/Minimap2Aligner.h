@@ -27,7 +27,11 @@ public:
                const std::string& alignment_header,
                mm_tbuf_t* buf);
 
-    /// Get the mapping details from a single alignment. This should only be
+    /** Get the mapping details from a single alignment.
+     *  This function should only be used when either the index is not split, or a split
+     *  index is being loaded incrementally. In either case, the Minimap2Aligner object will
+     *  contain only a single entry in m_minimap_indexes.
+     */
     std::tuple<mm_reg1_t*, int> get_mapping(bam1_t* record, mm_tbuf_t* buf);
 
     /// This will combine the sequence records from all blocks of a split-index.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace dorado::alignment {
@@ -8,7 +9,7 @@ namespace dorado::alignment {
 /// <summary>
 /// Collection of sequence record name/length pairs
 /// </summary>
-using HeaderSequenceRecords = std::vector<std::pair<char *, uint32_t>>;
+using HeaderSequenceRecords = std::vector<std::pair<std::string, uint32_t>>;
 
 /// <summary>
 /// Possible results when loading an index file.

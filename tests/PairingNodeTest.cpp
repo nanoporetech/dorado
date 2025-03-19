@@ -58,6 +58,7 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     dorado::utils::FastaReader fa_reader(fa_file.string());
     auto record = fa_reader.try_get_next_record();
     record = fa_reader.try_get_next_record();  // Skip the first sequence and use the second one.
+    CATCH_REQUIRE(record.has_value());
     const std::string seq = record->sequence();
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));

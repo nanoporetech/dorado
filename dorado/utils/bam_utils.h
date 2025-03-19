@@ -15,7 +15,7 @@ namespace dorado::utils {
 
 class SampleSheet;
 
-using sq_t = std::vector<std::pair<char*, uint32_t>>;
+using sq_t = std::vector<std::pair<std::string, uint32_t>>;
 
 struct AlignmentOps {
     size_t softclip_start;

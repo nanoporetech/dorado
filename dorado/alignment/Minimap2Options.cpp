@@ -85,6 +85,8 @@ bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
 
+Minimap2Options create_options(const std::string& opts) { return mm2::parse_options(opts); }
+
 Minimap2Options create_dflt_options() { return mm2::parse_options(""); }
 
 Minimap2Options create_preset_options(const std::string& preset) {

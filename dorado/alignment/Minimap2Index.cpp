@@ -190,10 +190,11 @@ void Minimap2Index::add_index(std::shared_ptr<const mm_idx_t> index) {
 }
 
 HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {
-    std::vector<std::pair<char*, uint32_t>> records;
-    for (size_t i = 0; i < m_indexes.size(); ++i) {
-        for (uint32_t j = 0; j < m_indexes[i]->n_seq; ++j) {
-            records.push_back(std::make_pair(m_indexes[i]->seq[j].name, m_indexes[i]->seq[j].len));
+    HeaderSequenceRecords records;
+    for (const auto& index : m_indexes) {
+        for (uint32_t j = 0; j < index->n_seq; ++j) {
+            records.emplace_back(
+                    std::make_pair(std::string(index->seq[j].name), index->seq[j].len));
         }
     }
     return records;
