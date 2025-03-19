@@ -199,17 +199,19 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // Get rid of any spurious unmapped records.
     size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
     if (alignment_found) {
+        bool first_block = true;
         for (auto& records : block_records) {
             std::vector<BamPtr> filtered_records;
             for (auto& record : records) {
                 if ((record->core.flag & BAM_FUNMAP) == 0) {
-                    if ((record->core.flag & BAM_FSUPPLEMENTARY) == 0) {
+                    if (!first_block || ((record->core.flag & BAM_FSUPPLEMENTARY) == 0)) {
                         non_sup_count++;
                     }
                     filtered_records.emplace_back(std::move(record));
                 }
             }
             records.swap(filtered_records);
+            first_block = false;
         }
     } else {
         // Just keep the first block, which will only have one record.
@@ -474,18 +476,20 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
     // We need to remove any spurious unmapped results.
     size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
     if (alignment_found) {
+        bool first_block = true;
         for (auto& results : block_results) {
             std::vector<AlignmentResult> filtered_results;
             // We can skip any unmapped records.
             for (auto& result : results) {
                 if (result.genome != "*") {
-                    if (!result.supplementary_alignment) {
+                    if (!first_block || !result.supplementary_alignment) {
                         non_sup_count++;
                     }
                     filtered_results.emplace_back(std::move(result));
                 }
             }
             results.swap(filtered_results);
+            first_block = false;
         }
     } else {
         // We can just include the first block of results, which will only have 1 result.
