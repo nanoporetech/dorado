@@ -120,7 +120,7 @@ void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool f
 }
 
 int compute_mapq(size_t num_alignments) {
-    // Return -1 if there is only 1 alignment. This means don't replace the mapq value.
+    // Return -1 if there are less than 2 alignments. This means don't replace the mapq value.
     if (num_alignments < 2) {
         return -1;
     }
@@ -197,14 +197,16 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     }
 
     // Get rid of any spurious unmapped records.
-    size_t total_count = 0;
+    size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
     if (alignment_found) {
         for (auto& records : block_records) {
             std::vector<BamPtr> filtered_records;
             for (auto& record : records) {
                 if ((record->core.flag & BAM_FUNMAP) == 0) {
+                    if ((record->core.flag & BAM_FSUPPLEMENTARY) == 0) {
+                        non_sup_count++;
+                    }
                     filtered_records.emplace_back(std::move(record));
-                    total_count++;
                 }
             }
             records.swap(filtered_records);
@@ -212,14 +214,13 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     } else {
         // Just keep the first block, which will only have one record.
         block_records.resize(1);
-        total_count = 1;
     }
 
     // We can only have one primary alignment. Make all other primary alignments, and all supplementary
     // alignments that aren't in the first block, secondary.
     std::vector<BamPtr> final_records;
     const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
-    int new_mapq = compute_mapq(total_count);
+    int new_mapq = compute_mapq(non_sup_count);
     bool first_block = true;
     for (auto& records : block_records) {
         for (auto& record : records) {
@@ -471,15 +472,17 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
     }
 
     // We need to remove any spurious unmapped results.
-    size_t total_count = 0;
+    size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
     if (alignment_found) {
         for (auto& results : block_results) {
             std::vector<AlignmentResult> filtered_results;
             // We can skip any unmapped records.
             for (auto& result : results) {
                 if (result.genome != "*") {
+                    if (!result.supplementary_alignment) {
+                        non_sup_count++;
+                    }
                     filtered_results.emplace_back(std::move(result));
-                    total_count++;
                 }
             }
             results.swap(filtered_results);
@@ -487,12 +490,11 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
     } else {
         // We can just include the first block of results, which will only have 1 result.
         block_results.resize(1);
-        total_count = 1;
     }
 
     // Mark all alignments that aren't from the first block as secondary.
     bool first_block = true;
-    const int new_mapq = compute_mapq(total_count);
+    const int new_mapq = compute_mapq(non_sup_count);
     for (auto& results : block_results) {
         for (auto& result : results) {
             update_read_record(result, new_mapq, first_block);
