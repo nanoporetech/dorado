@@ -73,7 +73,7 @@ void add_sa_tag(bam1_t* record,
 }
 
 size_t find_next_tab(const std::string& str, size_t pos) {
-    auto p = str.find('\t', pos);
+    const auto p = str.find('\t', pos);
     if (p == std::string::npos) {
         throw std::runtime_error("Error parsing SAM string.");
     }
@@ -167,7 +167,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // strip any existing alignment metadata from the read
     utils::remove_alignment_tags_from_record(irecord);
 
-    int best_score = 0;
+    int64_t best_score = 0;
     size_t best_index = 0;
     std::vector<size_t> all_primaries;
     bool alignment_found = false;
@@ -182,7 +182,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
             if (((flags & BAM_FSECONDARY) == 0) && ((flags & BAM_FSUPPLEMENTARY) == 0)) {
                 auto score_tag = bam_aux_get(record.get(), "AS");
-                const int score = (score_tag) ? bam_aux2i(score_tag) : 0;
+                const int64_t score = (score_tag) ? bam_aux2i(score_tag) : 0;
                 if (score > best_score) {
                     best_score = score;
                     best_index = i;
