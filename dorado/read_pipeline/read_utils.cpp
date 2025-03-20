@@ -152,6 +152,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
     // Trim the signal
     const size_t trim_signal_idx = read_common.moves.size() * read_common.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
+    read_common.attributes.num_samples = read_common.get_raw_data_samples();
 
     spdlog::trace("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
                   sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);

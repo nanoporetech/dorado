@@ -200,11 +200,6 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
             read_common_data.is_rna_model = m_is_rna_model;
 
-            if (m_is_rna_model) {
-                std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
-                std::reverse(read_common_data.qstring.begin(), read_common_data.qstring.end());
-            }
-
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += read_common_data.seq.length();
@@ -215,9 +210,16 @@ void BasecallerNode::working_reads_manager() {
 
             // Do not trim R9.4.1 data to avoid changes to legacy products
             // Check here to avoid adding models lib as a dependency of utils
+            // Needs to be done before we reverse the sequence for RNA, as we want
+            // to trim the end of the read as it passed through the pore
             if (read_common_data.chemistry != models::Chemistry::DNA_R9_4_1_E8) {
                 // Trim reads which are affected by mux change and unblocking
                 utils::mux_change_trim_read(read_common_data);
+            }
+
+            if (m_is_rna_model) {
+                std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
+                std::reverse(read_common_data.qstring.begin(), read_common_data.qstring.end());
             }
 
             // Cleanup the working read.
