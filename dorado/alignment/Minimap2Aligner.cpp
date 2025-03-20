@@ -72,7 +72,7 @@ void add_sa_tag(bam1_t* record,
     }
 }
 
-size_t find_next_tab(const std::string& str, size_t pos) {
+size_t find_next_tab(const std::string_view& str, size_t pos) {
     const auto p = str.find('\t', pos);
     if (p == std::string::npos) {
         throw std::runtime_error("Error parsing SAM string.");
@@ -87,18 +87,18 @@ void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool f
         alignment.supplementary_alignment = false;
         alignment.secondary_alignment = true;
     }
+    std::string_view sam_string(alignment.sam_string);
     std::string out;
-    out.reserve(alignment.sam_string.size() +
-                3);  // flags field could potentially go from 1 digit to 4.
+    out.reserve(sam_string.size() + 3);  // flags field could potentially go from 1 digit to 4.
 
     // The FLAG field is the 2nd field.
-    auto p1 = find_next_tab(alignment.sam_string, 0);
-    out = alignment.sam_string.substr(0, p1 + 1);
-    auto p2 = find_next_tab(alignment.sam_string, p1 + 1);
+    auto p1 = find_next_tab(sam_string, 0);
+    out += sam_string.substr(0, p1 + 1);
+    auto p2 = find_next_tab(sam_string, p1 + 1);
     if (first_block) {
-        out += alignment.sam_string.substr(p1 + 1, p2 - p1 - 1);
+        out += sam_string.substr(p1 + 1, p2 - p1 - 1);
     } else {
-        auto flag_field = alignment.sam_string.substr(p1 + 1, p2 - p1 - 1);
+        std::string flag_field(sam_string.substr(p1 + 1, p2 - p1 - 1));
         auto flags = unsigned(atoi(flag_field.c_str()));
         flags |= BAM_FSECONDARY;
         flags &= ~BAM_FSUPPLEMENTARY;
@@ -106,15 +106,15 @@ void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool f
     }
     if (new_mapq == -1) {
         // Keep the existing mapq value.
-        out += alignment.sam_string.substr(p2);
+        out += sam_string.substr(p2);
     } else {
         // The MAPQ field is the 5th field.
-        auto p3 = find_next_tab(alignment.sam_string, p2 + 1);
-        auto p4 = find_next_tab(alignment.sam_string, p3 + 1);
-        auto p5 = find_next_tab(alignment.sam_string, p4 + 1);
-        out += alignment.sam_string.substr(p2, p4 - p2 + 1);
+        auto p3 = find_next_tab(sam_string, p2 + 1);
+        auto p4 = find_next_tab(sam_string, p3 + 1);
+        auto p5 = find_next_tab(sam_string, p4 + 1);
+        out += sam_string.substr(p2, p4 - p2 + 1);
         out += std::to_string(new_mapq);
-        out += alignment.sam_string.substr(p5);
+        out += sam_string.substr(p5);
     }
     alignment.sam_string.swap(out);
 }
@@ -169,7 +169,6 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     int64_t best_score = 0;
     size_t best_index = 0;
-    std::vector<size_t> all_primaries;
     bool alignment_found = false;
     const size_t num_index_blocks = m_minimap_index->num_loaded_index_blocks();
     std::vector<std::vector<BamPtr>> block_records(num_index_blocks);
