@@ -114,6 +114,7 @@ struct TxEncoderImpl : torch::nn::Module {
     at::Tensor forward(at::Tensor x);
 
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
+    void koi_volta_forward(at::Tensor &x_f16);
 
     config::TxEncoderParams params;
 
@@ -134,6 +135,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
     at::Tensor forward(const at::Tensor &x);
 
     bool use_koi_tiled{false};
+    bool use_koi_volta_tiled{false};
     bool use_i8{false};
     torch::nn::Sequential stack{nullptr};
     std::vector<TxEncoder> layer_vec;

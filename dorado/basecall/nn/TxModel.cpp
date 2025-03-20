@@ -1,4 +1,4 @@
-#include "basecall/nn/TxModel.h"
+#include "TxModel.h"
 
 #include "basecall/nn/CRFModel.h"
 #include "config/BasecallModelConfig.h"
@@ -96,7 +96,6 @@ namespace dorado::basecall {
 
 namespace nn {
 
-using namespace config;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
@@ -435,7 +434,8 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOptions &options)
+TxEncoderImpl::TxEncoderImpl(const config::TxEncoderParams &params_,
+                             const at::TensorOptions &options)
         : params(params_) {
     self_attn =
             register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
@@ -597,7 +597,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
-        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
+        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", true));
         res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
                             use_f32_accum);
     }
@@ -616,6 +616,165 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     // TODO: handle result
     if (res != KOI_SUCCESS) {
         spdlog::error("Koi tiled path failed {}", calls);
+    }
+#endif
+}
+
+void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
+    (void)x_f16;
+#if DORADO_CUDA_BUILD && !DORADO_TX2
+    const int N = static_cast<int>(x_f16.size(0));
+    const int T = static_cast<int>(x_f16.size(1)) * 16;
+    const int C = params.d_model;
+    const int D = params.d_model / params.nhead;
+    const int H = params.nhead;
+    const int E = params.dim_feedforward * 2;  // E = 2048 I think
+    // const auto [win_upper, win_lower] = params.attn_window;
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
+
+    // Flags to use FP32 or FP16 Accumulator tiles. Using FP32 throughout for best possible accuracy
+    bool useFloatAccumQKV = true;
+    // bool useFloatAccumAttn = false; // Not yet implemented the possibility to change between float or fp16 online softmax in attn kernel
+    bool useFloatAccumProj = true;
+    bool useBiasProj = true;
+    // RMSNorm always in F16
+    bool useFloatAccumSwiglu = true;
+    bool useFloatAccumfc2 = true;
+    bool useBiasfc2 = false;
+
+    utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
+    const float alpha = params.deepnorm_alpha;
+
+    auto f16_opts = x_f16.options().dtype(torch::kF16);
+    if (!t_res_weights.numel()) {
+        // Weights for the Q,K and V tensors which will be multiplied with the inputs
+        wqkv_weights_f16.t = torch::empty_like(self_attn->wqkv->weight);
+        // For Q and K weights, we need to take the lower and upper halves of the D dimension
+        // and interleave them
+        auto wqk = self_attn->wqkv->weight.view({3, H, 2, D / 2, C}).slice(0, 0, 2);
+        wqkv_weights_f16.t.view({3, H, D / 2, 2, C}).slice(0, 0, 2) = wqk.transpose(2, 3);
+        wqkv_weights_f16.t = wqkv_weights_f16.t.view({3, H, D, C});
+        // Straight copy of V weights
+        wqkv_weights_f16.t[2] = self_attn->wqkv->weight.view({3, H, D, C})[2];
+
+        wqkv_weights_f16.t = wqkv_weights_f16.t.view({(3 * H * D) / 16, 16, C / 16, 16})
+                                     .permute({0, 2, 1, 3})
+                                     .contiguous();
+
+        //Rotary embedding as a torch tensor
+        auto rot_bfrs = self_attn->rotary_emb->named_buffers();
+        auto max_T = 16 * (rot_bfrs["sin_freqs"].size(0) / 16);
+        sincos_bfr = torch::empty({max_T, D / 2, 2}, f16_opts);
+        sincos_bfr.select(2, 0) = rot_bfrs["sin_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+        sincos_bfr.select(2, 1) = rot_bfrs["cos_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
+        sincos_bfr = sincos_bfr.view({max_T / 16, 2, 8, D / 16, 2, 8})
+                             .permute({0, 3, 4, 1, 2, 5})
+                             .contiguous();  // Very specific layout for this one, sorry
+
+        // proj_weight is the M, N=512, K=512 linear layer. self_attn->out_proj->weight is of layout (N, K)
+        proj_weight = self_attn->out_proj->weight.view({C / 16, 16, C / 16, 16})
+                              .transpose(1, 2)
+                              .contiguous();  // NKnk
+        proj_bias = self_attn->out_proj->bias.view({C});
+
+        // Both RMSNorm weights
+        t_res_weights = norm1->weight.view({C});
+        t_res2_weights = norm2->weight.view({C});
+
+        // Quantize SwiGLU weights, interleave, and rearrange as tiled
+        auto fc1_weight_interleaved = ff->fc1->weight.unflatten(0, {2, -1, 16})
+                                              .transpose(0, 1)
+                                              .contiguous()
+                                              .view({E / 32, 2, 16, C})
+                                              .transpose(1, 2)
+                                              .contiguous();
+
+        t_fc1_wts_f16.t =
+                fc1_weight_interleaved.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+
+        // t_fc2_wts is the M, N=512=C, K=2048 linear layer. ff->fc2->weight is of shape (N, K)
+        t_fc2_wts =
+                ff->fc2->weight.view({C / 16, 16, (E / 2) / 16, 16}).transpose(1, 2).contiguous();
+
+        // TODO: Investigate performance gain/accuracy loss from zeroing lowest mantissa bits in Volta
+    }
+
+    // Output buffers
+    auto qkv = torch::empty({N, T / 16, 3, H, D / 16, 16, 16}, f16_opts);
+    auto t_out_attn = torch::empty({N, T / 16, H, D / 16, 16, 16}, f16_opts);
+    auto t_out_proj = torch::empty({N, T / 16, C / 16, 16, 16}, f16_opts);
+    auto t_out_rms1 = torch::empty({N, T / 16, C / 16, 16, 16}, f16_opts);
+    auto t_fc1_out = torch::empty({N * T / 16, (E / 2) / 16, 16, 16}, f16_opts);
+    auto t_fc2_out = torch::empty({N, T / 16, C / 16, 16, 16}, f16_opts);
+
+    int res = KOI_SUCCESS;
+    int calls = 0;
+    std::stringstream ss;
+    if (res == KOI_SUCCESS && ++calls) {
+        // Fused QKV Matmul Plus Rotary embedding
+        utils::ScopedProfileRange spr("QKV+ROTE Volta", 3);
+        res = koi_volta_qkv_rotary(
+                stream, reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(wqkv_weights_f16.t.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(qkv.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(sincos_bfr.data_ptr<at::Half>()),
+                useFloatAccumQKV,  // This might be a mistake, I am passing a bool when I am C-linking it as an int
+                N * T, T);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Apply window flashattention
+        utils::ScopedProfileRange spr("MEA Volta", 3);
+        res = koi_volta_attn(stream, reinterpret_cast<void *>(qkv.data_ptr<at::Half>()),
+                             reinterpret_cast<void *>(t_out_attn.data_ptr<at::Half>()), N, T);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Koi linear matmul, proj weights (K=512)
+        utils::ScopedProfileRange spr("OUTP Volta", 3);
+        res = koi_volta_linear(stream, reinterpret_cast<void *>(t_out_attn.data_ptr<at::Half>()),
+                               reinterpret_cast<void *>(proj_weight.data_ptr<at::Half>()),
+                               reinterpret_cast<void *>(t_out_proj.data_ptr<at::Half>()),
+                               reinterpret_cast<void *>(proj_bias.data_ptr<at::Half>()),
+                               useFloatAccumProj, useBiasProj, N * T, C);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // RMS residual
+        utils::ScopedProfileRange spr("LNORM1 Volta", 3);
+        res = koi_volta_rmsnorm_residual(
+                stream, reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(t_out_proj.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(t_res_weights.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()), alpha, N * T);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Matmul + SWIGLU
+        utils::ScopedProfileRange spr("FC1+SILU Volta", 3);
+        koi_volta_mm_swiglu(stream, reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()),
+                            reinterpret_cast<void *>(t_fc1_wts_f16.t.data_ptr<at::Half>()),
+                            reinterpret_cast<void *>(t_fc1_out.data_ptr<at::Half>()),
+                            useFloatAccumSwiglu, N * T);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // Koi linear matmul, fc2 weights (K=2048)
+        utils::ScopedProfileRange spr("FC2 Volta", 3);
+        res = koi_volta_linear(stream, reinterpret_cast<void *>(t_fc1_out.data_ptr<at::Half>()),
+                               reinterpret_cast<void *>(t_fc2_wts.data_ptr<at::Half>()),
+                               reinterpret_cast<void *>(t_fc2_out.data_ptr<at::Half>()),
+                               nullptr,  // ! No bias for fc2
+                               useFloatAccumfc2, useBiasfc2, N * T, E / 2);
+    }
+    if (res == KOI_SUCCESS && ++calls) {
+        // RMS Norm Residual again
+        utils::ScopedProfileRange spr("LNORM2 Volta", 3);
+        res = koi_volta_rmsnorm_residual(
+                stream, reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(t_fc2_out.data_ptr<at::Half>()),
+                reinterpret_cast<void *>(t_res2_weights.data_ptr<at::Half>()),
+                // ! Use initial input x_f16 as output buffer for second rmsnorm
+                reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()), alpha, N * T);
+    }
+    // TODO: handle result
+    if (res != KOI_SUCCESS) {
+        spdlog::error("Koi Volta tiled path failed {}", calls);
     }
 #endif
 }
@@ -669,7 +828,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
+TxEncoderStackImpl::TxEncoderStackImpl(const config::TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
@@ -678,6 +837,16 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                     (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
                     (params.dim_feedforward == 2048);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
+
+    // Custom Volta flag
+    use_koi_volta_tiled =
+            (options.device().is_cuda() &&
+             koi_volta_tc_is_available(KOI_F16) ==
+                     KOI_SUCCESS) &&  // ! Passing argument to koi_volta_tc_is_available although not used, if not, function does not C-link properly
+            (params.d_model == 512) &&
+            (params.nhead == 8) && (params.attn_window.first == 127) &&
+            (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    spdlog::debug("TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
 #endif
 
     stack = Sequential();
@@ -692,6 +861,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
 at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     if (use_koi_tiled) {
+        use_i8 = false;
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
         const int C = static_cast<int>(x.size(2));
@@ -725,12 +895,33 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
             untiled_f16 = tiled_f16.transpose(2, 3).contiguous().view({N, T, C});
         }
         return untiled_f16;
+    } else if (use_koi_volta_tiled) {
+        const int N = static_cast<int>(x.size(0));
+        const int T = static_cast<int>(x.size(1));
+        const int C = static_cast<int>(x.size(2));
+
+        at::Tensor tiled_f16;
+        {
+            utils::ScopedProfileRange spr("Tile F16 Volta", 2);
+            tiled_f16 = x.view({N, T / 16, 16, C / 16, 16}).transpose(2, 3).contiguous();
+        }
+
+        for (auto &layer : layer_vec) {
+            layer->koi_volta_forward(tiled_f16);
+        }
+
+        at::Tensor untiled_f16;
+        {
+            utils::ScopedProfileRange spr("Untile F16 Volta", 2);
+            untiled_f16 = tiled_f16.transpose(2, 3).contiguous().view({N, T, C});
+        }
+        return untiled_f16;
     }
 #endif
     return stack->forward(x);
 }
 
-LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
+LinearUpsampleImpl::LinearUpsampleImpl(const config::EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
     linear = register_module(
             "linear",
@@ -745,7 +936,7 @@ at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     return out;
 };
 
-LinearScaledCRFImpl::LinearScaledCRFImpl(const CRFEncoderParams &params) {
+LinearScaledCRFImpl::LinearScaledCRFImpl(const config::CRFEncoderParams &params) {
     m_params = params;
     linear = register_module(
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
@@ -759,7 +950,8 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
     return linear(x);
 }
 
-TxModelImpl::TxModelImpl(const BasecallModelConfig &config, const at::TensorOptions &options)
+TxModelImpl::TxModelImpl(const config::BasecallModelConfig &config,
+                         const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));
