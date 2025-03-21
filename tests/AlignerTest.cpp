@@ -254,6 +254,59 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
 }
 
 CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
+                       "AlignerTest: Check split-index alignment",
+                       TEST_GROUP) {
+    const fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    const auto ref = aligner_test_dir / "split_reference_target.fa";
+    const auto query = aligner_test_dir / "split_reference_query.fa";
+
+    const auto options = dorado::alignment::create_options("-I 4K");
+    dorado::HtsReader reader(query.string(), std::nullopt);
+    auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
+    CATCH_REQUIRE(bam_records.size() == 5);
+
+    std::unordered_map<std::string, std::vector<int>> flag_lut;
+    std::unordered_map<std::string, std::vector<int>> mapq_lut;
+    for (const auto& record : bam_records) {
+        const std::string name = std::string(bam_get_qname(record.get()));
+        flag_lut[name].push_back(record->core.flag);
+        mapq_lut[name].push_back(record->core.qual);
+    }
+
+    std::vector<std::string> read_ids{"035f6ad7-78e2-4569-2492-3e8fe141afc4",
+                                      "3e8fe141-afc4-4569-78e2-035f6ad72567",
+                                      "4a9fe741-aecb-4569-6812-05474657756a"};
+
+    // First read should align to both segment1 and segment3.
+    const auto& flags1 = flag_lut.at(read_ids[0]);
+    const auto& mapqs1 = mapq_lut.at(read_ids[0]);
+    CATCH_REQUIRE(flags1.size() == 2);
+    CATCH_REQUIRE(mapqs1.size() == 2);
+    CATCH_CHECK(flags1[0] == 0);
+    CATCH_CHECK((flags1[1] & BAM_FSECONDARY) != 0);
+    CATCH_CHECK(mapqs1[0] == 3);
+    CATCH_CHECK(mapqs1[1] == 3);
+
+    // Second read should align only to segment2.
+    const auto& flags2 = flag_lut.at(read_ids[1]);
+    const auto& mapqs2 = mapq_lut.at(read_ids[1]);
+    CATCH_REQUIRE(flags2.size() == 1);
+    CATCH_REQUIRE(mapqs2.size() == 1);
+    CATCH_CHECK(flags2[0] == 0);
+    CATCH_CHECK(mapqs2[0] > 3);
+
+    // Third read should align to both segment1 and segement3.
+    const auto& flags3 = flag_lut.at(read_ids[2]);
+    const auto& mapqs3 = mapq_lut.at(read_ids[2]);
+    CATCH_REQUIRE(flags3.size() == 2);
+    CATCH_REQUIRE(mapqs3.size() == 2);
+    CATCH_CHECK(flags3[0] == 0);
+    CATCH_CHECK((flags3[1] & BAM_FSECONDARY) != 0);
+    CATCH_CHECK(mapqs3[0] == 3);
+    CATCH_CHECK(mapqs3[1] == 3);
+}
+
+CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
                        "AlignerTest: Check reverse complement alignment",
                        TEST_GROUP) {
     fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
@@ -375,17 +428,6 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
         auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 2);
         CATCH_CHECK(bam_records.size() == 1);  // Generates 1 alignment.
     }
-}
-
-CATCH_TEST_CASE("AlignerTest: Check AlignerNode crashes if multi index encountered", TEST_GROUP) {
-    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
-    auto ref = aligner_test_dir / "long_target.fa";
-
-    auto options = dorado::alignment::mm2::parse_options("-k 5 -w 5 -I 1K");
-    auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
-    auto bed_file_access = std::make_shared<dorado::alignment::BedFileAccess>();
-    CATCH_CHECK_THROWS(
-            dorado::AlignerNode(index_file_access, bed_file_access, ref.string(), "", options, 1));
 }
 
 CATCH_SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TEST_GROUP) {
