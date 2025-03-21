@@ -73,6 +73,8 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
             vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
 }
 
+}  // namespace
+
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples) {
     const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
@@ -126,6 +128,8 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
     return ret;
 }
+
+namespace {
 
 /**
  * \brief This function restructures the neighboring samples for one draft sequence.
@@ -282,6 +286,8 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 
     return ret;
 }
+
+}  // namespace
 
 Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,
@@ -510,6 +516,8 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 
     return ret;
 }
+
+namespace {
 
 std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                      const VariantCallingSample& vc_sample,
