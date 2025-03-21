@@ -6,6 +6,7 @@
 #include <minimap.h>
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace dorado::alignment {

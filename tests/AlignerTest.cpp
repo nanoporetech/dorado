@@ -256,11 +256,11 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
 CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
                        "AlignerTest: Check split-index alignment",
                        TEST_GROUP) {
-    fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
-    auto ref = aligner_test_dir / "split_reference_target.fa";
-    auto query = aligner_test_dir / "split_reference_query.fa";
+    const fs::path aligner_test_dir = fs::path(get_aligner_data_dir());
+    const auto ref = aligner_test_dir / "split_reference_target.fa";
+    const auto query = aligner_test_dir / "split_reference_query.fa";
 
-    auto options = dorado::alignment::create_options("-I 4K");
+    const auto options = dorado::alignment::create_options("-I 4K");
     dorado::HtsReader reader(query.string(), std::nullopt);
     auto bam_records = RunPipelineWithBamMessages(reader, ref.string(), "", options, 10);
     CATCH_REQUIRE(bam_records.size() == 5);

@@ -8,6 +8,8 @@
 #include <htslib/sam.h>
 #include <minimap.h>
 
+#include <stdexcept>
+
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
 //Ask lh3 t  make some of these funcs publicly available?
 #include <mmpriv.h>
@@ -87,19 +89,19 @@ void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool f
         alignment.supplementary_alignment = false;
         alignment.secondary_alignment = true;
     }
-    std::string_view sam_string(alignment.sam_string);
+    const std::string_view sam_string(alignment.sam_string);
     std::string out;
     out.reserve(sam_string.size() + 3);  // flags field could potentially go from 1 digit to 4.
 
     // The FLAG field is the 2nd field.
-    auto p1 = find_next_tab(sam_string, 0);
+    const size_t p1 = find_next_tab(sam_string, 0);
     out += sam_string.substr(0, p1 + 1);
-    auto p2 = find_next_tab(sam_string, p1 + 1);
+    const size_t p2 = find_next_tab(sam_string, p1 + 1);
     if (first_block) {
         out += sam_string.substr(p1 + 1, p2 - p1 - 1);
     } else {
-        std::string flag_field(sam_string.substr(p1 + 1, p2 - p1 - 1));
-        auto flags = unsigned(atoi(flag_field.c_str()));
+        const std::string flag_field(sam_string.substr(p1 + 1, p2 - p1 - 1));
+        uint32_t flags = uint32_t(atoi(flag_field.c_str()));
         flags |= BAM_FSECONDARY;
         flags &= ~BAM_FSUPPLEMENTARY;
         out += std::to_string(flags);
@@ -109,9 +111,9 @@ void update_read_record(dorado::AlignmentResult& alignment, int new_mapq, bool f
         out += sam_string.substr(p2);
     } else {
         // The MAPQ field is the 5th field.
-        auto p3 = find_next_tab(sam_string, p2 + 1);
-        auto p4 = find_next_tab(sam_string, p3 + 1);
-        auto p5 = find_next_tab(sam_string, p4 + 1);
+        const size_t p3 = find_next_tab(sam_string, p2 + 1);
+        const size_t p4 = find_next_tab(sam_string, p3 + 1);
+        const size_t p5 = find_next_tab(sam_string, p4 + 1);
         out += sam_string.substr(p2, p4 - p2 + 1);
         out += std::to_string(new_mapq);
         out += sam_string.substr(p5);
@@ -125,16 +127,8 @@ int compute_mapq(size_t num_alignments) {
         return -1;
     }
     // This gives -10*log(1 - 1/N), rounded to the nearest integer.
-    if (num_alignments == 2) {
-        return 3;
-    }
-    if (num_alignments < 4) {
-        return 2;
-    }
-    if (num_alignments < 10) {
-        return 1;
-    }
-    return 0;
+    static constexpr std::array<int32_t, 10> lookup{-1, -1, 3, 2, 1, 1, 1, 1, 1, 1};
+    return (num_alignments >= 10) ? 0 : lookup[num_alignments];
 }
 
 }  // namespace
@@ -171,6 +165,9 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     size_t best_index = 0;
     bool alignment_found = false;
     const size_t num_index_blocks = m_minimap_index->num_loaded_index_blocks();
+    if (num_index_blocks == 0) {
+        throw std::logic_error("Minimap2Aligner::align called without a loaded index.");
+    }
     std::vector<std::vector<BamPtr>> block_records(num_index_blocks);
     for (size_t i = 0; i < num_index_blocks; ++i) {
         auto records = align_impl(irecord, buf, int(i));
@@ -221,7 +218,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
     // alignments that aren't in the first block, secondary.
     std::vector<BamPtr> final_records;
     const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
-    int new_mapq = compute_mapq(non_sup_count);
+    const int new_mapq = compute_mapq(non_sup_count);
     bool first_block = true;
     for (auto& records : block_records) {
         for (auto& record : records) {
@@ -443,6 +440,10 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
                             const std::string& alignment_header,
                             mm_tbuf_t* buffer) {
     const size_t num_index_blocks = m_minimap_index->num_loaded_index_blocks();
+    if (num_index_blocks == 0) {
+        throw std::logic_error("Minimap2Aligner::align called without a loaded index.");
+    }
+
     std::vector<std::vector<AlignmentResult>> block_results(num_index_blocks);
     std::vector<int> scores(num_index_blocks);
     bool alignment_found = false;

@@ -54,7 +54,7 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     // expected pairs: {2, 3} and {5, 6}
 
     // Load a pre-determined read to exercise the mapping pathway.
-    auto fa_file = std::filesystem::path(get_aligner_data_dir()) / "long_target.fa";
+    const auto fa_file = std::filesystem::path(get_aligner_data_dir()) / "long_target.fa";
     dorado::utils::FastaReader fa_reader(fa_file.string());
     auto record = fa_reader.try_get_next_record();
     record = fa_reader.try_get_next_record();  // Skip the first sequence and use the second one.

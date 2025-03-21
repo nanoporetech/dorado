@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstdio>
 #include <filesystem>
+#include <stdexcept>
 
 namespace {
 
