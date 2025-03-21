@@ -326,7 +326,7 @@ int demuxer(int argc, char* argv[]) {
     demux_writer_ref.set_header(header.get());
 
     // All progress reporting is in the post-processing part.
-    ProgressTracker tracker(0, false, 1.f);
+    ProgressTracker tracker(0, false, false, 1.f);
     if (progress_stats_frequency > 0) {
         tracker.disable_progress_reporting();
     }

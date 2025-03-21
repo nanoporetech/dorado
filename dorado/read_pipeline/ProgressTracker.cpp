@@ -27,9 +27,13 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
-ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
+ProgressTracker::ProgressTracker(int total_reads,
+                                 bool duplex,
+                                 bool trim,
+                                 float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_duplex(duplex),
+          m_trim(trim),
           m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }
@@ -54,7 +58,8 @@ void ProgressTracker::summarize() const {
 
     spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
-        spdlog::info("> Simplex reads basecalled: {}", m_num_simplex_reads_written);
+        auto mode = m_trim ? "Reads written" : "Simplex reads basecalled";
+        spdlog::info("> {}: {}", mode, m_num_simplex_reads_filtered);
     }
     if (m_num_simplex_reads_filtered > 0) {
         spdlog::info("> Simplex reads filtered: {}", m_num_simplex_reads_filtered);

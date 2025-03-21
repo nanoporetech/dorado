@@ -562,7 +562,8 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex, hts_file->finalise_is_noop() ? 0.f : 0.5f);
+        ProgressTracker tracker(int(num_reads), duplex, false,
+                                hts_file->finalise_is_noop() ? 0.f : 0.5f);
         tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
