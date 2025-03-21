@@ -8,6 +8,7 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
+#include <ATen/core/TensorBody.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <spdlog/spdlog.h>
@@ -620,6 +621,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 #endif
 }
 
+namespace {
+inline void *half_ptr(at::Tensor &t) { return reinterpret_cast<void *>(t.data_ptr<at::Half>()); }
+}  // namespace
+
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
 #if DORADO_CUDA_BUILD && !DORADO_TX2
@@ -632,14 +637,15 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     // const auto [win_upper, win_lower] = params.attn_window;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
+    bool default_f32_accum = utils::get_dev_opt("volta_f32_accum", true);
     // Flags to use FP32 or FP16 Accumulator tiles. Using FP32 throughout for best possible accuracy
-    bool useFloatAccumQKV = true;
+    bool useFloatAccumQKV = utils::get_dev_opt("volta_f32_accum_qkv", default_f32_accum);
     // bool useFloatAccumAttn = false; // Not yet implemented the possibility to change between float or fp16 online softmax in attn kernel
-    bool useFloatAccumProj = true;
+    bool useFloatAccumProj = utils::get_dev_opt("volta_f32_accum_proj", default_f32_accum);
     bool useBiasProj = true;
     // RMSNorm always in F16
-    bool useFloatAccumSwiglu = true;
-    bool useFloatAccumfc2 = true;
+    bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", default_f32_accum);
+    bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", default_f32_accum);
     bool useBiasfc2 = false;
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
@@ -714,51 +720,41 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE Volta", 3);
         res = koi_volta_qkv_rotary(
-                stream, reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(wqkv_weights_f16.t.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(qkv.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(sincos_bfr.data_ptr<at::Half>()),
+                stream, half_ptr(x_f16), half_ptr(wqkv_weights_f16.t), half_ptr(qkv),
+                half_ptr(sincos_bfr),
                 useFloatAccumQKV,  // This might be a mistake, I am passing a bool when I am C-linking it as an int
                 N * T, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Apply window flashattention
         utils::ScopedProfileRange spr("MEA Volta", 3);
-        res = koi_volta_attn(stream, reinterpret_cast<void *>(qkv.data_ptr<at::Half>()),
-                             reinterpret_cast<void *>(t_out_attn.data_ptr<at::Half>()), N, T);
+        res = koi_volta_attn(stream, half_ptr(qkv), half_ptr(t_out_attn), N, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul, proj weights (K=512)
         utils::ScopedProfileRange spr("OUTP Volta", 3);
-        res = koi_volta_linear(stream, reinterpret_cast<void *>(t_out_attn.data_ptr<at::Half>()),
-                               reinterpret_cast<void *>(proj_weight.data_ptr<at::Half>()),
-                               reinterpret_cast<void *>(t_out_proj.data_ptr<at::Half>()),
-                               reinterpret_cast<void *>(proj_bias.data_ptr<at::Half>()),
-                               useFloatAccumProj, useBiasProj, N * T, C);
+        res = koi_volta_linear(stream, half_ptr(t_out_attn), half_ptr(proj_weight),
+                               half_ptr(t_out_proj), half_ptr(proj_bias), useFloatAccumProj,
+                               useBiasProj, N * T, C);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1 Volta", 3);
-        res = koi_volta_rmsnorm_residual(
-                stream, reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(t_out_proj.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(t_res_weights.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()), alpha, N * T);
+        res = koi_volta_rmsnorm_residual(stream, half_ptr(x_f16), half_ptr(t_out_proj),
+                                         half_ptr(t_res_weights), half_ptr(t_out_rms1), alpha,
+                                         N * T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU Volta", 3);
-        koi_volta_mm_swiglu(stream, reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()),
-                            reinterpret_cast<void *>(t_fc1_wts_f16.t.data_ptr<at::Half>()),
-                            reinterpret_cast<void *>(t_fc1_out.data_ptr<at::Half>()),
-                            useFloatAccumSwiglu, N * T);
+        koi_volta_mm_swiglu(stream, half_ptr(t_out_rms1), half_ptr(t_fc1_wts_f16.t),
+                            half_ptr(t_fc1_out), useFloatAccumSwiglu, N * T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul, fc2 weights (K=2048)
         utils::ScopedProfileRange spr("FC2 Volta", 3);
-        res = koi_volta_linear(stream, reinterpret_cast<void *>(t_fc1_out.data_ptr<at::Half>()),
-                               reinterpret_cast<void *>(t_fc2_wts.data_ptr<at::Half>()),
-                               reinterpret_cast<void *>(t_fc2_out.data_ptr<at::Half>()),
+        res = koi_volta_linear(stream, half_ptr(t_fc1_out), half_ptr(t_fc2_wts),
+                               half_ptr(t_fc2_out),
                                nullptr,  // ! No bias for fc2
                                useFloatAccumfc2, useBiasfc2, N * T, E / 2);
     }
@@ -766,11 +762,9 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2 Volta", 3);
         res = koi_volta_rmsnorm_residual(
-                stream, reinterpret_cast<void *>(t_out_rms1.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(t_fc2_out.data_ptr<at::Half>()),
-                reinterpret_cast<void *>(t_res2_weights.data_ptr<at::Half>()),
+                stream, half_ptr(t_out_rms1), half_ptr(t_fc2_out), half_ptr(t_res2_weights),
                 // ! Use initial input x_f16 as output buffer for second rmsnorm
-                reinterpret_cast<void *>(x_f16.data_ptr<at::Half>()), alpha, N * T);
+                half_ptr(x_f16), alpha, N * T);
     }
     // TODO: handle result
     if (res != KOI_SUCCESS) {
