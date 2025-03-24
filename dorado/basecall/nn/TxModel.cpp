@@ -722,8 +722,8 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         res = koi_volta_qkv_rotary(
                 stream, half_ptr(x_f16), half_ptr(wqkv_weights_f16.t), half_ptr(qkv),
                 half_ptr(sincos_bfr),
-                useFloatAccumQKV,  // This might be a mistake, I am passing a bool when I am C-linking it as an int
-                N * T, T);
+                useFloatAccumQKV,
+                N, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Apply window flashattention
