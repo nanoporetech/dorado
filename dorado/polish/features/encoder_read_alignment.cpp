@@ -2,6 +2,7 @@
 
 #include "medaka_read_matrix.h"
 #include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/ssize.h"
 #include "utils/timer_high_res.h"
@@ -84,17 +85,18 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                         torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
 
                 spdlog::trace("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
-                              tensor_shape_as_string(chunk), tensor_shape_as_string(padding));
+                              utils::tensor_shape_as_string(chunk),
+                              utils::tensor_shape_as_string(padding));
 
                 auto concated = torch::cat({std::move(chunk), std::move(padding)}, 1);
 
                 spdlog::trace("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
-                              tensor_shape_as_string(concated));
+                              utils::tensor_shape_as_string(concated));
 
                 padded_chunks.emplace_back(std::move(concated));
             } else {
                 spdlog::trace("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
-                              tensor_shape_as_string(chunk));
+                              utils::tensor_shape_as_string(chunk));
 
                 padded_chunks.emplace_back(std::move(chunk));
             }
@@ -127,7 +129,8 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
             spdlog::trace(
                     "[reorder_reads] n = {}, rids_out.size() = {}, rids_in.size() = {}, "
                     "chunk.shape = {}",
-                    n, std::size(rids_out), std::size(rids_in), tensor_shape_as_string(chunk));
+                    n, std::size(rids_out), std::size(rids_in),
+                    utils::tensor_shape_as_string(chunk));
 
             // Create a lookup.
             std::unordered_map<std::string, int64_t> rids_in_map;

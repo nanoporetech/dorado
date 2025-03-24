@@ -15,16 +15,6 @@
 namespace dorado::polisher {
 
 /**
- * \brief Prints the tensor size to a stream.
- */
-void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter);
-
-/**
- * \brief Returns a string with a formatted tensor size.
- */
-std::string tensor_shape_as_string(const at::Tensor& tensor);
-
-/**
  * \brief Parses a string of form "[1, 17]" into a std::vector.
  */
 std::vector<int32_t> parse_int32_vector(const std::string& input);

@@ -1,6 +1,7 @@
 #include "decoder_base.h"
 
 #include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/span.h"
 
 #include <cassert>
@@ -80,7 +81,7 @@ std::vector<ConsensusResult> decode_bases_impl(const LabelSchemeType label_schem
         throw std::runtime_error(
                 "Wrong input tensor shape! Expected shape: [num_samples x seq_length x "
                 "num_classes]. Provided shape: " +
-                tensor_shape_as_string(logits));
+                utils::tensor_shape_as_string(logits));
     }
 
     const size_t num_samples = logits.size(0);

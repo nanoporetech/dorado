@@ -2,6 +2,7 @@
 #include "model_factory.h"
 
 #include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -50,7 +51,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         }
         for (const auto& buffer : model.named_buffers()) {
             spdlog::debug("[model_params] Buffer key: {}, shape: {}", buffer.key(),
-                          (buffer.value().defined() ? tensor_shape_as_string(buffer.value())
+                          (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
                                                     : "undefined"));
         }
     }

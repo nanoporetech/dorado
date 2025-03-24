@@ -8,21 +8,6 @@
 
 namespace dorado::polisher {
 
-void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter) {
-    for (size_t i = 0; i < tensor.sizes().size(); ++i) {
-        os << tensor.size(i);
-        if ((i + 1) < tensor.sizes().size()) {
-            os << delimiter;
-        }
-    }
-}
-
-std::string tensor_shape_as_string(const at::Tensor& tensor) {
-    std::ostringstream oss;
-    print_tensor_shape(oss, tensor, ", ");
-    return oss.str();
-}
-
 std::vector<int32_t> parse_int32_vector(const std::string& input) {
     if (std::empty(input)) {
         return {};

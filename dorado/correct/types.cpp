@@ -1,6 +1,7 @@
 #include "types.h"
 
 #include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
 
 #include <ostream>
 #include <tuple>
@@ -20,10 +21,10 @@ std::ostream& operator<<(std::ostream& os, const OverlapWindow& ovl) {
 }
 
 std::ostream& operator<<(std::ostream& os, const WindowFeatures& wf) {
-    os << "bases = " << polisher::tensor_shape_as_string(wf.bases)
-       << ", quals = " << polisher::tensor_shape_as_string(wf.quals)
-       << ", indices = " << polisher::tensor_shape_as_string(wf.indices)
-       << ", length = " << wf.length << ", supported.size = " << std::size(wf.supported)
+    os << "bases = " << utils::tensor_shape_as_string(wf.bases)
+       << ", quals = " << utils::tensor_shape_as_string(wf.quals)
+       << ", indices = " << utils::tensor_shape_as_string(wf.indices) << ", length = " << wf.length
+       << ", supported.size = " << std::size(wf.supported)
        << ", inferred_bases.size = " << std::size(wf.inferred_bases) << ", n_alns = " << wf.n_alns
        << ", read_name = " << wf.read_name << ", window_idx = " << wf.window_idx;
 

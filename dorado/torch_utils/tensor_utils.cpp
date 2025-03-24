@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstring>
 #include <fstream>
+#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -206,6 +207,21 @@ std::string print_size(const at::Tensor& t, const std::string& name) {
     }
     ss << "] dtype: " << t.dtype();
     return ss.str();
+}
+
+void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter) {
+    for (size_t i = 0; i < std::size(tensor.sizes()); ++i) {
+        if (i > 0) {
+            os << delimiter;
+        }
+        os << tensor.size(i);
+    }
+}
+
+std::string tensor_shape_as_string(const at::Tensor& tensor) {
+    std::ostringstream oss;
+    print_tensor_shape(oss, tensor, ", ");
+    return oss.str();
 }
 
 }  // namespace dorado::utils

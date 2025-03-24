@@ -1,5 +1,7 @@
 #include "model_latent_space_lstm.h"
 
+#include "torch_utils/tensor_utils.h"
+
 #include <cmath>
 #include <stdexcept>
 #include <unordered_map>
@@ -197,7 +199,7 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
         if (x.sizes().back() != 5) {
             throw std::runtime_error(
                     "If using dwells, x must have 5 features/read/position. Shape of x: " +
-                    tensor_shape_as_string(x));
+                    utils::tensor_shape_as_string(x));
         }
         auto dwells = x.index({torch::indexing::Slice(), torch::indexing::Slice(),
                                torch::indexing::Slice(), 4})

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -49,5 +50,11 @@ ScaledTensor quantize_tensor(const at::Tensor& tensor, int dim);
 
 // Helper function to print tensor size.
 std::string print_size(const at::Tensor& t, const std::string& name);
+
+/// \brief Prints the tensor size to a stream.
+void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter);
+
+/// \brief Returns a string containing the input tensor size. Similar to print_size but less verbose.
+std::string tensor_shape_as_string(const at::Tensor& tensor);
 
 }  // namespace dorado::utils

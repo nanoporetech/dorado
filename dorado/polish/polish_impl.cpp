@@ -6,6 +6,7 @@
 #include "secondary/batching.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
@@ -809,7 +810,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                     "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, tensor_shape_as_string(batch_features_tensor),
+                    tid, utils::tensor_shape_as_string(batch_features_tensor),
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
@@ -895,8 +896,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             spdlog::trace(
                     "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
                     "out_item.samples.size() = {}, decode queue size: {}",
-                    tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
-                    std::size(decode_queue));
+                    tid, utils::tensor_shape_as_string(out_item.logits),
+                    std::size(out_item.samples), std::size(decode_queue));
             decode_queue.try_push(std::move(out_item));
         }
     };
@@ -1067,7 +1068,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
             spdlog::trace(
                     "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                     "tensor_batch_size = {}, queue size: {}",
-                    tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
+                    tid, utils::tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
                     tensor_batch_size, std::size(decode_queue));
 
             // This should handle the timeout case too.
