@@ -32,6 +32,92 @@
 
 namespace dorado::correction {
 
+namespace {
+
+std::vector<int32_t> calc_max_step_per_pos(const CorrectionAlignments& alignments,
+                                           const std::vector<OverlapWindow>& window,
+                                           const int32_t window_size,
+                                           const int32_t init_value) {
+    utils::ScopedProfileRange spr("calc_max_step_per_pos", 1);
+
+    if (std::empty(alignments.overlaps)) {
+        return {};
+    }
+
+    std::vector<int32_t> ret(window_size, init_value);
+
+    for (const auto& chunk : window) {
+        const int32_t aln_id = chunk.overlap_idx;
+
+        const auto& cigar = alignments.cigars[aln_id];
+        const int32_t cig_len = static_cast<int32_t>(std::size(cigar));
+
+        int32_t pos = 0;
+
+        // For each position of the target, determine how many columns there are.
+        for (int32_t cig_id = chunk.cigar_start_idx; cig_id <= chunk.cigar_end_idx; ++cig_id) {
+            if (cig_id == cig_len) {
+                break;
+            }
+            if ((cig_id == chunk.cigar_end_idx) && (chunk.cigar_end_offset == 0)) {
+                break;
+            }
+
+            const auto& c = cigar[cig_id];
+
+            int32_t len = static_cast<int32_t>(c.len);
+            if (chunk.cigar_start_idx == chunk.cigar_end_idx) {
+                len = chunk.cigar_end_offset - chunk.cigar_start_offset;
+            } else if (cig_id == chunk.cigar_start_idx) {
+                len = static_cast<int32_t>(c.len) - chunk.cigar_start_offset;
+            } else if (cig_id == chunk.cigar_end_idx) {
+                len = chunk.cigar_end_offset;
+            } else {
+                len = static_cast<int32_t>(c.len);
+            }
+
+            if ((pos > window_size) || ((pos == window_size) && (c.op != CigarOpType::I))) {
+                throw std::runtime_error("Position out of bounds! aln_id = " +
+                                         std::to_string(aln_id) + ", pos = " + std::to_string(pos) +
+                                         ", window_size = " + std::to_string(window_size) +
+                                         ", CIGAR op = " + cigar_op_to_string(c));
+            }
+
+            if ((c.op == CigarOpType::M) || (c.op == CigarOpType::EQ) || (c.op == CigarOpType::X) ||
+                c.op == CigarOpType::D) {
+                pos += len;
+
+            } else if ((c.op == CigarOpType::I) && (pos > 0)) {
+                ret[pos - 1] = std::max(ret[pos - 1], len + init_value);
+
+            } else {
+                throw std::runtime_error(
+                        "Unsupported CIGAR operation when computing inclusive scan!");
+            }
+        }
+    }
+
+    return ret;
+}
+
+int32_t find_target_end_for_window(const std::vector<int32_t>& consumed,
+                                   const int32_t win_tstart,
+                                   const int32_t win_tend,
+                                   const int32_t max_num_columns) {
+    utils::ScopedProfileRange spr("find_target_end_for_window", 1);
+    int32_t num_cols = 0;
+    for (int32_t tpos = win_tstart; tpos < win_tend; ++tpos) {
+        const int32_t curr_max_step = consumed[tpos - win_tstart];
+        if ((num_cols + curr_max_step) > max_num_columns) {
+            return tpos;
+        }
+        num_cols += curr_max_step;
+    }
+    return win_tend;
+}
+
+}  // namespace
+
 // This function attempts to create windows from the set
 // of reads that align to the target sequence being corrected.
 // Each window covers a fixed chunk (i.e. window size) on the
@@ -271,88 +357,6 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
     return true;
 }
 
-std::vector<int32_t> calc_max_step_per_pos(const CorrectionAlignments& alignments,
-                                           const std::vector<OverlapWindow>& window,
-                                           const int32_t window_size,
-                                           const int32_t init_value) {
-    utils::ScopedProfileRange spr("calc_max_step_per_pos", 1);
-
-    if (std::empty(alignments.overlaps)) {
-        return {};
-    }
-
-    std::vector<int32_t> ret(window_size, init_value);
-
-    for (const auto& chunk : window) {
-        const int32_t aln_id = chunk.overlap_idx;
-
-        const auto& cigar = alignments.cigars[aln_id];
-        const int32_t cig_len = static_cast<int32_t>(std::size(cigar));
-
-        int32_t pos = 0;
-
-        // For each position of the target, determine how many columns there are.
-        for (int32_t cig_id = chunk.cigar_start_idx; cig_id <= chunk.cigar_end_idx; ++cig_id) {
-            if (cig_id == cig_len) {
-                break;
-            }
-            if ((cig_id == chunk.cigar_end_idx) && (chunk.cigar_end_offset == 0)) {
-                break;
-            }
-
-            const auto& c = cigar[cig_id];
-
-            int32_t len = static_cast<int32_t>(c.len);
-            if (chunk.cigar_start_idx == chunk.cigar_end_idx) {
-                len = chunk.cigar_end_offset - chunk.cigar_start_offset;
-            } else if (cig_id == chunk.cigar_start_idx) {
-                len = static_cast<int32_t>(c.len) - chunk.cigar_start_offset;
-            } else if (cig_id == chunk.cigar_end_idx) {
-                len = chunk.cigar_end_offset;
-            } else {
-                len = static_cast<int32_t>(c.len);
-            }
-
-            if ((pos > window_size) || ((pos == window_size) && (c.op != CigarOpType::I))) {
-                throw std::runtime_error("Position out of bounds! aln_id = " +
-                                         std::to_string(aln_id) + ", pos = " + std::to_string(pos) +
-                                         ", window_size = " + std::to_string(window_size) +
-                                         ", CIGAR op = " + cigar_op_to_string(c));
-            }
-
-            if ((c.op == CigarOpType::M) || (c.op == CigarOpType::EQ) || (c.op == CigarOpType::X) ||
-                c.op == CigarOpType::D) {
-                pos += len;
-
-            } else if ((c.op == CigarOpType::I) && (pos > 0)) {
-                ret[pos - 1] = std::max(ret[pos - 1], len + init_value);
-
-            } else {
-                throw std::runtime_error(
-                        "Unsupported CIGAR operation when computing inclusive scan!");
-            }
-        }
-    }
-
-    return ret;
-}
-
-int32_t find_target_end_for_window(const std::vector<int32_t>& consumed,
-                                   const int32_t win_tstart,
-                                   const int32_t win_tend,
-                                   const int32_t max_num_columns) {
-    utils::ScopedProfileRange spr("find_target_end_for_window", 1);
-    int32_t num_cols = 0;
-    for (int32_t tpos = win_tstart; tpos < win_tend; ++tpos) {
-        const int32_t curr_max_step = consumed[tpos - win_tstart];
-        if ((num_cols + curr_max_step) > max_num_columns) {
-            return tpos;
-        }
-        num_cols += curr_max_step;
-    }
-    return win_tend;
-}
-
 std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
         const utils::Overlap& overlap,
         const std::vector<CigarOp>& cigar,
@@ -578,14 +582,6 @@ std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
     return result;
 }
 
-/// @brief Takes a set of alignments and a vector of window intervals, and finds chunks of the alignments
-///         which fall within those windows.
-/// @param alignments Input alignments.
-/// @param win_intervals Window intervals. They do not have to be adjacent, but they have to be sorted.
-/// @param window_size Window size in target coordinates, used for heuristic filtering.
-/// @param aln_ids Optionally process only the alignments listed here. If empty, all alignments will be processed.
-/// @param cigar_points Optional. If empty, all alignments will be processed from the beginning. This is useful for incremental processing.
-/// @return A vector of length equal to win_intervals, where each element contains zero or more alignment chunks which fall within these coordinates.
 std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
         const CorrectionAlignments& alignments,
         const std::vector<polisher::Interval>& win_intervals,

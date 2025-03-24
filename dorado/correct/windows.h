@@ -75,4 +75,19 @@ std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
         int32_t initial_tstart,
         int32_t initial_qstart);
 
+/// @brief Takes a set of alignments and a vector of window intervals, and finds chunks of the alignments
+///         which fall within those windows.
+/// @param alignments Input alignments.
+/// @param win_intervals Window intervals. They do not have to be adjacent, but they have to be sorted.
+/// @param window_size Window size in target coordinates, used for heuristic filtering.
+/// @param aln_ids Optionally process only the alignments listed here. If empty, all alignments will be processed.
+/// @param cigar_points Optional. If empty, all alignments will be processed from the beginning. This is useful for incremental processing.
+/// @return A vector of length equal to win_intervals, where each element contains zero or more alignment chunks which fall within these coordinates.
+std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
+        const CorrectionAlignments& alignments,
+        const std::vector<polisher::Interval>& win_intervals,
+        const int32_t window_size,
+        const std::vector<int32_t>& aln_ids,
+        const std::vector<CigarPoint>& cigar_points);
+
 }  // namespace dorado::correction
