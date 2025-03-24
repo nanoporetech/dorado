@@ -19,11 +19,19 @@ fi
 # CLI options.
 test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
+cli_out_dir="$2"
 
-# Output directory.
+# Test data directory.
 data_dir=$test_dir/data
-output_dir_name=test_output_dc_$(echo $RANDOM | head -c 10)
-output_dir=${test_dir}/${output_dir_name}
+
+# Output directory - allow override from the CLI.
+if [[ ${cli_out_dir} != "" ]]; then
+    output_dir=${cli_out_dir}
+else
+    output_dir_name=test_output_dc_$(echo $RANDOM | head -c 10)
+    output_dir=${test_dir}/${output_dir_name}
+fi
+
 mkdir -p $output_dir
 
 # Test dorado correct with auto detected platform. If that fails run on cpu.

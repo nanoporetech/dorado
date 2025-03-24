@@ -10,6 +10,10 @@ std::ostream& operator<<(std::ostream& os, const CigarOp& a) {
     return os;
 }
 
+std::string cigar_op_to_string(const CigarOp& a) {
+    return std::to_string(a.len) + std::string(1, convert_cigar_op_to_char(a.op));
+}
+
 std::ostream& operator<<(std::ostream& os, const std::vector<CigarOp>& cigar) {
     for (CigarOp op : cigar) {
         os << op;
