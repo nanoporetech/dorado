@@ -1,4 +1,5 @@
 #include "alignment/alignment_processing_items.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"

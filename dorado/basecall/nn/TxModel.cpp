@@ -92,21 +92,25 @@ struct KoiTensorExt : public KoiTensor {
 #include <string>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::basecall::nn {
 
-namespace nn {
+namespace {
 
 using namespace config;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
+#if DORADO_CUDA_BUILD && !DORADO_TX2
 void apply_rounding(at::Tensor &t, int remove_bits) {
     // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
     // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
     t.view(torch::kI16).add_(1 << (remove_bits - 1));
     t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
 }
+#endif
+
+}  // namespace
 
 torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
@@ -790,6 +794,4 @@ at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT) {
     return h;
 }
 
-}  // namespace nn
-
-}  // namespace dorado::basecall
+}  // namespace dorado::basecall::nn

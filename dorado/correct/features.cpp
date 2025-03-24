@@ -23,6 +23,8 @@ const int TOP_K = 30;
 
 namespace dorado::correction {
 
+namespace {
+
 bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
     size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
@@ -380,6 +382,8 @@ at::Tensor get_indices(const at::Tensor& bases, const std::vector<std::pair<int,
                          at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU))
             .clone();
 }
+
+}  // namespace
 
 std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>& windows,
                                         const CorrectionAlignments& alignments) {

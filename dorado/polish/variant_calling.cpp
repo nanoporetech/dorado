@@ -21,6 +21,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
  */
@@ -41,14 +43,6 @@ std::string extract_draft_with_gaps(const std::string& draft,
         ret[i] = (positions_minor[i] == 0) ? draft[positions_major[i]] : '*';
     }
 
-    return ret;
-}
-
-std::string extract_draft(const std::string& draft, const std::vector<int64_t>& positions_major) {
-    std::string ret(std::size(positions_major), '*');
-    for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
-        ret[i] = draft[positions_major[i]];
-    }
     return ret;
 }
 
@@ -78,6 +72,8 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                  std::begin(vc_sample.positions_minor) + idx_end),
             vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
 }
+
+}  // namespace
 
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples) {
@@ -132,6 +128,8 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
     return ret;
 }
+
+namespace {
 
 /**
  * \brief This function restructures the neighboring samples for one draft sequence.
@@ -288,6 +286,8 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 
     return ret;
 }
+
+}  // namespace
 
 Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,
@@ -516,6 +516,8 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 
     return ret;
 }
+
+namespace {
 
 std::vector<Variant> decode_variants(const DecoderBase& decoder,
                                      const VariantCallingSample& vc_sample,
@@ -762,6 +764,8 @@ std::vector<VariantCallingSample> trim_vc_samples(
 
     return trimmed_samples;
 }
+
+}  // namespace
 
 std::vector<Variant> call_variants(
         const dorado::polisher::Interval& region_batch,

@@ -222,7 +222,7 @@ CATCH_TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
     CATCH_CHECK(trimmed_record->core.mpos == -1);
 }
 
-std::string to_qstr(std::vector<int8_t> qscore) {
+static std::string to_qstr(std::vector<int8_t> qscore) {
     std::string qstr;
     for (size_t i = 0; i < qscore.size(); ++i) {
         qstr += static_cast<char>(qscore[i] + 33);

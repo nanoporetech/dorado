@@ -212,6 +212,8 @@ CATCH_TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
     }
 }
 
+namespace {
+
 void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t>& expected) {
     int len = bam_auxB_len(aux);
     CATCH_REQUIRE(size_t(len) == expected.size());
@@ -219,6 +221,8 @@ void require_sam_tag_B_int_matches(const uint8_t* aux, const std::vector<int64_t
         CATCH_REQUIRE(expected[i] == bam_auxB2i(aux, i));
     }
 }
+
+}  // namespace
 
 CATCH_TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     std::vector<std::string> modbase_alphabet = {"A", "a", "C", "m", "G", "T"};

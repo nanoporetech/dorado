@@ -37,7 +37,7 @@ void MessageSink::start_input_processing(const std::function<void()> &input_thre
     start_input_queue();
     for (int i = 0; i < m_num_input_threads; ++i) {
         m_input_threads.emplace_back([func = input_thread_fn, name = worker_name] {
-            dorado::utils::set_thread_name(name);
+            dorado::utils::set_thread_name(name.c_str());
             func();
         });
     }

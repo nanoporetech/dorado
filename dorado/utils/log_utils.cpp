@@ -15,6 +15,8 @@
 
 namespace dorado::utils {
 
+namespace {
+
 /**
  * @brief Get the file path associated with a given file descriptor
  *
@@ -63,6 +65,8 @@ bool is_safe_to_log() {
     return true;
 #endif
 }
+
+}  // namespace
 
 void InitLogging() {
     // Without modification, the default logger will write to stdout.

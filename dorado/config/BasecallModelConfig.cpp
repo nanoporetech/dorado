@@ -56,6 +56,8 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }  // namespace
 namespace dorado::config {
 
+namespace {
+
 void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains("qscore")) {
         const auto &qscore = toml::find(config_toml, "qscore");
@@ -320,8 +322,6 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     return config;
 }
 
-namespace {
-
 std::optional<toml::value> toml_get(const toml::value &value,
                                     const std::vector<std::string> &fields) {
     if (fields.empty()) {
@@ -364,6 +364,8 @@ bool is_rna_model(const BasecallModelConfig &model_config) {
 bool is_duplex_model(const BasecallModelConfig &model_config) {
     return model_config.num_features > 1;
 }
+
+namespace {
 
 TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     const auto &enc = toml::find(cfg, "model", "encoder", "transformer_encoder");
@@ -465,6 +467,8 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
 
     return config;
 }
+
+}  // namespace
 
 void TxStack::check() const {
     const auto eq = [](const int a, const int b, const std::string &msg) {

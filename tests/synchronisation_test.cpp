@@ -74,7 +74,7 @@ CATCH_TEST_CASE(CUT_TAG " Latch::wait_until() - created with count 1 signalled o
     CATCH_REQUIRE(latch.wait_until(test_clock::now() + 10ms));
 }
 
-void pause_and_signal(Latch &latch) {
+static void pause_and_signal(Latch &latch) {
     std::this_thread::sleep_for(50ms);
     latch.count_down();
 }
@@ -127,7 +127,7 @@ CATCH_TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - blocks until signal
     CATCH_REQUIRE_NOTHROW(flag.wait_for(TIMEOUT));
 }
 
-void do_signal(CompositeFlag &flags, std::size_t slot) {
+static void do_signal(CompositeFlag &flags, std::size_t slot) {
     std::this_thread::sleep_for(10ms);
     flags[slot].signal();
 }

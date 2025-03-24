@@ -359,24 +359,6 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
     }
 }
 
-void detect_and_trim(SimplexRead& read) {
-    demux::AdapterDetector detector(std::nullopt);
-    auto seqlen = int(read.read_common.seq.length());
-    std::pair<int, int> adapter_trim_interval = {0, seqlen};
-    std::pair<int, int> primer_trim_interval = {0, seqlen};
-
-    auto adapter_res = detector.find_adapters(read.read_common.seq, TEST_KIT1);
-    adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
-    auto primer_res = detector.find_primers(read.read_common.seq, TEST_KIT1);
-    primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
-    std::pair<int, int> trim_interval = adapter_trim_interval;
-    trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
-    trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
-    CATCH_CHECK(trim_interval.first < trim_interval.second);
-    Trimmer::trim_sequence(read, trim_interval);
-    read.read_common.adapter_trim_interval = trim_interval;
-}
-
 CATCH_TEST_CASE(
         "AdapterDetectorNode: check read messages are correctly updated after adapter/primer "
         "detection and trimming",

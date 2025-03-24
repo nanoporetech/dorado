@@ -2,6 +2,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "cli/basecall_output_args.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "config/BasecallModelConfig.h"
