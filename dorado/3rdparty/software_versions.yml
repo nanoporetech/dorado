@@ -27,7 +27,7 @@ cuda-toolkit:
 cutlass:
     description: >
          CUDA C++ template abstractions for implementing high-performance matrix-multiplication (GEMM) and related computations.
-    version: "012c62c748bdd5b2badc3ebe83e0891dee7c4e31"
+    version: "v3.1.0"
     url: https://github.com/NVIDIA/cutlass
     license: PATH_NOT_AVAILABLE
     files:
@@ -107,7 +107,7 @@ intervaltree:
 minimap2:
     description: >
         Sequence alignment program
-    version: "5279377544a36f690e8aa34fec856c6106d259e5"
+    version: "v2.28"
     url: https://github.com/lh3/minimap2
     license: ont-minimap2/src/3rdparty/minimap2/LICENSE.txt
     files:
@@ -165,7 +165,7 @@ toml11:
 zlib-ng:
     description: >
         zlib data compression library for the next generation systems.
-    version: "c255e58dd5e0ec3b2febb29c0905e89032419bcd"
+    version: "v2.2.4"
     url: https://github.com/zlib-ng/zlib-ng
     license: ont-minimap2/src/3rdparty/zlib-ng/LICENSE.md
     files:
