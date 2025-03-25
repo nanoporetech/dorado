@@ -81,6 +81,7 @@ add_executable(dorado_tests
     PolishTrimTest.cpp
     PolishWindowTest.cpp
     RleTest.cpp
+    CorrectionWindowTest.cpp
 )
 
 if (DORADO_GPU_BUILD)

@@ -57,9 +57,6 @@ ModelInfo get_simplex_model_info(const std::string& model_name);
 ModelInfo get_modification_model(const std::filesystem::path& simplex_model,
                                  const std::string& modification);
 
-ModelInfo get_modification_model(const ModelInfo& simplex_model_info,
-                                 const ModelVariantPair& model_variant);
-
 // get the sampling rate that the model is compatible with
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
 

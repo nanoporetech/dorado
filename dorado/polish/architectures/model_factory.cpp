@@ -25,6 +25,8 @@ ModelType parse_model_type(const std::string& type) {
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
 
+namespace {
+
 /**
  * \brief This function is a workaround around missing features in torchlib. There
  *          is currently no way to load only the state dict without the model either
@@ -131,6 +133,8 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         throw std::runtime_error{std::string("Error: ") + e.what()};
     }
 }
+
+}  // namespace
 
 std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,

@@ -176,17 +176,42 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     }
     hts_file.finalise([](size_t) { /* noop */ });
 
-    Minimap2Index cut{};
-    cut.initialise(mm2::parse_options("-I 10k"));
+    // The -I option in minimap2 appears to be a soft limit. It will load full sequences until
+    // the total number of bases exceeds this value. So setting this to 10K would result in it
+    // putting 2 full 10,000 base sequences into each batch.
+    auto opts = mm2::parse_options("-I 8K");
 
-    CATCH_SECTION("No split index allowed") {
-        CATCH_CHECK(cut.load(temp_input_file.string(), 1, false) ==
-                    IndexLoadResult::split_index_not_supported);
+    CATCH_SECTION("Full split-index loading") {
+        Minimap2Index cut{};
+        cut.initialise(opts);
+
+        CATCH_CHECK(cut.load(temp_input_file.string(), 1, false) == IndexLoadResult::success);
+
+        auto header_records = cut.get_sequence_records_for_header();
+        CATCH_CHECK(header_records.size() == 5);
+        for (size_t i = 0; i < header_records.size(); ++i) {
+            CATCH_CHECK(header_records[i].first == ("read" + std::to_string(i + 1)));
+            CATCH_CHECK(header_records[i].second == 10000u);
+        }
     }
 
-    CATCH_SECTION("Split index allowed") {
+    CATCH_SECTION("Sequential index loading") {
+        Minimap2Index cut{};
+        cut.initialise(opts);
+
         CATCH_CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
-        CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
+        auto header_records = cut.get_sequence_records_for_header();
+        CATCH_CHECK(header_records.size() == 1);
+        CATCH_CHECK(std::string(header_records[0].first) == "read1");
+        CATCH_CHECK(header_records[0].second == 10000u);
+
+        for (int i = 2; i < 6; ++i) {
+            CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
+            header_records = cut.get_sequence_records_for_header();
+            CATCH_CHECK(header_records[0].first == ("read" + std::to_string(i)));
+            CATCH_CHECK(header_records[0].second == 10000u);
+        }
+        CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::end_of_index);
     }
 }
 

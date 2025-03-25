@@ -78,4 +78,9 @@ std::string_view paf_aux_get(const PafEntry& paf_entry, const char tag[2], const
     return aux.substr(pos, end - pos);
 }
 
+std::ostream& operator<<(std::ostream& os, const Overlap& overlap) {
+    serialize_to_paf(os, "query", "target", overlap, 0, 0, 0, {});
+    return os;
+}
+
 }  // namespace dorado::utils

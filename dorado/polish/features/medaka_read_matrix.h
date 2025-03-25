@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-class BamFile;
-
 namespace dorado::polisher {
+
+class BamFile;
 
 // medaka-style feature data
 class ReadAlignmentData {

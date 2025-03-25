@@ -216,7 +216,7 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
     }
 }
 
-std::set<models::ChemistryKey> get_sequencing_chemistries(
+static std::set<models::ChemistryKey> get_sequencing_chemistries(
         const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::set<models::ChemistryKey> chemistries;
     bool fast5_found{false};

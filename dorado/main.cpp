@@ -31,6 +31,7 @@ extern "C" {
 // teardown anyway so the leak will be subsumed by termination.
 // Fix is borrowed from https://mailman.mit.edu/pipermail/cvs-krb5/2019-October/014884.html
 #if !__GLIBC_PREREQ(2, 25)
+int dlclose(void*);
 int dlclose(void*) { return 0; };
 #endif  // __GLIBC_PREREQ
 }

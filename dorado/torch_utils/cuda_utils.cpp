@@ -122,6 +122,8 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     selected_mat_mul(A, B, C);
 }
 
+namespace {
+
 bool is_cuda_device_string(const std::string &device_string) {
     return device_string.substr(0, 5) == "cuda:";
 }
@@ -216,6 +218,8 @@ bool try_parse_id_list(const std::string &device_string,
 
     return true;
 }
+
+}  // namespace
 
 bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> &devices,

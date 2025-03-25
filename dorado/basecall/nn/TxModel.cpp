@@ -93,20 +93,25 @@ struct KoiTensorExt : public KoiTensor {
 #include <string>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::basecall::nn {
 
-namespace nn {
+namespace {
 
+using namespace config;
 using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
+#if DORADO_CUDA_BUILD && !DORADO_TX2
 void apply_rounding(at::Tensor &t, int remove_bits) {
     // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
     // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
     t.view(torch::kI16).add_(1 << (remove_bits - 1));
     t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
 }
+#endif
+
+}  // namespace
 
 torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
@@ -435,8 +440,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const config::TxEncoderParams &params_,
-                             const at::TensorOptions &options)
+TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOptions &options)
         : params(params_) {
     self_attn =
             register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
@@ -598,7 +602,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
-        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", true));
+        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
         res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
                             use_f32_accum);
     }
@@ -688,9 +692,10 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         t_res2_weights = norm2->weight.view({C});
 
         // Quantize SwiGLU weights, interleave, and rearrange as tiled
-        auto fc1_weight_interleaved = ff->fc1->weight.unflatten(0, {2, -1, 16})
-                                              .transpose(0, 1)
-                                              .contiguous();    // ! New layout for changed swiglu function
+        auto fc1_weight_interleaved =
+                ff->fc1->weight.unflatten(0, {2, -1, 16})
+                        .transpose(0, 1)
+                        .contiguous();  // ! New layout for changed swiglu function
 
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
@@ -716,11 +721,8 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     if (res == KOI_SUCCESS && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE Volta", 3);
-        res = koi_volta_qkv_rotary(
-                stream, half_ptr(x_f16), half_ptr(wqkv_weights_f16.t), half_ptr(qkv),
-                half_ptr(sincos_bfr),
-                useFloatAccumQKV,
-                N, T);
+        res = koi_volta_qkv_rotary(stream, half_ptr(x_f16), half_ptr(wqkv_weights_f16.t),
+                                   half_ptr(qkv), half_ptr(sincos_bfr), useFloatAccumQKV, N, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Apply window flashattention
@@ -819,7 +821,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
     return x;
 }
 
-TxEncoderStackImpl::TxEncoderStackImpl(const config::TxEncoderParams &params,
+TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
@@ -852,7 +854,6 @@ TxEncoderStackImpl::TxEncoderStackImpl(const config::TxEncoderParams &params,
 at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     if (use_koi_tiled) {
-        use_i8 = false;
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
         const int C = static_cast<int>(x.size(2));
@@ -912,7 +913,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
     return stack->forward(x);
 }
 
-LinearUpsampleImpl::LinearUpsampleImpl(const config::EncoderUpsampleParams &params)
+LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
         : scale_factor(params.scale_factor) {
     linear = register_module(
             "linear",
@@ -927,7 +928,7 @@ at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
     return out;
 };
 
-LinearScaledCRFImpl::LinearScaledCRFImpl(const config::CRFEncoderParams &params) {
+LinearScaledCRFImpl::LinearScaledCRFImpl(const CRFEncoderParams &params) {
     m_params = params;
     linear = register_module(
             "linear", Linear(LinearOptions(m_params.insize, m_params.outsize()).bias(false)));
@@ -941,8 +942,7 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
     return linear(x);
 }
 
-TxModelImpl::TxModelImpl(const config::BasecallModelConfig &config,
-                         const at::TensorOptions &options)
+TxModelImpl::TxModelImpl(const BasecallModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
     convs = register_module("convs", basecall::nn::ConvStack(config.convs));
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));
@@ -973,6 +973,4 @@ at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT) {
     return h;
 }
 
-}  // namespace nn
-
-}  // namespace dorado::basecall
+}  // namespace dorado::basecall::nn

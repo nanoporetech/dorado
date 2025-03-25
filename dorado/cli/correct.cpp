@@ -1,3 +1,4 @@
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "correct/CorrectionProgressTracker.h"
 #include "dorado_version.h"
@@ -14,6 +15,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/string_utils.h"
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
@@ -64,6 +66,8 @@ struct Options {
     int32_t ovl_window_size = 17;
     int32_t min_chain_score = 2500;
     float mid_occ_frac = 0.05f;
+    std::unordered_set<std::string> debug_tnames;
+    bool legacy_windowing = false;
 };
 
 /// \brief Define the CLI options.
@@ -87,7 +91,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--infer-threads")
                 .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
-                .default_value(2)
+                .default_value(3)
 #else
                 .default_value(1)
 #endif
@@ -156,6 +160,12 @@ ParserPtr create_cli(int& verbosity) {
                       "process.")
                 .default_value(0.05f)
                 .scan<'g', float>();
+        parser->hidden.add_argument("--debug-tnames")
+                .help("Comma separated list of one or more target read names to process.")
+                .default_value("");
+        parser->hidden.add_argument("--legacy-windowing")
+                .help("Runs legacy windowing instead of the new version.")
+                .flag();
     }
 
     return parser;
@@ -198,11 +208,6 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.device = parser.visible.get<std::string>("device");
 
-    opt.kmer_size = parser.hidden.get<int>("kmer-size");
-    opt.ovl_window_size = parser.hidden.get<int>("ovl-window-size");
-    opt.min_chain_score = parser.hidden.get<int>("min-chain-score");
-    opt.mid_occ_frac = parser.hidden.get<float>("mid-occ-frac");
-
     if (opt.device == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
         opt.device = "cpu";
@@ -215,6 +220,20 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.compute_num_blocks = parser.visible.get<bool>("compute-num-blocks");
     opt.run_block_id = parser.visible.present<int>("run-block-id");
+
+    // Hidden parameters.
+    opt.kmer_size = parser.hidden.get<int>("kmer-size");
+    opt.ovl_window_size = parser.hidden.get<int>("ovl-window-size");
+    opt.min_chain_score = parser.hidden.get<int>("min-chain-score");
+    opt.mid_occ_frac = parser.hidden.get<float>("mid-occ-frac");
+    opt.legacy_windowing = parser.hidden.get<bool>("legacy-windowing");
+
+    // Debug option, hidden.
+    const std::string tnames_str = parser.hidden.get<std::string>("debug-tnames");
+    if (!std::empty(tnames_str)) {
+        const std::vector<std::string> tnames = utils::split(tnames_str, ',');
+        opt.debug_tnames.insert(std::begin(tnames), std::end(tnames));
+    }
 
     return opt;
 }
@@ -395,7 +414,8 @@ int correct(int argc, char* argv[]) {
 
     // Compute the number of threads for each stage.
     const int aligner_threads = opt.threads;
-    const int correct_threads = std::max(4, static_cast<int>(opt.threads / 4));
+    const int correct_threads =
+            (!std::empty(opt.debug_tnames)) ? 1 : std::max(4, static_cast<int>(opt.threads / 4));
     const int correct_writer_threads = 1;
     spdlog::debug("Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
                   correct_threads, correct_writer_threads);
@@ -472,7 +492,7 @@ int correct(int argc, char* argv[]) {
             // 2. Window generation, encoding + inference and decoding to generate final reads.
             pipeline_desc.add_node<CorrectionInferenceNode>(
                     {hts_writer}, in_reads_fn, correct_threads, opt.device, opt.infer_threads,
-                    opt.batch_size, model_dir);
+                    opt.batch_size, model_dir, opt.legacy_windowing, opt.debug_tnames);
         } else {
             pipeline_desc.add_node<CorrectionPafWriterNode>({});
         }

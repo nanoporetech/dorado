@@ -18,6 +18,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado {
@@ -29,7 +30,9 @@ public:
                             const std::string& device,
                             int infer_threads,
                             int bach_size,
-                            const std::filesystem::path& model_dir);
+                            const std::filesystem::path& model_dir,
+                            const bool legacy_windowing,
+                            const std::unordered_set<std::string>& debug_tnames);
     ~CorrectionInferenceNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionInferenceNode"; }
     stats::NamedStats sample_stats() const override;
@@ -112,6 +115,9 @@ private:
 
     MemoryManager<int> m_bases_manager;
     MemoryManager<float> m_quals_manager;
+
+    bool m_legacy_windowing = false;
+    std::unordered_set<std::string> m_debug_tnames;
 };
 
 }  // namespace dorado

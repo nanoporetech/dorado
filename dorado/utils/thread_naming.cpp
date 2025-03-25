@@ -13,7 +13,7 @@
 #endif
 namespace dorado::utils {
 
-void set_thread_name_impl(const char* name) {
+void set_thread_name(const char* name) {
 #if defined(_WIN32)
     // There is an alternative thread name mechanism based on throwing an exception. We don't bother
     // with it because it only works when the process is being run under the Visual Studio debugger
@@ -52,7 +52,5 @@ void set_thread_name_impl(const char* name) {
 #endif
 #endif
 }
-
-void set_thread_name(const std::string& name) { set_thread_name_impl(name.c_str()); }
 
 }  // namespace dorado::utils
