@@ -631,7 +631,7 @@ inline void *half_ptr(at::Tensor &t) { return reinterpret_cast<void *>(t.data_pt
 
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD && !DORADO_TX2 && !DORADO_ORIN
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
     const int C = params.d_model;
@@ -825,21 +825,19 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
-    use_koi_tiled = (options.device().is_cuda() && koi_tc_is_available(KOI_F16) == KOI_SUCCESS) &&
-                    (params.d_model == 512) && (params.nhead == 8) &&
-                    (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
-                    (params.dim_feedforward == 2048);
+    bool is_sup_model = (params.d_model == 512) && (params.nhead == 8) &&
+                        (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
+                        (params.dim_feedforward == 2048);
+    use_koi_tiled = is_sup_model && options.device().is_cuda() &&
+                    koi_tc_is_available(KOI_F16) == KOI_SUCCESS;
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 
+#if !DORADO_ORIN
     // Custom Volta flag
-    use_koi_volta_tiled =
-            (options.device().is_cuda() &&
-             koi_volta_tc_is_available(KOI_F16) ==
-                     KOI_SUCCESS) &&  // ! Passing argument to koi_volta_tc_is_available although not used, if not, function does not C-link properly
-            (params.d_model == 512) &&
-            (params.nhead == 8) && (params.attn_window.first == 127) &&
-            (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    use_koi_volta_tiled = is_sup_model && options.device().is_cuda() &&
+                          koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS;
     spdlog::debug("TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
+#endif
 #endif
 
     stack = Sequential();
@@ -887,7 +885,9 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
             untiled_f16 = tiled_f16.transpose(2, 3).contiguous().view({N, T, C});
         }
         return untiled_f16;
-    } else if (use_koi_volta_tiled) {
+    }
+#if !DORADO_ORIN
+    else if (use_koi_volta_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
         const int C = static_cast<int>(x.size(2));
@@ -909,6 +909,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
         }
         return untiled_f16;
     }
+#endif
 #endif
     return stack->forward(x);
 }
