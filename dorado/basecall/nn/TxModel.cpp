@@ -637,7 +637,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     // const auto [win_upper, win_lower] = params.attn_window;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-    bool default_f32_accum = utils::get_dev_opt("volta_f32_accum", true);
+    bool default_f32_accum = utils::get_dev_opt("volta_f32_accum", false);
     // Flags to use FP32 or FP16 Accumulator tiles. Using FP32 throughout for best possible accuracy
     bool useFloatAccumQKV = utils::get_dev_opt("volta_f32_accum_qkv", default_f32_accum);
     // bool useFloatAccumAttn = false; // Not yet implemented the possibility to change between float or fp16 online softmax in attn kernel
