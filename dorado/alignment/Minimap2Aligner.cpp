@@ -525,7 +525,12 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
     int n_regs{};
     mm_reg1_t* regs = mm_map(m_minimap_index->index(idx_no), query.l_seq, query.seq, &n_regs,
                              buffer, &m_minimap_index->mapping_options(), nullptr);
-    auto post_condition = utils::PostCondition([regs] { free(regs); });
+    auto post_condition = utils::PostCondition([regs, n_regs] {
+        for (int reg_idx = 0; reg_idx < n_regs; ++reg_idx) {
+            free(regs[reg_idx].p);
+        }
+        free(regs);
+    });
 
     std::string alignment_string{};
     if (!alignment_header.empty()) {
@@ -535,13 +540,12 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
     if (n_regs == 0) {
         alignment_string = read_common.read_id + UNMAPPED_SAM_LINE_STRIPPED;
     }
-    for (int reg_idx{0}; reg_idx < n_regs; ++reg_idx) {
+    for (int reg_idx = 0; reg_idx < n_regs; ++reg_idx) {
         kstring_t alignment_line{0, 0, nullptr};
         mm_write_sam3(&alignment_line, m_minimap_index->index(idx_no), &query, 0, reg_idx, 1,
                       &n_regs, &regs, NULL, MM_F_OUT_MD, buffer->rep_len);
         alignment_string += std::string(alignment_line.s, alignment_line.l) + "\n";
         free(alignment_line.s);
-        free(regs[reg_idx].p);
     }
     return parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
 }
