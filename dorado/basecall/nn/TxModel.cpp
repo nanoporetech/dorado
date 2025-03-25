@@ -529,13 +529,13 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
         // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
         // power efficient and results in higher performance for a small accuracy drop)
-        int remove_bits = 4;
-        apply_rounding(proj_weight, remove_bits);
-        apply_rounding(t_res_weights, remove_bits);
-        apply_rounding(t_res2_weights, remove_bits);
-        apply_rounding(t_fc2_wts, remove_bits);
-        apply_rounding(wqkv_weights_f16.t, remove_bits);
-        apply_rounding(t_fc1_wts_f16.t, remove_bits);
+        int default_remove = utils::get_dev_opt("remove_bits", 4);
+        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
+        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
+        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
+        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
+        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
+        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
     }
 
     // Output buffers
@@ -705,6 +705,15 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
                 ff->fc2->weight.view({C / 16, 16, (E / 2) / 16, 16}).transpose(1, 2).contiguous();
 
         // TODO: Investigate performance gain/accuracy loss from zeroing lowest mantissa bits in Volta
+        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
+        // power efficient and results in higher performance for a small accuracy drop)
+        int default_remove = utils::get_dev_opt("remove_bits", 4);
+        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
+        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
+        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
+        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
+        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
+        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
     }
 
     // Output buffers
