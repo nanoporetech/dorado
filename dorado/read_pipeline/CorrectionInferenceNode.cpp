@@ -182,6 +182,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
     if (device.is_cuda()) {
+        c10::cuda::CUDAGuard device_guard(device);
         stream = c10::cuda::getStreamFromPool(false, device.index());
     }
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
