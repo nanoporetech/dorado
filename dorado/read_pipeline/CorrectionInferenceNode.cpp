@@ -511,8 +511,8 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Corrected {} reads, decoded {} reads early, ", num_reads.load(),
-                              num_early_reads.load());
+                spdlog::debug("Sent {} reads to inference, decoded {} reads early.",
+                              num_reads.load(), num_early_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
