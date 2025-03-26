@@ -109,6 +109,21 @@ void apply_rounding(at::Tensor &t, int remove_bits) {
     t.view(torch::kI16).add_(1 << (remove_bits - 1));
     t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
 }
+
+void TxEncoderImpl::remove_bits(at::Tensor &qkv_w,
+                                at::Tensor &proj_w,
+                                at::Tensor &res1_w,
+                                at::Tensor &fc2_w,
+                                at::Tensor &fc1_w,
+                                at::Tensor &res2_w,
+                                int remove_bits) {
+    apply_rounding(qkv_w, remove_bits);
+    apply_rounding(proj_w, remove_bits);
+    apply_rounding(res1_w, remove_bits);
+    apply_rounding(fc2_w, remove_bits);
+    apply_rounding(fc1_w, remove_bits);
+    apply_rounding(res2_w, remove_bits);
+}
 #endif
 
 }  // namespace
@@ -530,12 +545,8 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
         // power efficient and results in higher performance for a small accuracy drop)
         int default_remove = utils::get_dev_opt("remove_bits", 4);
-        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
-        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
-        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
-        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
-        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
-        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
+        this->remove_bits(wqkv_weights_f16.t, proj_weight, t_res_weights, t_fc2_wts,
+                          t_fc1_wts_f16.t, t_res2_weights, default_remove);
     }
 
     // Output buffers
@@ -697,12 +708,8 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
         // power efficient and results in higher performance for a small accuracy drop)
         int default_remove = utils::get_dev_opt("remove_bits", 4);
-        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
-        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
-        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
-        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
-        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
-        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
+        this->remove_bits(wqkv_weights_f16.t, proj_weight, t_res_weights, t_fc2_wts,
+                          t_fc1_wts_f16.t, t_res2_weights, default_remove);
     }
 
     // Output buffers

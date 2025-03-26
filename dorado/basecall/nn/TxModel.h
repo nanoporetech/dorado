@@ -113,6 +113,8 @@ struct TxEncoderImpl : torch::nn::Module {
 
     at::Tensor forward(at::Tensor x);
 
+    void remove_bits(at::Tensor &qkv, at::Tensor &proj, at::Tensor &residual1, at::Tensor &fc2, at::Tensor &fc1, at::Tensor &residual2, int remove_bits)
+
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
     void koi_volta_forward(at::Tensor &x_f16);
 
