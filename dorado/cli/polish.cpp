@@ -10,6 +10,8 @@
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"
 #include "polish/vcf_writer.h"
+#include "secondary/bam_info.h"
+#include "secondary/batching.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
@@ -17,12 +19,12 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
+#include "utils/io_utils.h"
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
 #include <ATen/Parallel.h>
-#include <IntervalTree.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
@@ -87,7 +89,7 @@ struct Options {
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
     std::optional<std::string> regions_str;
-    std::vector<polisher::Region> regions;
+    std::vector<secondary::Region> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
@@ -108,41 +110,6 @@ struct Options {
     bool run_variant_calling = false;
     bool write_consensus = false;
 };
-
-/// \brief Parses Htslib-style regions either from a BED-like file on disk, or from a comma
-///         separated list of regions in the given string.
-std::vector<polisher::Region> parse_regions(const std::string& regions_arg) {
-    if (std::empty(regions_arg)) {
-        return {};
-    }
-
-    std::vector<polisher::Region> ret;
-
-    // Check if the string points to a file on disk.
-    if (std::filesystem::exists(regions_arg)) {
-        // Parse the BED-like format.
-        std::ifstream ifs(regions_arg);
-        std::string line;
-        while (std::getline(ifs, line)) {
-            std::istringstream iss(line);
-            std::string chr;
-            int64_t start = 0;
-            int64_t end = 0;
-            iss >> chr >> start >> end;
-            ret.emplace_back(polisher::Region{chr, start, end});
-        }
-
-    } else {
-        // Parse a comma delimited string of regions.
-        const auto str_regions = dorado::utils::split(regions_arg, ',');
-        for (const std::string& str_region : str_regions) {
-            polisher::Region region = polisher::parse_region_string(str_region);
-            ret.emplace_back(region);
-        }
-    }
-
-    return ret;
-}
 
 /// \brief Define the CLI options.
 ParserPtr create_cli(int& verbosity) {
@@ -347,7 +314,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.verbosity = verbosity;
     opt.regions_str = parser.visible.present<std::string>("regions");
     if (opt.regions_str) {
-        opt.regions = parse_regions(*opt.regions_str);
+        opt.regions = secondary::parse_regions(*opt.regions_str);
     }
     opt.min_depth = parser.visible.get<int>("min-depth");
 
@@ -475,75 +442,6 @@ void validate_options(const Options& opt) {
     }
 }
 
-std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
-        const std::filesystem::path& in_fastx_fn) {
-    const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
-
-    std::vector<std::pair<std::string, int64_t>> ret;
-    std::string line;
-    std::ifstream ifs(fai_path);
-    while (std::getline(ifs, line)) {
-        if (std::empty(line)) {
-            continue;
-        }
-        std::string name;
-        int64_t length = 0;
-        std::istringstream iss(line);
-        iss >> name >> length;
-        ret.emplace_back(std::move(name), length);
-    }
-    return ret;
-}
-
-std::vector<std::vector<polisher::ConsensusResult>> construct_consensus_seqs(
-        const dorado::polisher::Interval& region_batch,
-        const std::vector<polisher::ConsensusResult>& all_results_cons,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const bool fill_gaps,
-        const std::optional<char>& fill_char,
-        hts_io::FastxRandomReader& draft_reader) {
-    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
-
-    // Group samples by sequence ID.
-    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
-    for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
-        const polisher::ConsensusResult& r = all_results_cons[i];
-        const int32_t local_id = r.draft_id - region_batch.start;
-        // Skip filtered samples.
-        if (r.draft_id < 0) {
-            continue;
-        }
-        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
-            (local_id >= dorado::ssize(groups))) {
-            spdlog::error(
-                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
-                    "groups.size = {}",
-                    r.draft_id, std::size(draft_lens), std::size(groups));
-            continue;
-        }
-        groups[local_id].emplace_back(r.draft_start, i);
-    }
-
-    std::vector<std::vector<polisher::ConsensusResult>> ret;
-
-    // Consensus sequence - stitch the windows and write output.
-    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
-        const int64_t seq_id = group_id + region_batch.start;
-
-        auto& group = groups[group_id];
-        std::sort(std::begin(group), std::end(group));  // Sort by start pos.
-
-        const std::string& header = draft_lens[seq_id].first;
-
-        std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
-                draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
-
-        ret.emplace_back(std::move(consensus));
-    }
-
-    return ret;
-}
-
 void write_consensus_results(std::ostream& os,
                              const std::vector<polisher::ConsensusResult>& results,
                              const bool fill_gaps,
@@ -570,19 +468,6 @@ void write_consensus_results(std::ostream& os,
     }
 }
 
-std::unique_ptr<std::ostream, void (*)(std::ostream*)> get_output_stream(
-        const std::filesystem::path& out_fn) {
-    if (std::empty(out_fn)) {
-        return {&std::cout, [](std::ostream*) {}};
-    }
-    std::unique_ptr<std::ofstream, void (*)(std::ostream*)> ofs(
-            new std::ofstream(out_fn), [](std::ostream* ptr) { delete ptr; });
-    if (!ofs->is_open()) {
-        throw std::runtime_error("Failed to open file: " + out_fn.string());
-    }
-    return ofs;
-}
-
 std::filesystem::path download_model(const std::string& model_name) {
     const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
     const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
@@ -593,7 +478,7 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
-const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
+const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
                                           const std::string& model_str,
                                           const bool load_scripted_model,
                                           const bool bacteria,
@@ -788,141 +673,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     return model_config;
 }
 
-void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
-    if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
-        throw std::runtime_error{
-                "No @RG headers found in the input BAM, but user-specified RG was given. RG: '" +
-                cli_read_group + "'"};
-
-    } else if (std::empty(cli_read_group) && std::size(bam_info.read_groups) > 1) {
-        throw std::runtime_error{
-                "The input BAM contains more than one read group. Please specify --RG to select "
-                "which read group to process."};
-
-    } else if (!std::empty(cli_read_group) && !std::empty(bam_info.read_groups)) {
-        if (bam_info.read_groups.count(cli_read_group) == 0) {
-            std::ostringstream oss;
-            polisher::print_container(oss, bam_info.read_groups, ", ");
-            throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
-                                     cli_read_group + "'"};
-        }
-    }
-}
-
-/**
- * \brief Checks if any region overlaps amy of the other regions. This may produce wrong results, so
- *          we disallow that.
- */
-void validate_regions(const std::vector<polisher::Region>& regions,
-                      const std::vector<std::pair<std::string, int64_t>>& seq_lens) {
-    // Create intervals for each input sequence.
-    std::unordered_map<std::string, std::vector<interval_tree::Interval<int64_t, int64_t>>>
-            intervals;
-    for (const auto& region : regions) {
-        // NOTE: interval_tree has an inclusive end coordinate.
-        intervals[region.name].emplace_back(
-                interval_tree::Interval<int64_t, int64_t>(region.start, region.end - 1, 0));
-    }
-
-    // Compute the interval tree.
-    std::unordered_map<std::string, interval_tree::IntervalTree<int64_t, int64_t>> trees;
-    for (auto& [key, values] : intervals) {
-        trees[key] = interval_tree::IntervalTree<int64_t, int64_t>(std::move(values));
-    }
-
-    // Validate that none of the regions is overlapping any other region.
-    for (const auto& region : regions) {
-        std::vector<interval_tree::Interval<int64_t, int64_t>> results =
-                trees[region.name].findOverlapping(region.start, region.end - 1);
-        if (std::size(results) > 1) {
-            throw std::runtime_error("Region validation failed: region '" +
-                                     polisher::region_to_string(region) +
-                                     "' overlaps other regions. Regions have to be unique.");
-        }
-    }
-
-    // Validate that all of the regions are within the range of the input sequences.
-    std::unordered_map<std::string, int64_t> len_dict;
-    for (const auto& [key, val] : seq_lens) {
-        len_dict[key] = val;
-    }
-    for (const auto& region : regions) {
-        const auto it = len_dict.find(region.name);
-        if (it == std::end(len_dict)) {
-            throw std::runtime_error{"Region validation failed: sequence name for region '" +
-                                     polisher::region_to_string(region) +
-                                     "' does not exist in the input sequence file."};
-        }
-        const int64_t seq_len = it->second;
-        // Allow negative coordinates as a proxy for full sequence length.
-        if ((region.start >= seq_len) || (region.end > seq_len) ||
-            ((region.start >= 0) && (region.end >= 0) && (region.start >= region.end))) {
-            throw std::runtime_error{
-                    "Region validation failed: coordinates for region '" +
-                    polisher::region_to_string(region) +
-                    "' are not valid. Sequence length: " + std::to_string(seq_len)};
-        }
-    }
-}
-
-/**
- * \brief Groups input regions into bins of sequence IDs.
- * \param draft_lens Vector of sequence names and their lengths.
- * \param user_regions Vector of user-provided regions. Optional, can be empty.
- * \param draft_batch_size Split draft regions into batches of roughly this size. Each element is an interval
- *                          of draft sequences.
- * \returns Pair of two objects: (1) vector of sequence IDs (0 to len(draft_lens)), with the internal vector containing
- *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
- *          These intervals are indices of the first return vector in this pair.
- */
-std::pair<std::vector<std::vector<polisher::Region>>, std::vector<polisher::Interval>>
-prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                       const std::vector<polisher::Region>& user_regions,
-                       const int64_t draft_batch_size) {
-    // Create a lookup.
-    std::unordered_map<std::string, int64_t> draft_ids;
-    for (int64_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-        draft_ids[draft_lens[seq_id].first] = seq_id;
-    }
-
-    // Outer vector: ID of the draft, inner vector: regions.
-    std::vector<std::vector<polisher::Region>> ret(std::size(draft_lens));
-
-    if (std::empty(user_regions)) {
-        // Add full draft sequences.
-        for (int64_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-            const auto& [draft_name, draft_len] = draft_lens[seq_id];
-            ret[seq_id].emplace_back(polisher::Region{draft_name, 0, draft_len});
-        }
-
-    } else {
-        // Bin the user regions for individual contigs.
-        for (const auto& region : user_regions) {
-            const auto it = draft_ids.find(region.name);
-            if (it == std::end(draft_ids)) {
-                throw std::runtime_error(
-                        "Sequence name from a custom specified region not found in the input "
-                        "sequence file! region: " +
-                        polisher::region_to_string(region));
-            }
-            const int64_t seq_id = it->second;
-            ret[seq_id].emplace_back(polisher::Region{region.name, region.start, region.end});
-        }
-    }
-
-    // Divide draft sequences into groups of specified size, as sort of a barrier.
-    std::vector<polisher::Interval> region_batches = polisher::create_batches(
-            ret, draft_batch_size, [](const std::vector<polisher::Region>& regions) {
-                int64_t sum = 0;
-                for (const auto& region : regions) {
-                    sum += region.end - region.start;
-                }
-                return sum;
-            });
-
-    return std::make_pair(std::move(ret), std::move(region_batches));
-}
-
 void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
@@ -943,7 +693,7 @@ void run_polishing(const Options& opt,
     // Load sequence lengths.
     spdlog::debug("[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
-            load_seq_lengths(opt.in_draft_fastx_fn);
+            utils::load_seq_lengths(opt.in_draft_fastx_fn);
 
     // Create windows only for the selected regions.
     std::unordered_map<std::string, std::pair<int64_t, int64_t>> draft_lookup;
@@ -951,7 +701,7 @@ void run_polishing(const Options& opt,
         draft_lookup[draft_lens[seq_id].first] = {seq_id, draft_lens[seq_id].second};
     }
 
-    validate_regions(opt.regions, draft_lens);
+    secondary::validate_regions(opt.regions, draft_lens);
 
     // Open the draft FASTA file. One reader per thread.
     std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
@@ -983,7 +733,7 @@ void run_polishing(const Options& opt,
             (opt.out_format == OutputFormat::FASTA) ? "consensus.fasta" : "consensus.fastq";
     const std::filesystem::path out_consensus_fn =
             (std::empty(opt.output_dir)) ? "" : (opt.output_dir / bn);
-    auto ofs_consensus = get_output_stream(out_consensus_fn);
+    auto ofs_consensus = utils::get_output_stream(out_consensus_fn);
 
     // Open the output stream to a file/stdout for the variant calls.
     const std::filesystem::path out_vcf_fn =
@@ -1004,7 +754,7 @@ void run_polishing(const Options& opt,
 
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
-            prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
+            secondary::prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
 
     // Update the progress tracker.
     {
@@ -1033,7 +783,7 @@ void run_polishing(const Options& opt,
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
-        std::vector<polisher::Region> region_batch;
+        std::vector<secondary::Region> region_batch;
         for (int32_t i = batch_interval.start; i < batch_interval.end; ++i) {
             region_batch.insert(std::end(region_batch), std::begin(input_regions[i]),
                                 std::end(input_regions[i]));
@@ -1050,7 +800,7 @@ void run_polishing(const Options& opt,
                       batch_interval.start, batch_interval.end);
         for (int64_t i = 0; i < dorado::ssize(region_batch); ++i) {
             spdlog::debug("[run_polishing] region_batch i = {}: {}", i,
-                          polisher::region_to_string(region_batch[i]));
+                          secondary::region_to_string(region_batch[i]));
         }
 
         std::vector<polisher::ConsensusResult> all_results_cons;
@@ -1131,9 +881,9 @@ void run_polishing(const Options& opt,
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
                 const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                        construct_consensus_seqs(batch_interval, all_results_cons, draft_lens,
-                                                 opt.fill_gaps, opt.fill_char,
-                                                 *draft_readers.front());
+                        polisher::construct_consensus_seqs(batch_interval, all_results_cons,
+                                                           draft_lens, opt.fill_gaps, opt.fill_char,
+                                                           *draft_readers.front());
 
                 // Write the consensus file.
                 for (const auto& consensus : consensus_seqs) {
@@ -1203,7 +953,8 @@ int polish(int argc, char* argv[]) {
         validate_options(opt);
 
         // Get info from BAM needed for the run.
-        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
+        const secondary::BamInfo bam_info =
+                secondary::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
 
         // Debug printing.
         {
@@ -1231,7 +982,7 @@ int polish(int argc, char* argv[]) {
 
         // Validate the read groups in the BAM file.
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
-            check_read_groups(bam_info, opt.read_group);
+            secondary::check_read_groups(bam_info, opt.read_group);
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.

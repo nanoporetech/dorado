@@ -3,7 +3,8 @@
 #include "hts_io/FastxRandomReader.h"
 #include "polish/interval.h"
 #include "polish/polish_utils.h"
-#include "polish/region.h"
+#include "secondary/batching.h"
+#include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
@@ -13,6 +14,7 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <memory>
 
 #if DORADO_CUDA_BUILD
@@ -152,96 +154,6 @@ PolisherResources create_resources(const ModelConfig& model_config,
     }
 
     return resources;
-}
-
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
-    BamInfo ret;
-
-    BamFile bam(in_aln_bam_fn);
-
-    const std::vector<HeaderLineData> header = bam.parse_header();
-
-    // Get info from headers: program and the read groups.
-    for (const auto& line : header) {
-        // Convert all tags into a lookup.
-        const std::unordered_map<std::string, std::string> tags = [&]() {
-            std::unordered_map<std::string, std::string> local_ret;
-            for (const auto& [key, value] : line.tags) {
-                local_ret[key] = value;
-            }
-            return local_ret;
-        }();
-
-        if (line.header_type == "@PG") {
-            // Example PG line:
-            //      @PG	ID:aligner	PP:samtools.2	PN:dorado	VN:0.0.0+2852e11d	DS:2.27-r1193
-
-            const auto& it_pn = tags.find("PN");
-            const auto& it_id = tags.find("ID");
-            if ((it_pn != std::end(tags)) && it_id != std::end(tags)) {
-                // Convert the program name to lowercase just in case.
-                std::string pn = it_pn->second;
-                std::transform(std::begin(pn), std::end(pn), std::begin(pn),
-                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-                // Convert the program ID to lowercase just in case.
-                std::string id = it_id->second;
-                std::transform(std::begin(id), std::end(id), std::begin(id),
-                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-
-                if ((pn == "dorado") && utils::starts_with(id, "aligner")) {
-                    // Multiple tools can be run on a BAM, and the ID field needs to be unique by spec.
-                    // Example possibilites: aligner, aligner.1, samtools.1, samtools.2, etc.
-                    ret.uses_dorado_aligner = true;
-                }
-            }
-        } else if (line.header_type == "@RG") {
-            // Example RG line:
-            //      @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	DT:2022-10-18T10:38:07.247961+00:00	DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 modbase_models=dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v2,dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v2	LB:PCR_zymo	PL:ONT	PM:4A	PU:PAM93185	al:PCR_zymo
-
-            // Parse the read group ID.
-            const auto& it_id = tags.find("ID");
-            const std::string id = (it_id != std::end(tags)) ? it_id->second : "";
-
-            // Parse the basecaller model.
-            const auto& it_ds = tags.find("DS");
-            std::string basecaller_model;
-            if (it_ds != std::end(tags)) {
-                const std::vector<std::string> tokens = utils::split(it_ds->second, ' ');
-                constexpr std::string_view TOKEN_NAME{"basecall_model="};
-                for (const auto& token : tokens) {
-                    if (!utils::starts_with(token, TOKEN_NAME)) {
-                        continue;
-                    }
-                    basecaller_model = token.substr(std::size(TOKEN_NAME));
-                    break;
-                }
-            }
-
-            if (std::empty(id)) {
-                continue;
-            }
-            if (!std::empty(cli_read_group) && (id != cli_read_group)) {
-                continue;
-            }
-            if (std::empty(basecaller_model)) {
-                continue;
-            }
-
-            ret.read_groups.emplace(id);
-            ret.basecaller_models.emplace(basecaller_model);
-        }
-    }
-
-    // Check for the dwells ("mv") tag. Only parse one record.
-    {
-        const auto record = bam.get_next();
-        if ((record != nullptr) && (bam_aux_get(record.get(), "mv") != nullptr)) {
-            ret.has_dwells = true;
-        }
-    }
-
-    return ret;
 }
 
 void remove_deletions(ConsensusResult& cons) {
@@ -582,7 +494,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             // Compute sample trimming coordinates.
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
-                    local_samples, std::optional<RegionInt>(
+                    local_samples, std::optional<secondary::RegionInt>(
                                            {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
@@ -701,7 +613,7 @@ std::vector<Sample> encode_windows_in_parallel(
 }
 
 std::vector<Window> create_windows_from_regions(
-        const std::vector<Region>& regions,
+        const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap) {
@@ -778,8 +690,8 @@ void sample_producer(PolisherResources& resources,
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<Interval> bam_region_batches =
-            create_batches(bam_region_intervals, num_threads,
-                           [](const Interval& val) { return val.end - val.start; });
+            secondary::create_batches(bam_region_intervals, num_threads,
+                                      [](const Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
 
@@ -1243,6 +1155,55 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
     }
 
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
+}
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader) {
+    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
+
+    // Group samples by sequence ID.
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
+    for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
+        const ConsensusResult& r = all_results_cons[i];
+        const int32_t local_id = r.draft_id - region_batch.start;
+        // Skip filtered samples.
+        if (r.draft_id < 0) {
+            continue;
+        }
+        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+            (local_id >= dorado::ssize(groups))) {
+            spdlog::error(
+                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                    "groups.size = {}",
+                    r.draft_id, std::size(draft_lens), std::size(groups));
+            continue;
+        }
+        groups[local_id].emplace_back(r.draft_start, i);
+    }
+
+    std::vector<std::vector<ConsensusResult>> ret;
+
+    // Consensus sequence - stitch the windows and write output.
+    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
+        const int64_t seq_id = group_id + region_batch.start;
+
+        auto& group = groups[group_id];
+        std::sort(std::begin(group), std::end(group));  // Sort by start pos.
+
+        const std::string& header = draft_lens[seq_id].first;
+
+        std::vector<ConsensusResult> consensus = stitch_sequence(
+                draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
+
+        ret.emplace_back(std::move(consensus));
+    }
+
+    return ret;
 }
 
 }  // namespace dorado::polisher

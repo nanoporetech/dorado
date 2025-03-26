@@ -18,7 +18,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <tuple>
+#include <utility>
 #include <vector>
 
 // Forward declare the FastxRandomReader.
@@ -43,13 +43,6 @@ struct PolisherResources {
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<ModelTorchBase>> models;
     std::vector<c10::optional<c10::Stream>> streams;
-};
-
-struct BamInfo {
-    bool uses_dorado_aligner = false;
-    bool has_dwells = false;
-    std::unordered_set<std::string> read_groups;
-    std::unordered_set<std::string> basecaller_models;
 };
 
 /**
@@ -85,13 +78,6 @@ PolisherResources create_resources(const ModelConfig& model_config,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override);
-
-/**
- * \brief Opens the input BAM file and summarizes some information needed at runtime.
- * \param in_aln_bam_fn Path to the input BAM file.
- * \param cli_read_group If not empty, only this read group will be loaded from the BAM header.
- */
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
@@ -156,7 +142,7 @@ std::vector<Sample> encode_windows_in_parallel(
  *          input draft sequences into windows.
  */
 std::vector<Window> create_windows_from_regions(
-        const std::vector<Region>& regions,
+        const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap);
@@ -197,5 +183,13 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data);
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader);
 
 }  // namespace dorado::polisher

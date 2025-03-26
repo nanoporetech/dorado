@@ -1,6 +1,7 @@
 #pragma once
 
 #include "interval.h"
+#include "secondary/region.h"
 
 #include <ATen/ATen.h>
 
@@ -38,64 +39,6 @@ std::vector<int32_t> parse_int32_vector(const std::string& input);
  *          is given with a start (zero-based) and end (non-inclusive) item ID.
  */
 std::vector<Interval> compute_partitions(const int32_t num_items, const int32_t num_partitions);
-
-/**
- * \brief Prints the contents of an iterable container to a stream. Useful for debug purposes.
- */
-template <typename T>
-void print_container(std::ostream& os, const T& data, const std::string& delimiter) {
-    bool first = true;
-    os << "[";
-    for (const auto& val : data) {
-        if (!first) {
-            os << delimiter;
-        }
-        os << val;
-        first = false;
-    }
-    os << "]";
-}
-
-/**
- * \brief Wrapper around print_container, but it returns a std::string formatted string instead.
- */
-template <typename T>
-std::string print_container_as_string(const T& data, const std::string& delimiter) {
-    std::ostringstream oss;
-    print_container(oss, data, delimiter);
-    return oss.str();
-}
-
-/**
- * \brief Computes intervals of input objects to split the input data into. Similar to
- *          compute_partitions, but here the items can have variable size.
- * \param data Input data items to partition.
- * \param batch_size Approximate size of one output batch. The output batch size is allowed to be larger than this if the next item crosses the size boundary.
- * \param functor_data_size Functor used to determine the size of one of the data objects.
- * \returns Vector of intervals which divide the input data into batches of specified size.
- */
-template <typename T, typename F>
-std::vector<Interval> create_batches(const T& data,
-                                     const int64_t batch_size,
-                                     const F& functor_data_size) {
-    std::vector<Interval> ret;
-    Interval interval{0, 0};
-    int64_t sum = 0;
-    for (const auto& val : data) {
-        const int64_t s = functor_data_size(val);
-        sum += s;
-        ++interval.end;
-        if (sum >= batch_size) {
-            ret.emplace_back(interval);
-            interval.start = interval.end;
-            sum = 0;
-        }
-    }
-    if (interval.end > interval.start) {
-        ret.emplace_back(interval);
-    }
-    return ret;
-}
 
 void save_tensor(const at::Tensor& tensor, const std::string& file_path);
 
