@@ -460,55 +460,6 @@ std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
     return ret;
 }
 
-std::vector<std::vector<polisher::ConsensusResult>> construct_consensus_seqs(
-        const dorado::polisher::Interval& region_batch,
-        const std::vector<polisher::ConsensusResult>& all_results_cons,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const bool fill_gaps,
-        const std::optional<char>& fill_char,
-        hts_io::FastxRandomReader& draft_reader) {
-    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
-
-    // Group samples by sequence ID.
-    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
-    for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
-        const polisher::ConsensusResult& r = all_results_cons[i];
-        const int32_t local_id = r.draft_id - region_batch.start;
-        // Skip filtered samples.
-        if (r.draft_id < 0) {
-            continue;
-        }
-        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
-            (local_id >= dorado::ssize(groups))) {
-            spdlog::error(
-                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
-                    "groups.size = {}",
-                    r.draft_id, std::size(draft_lens), std::size(groups));
-            continue;
-        }
-        groups[local_id].emplace_back(r.draft_start, i);
-    }
-
-    std::vector<std::vector<polisher::ConsensusResult>> ret;
-
-    // Consensus sequence - stitch the windows and write output.
-    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
-        const int64_t seq_id = group_id + region_batch.start;
-
-        auto& group = groups[group_id];
-        std::sort(std::begin(group), std::end(group));  // Sort by start pos.
-
-        const std::string& header = draft_lens[seq_id].first;
-
-        std::vector<polisher::ConsensusResult> consensus = polisher::stitch_sequence(
-                draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
-
-        ret.emplace_back(std::move(consensus));
-    }
-
-    return ret;
-}
-
 void write_consensus_results(std::ostream& os,
                              const std::vector<polisher::ConsensusResult>& results,
                              const bool fill_gaps,
@@ -1027,9 +978,9 @@ void run_polishing(const Options& opt,
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
                 const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
-                        construct_consensus_seqs(batch_interval, all_results_cons, draft_lens,
-                                                 opt.fill_gaps, opt.fill_char,
-                                                 *draft_readers.front());
+                        polisher::construct_consensus_seqs(batch_interval, all_results_cons,
+                                                           draft_lens, opt.fill_gaps, opt.fill_char,
+                                                           *draft_readers.front());
 
                 // Write the consensus file.
                 for (const auto& consensus : consensus_seqs) {

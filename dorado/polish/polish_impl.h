@@ -18,7 +18,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <tuple>
+#include <utility>
 #include <vector>
 
 // Forward declare the FastxRandomReader.
@@ -197,5 +197,13 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data);
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader);
 
 }  // namespace dorado::polisher

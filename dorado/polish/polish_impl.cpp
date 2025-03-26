@@ -13,6 +13,7 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <memory>
 
 #if DORADO_CUDA_BUILD
@@ -1243,6 +1244,55 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
     }
 
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
+}
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader) {
+    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
+
+    // Group samples by sequence ID.
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
+    for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
+        const ConsensusResult& r = all_results_cons[i];
+        const int32_t local_id = r.draft_id - region_batch.start;
+        // Skip filtered samples.
+        if (r.draft_id < 0) {
+            continue;
+        }
+        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+            (local_id >= dorado::ssize(groups))) {
+            spdlog::error(
+                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                    "groups.size = {}",
+                    r.draft_id, std::size(draft_lens), std::size(groups));
+            continue;
+        }
+        groups[local_id].emplace_back(r.draft_start, i);
+    }
+
+    std::vector<std::vector<ConsensusResult>> ret;
+
+    // Consensus sequence - stitch the windows and write output.
+    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
+        const int64_t seq_id = group_id + region_batch.start;
+
+        auto& group = groups[group_id];
+        std::sort(std::begin(group), std::end(group));  // Sort by start pos.
+
+        const std::string& header = draft_lens[seq_id].first;
+
+        std::vector<ConsensusResult> consensus = stitch_sequence(
+                draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
+
+        ret.emplace_back(std::move(consensus));
+    }
+
+    return ret;
 }
 
 }  // namespace dorado::polisher
