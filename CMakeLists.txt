@@ -363,8 +363,6 @@ add_library(dorado_lib
     dorado/utils/container_utils.h
     dorado/utils/io_utils.cpp
     dorado/utils/io_utils.h
-    dorado/utils/region.cpp
-    dorado/utils/region.h
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
@@ -372,6 +370,8 @@ add_library(dorado_lib
     dorado/secondary/bam_info.h
     dorado/secondary/batching.cpp
     dorado/secondary/batching.h
+    dorado/secondary/region.cpp
+    dorado/secondary/region.h
 )
 
 enable_warnings_as_errors(dorado_lib)

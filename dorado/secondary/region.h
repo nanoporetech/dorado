@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::utils {
+namespace dorado::secondary {
 
 struct RegionInt {
     int32_t seq_id = -1;
@@ -55,4 +55,4 @@ std::vector<Region> parse_regions(const std::string& regions_arg);
 void validate_regions(const std::vector<Region>& regions,
                       const std::vector<std::pair<std::string, int64_t>>& seq_lens);
 
-}  // namespace dorado::utils
+}  // namespace dorado::secondary

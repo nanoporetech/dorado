@@ -142,7 +142,7 @@ std::vector<Sample> encode_windows_in_parallel(
  *          input draft sequences into windows.
  */
 std::vector<Window> create_windows_from_regions(
-        const std::vector<utils::Region>& regions,
+        const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap);

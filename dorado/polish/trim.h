@@ -1,7 +1,7 @@
 #pragma once
 
 #include "sample.h"
-#include "utils/region.h"
+#include "secondary/region.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -26,7 +26,7 @@ struct TrimInfo {
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
-                                   const std::optional<const utils::RegionInt>& region);
+                                   const std::optional<const secondary::RegionInt>& region);
 
 /**
  * \brief Identical functionality to the above trim_samples, but this one allows for more efficient sample
@@ -38,7 +38,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
 std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
-                                   const std::optional<const utils::RegionInt>& region);
+                                   const std::optional<const secondary::RegionInt>& region);
 
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs);
 

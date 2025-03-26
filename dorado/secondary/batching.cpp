@@ -5,9 +5,9 @@
 
 namespace dorado::secondary {
 
-std::pair<std::vector<std::vector<utils::Region>>, std::vector<polisher::Interval>>
+std::pair<std::vector<std::vector<secondary::Region>>, std::vector<polisher::Interval>>
 prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                       const std::vector<utils::Region>& user_regions,
+                       const std::vector<secondary::Region>& user_regions,
                        const int64_t draft_batch_size) {
     // Create a lookup.
     std::unordered_map<std::string, int64_t> draft_ids;
@@ -16,13 +16,13 @@ prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft
     }
 
     // Outer vector: ID of the draft, inner vector: regions.
-    std::vector<std::vector<utils::Region>> ret(std::size(draft_lens));
+    std::vector<std::vector<secondary::Region>> ret(std::size(draft_lens));
 
     if (std::empty(user_regions)) {
         // Add full draft sequences.
         for (int64_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
             const auto& [draft_name, draft_len] = draft_lens[seq_id];
-            ret[seq_id].emplace_back(utils::Region{draft_name, 0, draft_len});
+            ret[seq_id].emplace_back(secondary::Region{draft_name, 0, draft_len});
         }
 
     } else {
@@ -33,16 +33,16 @@ prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft
                 throw std::runtime_error(
                         "Sequence name from a custom specified region not found in the input "
                         "sequence file! region: " +
-                        utils::region_to_string(region));
+                        secondary::region_to_string(region));
             }
             const int64_t seq_id = it->second;
-            ret[seq_id].emplace_back(utils::Region{region.name, region.start, region.end});
+            ret[seq_id].emplace_back(secondary::Region{region.name, region.start, region.end});
         }
     }
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
-    std::vector<polisher::Interval> region_batches =
-            create_batches(ret, draft_batch_size, [](const std::vector<utils::Region>& regions) {
+    std::vector<polisher::Interval> region_batches = create_batches(
+            ret, draft_batch_size, [](const std::vector<secondary::Region>& regions) {
                 int64_t sum = 0;
                 for (const auto& region : regions) {
                     sum += region.end - region.start;

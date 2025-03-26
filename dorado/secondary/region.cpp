@@ -1,6 +1,6 @@
 #include "region.h"
 
-#include "string_utils.h"
+#include "utils/string_utils.h"
 
 #include <IntervalTree.h>
 
@@ -12,7 +12,7 @@
 #include <tuple>
 #include <unordered_map>
 
-namespace dorado::utils {
+namespace dorado::secondary {
 
 std::ostream& operator<<(std::ostream& os, const Region& region) {
     os << region.name << ":" << (region.start + 1) << "-" << region.end;
@@ -76,7 +76,7 @@ std::vector<Region> parse_regions(const std::string& regions_arg) {
 
     } else {
         // Parse a comma delimited string of regions.
-        const auto str_regions = split(regions_arg, ',');
+        const auto str_regions = utils::split(regions_arg, ',');
         for (const std::string& str_region : str_regions) {
             Region region = parse_region_string(str_region);
             ret.emplace_back(region);
@@ -138,4 +138,4 @@ void validate_regions(const std::vector<Region>& regions,
     }
 }
 
-}  // namespace dorado::utils
+}  // namespace dorado::secondary

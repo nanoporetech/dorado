@@ -1,7 +1,7 @@
 #pragma once
 
 #include "polish/interval.h"
-#include "utils/region.h"
+#include "region.h"
 #include "utils/ssize.h"
 
 #include <cstdint>
@@ -51,9 +51,9 @@ std::vector<polisher::Interval> create_batches(const T& data,
  *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
  *          These intervals are indices of the first return vector in this pair.
  */
-std::pair<std::vector<std::vector<utils::Region>>, std::vector<polisher::Interval>>
+std::pair<std::vector<std::vector<secondary::Region>>, std::vector<polisher::Interval>>
 prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                       const std::vector<utils::Region>& user_regions,
+                       const std::vector<secondary::Region>& user_regions,
                        const int64_t draft_batch_size);
 
 }  // namespace dorado::secondary

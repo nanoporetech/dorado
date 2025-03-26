@@ -89,7 +89,7 @@ struct Options {
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
     std::optional<std::string> regions_str;
-    std::vector<utils::Region> regions;
+    std::vector<secondary::Region> regions;
     bool full_precision = false;
     bool load_scripted_model = false;
     int32_t queue_size = 1000;
@@ -314,7 +314,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.verbosity = verbosity;
     opt.regions_str = parser.visible.present<std::string>("regions");
     if (opt.regions_str) {
-        opt.regions = utils::parse_regions(*opt.regions_str);
+        opt.regions = secondary::parse_regions(*opt.regions_str);
     }
     opt.min_depth = parser.visible.get<int>("min-depth");
 
@@ -701,7 +701,7 @@ void run_polishing(const Options& opt,
         draft_lookup[draft_lens[seq_id].first] = {seq_id, draft_lens[seq_id].second};
     }
 
-    validate_regions(opt.regions, draft_lens);
+    secondary::validate_regions(opt.regions, draft_lens);
 
     // Open the draft FASTA file. One reader per thread.
     std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
@@ -783,7 +783,7 @@ void run_polishing(const Options& opt,
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
-        std::vector<utils::Region> region_batch;
+        std::vector<secondary::Region> region_batch;
         for (int32_t i = batch_interval.start; i < batch_interval.end; ++i) {
             region_batch.insert(std::end(region_batch), std::begin(input_regions[i]),
                                 std::end(input_regions[i]));
@@ -800,7 +800,7 @@ void run_polishing(const Options& opt,
                       batch_interval.start, batch_interval.end);
         for (int64_t i = 0; i < dorado::ssize(region_batch); ++i) {
             spdlog::debug("[run_polishing] region_batch i = {}: {}", i,
-                          utils::region_to_string(region_batch[i]));
+                          secondary::region_to_string(region_batch[i]));
         }
 
         std::vector<polisher::ConsensusResult> all_results_cons;
