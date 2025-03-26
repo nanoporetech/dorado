@@ -637,17 +637,13 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     const int C = params.d_model;
     const int D = params.d_model / params.nhead;
     const int H = params.nhead;
-    const int E = params.dim_feedforward * 2;  // E = 2048 I think
-    // const auto [win_upper, win_lower] = params.attn_window;
+    const int E = params.dim_feedforward * 2;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
     bool default_f32_accum = utils::get_dev_opt("volta_f32_accum", false);
-    // Flags to use FP32 or FP16 Accumulator tiles. Using FP32 throughout for best possible accuracy
     bool useFloatAccumQKV = utils::get_dev_opt("volta_f32_accum_qkv", default_f32_accum);
-    // bool useFloatAccumAttn = false; // Not yet implemented the possibility to change between float or fp16 online softmax in attn kernel
     bool useFloatAccumProj = utils::get_dev_opt("volta_f32_accum_proj", default_f32_accum);
     bool useBiasProj = true;
-    // RMSNorm always in F16
     bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", default_f32_accum);
     bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", default_f32_accum);
     bool useBiasfc2 = false;
@@ -679,7 +675,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         sincos_bfr.select(2, 1) = rot_bfrs["cos_freqs"].slice(0, 0, max_T).view({max_T, D / 2});
         sincos_bfr = sincos_bfr.view({max_T / 16, 2, 8, D / 16, 2, 8})
                              .permute({0, 3, 4, 1, 2, 5})
-                             .contiguous();  // Very specific layout for this one, sorry
+                             .contiguous();  // This follows volta mma layout 16x16 tile
 
         // proj_weight is the M, N=512, K=512 linear layer. self_attn->out_proj->weight is of layout (N, K)
         proj_weight = self_attn->out_proj->weight.view({C / 16, 16, C / 16, 16})
@@ -695,7 +691,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         auto fc1_weight_interleaved =
                 ff->fc1->weight.unflatten(0, {2, -1, 16})
                         .transpose(0, 1)
-                        .contiguous();  // ! New layout for changed swiglu function
+                        .contiguous();
 
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
@@ -704,7 +700,6 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         t_fc2_wts =
                 ff->fc2->weight.view({C / 16, 16, (E / 2) / 16, 16}).transpose(1, 2).contiguous();
 
-        // TODO: Investigate performance gain/accuracy loss from zeroing lowest mantissa bits in Volta
         // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
         // power efficient and results in higher performance for a small accuracy drop)
         int default_remove = utils::get_dev_opt("remove_bits", 4);
@@ -774,7 +769,6 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
                 // ! Use initial input x_f16 as output buffer for second rmsnorm
                 half_ptr(x_f16), alpha, N * T);
     }
-    // TODO: handle result
     if (res != KOI_SUCCESS) {
         spdlog::error("Koi Volta tiled path failed {}", calls);
     }

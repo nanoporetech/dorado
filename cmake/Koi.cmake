@@ -1,4 +1,4 @@
-OPTION(BUILD_KOI_FROM_SOURCE ON)
+OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
@@ -43,7 +43,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION v100_transformer_test)
+    set(KOI_VERSION 0.5.4)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
