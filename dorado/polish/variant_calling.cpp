@@ -2,6 +2,7 @@
 
 #include "consensus_result.h"
 #include "polish_stats.h"
+#include "secondary/batching.h"
 #include "trim.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"
@@ -846,7 +847,7 @@ std::vector<Variant> call_variants(
 
     // Partition groups to chunks for multithreaded processing.
     const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
 
     // Create the thread pool.
     cxxpool::thread_pool pool{std::size(thread_chunks)};

@@ -11,6 +11,18 @@
 namespace dorado::secondary {
 
 /**
+ * \brief Utility function to determine partitions for multithreading. For example,
+ *          num_items is the number of items to process, while num_chunks is the number
+ *          of threads. The items are then chunked into as equal number of bins as possible.
+ * \param num_items Number of items to process.
+ * \param num_partitions Number of threads/buckets/partitions to divide the items into.
+ * \returns Vector of intervals which is the length of min(num_items, num_chunks). Each partition
+ *          is given with a start (zero-based) and end (non-inclusive) item ID.
+ */
+std::vector<polisher::Interval> compute_partitions(const int32_t num_items,
+                                                   const int32_t num_partitions);
+
+/**
  * \brief Computes intervals of input objects to split the input data into. Similar to
  *          compute_partitions, but here the items can have variable size.
  * \param data Input data items to partition.
