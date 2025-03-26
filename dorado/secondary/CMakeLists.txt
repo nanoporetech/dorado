@@ -1,4 +1,6 @@
 add_library(dorado_secondary
+    bam_file.cpp
+    bam_file.h
     bam_info.cpp
     bam_info.h
     batching.cpp

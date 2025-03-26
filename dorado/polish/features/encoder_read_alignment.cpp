@@ -341,7 +341,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype} {}
 
-Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
+Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
                                            const std::string& ref_name,
                                            const int64_t ref_start,
                                            const int64_t ref_end,

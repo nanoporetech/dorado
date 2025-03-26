@@ -1,8 +1,8 @@
 #pragma once
 
-#include "polish/bam_file.h"
 #include "polish/consensus_result.h"
 #include "polish/sample.h"
+#include "secondary/bam_file.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -48,7 +48,7 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual Sample encode_region(BamFile& bam_file,
+    virtual Sample encode_region(secondary::BamFile& bam_file,
                                  const std::string& ref_name,
                                  const int64_t ref_start,
                                  const int64_t ref_end,

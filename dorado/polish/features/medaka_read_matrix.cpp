@@ -1,7 +1,7 @@
 #include "medaka_read_matrix.h"
 
 #include "medaka_bamiter.h"
-#include "polish/bam_file.h"
+#include "secondary/bam_file.h"
 #include "utils/ssize.h"
 
 #include <htslib/sam.h>
@@ -229,7 +229,7 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
     buffer_reads = new_buffer_reads;
 }
 
-ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
+ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const std::string &chr_name,
                                            const int64_t start,
                                            const int64_t end,  // Non-inclusive.

@@ -17,7 +17,7 @@ struct HtsIdxDestructor {
 };
 using HtsIdxPtr = std::unique_ptr<hts_idx_t, HtsIdxDestructor>;
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct HeaderLineData {
     std::string header_type;
@@ -51,4 +51,4 @@ void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& heade
 
 std::string header_to_string(const std::vector<HeaderLineData>& header);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

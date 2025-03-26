@@ -6,6 +6,7 @@
 #include "polish/features/encoder_factory.h"
 #include "polish_stats.h"
 #include "sample.h"
+#include "secondary/bam_file.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
@@ -39,7 +40,7 @@ struct DeviceInfo {
 struct PolisherResources {
     std::unique_ptr<EncoderBase> encoder;
     std::unique_ptr<DecoderBase> decoder;
-    std::vector<BamFile> bam_handles;
+    std::vector<secondary::BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<ModelTorchBase>> models;
     std::vector<c10::optional<c10::Stream>> streams;
@@ -131,7 +132,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
  *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
  */
 std::vector<Sample> encode_windows_in_parallel(
-        std::vector<BamFile>& bam_handles,
+        std::vector<secondary::BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,

@@ -123,7 +123,7 @@ std::vector<float> get_weibull_scores(const bam_pileup1_t *p,
 
 }  // namespace
 
-PileupData calculate_pileup(BamFile &bam_file,
+PileupData calculate_pileup(secondary::BamFile &bam_file,
                             const std::string &chr_name,
                             const int64_t start,  // Zero-based.
                             const int64_t end,    // Non-inclusive.

@@ -150,7 +150,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
+        resources.bam_handles.emplace_back(secondary::BamFile(in_aln_bam_fn));
     }
 
     return resources;
@@ -553,7 +553,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 }
 
 std::vector<Sample> encode_windows_in_parallel(
-        std::vector<BamFile>& bam_handles,
+        std::vector<secondary::BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
