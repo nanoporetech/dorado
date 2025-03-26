@@ -1,4 +1,4 @@
-OPTION(BUILD_KOI_FROM_SOURCE OFF)
+OPTION(BUILD_KOI_FROM_SOURCE ON)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
