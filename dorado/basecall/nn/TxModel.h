@@ -113,14 +113,6 @@ struct TxEncoderImpl : torch::nn::Module {
 
     at::Tensor forward(at::Tensor x);
 
-    void remove_bits(at::Tensor &qkv,
-                     at::Tensor &proj,
-                     at::Tensor &residual1,
-                     at::Tensor &fc2,
-                     at::Tensor &fc1,
-                     at::Tensor &residual2,
-                     int remove_bits);
-
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
     void koi_volta_forward(at::Tensor &x_f16);
 
@@ -129,6 +121,8 @@ struct TxEncoderImpl : torch::nn::Module {
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
     at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
+
+    void remove_bits(int remove_bits);
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
