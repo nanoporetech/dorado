@@ -109,21 +109,6 @@ void apply_rounding(at::Tensor &t, int remove_bits) {
     t.view(torch::kI16).add_(1 << (remove_bits - 1));
     t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
 }
-
-void TxEncoderImpl::remove_bits(at::Tensor &qkv_w,
-                                at::Tensor &proj_w,
-                                at::Tensor &res1_w,
-                                at::Tensor &fc2_w,
-                                at::Tensor &fc1_w,
-                                at::Tensor &res2_w,
-                                int remove_bits) {
-    apply_rounding(qkv_w, remove_bits);
-    apply_rounding(proj_w, remove_bits);
-    apply_rounding(res1_w, remove_bits);
-    apply_rounding(fc2_w, remove_bits);
-    apply_rounding(fc1_w, remove_bits);
-    apply_rounding(res2_w, remove_bits);
-}
 #endif
 
 }  // namespace
@@ -468,6 +453,21 @@ TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOpt
     const at::Tensor deepnorm_alpha = at::tensor(params.deepnorm_alpha);
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
+
+void TxEncoderImpl::remove_bits(at::Tensor &qkv_w,
+                                at::Tensor &proj_w,
+                                at::Tensor &res1_w,
+                                at::Tensor &fc2_w,
+                                at::Tensor &fc1_w,
+                                at::Tensor &res2_w,
+                                int remove_bits) {
+    apply_rounding(qkv_w, remove_bits);
+    apply_rounding(proj_w, remove_bits);
+    apply_rounding(res1_w, remove_bits);
+    apply_rounding(fc2_w, remove_bits);
+    apply_rounding(fc1_w, remove_bits);
+    apply_rounding(res2_w, remove_bits);
+}
 
 void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
     (void)scaled_tensor;
