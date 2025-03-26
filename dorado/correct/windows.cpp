@@ -130,6 +130,8 @@ int32_t find_target_end_for_window(const std::vector<int32_t>& consumed,
 bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                      const CorrectionAlignments& alignments,
                      int window_size) {
+    utils::ScopedProfileRange spr("extract_windows", 1);
+
     int num_alignments = (int)alignments.overlaps.size();
     if (num_alignments == 0) {
         return true;
@@ -368,6 +370,8 @@ std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
         const int32_t initial_cig_offset,
         const int32_t initial_tstart,
         const int32_t initial_qstart) {
+    utils::ScopedProfileRange spr("split_alignment", 3);
+
     if (std::empty(cigar)) {
         return {};
     }
@@ -588,7 +592,7 @@ std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
         const int32_t window_size,
         const std::vector<int32_t>& aln_ids,
         const std::vector<CigarPoint>& cigar_points) {
-    utils::ScopedProfileRange spr("extract_limited_windows", 1);
+    utils::ScopedProfileRange spr("split_alignments_into_windows", 2);
 
     if (std::empty(win_intervals)) {
         return {};

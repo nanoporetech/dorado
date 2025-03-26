@@ -409,6 +409,9 @@ int correct(int argc, char* argv[]) {
     // Check if input options are good.
     validate_options(opt);
 
+    // Set the number of threads so that libtorch doesn't cause a thread bomb.
+    utils::initialise_torch();
+
     // After validation, there is exactly one reads file allowed:
     const std::string in_reads_fn = opt.in_reads_fns.front();
 

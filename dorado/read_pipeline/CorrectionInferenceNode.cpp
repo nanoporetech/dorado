@@ -182,6 +182,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 #if DORADO_CUDA_BUILD
     c10::optional<c10::Stream> stream;
     if (device.is_cuda()) {
+        c10::cuda::CUDAGuard device_guard(device);
         stream = c10::cuda::getStreamFromPool(false, device.index());
     }
     c10::cuda::OptionalCUDAStreamGuard guard(stream);
@@ -221,26 +222,30 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
         return bases;
     };
 
-    auto batch_infer = [&]() {
+    auto batch_infer = [&, this]() {
         utils::ScopedProfileRange infer("infer", 1);
         // Run inference on batch
         auto length_tensor =
                 at::from_blob(lengths.data(), {(int)lengths.size()},
                               at::TensorOptions().dtype(torch::kInt32).device(torch::kCPU));
 
+        const bool legacy_windowing = this->m_legacy_windowing;
+
         // Collate bases.
         at::Tensor batched_bases;
-        std::thread thread_bases = std::thread([&bases_batch, &batched_bases]() {
+        std::thread thread_bases = std::thread([&bases_batch, &batched_bases, legacy_windowing]() {
+            const bool use_pinned_memory = USING_DORADO_CUDA_BUILD && !legacy_windowing;
             batched_bases = correction::collate<int32_t>(bases_batch, static_cast<int32_t>(11),
-                                                         torch::kInt32, USING_DORADO_CUDA_BUILD);
+                                                         torch::kInt32, use_pinned_memory);
             bases_batch.clear();
         });
 
         // Collate quals.
         at::Tensor batched_quals;
-        std::thread thread_quals = std::thread([&quals_batch, &batched_quals]() {
+        std::thread thread_quals = std::thread([&quals_batch, &batched_quals, legacy_windowing]() {
+            const bool use_pinned_memory = USING_DORADO_CUDA_BUILD && !legacy_windowing;
             batched_quals = correction::collate<float>(quals_batch, 0.0f, torch::kFloat32,
-                                                       USING_DORADO_CUDA_BUILD);
+                                                       use_pinned_memory);
             quals_batch.clear();
         });
 
@@ -249,12 +254,13 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 
         std::vector<torch::jit::IValue> inputs;
         {
+            const bool non_blocking = !m_legacy_windowing;
             utils::ScopedProfileRange move_to_device("move_to_device", 1);
-            inputs.push_back(batched_bases.to(device, /*non_blocking=*/true));
-            inputs.push_back(batched_quals.to(device, /*non_blocking=*/true));
-            inputs.push_back(length_tensor.to(device, /*non_blocking=*/true));
+            inputs.push_back(batched_bases.to(device, non_blocking));
+            inputs.push_back(batched_quals.to(device, non_blocking));
+            inputs.push_back(length_tensor.to(device, non_blocking));
             std::for_each(indices_batch.begin(), indices_batch.end(),
-                          [device](at::Tensor& t) { t.to(device, /*non_blocking=*/true); });
+                          [device, non_blocking](at::Tensor& t) { t.to(device, non_blocking); });
             inputs.push_back(indices_batch);
         }
 
@@ -510,8 +516,8 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Corrected {} reads, decoded {} reads early, ", num_reads.load(),
-                              num_early_reads.load());
+                spdlog::debug("Sent {} reads to inference, decoded {} reads early.",
+                              num_reads.load(), num_early_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
