@@ -689,9 +689,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
 
         // Quantize SwiGLU weights, interleave, and rearrange as tiled
         auto fc1_weight_interleaved =
-                ff->fc1->weight.unflatten(0, {2, -1, 16})
-                        .transpose(0, 1)
-                        .contiguous();
+                ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
 
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
