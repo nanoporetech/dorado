@@ -441,26 +441,6 @@ void validate_options(const Options& opt) {
     }
 }
 
-std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
-        const std::filesystem::path& in_fastx_fn) {
-    const std::filesystem::path fai_path = utils::get_fai_path(in_fastx_fn);
-
-    std::vector<std::pair<std::string, int64_t>> ret;
-    std::string line;
-    std::ifstream ifs(fai_path);
-    while (std::getline(ifs, line)) {
-        if (std::empty(line)) {
-            continue;
-        }
-        std::string name;
-        int64_t length = 0;
-        std::istringstream iss(line);
-        iss >> name >> length;
-        ret.emplace_back(std::move(name), length);
-    }
-    return ret;
-}
-
 void write_consensus_results(std::ostream& os,
                              const std::vector<polisher::ConsensusResult>& results,
                              const bool fill_gaps,
@@ -733,7 +713,7 @@ void run_polishing(const Options& opt,
     // Load sequence lengths.
     spdlog::debug("[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
-            load_seq_lengths(opt.in_draft_fastx_fn);
+            utils::load_seq_lengths(opt.in_draft_fastx_fn);
 
     // Create windows only for the selected regions.
     std::unordered_map<std::string, std::pair<int64_t, int64_t>> draft_lookup;

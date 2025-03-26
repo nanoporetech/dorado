@@ -3,6 +3,8 @@
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -55,6 +57,26 @@ bool create_fai_index(const std::filesystem::path& in_fastx_fn) {
     }
 
     return true;
+}
+
+std::vector<std::pair<std::string, int64_t>> load_seq_lengths(
+        const std::filesystem::path& in_fastx_fn) {
+    const std::filesystem::path fai_path = get_fai_path(in_fastx_fn);
+
+    std::vector<std::pair<std::string, int64_t>> ret;
+    std::string line;
+    std::ifstream ifs(fai_path);
+    while (std::getline(ifs, line)) {
+        if (std::empty(line)) {
+            continue;
+        }
+        std::string name;
+        int64_t length = 0;
+        std::istringstream iss(line);
+        iss >> name >> length;
+        ret.emplace_back(std::move(name), length);
+    }
+    return ret;
 }
 
 }  // namespace dorado::utils
