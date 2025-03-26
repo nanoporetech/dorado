@@ -640,12 +640,12 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     const int E = params.dim_feedforward * 2;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-    bool default_f32_accum = utils::get_dev_opt("volta_f32_accum", false);
-    bool useFloatAccumQKV = utils::get_dev_opt("volta_f32_accum_qkv", default_f32_accum);
-    bool useFloatAccumProj = utils::get_dev_opt("volta_f32_accum_proj", default_f32_accum);
+    // Koi tests show fastest configuration with f32_accum for proj, swiglu, fc2 and f16_accum for qkv
+    bool useFloatAccumQKV = utils::get_dev_opt("volta_f32_accum_qkv", false);
+    bool useFloatAccumProj = utils::get_dev_opt("volta_f32_accum_proj", true);
     bool useBiasProj = true;
-    bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", default_f32_accum);
-    bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", default_f32_accum);
+    bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", true);
+    bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", true);
     bool useBiasfc2 = false;
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
