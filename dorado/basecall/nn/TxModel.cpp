@@ -454,17 +454,17 @@ TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOpt
 };
 
 #if DORADO_CUDA_BUILD && !DORADO_TX2
-    void TxEncoderImpl::remove_bits() {
-        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
-        // power efficient and results in higher performance for a small accuracy drop)
-        int default_remove = utils::get_dev_opt("remove_bits", 4);
-        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
-        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
-        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
-        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
-        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
-        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
-    }
+void TxEncoderImpl::remove_bits() {
+    // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
+    // power efficient and results in higher performance for a small accuracy drop)
+    int default_remove = utils::get_dev_opt("remove_bits", 4);
+    apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
+    apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
+    apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
+    apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
+    apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
+    apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
+}
 #endif
 
 void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
