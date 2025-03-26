@@ -10,6 +10,7 @@
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"
 #include "polish/vcf_writer.h"
+#include "secondary/bam_info.h"
 #include "secondary/batching.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
@@ -477,7 +478,7 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
-const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
+const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
                                           const std::string& model_str,
                                           const bool load_scripted_model,
                                           const bool bacteria,
@@ -670,27 +671,6 @@ const polisher::ModelConfig resolve_model(const polisher::BamInfo& bam_info,
     }
 
     return model_config;
-}
-
-void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli_read_group) {
-    if (!std::empty(cli_read_group) && std::empty(bam_info.read_groups)) {
-        throw std::runtime_error{
-                "No @RG headers found in the input BAM, but user-specified RG was given. RG: '" +
-                cli_read_group + "'"};
-
-    } else if (std::empty(cli_read_group) && std::size(bam_info.read_groups) > 1) {
-        throw std::runtime_error{
-                "The input BAM contains more than one read group. Please specify --RG to select "
-                "which read group to process."};
-
-    } else if (!std::empty(cli_read_group) && !std::empty(bam_info.read_groups)) {
-        if (bam_info.read_groups.count(cli_read_group) == 0) {
-            std::ostringstream oss;
-            polisher::print_container(oss, bam_info.read_groups, ", ");
-            throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
-                                     cli_read_group + "'"};
-        }
-    }
 }
 
 void run_polishing(const Options& opt,
@@ -973,7 +953,8 @@ int polish(int argc, char* argv[]) {
         validate_options(opt);
 
         // Get info from BAM needed for the run.
-        const polisher::BamInfo bam_info = polisher::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
+        const secondary::BamInfo bam_info =
+                secondary::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
 
         // Debug printing.
         {
@@ -1001,7 +982,7 @@ int polish(int argc, char* argv[]) {
 
         // Validate the read groups in the BAM file.
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
-            check_read_groups(bam_info, opt.read_group);
+            secondary::check_read_groups(bam_info, opt.read_group);
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.

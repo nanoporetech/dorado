@@ -45,13 +45,6 @@ struct PolisherResources {
     std::vector<c10::optional<c10::Stream>> streams;
 };
 
-struct BamInfo {
-    bool uses_dorado_aligner = false;
-    bool has_dwells = false;
-    std::unordered_set<std::string> read_groups;
-    std::unordered_set<std::string> basecaller_models;
-};
-
 /**
  * \brief Struct which holds data prepared for inference. In practice,
  *          vectors here hold one batch for inference. Both vectors should
@@ -85,13 +78,6 @@ PolisherResources create_resources(const ModelConfig& model_config,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override);
-
-/**
- * \brief Opens the input BAM file and summarizes some information needed at runtime.
- * \param in_aln_bam_fn Path to the input BAM file.
- * \param cli_read_group If not empty, only this read group will be loaded from the BAM header.
- */
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.

@@ -368,6 +368,8 @@ add_library(dorado_lib
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
+    dorado/secondary/bam_info.cpp
+    dorado/secondary/bam_info.h
     dorado/secondary/batching.cpp
     dorado/secondary/batching.h
 )
