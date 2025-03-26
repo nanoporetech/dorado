@@ -57,4 +57,6 @@ void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::s
 /// \brief Returns a string containing the input tensor size. Similar to print_size but less verbose.
 std::string tensor_shape_as_string(const at::Tensor& tensor);
 
+void save_tensor(const at::Tensor& tensor, const std::string& file_path);
+
 }  // namespace dorado::utils

@@ -2,7 +2,6 @@
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
-#include <torch/script.h>
 
 #include <ostream>
 
@@ -33,12 +32,6 @@ std::vector<int32_t> parse_int32_vector(const std::string& input) {
     }
 
     return result;
-}
-
-void save_tensor(const at::Tensor& tensor, const std::string& file_path) {
-    const std::vector<char> pickled = torch::jit::pickle_save(tensor);
-    std::ofstream fout(file_path, std::ios::out | std::ios::binary);
-    fout.write(std::data(pickled), std::size(pickled));
 }
 
 }  // namespace dorado::polisher

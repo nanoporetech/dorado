@@ -19,6 +19,4 @@ namespace dorado::polisher {
  */
 std::vector<int32_t> parse_int32_vector(const std::string& input);
 
-void save_tensor(const at::Tensor& tensor, const std::string& file_path);
-
 }  // namespace dorado::polisher
