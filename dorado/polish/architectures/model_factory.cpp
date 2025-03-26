@@ -2,6 +2,7 @@
 #include "model_factory.h"
 
 #include "polish/polish_utils.h"
+#include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <torch/autograd.h>
@@ -93,7 +94,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
                 throw std::runtime_error(
                         "Cannot load weights into the model: model contains parameters which are "
                         "not present in the weights file. Missing parameters: " +
-                        print_container_as_string(missing, ", "));
+                        utils::print_container_as_string(missing, ", "));
             }
         }
         {
@@ -107,7 +108,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
                 throw std::runtime_error(
                         "Cannot load weights into the model: weights file contains parameters "
                         "which are not present in the model. Missing parameters: " +
-                        print_container_as_string(missing, ", "));
+                        utils::print_container_as_string(missing, ", "));
             }
         }
 

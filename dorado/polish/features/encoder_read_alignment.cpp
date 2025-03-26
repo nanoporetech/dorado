@@ -2,6 +2,7 @@
 
 #include "medaka_read_matrix.h"
 #include "polish/polish_utils.h"
+#include "utils/container_utils.h"
 #include "utils/ssize.h"
 #include "utils/timer_high_res.h"
 
@@ -165,9 +166,9 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
             spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                          print_container_as_string(missing_in_indices, ", "));
+                          utils::print_container_as_string(missing_in_indices, ", "));
             spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                          print_container_as_string(missing_out_indices, ", "));
+                          utils::print_container_as_string(missing_out_indices, ", "));
 
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;

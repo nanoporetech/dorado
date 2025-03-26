@@ -360,6 +360,7 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_base.h
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
+    dorado/utils/container_utils.h
     dorado/utils/io_utils.cpp
     dorado/utils/io_utils.h
     dorado/utils/region.cpp
