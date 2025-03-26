@@ -121,7 +121,7 @@ struct TxEncoderImpl : torch::nn::Module {
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
     at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
 
-    void remove_bits(int remove_bits);
+    void remove_bits();
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};

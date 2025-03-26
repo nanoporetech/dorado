@@ -453,14 +453,19 @@ TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOpt
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
-void TxEncoderImpl::remove_bits(int remove_bits) {
-    apply_rounding(wqkv_weights_f16.t, remove_bits);
-    apply_rounding(proj_weight, remove_bits);
-    apply_rounding(t_res_weights, remove_bits);
-    apply_rounding(t_fc2_wts, remove_bits);
-    apply_rounding(t_fc1_wts_f16.t, remove_bits);
-    apply_rounding(t_res2_weights, remove_bits);
-}
+#if DORADO_CUDA_BUILD && !DORADO_TX2
+    void TxEncoderImpl::remove_bits() {
+        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
+        // power efficient and results in higher performance for a small accuracy drop)
+        int default_remove = utils::get_dev_opt("remove_bits", 4);
+        apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
+        apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
+        apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
+        apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
+        apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
+        apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
+    }
+#endif
 
 void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
     (void)scaled_tensor;
@@ -535,10 +540,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
         t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
 
-        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
-        // power efficient and results in higher performance for a small accuracy drop)
-        int default_remove = utils::get_dev_opt("remove_bits", 4);
-        this->remove_bits(default_remove);
+        this->remove_bits();
     }
 
     // Output buffers
@@ -697,10 +699,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         t_fc2_wts =
                 ff->fc2->weight.view({C / 16, 16, (E / 2) / 16, 16}).transpose(1, 2).contiguous();
 
-        // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
-        // power efficient and results in higher performance for a small accuracy drop)
-        int default_remove = utils::get_dev_opt("remove_bits", 4);
-        this->remove_bits(default_remove);
+        this->remove_bits();
     }
 
     // Output buffers
