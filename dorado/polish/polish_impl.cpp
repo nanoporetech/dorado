@@ -3,6 +3,7 @@
 #include "hts_io/FastxRandomReader.h"
 #include "polish/interval.h"
 #include "polish/polish_utils.h"
+#include "secondary/batching.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/region.h"
 #include "utils/ssize.h"
@@ -779,8 +780,8 @@ void sample_producer(PolisherResources& resources,
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<Interval> bam_region_batches =
-            create_batches(bam_region_intervals, num_threads,
-                           [](const Interval& val) { return val.end - val.start; });
+            secondary::create_batches(bam_region_intervals, num_threads,
+                                      [](const Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
 

@@ -10,6 +10,7 @@
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"
 #include "polish/vcf_writer.h"
+#include "secondary/batching.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
@@ -712,64 +713,6 @@ void check_read_groups(const polisher::BamInfo& bam_info, const std::string& cli
     }
 }
 
-/**
- * \brief Groups input regions into bins of sequence IDs.
- * \param draft_lens Vector of sequence names and their lengths.
- * \param user_regions Vector of user-provided regions. Optional, can be empty.
- * \param draft_batch_size Split draft regions into batches of roughly this size. Each element is an interval
- *                          of draft sequences.
- * \returns Pair of two objects: (1) vector of sequence IDs (0 to len(draft_lens)), with the internal vector containing
- *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
- *          These intervals are indices of the first return vector in this pair.
- */
-std::pair<std::vector<std::vector<utils::Region>>, std::vector<polisher::Interval>>
-prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                       const std::vector<utils::Region>& user_regions,
-                       const int64_t draft_batch_size) {
-    // Create a lookup.
-    std::unordered_map<std::string, int64_t> draft_ids;
-    for (int64_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-        draft_ids[draft_lens[seq_id].first] = seq_id;
-    }
-
-    // Outer vector: ID of the draft, inner vector: regions.
-    std::vector<std::vector<utils::Region>> ret(std::size(draft_lens));
-
-    if (std::empty(user_regions)) {
-        // Add full draft sequences.
-        for (int64_t seq_id = 0; seq_id < dorado::ssize(draft_lens); ++seq_id) {
-            const auto& [draft_name, draft_len] = draft_lens[seq_id];
-            ret[seq_id].emplace_back(utils::Region{draft_name, 0, draft_len});
-        }
-
-    } else {
-        // Bin the user regions for individual contigs.
-        for (const auto& region : user_regions) {
-            const auto it = draft_ids.find(region.name);
-            if (it == std::end(draft_ids)) {
-                throw std::runtime_error(
-                        "Sequence name from a custom specified region not found in the input "
-                        "sequence file! region: " +
-                        utils::region_to_string(region));
-            }
-            const int64_t seq_id = it->second;
-            ret[seq_id].emplace_back(utils::Region{region.name, region.start, region.end});
-        }
-    }
-
-    // Divide draft sequences into groups of specified size, as sort of a barrier.
-    std::vector<polisher::Interval> region_batches = polisher::create_batches(
-            ret, draft_batch_size, [](const std::vector<utils::Region>& regions) {
-                int64_t sum = 0;
-                for (const auto& region : regions) {
-                    sum += region.end - region.start;
-                }
-                return sum;
-            });
-
-    return std::make_pair(std::move(ret), std::move(region_batches));
-}
-
 void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
@@ -851,7 +794,7 @@ void run_polishing(const Options& opt,
 
     // Prepare regions for processing.
     const auto [input_regions, region_batches] =
-            prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
+            secondary::prepare_region_batches(draft_lens, opt.regions, opt.draft_batch_size);
 
     // Update the progress tracker.
     {

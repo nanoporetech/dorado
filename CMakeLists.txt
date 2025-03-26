@@ -367,6 +367,8 @@ add_library(dorado_lib
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
+    dorado/secondary/batching.cpp
+    dorado/secondary/batching.h
 )
 
 enable_warnings_as_errors(dorado_lib)
