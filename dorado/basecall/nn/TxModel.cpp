@@ -625,10 +625,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 #endif
 }
 
-namespace {
-inline void *half_ptr(at::Tensor &t) { return reinterpret_cast<void *>(t.data_ptr<at::Half>()); }
-}  // namespace
-
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
 #if DORADO_CUDA_BUILD && !DORADO_TX2 && !DORADO_ORIN
@@ -723,39 +719,39 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     if (res == KOI_SUCCESS && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE Volta", 3);
-        res = koi_volta_qkv_rotary(stream, half_ptr(x_f16), half_ptr(wqkv_weights_f16.t),
-                                   half_ptr(qkv), half_ptr(sincos_bfr), useFloatAccumQKV, N, T);
+        res = koi_volta_qkv_rotary(stream, x_f16.data_ptr(), wqkv_weights_f16.t.data_ptr(),
+                                   qkv.data_ptr(), sincos_bfr.data_ptr(), useFloatAccumQKV, N, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Apply window flashattention
         utils::ScopedProfileRange spr("MEA Volta", 3);
-        res = koi_volta_attn(stream, half_ptr(qkv), half_ptr(t_out_attn), N, T);
+        res = koi_volta_attn(stream, qkv.data_ptr(), t_out_attn.data_ptr(), N, T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul, proj weights (K=512)
         utils::ScopedProfileRange spr("OUTP Volta", 3);
-        res = koi_volta_linear(stream, half_ptr(t_out_attn), half_ptr(proj_weight),
-                               half_ptr(t_out_proj), half_ptr(proj_bias), useFloatAccumProj,
+        res = koi_volta_linear(stream, t_out_attn.data_ptr(), proj_weight.data_ptr(),
+                               t_out_proj.data_ptr(), proj_bias.data_ptr(), useFloatAccumProj,
                                useBiasProj, N * T, C);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1 Volta", 3);
-        res = koi_volta_rmsnorm_residual(stream, half_ptr(x_f16), half_ptr(t_out_proj),
-                                         half_ptr(t_res_weights), half_ptr(t_out_rms1), alpha,
+        res = koi_volta_rmsnorm_residual(stream, x_f16.data_ptr(), t_out_proj.data_ptr(),
+                                         t_res_weights.data_ptr(), t_out_rms1.data_ptr(), alpha,
                                          N * T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU Volta", 3);
-        koi_volta_mm_swiglu(stream, half_ptr(t_out_rms1), half_ptr(t_fc1_wts_f16.t),
-                            half_ptr(t_fc1_out), useFloatAccumSwiglu, N * T);
+        koi_volta_mm_swiglu(stream, t_out_rms1.data_ptr(), t_fc1_wts_f16.t.data_ptr(),
+                            t_fc1_out.data_ptr(), useFloatAccumSwiglu, N * T);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul, fc2 weights (K=2048)
         utils::ScopedProfileRange spr("FC2 Volta", 3);
-        res = koi_volta_linear(stream, half_ptr(t_fc1_out), half_ptr(t_fc2_wts),
-                               half_ptr(t_fc2_out),
+        res = koi_volta_linear(stream, t_fc1_out.data_ptr(), t_fc2_wts.data_ptr(),
+                               t_fc2_out.data_ptr(),
                                nullptr,  // ! No bias for fc2
                                useFloatAccumfc2, useBiasfc2, N * T, E / 2);
     }
@@ -763,9 +759,9 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2 Volta", 3);
         res = koi_volta_rmsnorm_residual(
-                stream, half_ptr(t_out_rms1), half_ptr(t_fc2_out), half_ptr(t_res2_weights),
+                stream, t_out_rms1.data_ptr(), t_fc2_out.data_ptr(), t_res2_weights.data_ptr(),
                 // ! Use initial input x_f16 as output buffer for second rmsnorm
-                half_ptr(x_f16), alpha, N * T);
+                x_f16.data_ptr(), alpha, N * T);
     }
     if (res != KOI_SUCCESS) {
         spdlog::error("Koi Volta tiled path failed {}", calls);
