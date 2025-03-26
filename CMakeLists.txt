@@ -143,6 +143,7 @@ add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
+add_subdirectory(dorado/secondary)
 
 add_library(dorado_lib
     dorado/alignment/alignment_info.h
@@ -366,12 +367,6 @@ add_library(dorado_lib
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
-    dorado/secondary/bam_info.cpp
-    dorado/secondary/bam_info.h
-    dorado/secondary/batching.cpp
-    dorado/secondary/batching.h
-    dorado/secondary/region.cpp
-    dorado/secondary/region.h
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -416,6 +411,7 @@ target_link_libraries(dorado_lib
         dorado_basecall
         dorado_modbase
         dorado_version
+        dorado_secondary
     PRIVATE
         minimap2
         toml11::toml11
@@ -486,7 +482,7 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
         include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_file_info)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_secondary dorado_file_info)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
         endforeach()
         setup_target_for_coverage_gcovr_html(

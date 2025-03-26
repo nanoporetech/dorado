@@ -110,6 +110,7 @@ target_link_libraries(dorado_tests_common
         dorado_torch_utils
         dorado_utils
         dorado_compat
+        dorado_secondary
         Catch2::Catch2
 )
 target_compile_definitions(dorado_tests_common
@@ -133,6 +134,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_model_downloader_lib
             dorado_basecall
             dorado_modbase
+            dorado_secondary
             minimap2
             ${ZLIB_LIBRARIES}
             dorado_io_lib
