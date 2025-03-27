@@ -308,7 +308,6 @@ add_library(dorado_lib
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
     dorado/polish/consensus_result.h
-    dorado/polish/interval.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp

@@ -5,6 +5,7 @@ add_library(dorado_secondary
     bam_info.h
     batching.cpp
     batching.h
+    interval.h
     region.cpp
     region.h
  )

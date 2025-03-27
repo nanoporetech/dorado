@@ -392,14 +392,14 @@ void CorrectionInferenceNode::input_thread_fn() {
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
 
-            std::vector<polisher::Interval> win_intervals;
+            std::vector<secondary::Interval> win_intervals;
             std::unordered_set<int> overlap_idxs;
             bool rv = false;
             if (m_legacy_windowing) {
                 rv = extract_windows(windows, alignments, m_window_size);
                 for (int32_t ii = 0; ii < tlen; ii += m_window_size) {
                     win_intervals.emplace_back(
-                            polisher::Interval{ii, std::min(ii + m_window_size, tlen)});
+                            secondary::Interval{ii, std::min(ii + m_window_size, tlen)});
                 }
 
                 // Filter the window features and get the set of unique overlaps.

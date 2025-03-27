@@ -769,7 +769,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
 }  // namespace
 
 std::vector<Variant> call_variants(
-        const dorado::polisher::Interval& region_batch,
+        const secondary::Interval& region_batch,
         const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -846,7 +846,7 @@ std::vector<Variant> call_variants(
     };
 
     // Partition groups to chunks for multithreaded processing.
-    const std::vector<Interval> thread_chunks =
+    const std::vector<secondary::Interval> thread_chunks =
             secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
 
     // Create the thread pool.

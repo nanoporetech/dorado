@@ -5,7 +5,6 @@
 #include "model_downloader/model_downloader.h"
 #include "models/models.h"
 #include "polish/architectures/model_config.h"
-#include "polish/interval.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"

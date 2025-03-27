@@ -1,6 +1,6 @@
 #pragma once
 
-#include "polish/interval.h"
+#include "secondary/interval.h"
 #include "types.h"
 #include "utils/cigar.h"
 #include "utils/overlap.h"
@@ -57,7 +57,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
  *                          the memory consumption.
  * \returns true if windows were successfully generated, false otherwise.
  */
-std::vector<polisher::Interval> extract_limited_windows(
+std::vector<secondary::Interval> extract_limited_windows(
         std::vector<std::vector<OverlapWindow>>& windows,
         const CorrectionAlignments& alignments,
         int32_t window_size,
@@ -66,7 +66,7 @@ std::vector<polisher::Interval> extract_limited_windows(
 std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
         const utils::Overlap& overlap,
         const std::vector<CigarOp>& cigar,
-        const std::vector<polisher::Interval>& win_intervals,
+        const std::vector<secondary::Interval>& win_intervals,
         int32_t aln_id,
         bool legacy_qstart,
         bool custom_initial_point,
@@ -85,7 +85,7 @@ std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
 /// @return A vector of length equal to win_intervals, where each element contains zero or more alignment chunks which fall within these coordinates.
 std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
         const CorrectionAlignments& alignments,
-        const std::vector<polisher::Interval>& win_intervals,
+        const std::vector<secondary::Interval>& win_intervals,
         const int32_t window_size,
         const std::vector<int32_t>& aln_ids,
         const std::vector<CigarPoint>& cigar_points);

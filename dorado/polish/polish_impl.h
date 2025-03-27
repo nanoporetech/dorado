@@ -1,13 +1,13 @@
 #pragma once
 
 #include "consensus_result.h"
-#include "interval.h"
 #include "polish/architectures/model_factory.h"
 #include "polish/features/decoder_factory.h"
 #include "polish/features/encoder_factory.h"
 #include "polish_stats.h"
 #include "sample.h"
 #include "secondary/bam_file.h"
+#include "secondary/interval.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
@@ -121,7 +121,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         std::vector<Sample>& window_samples,
         const EncoderBase& encoder,
         const Span<const Window> bam_regions,
-        const Span<const Interval> bam_region_intervals,
+        const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -187,7 +187,7 @@ void sample_producer(PolisherResources& resources,
                      utils::AsyncQueue<InferenceData>& infer_data);
 
 std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
-        const Interval& region_batch,
+        const secondary::Interval& region_batch,
         const std::vector<ConsensusResult>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
