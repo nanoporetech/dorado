@@ -3,7 +3,7 @@
 #include <ostream>
 #include <tuple>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 std::ostream& operator<<(std::ostream& os, const Variant& v) {
     os << v.seq_id << '\t' << v.pos << '\t' << v.ref << "\t{";
@@ -24,4 +24,4 @@ bool operator==(const Variant& lhs, const Variant& rhs) {
                                           rhs.info, rhs.qual, rhs.genotype, rhs.rstart, rhs.rend);
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

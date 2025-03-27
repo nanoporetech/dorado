@@ -1,8 +1,8 @@
 #pragma once
 
 #include "encoder_base.h"
-#include "polish/bam_file.h"
 #include "polish/sample.h"
+#include "secondary/bam_file.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -38,7 +38,7 @@ public:
 
     ~EncoderReadAlignment() = default;
 
-    Sample encode_region(BamFile& bam_file,
+    Sample encode_region(secondary::BamFile& bam_file,
                          const std::string& ref_name,
                          const int64_t ref_start,
                          const int64_t ref_end,

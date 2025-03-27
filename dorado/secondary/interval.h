@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct Interval {
     int32_t start = 0;
@@ -11,4 +11,4 @@ struct Interval {
     int32_t length() const { return end - start; }
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

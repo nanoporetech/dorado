@@ -2,7 +2,6 @@
 
 #include "conversions.h"
 #include "features.h"
-#include "polish/polish_utils.h"
 #include "read_pipeline/messages.h"
 #include "torch_utils/gpu_profiling.h"
 #include "types.h"
@@ -362,7 +361,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
 std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
         const utils::Overlap& overlap,
         const std::vector<CigarOp>& cigar,
-        const std::vector<polisher::Interval>& win_intervals,
+        const std::vector<secondary::Interval>& win_intervals,
         const int32_t aln_id,
         const bool legacy_qstart,
         const bool custom_initial_point,
@@ -588,7 +587,7 @@ std::vector<std::pair<int32_t, OverlapWindow>> split_alignment(
 
 std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
         const CorrectionAlignments& alignments,
-        const std::vector<polisher::Interval>& win_intervals,
+        const std::vector<secondary::Interval>& win_intervals,
         const int32_t window_size,
         const std::vector<int32_t>& aln_ids,
         const std::vector<CigarPoint>& cigar_points) {
@@ -655,7 +654,7 @@ std::vector<std::vector<OverlapWindow>> split_alignments_into_windows(
     return windows;
 }
 
-std::vector<polisher::Interval> extract_limited_windows(
+std::vector<secondary::Interval> extract_limited_windows(
         std::vector<std::vector<OverlapWindow>>& windows,
         const CorrectionAlignments& alignments,
         const int32_t window_size,
@@ -670,7 +669,7 @@ std::vector<polisher::Interval> extract_limited_windows(
 
     const int32_t tlen = alignments.overlaps.front().tlen;
 
-    std::vector<polisher::Interval> win_intervals;
+    std::vector<secondary::Interval> win_intervals;
 
     std::vector<CigarPoint> cigar_points(std::size(alignments.cigars));
     for (size_t i = 0; i < std::size(alignments.overlaps); ++i) {
@@ -700,7 +699,7 @@ std::vector<polisher::Interval> extract_limited_windows(
 
         // Extract CIGARs for the current window (only ONE window) starting from the previous CIGAR locations (cigar_points).
         auto new_windows = split_alignments_into_windows(
-                alignments, {polisher::Interval{win_start, max_win_end}}, window_size, {},
+                alignments, {secondary::Interval{win_start, max_win_end}}, window_size, {},
                 cigar_points);
 
         // Sanity check. One input window was given, one output window is expected.
@@ -735,7 +734,7 @@ std::vector<polisher::Interval> extract_limited_windows(
         const std::unordered_set<int32_t> overlap_idxs = filter_features(new_windows, alignments);
         if (overlap_idxs.empty()) {
             windows.emplace_back(std::vector<OverlapWindow>());
-            win_intervals.emplace_back(polisher::Interval{win_start, max_win_end});
+            win_intervals.emplace_back(secondary::Interval{win_start, max_win_end});
             win_start = max_win_end;
             continue;
         }
@@ -769,7 +768,7 @@ std::vector<polisher::Interval> extract_limited_windows(
         const int32_t new_win_end =
                 find_target_end_for_window(consumed, win_start, max_win_end, max_num_columns);
 
-        win_intervals.emplace_back(polisher::Interval{win_start, new_win_end});
+        win_intervals.emplace_back(secondary::Interval{win_start, new_win_end});
 
         // Collect the IDs of the alignments which will be used in the end.
         std::vector<int32_t> aln_ids;
@@ -785,7 +784,7 @@ std::vector<polisher::Interval> extract_limited_windows(
 
         // Compute the new slices but only for the alignments which survived initial filtering.
         new_windows = split_alignments_into_windows(alignments,
-                                                    {polisher::Interval{win_start, new_win_end}},
+                                                    {secondary::Interval{win_start, new_win_end}},
                                                     window_size, aln_ids, cigar_points);
         if (std::size(new_windows) != 1) {
             spdlog::warn(
@@ -809,7 +808,7 @@ std::vector<polisher::Interval> extract_limited_windows(
     }
 
     if (win_start < tlen) {
-        win_intervals.emplace_back(polisher::Interval{win_start, tlen});
+        win_intervals.emplace_back(secondary::Interval{win_start, tlen});
         windows.emplace_back(std::vector<OverlapWindow>());
         std::cerr << "[extract_limited_windows] Emplaced new final interval: [" << win_start << ", "
                   << tlen << "]\n";

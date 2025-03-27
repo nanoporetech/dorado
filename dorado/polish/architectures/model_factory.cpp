@@ -1,7 +1,7 @@
 
 #include "model_factory.h"
 
-#include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -50,7 +50,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         }
         for (const auto& buffer : model.named_buffers()) {
             spdlog::debug("[model_params] Buffer key: {}, shape: {}", buffer.key(),
-                          (buffer.value().defined() ? tensor_shape_as_string(buffer.value())
+                          (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
                                                     : "undefined"));
         }
     }
@@ -194,7 +194,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         const int32_t bases_embedding_size =
                 std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
         const std::vector<int32_t> kernel_sizes =
-                parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
+                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
         const bool use_dwells =
                 (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
 

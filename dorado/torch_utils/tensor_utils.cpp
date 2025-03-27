@@ -3,11 +3,13 @@
 #include "utils/simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
+#include <torch/script.h>
 #include <torch/torch.h>
 
 #include <cstddef>
 #include <cstring>
 #include <fstream>
+#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -206,6 +208,27 @@ std::string print_size(const at::Tensor& t, const std::string& name) {
     }
     ss << "] dtype: " << t.dtype();
     return ss.str();
+}
+
+void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter) {
+    for (size_t i = 0; i < std::size(tensor.sizes()); ++i) {
+        if (i > 0) {
+            os << delimiter;
+        }
+        os << tensor.size(i);
+    }
+}
+
+std::string tensor_shape_as_string(const at::Tensor& tensor) {
+    std::ostringstream oss;
+    print_tensor_shape(oss, tensor, ", ");
+    return oss.str();
+}
+
+void save_tensor(const at::Tensor& tensor, const std::string& file_path) {
+    const std::vector<char> pickled = torch::jit::pickle_save(tensor);
+    std::ofstream fout(file_path, std::ios::out | std::ios::binary);
+    fout.write(std::data(pickled), std::size(pickled));
 }
 
 }  // namespace dorado::utils

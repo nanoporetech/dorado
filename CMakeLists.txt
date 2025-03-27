@@ -308,28 +308,19 @@ add_library(dorado_lib
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
     dorado/polish/consensus_result.h
-    dorado/polish/bam_file.cpp
-    dorado/polish/bam_file.h
-    dorado/polish/interval.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp
     dorado/polish/polish_progress_tracker.h
     dorado/polish/polish_stats.h
-    dorado/polish/polish_utils.cpp
-    dorado/polish/polish_utils.h
     dorado/polish/sample.cpp
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
-    dorado/polish/variant.cpp
-    dorado/polish/variant.h
     dorado/polish/variant_calling.cpp
     dorado/polish/variant_calling.h
     dorado/polish/variant_calling_sample.cpp
     dorado/polish/variant_calling_sample.h
-    dorado/polish/vcf_writer.cpp
-    dorado/polish/vcf_writer.h
     dorado/polish/window.cpp
     dorado/polish/window.h
     dorado/polish/features/decoder_base.cpp
@@ -361,6 +352,7 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_base.h
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
+    dorado/utils/container_utils.cpp
     dorado/utils/container_utils.h
     dorado/utils/io_utils.cpp
     dorado/utils/io_utils.h

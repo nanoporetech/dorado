@@ -1,7 +1,5 @@
 #pragma once
 
-#include "polish_utils.h"
-
 #include <ATen/ATen.h>
 
 #include <cstdint>

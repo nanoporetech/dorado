@@ -1,6 +1,6 @@
 #pragma once
 
-#include "polish/interval.h"
+#include "interval.h"
 #include "region.h"
 #include "utils/ssize.h"
 
@@ -11,6 +11,17 @@
 namespace dorado::secondary {
 
 /**
+ * \brief Utility function to determine partitions for multithreading. For example,
+ *          num_items is the number of items to process, while num_chunks is the number
+ *          of threads. The items are then chunked into as equal number of bins as possible.
+ * \param num_items Number of items to process.
+ * \param num_partitions Number of threads/buckets/partitions to divide the items into.
+ * \returns Vector of intervals which is the length of min(num_items, num_chunks). Each partition
+ *          is given with a start (zero-based) and end (non-inclusive) item ID.
+ */
+std::vector<Interval> compute_partitions(const int32_t num_items, const int32_t num_partitions);
+
+/**
  * \brief Computes intervals of input objects to split the input data into. Similar to
  *          compute_partitions, but here the items can have variable size.
  * \param data Input data items to partition.
@@ -19,11 +30,11 @@ namespace dorado::secondary {
  * \returns Vector of intervals which divide the input data into batches of specified size.
  */
 template <typename T, typename F>
-std::vector<polisher::Interval> create_batches(const T& data,
-                                               const int64_t batch_size,
-                                               const F& functor_data_size) {
-    std::vector<polisher::Interval> ret;
-    polisher::Interval interval{0, 0};
+std::vector<Interval> create_batches(const T& data,
+                                     const int64_t batch_size,
+                                     const F& functor_data_size) {
+    std::vector<Interval> ret;
+    Interval interval{0, 0};
     int64_t sum = 0;
     for (const auto& val : data) {
         const int64_t s = functor_data_size(val);
@@ -51,9 +62,9 @@ std::vector<polisher::Interval> create_batches(const T& data,
  *          regions for that sequence; (2) vector of intervals of roughly batch_size bases (or more if a sequence is larger).
  *          These intervals are indices of the first return vector in this pair.
  */
-std::pair<std::vector<std::vector<secondary::Region>>, std::vector<polisher::Interval>>
-prepare_region_batches(const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                       const std::vector<secondary::Region>& user_regions,
-                       const int64_t draft_batch_size);
+std::pair<std::vector<std::vector<Region>>, std::vector<Interval>> prepare_region_batches(
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const std::vector<Region>& user_regions,
+        const int64_t draft_batch_size);
 
 }  // namespace dorado::secondary

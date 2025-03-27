@@ -1,5 +1,5 @@
 #include "correct/windows.h"
-#include "polish/interval.h"
+#include "secondary/interval.h"
 #include "utils/cigar.h"
 #include "utils/overlap.h"
 
@@ -23,7 +23,7 @@
 namespace dorado::correction::window_tests {
 
 CATCH_TEST_CASE("All tests", TEST_GROUP) {
-    using namespace dorado::polisher;
+    using namespace dorado::secondary;
 
     struct TestCase {
         std::string test_name;

@@ -3,6 +3,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace dorado::utils {
 
@@ -32,5 +33,15 @@ std::string print_container_as_string(const T& data, const std::string& delimite
     print_container(oss, data, delimiter);
     return oss.str();
 }
+
+/**
+ * \brief Parses a string of form "[1, 17]" into a std::vector.
+ * \param input Input string needs to begin with '[' and end
+ *          with ']', values are comma separated, whitespaces are allowed.
+ * \returns Vector of parsed integers.
+ *
+ * Can throw.
+ */
+std::vector<int32_t> parse_int32_vector(const std::string& input);
 
 }  // namespace dorado::utils

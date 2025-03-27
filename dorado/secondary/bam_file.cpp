@@ -8,7 +8,7 @@
 
 void HtsIdxDestructor::operator()(hts_idx_t* bam) { hts_idx_destroy(bam); }
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 BamFile::BamFile(const std::filesystem::path& in_fn)
         : m_fp{hts_open(in_fn.string().c_str(), "rb"), HtsFileDestructor()},
           m_idx{sam_index_load(m_fp.get(), in_fn.string().c_str()), HtsIdxDestructor()},
@@ -112,4 +112,4 @@ std::string header_to_string(const std::vector<HeaderLineData>& header) {
     return oss.str();
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

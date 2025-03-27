@@ -12,7 +12,7 @@
 
 struct bcf_hdr_t;
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 // RAII for the BCF header.
 struct BcfHdrDestructor {
@@ -40,4 +40,4 @@ private:
     BcfHdrPtr m_header;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

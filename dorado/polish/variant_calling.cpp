@@ -2,6 +2,7 @@
 
 #include "consensus_result.h"
 #include "polish_stats.h"
+#include "secondary/batching.h"
 #include "trim.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"
@@ -289,11 +290,11 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 
 }  // namespace
 
-Variant normalize_variant(const std::string_view ref_with_gaps,
-                          const std::vector<std::string_view>& cons_seqs_with_gaps,
-                          const std::vector<int64_t>& positions_major,
-                          const std::vector<int64_t>& positions_minor,
-                          const Variant& variant) {
+secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
+                                     const std::vector<std::string_view>& cons_seqs_with_gaps,
+                                     const std::vector<int64_t>& positions_major,
+                                     const std::vector<int64_t>& positions_minor,
+                                     const secondary::Variant& variant) {
     const bool all_same_as_ref =
             std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
                         [&variant](const std::string& s) { return s == variant.ref; });
@@ -302,7 +303,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         return variant;
     }
 
-    const auto trim_start = [&positions_major](Variant& var, const bool rev) {
+    const auto trim_start = [&positions_major](secondary::Variant& var, const bool rev) {
         // Get the sequences and reverse if needed.
         std::vector<std::string> seqs{var.ref};
         seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
@@ -365,7 +366,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
-                                     &positions_minor](Variant& var) {
+                                     &positions_minor](secondary::Variant& var) {
         const auto find_previous_major = [&](int64_t rpos) {
             while (rpos > 0) {
                 --rpos;
@@ -376,7 +377,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             return rpos;
         };
 
-        const auto reset_var = [](const Variant& v) {
+        const auto reset_var = [](const secondary::Variant& v) {
             std::vector<std::string> seqs{v.ref};
             seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
             return std::make_pair(v, seqs);
@@ -391,7 +392,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             changed = false;
 
             // Keep a copy if we need to bail.
-            const Variant var_before_change = var;
+            const secondary::Variant var_before_change = var;
 
             const bool all_non_empty =
                     std::all_of(std::cbegin(seqs), std::cend(seqs),
@@ -504,7 +505,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
     };
 
-    Variant ret = variant;
+    secondary::Variant ret = variant;
 
     if (std::empty(ref_with_gaps)) {
         trim_start(ret, true);
@@ -519,11 +520,11 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 
 namespace {
 
-std::vector<Variant> decode_variants(const DecoderBase& decoder,
-                                     const VariantCallingSample& vc_sample,
-                                     const std::string& draft,
-                                     const bool ambig_ref,
-                                     const bool gvcf) {
+std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
+                                                const VariantCallingSample& vc_sample,
+                                                const std::string& draft,
+                                                const bool ambig_ref,
+                                                const bool gvcf) {
     // Validate that all vectors/tensors are of equal length.
     vc_sample.validate();
 
@@ -619,7 +620,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             dorado::run_length_encode(is_variant);
 
     // Extract variants.
-    std::vector<Variant> variants;
+    std::vector<secondary::Variant> variants;
     for (const auto& [rstart, rend, is_var] : runs) {
         // Skip non-variants.
         if (!is_var) {
@@ -664,7 +665,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             var_ref.insert(0, 1, draft[var_pos]);
             var_pred.insert(0, 1, draft[var_pos]);
         }
-        Variant variant{
+        secondary::Variant variant{
                 vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
                 round_float(qual, 3), genotype, rstart,  rend,
         };
@@ -695,7 +696,7 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             };
 
             // clang-format off
-            Variant variant{
+            secondary::Variant variant{
                 vc_sample.seq_id,
                 pos,
                 ref,
@@ -767,8 +768,8 @@ std::vector<VariantCallingSample> trim_vc_samples(
 
 }  // namespace
 
-std::vector<Variant> call_variants(
-        const dorado::polisher::Interval& region_batch,
+std::vector<secondary::Variant> call_variants(
+        const secondary::Interval& region_batch,
         const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -802,7 +803,8 @@ std::vector<Variant> call_variants(
 
     // Worker for parallel processing.
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
-                            std::vector<std::vector<Variant>>& results, PolishStats& ps) {
+                            std::vector<std::vector<secondary::Variant>>& results,
+                            PolishStats& ps) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
                                      std::to_string(start) + ", end = " + std::to_string(end) +
@@ -832,7 +834,7 @@ std::vector<Variant> call_variants(
             const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
             for (const auto& vc_sample : joined_samples) {
-                std::vector<Variant> variants =
+                std::vector<secondary::Variant> variants =
                         decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
 
                 ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
@@ -845,8 +847,8 @@ std::vector<Variant> call_variants(
     };
 
     // Partition groups to chunks for multithreaded processing.
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+    const std::vector<secondary::Interval> thread_chunks =
+            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
 
     // Create the thread pool.
     cxxpool::thread_pool pool{std::size(thread_chunks)};
@@ -856,7 +858,7 @@ std::vector<Variant> call_variants(
     futures.reserve(std::size(thread_chunks));
 
     // Reserve the space for results for each individual group.
-    std::vector<std::vector<Variant>> thread_results(std::size(groups));
+    std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
 
     // Add worker tasks.
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
@@ -876,7 +878,7 @@ std::vector<Variant> call_variants(
     }
 
     // Flatten the results.
-    std::vector<Variant> all_results;
+    std::vector<secondary::Variant> all_results;
     {
         size_t count = 0;
         for (const auto& vals : thread_results) {

@@ -1,10 +1,17 @@
 add_library(dorado_secondary
+    bam_file.cpp
+    bam_file.h
     bam_info.cpp
     bam_info.h
     batching.cpp
     batching.h
+    interval.h
     region.cpp
     region.h
+    variant.cpp
+    variant.h
+    vcf_writer.cpp
+    vcf_writer.h
  )
 
 target_compile_definitions(dorado_secondary

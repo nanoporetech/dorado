@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct Variant {
     int32_t seq_id = -1;
@@ -26,4 +26,4 @@ std::ostream& operator<<(std::ostream& os, const Variant& v);
 
 bool operator==(const Variant& lhs, const Variant& rhs);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

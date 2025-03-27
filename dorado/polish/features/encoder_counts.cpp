@@ -305,7 +305,7 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
-Sample EncoderCounts::encode_region(BamFile& bam_file,
+Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
                                     const std::string& ref_name,
                                     const int64_t ref_start,
                                     const int64_t ref_end,

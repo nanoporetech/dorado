@@ -1,11 +1,11 @@
 #include "polish_impl.h"
 
 #include "hts_io/FastxRandomReader.h"
-#include "polish/interval.h"
-#include "polish/polish_utils.h"
 #include "secondary/batching.h"
+#include "secondary/interval.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
@@ -150,7 +150,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
+        resources.bam_handles.emplace_back(secondary::BamFile(in_aln_bam_fn));
     }
 
     return resources;
@@ -413,7 +413,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         std::vector<Sample>& window_samples,
         const EncoderBase& encoder,
         const Span<const Window> bam_regions,
-        const Span<const Interval> bam_region_intervals,
+        const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -442,7 +442,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
             // Get the interval of samples for this BAM region and subtract the offset due to batching.
-            Interval interval = bam_region_intervals[bam_region_id];
+            secondary::Interval interval = bam_region_intervals[bam_region_id];
             interval.start -= window_interval_offset;
             interval.end -= window_interval_offset;
 
@@ -505,8 +505,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM regions in parallel.
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+    const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
+            static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
 
     spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
                   std::size(bam_region_intervals), std::size(thread_chunks));
@@ -553,7 +553,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 }
 
 std::vector<Sample> encode_windows_in_parallel(
-        std::vector<BamFile>& bam_handles,
+        std::vector<secondary::BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
@@ -580,9 +580,9 @@ std::vector<Sample> encode_windows_in_parallel(
         }
     };
 
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(windows)),
-                               std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
+    const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
+            static_cast<int32_t>(std::size(windows)),
+            std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
 
     spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
                   std::size(thread_chunks));
@@ -672,26 +672,27 @@ void sample_producer(PolisherResources& resources,
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
-    std::vector<Interval> bam_region_intervals;
+    std::vector<secondary::Interval> bam_region_intervals;
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const Window& bw = bam_regions[i];
         std::vector<Window> new_windows =
                 create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
         if (std::empty(new_windows)) {
-            bam_region_intervals.emplace_back(Interval{0, 0});
+            bam_region_intervals.emplace_back(secondary::Interval{0, 0});
             continue;
         }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
         const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
-        bam_region_intervals.emplace_back(Interval{num_windows, num_windows + num_new_windows});
+        bam_region_intervals.emplace_back(
+                secondary::Interval{num_windows, num_windows + num_new_windows});
         windows.reserve(std::size(windows) + std::size(new_windows));
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
-    const std::vector<Interval> bam_region_batches =
-            secondary::create_batches(bam_region_intervals, num_threads,
-                                      [](const Interval& val) { return val.end - val.start; });
+    const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
+            bam_region_intervals, num_threads,
+            [](const secondary::Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
 
@@ -719,8 +720,8 @@ void sample_producer(PolisherResources& resources,
         auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
                 region_samples, *resources.encoder,
                 Span<const Window>(std::data(bam_regions) + region_id_start, num_regions),
-                Span<const Interval>(std::data(bam_region_intervals) + region_id_start,
-                                     num_regions),
+                Span<const secondary::Interval>(std::data(bam_region_intervals) + region_id_start,
+                                                num_regions),
                 num_threads, window_len, window_overlap, window_id_start);
 
         if (std::size(samples) != std::size(trims)) {
@@ -809,7 +810,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                     "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, tensor_shape_as_string(batch_features_tensor),
+                    tid, utils::tensor_shape_as_string(batch_features_tensor),
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
@@ -895,8 +896,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             spdlog::trace(
                     "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
                     "out_item.samples.size() = {}, decode queue size: {}",
-                    tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
-                    std::size(decode_queue));
+                    tid, utils::tensor_shape_as_string(out_item.logits),
+                    std::size(out_item.samples), std::size(decode_queue));
             decode_queue.try_push(std::move(out_item));
         }
     };
@@ -970,7 +971,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                 continue;
             }
 
-            std::vector<Interval> good_intervals{Interval{0, static_cast<int32_t>(num_positions)}};
+            std::vector<secondary::Interval> good_intervals{
+                    secondary::Interval{0, static_cast<int32_t>(num_positions)}};
 
             // Break on low coverage.
             if (min_depth > 0) {
@@ -978,7 +980,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 
                 const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
                                           static_cast<size_t>(sample.depth.size(0)));
-                Interval interval{0, 0};
+                secondary::Interval interval{0, 0};
                 for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
                     if (depth[ii] < min_depth) {
                         if (interval.length() > 0) {
@@ -1067,7 +1069,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
             spdlog::trace(
                     "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                     "tensor_batch_size = {}, queue size: {}",
-                    tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
+                    tid, utils::tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
                     tensor_batch_size, std::size(decode_queue));
 
             // This should handle the timeout case too.
@@ -1158,7 +1160,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 }
 
 std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
-        const Interval& region_batch,
+        const secondary::Interval& region_batch,
         const std::vector<ConsensusResult>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
