@@ -7,7 +7,7 @@ struct sam_hdr_t;
 struct hts_itr_t;
 struct bam1_t;
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct HtslibMpileupData {
     htsFile* fp = nullptr;
@@ -27,4 +27,4 @@ struct HtslibMpileupData {
  */
 int32_t mpileup_read_bam(void* data, bam1_t* b);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

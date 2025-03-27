@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct ReadAlignmentTensors {
     at::Tensor counts;
@@ -38,15 +38,16 @@ public:
 
     ~EncoderReadAlignment() = default;
 
-    Sample encode_region(secondary::BamFile& bam_file,
-                         const std::string& ref_name,
-                         const int64_t ref_start,
-                         const int64_t ref_end,
-                         const int32_t seq_id) const override;
+    polisher::Sample encode_region(secondary::BamFile& bam_file,
+                                   const std::string& ref_name,
+                                   const int64_t ref_start,
+                                   const int64_t ref_end,
+                                   const int32_t seq_id) const override;
 
     at::Tensor collate(std::vector<at::Tensor> batch) const override;
 
-    std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const override;
+    std::vector<polisher::Sample> merge_adjacent_samples(
+            std::vector<polisher::Sample> samples) const override;
 
 private:
     std::vector<std::string> m_dtypes;
@@ -62,4 +63,4 @@ private:
     bool m_include_haplotype = false;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

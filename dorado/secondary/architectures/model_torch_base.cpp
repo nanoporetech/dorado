@@ -1,6 +1,6 @@
 #include "model_torch_base.h"
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 torch::Device ModelTorchBase::get_device() const {
     // Get the device of the first parameter as a representative.
@@ -42,4 +42,4 @@ torch::Tensor ModelTorchBase::predict_on_batch(torch::Tensor x) {
     return x;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

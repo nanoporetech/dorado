@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 enum class NormaliseType {
     TOTAL,
@@ -48,15 +48,16 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual Sample encode_region(secondary::BamFile& bam_file,
-                                 const std::string& ref_name,
-                                 const int64_t ref_start,
-                                 const int64_t ref_end,
-                                 const int32_t seq_id) const = 0;
+    virtual polisher::Sample encode_region(secondary::BamFile& bam_file,
+                                           const std::string& ref_name,
+                                           const int64_t ref_start,
+                                           const int64_t ref_end,
+                                           const int32_t seq_id) const = 0;
 
     virtual at::Tensor collate(std::vector<at::Tensor> batch) const = 0;
 
-    virtual std::vector<Sample> merge_adjacent_samples(std::vector<Sample> samples) const = 0;
+    virtual std::vector<polisher::Sample> merge_adjacent_samples(
+            std::vector<polisher::Sample> samples) const = 0;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

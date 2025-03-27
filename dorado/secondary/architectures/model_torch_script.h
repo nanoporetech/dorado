@@ -6,7 +6,7 @@
 
 #include <filesystem>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 class ModelTorchScript : public ModelTorchBase {
 public:
@@ -28,4 +28,4 @@ private:
     torch::jit::script::Module m_module;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

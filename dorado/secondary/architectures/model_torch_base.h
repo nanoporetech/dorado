@@ -5,7 +5,7 @@
 
 #include <memory>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 class ModelTorchBase : public torch::nn::Module {
 public:
@@ -53,4 +53,4 @@ protected:
     bool m_half_precision = false;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

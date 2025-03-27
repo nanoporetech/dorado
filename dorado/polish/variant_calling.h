@@ -1,9 +1,9 @@
 #pragma once
 
-#include "features/decoder_base.h"
 #include "hts_io/FastxRandomReader.h"
 #include "polish_stats.h"
 #include "sample.h"
+#include "secondary/features/decoder_base.h"
 #include "secondary/interval.h"
 #include "secondary/variant.h"
 #include "variant_calling_sample.h"
@@ -23,7 +23,7 @@ std::vector<secondary::Variant> call_variants(
         const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const DecoderBase& decoder,
+        const secondary::DecoderBase& decoder,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
@@ -38,7 +38,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples);
 
-std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
+std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& decoder,
                                                 const VariantCallingSample& vc_sample,
                                                 const std::string& draft,
                                                 const bool ambig_ref,

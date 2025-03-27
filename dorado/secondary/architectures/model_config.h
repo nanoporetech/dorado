@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct ModelConfig {
     int32_t version = 0;
@@ -32,4 +32,4 @@ struct ModelConfig {
 ModelConfig parse_model_config(const std::filesystem::path& config_path,
                                const std::string& model_file);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

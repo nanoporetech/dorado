@@ -323,35 +323,6 @@ add_library(dorado_lib
     dorado/polish/variant_calling_sample.h
     dorado/polish/window.cpp
     dorado/polish/window.h
-    dorado/polish/features/decoder_base.cpp
-    dorado/polish/features/decoder_base.h
-    dorado/polish/features/decoder_factory.cpp
-    dorado/polish/features/decoder_factory.h
-    dorado/polish/features/encoder_base.h
-    dorado/polish/features/encoder_counts.cpp
-    dorado/polish/features/encoder_counts.h
-    dorado/polish/features/encoder_factory.cpp
-    dorado/polish/features/encoder_factory.h
-    dorado/polish/features/encoder_read_alignment.cpp
-    dorado/polish/features/encoder_read_alignment.h
-    dorado/polish/features/medaka_bamiter.cpp
-    dorado/polish/features/medaka_bamiter.h
-    dorado/polish/features/medaka_counts.cpp
-    dorado/polish/features/medaka_counts.h
-    dorado/polish/features/medaka_read_matrix.cpp
-    dorado/polish/features/medaka_read_matrix.h
-    dorado/polish/architectures/model_config.cpp
-    dorado/polish/architectures/model_config.h
-    dorado/polish/architectures/model_factory.cpp
-    dorado/polish/architectures/model_factory.h
-    dorado/polish/architectures/model_gru.cpp
-    dorado/polish/architectures/model_gru.h
-    dorado/polish/architectures/model_latent_space_lstm.cpp
-    dorado/polish/architectures/model_latent_space_lstm.h
-    dorado/polish/architectures/model_torch_base.cpp
-    dorado/polish/architectures/model_torch_base.h
-    dorado/polish/architectures/model_torch_script.cpp
-    dorado/polish/architectures/model_torch_script.h
     dorado/utils/container_utils.cpp
     dorado/utils/container_utils.h
     dorado/utils/io_utils.cpp

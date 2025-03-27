@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 // medaka-style feature data
 class ReadAlignmentData {
@@ -84,4 +84,4 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool include_haplotype,
                                            const int32_t max_reads);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

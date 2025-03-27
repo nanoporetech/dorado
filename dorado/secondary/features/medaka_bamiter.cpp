@@ -5,7 +5,7 @@
 #include <cerrno>
 #include <cstring>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 int32_t mpileup_read_bam(void *data, bam1_t *b) {
     HtslibMpileupData *aux = reinterpret_cast<HtslibMpileupData *>(data);
@@ -72,4 +72,4 @@ int32_t mpileup_read_bam(void *data, bam1_t *b) {
     return ret;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

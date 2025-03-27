@@ -1,12 +1,13 @@
 #pragma once
 
 #include "consensus_result.h"
-#include "polish/architectures/model_factory.h"
-#include "polish/features/decoder_factory.h"
-#include "polish/features/encoder_factory.h"
 #include "polish_stats.h"
 #include "sample.h"
+#include "secondary/architectures/model_config.h"
+#include "secondary/architectures/model_torch_base.h"
 #include "secondary/bam_file.h"
+#include "secondary/features/decoder_factory.h"
+#include "secondary/features/encoder_factory.h"
 #include "secondary/interval.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
@@ -39,11 +40,11 @@ struct DeviceInfo {
 };
 
 struct PolisherResources {
-    std::unique_ptr<EncoderBase> encoder;
-    std::unique_ptr<DecoderBase> decoder;
+    std::unique_ptr<secondary::EncoderBase> encoder;
+    std::unique_ptr<secondary::DecoderBase> decoder;
     std::vector<secondary::BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
-    std::vector<std::shared_ptr<ModelTorchBase>> models;
+    std::vector<std::shared_ptr<secondary::ModelTorchBase>> models;
     std::vector<c10::optional<c10::Stream>> streams;
 };
 
@@ -69,7 +70,7 @@ struct DecodeData {
 /**
  * \brief Creates all resources required to run polishing.
  */
-PolisherResources create_resources(const ModelConfig& model_config,
+PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
@@ -107,7 +108,7 @@ std::vector<ConsensusResult> stitch_sequence(
  *          2. Checks for discontinuities in any of the samples (based on major positions) and splits them.
  *          3. Splits the merged samples into equally sized pieces which will be used for inference to prevent memory usage spikes.
  * \param window_samples Input samples which will be merged and split. Non-const to enable moving of data.
- * \param encoder Encoder used to produce the sample tensors. It is needed becaue of the EncoderBase::merge_adjacent_samples() function.
+ * \param encoder Encoder used to produce the sample tensors. It is needed becaue of the secondary::EncoderBase::merge_adjacent_samples() function.
  * \param bam_regions BAM region coordinates. This is a Span to facilitate batching of BAM regions from the outside.
  * \param bam_region_intervals Range of IDs of window_samples which comprise this BAM region. E.g. BAM region 0 uses window_samples[0:5], BAM region 1 uses window_samples[5:9], etc.
  *                              This is a Span to facilitate batching of BAM regions from the outside and avoid copying vectors.
@@ -119,7 +120,7 @@ std::vector<ConsensusResult> stitch_sequence(
  */
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
         std::vector<Sample>& window_samples,
-        const EncoderBase& encoder,
+        const secondary::EncoderBase& encoder,
         const Span<const Window> bam_regions,
         const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
@@ -134,7 +135,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
  */
 std::vector<Sample> encode_windows_in_parallel(
         std::vector<secondary::BamFile>& bam_handles,
-        const EncoderBase& encoder,
+        const secondary::EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads);
@@ -165,16 +166,16 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
-                                const DecoderBase& decoder,
+                                const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
                                const std::vector<c10::optional<c10::Stream>>& streams,
-                               const EncoderBase& encoder);
+                               const secondary::EncoderBase& encoder);
 
 void sample_producer(PolisherResources& resources,
                      const std::vector<Window>& bam_regions,

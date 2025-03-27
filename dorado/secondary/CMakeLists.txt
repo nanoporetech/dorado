@@ -12,6 +12,36 @@ add_library(dorado_secondary
     variant.h
     vcf_writer.cpp
     vcf_writer.h
+    features/decoder_base.cpp
+    features/decoder_base.h
+    features/decoder_factory.cpp
+    features/decoder_factory.h
+    features/encoder_base.h
+    features/encoder_counts.cpp
+    features/encoder_counts.h
+    features/encoder_factory.cpp
+    features/encoder_factory.h
+    features/encoder_read_alignment.cpp
+    features/encoder_read_alignment.h
+    features/medaka_bamiter.cpp
+    features/medaka_bamiter.h
+    features/medaka_counts.cpp
+    features/medaka_counts.h
+    features/medaka_read_matrix.cpp
+    features/medaka_read_matrix.h
+    architectures/model_config.cpp
+    architectures/model_config.h
+    architectures/model_factory.cpp
+    architectures/model_factory.h
+    architectures/model_gru.cpp
+    architectures/model_gru.h
+    architectures/model_latent_space_lstm.cpp
+    architectures/model_latent_space_lstm.h
+    architectures/model_torch_base.cpp
+    architectures/model_torch_base.h
+    architectures/model_torch_script.cpp
+    architectures/model_torch_script.h
+
  )
 
 target_compile_definitions(dorado_secondary
@@ -56,6 +86,7 @@ target_link_libraries(dorado_secondary
     PRIVATE
         htslib
         spdlog::spdlog
+        toml11::toml11
 )
 
 if (NOT APPLE)

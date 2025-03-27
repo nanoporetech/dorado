@@ -4,10 +4,10 @@
 #include "hts_io/FastxRandomReader.h"
 #include "model_downloader/model_downloader.h"
 #include "models/models.h"
-#include "polish/architectures/model_config.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"
+#include "secondary/architectures/model_config.h"
 #include "secondary/bam_info.h"
 #include "secondary/batching.h"
 #include "secondary/vcf_writer.h"
@@ -477,11 +477,11 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
-const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
-                                          const std::string& model_str,
-                                          const bool load_scripted_model,
-                                          const bool bacteria,
-                                          const bool any_model) {
+const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
+                                           const std::string& model_str,
+                                           const bool load_scripted_model,
+                                           const bool bacteria,
+                                           const bool any_model) {
     const auto count_model_hits = [](const dorado::models::ModelList& model_list,
                                      const std::string& model_name) {
         int32_t num_found = 0;
@@ -620,8 +620,8 @@ const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     // Load the model.
     spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
-    polisher::ModelConfig model_config =
-            polisher::parse_model_config(model_dir / "config.toml", model_file);
+    secondary::ModelConfig model_config =
+            secondary::parse_model_config(model_dir / "config.toml", model_file);
 
     // Check that both the model and data have dwells, or that they both do not have dwells.
     const auto it_dwells = model_config.model_kwargs.find("use_dwells");
@@ -988,7 +988,7 @@ int polish(int argc, char* argv[]) {
         utils::initialise_torch();
 
         // Resolve the model for polishing.
-        const polisher::ModelConfig model_config = resolve_model(
+        const secondary::ModelConfig model_config = resolve_model(
                 bam_info, opt.model_str, opt.load_scripted_model, opt.bacteria, opt.any_model);
 
         // Create the models, encoders and BAM handles.

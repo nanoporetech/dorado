@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 // medaka-style base encoding
 static constexpr std::string_view PILEUP_BASES{"acgtACGTdD"};
@@ -112,4 +112,4 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
                             const std::string &read_group,
                             const int32_t min_mapq);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

@@ -16,7 +16,7 @@
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
 #define bam1_seqi(s, i) (bam_seqi((s), (i)))
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 PileupData::PileupData(const int64_t n_cols_,
                        const int64_t buffer_cols_,
@@ -328,4 +328,4 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
     return pileup;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

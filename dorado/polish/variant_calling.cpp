@@ -141,7 +141,7 @@ namespace {
  */
 std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
                                                const std::string& draft,
-                                               const DecoderBase& decoder) {
+                                               const secondary::DecoderBase& decoder) {
     std::vector<VariantCallingSample> ret;
 
     std::vector<VariantCallingSample> queue;
@@ -532,7 +532,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
     return ret;
 }
 
-std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
+std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& decoder,
                                                 const VariantCallingSample& vc_sample,
                                                 const std::string& draft,
                                                 const bool ambig_ref,
@@ -798,7 +798,7 @@ std::vector<secondary::Variant> call_variants(
         const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const DecoderBase& decoder,
+        const secondary::DecoderBase& decoder,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,

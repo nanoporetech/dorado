@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 enum class ModelType {
     GRU,
@@ -20,4 +20,4 @@ ModelType parse_model_type(const std::string& type);
 
 std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

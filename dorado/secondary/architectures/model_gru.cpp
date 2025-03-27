@@ -1,6 +1,6 @@
 #include "model_gru.h"
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 ModelGRU::ModelGRU(const int32_t num_features,
                    const int32_t num_classes,
@@ -27,4 +27,4 @@ torch::Tensor ModelGRU::forward(torch::Tensor x) {
     return x;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 namespace {
 
@@ -52,7 +52,7 @@ ReadAlignmentTensors read_matrix_data_to_tensors(ReadAlignmentData& data) {
     return result;
 }
 
-std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
+std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples) {
     const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
         size_t size = 0;
         for (const auto& vec : vecs) {
@@ -228,7 +228,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                                 &reorder_reads](const std::vector<int64_t>& sample_ids) {
         // The torch::cat is slow, so just move if there is nothing to concatenate.
         if (std::empty(sample_ids)) {
-            return Sample{};
+            return polisher::Sample{};
         }
         if (std::size(sample_ids) == 1) {
             return std::move(samples[sample_ids.front()]);
@@ -245,7 +245,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
 
         // Make buffers.
         for (const int64_t id : sample_ids) {
-            Sample& sample = samples[id];
+            polisher::Sample& sample = samples[id];
             features.emplace_back(std::move(sample.features));
             depth.emplace_back(std::move(sample.depth));
             positions_major.emplace_back(std::move(sample.positions_major));
@@ -255,7 +255,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
         }
 
         // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
-        Sample ret{
+        polisher::Sample ret{
                 seq_id,
                 torch::cat(pad_reads(
                         reorder_reads(std::move(features), read_ids_left, read_ids_right), -1)),
@@ -272,7 +272,7 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
     std::vector<int64_t> buffer_ids;
     int64_t last_end = -1;
 
-    std::vector<Sample> results;
+    std::vector<polisher::Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
         auto& sample = samples[i];
@@ -343,11 +343,11 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype} {}
 
-Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
-                                           const std::string& ref_name,
-                                           const int64_t ref_start,
-                                           const int64_t ref_end,
-                                           const int32_t seq_id) const {
+polisher::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
+                                                     const std::string& ref_name,
+                                                     const int64_t ref_start,
+                                                     const int64_t ref_end,
+                                                     const int32_t seq_id) const {
     // Compute the counts and data.
     ReadAlignmentTensors tensors;
     try {
@@ -376,13 +376,13 @@ Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
 
     at::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
-    Sample sample{seq_id,
-                  std::move(tensors.counts),
-                  std::move(tensors.positions_major),
-                  std::move(tensors.positions_minor),
-                  std::move(depth),
-                  std::move(tensors.read_ids_left),
-                  std::move(tensors.read_ids_right)};
+    polisher::Sample sample{seq_id,
+                            std::move(tensors.counts),
+                            std::move(tensors.positions_major),
+                            std::move(tensors.positions_minor),
+                            std::move(depth),
+                            std::move(tensors.read_ids_left),
+                            std::move(tensors.read_ids_right)};
 
     return sample;
 }
@@ -431,9 +431,9 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch) const {
     return features;
 }
 
-std::vector<Sample> EncoderReadAlignment::merge_adjacent_samples(
-        std::vector<Sample> samples) const {
+std::vector<polisher::Sample> EncoderReadAlignment::merge_adjacent_samples(
+        std::vector<polisher::Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

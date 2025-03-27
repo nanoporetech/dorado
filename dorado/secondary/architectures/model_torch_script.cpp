@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 ModelTorchScript::ModelTorchScript(const std::filesystem::path& model_path) {
     try {
@@ -49,4 +49,4 @@ void ModelTorchScript::to_device(torch::Device device) {
     m_module.to(device);
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

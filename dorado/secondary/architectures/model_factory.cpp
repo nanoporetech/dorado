@@ -15,7 +15,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 ModelType parse_model_type(const std::string& type) {
     if (type == "GRUModel") {
@@ -218,4 +218,4 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     return model;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

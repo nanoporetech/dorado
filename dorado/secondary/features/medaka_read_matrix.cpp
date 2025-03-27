@@ -142,7 +142,7 @@ size_t aligned_ref_pos_from_cigar(const uint32_t *cigar, const uint32_t n_cigar)
 
 }  // namespace
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 /** Constructs a ReadAlignmentData data structure.
  *
@@ -583,4 +583,4 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     return pileup;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

@@ -1,6 +1,7 @@
 #include "polish_impl.h"
 
 #include "hts_io/FastxRandomReader.h"
+#include "secondary/architectures/model_factory.h"
 #include "secondary/batching.h"
 #include "secondary/interval.h"
 #include "secondary/region.h"
@@ -60,7 +61,7 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 
 }  // namespace
 
-PolisherResources create_resources(const ModelConfig& model_config,
+PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
@@ -82,7 +83,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     // Construct the model.
     spdlog::debug("[create_resources] Loading the model.");
     const auto create_models = [&]() {
-        std::vector<std::shared_ptr<ModelTorchBase>> ret;
+        std::vector<std::shared_ptr<secondary::ModelTorchBase>> ret;
         std::vector<c10::optional<c10::Stream>> ret_streams;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
@@ -98,7 +99,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
 #endif
 
                 spdlog::debug("[create_resources] Creating a model from the config.");
-                auto model = model_factory(model_config);
+                auto model = secondary::model_factory(model_config);
 
                 spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
                               device_info.name);
@@ -411,7 +412,7 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
 
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
         std::vector<Sample>& window_samples,
-        const EncoderBase& encoder,
+        const secondary::EncoderBase& encoder,
         const Span<const Window> bam_regions,
         const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
@@ -554,7 +555,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 
 std::vector<Sample> encode_windows_in_parallel(
         std::vector<secondary::BamFile>& bam_handles,
-        const EncoderBase& encoder,
+        const secondary::EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads) {
@@ -775,16 +776,16 @@ void sample_producer(PolisherResources& resources,
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
                                const std::vector<c10::optional<c10::Stream>>& streams,
-                               const EncoderBase& encoder) {
+                               const secondary::EncoderBase& encoder) {
     utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
 
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    auto batch_infer = [&encoder](ModelTorchBase& model, const InferenceData& batch,
+    auto batch_infer = [&encoder](secondary::ModelTorchBase& model, const InferenceData& batch,
                                   const int32_t tid) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
@@ -853,7 +854,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         return output;
     };
 
-    const auto worker = [&](const int32_t tid, ModelTorchBase& model,
+    const auto worker = [&](const int32_t tid, secondary::ModelTorchBase& model,
                             [[maybe_unused]] const c10::optional<c10::Stream>& stream) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-worker", 3);
 
@@ -929,7 +930,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 std::vector<VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
-                                const DecoderBase& decoder,
+                                const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data) {

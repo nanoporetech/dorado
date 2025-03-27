@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 class ModelGRU : public ModelTorchBase {
 public:
@@ -31,4 +31,4 @@ private:
     torch::nn::Linear m_linear{nullptr};
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

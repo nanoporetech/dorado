@@ -4,10 +4,10 @@
 
 #include <memory>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct ModelConfig;
 
 std::unique_ptr<DecoderBase> decoder_factory(const ModelConfig& config);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

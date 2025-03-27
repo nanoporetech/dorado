@@ -16,7 +16,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 class ReadLevelConvImpl : public torch::nn::Module {
 public:
@@ -93,4 +93,4 @@ private:
     torch::nn::Linear m_linear;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

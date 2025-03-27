@@ -6,7 +6,7 @@
 #include <ostream>
 #include <stdexcept>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 namespace {
 
@@ -155,4 +155,4 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     return cfg;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

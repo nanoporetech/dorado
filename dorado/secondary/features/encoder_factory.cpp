@@ -1,11 +1,11 @@
 #include "encoder_factory.h"
 
-#include "polish/architectures/model_config.h"
+#include "secondary/architectures/model_config.h"
 
 #include <stdexcept>
 #include <unordered_map>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     if (type == "CountsFeatureEncoder") {
@@ -84,4 +84,4 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
     throw std::runtime_error{"Unsupported feature encoder type: " + config.feature_encoder_type};
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

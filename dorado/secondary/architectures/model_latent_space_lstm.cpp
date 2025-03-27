@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 namespace {
 
@@ -230,4 +230,4 @@ torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
     return x;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary
