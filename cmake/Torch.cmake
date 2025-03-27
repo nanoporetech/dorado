@@ -465,4 +465,7 @@ if (WIN32 AND USING_STATIC_TORCH_LIB)
         # Torch Windows static build includes some win headers without defining NOMINMAX.
         NOMINMAX
     )
+elseif (CMAKE_COMPILER_IS_GNUCXX AND TORCH_VERSION VERSION_EQUAL 2.6)
+    # Don't allow the linker to relax addresses otherwise we get "failed to convert GOTPCREL relocation" errors.
+    target_link_options(torch_lib INTERFACE "LINKER:--no-relax")
 endif()

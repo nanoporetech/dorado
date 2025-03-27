@@ -437,7 +437,6 @@ build_archive:linux:x86:cuda12:
   image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-12.8.0:1.0
   variables:
     CUDA: "12.8"
-    BUILD_OPTIONS: "-D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--no-relax'"
   extends:
     - .linux_build_dependencies
     - .linux_runner
