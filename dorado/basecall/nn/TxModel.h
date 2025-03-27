@@ -6,7 +6,6 @@
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <ATen/core/TensorBody.h>
 #include <c10/core/Device.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
@@ -114,12 +113,15 @@ struct TxEncoderImpl : torch::nn::Module {
     at::Tensor forward(at::Tensor x);
 
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
+    void koi_volta_forward(at::Tensor &x_f16);
 
     config::TxEncoderParams params;
 
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
     at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
+
+    void remove_bits();
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
@@ -134,6 +136,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
     at::Tensor forward(const at::Tensor &x);
 
     bool use_koi_tiled{false};
+    bool use_koi_volta_tiled{false};
     bool use_i8{false};
     torch::nn::Sequential stack{nullptr};
     std::vector<TxEncoder> layer_vec;
