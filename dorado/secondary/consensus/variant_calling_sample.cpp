@@ -6,7 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 void VariantCallingSample::validate() const {
     if (seq_id < 0) {
@@ -82,4 +82,4 @@ bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs
             std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor));
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

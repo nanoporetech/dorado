@@ -14,6 +14,7 @@
 
 CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
     using namespace dorado::polisher;
+    using namespace dorado::secondary;
 
     struct TestCase {
         std::string test_name;

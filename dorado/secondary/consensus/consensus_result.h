@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct ConsensusResult {
     std::string name;
@@ -14,4 +14,4 @@ struct ConsensusResult {
     int64_t draft_end = 0;    // Position in draft where seq ends.
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

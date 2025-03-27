@@ -1,8 +1,8 @@
 #include "variant_calling.h"
 
-#include "consensus_result.h"
 #include "polish_stats.h"
 #include "secondary/batching.h"
+#include "secondary/consensus/consensus_result.h"
 #include "trim.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"
@@ -47,9 +47,9 @@ std::string extract_draft_with_gaps(const std::string& draft,
     return ret;
 }
 
-VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
-                                     const int64_t idx_start,
-                                     const int64_t idx_end) {
+secondary::VariantCallingSample slice_vc_sample(const secondary::VariantCallingSample& vc_sample,
+                                                const int64_t idx_start,
+                                                const int64_t idx_end) {
     // Check that all members of the sample are of the same length.
     vc_sample.validate();
 
@@ -65,7 +65,7 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
     }
 
     // Slice.
-    return VariantCallingSample{
+    return secondary::VariantCallingSample{
             vc_sample.seq_id,
             std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
                                  std::begin(vc_sample.positions_major) + idx_end),
@@ -76,10 +76,10 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
 
 }  // namespace
 
-std::vector<VariantCallingSample> merge_vc_samples(
-        const std::vector<VariantCallingSample>& vc_samples) {
-    const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
-                                                    const VariantCallingSample& rh) {
+std::vector<secondary::VariantCallingSample> merge_vc_samples(
+        const std::vector<secondary::VariantCallingSample>& vc_samples) {
+    const auto merge_adjacent_samples_in_place = [](secondary::VariantCallingSample& lh,
+                                                    const secondary::VariantCallingSample& rh) {
         const size_t width = std::size(lh.positions_major);
 
         // Insert positions vectors.
@@ -98,7 +98,7 @@ std::vector<VariantCallingSample> merge_vc_samples(
         return {};
     }
 
-    std::vector<VariantCallingSample> ret{vc_samples.front()};
+    std::vector<secondary::VariantCallingSample> ret{vc_samples.front()};
 
     // Validate sample for sanity. This can throw.
     vc_samples[0].validate();
@@ -139,15 +139,16 @@ namespace {
  *          previous sample's right portion). The right part is then added to a cleared queue.
  *          The goal of this function is to prevent calling variants on sample boundaries.
  */
-std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
-                                               const std::string& draft,
-                                               const secondary::DecoderBase& decoder) {
-    std::vector<VariantCallingSample> ret;
+std::vector<secondary::VariantCallingSample> join_samples(
+        const std::vector<secondary::VariantCallingSample>& vc_samples,
+        const std::string& draft,
+        const secondary::DecoderBase& decoder) {
+    std::vector<secondary::VariantCallingSample> ret;
 
-    std::vector<VariantCallingSample> queue;
+    std::vector<secondary::VariantCallingSample> queue;
 
     for (int64_t i = 0; i < dorado::ssize(vc_samples); ++i) {
-        const VariantCallingSample& vc_sample = vc_samples[i];
+        const secondary::VariantCallingSample& vc_sample = vc_samples[i];
 
         vc_sample.validate();
 
@@ -156,7 +157,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
         // In this case, the "batch size" is 1.
         const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-        const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+        const std::vector<secondary::ConsensusResult> c = decoder.decode_bases(logits);
 
         // This shouldn't be possible.
         if (std::size(c) != 1) {
@@ -205,8 +206,9 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         }
 
         // Split the sample.
-        VariantCallingSample left_slice = slice_vc_sample(vc_sample, 0, last_non_var_start);
-        VariantCallingSample right_slice =
+        secondary::VariantCallingSample left_slice =
+                slice_vc_sample(vc_sample, 0, last_non_var_start);
+        secondary::VariantCallingSample right_slice =
                 slice_vc_sample(vc_sample, last_non_var_start, num_positions);
 
         // Enqueue the queue if possible.
@@ -533,7 +535,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
 }
 
 std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& decoder,
-                                                const VariantCallingSample& vc_sample,
+                                                const secondary::VariantCallingSample& vc_sample,
                                                 const std::string& draft,
                                                 const bool ambig_ref,
                                                 const bool gvcf) {
@@ -618,7 +620,7 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
 
     // Predicted sequence with gaps.
     const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-    const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+    const std::vector<secondary::ConsensusResult> c = decoder.decode_bases(logits);
     const std::string& cons_seq_with_gaps = c.front().seq;
 
     // Draft sequence with gaps.
@@ -741,23 +743,24 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
 
 namespace {
 
-std::vector<VariantCallingSample> trim_vc_samples(
-        const std::vector<VariantCallingSample>& vc_input_data,
+std::vector<secondary::VariantCallingSample> trim_vc_samples(
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
         const std::vector<std::pair<int64_t, int32_t>>& group) {
     // Mock the Sample objects. Trimming works on Sample objects only, but
     // it only needs positions, not the actual tensors.
-    std::vector<Sample> local_samples;
+    std::vector<secondary::Sample> local_samples;
     local_samples.reserve(std::size(group));
     for (const auto& [start, id] : group) {
         const auto& vc_sample = vc_input_data[id];
-        local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
-                                          vc_sample.positions_minor, {}, {}, {}));
+        local_samples.emplace_back(secondary::Sample(vc_sample.seq_id, {},
+                                                     vc_sample.positions_major,
+                                                     vc_sample.positions_minor, {}, {}, {}));
     }
 
     // Compute trimming of all samples for this group.
     const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
 
-    std::vector<VariantCallingSample> trimmed_samples;
+    std::vector<secondary::VariantCallingSample> trimmed_samples;
 
     assert(std::size(trims) == std::size(local_samples));
     assert(std::size(trims) == std::size(group));
@@ -779,7 +782,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
                                     ", num_columns = " + std::to_string(num_columns));
         }
 
-        trimmed_samples.emplace_back(VariantCallingSample{
+        trimmed_samples.emplace_back(secondary::VariantCallingSample{
                 s.seq_id,
                 std::vector<int64_t>(std::begin(s.positions_major) + t.start,
                                      std::begin(s.positions_major) + t.end),
@@ -795,7 +798,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
 
 std::vector<secondary::Variant> call_variants(
         const secondary::Interval& region_batch,
-        const std::vector<VariantCallingSample>& vc_input_data,
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const secondary::DecoderBase& decoder,

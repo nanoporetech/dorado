@@ -4,7 +4,7 @@
 
 #include <ostream>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 std::ostream& operator<<(std::ostream& os, const Window& w) {
     os << "seq_id = " << w.seq_id << ", seq_length = " << w.seq_length << ", start = " << w.start
@@ -100,4 +100,4 @@ std::vector<Window> create_windows(const int32_t seq_id,
     return ret;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

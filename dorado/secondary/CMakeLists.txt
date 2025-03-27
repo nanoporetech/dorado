@@ -12,6 +12,25 @@ add_library(dorado_secondary
     variant.h
     vcf_writer.cpp
     vcf_writer.h
+    architectures/model_config.cpp
+    architectures/model_config.h
+    architectures/model_factory.cpp
+    architectures/model_factory.h
+    architectures/model_gru.cpp
+    architectures/model_gru.h
+    architectures/model_latent_space_lstm.cpp
+    architectures/model_latent_space_lstm.h
+    architectures/model_torch_base.cpp
+    architectures/model_torch_base.h
+    architectures/model_torch_script.cpp
+    architectures/model_torch_script.h
+    consensus/consensus_result.h
+    consensus/sample.cpp
+    consensus/sample.h
+    consensus/variant_calling_sample.cpp
+    consensus/variant_calling_sample.h
+    consensus/window.cpp
+    consensus/window.h
     features/decoder_base.cpp
     features/decoder_base.h
     features/decoder_factory.cpp
@@ -29,19 +48,6 @@ add_library(dorado_secondary
     features/medaka_counts.h
     features/medaka_read_matrix.cpp
     features/medaka_read_matrix.h
-    architectures/model_config.cpp
-    architectures/model_config.h
-    architectures/model_factory.cpp
-    architectures/model_factory.h
-    architectures/model_gru.cpp
-    architectures/model_gru.h
-    architectures/model_latent_space_lstm.cpp
-    architectures/model_latent_space_lstm.h
-    architectures/model_torch_base.cpp
-    architectures/model_torch_base.h
-    architectures/model_torch_script.cpp
-    architectures/model_torch_script.h
-
  )
 
 target_compile_definitions(dorado_secondary

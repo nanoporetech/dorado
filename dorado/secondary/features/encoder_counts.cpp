@@ -75,11 +75,11 @@ FeatureIndicesType pileup_counts_norm_indices(const std::vector<std::string>& dt
 /**
  * \brief Normalizes the counts to produce the features for inference.
  */
-polisher::Sample counts_to_features(CountsResult& pileup,
-                                    const int32_t seq_id,
-                                    const bool sym_indels,
-                                    const FeatureIndicesType& feature_indices,
-                                    const NormaliseType normalise_type) {
+secondary::Sample counts_to_features(CountsResult& pileup,
+                                     const int32_t seq_id,
+                                     const bool sym_indels,
+                                     const FeatureIndicesType& feature_indices,
+                                     const NormaliseType normalise_type) {
     // Avoid slow Torch operations as much as possible. The original Medaka code had this implemented
     // on a very high level with lots of redundancy in computation.
 
@@ -170,18 +170,18 @@ polisher::Sample counts_to_features(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
-    polisher::Sample sample{seq_id,
-                            std::move(feature_array),
-                            std::move(pileup.positions_major),
-                            std::move(pileup.positions_minor),
-                            std::move(depth),
-                            {},
-                            {}};
+    secondary::Sample sample{seq_id,
+                             std::move(feature_array),
+                             std::move(pileup.positions_major),
+                             std::move(pileup.positions_minor),
+                             std::move(depth),
+                             {},
+                             {}};
 
     return sample;
 }
 
-std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::Sample> samples) {
+std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary::Sample> samples) {
     const auto cat_vectors = [](const std::vector<std::vector<int64_t>>& vecs) {
         size_t size = 0;
         for (const auto& vec : vecs) {
@@ -197,7 +197,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
 
     const auto merge_samples = [&samples, &cat_vectors](const std::vector<int64_t>& sample_ids) {
         if (std::empty(sample_ids)) {
-            return polisher::Sample{};
+            return secondary::Sample{};
         }
 
         // The torch::cat is slow, so just move if there is nothing to concatenate.
@@ -214,7 +214,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
 
         // Make buffers.
         for (const int64_t id : sample_ids) {
-            polisher::Sample& sample = samples[id];
+            secondary::Sample& sample = samples[id];
             features.emplace_back(std::move(sample.features));
             depth.emplace_back(std::move(sample.depth));
             positions_major.emplace_back(std::move(sample.positions_major));
@@ -222,7 +222,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
         }
 
         // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
-        polisher::Sample ret{
+        secondary::Sample ret{
                 seq_id,
                 torch::cat(std::move(features)),
                 cat_vectors(positions_major),
@@ -238,7 +238,7 @@ std::vector<polisher::Sample> merge_adjacent_samples_impl(std::vector<polisher::
     std::vector<int64_t> buffer_ids;
     int64_t last_end = -1;
 
-    std::vector<polisher::Sample> results;
+    std::vector<secondary::Sample> results;
 
     for (int64_t i = 0; i < dorado::ssize(samples); ++i) {
         // Non-const so that it can be moved by the lambdas.
@@ -305,11 +305,11 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
           m_symmetric_indels{symmetric_indels},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
-polisher::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
-                                              const std::string& ref_name,
-                                              const int64_t ref_start,
-                                              const int64_t ref_end,
-                                              const int32_t seq_id) const {
+secondary::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
+                                               const std::string& ref_name,
+                                               const int64_t ref_start,
+                                               const int64_t ref_end,
+                                               const int32_t seq_id) const {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -350,8 +350,8 @@ at::Tensor EncoderCounts::collate(std::vector<at::Tensor> batch) const {
     return torch::stack(batch);
 }
 
-std::vector<polisher::Sample> EncoderCounts::merge_adjacent_samples(
-        std::vector<polisher::Sample> samples) const {
+std::vector<secondary::Sample> EncoderCounts::merge_adjacent_samples(
+        std::vector<secondary::Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
 }
 

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 /**
  * \brief Type which holds the input data for variant calling. This includes _all_
@@ -29,4 +29,4 @@ std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample
 
 bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

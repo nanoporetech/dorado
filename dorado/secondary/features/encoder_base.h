@@ -1,8 +1,8 @@
 #pragma once
 
-#include "polish/consensus_result.h"
-#include "polish/sample.h"
 #include "secondary/bam_file.h"
+#include "secondary/consensus/consensus_result.h"
+#include "secondary/consensus/sample.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -48,16 +48,16 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual polisher::Sample encode_region(secondary::BamFile& bam_file,
-                                           const std::string& ref_name,
-                                           const int64_t ref_start,
-                                           const int64_t ref_end,
-                                           const int32_t seq_id) const = 0;
+    virtual secondary::Sample encode_region(secondary::BamFile& bam_file,
+                                            const std::string& ref_name,
+                                            const int64_t ref_start,
+                                            const int64_t ref_end,
+                                            const int32_t seq_id) const = 0;
 
     virtual at::Tensor collate(std::vector<at::Tensor> batch) const = 0;
 
-    virtual std::vector<polisher::Sample> merge_adjacent_samples(
-            std::vector<polisher::Sample> samples) const = 0;
+    virtual std::vector<secondary::Sample> merge_adjacent_samples(
+            std::vector<secondary::Sample> samples) const = 0;
 };
 
 }  // namespace dorado::secondary

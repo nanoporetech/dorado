@@ -65,9 +65,10 @@ std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs) {
 
 namespace {
 
-Relationship relative_position(const Sample& s1, const Sample& s2) {
+Relationship relative_position(const secondary::Sample& s1, const secondary::Sample& s2) {
     // Helper lambdas for comparisons
-    const auto ordered_abuts = [](const Sample& s1_, const Sample& s2_) -> bool {
+    const auto ordered_abuts = [](const secondary::Sample& s1_,
+                                  const secondary::Sample& s2_) -> bool {
         const auto [s1_end_maj, s1_end_min] = s1_.get_last_position();
         const auto [s2_start_maj, s2_start_min] = s2_.get_position(0);
         if (((s2_start_maj == (s1_end_maj + 1)) && (s2_start_min == 0)) ||
@@ -77,12 +78,14 @@ Relationship relative_position(const Sample& s1, const Sample& s2) {
         return false;
     };
 
-    const auto ordered_contained = [](const Sample& s1_, const Sample& s2_) -> bool {
+    const auto ordered_contained = [](const secondary::Sample& s1_,
+                                      const secondary::Sample& s2_) -> bool {
         return (s2_.get_position(0) >= s1_.get_position(0)) &&
                (s2_.get_last_position() <= s1_.get_last_position());
     };
 
-    const auto ordered_overlaps = [](const Sample& s1_, const Sample& s2_) -> bool {
+    const auto ordered_overlaps = [](const secondary::Sample& s1_,
+                                     const secondary::Sample& s2_) -> bool {
         const auto [s1_end_maj, s1_end_min] = s1_.get_last_position();
         const auto [s2_start_maj, s2_start_min] = s2_.get_position(0);
         if ((s2_start_maj < s1_end_maj) ||
@@ -92,7 +95,8 @@ Relationship relative_position(const Sample& s1, const Sample& s2) {
         return false;
     };
 
-    const auto ordered_gapped = [](const Sample& s1_, const Sample& s2_) -> bool {
+    const auto ordered_gapped = [](const secondary::Sample& s1_,
+                                   const secondary::Sample& s2_) -> bool {
         const auto [s1_end_maj, s1_end_min] = s1_.get_last_position();
         const auto [s2_start_maj, s2_start_min] = s2_.get_position(0);
         if ((s2_start_maj > (s1_end_maj + 1)) ||
@@ -109,11 +113,12 @@ Relationship relative_position(const Sample& s1, const Sample& s2) {
     }
 
     // Sort s1 and s2 by first position, and then by size in descending order
-    const Sample& s1_ord = (std::pair(s1.get_position(0), -dorado::ssize(s1.positions_major)) <=
-                            std::pair(s2.get_position(0), -dorado::ssize(s2.positions_major)))
-                                   ? s1
-                                   : s2;
-    const Sample& s2_ord = (&s1_ord == &s1) ? s2 : s1;
+    const secondary::Sample& s1_ord =
+            (std::pair(s1.get_position(0), -dorado::ssize(s1.positions_major)) <=
+             std::pair(s2.get_position(0), -dorado::ssize(s2.positions_major)))
+                    ? s1
+                    : s2;
+    const secondary::Sample& s2_ord = (&s1_ord == &s1) ? s2 : s1;
     const bool is_ordered = (&s1_ord == &s1);
 
     // Determine the relationship based on various conditions
@@ -129,7 +134,8 @@ Relationship relative_position(const Sample& s1, const Sample& s2) {
     return Relationship::UNKNOWN;
 }
 
-std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sample& s2) {
+std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
+                                                   const secondary::Sample& s2) {
     const Relationship rel = relative_position(s1, s2);
 
     if (rel == Relationship::FORWARD_ABUTTED) {
@@ -143,7 +149,8 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     }
 
     // Linear search over the pairs.
-    const auto find_left = [](const Sample& s, const std::pair<int64_t, int64_t> target) {
+    const auto find_left = [](const secondary::Sample& s,
+                              const std::pair<int64_t, int64_t> target) {
         int64_t idx = -1;
         for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
             const std::pair<int64_t, int64_t> pos = s.get_position(idx);
@@ -155,7 +162,8 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
         return idx;
     };
 
-    const auto find_right = [](const Sample& s, const std::pair<int64_t, int64_t> target) {
+    const auto find_right = [](const secondary::Sample& s,
+                               const std::pair<int64_t, int64_t> target) {
         int64_t idx = 0;
         for (idx = 0; idx < dorado::ssize(s.positions_major); ++idx) {
             const std::pair<int64_t, int64_t> pos = s.get_position(idx);
@@ -308,9 +316,9 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
 
 }  // namespace
 
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
+std::vector<TrimInfo> trim_samples(const std::vector<secondary::Sample>& samples,
                                    const std::optional<const secondary::RegionInt>& region) {
-    std::vector<const Sample*> ptrs;
+    std::vector<const secondary::Sample*> ptrs;
     ptrs.reserve(std::size(samples));
     for (const auto& sample : samples) {
         ptrs.emplace_back(&sample);
@@ -318,7 +326,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
     return trim_samples(ptrs, region);
 }
 
-std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
+std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& samples,
                                    const std::optional<const secondary::RegionInt>& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
@@ -339,8 +347,8 @@ std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
     result[0].end = dorado::ssize(samples.front()->positions_major);
 
     for (size_t i = 1; i < std::size(samples); ++i) {
-        const Sample& s1 = *samples[idx_s1];
-        const Sample& s2 = *samples[i];
+        const secondary::Sample& s1 = *samples[idx_s1];
+        const secondary::Sample& s2 = *samples[i];
         bool heuristic = false;
 
         const Relationship rel = relative_position(s1, s2);
@@ -392,7 +400,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
         spdlog::trace("[trim_samples] Trimming to region.");
 
         for (size_t i = 0; i < std::size(samples); ++i) {
-            const Sample& sample = *samples[i];
+            const secondary::Sample& sample = *samples[i];
             TrimInfo& trim = result[i];
 
             // Sample not on the specified sequence.

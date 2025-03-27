@@ -1,4 +1,4 @@
-#include "polish/window.h"
+#include "secondary/consensus/window.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -9,7 +9,7 @@
 #define TEST_GROUP "[PolishCreateWindows]"
 
 CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
-    using namespace dorado::polisher;
+    using namespace dorado::secondary;
 
     struct TestCase {
         std::string name;

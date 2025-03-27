@@ -8,7 +8,7 @@
 #include <tuple>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct Sample {
     int32_t seq_id = -1;
@@ -68,4 +68,4 @@ void debug_print_sample(std::ostream& os,
 
 std::ostream& operator<<(std::ostream& os, const Sample& sample);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

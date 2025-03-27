@@ -1,4 +1,4 @@
-#include "polish/sample.h"
+#include "secondary/consensus/sample.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
@@ -6,9 +6,9 @@
 #include <cstdint>
 #include <vector>
 
-namespace dorado::polisher::sample::tests {
+namespace dorado::secondary::sample::tests {
 
-#define TEST_GROUP "[PolishSample]"
+#define TEST_GROUP "[SecondaryConsensusSample]"
 
 CATCH_TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
     // Create a mock sample.
@@ -187,4 +187,4 @@ CATCH_TEST_CASE("slice_sample: error, wrong length of the positions_minor vector
     CATCH_CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
-}  // namespace dorado::polisher::sample::tests
+}  // namespace dorado::secondary::sample::tests

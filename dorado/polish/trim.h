@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sample.h"
+#include "secondary/consensus/sample.h"
 #include "secondary/region.h"
 
 #include <cstdint>
@@ -25,7 +25,7 @@ struct TrimInfo {
  * \param region Optional region to trim to. After samples are trimmed on neighboring overlaps, region trimming is applied.
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
-std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
+std::vector<TrimInfo> trim_samples(const std::vector<secondary::Sample>& samples,
                                    const std::optional<const secondary::RegionInt>& region);
 
 /**
@@ -37,7 +37,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
  * \param region Optional region to trim to. After samples are trimmed on neighboring overlaps, region trimming is applied.
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
-std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
+std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& samples,
                                    const std::optional<const secondary::RegionInt>& region);
 
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs);

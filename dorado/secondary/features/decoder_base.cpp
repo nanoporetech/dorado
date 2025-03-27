@@ -12,7 +12,7 @@ namespace dorado::secondary {
 DecoderBase::DecoderBase(const LabelSchemeType label_scheme_type)
         : m_label_scheme_type(label_scheme_type) {}
 
-std::vector<polisher::ConsensusResult> DecoderBase::decode_bases(const at::Tensor& logits) const {
+std::vector<secondary::ConsensusResult> DecoderBase::decode_bases(const at::Tensor& logits) const {
     return decode_bases_impl(m_label_scheme_type, logits);
 }
 
@@ -29,17 +29,17 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
 
 namespace {
 
-std::vector<polisher::ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
-                                                         const dorado::Span<const float> logits,
-                                                         const size_t num_samples,
-                                                         const size_t sequence_length,
-                                                         const size_t num_classes) {
+std::vector<secondary::ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
+                                                          const dorado::Span<const float> logits,
+                                                          const size_t num_samples,
+                                                          const size_t sequence_length,
+                                                          const size_t num_classes) {
     const std::string label_scheme = label_scheme_symbols(label_scheme_type);
 
     constexpr double QV_CAP = 70.0;
     const double min_err = std::pow(10.0, -QV_CAP / 10.0);
 
-    std::vector<polisher::ConsensusResult> results;
+    std::vector<secondary::ConsensusResult> results;
     results.reserve(num_samples);
     for (size_t sample_id = 0; sample_id < num_samples; ++sample_id) {
         auto& result = results.emplace_back();
@@ -74,8 +74,8 @@ std::vector<polisher::ConsensusResult> decode_bases_impl(const LabelSchemeType l
 
 }  // namespace
 
-std::vector<polisher::ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
-                                                         const at::Tensor& logits) {
+std::vector<secondary::ConsensusResult> decode_bases_impl(const LabelSchemeType label_scheme_type,
+                                                          const at::Tensor& logits) {
     if (logits.sizes().size() != 3) {
         throw std::runtime_error(
                 "Wrong input tensor shape! Expected shape: [num_samples x seq_length x "

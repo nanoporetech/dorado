@@ -7,7 +7,7 @@
 
 #include <ostream>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 void Sample::validate() const {
     const int64_t num_columns = dorado::ssize(positions_major);
@@ -147,4 +147,4 @@ void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
     lh.read_ids_right.clear();
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

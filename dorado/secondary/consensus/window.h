@@ -4,7 +4,7 @@
 #include <iosfwd>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 // clang-format off
 struct Window {
@@ -32,4 +32,4 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int32_t window_len,
                                    const int32_t window_overlap);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

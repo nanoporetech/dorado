@@ -442,7 +442,7 @@ void validate_options(const Options& opt) {
 }
 
 void write_consensus_results(std::ostream& os,
-                             const std::vector<polisher::ConsensusResult>& results,
+                             const std::vector<secondary::ConsensusResult>& results,
                              const bool fill_gaps,
                              const bool write_quals) {
     if (std::empty(results)) {
@@ -450,8 +450,8 @@ void write_consensus_results(std::ostream& os,
     }
 
     for (size_t i = 0; i < std::size(results); ++i) {
-        polisher::ConsensusResult out = results[i];
-        remove_deletions(out);
+        secondary::ConsensusResult out = results[i];
+        polisher::remove_deletions(out);
 
         std::string header = results[i].name;
         if (!fill_gaps) {
@@ -802,8 +802,8 @@ void run_polishing(const Options& opt,
                           secondary::region_to_string(region_batch[i]));
         }
 
-        std::vector<polisher::ConsensusResult> all_results_cons;
-        std::vector<polisher::VariantCallingSample> vc_input_data;
+        std::vector<secondary::ConsensusResult> all_results_cons;
+        std::vector<secondary::VariantCallingSample> vc_input_data;
 
         // Profiling block.
         {
@@ -812,8 +812,9 @@ void run_polishing(const Options& opt,
             // Split the sequences into larger BAM windows, like Medaka.
             // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
             spdlog::debug("Creating BAM windows.");
-            const std::vector<polisher::Window> bam_regions = polisher::create_windows_from_regions(
-                    region_batch, draft_lookup, opt.bam_chunk, opt.window_overlap);
+            const std::vector<secondary::Window> bam_regions =
+                    polisher::create_windows_from_regions(region_batch, draft_lookup, opt.bam_chunk,
+                                                          opt.window_overlap);
 
             spdlog::debug(
                     "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
@@ -879,7 +880,7 @@ void run_polishing(const Options& opt,
             if (opt.write_consensus) {
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
-                const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
+                const std::vector<std::vector<secondary::ConsensusResult>> consensus_seqs =
                         polisher::construct_consensus_seqs(batch_interval, all_results_cons,
                                                            draft_lens, opt.fill_gaps, opt.fill_char,
                                                            *draft_readers.front());

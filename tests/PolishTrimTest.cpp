@@ -1,4 +1,5 @@
 #include "polish/trim.h"
+#include "secondary/consensus/sample.h"
 #include "secondary/region.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -358,6 +359,7 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
  */
 CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     using namespace dorado::polisher;
+    using namespace dorado::secondary;
 
     // The actual Sample struct is complicated, but the only thing needed
     // for trimming are seq_id, positions_major and positions_minor.

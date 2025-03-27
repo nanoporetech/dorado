@@ -1,8 +1,8 @@
 #pragma once
 
 #include "encoder_base.h"
-#include "polish/sample.h"
 #include "secondary/bam_file.h"
+#include "secondary/consensus/sample.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -34,16 +34,16 @@ public:
 
     ~EncoderCounts() = default;
 
-    polisher::Sample encode_region(secondary::BamFile& bam_file,
-                                   const std::string& ref_name,
-                                   const int64_t ref_start,
-                                   const int64_t ref_end,
-                                   const int32_t seq_id) const override;
+    secondary::Sample encode_region(secondary::BamFile& bam_file,
+                                    const std::string& ref_name,
+                                    const int64_t ref_start,
+                                    const int64_t ref_end,
+                                    const int32_t seq_id) const override;
 
     at::Tensor collate(std::vector<at::Tensor> batch) const override;
 
-    std::vector<polisher::Sample> merge_adjacent_samples(
-            std::vector<polisher::Sample> samples) const override;
+    std::vector<secondary::Sample> merge_adjacent_samples(
+            std::vector<secondary::Sample> samples) const override;
 
 private:
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
