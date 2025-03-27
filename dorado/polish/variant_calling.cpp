@@ -303,7 +303,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
         return variant;
     }
 
-    const auto trim_start = [&positions_major](secondary::Variant& var, const bool rev) {
+    const auto trim_start = [](secondary::Variant& var, const bool rev) {
         // Get the sequences and reverse if needed.
         std::vector<std::string> seqs{var.ref};
         seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
@@ -356,13 +356,6 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
         var.pos += start_pos;
-        // Move rstart if needed.
-        while (var.rstart < static_cast<int32_t>(std::size(positions_major))) {
-            if (positions_major[var.rstart] == var.pos) {
-                break;
-            }
-            ++var.rstart;
-        }
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
@@ -506,6 +499,27 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
     };
 
     secondary::Variant ret = variant;
+
+    // Normalize the start of the variant. For example, if the input variant represents a region like this:
+    // - POS  :      43499195    43499196
+    //               v           v
+    // - REF  : CCTAG************TTATTATT
+    // - HAP 0: CCTAG*********TT**T*TTATT
+    // - HAP 1: CCTAG*********T*AT*ATTATT
+    // - VAR  : 0000011111111111111100000
+    // - MARK :      ^
+    //
+    // it is possible that the input variant.pos was set to the pos_major of the beginning of the variant
+    // (in this case, on a minor position which does not contain a reference base).
+    // While actually, the variant.pos should have been set to the first major position after rstart.
+    if (!std::empty(ret.ref)) {
+        for (int32_t r = ret.rstart; r < ret.rend; ++r) {
+            if ((positions_major[r] >= ret.pos) && (positions_minor[r] == 0)) {
+                ret.pos = positions_major[r];
+                break;
+            }
+        }
+    }
 
     if (std::empty(ref_with_gaps)) {
         trim_start(ret, true);
