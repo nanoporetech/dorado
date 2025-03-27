@@ -27,13 +27,9 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
-ProgressTracker::ProgressTracker(int total_reads,
-                                 bool duplex,
-                                 bool trim,
-                                 float post_processing_percentage)
+ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
-          m_duplex(duplex),
-          m_trim(trim),
+          m_mode(mode),
           m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }
@@ -58,13 +54,13 @@ void ProgressTracker::summarize() const {
 
     spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
-        auto mode = m_trim ? "Reads written" : "Simplex reads basecalled";
-        spdlog::info("> {}: {}", mode, m_num_simplex_reads_filtered);
+        auto ctx = m_mode == Mode::TRIM ? "Reads written" : "Simplex reads basecalled";
+        spdlog::info("> {}: {}", ctx, m_num_simplex_reads_written);
     }
     if (m_num_simplex_reads_filtered > 0) {
         spdlog::info("> Simplex reads filtered: {}", m_num_simplex_reads_filtered);
     }
-    if (m_duplex) {
+    if (m_mode == Mode::DUPLEX) {
         spdlog::info("> Duplex reads basecalled: {}", m_num_duplex_reads_written);
         if (m_num_duplex_reads_filtered > 0) {
             spdlog::info("> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
@@ -78,7 +74,7 @@ void ProgressTracker::summarize() const {
     }
     if (m_num_bases_processed > 0) {
         std::ostringstream samples_sec;
-        if (m_duplex) {
+        if (m_mode == Mode::DUPLEX) {
             samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
@@ -162,7 +158,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_bases_processed = m_num_simplex_bases_processed;
     m_num_samples_processed = int64_t(fetch_stat("BasecallerNode.samples_processed"));
     m_num_samples_incl_padding = int64_t(fetch_stat("BasecallerNode.samples_incl_padding"));
-    if (m_duplex) {
+    if (m_mode == Mode::DUPLEX) {
         m_num_duplex_bases_processed = int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
         m_num_bases_processed += m_num_duplex_bases_processed;
     }

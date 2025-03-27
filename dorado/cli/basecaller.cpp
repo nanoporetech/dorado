@@ -603,7 +603,8 @@ void setup(const std::vector<std::string>& args,
     // If we're doing alignment, post-processing takes longer due to bam file sorting.
     float post_processing_percentage = (hts_file->finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
 
-    ProgressTracker tracker(int(num_reads), false, false, post_processing_percentage);
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, int(num_reads),
+                            post_processing_percentage);
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
