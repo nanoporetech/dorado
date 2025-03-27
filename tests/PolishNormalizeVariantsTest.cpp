@@ -70,7 +70,7 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             "Haploid, parsimony, Left trim",
             reference_1, consensus_1, pos_major_1, pos_minor_1,
             Variant{0, 3, "GCAT", {"GTGC"}, {}, {}, 30.0f, {}, 3, 7},
-            Variant{0, 4, "CAT", {"TGC"}, {}, {}, 30.0f, {}, 4, 7},
+            Variant{0, 4, "CAT", {"TGC"}, {}, {}, 30.0f, {}, 3, 7},
             false,
         },
         TestCase{
@@ -84,7 +84,7 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             "Haploid, parsimony, left and right trim",
             reference_1, consensus_1, pos_major_1, pos_minor_1,
             Variant{0, 3, "GCATG", {"GTGCG"}, {}, {}, 32.0f, {}, 3, 8},
-            Variant{0, 4, "CAT", {"TGC"}, {}, {}, 32.0f, {}, 4, 8},
+            Variant{0, 4, "CAT", {"TGC"}, {}, {}, 32.0f, {}, 3, 8},
             false,
         },
         TestCase{
@@ -121,7 +121,7 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             "Haploid, normalize, left trim",
             reference_2, consensus_2, pos_major_2, pos_minor_2,
             Variant{0, 1, "GGCA", {"GG"}, {}, {}, 37.0f, {}, 1, 5},
-            Variant{0, 2, "GCA", {"G"}, {}, {}, 37.0f, {}, 2, 5},
+            Variant{0, 2, "GCA", {"G"}, {}, {}, 37.0f, {}, 1, 5},
             false,
         },
 
@@ -148,7 +148,7 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             {0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
             {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0},
             Variant{0, 2, "TT", {"CGG"}, {}, {}, 50.0f, {}, 3, 6},
-            Variant{0, 2, "TT", {"CGG"}, {}, {}, 50.0f, {}, 3, 6},
+            Variant{0, 3, "TT", {"CGG"}, {}, {}, 50.0f, {}, 3, 6},
             false,
         },
 
