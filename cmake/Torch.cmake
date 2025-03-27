@@ -1,7 +1,7 @@
 # Guard against double-inclusion errors. See https://github.com/pytorch/pytorch/issues/25004
 include_guard(GLOBAL)
 
-set(TORCH_VERSION 2.0.0)
+set(TORCH_VERSION 2.6.0)
 unset(TORCH_PATCH_SUFFIX)
 
 if (NOT DEFINED TRY_USING_STATIC_TORCH_LIB)
@@ -79,7 +79,6 @@ else()
                 endif()
             elseif(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.0)
                 if (TRY_USING_STATIC_TORCH_LIB)
-                    set(TORCH_VERSION 2.6.0)
                     set(TORCH_URL ${DORADO_CDN_URL}/torch-2.6.0-linux-aarch64-ont.zip)
                     set(TORCH_PATCH_SUFFIX -ont)
                     set(TORCH_HASH "7e741501d7c8b050d3de853c31f79e91f6eb7ba370694431029f3c7dbba69ad3")
@@ -104,7 +103,6 @@ else()
                 endif()
             endif()
         else()
-            set(TORCH_VERSION 2.6.0)
             if (TRY_USING_STATIC_TORCH_LIB)
                 if(DORADO_USING_OLD_CPP_ABI)
                     if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.8)
@@ -141,7 +139,6 @@ else()
         endif()
 
     elseif(APPLE)
-        set(TORCH_VERSION 2.6.0)
         if (TRY_USING_STATIC_TORCH_LIB)
             set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.1-macos-m1-ont.zip)
             set(TORCH_PATCH_SUFFIX -ont.1)
@@ -156,28 +153,16 @@ else()
         endif()
     elseif(WIN32)
         if (TRY_USING_STATIC_TORCH_LIB)
-            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.0.0.3-Windows-ont.zip)
-            set(TORCH_PATCH_SUFFIX -ont.3)
-            set(TORCH_HASH "03eeb36741acb40c239279bc65ae7d67bae9b819a4d3a1b24096d7b963b3d77c")
+            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.6.0.0-windows-ont.zip)
+            set(TORCH_PATCH_SUFFIX -ont.0)
+            set(TORCH_HASH "6306be612768b659b6780707512bed356473da2f7e9ea8f460f9c47378ca4034")
             set(TORCH_LIB_SUFFIX "/libtorch")
             set(USING_STATIC_TORCH_LIB TRUE)
-            # Torch Windows static build includes some win headers without defining NOMINMAX.
-            add_compile_options(-DNOMINMAX)
         else()
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu118/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu118.zip)
-            set(TORCH_HASH "becd860f05c3db6d1104c15264f93706dcfea8446f507fb933a01371022b2e45")
+            set(TORCH_URL https://download.pytorch.org/libtorch/cu126/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu126.zip)
+            set(TORCH_HASH "89ed2ae468555487ad153bf6f1b0bcce17814da314ba14996c4d63602e94c8c9")
             set(TORCH_LIB_SUFFIX "/libtorch")
         endif()
-
-        # Note we need to use the generator expression to avoid setting this for CUDA.
-        add_compile_options(
-            # from libtorch: destructor was implicitly defined as deleted
-            $<$<COMPILE_LANGUAGE:CXX>:/wd4624>
-            # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
-            # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
-            # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
-            $<$<COMPILE_LANGUAGE:CXX>:/wd4702>
-        )
     endif()
 
     if (USING_STATIC_TORCH_LIB)
@@ -459,3 +444,25 @@ endif()
 add_library(torch_lib INTERFACE)
 target_link_libraries(torch_lib INTERFACE ${TORCH_LIBRARIES})
 target_include_directories(torch_lib SYSTEM INTERFACE ${TORCH_INCLUDE_DIRS})
+
+if (WIN32 AND USING_STATIC_TORCH_LIB)
+    # Note we need to use the generator expression to avoid setting this for CUDA.
+    target_compile_options(torch_lib INTERFACE
+        # from libtorch: destructor was implicitly defined as deleted
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4624>
+        # from libtorch: structure was padded due to alignment specifier
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4324>
+        # from libtorch: possible loss of data
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4267>
+        # from libtorch: 'initializing': conversion from 'X' to 'Y', possible loss of data
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
+        # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
+        # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
+        # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4702>
+    )
+    target_compile_definitions(torch_lib INTERFACE
+        # Torch Windows static build includes some win headers without defining NOMINMAX.
+        NOMINMAX
+    )
+endif()
