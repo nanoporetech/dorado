@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string_view>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 // RAII for the BCF header.
 void BcfHdrDestructor::operator()(bcf_hdr_t* p) {
@@ -145,4 +145,4 @@ void VCFWriter::write_variant(const Variant& variant) {
     }
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

@@ -8,6 +8,10 @@ add_library(dorado_secondary
     interval.h
     region.cpp
     region.h
+    variant.cpp
+    variant.h
+    vcf_writer.cpp
+    vcf_writer.h
  )
 
 target_compile_definitions(dorado_secondary

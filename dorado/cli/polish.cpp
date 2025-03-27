@@ -8,9 +8,9 @@
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
 #include "polish/variant_calling.h"
-#include "polish/vcf_writer.h"
 #include "secondary/bam_info.h"
 #include "secondary/batching.h"
+#include "secondary/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
@@ -739,7 +739,7 @@ void run_polishing(const Options& opt,
             (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
 
     // VCF writer, nullptr unless variant calling is run.
-    std::unique_ptr<polisher::VCFWriter> vcf_writer;
+    std::unique_ptr<secondary::VCFWriter> vcf_writer;
 
     if (opt.run_variant_calling) {
         // These are the only available FILTER options.
@@ -748,7 +748,7 @@ void run_polishing(const Options& opt,
                 {".", "Non-variant position"},
         };
 
-        vcf_writer = std::make_unique<polisher::VCFWriter>(out_vcf_fn, filters, draft_lens);
+        vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens);
     }
 
     // Prepare regions for processing.
@@ -895,7 +895,7 @@ void run_polishing(const Options& opt,
             if (opt.run_variant_calling) {
                 utils::ScopedProfileRange spr2("run-variant_calling", 2);
 
-                std::vector<polisher::Variant> variants = call_variants(
+                std::vector<secondary::Variant> variants = call_variants(
                         batch_interval, vc_input_data, draft_readers, draft_lens,
                         *resources.decoder, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
                         opt.threads, polish_stats);

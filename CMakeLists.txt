@@ -317,14 +317,10 @@ add_library(dorado_lib
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
-    dorado/polish/variant.cpp
-    dorado/polish/variant.h
     dorado/polish/variant_calling.cpp
     dorado/polish/variant_calling.h
     dorado/polish/variant_calling_sample.cpp
     dorado/polish/variant_calling_sample.h
-    dorado/polish/vcf_writer.cpp
-    dorado/polish/vcf_writer.h
     dorado/polish/window.cpp
     dorado/polish/window.h
     dorado/polish/features/decoder_base.cpp

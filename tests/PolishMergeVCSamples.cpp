@@ -1,5 +1,5 @@
-#include "polish/variant.h"
 #include "polish/variant_calling.h"
+#include "secondary/variant.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
