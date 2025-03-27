@@ -454,6 +454,8 @@ if (WIN32 AND USING_STATIC_TORCH_LIB)
         $<$<COMPILE_LANGUAGE:CXX>:/wd4324>
         # from libtorch: possible loss of data
         $<$<COMPILE_LANGUAGE:CXX>:/wd4267>
+        # from libtorch: 'initializing': conversion from 'X' to 'Y', possible loss of data
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
         # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
         # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
         # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
