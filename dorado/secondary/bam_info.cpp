@@ -15,9 +15,9 @@ namespace dorado::secondary {
 BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
     BamInfo ret;
 
-    secondary::BamFile bam(in_aln_bam_fn);
+    BamFile bam(in_aln_bam_fn);
 
-    const std::vector<secondary::HeaderLineData> header = bam.parse_header();
+    const std::vector<HeaderLineData> header = bam.parse_header();
 
     // Get info from headers: program and the read groups.
     for (const auto& line : header) {
