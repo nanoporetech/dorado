@@ -5,7 +5,6 @@
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
-#include "polish/polish_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/bam_utils.h"
 #include "utils/paf_utils.h"

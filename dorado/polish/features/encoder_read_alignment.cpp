@@ -1,7 +1,6 @@
 #include "encoder_read_alignment.h"
 
 #include "medaka_read_matrix.h"
-#include "polish/polish_utils.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/ssize.h"

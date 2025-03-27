@@ -1,7 +1,6 @@
 #pragma once
 
 #include "model_torch_base.h"
-#include "polish/polish_utils.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/activation.h>

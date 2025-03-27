@@ -1,11 +1,9 @@
-#include "polish_utils.h"
+#include "container_utils.h"
 
-#include <htslib/faidx.h>
-#include <spdlog/spdlog.h>
+#include <algorithm>
+#include <sstream>
 
-#include <ostream>
-
-namespace dorado::polisher {
+namespace dorado::utils {
 
 std::vector<int32_t> parse_int32_vector(const std::string& input) {
     if (std::empty(input)) {
@@ -34,4 +32,4 @@ std::vector<int32_t> parse_int32_vector(const std::string& input) {
     return result;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::utils

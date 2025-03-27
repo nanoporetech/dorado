@@ -2,7 +2,6 @@
 
 #include "hts_io/FastxRandomReader.h"
 #include "polish/interval.h"
-#include "polish/polish_utils.h"
 #include "secondary/batching.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"

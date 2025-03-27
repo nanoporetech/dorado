@@ -1,6 +1,5 @@
 #include "decoder_base.h"
 
-#include "polish/polish_utils.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/span.h"
 

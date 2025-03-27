@@ -1,6 +1,7 @@
 #pragma once
 
 #include "consensus_result.h"
+#include "interval.h"
 #include "polish/architectures/model_factory.h"
 #include "polish/features/decoder_factory.h"
 #include "polish/features/encoder_factory.h"
