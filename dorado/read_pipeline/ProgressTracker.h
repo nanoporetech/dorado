@@ -20,7 +20,9 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    ProgressTracker(int total_reads, bool duplex, float post_processing_percentage);
+    enum Mode : uint8_t { SIMPLEX, DUPLEX, TRIM };
+
+    ProgressTracker(Mode mode, int total_reads, float post_processing_percentage);
     ~ProgressTracker();
 
     void set_description(const std::string& desc);
@@ -67,7 +69,7 @@ private:
     std::chrono::time_point<std::chrono::system_clock> m_initialization_time;
     std::chrono::time_point<std::chrono::system_clock> m_end_time;
 
-    const bool m_duplex;
+    const Mode m_mode;
 
 #ifdef _WIN32
     indicators::ProgressBar m_progress_bar {

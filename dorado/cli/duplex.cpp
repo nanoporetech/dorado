@@ -475,7 +475,7 @@ int duplex(int argc, char* argv[]) {
                     "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        bool emit_moves = false, duplex = true;
+        bool emit_moves = false;
 
         auto output_mode = OutputMode::BAM;
 
@@ -563,7 +563,8 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex, hts_file->finalise_is_noop() ? 0.f : 0.5f);
+        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX, int(num_reads),
+                                hts_file->finalise_is_noop() ? 0.f : 0.5f);
         tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(

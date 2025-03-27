@@ -297,7 +297,7 @@ int aligner(int argc, char* argv[]) {
         hts_file.set_header(header.get());
 
         // All progress reporting is in the post-processing part.
-        ProgressTracker tracker(0, false, 1.f);
+        ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
         if (progress_stats_frequency > 0) {
             tracker.disable_progress_reporting();
         }
