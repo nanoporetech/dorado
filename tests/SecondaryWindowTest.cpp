@@ -6,11 +6,11 @@
 #include <cstdint>
 #include <vector>
 
-#define TEST_GROUP "[PolishCreateWindows]"
+namespace dorado::secondary::sample::tests {
+
+#define TEST_GROUP "[SecondaryConsensusWindow]"
 
 CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
-    using namespace dorado::secondary;
-
     struct TestCase {
         std::string name;
         int32_t seq_id = 0;
@@ -107,3 +107,5 @@ CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
                            test_case.seq_len, test_case.window_len, test_case.window_overlap);
     CATCH_CHECK(result == test_case.expected);
 }
+
+}  // namespace dorado::secondary::sample::tests

@@ -10,11 +10,12 @@
 #include <string>
 #include <vector>
 
-#define TEST_GROUP "[PolishVariantCalling]"
+namespace dorado::secondary::consensus::tests {
+
+#define TEST_GROUP "[SecondaryConsensusVariantCalling]"
 
 CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
     using namespace dorado::polisher;
-    using namespace dorado::secondary;
 
     spdlog::set_level(spdlog::level::trace);
 
@@ -288,3 +289,5 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
         CATCH_CHECK(test_case.expected == result);
     }
 }
+
+}  // namespace dorado::secondary::consensus::tests

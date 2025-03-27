@@ -10,11 +10,12 @@
 #include <string>
 #include <vector>
 
-#define TEST_GROUP "[PolishVariantCalling]"
+namespace dorado::secondary::consensus::tests {
+
+#define TEST_GROUP "[SecondaryConsensusVariantCalling]"
 
 CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
     using namespace dorado::polisher;
-    using namespace dorado::secondary;
 
     struct TestCase {
         std::string test_name;
@@ -171,3 +172,5 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
         CATCH_CHECK(test_case.expected == result);
     }
 }
+
+}  // namespace dorado::secondary::consensus::tests
