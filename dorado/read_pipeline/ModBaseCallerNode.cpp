@@ -100,6 +100,11 @@ void ModBaseCallerNode::terminate_impl() {
     if (m_output_worker.joinable()) {
         m_output_worker.join();
     }
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in ModBaseCallerNode");
+    }
 }
 
 void ModBaseCallerNode::restart() {

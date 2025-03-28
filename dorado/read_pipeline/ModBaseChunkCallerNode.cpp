@@ -146,6 +146,11 @@ void ModBaseChunkCallerNode::terminate_impl() {
         }
     }
     m_output_workers.clear();
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in ModBaseChunkCallerNode");
+    }
 }
 
 void ModBaseChunkCallerNode::restart() {

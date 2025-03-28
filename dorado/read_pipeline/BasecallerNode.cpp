@@ -467,6 +467,11 @@ void BasecallerNode::terminate_impl() {
         t.join();
     }
     m_working_reads_managers.clear();
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in BasecallerNode");
+    }
 }
 
 void BasecallerNode::restart() {
