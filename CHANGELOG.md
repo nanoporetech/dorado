@@ -2,6 +2,74 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.9.5] (31 March 2025)
+
+**[SUMMARY STILL TO BE WRITTEN]**
+To highlight: Basecalling speed improvements; pychopper functionality; poly(A) accuracy and fixes; Dorado `polish` and `correct` speed improvements and stability; Dorado `aligner` split index support and minimap2 update; (others?); bug fixes. Now requires macOS ≥13.0 & we have updated the required JetPack version to support Orin to JetPack 6.3 (Jammy).
+
+* 833a1aa98cb52b58cb83b3a399dfcd9226262a33 - Improve speed of v5+ SUP basecalling models on Volta GPUs
+* [?] - Improve speed of HAC and fast basecalling models on Hopper GPUs
+* c1763b63001ab850d31d85efde1568a26e55d847 - Enable v5+ SUP basecalling model performance improvements on Orin
+* ee7b7ccce59eef8b5bfdc447b0e06d183b15583f - Add caching of automatic batch size for H100 GPUs
+* c946a4657ef957c730ddbc3d54b29dc36fc7d75e - Update minimum macOS to Ventura (version 13.0)
+* 99c3cb2e03bfafc40e87cc146f6804e2236c8012 - Remove support for Focal and CUDA 11 on Orin
+* bffa71d61e55b87ecb2b6aa2fcddf983619a5417 - Update to JetPack 6.3 for Orin
+* 78260d41aab9bd503adae9f24ec4b3647f4958b3 - Update to torch v2.6.0
+* 04077780e9d0b9d4241c6803ad62acd7dab90f4e - Update to minimap2 v2.28
+* 7f4c57582d11e62823e6978547d6f3d3155064d3 - Add cDNA preprocessing in Dorado `basecaller` and `trim`, including UMI tag and strand orientation detection
+* 3232e5b76cd8e412f8c9b6283a46e6c74b524d43 - Poly(A) tail estimation accuracy improvements
+* 1d384dc29cc0b2df20162ec0b401780a45477760 - Poly(A) tail estimation now consistently emits `pt:i` BAM tag
+* 56bef2464ef5341d16db56318e04e60113093221 - Ensure all valid poly(A) tails in plasmids are captured during estimation
+* 517d611972dba0ce805004a44fd0eec5dea1f627 - Improve primer detection for kits with barcodes
+* 04915f335b49f478508fd73ae3fad28a66fd9946 - Fix trimming of RNA reads affected by mux change and unblocking
+* 598d17c6a726a307163fa5889229e059a8e6a5c6 - Add Dorado `aligner` support for split indexes
+* c973914966c99f70dbaaa85890e70b7a0239bb75 - Fix Dorado `aligner` output non-determinism
+* b02d3a72cfed4388b29880e47dc3a2ca2f816bac - Dorado `polish` speed improvements
+* 49d5aa83a96ab0e89fdad8269460941f91da1652 - Prevent overlapping variants in Dorado `polish` VCF output
+* e0eb79b233df832b116ba1744c5f6545f6f86679 - Dorado `correct` speed improvements in inference stage
+* d520323413eecde7ce2704d4b24231dcca67096f - Ensure Dorado does not take GPU memory on unspecified devices when using `-x` or `--device`
+* 48b513daa867b2b727b753c0d57f57629766a700 - Fix crashes when running Dorado `basecaller` on systems with heterogeneous GPUs
+* e8a3217695d907ac5ed1ad20697d6ab1e14b6a74 - Fix inconsistency in calculation of `sm`/`sd` BAM tag values
+* 12ffaa3eb6d255fbd0c525440b7ca038e04aff25 - Improve error handling in model download
+* 4984a530bb6a7d492321f837bf8c2c7f693ba278 - Dorado `trim` logging now reports number of bases trimmed
+* 85578822283197ab7e131311af8e1674755d7fe2 - Change short adapter and/or primer trimming warning to trace message
+* 990acb52765734eac51bdae3bbcf736f122c2e43 - Added note in README for getting good performance from GPUs on Windows
+
+
+**TO REMOVE:** 
+* a466bd5c729135211070c00764c2734865277fbb - [DOR-1054] Modbase check traces
+* cfc714d59411c6b9d415aeef2d66137462c3f9d4 - [INSTX-8176] Always build and link to a static zstd
+* cb94891f9a4ca68fb2359efa23d3337a130758c0 - [DOR-1056] Per read trace logging
+* 594cbc74b971b4108f95c1a4a59e384b890166f7 - [INSTX-8100] Update from xcode-15.0.1 to xcode-15.3 for OSX Arm builds
+* 4d8e85e485a677038839a29ed3435b1be93929d9 - [DOR-1061] Added the ability to override where the CDN dependency files are downloaded from
+* 84604b20c18aa6b6d469952832dd45c4b76becba - Fix centos7 archive build
+* fc7635a72afa5895f7d1fe2741a6d4ed2ce9215f - [DOR-1048] Bump catch2 version
+* 7893825ed1f3bcf93f02d87918920bfff5cf4597 - [INSTX-8100] Update benchmark runner tags
+* 11a89bcc413e78002008fcd95ae9dbe3ae0fc270 - [DOR-1073] Remove dependency on an explicit version of autoconf
+* 5c7f199765130cd900588b851999a9e7765346bb - [DOR-1087] Don't install what we don't need in tests
+* 9d83b96d1d8f71691c8db3d3e75f036b6f1f0206 - [DOR-915] Add checksums to all downloads
+* 4661a77d9c6336b808d7aaddc92fb2c0f4a2787b - [DOR-1092] Fix custom sequence format documentation
+* b8e7aac4bbd8d1c426f6665c908d415840e1cbf3 - [DOR-1077] Dorado Polish: Less sensitive tests
+* 87f1aa6caa666d1bed140f5acb0d227ca478c074 - [DOR-1096] New torch build for macOS 13 support
+* 8955c877936008043432145cecc9cb4baebd87f4 - [INSTX-8864] SQK-MAB114-24
+* 176a3f3f38c58523a1f1501ba23894c6d01d2c28 - [INSTX-7405] Misc changes made while investigating 
+* 9ba0d79dee3d350796d526bc14453e72e506949f - [DOR-1095] Dorado Correct: CUDA guard and legacy windowing
+* 39601194d6bfa094505b4b1c3ccfe0bf32b3910d - [DOR-1121] No superior barcode check for already unclassified reads
+* f5aa4665721a6362e6a76d6092b9b62b8e83c1a8 - [DOR-1128] Update Dorado Correct overlap parameters and expose as hidden CLI args
+* b6e7d29d9d574af16834adb7afbd4f28b1b32c62 - [DOR-1127] Fix CUDA12 archives no running in clean environments
+* f518db288f94aa8db46737fef718d5702defc0ac - Fix nightly build by forward declaring a function
+* 46bd14e56145787bc8519044ac5ab161a97652e8 - Enable missing declaration warnings
+* c2ebacb3b4169e25a70afd7ae5afe07b1953fd6f - [DOR-961] Bump macOS/arm to torch 2.6.0
+* 825b78565b3ac42bd53aa3f63e27410506a027e8 - [INSTX-6798] Pre commit update
+* c137fef8df65fc66f60d47a345846e4e1a771cf4 - [DOR-1118] Model config parsing refactor
+* 98a470fee9d171469c728774c25fd589e58b9eba - [DOR-1111] Support chunked modbase models for RNA
+* c7de7e485d0f488bbd2374e64c7f964a6ed06016 - [DOR-1048] Bump 3rd party library versions
+* 1cda4717e015ffcd065ee8010fedd44955da6214 - [DOR-1119] Revert back to torch 2.0 for CUDA 11 builds
+* 6ed28652cbcaee238215885bda2d4ce9fcfd19fa - [INSTX-8701] Drop macOS x64 pipelines
+* d6be4752f2595d55daf8b54e8c9309856b464876 - [DOR-1119] Avoid linking to the CUDA driver
+* 429de1676746764f55359f70c491ff7479586c04 - [INSTX-7939] Proper fix for modbase perf issues on TX2
+
+
 # [0.9.1] (21 Jan 2025)
 
 This release of Dorado brings significant basecalling speed improvements for Nvidia GPUs with compute capabilities 8.6 (Ampere – e.g., RTX A6000), 8.7 (Ampere – e.g., Orin family), and 8.9 (Ada Lovelace). Additionally, `dorado polish` receives major enhancements, including the introduction of the `--bacteria` flag, which optimizes basecalling for native bacterial and methylated DNA. The updated `dorado polish` is now compatible with data basecalled using v4.3 and v4.2 models and serves as a beta-stage replacement for Medaka.

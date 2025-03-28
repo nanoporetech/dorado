@@ -24,10 +24,11 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.9.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-x64.tar.gz)
- - [dorado-0.9.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-arm64.tar.gz)
- - [dorado-0.9.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-osx-arm64.zip)
- - [dorado-0.9.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-win64.zip)
+ - [dorado-0.9.5-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-x64.tar.gz)
+ - [dorado-0.9.5-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-arm64.tar.gz)
+   - For customers who cannot upgrade to CUDA 12, we currently support a CUDA 11.8 build here: [dorado-0.9.5-linux-x64-11.8](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-x64-11.8.tar.gz)
+ - [dorado-0.9.5-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-osx-arm64.zip)
+ - [dorado-0.9.5-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -68,7 +69,7 @@ AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.
 
 1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
 2. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
-3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a hetrogenous collection of GPUs, select the faster GPUs using the `--device` flag (e.g `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
+3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a heterogeneous collection of GPUs, select the faster GPUs using the `--device` flag (e.g., `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
 4. On Windows systems with Nvidia GPUs, open Nvidia Control Panel, navigate into “Manage 3D settings” and then set “CUDA - Sysmem Fallback Policy” to “Prefer No Sysmem Fallback”.  This will provide a significant performance improvement.
 
 ## Running
@@ -118,7 +119,7 @@ This functionality can be altered by using either the `--trim` or `--no-trim` op
 
 The `--trim` option takes as its argument one of the following values:
 
-* `all` This is the the same as the default behavior. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
+* `all` This is the same as the default behaviour. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
