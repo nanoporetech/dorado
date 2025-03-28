@@ -624,6 +624,11 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
         spdlog::error("ModBase Duplex Caller: {}", e.what());
     }
 
+    if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
+        send_message_to_sink(std::move(read_ptr));
+        return;
+    }
+
     add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
