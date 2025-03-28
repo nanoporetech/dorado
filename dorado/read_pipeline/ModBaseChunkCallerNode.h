@@ -177,8 +177,8 @@ private:
                                const std::vector<uint64_t>& seq_to_sig_map) const;
 
     template <typename ReadType>
-    void finalise_read(std::unique_ptr<ReadType>& read_ptr,
-                       std::shared_ptr<WorkingRead>& working_read);
+    void add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
+                                 std::shared_ptr<WorkingRead> working_read);
 
     std::vector<uint64_t> get_seq_to_sig_map(const std::vector<uint8_t>& moves,
                                              const size_t raw_samples,

@@ -452,10 +452,10 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
 }
 
 template <typename ReadType>
-void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<ReadType>& read_ptr,
-                                           std::shared_ptr<WorkingRead>& working_read) {
+void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
+                                                     std::shared_ptr<WorkingRead> working_read) {
     if (!read_ptr || !working_read) {
-        throw std::invalid_argument("Null pointer passed to finalise_read.");
+        throw std::invalid_argument("Null pointer passed to add_read_to_working_set.");
     }
 
     // Hand over our ownership to the working read
@@ -527,14 +527,14 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
                                read_id)) {
-        finalise_read(read_ptr, working_read);
+        add_read_to_working_set(std::move(read_ptr), std::move(working_read));
         return;
     };
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
 
-    finalise_read(read_ptr, working_read);
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
@@ -624,7 +624,7 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
         spdlog::error("ModBase Duplex Caller: {}", e.what());
     }
 
-    finalise_read(read_ptr, working_read);
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
