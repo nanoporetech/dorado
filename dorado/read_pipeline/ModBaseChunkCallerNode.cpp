@@ -890,10 +890,6 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         const std::vector<int64_t>& hits_seq = modbase_data.per_base_hits_seq.at(chunk->base_id);
         const std::vector<int64_t>& hits_sig = modbase_data.per_base_hits_sig.at(chunk->base_id);
 
-        if (hits_seq.empty()) {
-            continue;
-        }
-
         // The offset into the mod probs for the canonical base
         const int64_t base_offset = static_cast<int64_t>(m_base_prob_offsets.at(cfg.mods.base_id));
 
