@@ -527,9 +527,9 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
                                read_id)) {
-        add_read_to_working_set(std::move(read_ptr), std::move(working_read));
+        send_message_to_sink(std::move(read_ptr));
         return;
-    };
+    }
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
