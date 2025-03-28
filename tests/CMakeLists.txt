@@ -75,6 +75,7 @@ add_executable(dorado_tests
     TimeUtilsTest.cpp
     TrimTest.cpp
     PafUtilsTest.cpp
+    PolishDecodeVariantsTest.cpp
     PolishNormalizeVariantsTest.cpp
     PolishMergeVCSamples.cpp
     PolishSampleTest.cpp
