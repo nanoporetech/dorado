@@ -59,6 +59,8 @@ add_library(dorado_utils
     stream_utils.h
     sys_stats.cpp
     sys_stats.h
+    sys_utils.cpp
+    sys_utils.h
     thread_naming.cpp
     thread_naming.h
     time_utils.cpp
