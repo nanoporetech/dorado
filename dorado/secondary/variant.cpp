@@ -11,9 +11,34 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
         if (i > 0) {
             os << ',';
         }
-        os << v.alts[i];
+        os << '\'' << v.alts[i] << '\'';
     }
     os << "}\t" << v.filter << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
+
+    {
+        os << "\tgt:";
+        bool first = true;
+        for (const auto& [key, val] : v.genotype) {
+            if (!first) {
+                os << ',';
+            }
+            os << key << '=' << val;
+            first = false;
+        }
+    }
+
+    {
+        os << "\tinfo:";
+        bool first = true;
+        for (const auto& [key, val] : v.info) {
+            if (!first) {
+                os << ',';
+            }
+            os << key << '=' << val;
+            first = false;
+        }
+    }
+
     return os;
 }
 
