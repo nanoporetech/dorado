@@ -54,7 +54,8 @@ void ProgressTracker::summarize() const {
 
     spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
-        auto ctx = m_mode == Mode::TRIM ? "Reads written" : "Simplex reads basecalled";
+        auto ctx = m_mode == Mode::TRIM || m_mode == Mode::ALIGN ? "Reads written"
+                                                                 : "Simplex reads basecalled";
         spdlog::info("> {}: {}", ctx, m_num_simplex_reads_written);
     }
     if (m_num_simplex_reads_filtered > 0) {
