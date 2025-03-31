@@ -36,8 +36,6 @@ To highlight: Basecalling speed improvements; pychopper functionality; poly(A) a
 * 990acb52765734eac51bdae3bbcf736f122c2e43 - Add note in README for getting good performance from GPUs on Windows
 * 9d83b96d1d8f71691c8db3d3e75f036b6f1f0206 - Add sha256 checksums to all downloads
 * 4661a77d9c6336b808d7aaddc92fb2c0f4a2787b - Fix custom sequence format documentation
-* 8955c877936008043432145cecc9cb4baebd87f4 - Add Microbial Amplicon Barcoding Kit SQK-MAB114-24
-* c2ebacb3b4169e25a70afd7ae5afe07b1953fd6f - Upgrade macOS/arm to torch 2.6.0
 * 6ed28652cbcaee238215885bda2d4ce9fcfd19fa - Drop macOS/x64 pipelines
 
 
