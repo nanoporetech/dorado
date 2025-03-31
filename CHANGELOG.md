@@ -20,7 +20,7 @@ Additional updates include improvements to primer sequence trimming, read orient
 * ee7b7ccce59eef8b5bfdc447b0e06d183b15583f - Add caching of automatic batch size for H100 GPUs
 * c946a4657ef957c730ddbc3d54b29dc36fc7d75e - Update minimum macOS to Ventura (version 13.0)
 * 99c3cb2e03bfafc40e87cc146f6804e2236c8012 - Remove support for Focal and CUDA 11 on Orin
-* bffa71d61e55b87ecb2b6aa2fcddf983619a5417 - Update to JetPack 6.3 for Orin
+* bffa71d61e55b87ecb2b6aa2fcddf983619a5417 - Update to JetPack 6.2 for Orin
 * 78260d41aab9bd503adae9f24ec4b3647f4958b3 - Update to torch v2.6.0
 * 04077780e9d0b9d4241c6803ad62acd7dab90f4e - Update to minimap2 v2.28
 * 7f4c57582d11e62823e6978547d6f3d3155064d3 - Add cDNA preprocessing in Dorado `basecaller` and `trim`, including UMI tag and strand orientation detection
