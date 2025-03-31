@@ -9,7 +9,7 @@ This release of Dorado delivers significant performance improvements and broader
 * Enhanced speedups for HAC basecalling models on Nvidia Hopper GPUs (Compute Capability 9.0)
 * Support for Nvidia Blackwell GPUs (Compute Capabilities 10.0 and 12.0)
 
-Additional updates include improvements to `pychopper` integration, increased poly(A) tail estimation accuracy, and enhanced stability and speed in `dorado polish` and `dorado correct`. `dorado aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
+Additional updates include improvements to primer sequence trimming, read orientation inference (if inferred, this will be added to the `TS` flag in SAM/BAM) and UMI tag sequence detection (If found, these are included in the BAM/SAM output using the `RX` tag). Poly(A) tail estimation accuracy has been improved. The stability and speed of `dorado polish` and `dorado correct` have also been improved. `dorado aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
 
 > Note: Dorado now requires CUDA 12.8, which increases the minimum supported Nvidia driver version to 525.105. The minimum supported macOS version is now 13.0 (Ventura). For Orin platforms, JetPack 6.3 (based on Ubuntu 22.04 'Jammy Jellyfish') is now required.
 
