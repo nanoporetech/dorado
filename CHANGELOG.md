@@ -2,6 +2,50 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.9.5] (31 March 2025)
+
+This release of Dorado delivers significant performance improvements and broader hardware support:
+
+* Major speed increase of the v5 SUP basecalling models on Volta (7.0) and Orin (8.7) GPUs
+* Enhanced speedups for HAC basecalling models on Nvidia Hopper GPUs (Compute Capability 9.0)
+* Support for Nvidia Blackwell GPUs (Compute Capabilities 10.0 and 12.0)
+
+Additional updates include improvements to primer sequence trimming, read orientation inference (if inferred, this will be added to the `TS` tag in SAM/BAM) and UMI tag sequence detection (if found, these are included in the BAM/SAM output using the `RX` tag). Poly(A) tail estimation accuracy has been improved, along with the stability and speed of Dorado `polish` and `correct`. Dorado `aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
+
+> Note: Dorado now requires CUDA 12.8, which increases the minimum supported Nvidia driver version to 525.105. The minimum supported macOS version is now 13.0 (Ventura). For Orin platforms, JetPack 6.2 (based on Ubuntu 22.04 'Jammy Jellyfish') is now required.
+
+* 833a1aa98cb52b58cb83b3a399dfcd9226262a33 - Improve speed of Transformer based SUP basecalling models on Volta GPUs
+* d46286e9e9f549b2f776f2d86e5bf01810d6998d - Improve speed of LSTM HAC basecalling models on Hopper GPUs
+* c1763b63001ab850d31d85efde1568a26e55d847 - Enable Transformer SUP basecalling model performance improvements on Orin
+* ee7b7ccce59eef8b5bfdc447b0e06d183b15583f - Add caching of automatic batch size for H100 GPUs
+* c946a4657ef957c730ddbc3d54b29dc36fc7d75e - Update minimum macOS to Ventura (version 13.0)
+* 99c3cb2e03bfafc40e87cc146f6804e2236c8012 - Remove support for Focal and CUDA 11 on Orin
+* bffa71d61e55b87ecb2b6aa2fcddf983619a5417 - Update to JetPack 6.2 for Orin
+* 78260d41aab9bd503adae9f24ec4b3647f4958b3 - Update to torch v2.6.0
+* 04077780e9d0b9d4241c6803ad62acd7dab90f4e - Update to minimap2 v2.28
+* 7f4c57582d11e62823e6978547d6f3d3155064d3 - Add cDNA preprocessing in Dorado `basecaller` and `trim`, including UMI tag and strand orientation detection
+* 3232e5b76cd8e412f8c9b6283a46e6c74b524d43 - Poly(A) tail estimation accuracy improvements
+* 1d384dc29cc0b2df20162ec0b401780a45477760 - Poly(A) tail estimation now consistently emits `pt:i` BAM tag
+* 56bef2464ef5341d16db56318e04e60113093221 - Ensure all valid poly(A) tails in plasmids are captured during estimation
+* 517d611972dba0ce805004a44fd0eec5dea1f627 - Improve primer detection for kits with barcodes
+* 04915f335b49f478508fd73ae3fad28a66fd9946 - Fix trimming of RNA reads affected by mux change and unblocking
+* 598d17c6a726a307163fa5889229e059a8e6a5c6 - Add Dorado `aligner` support for split indexes
+* c973914966c99f70dbaaa85890e70b7a0239bb75 - Fix Dorado `aligner` output non-determinism
+* b02d3a72cfed4388b29880e47dc3a2ca2f816bac - Dorado `polish` speed improvements
+* 49d5aa83a96ab0e89fdad8269460941f91da1652 - Prevent overlapping variants in Dorado `polish` VCF output
+* e0eb79b233df832b116ba1744c5f6545f6f86679 - Dorado `correct` speed improvements in inference stage
+* d520323413eecde7ce2704d4b24231dcca67096f - Ensure Dorado does not take GPU memory on unspecified devices when using `-x` or `--device`
+* 48b513daa867b2b727b753c0d57f57629766a700 - Fix crashes when running Dorado `basecaller` on systems with heterogeneous GPUs
+* e8a3217695d907ac5ed1ad20697d6ab1e14b6a74 - Fix inconsistency in calculation of `sm`/`sd` BAM tag values
+* 12ffaa3eb6d255fbd0c525440b7ca038e04aff25 - Improve error handling in model download
+* 4984a530bb6a7d492321f837bf8c2c7f693ba278 - Dorado `trim` logging now reports number of reads trimmed
+* 85578822283197ab7e131311af8e1674755d7fe2 - Change short adapter and/or primer trimming warning to trace message
+* 990acb52765734eac51bdae3bbcf736f122c2e43 - Add note in README for getting good performance from GPUs on Windows
+* 9d83b96d1d8f71691c8db3d3e75f036b6f1f0206 - Add sha256 checksums to all downloads
+* 4661a77d9c6336b808d7aaddc92fb2c0f4a2787b - Fix custom sequence format documentation
+* 6ed28652cbcaee238215885bda2d4ce9fcfd19fa - Drop macOS/x64 pipelines
+
+
 # [0.9.1] (21 Jan 2025)
 
 This release of Dorado brings significant basecalling speed improvements for Nvidia GPUs with compute capabilities 8.6 (Ampere – e.g., RTX A6000), 8.7 (Ampere – e.g., Orin family), and 8.9 (Ada Lovelace). Additionally, `dorado polish` receives major enhancements, including the introduction of the `--bacteria` flag, which optimizes basecalling for native bacterial and methylated DNA. The updated `dorado polish` is now compatible with data basecalled using v4.3 and v4.2 models and serves as a beta-stage replacement for Medaka.
