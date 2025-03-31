@@ -6,13 +6,13 @@ All notable changes to Dorado will be documented in this file.
 
 This release of Dorado delivers significant performance improvements and broader hardware support:
 
-* Major speed increase of the V5 SUP model on Volta (7.0) and Orin (8.7) GPUs
+* Major speed increase of the v5 SUP basecalling models on Volta (7.0) and Orin (8.7) GPUs
 * Enhanced speedups for HAC basecalling models on Nvidia Hopper GPUs (Compute Capability 9.0)
 * Support for Nvidia Blackwell GPUs (Compute Capabilities 10.0 and 12.0)
 
-Additional updates include improvements to primer sequence trimming, read orientation inference (if inferred, this will be added to the `TS` flag in SAM/BAM) and UMI tag sequence detection (If found, these are included in the BAM/SAM output using the `RX` tag). Poly(A) tail estimation accuracy has been improved. The stability and speed of `dorado polish` and `dorado correct` have also been improved. `dorado aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
+Additional updates include improvements to primer sequence trimming, read orientation inference (if inferred, this will be added to the `TS` tag in SAM/BAM) and UMI tag sequence detection (if found, these are included in the BAM/SAM output using the `RX` tag). Poly(A) tail estimation accuracy has been improved, along with the stability and speed of Dorado `polish` and `correct`. Dorado `aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
 
-> Note: Dorado now requires CUDA 12.8, which increases the minimum supported Nvidia driver version to 525.105. The minimum supported macOS version is now 13.0 (Ventura). For Orin platforms, JetPack 6.3 (based on Ubuntu 22.04 'Jammy Jellyfish') is now required.
+> Note: Dorado now requires CUDA 12.8, which increases the minimum supported Nvidia driver version to 525.105. The minimum supported macOS version is now 13.0 (Ventura). For Orin platforms, JetPack 6.2 (based on Ubuntu 22.04 'Jammy Jellyfish') is now required.
 
 * 833a1aa98cb52b58cb83b3a399dfcd9226262a33 - Improve speed of Transformer based SUP basecalling models on Volta GPUs
 * d46286e9e9f549b2f776f2d86e5bf01810d6998d - Improve speed of LSTM HAC basecalling models on Hopper GPUs
