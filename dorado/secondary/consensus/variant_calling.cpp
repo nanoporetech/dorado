@@ -1,9 +1,9 @@
 #include "variant_calling.h"
 
-#include "polish_stats.h"
+#include "consensus_utils.h"
+#include "polish/trim.h"
 #include "secondary/batching.h"
 #include "secondary/consensus/consensus_result.h"
-#include "trim.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"
 
@@ -20,226 +20,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 namespace {
-
-/**
- * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
- */
-std::string extract_draft_with_gaps(const std::string& draft,
-                                    const std::vector<int64_t>& positions_major,
-                                    const std::vector<int64_t>& positions_minor) {
-    if (std::size(positions_major) != std::size(positions_minor)) {
-        throw std::runtime_error(
-                "The positions_major and positions_minor are not of the same size! "
-                "positions_major.size = " +
-                std::to_string(std::size(positions_major)) +
-                ", positions_minor.size = " + std::to_string(std::size(positions_minor)));
-    }
-
-    std::string ret(std::size(positions_major), '*');
-
-    for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
-        ret[i] = (positions_minor[i] == 0) ? draft[positions_major[i]] : '*';
-    }
-
-    return ret;
-}
-
-secondary::VariantCallingSample slice_vc_sample(const secondary::VariantCallingSample& vc_sample,
-                                                const int64_t idx_start,
-                                                const int64_t idx_end) {
-    // Check that all members of the sample are of the same length.
-    vc_sample.validate();
-
-    const int64_t num_columns = dorado::ssize(vc_sample.positions_major);
-
-    // Validate idx.
-    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_start >= idx_end) ||
-        (idx_end > num_columns)) {
-        throw std::out_of_range("Index is out of range in slice_vc_sample. idx_start = " +
-                                std::to_string(idx_start) +
-                                ", idx_end = " + std::to_string(idx_end) +
-                                ", num_columns = " + std::to_string(num_columns));
-    }
-
-    // Slice.
-    return secondary::VariantCallingSample{
-            vc_sample.seq_id,
-            std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
-                                 std::begin(vc_sample.positions_major) + idx_end),
-            std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
-                                 std::begin(vc_sample.positions_minor) + idx_end),
-            vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
-}
-
-}  // namespace
-
-std::vector<secondary::VariantCallingSample> merge_vc_samples(
-        const std::vector<secondary::VariantCallingSample>& vc_samples) {
-    const auto merge_adjacent_samples_in_place = [](secondary::VariantCallingSample& lh,
-                                                    const secondary::VariantCallingSample& rh) {
-        const size_t width = std::size(lh.positions_major);
-
-        // Insert positions vectors.
-        lh.positions_major.reserve(width + std::size(rh.positions_major));
-        lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
-                                  std::end(rh.positions_major));
-        lh.positions_minor.reserve(width + std::size(rh.positions_minor));
-        lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
-                                  std::end(rh.positions_minor));
-
-        // Merge the tensors.
-        lh.logits = torch::cat({std::move(lh.logits), rh.logits});
-    };
-
-    if (std::empty(vc_samples)) {
-        return {};
-    }
-
-    std::vector<secondary::VariantCallingSample> ret{vc_samples.front()};
-
-    // Validate sample for sanity. This can throw.
-    vc_samples[0].validate();
-
-    for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
-        const auto& last = ret.back();
-        const auto& curr = vc_samples[i];
-
-        // Validate sample for sanity. This can throw.
-        curr.validate();
-
-        // Should not happen, but sanity check.
-        if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
-            ret.emplace_back(vc_samples[i]);
-            continue;
-        }
-
-        // Merge if major coordinates are adjacent, or if major coordinates are equal but minor are adjacent.
-        if ((curr.seq_id == last.seq_id) &&
-            ((curr.positions_major[0] == (last.positions_major.back() + 1)) ||
-             ((curr.positions_major[0] == last.positions_major.back()) &&
-              (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
-            merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
-        } else {
-            ret.emplace_back(vc_samples[i]);
-        }
-    }
-
-    return ret;
-}
-
-namespace {
-
-/**
- * \brief This function restructures the neighboring samples for one draft sequence.
- *          Each input sample is split on the last non-variant position.
- *          The left part is merged with anything previously added to a queue (i.e.
- *          previous sample's right portion). The right part is then added to a cleared queue.
- *          The goal of this function is to prevent calling variants on sample boundaries.
- */
-std::vector<secondary::VariantCallingSample> join_samples(
-        const std::vector<secondary::VariantCallingSample>& vc_samples,
-        const std::string& draft,
-        const secondary::DecoderBase& decoder) {
-    std::vector<secondary::VariantCallingSample> ret;
-
-    std::vector<secondary::VariantCallingSample> queue;
-
-    for (int64_t i = 0; i < dorado::ssize(vc_samples); ++i) {
-        const secondary::VariantCallingSample& vc_sample = vc_samples[i];
-
-        vc_sample.validate();
-
-        // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
-        // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
-        // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
-        // In this case, the "batch size" is 1.
-        const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-        const std::vector<secondary::ConsensusResult> c = decoder.decode_bases(logits);
-
-        // This shouldn't be possible.
-        if (std::size(c) != 1) {
-            spdlog::warn(
-                    "Unexpected number of consensus sequences generated from a single sample: "
-                    "c.size = {}. Skipping consensus of this sample.",
-                    std::size(c));
-            continue;
-        }
-
-        // Sequences for comparison.
-        const std::string& call_with_gaps = c.front().seq;
-        const std::string draft_with_gaps = extract_draft_with_gaps(
-                draft, vc_sample.positions_major, vc_sample.positions_minor);
-        assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
-
-        const auto check_is_diff = [](const char base1, const char base2) {
-            return (base1 != base2) || (base1 == '*' && base2 == '*');
-        };
-
-        // Check if all positions are diffs, or if all positions are gaps in both sequences.
-        {
-            int64_t count = 0;
-            for (int64_t j = 0; j < dorado::ssize(call_with_gaps); ++j) {
-                if (check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
-                    ++count;
-                }
-            }
-            if (count == dorado::ssize(call_with_gaps)) {
-                // Merge the entire sample with the next one. We need at least one non-diff non-gap pos.
-                queue.emplace_back(vc_sample);
-                continue;
-            }
-        }
-
-        const int64_t num_positions = dorado::ssize(vc_sample.positions_major);
-
-        // Find a location where to split the sample.
-        int64_t last_non_var_start = 0;
-        for (int64_t j = (num_positions - 1); j >= 0; --j) {
-            if ((vc_sample.positions_minor[j] == 0) &&
-                !check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
-                last_non_var_start = j;
-                break;
-            }
-        }
-
-        // Split the sample.
-        secondary::VariantCallingSample left_slice =
-                slice_vc_sample(vc_sample, 0, last_non_var_start);
-        secondary::VariantCallingSample right_slice =
-                slice_vc_sample(vc_sample, last_non_var_start, num_positions);
-
-        // Enqueue the queue if possible.
-        if (last_non_var_start > 0) {
-            queue.emplace_back(std::move(left_slice));
-        }
-
-        // Merge and insert.
-        if (!std::empty(queue)) {
-            auto new_samples = merge_vc_samples(queue);
-            queue.clear();
-
-            ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
-                       std::make_move_iterator(std::end(new_samples)));
-        }
-
-        // Reset the queue.
-        queue = {std::move(right_slice)};
-    }
-
-    // Merge and insert.
-    if (!std::empty(queue)) {
-        auto new_samples = merge_vc_samples(queue);
-        queue.clear();
-
-        ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
-                   std::make_move_iterator(std::end(new_samples)));
-    }
-
-    return ret;
-}
 
 std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
                                   const std::string& reference,
@@ -292,11 +75,11 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 
 }  // namespace
 
-secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
-                                     const std::vector<std::string_view>& cons_seqs_with_gaps,
-                                     const std::vector<int64_t>& positions_major,
-                                     const std::vector<int64_t>& positions_minor,
-                                     const secondary::Variant& variant) {
+Variant normalize_variant(const std::string_view ref_with_gaps,
+                          const std::vector<std::string_view>& cons_seqs_with_gaps,
+                          const std::vector<int64_t>& positions_major,
+                          const std::vector<int64_t>& positions_minor,
+                          const Variant& variant) {
     const bool all_same_as_ref =
             std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
                         [&variant](const std::string& s) { return s == variant.ref; });
@@ -305,7 +88,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
         return variant;
     }
 
-    const auto trim_start = [](secondary::Variant& var, const bool rev) {
+    const auto trim_start = [](Variant& var, const bool rev) {
         // Get the sequences and reverse if needed.
         std::vector<std::string> seqs{var.ref};
         seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
@@ -361,7 +144,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
-                                     &positions_minor](secondary::Variant& var) {
+                                     &positions_minor](Variant& var) {
         const auto find_previous_major = [&](int64_t rpos) {
             while (rpos > 0) {
                 --rpos;
@@ -372,7 +155,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
             return rpos;
         };
 
-        const auto reset_var = [](const secondary::Variant& v) {
+        const auto reset_var = [](const Variant& v) {
             std::vector<std::string> seqs{v.ref};
             seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
             return std::make_pair(v, seqs);
@@ -387,7 +170,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
             changed = false;
 
             // Keep a copy if we need to bail.
-            const secondary::Variant var_before_change = var;
+            const Variant var_before_change = var;
 
             const bool all_non_empty =
                     std::all_of(std::cbegin(seqs), std::cend(seqs),
@@ -500,7 +283,7 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
         var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
     };
 
-    secondary::Variant ret = variant;
+    Variant ret = variant;
 
     // Normalize the start of the variant. For example, if the input variant represents a region like this:
     // - POS  :      43499195    43499196
@@ -534,11 +317,11 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
     return ret;
 }
 
-std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& decoder,
-                                                const secondary::VariantCallingSample& vc_sample,
-                                                const std::string& draft,
-                                                const bool ambig_ref,
-                                                const bool gvcf) {
+std::vector<Variant> decode_variants(const DecoderBase& decoder,
+                                     const VariantCallingSample& vc_sample,
+                                     const std::string& draft,
+                                     const bool ambig_ref,
+                                     const bool gvcf) {
     // Validate that all vectors/tensors are of equal length.
     vc_sample.validate();
 
@@ -620,7 +403,7 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
 
     // Predicted sequence with gaps.
     const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-    const std::vector<secondary::ConsensusResult> c = decoder.decode_bases(logits);
+    const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
     const std::string& cons_seq_with_gaps = c.front().seq;
 
     // Draft sequence with gaps.
@@ -634,7 +417,7 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
             dorado::run_length_encode(is_variant);
 
     // Extract variants.
-    std::vector<secondary::Variant> variants;
+    std::vector<Variant> variants;
     for (const auto& [rstart, rend, is_var] : runs) {
         // Skip non-variants.
         if (!is_var) {
@@ -675,7 +458,7 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
         };
         const int64_t var_pos = vc_sample.positions_major[rstart];
 
-        secondary::Variant var{
+        Variant var{
                 vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
                 round_float(qual, 3), genotype, rstart,  rend,
         };
@@ -717,7 +500,7 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
             };
 
             // clang-format off
-            secondary::Variant variant{
+            Variant variant{
                 vc_sample.seq_id,
                 pos,
                 ref,
@@ -743,24 +526,24 @@ std::vector<secondary::Variant> decode_variants(const secondary::DecoderBase& de
 
 namespace {
 
-std::vector<secondary::VariantCallingSample> trim_vc_samples(
-        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+std::vector<VariantCallingSample> trim_vc_samples(
+        const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::pair<int64_t, int32_t>>& group) {
     // Mock the Sample objects. Trimming works on Sample objects only, but
     // it only needs positions, not the actual tensors.
-    std::vector<secondary::Sample> local_samples;
+    std::vector<Sample> local_samples;
     local_samples.reserve(std::size(group));
     for (const auto& [start, id] : group) {
         const auto& vc_sample = vc_input_data[id];
-        local_samples.emplace_back(secondary::Sample(vc_sample.seq_id, {},
-                                                     vc_sample.positions_major,
-                                                     vc_sample.positions_minor, {}, {}, {}));
+        local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
+                                          vc_sample.positions_minor, {}, {}, {}));
     }
 
     // Compute trimming of all samples for this group.
-    const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
+    const std::vector<polisher::TrimInfo> trims =
+            polisher::trim_samples(local_samples, std::nullopt);
 
-    std::vector<secondary::VariantCallingSample> trimmed_samples;
+    std::vector<VariantCallingSample> trimmed_samples;
 
     assert(std::size(trims) == std::size(local_samples));
     assert(std::size(trims) == std::size(group));
@@ -768,7 +551,7 @@ std::vector<secondary::VariantCallingSample> trim_vc_samples(
     for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
         const int32_t id = group[i].second;
         const auto& s = vc_input_data[id];
-        const TrimInfo& t = trims[i];
+        const polisher::TrimInfo& t = trims[i];
 
         // Make sure that all vectors and tensors are of the same length.
         s.validate();
@@ -782,7 +565,7 @@ std::vector<secondary::VariantCallingSample> trim_vc_samples(
                                     ", num_columns = " + std::to_string(num_columns));
         }
 
-        trimmed_samples.emplace_back(secondary::VariantCallingSample{
+        trimmed_samples.emplace_back(VariantCallingSample{
                 s.seq_id,
                 std::vector<int64_t>(std::begin(s.positions_major) + t.start,
                                      std::begin(s.positions_major) + t.end),
@@ -796,16 +579,16 @@ std::vector<secondary::VariantCallingSample> trim_vc_samples(
 
 }  // namespace
 
-std::vector<secondary::Variant> call_variants(
-        const secondary::Interval& region_batch,
-        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+std::vector<Variant> call_variants(
+        const Interval& region_batch,
+        const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const secondary::DecoderBase& decoder,
+        const DecoderBase& decoder,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
-        PolishStats& polish_stats) {
+        polisher::PolishStats& polish_stats) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -831,8 +614,7 @@ std::vector<secondary::Variant> call_variants(
 
     // Worker for parallel processing.
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
-                            std::vector<std::vector<secondary::Variant>>& results,
-                            PolishStats& ps) {
+                            std::vector<std::vector<Variant>>& results, polisher::PolishStats& ps) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
                                      std::to_string(start) + ", end = " + std::to_string(end) +
@@ -862,7 +644,7 @@ std::vector<secondary::Variant> call_variants(
             const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
             for (const auto& vc_sample : joined_samples) {
-                std::vector<secondary::Variant> variants =
+                std::vector<Variant> variants =
                         decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
 
                 ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
@@ -875,8 +657,8 @@ std::vector<secondary::Variant> call_variants(
     };
 
     // Partition groups to chunks for multithreaded processing.
-    const std::vector<secondary::Interval> thread_chunks =
-            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+    const std::vector<Interval> thread_chunks =
+            compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
 
     // Create the thread pool.
     cxxpool::thread_pool pool{std::size(thread_chunks)};
@@ -886,7 +668,7 @@ std::vector<secondary::Variant> call_variants(
     futures.reserve(std::size(thread_chunks));
 
     // Reserve the space for results for each individual group.
-    std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
+    std::vector<std::vector<Variant>> thread_results(std::size(groups));
 
     // Add worker tasks.
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
@@ -906,7 +688,7 @@ std::vector<secondary::Variant> call_variants(
     }
 
     // Flatten the results.
-    std::vector<secondary::Variant> all_results;
+    std::vector<Variant> all_results;
     {
         size_t count = 0;
         for (const auto& vals : thread_results) {
@@ -922,4 +704,4 @@ std::vector<secondary::Variant> call_variants(
     return all_results;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

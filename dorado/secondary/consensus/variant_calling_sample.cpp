@@ -1,6 +1,10 @@
 #include "variant_calling_sample.h"
 
+#include "consensus_utils.h"
+#include "secondary/features/decoder_base.h"
 #include "utils/ssize.h"
+
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <sstream>
@@ -80,6 +84,194 @@ bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs
     return (lhs.logits.equal(rhs.logits)) &&
            (std::tie(lhs.seq_id, lhs.positions_major, lhs.positions_minor) ==
             std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor));
+}
+
+VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
+                                     const int64_t idx_start,
+                                     const int64_t idx_end) {
+    // Check that all members of the sample are of the same length.
+    vc_sample.validate();
+
+    const int64_t num_columns = dorado::ssize(vc_sample.positions_major);
+
+    // Validate idx.
+    if ((idx_start < 0) || (idx_start >= num_columns) || (idx_start >= idx_end) ||
+        (idx_end > num_columns)) {
+        throw std::out_of_range("Index is out of range in slice_vc_sample. idx_start = " +
+                                std::to_string(idx_start) +
+                                ", idx_end = " + std::to_string(idx_end) +
+                                ", num_columns = " + std::to_string(num_columns));
+    }
+
+    // Slice.
+    return VariantCallingSample{
+            vc_sample.seq_id,
+            std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
+                                 std::begin(vc_sample.positions_major) + idx_end),
+            std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
+                                 std::begin(vc_sample.positions_minor) + idx_end),
+            vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
+}
+
+std::vector<VariantCallingSample> merge_vc_samples(
+        const std::vector<VariantCallingSample>& vc_samples) {
+    const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
+                                                    const VariantCallingSample& rh) {
+        const size_t width = std::size(lh.positions_major);
+
+        // Insert positions vectors.
+        lh.positions_major.reserve(width + std::size(rh.positions_major));
+        lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
+                                  std::end(rh.positions_major));
+        lh.positions_minor.reserve(width + std::size(rh.positions_minor));
+        lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
+                                  std::end(rh.positions_minor));
+
+        // Merge the tensors.
+        lh.logits = torch::cat({std::move(lh.logits), rh.logits});
+    };
+
+    if (std::empty(vc_samples)) {
+        return {};
+    }
+
+    std::vector<VariantCallingSample> ret{vc_samples.front()};
+
+    // Validate sample for sanity. This can throw.
+    vc_samples[0].validate();
+
+    for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
+        const VariantCallingSample& last = ret.back();
+        const VariantCallingSample& curr = vc_samples[i];
+
+        // Validate sample for sanity. This can throw.
+        curr.validate();
+
+        // Should not happen, but sanity check.
+        if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
+            ret.emplace_back(vc_samples[i]);
+            continue;
+        }
+
+        // Merge if major coordinates are adjacent, or if major coordinates are equal but minor are adjacent.
+        if ((curr.seq_id == last.seq_id) &&
+            ((curr.positions_major[0] == (last.positions_major.back() + 1)) ||
+             ((curr.positions_major[0] == last.positions_major.back()) &&
+              (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
+            merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
+        } else {
+            ret.emplace_back(vc_samples[i]);
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * \brief This function restructures the neighboring samples for one draft sequence.
+ *          Each input sample is split on the last non-variant position.
+ *          The left part is merged with anything previously added to a queue (i.e.
+ *          previous sample's right portion). The right part is then added to a cleared queue.
+ *          The goal of this function is to prevent calling variants on sample boundaries.
+ */
+std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
+                                               const std::string& draft,
+                                               const DecoderBase& decoder) {
+    std::vector<VariantCallingSample> ret;
+
+    std::vector<VariantCallingSample> queue;
+
+    for (int64_t i = 0; i < dorado::ssize(vc_samples); ++i) {
+        const VariantCallingSample& vc_sample = vc_samples[i];
+
+        vc_sample.validate();
+
+        // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
+        // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
+        // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
+        // In this case, the "batch size" is 1.
+        const at::Tensor logits = vc_sample.logits.unsqueeze(0);
+        const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+
+        // This shouldn't be possible.
+        if (std::size(c) != 1) {
+            spdlog::warn(
+                    "Unexpected number of consensus sequences generated from a single sample: "
+                    "c.size = {}. Skipping consensus of this sample.",
+                    std::size(c));
+            continue;
+        }
+
+        // Sequences for comparison.
+        const std::string& call_with_gaps = c.front().seq;
+        const std::string draft_with_gaps = extract_draft_with_gaps(
+                draft, vc_sample.positions_major, vc_sample.positions_minor);
+        assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
+
+        const auto check_is_diff = [](const char base1, const char base2) {
+            return (base1 != base2) || (base1 == '*' && base2 == '*');
+        };
+
+        // Check if all positions are diffs, or if all positions are gaps in both sequences.
+        {
+            int64_t count = 0;
+            for (int64_t j = 0; j < dorado::ssize(call_with_gaps); ++j) {
+                if (check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
+                    ++count;
+                }
+            }
+            if (count == dorado::ssize(call_with_gaps)) {
+                // Merge the entire sample with the next one. We need at least one non-diff non-gap pos.
+                queue.emplace_back(vc_sample);
+                continue;
+            }
+        }
+
+        const int64_t num_positions = dorado::ssize(vc_sample.positions_major);
+
+        // Find a location where to split the sample.
+        int64_t last_non_var_start = 0;
+        for (int64_t j = (num_positions - 1); j >= 0; --j) {
+            if ((vc_sample.positions_minor[j] == 0) &&
+                !check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
+                last_non_var_start = j;
+                break;
+            }
+        }
+
+        // Split the sample.
+        VariantCallingSample left_slice = slice_vc_sample(vc_sample, 0, last_non_var_start);
+        VariantCallingSample right_slice =
+                slice_vc_sample(vc_sample, last_non_var_start, num_positions);
+
+        // Enqueue the queue if possible.
+        if (last_non_var_start > 0) {
+            queue.emplace_back(std::move(left_slice));
+        }
+
+        // Merge and insert.
+        if (!std::empty(queue)) {
+            auto new_samples = merge_vc_samples(queue);
+            queue.clear();
+
+            ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
+                       std::make_move_iterator(std::end(new_samples)));
+        }
+
+        // Reset the queue.
+        queue = {std::move(right_slice)};
+    }
+
+    // Merge and insert.
+    if (!std::empty(queue)) {
+        auto new_samples = merge_vc_samples(queue);
+        queue.clear();
+
+        ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
+                   std::make_move_iterator(std::end(new_samples)));
+    }
+
+    return ret;
 }
 
 }  // namespace dorado::secondary

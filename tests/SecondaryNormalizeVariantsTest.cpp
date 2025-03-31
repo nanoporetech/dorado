@@ -1,4 +1,4 @@
-#include "polish/variant_calling.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/variant.h"
 
 #include <catch2/catch_test_macros.hpp>

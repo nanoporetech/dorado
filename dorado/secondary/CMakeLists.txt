@@ -27,6 +27,10 @@ add_library(dorado_secondary
     consensus/consensus_result.h
     consensus/sample.cpp
     consensus/sample.h
+    consensus/consensus_utils.cpp
+    consensus/consensus_utils.h
+    consensus/variant_calling.cpp
+    consensus/variant_calling.h
     consensus/variant_calling_sample.cpp
     consensus/variant_calling_sample.h
     consensus/window.cpp
