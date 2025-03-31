@@ -38,4 +38,10 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples);
 
+std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
+                                                const VariantCallingSample& vc_sample,
+                                                const std::string& draft,
+                                                const bool ambig_ref,
+                                                const bool gvcf);
+
 }  // namespace dorado::polisher

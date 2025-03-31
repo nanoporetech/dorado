@@ -532,8 +532,6 @@ secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
     return ret;
 }
 
-namespace {
-
 std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
                                                 const VariantCallingSample& vc_sample,
                                                 const std::string& draft,
@@ -674,19 +672,26 @@ std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
                 {"GQ", qual_i},
         };
         const int64_t var_pos = vc_sample.positions_major[rstart];
-        if (vc_sample.positions_minor[rstart] != 0) {
-            // Variant starts on insert - prepend ref base.
-            var_ref.insert(0, 1, draft[var_pos]);
-            var_pred.insert(0, 1, draft[var_pos]);
-        }
-        secondary::Variant variant{
+
+        secondary::Variant var{
                 vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
                 round_float(qual, 3), genotype, rstart,  rend,
         };
 
-        variant = normalize_variant(ref_seq_with_gaps, {cons_seq_with_gaps},
-                                    vc_sample.positions_major, vc_sample.positions_minor, variant);
-        variants.emplace_back(std::move(variant));
+        // Variant starts on insert - prepend ref base.
+        if ((vc_sample.positions_minor[var.rstart] != 0) && !std::empty(var.alts)) {
+            while ((var.rstart > 0) && (vc_sample.positions_minor[var.rstart] != 0)) {
+                --var.rstart;
+            }
+            var.pos = vc_sample.positions_major[var.rstart];
+            var.ref = draft[var.pos] + var.ref;
+            var.alts[0] = draft[var.pos] + var.alts[0];
+        }
+
+        var = normalize_variant(ref_seq_with_gaps, {cons_seq_with_gaps}, vc_sample.positions_major,
+                                vc_sample.positions_minor, var);
+
+        variants.emplace_back(std::move(var));
     }
 
     if (gvcf) {
@@ -727,8 +732,14 @@ std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
         }
     }
 
+    std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+        return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+    });
+
     return variants;
 }
+
+namespace {
 
 std::vector<VariantCallingSample> trim_vc_samples(
         const std::vector<VariantCallingSample>& vc_input_data,
