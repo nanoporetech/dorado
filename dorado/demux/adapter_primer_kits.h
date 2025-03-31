@@ -40,7 +40,7 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
           KC::SQK_NBD114_96,    KC::SQK_NBD114_96_260,    KC::SQK_PCB114_24, KC::SQK_PCB114_24_260,
           KC::SQK_RBK114_24,    KC::SQK_RBK114_24_260,    KC::SQK_RBK114_96, KC::SQK_RBK114_96_260,
           KC::SQK_RPB114_24,    KC::SQK_RPB114_24_260}},
-        {AC::RNA004, {KC::SQK_RNA004}}};
+        {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL}}};
 
 // Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
 // will actually be found near the beginning of a forward read, and vice-versa for reverse

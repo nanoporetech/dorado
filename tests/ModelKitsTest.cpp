@@ -101,6 +101,7 @@ CATCH_TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
         CATCH_CHECK(to_string(KitCode::SQK_RNA001) == "SQK-RNA001");
         CATCH_CHECK(to_string(KitCode::SQK_RNA002) == "SQK-RNA002");
         CATCH_CHECK(to_string(KitCode::SQK_RNA004) == "SQK-RNA004");
+        CATCH_CHECK(to_string(KitCode::SQK_RNA004_XL) == "SQK-RNA004-XL");
         CATCH_CHECK(to_string(KitCode::SQK_ULK001) == "SQK-ULK001");
         CATCH_CHECK(to_string(KitCode::SQK_ULK114) == "SQK-ULK114");
         CATCH_CHECK(to_string(KitCode::SQK_ULK114_260) == "SQK-ULK114-260");
@@ -175,7 +176,7 @@ CATCH_TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
                 CATCH_CHECK(speed == 260);
             } else if (ends_with(name, "RNA002")) {
                 CATCH_CHECK(speed == 70);
-            } else if (ends_with(name, "RNA004")) {
+            } else if (ends_with(name, "RNA004") || ends_with(name, "RNA004-XL")) {
                 CATCH_CHECK(speed == 130);
             } else if (ends_with(name, "__UNKNOWN_KIT__")) {
                 continue;
