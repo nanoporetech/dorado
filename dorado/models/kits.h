@@ -86,6 +86,7 @@ enum class KitCode {
     SQK_RNA001,
     SQK_RNA002,
     SQK_RNA004,
+    SQK_RNA004_XL,
     SQK_ULK001,
     SQK_ULK114,
     SQK_ULK114_260,

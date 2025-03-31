@@ -122,6 +122,7 @@ const std::unordered_map<KitCode, KitInfo> codes_map = {
         {KC::SQK_RNA001, {"SQK-RNA001", 400}},
         {KC::SQK_RNA002, {"SQK-RNA002", 70}},
         {KC::SQK_RNA004, {"SQK-RNA004", 130}},
+        {KC::SQK_RNA004_XL, {"SQK-RNA004-XL", 130}},
         {KC::SQK_ULK001, {"SQK-ULK001", 400}},
         {KC::SQK_ULK114, {"SQK-ULK114", 400}},
         {KC::SQK_ULK114_260, {"SQK-ULK114-260", 260}},
@@ -325,7 +326,7 @@ const KitSets sets = {{flowcells, kits}};
 namespace rna004 {
 // RNA004 Flowcells and Kits
 const std::vector<FC> flowcells = {FC::FLO_PRO004RA, FC::FLO_MIN004RA};
-const std::vector<KC> kits = {KC::SQK_RNA004};
+const std::vector<KC> kits = {KC::SQK_RNA004, KC::SQK_RNA004_XL};
 const KitSets sets = {{rna004::flowcells, rna004::kits}};
 }  // namespace rna004
 
