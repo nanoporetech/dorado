@@ -4,8 +4,10 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.9.5] (31 March 2025)
 
-**[SUMMARY STILL TO BE WRITTEN]**
-To highlight: Basecalling speed improvements; pychopper functionality; poly(A) accuracy and fixes; Dorado `polish` and `correct` speed improvements and stability; Dorado `aligner` split index support and minimap2 update; (others?); bug fixes. Now requires macOS ≥13.0 & we have updated the required JetPack version to support Orin to JetPack 6.3 (Jammy).
+This release of Dorado upgrades to using Torch 2.6 and Cuda 12.8 which enables support for Nvidia Blackwell GPU architectures (Compute Capability 10.0 & 12.0).
+Highlights of this release include Basecalling performance optimisation of LSTM HAC models on Hopper (CC 9.0), Transformer SUP models on Volta (7.0) & Orin (8.7); pychopper functionality; poly(A) tail estimation accuracy improvements; Dorado `polish` and `correct` stability and speed improvements; Dorado `aligner` split index support and minimap2 updated to the latest version.
+
+Please note: with the upgrade to Cuda 12.8 the minimum supported Nvidia driver version is now 525.105. Also, the minimum supported MacOS is now ≥13.0 & we have updated the required JetPack version to support Orin to JetPack 6.3 (Jammy Jellyfish 22.04).
 
 * 833a1aa98cb52b58cb83b3a399dfcd9226262a33 - Improve speed of Transformer based SUP basecalling models on Volta GPUs
 * d46286e9e9f549b2f776f2d86e5bf01810d6998d - Improve speed of LSTM HAC basecalling models on Hopper GPUs
