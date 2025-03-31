@@ -109,22 +109,6 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
         }
     }
 
-    // Check if the "supported_basecallers" key exists
-    {
-        cfg.supported_basecallers.emplace(cfg.basecaller_model);
-
-        if (config_toml.contains("supported_basecallers")) {
-            try {
-                std::vector<std::string> data =
-                        toml::find<std::vector<std::string>>(config_toml, "supported_basecallers");
-                cfg.supported_basecallers.insert(std::begin(data), std::end(data));
-            } catch (const std::exception& e) {
-                throw std::runtime_error("Error parsing 'supported_basecallers' from config: '" +
-                                         config_path.string() + "'. Message: " + e.what());
-            }
-        }
-    }
-
     // Parse the model info.
     {
         const auto& section = toml::find(config_toml, "model");
