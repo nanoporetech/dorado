@@ -5,8 +5,8 @@ All notable changes to Dorado will be documented in this file.
 # [0.9.5] (31 March 2025)
 
 This release of Dorado delivers significant performance improvements and broader hardware support:
-* Major speedups for HAC basecalling models on Nvidia Hopper GPUs (Compute Capability 9.0)
-* Enhanced performance of the V5 SUP model on Volta (7.0) and Orin (8.7) GPUs
+* Major performance of the V5 SUP model on Volta (7.0) and Orin (8.7) GPUs
+* Enhanced speedups for HAC basecalling models on Nvidia Hopper GPUs (Compute Capability 9.0)
 * Support for Nvidia Blackwell GPUs (Compute Capabilities 10.0 and 12.0)
 
 Additional updates include improvements to `pychopper` integration, increased poly(A) tail estimation accuracy, and enhanced stability and speed in `dorado polish` and `dorado correct`. `dorado aligner` now supports split indexes, and the internal dependency on minimap2 has been updated to v2.28.
