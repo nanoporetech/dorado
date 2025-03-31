@@ -15,8 +15,6 @@ namespace dorado::secondary::consensus::tests {
 #define TEST_GROUP "[SecondaryConsensusVariantCalling]"
 
 CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
-    using namespace dorado::polisher;
-
     struct TestCase {
         std::string test_name;
         std::vector<VariantCallingSample> in_samples;

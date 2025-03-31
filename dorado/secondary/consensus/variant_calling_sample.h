@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dorado::secondary {
@@ -41,5 +42,9 @@ std::vector<VariantCallingSample> merge_vc_samples(
 std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
                                                const std::string& draft,
                                                const DecoderBase& decoder);
+
+std::vector<VariantCallingSample> trim_vc_samples(
+        const std::vector<VariantCallingSample>& vc_input_data,
+        const std::vector<std::pair<int64_t, int32_t>>& group);
 
 }  // namespace dorado::secondary

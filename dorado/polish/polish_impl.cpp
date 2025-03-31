@@ -3,7 +3,7 @@
 #include "hts_io/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"
 #include "secondary/batching.h"
-#include "secondary/interval.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -1212,6 +1212,132 @@ std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
     }
 
     return ret;
+}
+
+std::vector<secondary::Variant> call_variants(
+        const secondary::Interval& region_batch,
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+        const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const secondary::DecoderBase& decoder,
+        const bool ambig_ref,
+        const bool gvcf,
+        const int32_t num_threads,
+        polisher::PolishStats& polish_stats) {
+    // Group samples by sequence ID.
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
+    for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
+        const auto& vc_sample = vc_input_data[i];
+
+        const int32_t local_id = vc_sample.seq_id - region_batch.start;
+
+        // Skip filtered samples.
+        if (vc_sample.seq_id < 0) {
+            continue;
+        }
+
+        if ((vc_sample.seq_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+            (local_id >= dorado::ssize(groups))) {
+            spdlog::error(
+                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                    "groups.size = {}",
+                    vc_sample.seq_id, std::size(draft_lens), std::size(groups));
+            continue;
+        }
+        groups[local_id].emplace_back(vc_sample.start(), i);
+    }
+
+    // Worker for parallel processing.
+    const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
+                            std::vector<std::vector<secondary::Variant>>& results,
+                            polisher::PolishStats& ps) {
+        if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
+            throw std::runtime_error("Worker group_id is out of bounds! start = " +
+                                     std::to_string(start) + ", end = " + std::to_string(end) +
+                                     ", results.size = " + std::to_string(std::size(results)));
+        }
+
+        for (int32_t group_id = start; group_id < end; ++group_id) {
+            const int64_t seq_id = group_id + region_batch.start;
+            const std::string& header = draft_lens[seq_id].first;
+
+            // Sort the group by start positions.
+            auto& group = groups[group_id];
+            std::stable_sort(std::begin(group), std::end(group));
+
+            if (std::empty(group)) {
+                continue;
+            }
+
+            // Get the draft sequence.
+            const std::string draft = draft_readers[tid]->fetch_seq(header);
+
+            // Trim the overlapping portions between samples.
+            const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
+
+            // Break and merge samples on non-variant positions.
+            // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+            const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+
+            for (const auto& vc_sample : joined_samples) {
+                std::vector<secondary::Variant> variants =
+                        secondary::decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+
+                ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
+
+                results[group_id].insert(std::end(results[group_id]),
+                                         std::make_move_iterator(std::begin(variants)),
+                                         std::make_move_iterator(std::end(variants)));
+            }
+        }
+    };
+
+    // Partition groups to chunks for multithreaded processing.
+    const std::vector<secondary::Interval> thread_chunks =
+            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+
+    // Create the thread pool.
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+
+    // Create the futures.
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+
+    // Reserve the space for results for each individual group.
+    std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
+
+    // Add worker tasks.
+    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
+                                       std::ref(thread_results), std::ref(polish_stats)));
+    }
+
+    // Join and catch exceptions.
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception when computing variants: ") +
+                                 e.what()};
+    }
+
+    // Flatten the results.
+    std::vector<secondary::Variant> all_results;
+    {
+        size_t count = 0;
+        for (const auto& vals : thread_results) {
+            count += std::size(vals);
+        }
+        all_results.reserve(count);
+        for (auto& vals : thread_results) {
+            all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(vals)),
+                               std::make_move_iterator(std::end(vals)));
+        }
+    }
+
+    return all_results;
 }
 
 }  // namespace dorado::polisher

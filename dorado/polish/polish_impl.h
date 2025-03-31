@@ -11,6 +11,7 @@
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
 #include "secondary/interval.h"
+#include "secondary/variant.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
@@ -194,5 +195,17 @@ std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
         const bool fill_gaps,
         const std::optional<char>& fill_char,
         hts_io::FastxRandomReader& draft_reader);
+
+// Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
+std::vector<secondary::Variant> call_variants(
+        const secondary::Interval& region_batch,
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+        const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const secondary::DecoderBase& decoder,
+        const bool ambig_ref,
+        const bool gvcf,
+        const int32_t num_threads,
+        PolishStats& polish_stats);
 
 }  // namespace dorado::polisher

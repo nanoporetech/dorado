@@ -1,12 +1,11 @@
 #pragma once
 
 #include "hts_io/FastxRandomReader.h"
-#include "polish/polish_stats.h"
-#include "secondary/consensus/sample.h"
-#include "secondary/consensus/variant_calling_sample.h"
+#include "sample.h"
 #include "secondary/features/decoder_base.h"
 #include "secondary/interval.h"
 #include "secondary/variant.h"
+#include "variant_calling_sample.h"
 
 #include <cstdint>
 #include <memory>
@@ -16,18 +15,6 @@
 #include <vector>
 
 namespace dorado::secondary {
-
-// Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
-std::vector<Variant> call_variants(
-        const Interval& region_batch,
-        const std::vector<VariantCallingSample>& vc_input_data,
-        const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const DecoderBase& decoder,
-        const bool ambig_ref,
-        const bool gvcf,
-        const int32_t num_threads,
-        polisher::PolishStats& polish_stats);
 
 Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,

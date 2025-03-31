@@ -1,6 +1,8 @@
 #include "variant_calling_sample.h"
 
 #include "consensus_utils.h"
+#include "polish/trim.h"
+#include "sample.h"
 #include "secondary/features/decoder_base.h"
 #include "utils/ssize.h"
 
@@ -272,6 +274,57 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
     }
 
     return ret;
+}
+
+std::vector<VariantCallingSample> trim_vc_samples(
+        const std::vector<VariantCallingSample>& vc_input_data,
+        const std::vector<std::pair<int64_t, int32_t>>& group) {
+    // Mock the Sample objects. Trimming works on Sample objects only, but
+    // it only needs positions, not the actual tensors.
+    std::vector<Sample> local_samples;
+    local_samples.reserve(std::size(group));
+    for (const auto& [start, id] : group) {
+        const auto& vc_sample = vc_input_data[id];
+        local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
+                                          vc_sample.positions_minor, {}, {}, {}));
+    }
+
+    // Compute trimming of all samples for this group.
+    const std::vector<polisher::TrimInfo> trims =
+            polisher::trim_samples(local_samples, std::nullopt);
+
+    std::vector<VariantCallingSample> trimmed_samples;
+
+    assert(std::size(trims) == std::size(local_samples));
+    assert(std::size(trims) == std::size(group));
+
+    for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
+        const int32_t id = group[i].second;
+        const auto& s = vc_input_data[id];
+        const polisher::TrimInfo& t = trims[i];
+
+        // Make sure that all vectors and tensors are of the same length.
+        s.validate();
+
+        const int64_t num_columns = dorado::ssize(s.positions_major);
+        if ((t.start < 0) || (t.start >= num_columns) || (t.start >= t.end) ||
+            (t.end > num_columns)) {
+            throw std::out_of_range("Index is out of range in trim_vc_samples. idx_start = " +
+                                    std::to_string(t.start) +
+                                    ", idx_end = " + std::to_string(t.end) +
+                                    ", num_columns = " + std::to_string(num_columns));
+        }
+
+        trimmed_samples.emplace_back(VariantCallingSample{
+                s.seq_id,
+                std::vector<int64_t>(std::begin(s.positions_major) + t.start,
+                                     std::begin(s.positions_major) + t.end),
+                std::vector<int64_t>(std::begin(s.positions_minor) + t.start,
+                                     std::begin(s.positions_minor) + t.end),
+                s.logits.index({at::indexing::Slice(t.start, t.end)}).clone()});
+    }
+
+    return trimmed_samples;
 }
 
 }  // namespace dorado::secondary

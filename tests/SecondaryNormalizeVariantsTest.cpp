@@ -15,8 +15,6 @@ namespace dorado::secondary::consensus::tests {
 #define TEST_GROUP "[SecondaryConsensusVariantCalling]"
 
 CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
-    using namespace dorado::polisher;
-
     spdlog::set_level(spdlog::level::trace);
 
     const std::string reference_1{"GGGGCATGGGG"};
