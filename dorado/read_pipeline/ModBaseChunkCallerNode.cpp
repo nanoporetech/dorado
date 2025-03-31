@@ -146,6 +146,11 @@ void ModBaseChunkCallerNode::terminate_impl() {
         }
     }
     m_output_workers.clear();
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in ModBaseChunkCallerNode");
+    }
 }
 
 void ModBaseChunkCallerNode::restart() {
@@ -447,10 +452,10 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
 }
 
 template <typename ReadType>
-void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<ReadType>& read_ptr,
-                                           std::shared_ptr<WorkingRead>& working_read) {
+void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
+                                                     std::shared_ptr<WorkingRead> working_read) {
     if (!read_ptr || !working_read) {
-        throw std::invalid_argument("Null pointer passed to finalise_read.");
+        throw std::invalid_argument("Null pointer passed to add_read_to_working_set.");
     }
 
     // Hand over our ownership to the working read
@@ -522,14 +527,14 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
                                read_id)) {
-        finalise_read(read_ptr, working_read);
+        send_message_to_sink(std::move(read_ptr));
         return;
-    };
+    }
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
 
-    finalise_read(read_ptr, working_read);
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
@@ -619,7 +624,12 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
         spdlog::error("ModBase Duplex Caller: {}", e.what());
     }
 
-    finalise_read(read_ptr, working_read);
+    if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
+        send_message_to_sink(std::move(read_ptr));
+        return;
+    }
+
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
@@ -884,10 +894,6 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 
         const std::vector<int64_t>& hits_seq = modbase_data.per_base_hits_seq.at(chunk->base_id);
         const std::vector<int64_t>& hits_sig = modbase_data.per_base_hits_sig.at(chunk->base_id);
-
-        if (hits_seq.empty()) {
-            continue;
-        }
 
         // The offset into the mod probs for the canonical base
         const int64_t base_offset = static_cast<int64_t>(m_base_prob_offsets.at(cfg.mods.base_id));
