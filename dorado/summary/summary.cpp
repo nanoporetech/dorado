@@ -189,7 +189,7 @@ void SummaryData::write_rows_from_reader(
 
         auto barcode = reader.get_tag<std::string>("BC");
         if (barcode.empty()) {
-            barcode = "unclassified";
+            barcode = UNCLASSIFIED;
         }
 
         float template_duration = duration;

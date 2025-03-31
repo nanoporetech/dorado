@@ -6,7 +6,6 @@
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "messages.h"
-#include "utils/concurrency/async_task_executor.h"
 #include "utils/concurrency/multi_queue_thread_pool.h"
 
 #include <htslib/sam.h>
@@ -37,10 +36,6 @@ std::shared_ptr<const dorado::alignment::Minimap2Index> load_and_get_index(
         throw std::runtime_error("AlignerNode validation error checking minimap options");
     case dorado::alignment::IndexLoadResult::file_open_error:
         throw std::runtime_error("Error opening index file: " + index_file);
-    case dorado::alignment::IndexLoadResult::split_index_not_supported:
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger index "
-                "size.");
     case dorado::alignment::IndexLoadResult::no_index_loaded:
     case dorado::alignment::IndexLoadResult::end_of_index:
         throw std::runtime_error("AlignerNode index loading error - should not reach here.");
@@ -77,14 +72,15 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          const std::string& bed_file,
                          const alignment::Minimap2Options& options,
                          int threads)
-        : MessageSink(10000, 1),
+        : MessageSink(MAX_INPUT_QUEUE_SIZE, 1),
           m_thread_pool(
                   std::make_shared<utils::concurrency::MultiQueueThreadPool>(threads,
                                                                              "align_node_pool")),
           m_index_for_bam_messages(
                   load_and_get_index(*index_file_access, index_file, options, threads)),
           m_index_file_access(std::move(index_file_access)),
-          m_bed_file_access(std::move(bed_file_access)) {
+          m_bed_file_access(std::move(bed_file_access)),
+          m_task_executor(*m_thread_pool, m_pipeline_priority, MAX_PROCESSING_QUEUE_SIZE) {
     if (!bed_file.empty()) {
         if (!m_bed_file_access) {
             throw std::runtime_error(
@@ -106,11 +102,12 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
                          std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                          std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
                          utils::concurrency::TaskPriority pipeline_priority)
-        : MessageSink(10000, 1),
+        : MessageSink(MAX_INPUT_QUEUE_SIZE, 1),
           m_thread_pool(std::move(thread_pool)),
           m_pipeline_priority(pipeline_priority),
           m_index_file_access(std::move(index_file_access)),
-          m_bed_file_access(std::move(bed_file_access)) {}
+          m_bed_file_access(std::move(bed_file_access)),
+          m_task_executor(*m_thread_pool, m_pipeline_priority, MAX_PROCESSING_QUEUE_SIZE) {}
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {
@@ -178,17 +175,16 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
 }
 
 template <typename READ>
-void AlignerNode::align_read(utils::concurrency::AsyncTaskExecutor& executor, READ&& read) {
-    executor.send([this, read_ = std::move(read)]() mutable {
+void AlignerNode::align_read(READ&& read) {
+    m_task_executor.send([this, read_ = std::move(read)]() mutable {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         align_read_common(read_->read_common, tbuf.get());
         send_message_to_sink(std::move(read_));
     });
 }
 
-void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& executor,
-                                    BamMessage&& bam_message) {
-    executor.send([this, bam_message_ = std::move(bam_message)] {
+void AlignerNode::align_bam_message(BamMessage&& bam_message) {
+    m_task_executor.send([this, bam_message_ = std::move(bam_message)] {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                .align(bam_message_.bam_ptr.get(), tbuf.get());
@@ -204,16 +200,13 @@ void AlignerNode::align_bam_message(utils::concurrency::AsyncTaskExecutor& execu
 
 void AlignerNode::input_thread_fn() {
     Message message;
-    // create an executor for the pool whose destructor will block till all tasks completed.
-    utils::concurrency::AsyncTaskExecutor task_executor{*m_thread_pool, m_pipeline_priority,
-                                                        MAX_PROCESSING_QUEUE_SIZE};
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
-            align_bam_message(task_executor, std::get<BamMessage>(std::move(message)));
+            align_bam_message(std::get<BamMessage>(std::move(message)));
         } else if (std::holds_alternative<SimplexReadPtr>(message)) {
-            align_read(task_executor, std::get<SimplexReadPtr>(std::move(message)));
+            align_read(std::get<SimplexReadPtr>(std::move(message)));
         } else if (std::holds_alternative<DuplexReadPtr>(message)) {
-            align_read(task_executor, std::get<DuplexReadPtr>(std::move(message)));
+            align_read(std::get<DuplexReadPtr>(std::move(message)));
         } else {
             send_message_to_sink(std::move(message));
             continue;
@@ -221,7 +214,20 @@ void AlignerNode::input_thread_fn() {
     }
 }
 
-stats::NamedStats AlignerNode::sample_stats() const { return stats::from_obj(m_work_queue); }
+void AlignerNode::terminate(const FlushOptions&) {
+    stop_input_processing();
+    m_task_executor.flush();
+}
+void AlignerNode::restart() {
+    m_task_executor.restart();
+    start_input_processing([this] { input_thread_fn(); }, "aligner_node");
+}
+
+stats::NamedStats AlignerNode::sample_stats() const {
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats["queued_tasks"] = double(m_task_executor.num_tasks_in_flight());
+    return stats;
+}
 
 void AlignerNode::add_bed_hits_to_record(const std::string& genome, bam1_t* record) {
     size_t genome_start = record->core.pos;

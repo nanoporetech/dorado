@@ -7,6 +7,8 @@
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
+#include <set>
+
 namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(
@@ -17,7 +19,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".pod5") {
             pod5_init();
 
@@ -38,7 +40,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     auto exp_start_time_ms = run_info_data->acquisition_start_time_ms;
                     std::string flowcell_id = run_info_data->flow_cell_id;
                     std::string device_id = run_info_data->system_name;
-                    std::string run_id = run_info_data->acquisition_id;
+                    std::string run_id = run_info_data->protocol_run_id;
                     std::string sample_id = run_info_data->sample_id;
                     std::string position_id = run_info_data->sequencer_position;
                     std::string experiment_id = run_info_data->experiment_name;
@@ -77,7 +79,7 @@ int get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_files
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".pod5") {
             pod5_init();
 
@@ -122,7 +124,7 @@ bool is_read_data_present(const std::vector<std::filesystem::directory_entry>& d
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (ext == ".pod5" || ext == ".fast5") {
             return true;
         }
@@ -136,7 +138,7 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         auto file_path = entry.path().string();
         if (ext == ".pod5") {
             pod5_init();
@@ -214,14 +216,14 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
     }
 }
 
-std::set<models::ChemistryKey> get_sequencing_chemistries(
+static std::set<models::ChemistryKey> get_sequencing_chemistries(
         const std::vector<std::filesystem::directory_entry>& dir_files) {
     std::set<models::ChemistryKey> chemistries;
     bool fast5_found{false};
     for (const auto& entry : dir_files) {
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         auto file_path = entry.path().string();
         if (ext == ".fast5") {
             fast5_found = true;

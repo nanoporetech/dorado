@@ -1,7 +1,8 @@
 
 #include "model_factory.h"
 
-#include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
+#include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <torch/autograd.h>
@@ -25,6 +26,8 @@ ModelType parse_model_type(const std::string& type) {
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
 
+namespace {
+
 /**
  * \brief This function is a workaround around missing features in torchlib. There
  *          is currently no way to load only the state dict without the model either
@@ -47,7 +50,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         }
         for (const auto& buffer : model.named_buffers()) {
             spdlog::debug("[model_params] Buffer key: {}, shape: {}", buffer.key(),
-                          (buffer.value().defined() ? tensor_shape_as_string(buffer.value())
+                          (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
                                                     : "undefined"));
         }
     }
@@ -91,7 +94,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
                 throw std::runtime_error(
                         "Cannot load weights into the model: model contains parameters which are "
                         "not present in the weights file. Missing parameters: " +
-                        print_container_as_string(missing, ", "));
+                        utils::print_container_as_string(missing, ", "));
             }
         }
         {
@@ -105,7 +108,7 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
                 throw std::runtime_error(
                         "Cannot load weights into the model: weights file contains parameters "
                         "which are not present in the model. Missing parameters: " +
-                        print_container_as_string(missing, ", "));
+                        utils::print_container_as_string(missing, ", "));
             }
         }
 
@@ -131,6 +134,8 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         throw std::runtime_error{std::string("Error: ") + e.what()};
     }
 }
+
+}  // namespace
 
 std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
@@ -189,7 +194,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         const int32_t bases_embedding_size =
                 std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
         const std::vector<int32_t> kernel_sizes =
-                parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
+                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
         const bool use_dwells =
                 (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
 

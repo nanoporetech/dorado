@@ -1,5 +1,6 @@
 #include "sample.h"
 
+#include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"
 
 #include <torch/types.h>
@@ -97,7 +98,7 @@ void debug_print_sample(std::ostream& os,
         os.flush();
     }
     os << "], size = " << std::size(sample.positions_major);
-    os << ", depth.shape = " << tensor_shape_as_string(sample.depth);
+    os << ", depth.shape = " << utils::tensor_shape_as_string(sample.depth);
     os.flush();
 
     if (debug) {

@@ -23,3 +23,11 @@ else()
 endif()
 
 set(DORADO_VERSION "${DORADO_VERSION_MAJOR}.${DORADO_VERSION_MINOR}.${DORADO_VERSION_REV}+${DORADO_SHORT_HASH}")
+
+# Setup a target that you can link to get version info.
+configure_file(
+    dorado/dorado_version.h.in
+    ${CMAKE_BINARY_DIR}/dorado_version/dorado_version.h
+)
+add_library(dorado_version INTERFACE)
+target_include_directories(dorado_version INTERFACE ${CMAKE_BINARY_DIR}/dorado_version)

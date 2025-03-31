@@ -1,7 +1,7 @@
 #pragma once
 
 #include "medaka_bamiter.h"
-#include "polish/bam_file.h"
+#include "secondary/bam_file.h"
 
 #include <array>
 #include <cstdint>
@@ -98,7 +98,7 @@ void print_pileup_data(std::ostream &os,
  *  When tag_name is given, the behaviour for alignments without the tag is
  *  determined by keep_missing.
  */
-PileupData calculate_pileup(BamFile &bam_file,
+PileupData calculate_pileup(secondary::BamFile &bam_file,
                             const std::string &chr_name,
                             const int64_t start,  // Zero-based.
                             const int64_t end,    // Non-inclusive.

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "region.h"
 #include "sample.h"
+#include "secondary/region.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -26,7 +26,19 @@ struct TrimInfo {
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
-                                   const std::optional<const RegionInt>& region);
+                                   const std::optional<const secondary::RegionInt>& region);
+
+/**
+ * \brief Identical functionality to the above trim_samples, but this one allows for more efficient sample
+ *          comparison in case the client code has samples in a permuted order.
+ *          In this case, samples do not have to contiguous in memory, only their pointers.
+ *
+ * \param samples A vector of pointers to samples to trim. Client of this function is responsible for sorting them. Only neighboring samples are compared.
+ * \param region Optional region to trim to. After samples are trimmed on neighboring overlaps, region trimming is applied.
+ * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
+ */
+std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
+                                   const std::optional<const secondary::RegionInt>& region);
 
 /**
  * \brief Identical functionality to the above trim_samples, but this one allows for more efficient sample

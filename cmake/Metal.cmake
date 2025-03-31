@@ -1,15 +1,15 @@
-download_and_extract(https://developer.apple.com/metal/cpp/files/metal-cpp_macOS13_iOS16.zip metal-cpp)
+download_and_extract(
+    https://developer.apple.com/metal/cpp/files/metal-cpp_macOS13_iOS16.zip
+    metal-cpp
+    "6f741894229e9c750add1afc3797274fc008c7507e2ae726370c17c34b7c6a68"
+)
 
 set(AIR_FILES)
 set(METAL_SOURCES dorado/basecall/metal/nn.metal)
 
-if (IOS)
-    set(XCRUN_SDK ${SDK_NAME})
-    set(METAL_STD_VERSION "metal3.0") # iOS 16
-else()
-    set(XCRUN_SDK macosx)
-    set(METAL_STD_VERSION "macos-metal2.3") # macOS 11.0
-endif()
+
+set(XCRUN_SDK macosx)
+set(METAL_STD_VERSION "macos-metal2.3") # macOS 11.0
 string(TOUPPER ${XCRUN_SDK} XCRUN_SDK_UPPER)
 
 foreach(source ${METAL_SOURCES})

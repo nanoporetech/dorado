@@ -32,6 +32,8 @@ CREATE_POINT_OF_INTEREST_ID(MetalCaller);
 
 namespace dorado::basecall {
 
+using namespace config;
+
 struct MetalCaller::NNTask {
     NNTask(at::Tensor *input_, int num_chunks_, std::vector<decode::DecodedChunk> *out_chunks_)
             : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
@@ -157,15 +159,9 @@ void MetalCaller::metal_thread_fn() {
 
             // We retry the entire set of kernels up to 5 times, to deal with seemingly
             // random intermittent errors with command buffer submissions.
-            // On iOS we can't bail here, so we need to keep retrying.
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             bool cb_success = false;
-#if TARGET_OS_IPHONE
-            for (int try_count = 0; !cb_success; ++try_count)
-#else   // TARGET_OS_IPHONE
-            for (int try_count = 0; try_count < 5; ++try_count)
-#endif  // TARGET_OS_IPHONE
-            {
+            for (int try_count = 0; try_count < 5; ++try_count) {
                 cb_success = call_task(*task, inter_caller_mutex, try_count);
                 if (cb_success) {
                     break;
@@ -229,7 +225,8 @@ void MetalCaller::decode_thread_fn() {
     }
 }
 
-MetalLSTMCaller::MetalLSTMCaller(const CRFModelConfig &model_config, float memory_limit_fraction)
+MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
+                                 float memory_limit_fraction)
         : MetalCaller(model_config) {
     ScopedAutoReleasePool autorelease_pool;
     // Our metal builds assume shared memory, so it's safe to check host.
@@ -263,7 +260,7 @@ MetalLSTMCaller::MetalLSTMCaller(const CRFModelConfig &model_config, float memor
     start_threads();
 }
 
-void MetalLSTMCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
+void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_config,
                                            const std::vector<at::Tensor> &state_dict,
                                            int chunk_size,
                                            int batch_size) {
@@ -342,7 +339,7 @@ void MetalLSTMCaller::set_chunk_batch_size(const CRFModelConfig &model_config,
     }
 }
 
-int MetalLSTMCaller::benchmark_batch_sizes(const CRFModelConfig &model_config,
+int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_config,
                                            const std::vector<at::Tensor> &state_dict,
                                            float memory_limit_fraction) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
@@ -480,7 +477,7 @@ DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
             m_decoder_options.q_shift, m_decoder_options.q_scale, m_score_scale);
 }
 
-MetalTxCaller::MetalTxCaller(const CRFModelConfig &model_config) : MetalCaller(model_config) {
+MetalTxCaller::MetalTxCaller(const BasecallModelConfig &model_config) : MetalCaller(model_config) {
     ScopedAutoReleasePool autorelease_pool;
 
     if (!model_config.is_tx_model()) {
@@ -536,7 +533,7 @@ MetalTxCaller::MetalTxCaller(const CRFModelConfig &model_config) : MetalCaller(m
     start_threads();
 }
 
-void MetalTxCaller::load_tx_model(const CRFModelConfig &model_config) {
+void MetalTxCaller::load_tx_model(const BasecallModelConfig &model_config) {
     const auto device_type = torch::kMPS;
     const auto scalar_type = torch::kFloat16;
     const auto options = at::TensorOptions().device(device_type).dtype(scalar_type);

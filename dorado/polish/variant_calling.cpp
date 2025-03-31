@@ -2,10 +2,12 @@
 
 #include "consensus_result.h"
 #include "polish_stats.h"
+#include "secondary/batching.h"
 #include "trim.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"
 
+#include <ATen/ATen.h>
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
@@ -19,6 +21,8 @@
 #include <unordered_set>
 
 namespace dorado::polisher {
+
+namespace {
 
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
@@ -40,14 +44,6 @@ std::string extract_draft_with_gaps(const std::string& draft,
         ret[i] = (positions_minor[i] == 0) ? draft[positions_major[i]] : '*';
     }
 
-    return ret;
-}
-
-std::string extract_draft(const std::string& draft, const std::vector<int64_t>& positions_major) {
-    std::string ret(std::size(positions_major), '*');
-    for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
-        ret[i] = draft[positions_major[i]];
-    }
     return ret;
 }
 
@@ -78,22 +74,12 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
             vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
 }
 
+}  // namespace
+
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples) {
     const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
                                                     const VariantCallingSample& rh) {
-        if (lh.seq_id != rh.seq_id) {
-            std::ostringstream oss;
-            oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
-            throw std::runtime_error(oss.str());
-        }
-        if (lh.end() != (rh.start() + 1)) {
-            std::ostringstream oss;
-            oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh
-                << ", rh = " << rh;
-            throw std::runtime_error(oss.str());
-        }
-
         const size_t width = std::size(lh.positions_major);
 
         // Insert positions vectors.
@@ -114,8 +100,27 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
     std::vector<VariantCallingSample> ret{vc_samples.front()};
 
+    // Validate sample for sanity. This can throw.
+    vc_samples[0].validate();
+
     for (int64_t i = 1; i < dorado::ssize(vc_samples); ++i) {
-        if (ret.back().end() == (vc_samples[i].start() + 1)) {
+        const auto& last = ret.back();
+        const auto& curr = vc_samples[i];
+
+        // Validate sample for sanity. This can throw.
+        curr.validate();
+
+        // Should not happen, but sanity check.
+        if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
+            ret.emplace_back(vc_samples[i]);
+            continue;
+        }
+
+        // Merge if major coordinates are adjacent, or if major coordinates are equal but minor are adjacent.
+        if ((curr.seq_id == last.seq_id) &&
+            ((curr.positions_major[0] == (last.positions_major.back() + 1)) ||
+             ((curr.positions_major[0] == last.positions_major.back()) &&
+              (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
             merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
         } else {
             ret.emplace_back(vc_samples[i]);
@@ -124,6 +129,8 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
     return ret;
 }
+
+namespace {
 
 /**
  * \brief This function restructures the neighboring samples for one draft sequence.
@@ -281,72 +288,243 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
     return ret;
 }
 
-Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
-    if (variant.alt == variant.ref) {
+}  // namespace
+
+secondary::Variant normalize_variant(const std::string_view ref_with_gaps,
+                                     const std::vector<std::string_view>& cons_seqs_with_gaps,
+                                     const std::vector<int64_t>& positions_major,
+                                     const std::vector<int64_t>& positions_minor,
+                                     const secondary::Variant& variant) {
+    const bool all_same_as_ref =
+            std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
+                        [&variant](const std::string& s) { return s == variant.ref; });
+
+    if (all_same_as_ref) {
         return variant;
     }
 
-    const auto trim_start = [](Variant& var, const bool rev) {
-        std::array<std::string, 2> seqs{var.ref, var.alt};
+    const auto trim_start = [](secondary::Variant& var, const bool rev) {
+        // Get the sequences and reverse if needed.
+        std::vector<std::string> seqs{var.ref};
+        seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
         if (rev) {
-            std::reverse(std::begin(seqs[0]), std::end(seqs[0]));
-            std::reverse(std::begin(seqs[1]), std::end(seqs[1]));
+            for (auto& seq : seqs) {
+                std::reverse(std::begin(seq), std::end(seq));
+            }
         }
-        const int64_t min_len = std::min(dorado::ssize(seqs[0]), dorado::ssize(seqs[1]));
+
+        // Sanity check.
+        if (std::size(seqs) < 2) {
+            return;
+        }
+
+        const int64_t min_len = dorado::ssize(
+                *std::min_element(std::cbegin(seqs), std::cend(seqs),
+                                  [](const std::string_view a, const std::string_view b) {
+                                      return dorado::ssize(a) < dorado::ssize(b);
+                                  }));
+
+        // Never trim the last base.
         int64_t start_pos = 0;
         for (int64_t i = 0; i < (min_len - 1); ++i) {
-            if (seqs[0][i] != seqs[1][i]) {
+            bool bases_same = true;
+            for (size_t j = 1; j < std::size(seqs); ++j) {
+                if (seqs[j][i] != seqs[0][i]) {
+                    bases_same = false;
+                    break;
+                }
+            }
+            if (!bases_same) {
                 break;
             }
             ++start_pos;
         }
-        var.ref = seqs[0].substr(start_pos);
-        var.alt = seqs[1].substr(start_pos);
-        if (rev) {
-            std::reverse(std::begin(var.ref), std::end(var.ref));
-            std::reverse(std::begin(var.alt), std::end(var.alt));
-        } else {
-            var.pos += start_pos;
+        // Trim.
+        if (start_pos > 0) {
+            for (auto& seq : seqs) {
+                seq = seq.substr(start_pos);
+            }
         }
+        // Reverse if needed.
+        if (rev) {
+            for (auto& seq : seqs) {
+                std::reverse(std::begin(seq), std::end(seq));
+            }
+            start_pos = 0;
+        }
+        // Assign.
+        var.ref = seqs[0];
+        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+        var.pos += start_pos;
     };
 
-    const auto trim_end_and_align = [](Variant& var, const std::string& reference) {
-        std::array<std::string, 2> seqs{var.ref, var.alt};
+    const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
+                                     &positions_minor](secondary::Variant& var) {
+        const auto find_previous_major = [&](int64_t rpos) {
+            while (rpos > 0) {
+                --rpos;
+                if (positions_minor[rpos] == 0) {
+                    break;
+                }
+            }
+            return rpos;
+        };
+
+        const auto reset_var = [](const secondary::Variant& v) {
+            std::vector<std::string> seqs{v.ref};
+            seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
+            return std::make_pair(v, seqs);
+        };
+
+        std::vector<std::string> seqs{var.ref};
+        seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
+
         bool changed = true;
+
         while (changed) {
             changed = false;
 
-            // Trim the last base if identical.
-            if (!std::empty(seqs[0]) && !std::empty(seqs[1]) &&
-                (seqs[0].back() == seqs[1].back())) {
-                seqs[0] = seqs[0].substr(0, dorado::ssize(seqs[0]) - 1);
-                seqs[1] = seqs[1].substr(0, dorado::ssize(seqs[1]) - 1);
-                changed = true;
+            // Keep a copy if we need to bail.
+            const secondary::Variant var_before_change = var;
+
+            const bool all_non_empty =
+                    std::all_of(std::cbegin(seqs), std::cend(seqs),
+                                [](const std::string_view s) { return !std::empty(s); });
+
+            // Trim the last base if identical (right trim).
+            if (all_non_empty) {
+                // Check if the last base is identical in all seqs.
+                bool all_same = true;
+                for (size_t i = 1; i < std::size(seqs); ++i) {
+                    if (seqs[i].back() != seqs[0].back()) {
+                        all_same = false;
+                        break;
+                    }
+                }
+
+                // Trim right.
+                if (all_same) {
+                    for (auto& seq : seqs) {
+                        seq.resize(dorado::ssize(seq) - 1);
+                    }
+                    changed = true;
+                    var.ref = seqs[0];
+                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                }
             }
 
-            if (std::empty(seqs[0]) || std::empty(seqs[1])) {
-                if (var.pos == 0) {
-                    seqs[0] += reference[std::size(seqs[0])];
-                    seqs[1] += reference[std::size(seqs[1])];
+            const bool any_empty =
+                    std::any_of(std::cbegin(seqs), std::cend(seqs),
+                                [](const std::string_view s) { return std::empty(s); });
+
+            // Extend. Prepend/append a base if any seq is empty.
+            if (any_empty) {
+                // If we can't extend to the left, take one reference base to the right.
+                if ((var.pos == 0) || (var.rstart == 0)) {
+                    // If this variant is at the beginning of the ref, append a ref base.
+                    const int64_t ref_pos = dorado::ssize(seqs[0]);
+                    int64_t found_idx = -1;
+                    for (int64_t idx = 0; idx < dorado::ssize(positions_major); ++idx) {
+                        if ((positions_major[idx] == ref_pos) && (positions_minor[idx] == 0)) {
+                            found_idx = idx;
+                            break;
+                        }
+                    }
+                    changed = false;
+                    if (found_idx >= 0) {
+                        // Found a candidate base, append it.
+                        const char base = ref_with_gaps[found_idx];
+                        for (auto& seq : seqs) {
+                            seq += base;
+                        }
+                        var.rend = found_idx + 1;
+                        var.ref = seqs[0];
+                        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                        changed = true;
+                    } else {
+                        // Revert any trimming and stop if a base wasn't found.
+                        // E.g. the variant regions covers the full window.
+                        std::tie(var, seqs) = reset_var(var_before_change);
+                        changed = false;
+                    }
                     break;
                 } else {
-                    --var.pos;
-                    seqs[0] = reference[var.pos] + seqs[0];
-                    seqs[1] = reference[var.pos] + seqs[1];
+                    const int64_t new_rstart = find_previous_major(var.rstart);
+                    const int64_t span = var.rstart - new_rstart;
+
+                    // Sanity check. Revert any trimming if for any reason we cannot extend to the left.
+                    if (span == 0) {
+                        std::tie(var, seqs) = reset_var(var_before_change);
+                        changed = false;
+                        break;
+                    }
+
+                    // Collect all prefixes for all consensus sequences and the ref.
+                    std::vector<std::string> prefixes;
+                    prefixes.emplace_back(ref_with_gaps.substr(new_rstart, span));
+                    for (const auto& seq : cons_seqs_with_gaps) {
+                        prefixes.emplace_back(seq.substr(new_rstart, span));
+                    }
+
+                    // Create a set to count unique prefixes.
+                    const std::unordered_set<std::string> prefix_set(std::begin(prefixes),
+                                                                     std::end(prefixes));
+
+                    // Check if there is more than 1 unique prefix - this is a variant then, stop extension.
+                    // Revert trimming if it was applied.
+                    if (std::size(prefix_set) > 1) {
+                        std::tie(var, seqs) = reset_var(var_before_change);
+                        changed = false;
+                        break;
+                    }
+
+                    // Remove the deletions and prepend the prefix sequence.
+                    for (size_t i = 0; i < std::size(seqs); ++i) {
+                        std::string& p = prefixes[i];
+                        p.erase(std::remove(std::begin(p), std::end(p), '*'), std::end(p));
+                        seqs[i] = p + seqs[i];
+                    }
+
+                    // Finally, extend to the left.
+                    var.pos = positions_major[new_rstart];
+                    var.rstart = new_rstart;
+                    var.ref = seqs[0];
+                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
                     changed = true;
                 }
             }
         }
         var.ref = seqs[0];
-        var.alt = seqs[1];
+        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
     };
 
-    Variant ret = variant;
+    secondary::Variant ret = variant;
 
-    if (std::empty(ref_seq)) {
+    // Normalize the start of the variant. For example, if the input variant represents a region like this:
+    // - POS  :      43499195    43499196
+    //               v           v
+    // - REF  : CCTAG************TTATTATT
+    // - HAP 0: CCTAG*********TT**T*TTATT
+    // - HAP 1: CCTAG*********T*AT*ATTATT
+    // - VAR  : 0000011111111111111100000
+    // - MARK :      ^
+    //
+    // it is possible that the input variant.pos was set to the pos_major of the beginning of the variant
+    // (in this case, on a minor position which does not contain a reference base).
+    // While actually, the variant.pos should have been set to the first major position after rstart.
+    if (!std::empty(ret.ref)) {
+        for (int32_t r = ret.rstart; r < ret.rend; ++r) {
+            if ((positions_major[r] >= ret.pos) && (positions_minor[r] == 0)) {
+                ret.pos = positions_major[r];
+                break;
+            }
+        }
+    }
+
+    if (std::empty(ref_with_gaps)) {
         trim_start(ret, true);
     } else {
-        trim_end_and_align(ret, ref_seq);
+        trim_end_and_align(ret);
     }
 
     trim_start(ret, false);
@@ -354,11 +532,11 @@ Variant normalize_variant(const Variant& variant, const std::string& ref_seq) {
     return ret;
 }
 
-std::vector<Variant> decode_variants(const DecoderBase& decoder,
-                                     const VariantCallingSample& vc_sample,
-                                     const std::string& draft,
-                                     const bool ambig_ref,
-                                     const bool gvcf) {
+std::vector<secondary::Variant> decode_variants(const DecoderBase& decoder,
+                                                const VariantCallingSample& vc_sample,
+                                                const std::string& draft,
+                                                const bool ambig_ref,
+                                                const bool gvcf) {
     // Validate that all vectors/tensors are of equal length.
     vc_sample.validate();
 
@@ -441,20 +619,20 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
     // Predicted sequence with gaps.
     const at::Tensor logits = vc_sample.logits.unsqueeze(0);
     const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
-    const std::string& prediction = c.front().seq;
+    const std::string& cons_seq_with_gaps = c.front().seq;
 
     // Draft sequence with gaps.
-    const std::string reference =
+    const std::string ref_seq_with_gaps =
             extract_draft_with_gaps(draft, vc_sample.positions_major, vc_sample.positions_minor);
 
     // Candidate variant positions.
     const std::vector<bool> is_variant =
-            variant_columns(vc_sample.positions_minor, reference, prediction);
+            variant_columns(vc_sample.positions_minor, ref_seq_with_gaps, cons_seq_with_gaps);
     const std::vector<std::tuple<int64_t, int64_t, bool>> runs =
             dorado::run_length_encode(is_variant);
 
     // Extract variants.
-    std::vector<Variant> variants;
+    std::vector<secondary::Variant> variants;
     for (const auto& [rstart, rend, is_var] : runs) {
         // Skip non-variants.
         if (!is_var) {
@@ -462,9 +640,9 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         }
 
         // Get the reference and the predictions for the variant stretch.
-        const std::string_view var_ref_with_gaps(std::data(reference) + rstart,
+        const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
                                                  static_cast<size_t>(rend - rstart));
-        const std::string_view var_pred_with_gaps(std::data(prediction) + rstart,
+        const std::string_view var_pred_with_gaps(std::data(cons_seq_with_gaps) + rstart,
                                                   static_cast<size_t>(rend - rstart));
 
         // Mutable ref and pred sequences - a ref base may be prepended later.
@@ -494,17 +672,26 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
                 {"GQ", qual_i},
         };
         const int64_t var_pos = vc_sample.positions_major[rstart];
-        if (vc_sample.positions_minor[rstart] != 0) {
-            // Variant starts on insert - prepend ref base.
-            var_ref.insert(0, 1, draft[var_pos]);
-            var_pred.insert(0, 1, draft[var_pos]);
-        }
-        Variant variant{
-                vc_sample.seq_id,     var_pos,  var_ref, var_pred, "PASS", {},
-                round_float(qual, 3), genotype,
+
+        secondary::Variant var{
+                vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
+                round_float(qual, 3), genotype, rstart,  rend,
         };
-        variant = normalize_variant(variant, draft);
-        variants.emplace_back(std::move(variant));
+
+        // Variant starts on insert - prepend ref base.
+        if ((vc_sample.positions_minor[var.rstart] != 0) && !std::empty(var.alts)) {
+            while ((var.rstart > 0) && (vc_sample.positions_minor[var.rstart] != 0)) {
+                --var.rstart;
+            }
+            var.pos = vc_sample.positions_major[var.rstart];
+            var.ref = draft[var.pos] + var.ref;
+            var.alts[0] = draft[var.pos] + var.alts[0];
+        }
+
+        var = normalize_variant(ref_seq_with_gaps, {cons_seq_with_gaps}, vc_sample.positions_major,
+                                vc_sample.positions_minor, var);
+
+        variants.emplace_back(std::move(var));
     }
 
     if (gvcf) {
@@ -528,15 +715,16 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             };
 
             // clang-format off
-            Variant variant{
+            secondary::Variant variant{
                 vc_sample.seq_id,
                 pos,
                 ref,
-                ".",
+                {"."},
                 ".",
                 {},
                 round_float(qual, 3),
                 genotype,
+                i, (i + 1),
             };
             // clang-format on
 
@@ -544,8 +732,14 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
         }
     }
 
+    std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+        return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+    });
+
     return variants;
 }
+
+namespace {
 
 std::vector<VariantCallingSample> trim_vc_samples(
         const std::vector<VariantCallingSample>& vc_input_data,
@@ -597,8 +791,10 @@ std::vector<VariantCallingSample> trim_vc_samples(
     return trimmed_samples;
 }
 
-std::vector<Variant> call_variants(
-        const dorado::polisher::Interval& region_batch,
+}  // namespace
+
+std::vector<secondary::Variant> call_variants(
+        const secondary::Interval& region_batch,
         const std::vector<VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -632,7 +828,8 @@ std::vector<Variant> call_variants(
 
     // Worker for parallel processing.
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
-                            std::vector<std::vector<Variant>>& results, PolishStats& ps) {
+                            std::vector<std::vector<secondary::Variant>>& results,
+                            PolishStats& ps) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
                                      std::to_string(start) + ", end = " + std::to_string(end) +
@@ -662,7 +859,7 @@ std::vector<Variant> call_variants(
             const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
             for (const auto& vc_sample : joined_samples) {
-                std::vector<Variant> variants =
+                std::vector<secondary::Variant> variants =
                         decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
 
                 ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
@@ -675,8 +872,8 @@ std::vector<Variant> call_variants(
     };
 
     // Partition groups to chunks for multithreaded processing.
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+    const std::vector<secondary::Interval> thread_chunks =
+            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
 
     // Create the thread pool.
     cxxpool::thread_pool pool{std::size(thread_chunks)};
@@ -686,7 +883,7 @@ std::vector<Variant> call_variants(
     futures.reserve(std::size(thread_chunks));
 
     // Reserve the space for results for each individual group.
-    std::vector<std::vector<Variant>> thread_results(std::size(groups));
+    std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
 
     // Add worker tasks.
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
@@ -706,7 +903,7 @@ std::vector<Variant> call_variants(
     }
 
     // Flatten the results.
-    std::vector<Variant> all_results;
+    std::vector<secondary::Variant> all_results;
     {
         size_t count = 0;
         for (const auto& vals : thread_results) {

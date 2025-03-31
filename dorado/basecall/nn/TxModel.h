@@ -1,12 +1,11 @@
 #pragma once
 
-#include "basecall/CRFModelConfig.h"
 #include "basecall/nn/CRFModel.h"
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <ATen/core/TensorBody.h>
 #include <c10/core/Device.h>
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
@@ -84,6 +83,8 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
                            bool qkv_bias_,
                            bool out_bias_,
                            const std::pair<int, int> &attn_window_,
+                           float theta_,
+                           int max_seq_len_,
                            const at::TensorOptions &options_);
 
     at::Tensor forward(at::Tensor x);
@@ -93,6 +94,8 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 
     const int d_model, nhead, head_dim, num_splits;
     const std::pair<int, int> attn_window;
+    const float theta;
+    const int max_seq_len;
     const at::TensorOptions options;
     bool wqkv_transposed = false;
 
@@ -105,17 +108,20 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderImpl(const config::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
 
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16);
+    void koi_volta_forward(at::Tensor &x_f16);
 
-    tx::TxEncoderParams params;
+    config::TxEncoderParams params;
 
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f16;
     at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
+
+    void remove_bits();
 
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
@@ -125,11 +131,12 @@ struct TxEncoderImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoder);
 
 struct TxEncoderStackImpl : torch::nn::Module {
-    TxEncoderStackImpl(const tx::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderStackImpl(const config::TxEncoderParams &params, const at::TensorOptions &options);
 
     at::Tensor forward(const at::Tensor &x);
 
     bool use_koi_tiled{false};
+    bool use_koi_volta_tiled{false};
     bool use_i8{false};
     torch::nn::Sequential stack{nullptr};
     std::vector<TxEncoder> layer_vec;
@@ -138,7 +145,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const tx::EncoderUpsampleParams &params);
+    LinearUpsampleImpl(const config::EncoderUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 
@@ -149,19 +156,20 @@ struct LinearUpsampleImpl : torch::nn::Module {
 TORCH_MODULE(LinearUpsample);
 
 struct LinearScaledCRFImpl : torch::nn::Module {
-    LinearScaledCRFImpl(const tx::CRFEncoderParams &params);
+    LinearScaledCRFImpl(const config::CRFEncoderParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 
     bool scale_applied = false;
     torch::nn::Linear linear{nullptr};
-    tx::CRFEncoderParams m_params;
+    config::CRFEncoderParams m_params;
 };
 
 TORCH_MODULE(LinearScaledCRF);
 
 struct TxModelImpl : torch::nn::Module {
-    explicit TxModelImpl(const basecall::CRFModelConfig &config, const at::TensorOptions &options);
+    explicit TxModelImpl(const config::BasecallModelConfig &config,
+                         const at::TensorOptions &options);
 
     void load_state_dict(const std::vector<at::Tensor> &weights) {
         utils::load_state_dict(*this, weights);

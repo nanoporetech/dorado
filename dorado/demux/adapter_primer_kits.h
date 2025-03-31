@@ -29,7 +29,8 @@ const std::unordered_map<AdapterCode, Candidate> adapters = {
         {AC::RNA004, {"RNA004", "", "GGTTGTTTCTGTTGGTGCTG"}}};
 
 // If we know the kit, and it is in this mapping, we will look for the adapters we expect
-// for that kit.
+// for that kit. We look for the specified front adapter sequence at the beginning of the
+// read, and the specified rear adapter sequence at the end of the read.
 const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter_kit_map = {
         {AC::LSK110,
          {KC::SQK_LSK114,       KC::SQK_LSK114_260,       KC::SQK_LSK114_XL, KC::SQK_LSK114_XL_260,
@@ -39,22 +40,41 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
           KC::SQK_NBD114_96,    KC::SQK_NBD114_96_260,    KC::SQK_PCB114_24, KC::SQK_PCB114_24_260,
           KC::SQK_RBK114_24,    KC::SQK_RBK114_24_260,    KC::SQK_RBK114_96, KC::SQK_RBK114_96_260,
           KC::SQK_RPB114_24,    KC::SQK_RPB114_24_260}},
-        {AC::RNA004, {KC::SQK_RNA004}}};
+        {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL}}};
 
+// Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
+// will actually be found near the beginning of a forward read, and vice-versa for reverse
+// reads. So for example, we list the SSP cDNA primer as the frint primer, and the VNP one as
+// the rear primer, so that the code will work properly. The PCS and RAD primer sequences used
+// here are also truncated from the beginning. This does not affect trimming, because trimming
+// is done from the end of the detected primer. It does allow these sequences to be used with
+// barcoding, where a truncated version of the primer appears as the inside flanking region.
 const std::unordered_map<PrimerCode, Candidate> primers = {
-        {PC::cDNA, {"cDNA", "ACTTGCCTGTCGCTCTATCTTC", "TTTCTGTTGGTGCTGATATTGCTGGG"}},
+        {PC::cDNA,
+         {
+                 "cDNA",
+                 "TTTCTGTTGGTGCTGATATTGCTGGG",  // SSP
+                 "ACTTGCCTGTCGCTCTATCTTCTTT"    // VNP
+         }},
         {PC::PCS110,
-         {"PCS110",
-          "TCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTT",
-          "AAAGCAATATCAGCACCAACAGAAACACAAAGACACCGACAACTTTCTTGTCACGGTAGGCGAT"}},
+         {
+                 // These are actually truncated version of the actual primer sequences.
+                 "PCS110",
+                 "TTTCTGTTGGTGCTGATATTGCTTT",                          // SSP
+                 "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT"  // VNP
+         }},
         {PC::RAD,
-         {"RAD", "GCTTGGGTGTTTAACCGTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA", ""}}};
+         {
+                 // This is also a truncated version of the actual primer sequence.
+                 "RAD", "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
+                 ""  // No rear primer for RAD
+         }}};
 
 // Only Kit14 sequencing kits are listed here. If the kit is specified, and found in this map,
-// then we will search for the specified primer at the front of the read, and its corresponding
-// rear primer sequence (as specified in the primer_reverse_map object that follows), at the end.
-// Likewise we will search for the RC of the rear primer sequence at the beginning, and the RC of
-// the front primer sequence at the end.
+// then we will search for the specified front primer sequence near the beginning of the read,
+// and the RC of the specified rear primer sequence near the end of the read. Likewise we will
+// search for the rear primer sequence at the beginning, and the RC of the front primer sequence
+// at the end of the read, which is what we should see if we've sequenced the reverse strand.
 const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_kit_map = {
         {
                 PC::cDNA,
@@ -62,9 +82,24 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
         },
         {
                 PC::PCS110,
-                {KC::SQK_PCS114, KC::SQK_PCS114_260},
+                {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
         },
-        {PC::RAD, {KC::SQK_RAD114, KC::SQK_RAD114_260}}};
+        {PC::RAD,
+         {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260, KC::SQK_RBK114_24,
+          KC::SQK_RBK114_24_260, KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
+
+// The PCS114 and PCB114_24 kits can include UMI tag sequences.
+// When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning
+// of the read, or its RC will immediately precede the RC of the PCS110 SSP sequence near the end
+// of the read. Note that the Vs are wildcards, which could be any of "A", "C", or "G".
+const std::string umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+
+// This indicates how many bases before the end of the detected SSP primer the UMI search window
+// should begin. Note that the first 3 bases of the UMI tag are also the last 3 bases of the primer.
+constexpr int UMI_WINDOW_FRONT_OVERLAP = 6;
+
+// The total length of the window used to search for the UMI tag.
+constexpr int UMI_WINDOW_LENGTH = 40;
 
 class AdapterPrimerManager {
 public:

@@ -12,6 +12,8 @@
 
 namespace dorado::polisher {
 
+namespace {
+
 enum class Relationship {
     DIFFERENT_REF_NAME,
     FORWARD_OVERLAP,
@@ -49,6 +51,8 @@ std::string relationship_to_string(const Relationship rel) {
     return oss.str();
 }
 
+}  // namespace
+
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs) {
     return std::tie(lhs.start, lhs.end, lhs.heuristic) ==
            std::tie(rhs.start, rhs.end, rhs.heuristic);
@@ -58,6 +62,8 @@ std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs) {
     os << "start = " << rhs.start << ", end = " << rhs.end << ", heuristic = " << rhs.heuristic;
     return os;
 }
+
+namespace {
 
 Relationship relative_position(const Sample& s1, const Sample& s2) {
     // Helper lambdas for comparisons
@@ -300,8 +306,10 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const Sample& s1, const Sampl
     return {end_1_ind, start_2_ind, heuristic};
 }
 
+}  // namespace
+
 std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
-                                   const std::optional<const RegionInt>& region) {
+                                   const std::optional<const secondary::RegionInt>& region) {
     std::vector<const Sample*> ptrs;
     ptrs.reserve(std::size(samples));
     for (const auto& sample : samples) {
@@ -311,7 +319,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
 }
 
 std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
-                                   const std::optional<const RegionInt>& region) {
+                                   const std::optional<const secondary::RegionInt>& region) {
     std::vector<TrimInfo> result(std::size(samples));
 
     if (std::empty(samples)) {

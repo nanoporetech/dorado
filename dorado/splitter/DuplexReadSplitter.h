@@ -38,7 +38,7 @@ private:
     std::vector<ExtRead> apply_split_finders(ExtRead read) const;
     template <typename SplitFinder>
     void apply_split_finder(std::vector<ExtRead>& to_split,
-                            const char* description,
+                            [[maybe_unused]] const char* description,
                             const SplitFinder& split_finder) const;
 
     const DuplexSplitSettings m_settings;

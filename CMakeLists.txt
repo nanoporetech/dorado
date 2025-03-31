@@ -44,6 +44,10 @@ if(WIN32)
     add_compile_options("$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:/MP${WIN_THREADS}>")
 endif()
 
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message(FATAL_ERROR "MacOS x86_64 builds are no longer supported.")
+endif()
+
 if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
     # Prefer static libs if they exist so that we don't run into issues
     # linking to dynamic libraries that live in brew.
@@ -61,12 +65,8 @@ set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
     CACHE PATH "Location to download 3rdparty libraries into")
 
-# We don't support GPU builds on macOS/x64
-if (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(DORADO_GPU_BUILD FALSE)
-else()
-    set(DORADO_GPU_BUILD TRUE)
-endif()
+# All builds are now GPU builds
+set(DORADO_GPU_BUILD TRUE)
 
 find_package(CUDAToolkit QUIET)
 
@@ -74,6 +74,13 @@ if(${CUDAToolkit_FOUND})
   file(REAL_PATH ${CUDAToolkit_TARGET_DIR} CUDAToolkit_REAL_DIR)
   message(STATUS "Found CUDA ${CUDAToolkit_VERSION} (${CUDAToolkit_TARGET_DIR} -> ${CUDAToolkit_REAL_DIR})")
 endif()
+
+if(DEFINED ENV{DORADO_CDN_URL_OVERRIDE})
+    set(DORADO_CDN_URL "$ENV{DORADO_CDN_URL_OVERRIDE}")
+else()
+    set(DORADO_CDN_URL "https://cdn.oxfordnanoportal.com/software/analysis")
+endif()
+message(STATUS "Using CDN URL ${DORADO_CDN_URL} for downloads")
 
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
@@ -122,20 +129,13 @@ else()
     set(DORADO_ENABLE_PCH TRUE)
 endif()
 
-if((CMAKE_SYSTEM_NAME STREQUAL "Linux") AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*"))
-    if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
-        add_compile_definitions(DORADO_TX2)
-    else()
-        add_compile_definitions(DORADO_ORIN)
-    endif()
-endif()
-
 # Bring in 3rdparty libs
 add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
 add_subdirectory(dorado/compat)
+add_subdirectory(dorado/config)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/models)
@@ -143,11 +143,7 @@ add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
-
-configure_file(
-    dorado/dorado_version.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated/dorado_version.h
-)
+add_subdirectory(dorado/secondary)
 
 add_library(dorado_lib
     dorado/alignment/alignment_info.h
@@ -307,33 +303,24 @@ add_library(dorado_lib
     dorado/correct/decode.h
     dorado/correct/infer.cpp
     dorado/correct/infer.h
+    dorado/correct/types.cpp
+    dorado/correct/types.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
     dorado/polish/consensus_result.h
-    dorado/polish/bam_file.cpp
-    dorado/polish/bam_file.h
-    dorado/polish/interval.h
     dorado/polish/polish_impl.cpp
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp
     dorado/polish/polish_progress_tracker.h
     dorado/polish/polish_stats.h
-    dorado/polish/polish_utils.cpp
-    dorado/polish/polish_utils.h
-    dorado/polish/region.cpp
-    dorado/polish/region.h
     dorado/polish/sample.cpp
     dorado/polish/sample.h
     dorado/polish/trim.cpp
     dorado/polish/trim.h
-    dorado/polish/variant.cpp
-    dorado/polish/variant.h
     dorado/polish/variant_calling.cpp
     dorado/polish/variant_calling.h
     dorado/polish/variant_calling_sample.cpp
     dorado/polish/variant_calling_sample.h
-    dorado/polish/vcf_writer.cpp
-    dorado/polish/vcf_writer.h
     dorado/polish/window.cpp
     dorado/polish/window.h
     dorado/polish/features/decoder_base.cpp
@@ -365,6 +352,10 @@ add_library(dorado_lib
     dorado/polish/architectures/model_torch_base.h
     dorado/polish/architectures/model_torch_script.cpp
     dorado/polish/architectures/model_torch_script.h
+    dorado/utils/container_utils.cpp
+    dorado/utils/container_utils.h
+    dorado/utils/io_utils.cpp
+    dorado/utils/io_utils.h
     dorado/utils/rle.h
     dorado/utils/ssize.h
     dorado/utils/span.h
@@ -380,15 +371,12 @@ set_target_properties(dorado_lib
 
 target_include_directories(dorado_lib
     PUBLIC
-        ${CMAKE_CURRENT_BINARY_DIR}/dorado_generated
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
 )
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/argparse
-        ${DORADO_3RD_PARTY_SOURCE}/toml11
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
@@ -414,8 +402,11 @@ target_link_libraries(dorado_lib
         edlib
         dorado_basecall
         dorado_modbase
+        dorado_version
+        dorado_secondary
     PRIVATE
         minimap2
+        toml11::toml11
 )
 
 if(NOT WIN32)
@@ -432,7 +423,6 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/duplex.cpp
         dorado/cli/trim.cpp
         dorado/cli/basecaller.cpp
-        dorado/cli/benchmark.cpp
         dorado/cli/download.cpp
         dorado/cli/summary.cpp
         dorado/cli/correct.cpp
@@ -471,11 +461,8 @@ if(NOT DORADO_DISABLE_DORADO)
     install(TARGETS dorado RUNTIME)
 endif()
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    add_subdirectory(dorado/data_loader)
-    add_subdirectory(dorado/file_info)
-endif()
-
+add_subdirectory(dorado/data_loader)
+add_subdirectory(dorado/file_info)
 add_subdirectory(tests)
 
 include(cmake/InstallRedistLibs.cmake)
@@ -487,7 +474,7 @@ endif()
 if (GENERATE_TEST_COVERAGE)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
         include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_file_info)
+        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_secondary dorado_file_info)
             append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
         endforeach()
         setup_target_for_coverage_gcovr_html(

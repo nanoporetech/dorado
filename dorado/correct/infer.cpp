@@ -12,7 +12,6 @@
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
-#include <toml/value.hpp>
 #include <torch/types.h>
 
 namespace dorado::correction {

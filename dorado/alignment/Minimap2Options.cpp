@@ -13,7 +13,7 @@ Minimap2MappingOptions::Minimap2MappingOptions() {
     mapping_options = std::make_shared<Minimap2MapOptHolder>();
 }
 
-auto comparable_index_options(const Minimap2IndexOptions& options) {
+static auto comparable_index_options(const Minimap2IndexOptions& options) {
     const auto& mm_opts = options.index_options->get();
     // Include the --junc_bed in the comparison as this will be applied to the
     // index once it is loaded. So different --junc_bed could mean two
@@ -38,7 +38,7 @@ bool operator==(const Minimap2IndexOptions& left, const Minimap2IndexOptions& ri
 
 bool operator!=(const Minimap2IndexOptions& l, const Minimap2IndexOptions& r) { return !(l == r); }
 
-auto comparable_mapping_options(const Minimap2MappingOptions& options) {
+static auto comparable_mapping_options(const Minimap2MappingOptions& options) {
     const auto& o = options.mapping_options->get();
     // exclude mid_occ from the comparison as this is set with info from the index
     // after it has been loaded, and we are interested in being able to compare mapping
@@ -84,6 +84,8 @@ bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
 }
 
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }
+
+Minimap2Options create_options(const std::string& opts) { return mm2::parse_options(opts); }
 
 Minimap2Options create_dflt_options() { return mm2::parse_options(""); }
 

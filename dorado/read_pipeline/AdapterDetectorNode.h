@@ -28,6 +28,7 @@ public:
 
 private:
     std::atomic<int> m_num_records{0};
+    std::atomic<int> m_num_untrimmed_short_reads{0};
     demux::AdapterDetectorSelector m_detector_selector{};
 
     void input_thread_fn();

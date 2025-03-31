@@ -1,6 +1,6 @@
 #include "CudaCaller.h"
 
-#include "CudaChunkBenchmarks.h"
+#include "benchmarks/CudaChunkBenchmarks.h"
 #include "crf_utils.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
@@ -25,7 +25,61 @@ using namespace std::chrono_literals;
 
 namespace dorado::basecall {
 
-static constexpr float GB = 1.0e9f;
+namespace {
+
+constexpr float GB = 1.0e9f;
+
+void emit_benchmark_file(const std::string &gpu_name,
+                         int compute_major,
+                         const std::string &model,
+                         const std::vector<std::pair<float, int>> &times_and_batch_sizes,
+                         const std::vector<std::pair<float, int>> &all_times_and_batch_sizes) {
+    // Prevent multiple devices outputting at once.
+    static std::mutex batch_output_mutex;
+    std::lock_guard<std::mutex> batch_output_lock(batch_output_mutex);
+
+    std::string gpu_cuda_variant_name = gpu_name;
+    // Hopper has specific optimizations that are only available if we are building with cuda12
+    if (compute_major == 9 || compute_major == 10) {
+        gpu_cuda_variant_name.append("_cuda");
+        gpu_cuda_variant_name.append(std::to_string(CUDA_VERSION / 1000));
+    }
+
+    std::string cpp_filename = std::string("chunk_benchmarks__")
+                                       .append(gpu_cuda_variant_name)
+                                       .append("__")
+                                       .append(model)
+                                       .append(".txt");
+    std::ofstream cpp_bench_file(cpp_filename);
+    assert(cpp_bench_file);
+    // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
+    cpp_bench_file << "    chunk_benchmarks[{\"" << gpu_name << "\", \"" << model << "\"}] = {\n";
+    for (const auto &[batchsize, time] : times_and_batch_sizes) {
+        cpp_bench_file << "        { " << time << ", " << batchsize << "f },\n";
+    }
+    cpp_bench_file << "    };\n";
+
+    // Report out the batch sizes as a CSV file, for visualisation
+    // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
+    std::string csv_filename = std::string("chunk_benchmarks__")
+                                       .append(gpu_cuda_variant_name)
+                                       .append("__")
+                                       .append(model)
+                                       .append(".csv");
+    std::ofstream csv_bench_file(csv_filename);
+    assert(csv_bench_file);
+    csv_bench_file << "batch_size,time_per_chunk\n";
+    for (const auto &[batchsize, time] : all_times_and_batch_sizes) {
+        csv_bench_file << time << "," << batchsize << "\n";
+    }
+}
+
+c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
+    c10::cuda::CUDAGuard device_guard(device);
+    return c10::cuda::getStreamFromPool(false, device.index());
+}
+
+}  // namespace
 
 // If 5 minutes has passed since the first chunk was added to a batch, we will
 // dispatch the batch even if it is not full. This is to prevent issues with
@@ -62,7 +116,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
-          m_stream(c10::cuda::getStreamFromPool(false, m_options.device().index())) {
+          m_stream(get_stream_for_device(m_options.device())) {
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
@@ -154,7 +208,7 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
     int64_t T_in = m_batch_dims[batch_dims_idx].T_in;
     int64_t T_out = m_batch_dims[batch_dims_idx].T_out;
     int64_t C_in = m_num_input_features;
-#ifdef DORADO_TX2
+#if DORADO_TX2
     // The libtorch version on TX2 doesn't support `Tensor::view()` with a dtype of a different
     // size, so we use separate tensors here.
     auto input = torch::empty({N, C_in, T_in}, opts.dtype(m_options.dtype()));
@@ -240,7 +294,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     // First set of batch dimensions.
     std::set<int> T_outs({calculate_T_out(requested_chunk_size)});
-#ifdef DORADO_TX2
+#if DORADO_TX2
     requested_batch_size = (requested_batch_size == 0) ? 256 : requested_batch_size;
     requested_batch_size = std::min(256, utils::pad_to(requested_batch_size, batch_granularity));
     int T_out = *(T_outs.begin());
@@ -362,13 +416,16 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     std::vector<std::pair<float, int>> all_times_and_batch_sizes;
     times_and_batch_sizes.reserve(max_batch_size / batch_granularity);
 
+    const std::string model_name = m_config.model_path.filename().string();
+
     // See if we can find cached values for the chunk timings for this run condition
-    const auto &chunk_benchmarks = CudaChunkBenchmarks::instance().get_chunk_timings(
-            prop->name, m_config.model_path.string());
-    if (!chunk_benchmarks && !params.run_batchsize_benchmarks) {
-        spdlog::info(std::string("Calculating optimized batch size for GPU \"") + prop->name +
-                     "\" and model " + m_config.model_path.string() +
-                     ". Full benchmarking will run for this device, which may take some time.");
+    const auto chunk_benchmarks =
+            CudaChunkBenchmarks::instance().get_chunk_timings(prop->name, model_name);
+    if (!chunk_benchmarks || params.run_batchsize_benchmarks) {
+        spdlog::info(
+                "Calculating optimized batch size for GPU \"{}\" and model {}. Full benchmarking "
+                "will run for this device, which may take some time.",
+                prop->name, model_name);
     }
 
     for (int batch_size = batch_granularity; batch_size <= max_batch_size;
@@ -419,47 +476,21 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     }
 
     if (params.emit_batchsize_benchmarks) {
-        static std::mutex batch_output_mutex;
-        std::unique_lock<std::mutex> batch_output_lock(
-                batch_output_mutex);  // Prevent multiple devices outputting at once.
-
-        // Report out the batch sizes as a C++ map entry, for inclusion in dorado code
-        std::string cpp_autobatch_output = std::string("    chunk_benchmarks[{\"") + prop->name +
-                                           "\", \"" + m_config.model_path.string() + "\"}] = {\n";
-        for (const auto &batch_time : times_and_batch_sizes) {
-            cpp_autobatch_output += "        { " + std::to_string(batch_time.second) + ", " +
-                                    std::to_string(batch_time.first) + "f },\n";
-        }
-        cpp_autobatch_output += "    };\n";
-        std::string cpp_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + ".txt";
-        std::ofstream cpp_bench_file(cpp_filename);
-        cpp_bench_file << cpp_autobatch_output;
-
-        // Report out the batch sizes as a CSV file, for visualisation
-        std::string csv_autobatch_output = "batch_size,time_per_chunk\n";
-        // For CSV output we output all timings, including ones which were worse than smaller batch sizes.
-        for (const auto &batch_time : all_times_and_batch_sizes) {
-            csv_autobatch_output += std::to_string(batch_time.second) + "," +
-                                    std::to_string(batch_time.first) + "\n";
-        }
-        std::string csv_filename = std::string("chunk_benchmarks__") + prop->name + "__" +
-                                   m_config.model_path.string() + ".csv";
-        std::ofstream csv_bench_file(csv_filename);
-        csv_bench_file << csv_autobatch_output;
+        emit_benchmark_file(prop->name, prop->major, model_name, times_and_batch_sizes,
+                            all_times_and_batch_sizes);
     }
 
     if (!chunk_benchmarks) {
         // If we have just generated benchmarks that didn't previously exist, add them to the in-memory cache. This
         // will be of benefit to basecall servers which won't have to keep re-generating the benchmarks each time a
         // runner is created.
-        CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, m_config.model_path.string(),
+        CudaChunkBenchmarks::instance().add_chunk_timings(prop->name, model_name,
                                                           times_and_batch_sizes);
 
         spdlog::debug(
                 "Adding chunk timings to internal cache for GPU {}, model {} ({} "
                 "entries)",
-                prop->name, m_config.model_path.string(), times_and_batch_sizes.size());
+                prop->name, model_name, times_and_batch_sizes.size());
     }
 
     // Find the first batch size that was under the threshold.
@@ -529,7 +560,7 @@ void CudaCaller::cuda_thread_fn() {
         auto device_stats =
                 c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
-        auto print_stat = [](c10::cuda::CUDACachingAllocator::StatArray &st) {
+        auto print_stat = [](const auto &st) {
             return "aggregate current " + std::to_string(st[0].current);
         };
         spdlog::trace(

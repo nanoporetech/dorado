@@ -1,10 +1,11 @@
 #include "polish_impl.h"
 
 #include "hts_io/FastxRandomReader.h"
-#include "polish/interval.h"
-#include "polish/polish_utils.h"
-#include "polish/region.h"
+#include "secondary/batching.h"
+#include "secondary/interval.h"
+#include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
@@ -13,6 +14,7 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <memory>
 
 #if DORADO_CUDA_BUILD
@@ -25,6 +27,8 @@
 // #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
 
 namespace dorado::polisher {
+
+namespace {
 
 std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     std::vector<DeviceInfo> devices;
@@ -54,11 +58,13 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
     return devices;
 }
 
+}  // namespace
+
 PolisherResources create_resources(const ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
-                                   const int32_t num_inference_cpu_threads,
+                                   const int32_t num_inference_threads,
                                    const bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
@@ -77,42 +83,62 @@ PolisherResources create_resources(const ModelConfig& model_config,
     spdlog::debug("[create_resources] Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<ModelTorchBase>> ret;
+        std::vector<c10::optional<c10::Stream>> ret_streams;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];
 
-            spdlog::debug("[create_resources] Creating a model from the config.");
-            auto model = model_factory(model_config);
+            {
+                c10::optional<c10::Stream> stream;
+#if DORADO_CUDA_BUILD
+                if (device_info.device.is_cuda()) {
+                    c10::cuda::CUDAGuard device_guard(device_info.device);
+                    stream = c10::cuda::getStreamFromPool(false, device_info.device.index());
+                }
+#endif
 
-            spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
-                          device_info.name);
-            model->to_device(device_info.device);
+                spdlog::debug("[create_resources] Creating a model from the config.");
+                auto model = model_factory(model_config);
 
-            // Half-precision if needed.
-            if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-                spdlog::debug("[create_resources] Converting the model to half.");
-                model->to_half();
-            } else {
-                spdlog::debug("[create_resources] Using full precision.");
+                spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
+                              device_info.name);
+                model->to_device(device_info.device);
+
+                // Half-precision if needed.
+                if ((device_info.type == DeviceType::CUDA) && !full_precision) {
+                    spdlog::debug("[create_resources] Converting the model to half.");
+                    model->to_half();
+                } else {
+                    spdlog::debug("[create_resources] Using full precision.");
+                }
+
+                spdlog::debug("[create_resources] Switching model to eval mode.");
+                model->set_eval();
+
+                ret.emplace_back(std::move(model));
+                ret_streams.emplace_back(std::move(stream));
+
+                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
             }
 
-            spdlog::debug("[create_resources] Switching model to eval mode.");
-            model->set_eval();
-
-            ret.emplace_back(std::move(model));
-
-            spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
-        }
-        // In case the device is set to CPU, we add up to inference_threads models.
-        if ((std::size(resources.devices) == 1) &&
-            (resources.devices.front().type == DeviceType::CPU)) {
-            for (int32_t i = 1; i < num_inference_cpu_threads; ++i) {
-                ret.emplace_back(ret.front());
+            const int32_t last_model = static_cast<int32_t>(std::size(ret)) - 1;
+            for (int32_t i = 1; i < num_inference_threads; ++i) {
+                ret.emplace_back(ret[last_model]);
+                c10::optional<c10::Stream> stream;
+#if DORADO_CUDA_BUILD
+                if (device_info.device.is_cuda()) {
+                    c10::cuda::CUDAGuard device_guard(device_info.device);
+                    stream = c10::cuda::getStreamFromPool(false, device_info.device.index());
+                }
+#endif
+                ret_streams.emplace_back(std::move(stream));
+                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
             }
         }
-        return ret;
+
+        return std::make_pair(std::move(ret), std::move(ret_streams));
     };
-    resources.models = create_models();
+    std::tie(resources.models, resources.streams) = create_models();
 
     spdlog::info("Creating the encoder.");
     resources.encoder = encoder_factory(model_config, read_group, tag_name, tag_value,
@@ -124,100 +150,10 @@ PolisherResources create_resources(const ModelConfig& model_config,
     // Open the BAM file for each thread.
     spdlog::info("Creating {} BAM handles.", num_bam_threads);
     for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(BamFile(in_aln_bam_fn));
+        resources.bam_handles.emplace_back(secondary::BamFile(in_aln_bam_fn));
     }
 
     return resources;
-}
-
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
-    BamInfo ret;
-
-    BamFile bam(in_aln_bam_fn);
-
-    const std::vector<HeaderLineData> header = bam.parse_header();
-
-    // Get info from headers: program and the read groups.
-    for (const auto& line : header) {
-        // Convert all tags into a lookup.
-        const std::unordered_map<std::string, std::string> tags = [&]() {
-            std::unordered_map<std::string, std::string> local_ret;
-            for (const auto& [key, value] : line.tags) {
-                local_ret[key] = value;
-            }
-            return local_ret;
-        }();
-
-        if (line.header_type == "@PG") {
-            // Example PG line:
-            //      @PG	ID:aligner	PP:samtools.2	PN:dorado	VN:0.0.0+2852e11d	DS:2.27-r1193
-
-            const auto& it_pn = tags.find("PN");
-            const auto& it_id = tags.find("ID");
-            if ((it_pn != std::end(tags)) && it_id != std::end(tags)) {
-                // Convert the program name to lowercase just in case.
-                std::string pn = it_pn->second;
-                std::transform(std::begin(pn), std::end(pn), std::begin(pn),
-                               [](unsigned char c) { return std::tolower(c); });
-
-                // Convert the program ID to lowercase just in case.
-                std::string id = it_id->second;
-                std::transform(std::begin(id), std::end(id), std::begin(id),
-                               [](unsigned char c) { return std::tolower(c); });
-
-                if ((pn == "dorado") && utils::starts_with(id, "aligner")) {
-                    // Multiple tools can be run on a BAM, and the ID field needs to be unique by spec.
-                    // Example possibilites: aligner, aligner.1, samtools.1, samtools.2, etc.
-                    ret.uses_dorado_aligner = true;
-                }
-            }
-        } else if (line.header_type == "@RG") {
-            // Example RG line:
-            //      @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	DT:2022-10-18T10:38:07.247961+00:00	DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 modbase_models=dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v2,dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v2	LB:PCR_zymo	PL:ONT	PM:4A	PU:PAM93185	al:PCR_zymo
-
-            // Parse the read group ID.
-            const auto& it_id = tags.find("ID");
-            const std::string id = (it_id != std::end(tags)) ? it_id->second : "";
-
-            // Parse the basecaller model.
-            const auto& it_ds = tags.find("DS");
-            std::string basecaller_model;
-            if (it_ds != std::end(tags)) {
-                const std::vector<std::string> tokens = utils::split(it_ds->second, ' ');
-                constexpr std::string_view TOKEN_NAME{"basecall_model="};
-                for (const auto& token : tokens) {
-                    if (!utils::starts_with(token, TOKEN_NAME)) {
-                        continue;
-                    }
-                    basecaller_model = token.substr(std::size(TOKEN_NAME));
-                    break;
-                }
-            }
-
-            if (std::empty(id)) {
-                continue;
-            }
-            if (!std::empty(cli_read_group) && (id != cli_read_group)) {
-                continue;
-            }
-            if (std::empty(basecaller_model)) {
-                continue;
-            }
-
-            ret.read_groups.emplace(id);
-            ret.basecaller_models.emplace(basecaller_model);
-        }
-    }
-
-    // Check for the dwells ("mv") tag. Only parse one record.
-    {
-        const auto record = bam.get_next();
-        if ((record != nullptr) && (bam_aux_get(record.get(), "mv") != nullptr)) {
-            ret.has_dwells = true;
-        }
-    }
-
-    return ret;
 }
 
 void remove_deletions(ConsensusResult& cons) {
@@ -329,6 +265,8 @@ std::vector<ConsensusResult> stitch_sequence(
 
     return ret;
 }
+
+namespace {
 
 /**
  * \brief If the input sample coordinates (positions_major) have gaps,
@@ -469,11 +407,13 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
     return results;
 }
 
+}  // namespace
+
 std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
         std::vector<Sample>& window_samples,
         const EncoderBase& encoder,
         const Span<const Window> bam_regions,
-        const Span<const Interval> bam_region_intervals,
+        const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -493,12 +433,16 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     };
 #endif
 
+    utils::ScopedProfileRange spr1("merge_and_split_bam_regions_in_parallel", 3);
+
     const auto worker = [&](const int32_t start, const int32_t end,
                             std::vector<std::vector<Sample>>& results_samples,
                             std::vector<std::vector<TrimInfo>>& results_trims) {
+        utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
+
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
             // Get the interval of samples for this BAM region and subtract the offset due to batching.
-            Interval interval = bam_region_intervals[bam_region_id];
+            secondary::Interval interval = bam_region_intervals[bam_region_id];
             interval.start -= window_interval_offset;
             interval.end -= window_interval_offset;
 
@@ -550,7 +494,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             // Compute sample trimming coordinates.
             const Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
-                    local_samples, std::optional<RegionInt>(
+                    local_samples, std::optional<secondary::RegionInt>(
                                            {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
             results_samples[bam_region_id] = std::move(local_samples);
         }
@@ -561,8 +505,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM regions in parallel.
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+    const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
+            static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
 
     spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
                   std::size(bam_region_intervals), std::size(thread_chunks));
@@ -609,14 +553,18 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 }
 
 std::vector<Sample> encode_windows_in_parallel(
-        std::vector<BamFile>& bam_handles,
+        std::vector<secondary::BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
         const int32_t num_threads) {
+    utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
+
     // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
                             std::vector<Sample>& results) {
+        utils::ScopedProfileRange spr2("encode_windows_in_parallel-worker", 4);
+
         for (int32_t i = start; i < end; ++i) {
             const auto& window = windows[i];
             const std::string& name = draft_lens[window.seq_id].first;
@@ -632,9 +580,9 @@ std::vector<Sample> encode_windows_in_parallel(
         }
     };
 
-    const std::vector<Interval> thread_chunks =
-            compute_partitions(static_cast<int32_t>(std::size(windows)),
-                               std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
+    const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
+            static_cast<int32_t>(std::size(windows)),
+            std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
 
     spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
                   std::size(thread_chunks));
@@ -665,10 +613,12 @@ std::vector<Sample> encode_windows_in_parallel(
 }
 
 std::vector<Window> create_windows_from_regions(
-        const std::vector<Region>& regions,
+        const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap) {
+    utils::ScopedProfileRange spr1("create_windows_from_regions", 2);
+
     std::vector<Window> windows;
 
     for (auto region : regions) {
@@ -715,31 +665,34 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data) {
+    utils::ScopedProfileRange spr1("sample_producer", 2);
+
     spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
     std::vector<Window> windows;
-    std::vector<Interval> bam_region_intervals;
+    std::vector<secondary::Interval> bam_region_intervals;
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const Window& bw = bam_regions[i];
         std::vector<Window> new_windows =
                 create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
         if (std::empty(new_windows)) {
-            bam_region_intervals.emplace_back(Interval{0, 0});
+            bam_region_intervals.emplace_back(secondary::Interval{0, 0});
             continue;
         }
         const int32_t num_windows = static_cast<int32_t>(std::size(windows));
         const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
-        bam_region_intervals.emplace_back(Interval{num_windows, num_windows + num_new_windows});
+        bam_region_intervals.emplace_back(
+                secondary::Interval{num_windows, num_windows + num_new_windows});
         windows.reserve(std::size(windows) + std::size(new_windows));
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
-    const std::vector<Interval> bam_region_batches =
-            create_batches(bam_region_intervals, num_threads,
-                           [](const Interval& val) { return val.end - val.start; });
+    const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
+            bam_region_intervals, num_threads,
+            [](const secondary::Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
 
@@ -767,8 +720,8 @@ void sample_producer(PolisherResources& resources,
         auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
                 region_samples, *resources.encoder,
                 Span<const Window>(std::data(bam_regions) + region_id_start, num_regions),
-                Span<const Interval>(std::data(bam_region_intervals) + region_id_start,
-                                     num_regions),
+                Span<const secondary::Interval>(std::data(bam_region_intervals) + region_id_start,
+                                                num_regions),
                 num_threads, window_len, window_overlap, window_id_start);
 
         if (std::size(samples) != std::size(trims)) {
@@ -823,64 +776,96 @@ void sample_producer(PolisherResources& resources,
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               const std::vector<c10::optional<c10::Stream>>& streams,
                                const EncoderBase& encoder) {
+    utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
+
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
     auto batch_infer = [&encoder](ModelTorchBase& model, const InferenceData& batch,
                                   const int32_t tid) {
-        utils::ScopedProfileRange infer("infer", 1);
+        utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         timer::TimerHighRes timer_collate;
-        std::vector<torch::Tensor> batch_features;
-        batch_features.reserve(std::size(batch.samples));
-        for (const auto& sample : batch.samples) {
-            batch_features.emplace_back(sample.features);
+        torch::Tensor batch_features_tensor;
+        int64_t time_collate = 0;
+        {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-collate", 4);
+            std::vector<torch::Tensor> batch_features;
+            batch_features.reserve(std::size(batch.samples));
+            for (const auto& sample : batch.samples) {
+                batch_features.emplace_back(sample.features);
+            }
+            batch_features_tensor = encoder.collate(std::move(batch_features));
+            time_collate = timer_collate.GetElapsedMilliseconds();
         }
-        torch::Tensor batch_features_tensor = encoder.collate(std::move(batch_features));
-        const int64_t time_collate = timer_collate.GetElapsedMilliseconds();
 
         // Debug output.
         {
-            std::ostringstream oss;
-            print_tensor_shape(oss, batch_features_tensor);
             spdlog::trace(
-                    "[consumer {}] About to call forward(): batch_features_tensor.size() = {}, "
+                    "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, oss.str(),
+                    tid, utils::tensor_shape_as_string(batch_features_tensor),
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
 
         // Inference.
-        timer::TimerHighRes timer_forward;
         torch::Tensor output;
-        try {
-            output = model.predict_on_batch(std::move(batch_features_tensor));
-        } catch (std::exception& e) {
-            spdlog::error("ERROR! Exception caught: {}", e.what());
-            throw;
+        timer::TimerHighRes timer_forward;
+
+        {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-infer", 4);
+
+            std::unique_lock<std::mutex> lock;
+
+#if DORADO_CUDA_BUILD
+            if (model.get_device() == torch::kCUDA) {
+                lock = dorado::utils::acquire_gpu_lock(model.get_device().index(), true);
+            }
+#endif
+
+            try {
+                output = model.predict_on_batch(std::move(batch_features_tensor));
+            } catch (std::exception& e) {
+                spdlog::error("ERROR! Exception caught: {}", e.what());
+                throw;
+            }
         }
-        const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
 
-        const int64_t time_total = timer_total.GetElapsedMilliseconds();
+        // Debug output.
+        {
+            const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
+            const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-        spdlog::trace(
-                "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} ms, "
-                "total = {}",
-                tid, time_collate, time_forward, time_total);
+            spdlog::trace(
+                    "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} "
+                    "ms, "
+                    "total = {}",
+                    tid, time_collate, time_forward, time_total);
+        }
 
         return output;
     };
 
-    const auto worker = [&](const int32_t tid) {
+    const auto worker = [&](const int32_t tid, ModelTorchBase& model,
+                            [[maybe_unused]] const c10::optional<c10::Stream>& stream) {
+        utils::ScopedProfileRange spr2("infer_samples_in_parallel-worker", 3);
+
+#if DORADO_CUDA_BUILD
+        c10::cuda::OptionalCUDAStreamGuard guard(stream);
+#endif
+
         at::InferenceMode infer_guard;
 
         while (true) {
+            utils::ScopedProfileRange spr3("infer_samples_in_parallel-worker-while", 4);
+
             spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
                           std::size(batch_queue));
 
@@ -899,7 +884,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 
             // Inference.
-            torch::Tensor logits = batch_infer(*models[tid], item, tid);
+            torch::Tensor logits = batch_infer(model, item, tid);
 
             // One out_item contains samples for one inference batch.
             // No guarantees on any sort of logical ordering of the samples.
@@ -911,8 +896,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             spdlog::trace(
                     "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
                     "out_item.samples.size() = {}, decode queue size: {}",
-                    tid, tensor_shape_as_string(out_item.logits), std::size(out_item.samples),
-                    std::size(decode_queue));
+                    tid, utils::tensor_shape_as_string(out_item.logits),
+                    std::size(out_item.samples), std::size(decode_queue));
             decode_queue.try_push(std::move(out_item));
         }
     };
@@ -924,7 +909,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid));
+        futures.emplace_back(pool.push(worker, tid, std::ref(*models[tid]), streams[tid]));
     }
 
     try {
@@ -948,11 +933,13 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data) {
+    utils::ScopedProfileRange spr1("decode_samples_in_parallel", 2);
+
     auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
                                                              const int32_t tid) {
-        utils::ScopedProfileRange scope_decode("decode", 1);
-        timer::TimerHighRes timer_total;
+        utils::ScopedProfileRange spr2("decode_samples_in_parallel-batch_decode", 3);
 
+        timer::TimerHighRes timer_total;
         timer::TimerHighRes timer_decode;
 
         // Decode output to bases and qualities.
@@ -984,7 +971,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                 continue;
             }
 
-            std::vector<Interval> good_intervals{Interval{0, static_cast<int32_t>(num_positions)}};
+            std::vector<secondary::Interval> good_intervals{
+                    secondary::Interval{0, static_cast<int32_t>(num_positions)}};
 
             // Break on low coverage.
             if (min_depth > 0) {
@@ -992,7 +980,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 
                 const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
                                           static_cast<size_t>(sample.depth.size(0)));
-                Interval interval{0, 0};
+                secondary::Interval interval{0, 0};
                 for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
                     if (depth[ii] < min_depth) {
                         if (interval.length() > 0) {
@@ -1060,9 +1048,12 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 
     const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results,
                             std::vector<VariantCallingSample>& thread_vc_data) {
+        utils::ScopedProfileRange spr2("decode_samples_in_parallel-worker", 3);
         at::InferenceMode infer_guard;
 
         while (true) {
+            utils::ScopedProfileRange spr3("decode_samples_in_parallel-worker-while", 4);
+
             DecodeData item;
             const auto pop_status = decode_queue.try_pop(item);
 
@@ -1078,7 +1069,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
             spdlog::trace(
                     "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                     "tensor_batch_size = {}, queue size: {}",
-                    tid, tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
+                    tid, utils::tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
                     tensor_batch_size, std::size(decode_queue));
 
             // This should handle the timeout case too.
@@ -1166,6 +1157,55 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
     }
 
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
+}
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const secondary::Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader) {
+    utils::ScopedProfileRange spr1("construct_consensus_seqs", 3);
+
+    // Group samples by sequence ID.
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
+    for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
+        const ConsensusResult& r = all_results_cons[i];
+        const int32_t local_id = r.draft_id - region_batch.start;
+        // Skip filtered samples.
+        if (r.draft_id < 0) {
+            continue;
+        }
+        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+            (local_id >= dorado::ssize(groups))) {
+            spdlog::error(
+                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                    "groups.size = {}",
+                    r.draft_id, std::size(draft_lens), std::size(groups));
+            continue;
+        }
+        groups[local_id].emplace_back(r.draft_start, i);
+    }
+
+    std::vector<std::vector<ConsensusResult>> ret;
+
+    // Consensus sequence - stitch the windows and write output.
+    for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
+        const int64_t seq_id = group_id + region_batch.start;
+
+        auto& group = groups[group_id];
+        std::sort(std::begin(group), std::end(group));  // Sort by start pos.
+
+        const std::string& header = draft_lens[seq_id].first;
+
+        std::vector<ConsensusResult> consensus = stitch_sequence(
+                draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
+
+        ret.emplace_back(std::move(consensus));
+    }
+
+    return ret;
 }
 
 }  // namespace dorado::polisher

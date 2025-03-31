@@ -2,6 +2,7 @@
 
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"
+#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
@@ -26,9 +27,9 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
-ProgressTracker::ProgressTracker(int total_reads, bool duplex, float post_processing_percentage)
+ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
-          m_duplex(duplex),
+          m_mode(mode),
           m_post_processing_percentage(post_processing_percentage) {
     m_initialization_time = std::chrono::system_clock::now();
 }
@@ -53,12 +54,14 @@ void ProgressTracker::summarize() const {
 
     spdlog::info("> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
-        spdlog::info("> Simplex reads basecalled: {}", m_num_simplex_reads_written);
+        auto ctx = m_mode == Mode::TRIM || m_mode == Mode::ALIGN ? "Reads written"
+                                                                 : "Simplex reads basecalled";
+        spdlog::info("> {}: {}", ctx, m_num_simplex_reads_written);
     }
     if (m_num_simplex_reads_filtered > 0) {
         spdlog::info("> Simplex reads filtered: {}", m_num_simplex_reads_filtered);
     }
-    if (m_duplex) {
+    if (m_mode == Mode::DUPLEX) {
         spdlog::info("> Duplex reads basecalled: {}", m_num_duplex_reads_written);
         if (m_num_duplex_reads_filtered > 0) {
             spdlog::info("> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
@@ -72,7 +75,7 @@ void ProgressTracker::summarize() const {
     }
     if (m_num_bases_processed > 0) {
         std::ostringstream samples_sec;
-        if (m_duplex) {
+        if (m_mode == Mode::DUPLEX) {
             samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
             spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
@@ -98,12 +101,16 @@ void ProgressTracker::summarize() const {
             for (const auto& [bc_name, bc_count] : m_barcode_count) {
                 spdlog::debug("{} : {}", bc_name, bc_count);
                 total += bc_count;
-                if (bc_name == "unclassified") {
+                if (bc_name == UNCLASSIFIED) {
                     unclassified += bc_count;
                 }
             }
             spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
         }
+    }
+
+    if (m_num_untrimmed_short_reads > 0) {
+        spdlog::debug("> Untrimmed short reads: {}", m_num_untrimmed_short_reads);
     }
 
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0) {
@@ -152,13 +159,16 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_bases_processed = m_num_simplex_bases_processed;
     m_num_samples_processed = int64_t(fetch_stat("BasecallerNode.samples_processed"));
     m_num_samples_incl_padding = int64_t(fetch_stat("BasecallerNode.samples_incl_padding"));
-    if (m_duplex) {
+    if (m_mode == Mode::DUPLEX) {
         m_num_duplex_bases_processed = int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
         m_num_bases_processed += m_num_duplex_bases_processed;
     }
     m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
+
+    // Adapter/primer trimming
+    m_num_untrimmed_short_reads = int(fetch_stat("AdapterDetectorNode.num_untrimmed_short_reads"));
 
     // Modbase
     m_num_mods_samples_processed = int64_t(fetch_stat("ModBaseChunkCallerNode.samples_processed"));

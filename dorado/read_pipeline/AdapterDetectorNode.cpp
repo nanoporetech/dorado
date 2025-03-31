@@ -98,20 +98,23 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         auto adapter_res = detector->find_adapters(seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
+    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(seq, kit_name);
+        primer_res = detector->find_primers(seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
+        bam_message.primer_classification =
+                detector->classify_primers(primer_res, primer_trim_interval, seq);
     }
-
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::warn(
+            spdlog::trace(
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     qname);
+            ++m_num_untrimmed_short_reads;
             return;
         }
         bam_message.adapter_trim_interval = trim_interval;
@@ -148,19 +151,23 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         auto adapter_res = detector->find_adapters(read.read_common.seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
+    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        auto primer_res = detector->find_primers(read.read_common.seq, kit_name);
+        primer_res = detector->find_primers(read.read_common.seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
+        read.read_common.primer_classification =
+                detector->classify_primers(primer_res, primer_trim_interval, read.read_common.seq);
     }
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
         std::pair<int, int> trim_interval = adapter_trim_interval;
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::warn(
+            spdlog::trace(
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     read.read_common.read_id);
+            ++m_num_untrimmed_short_reads;
             return;
         }
         read.read_common.adapter_trim_interval = trim_interval;
@@ -170,6 +177,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
 stats::NamedStats AdapterDetectorNode::sample_stats() const {
     auto stats = stats::from_obj(m_work_queue);
     stats["num_reads_processed"] = m_num_records.load();
+    stats["num_untrimmed_short_reads"] = m_num_untrimmed_short_reads.load();
     return stats;
 }
 

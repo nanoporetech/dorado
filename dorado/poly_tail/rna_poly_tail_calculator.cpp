@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 namespace {
@@ -23,8 +24,9 @@ namespace dorado::poly_tail {
 
 RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config,
                                              bool is_rna_adapter,
-                                             const std::vector<float>& calibration_coeffs)
-        : PolyTailCalculator(std::move(config), calibration_coeffs),
+                                             float speed_calibration,
+                                             float offset_calibration)
+        : PolyTailCalculator(std::move(config), speed_calibration, offset_calibration),
           m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
@@ -112,6 +114,14 @@ std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int
                 interval.second - interval.first};
     }
     return {interval.second - interval.first, interval.second - interval.first};
+}
+
+std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
+                                                        int signal_len,
+                                                        float samples_per_base,
+                                                        bool fwd) const {
+    assert(!fwd);  // RNA should always be treated as a reverse strand
+    return PolyTailCalculator::signal_range(signal_anchor, signal_len, samples_per_base, fwd);
 }
 
 }  // namespace dorado::poly_tail

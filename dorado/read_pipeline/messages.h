@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -39,6 +40,8 @@ class ClientInfo;
 
 class ReadCommon {
 public:
+    static constexpr int POLY_TAIL_NO_ANCHOR_FOUND = -1;
+    static constexpr int POLY_TAIL_NOT_ENABLED = -2;
     at::Tensor raw_data;  // Loaded from source file
 
     int model_stride{-1};  // The down sampling factor of the model
@@ -61,6 +64,7 @@ public:
     uint64_t start_time_ms;
 
     std::shared_ptr<BarcodeScoreResult> barcoding_result;
+    PrimerClassification primer_classification{};
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
@@ -79,7 +83,7 @@ public:
     float calculate_mean_qscore() const;
 
     std::vector<BamPtr> extract_sam_lines(bool emit_moves,
-                                          uint8_t modbase_threshold,
+                                          std::optional<uint8_t> modbase_threshold,
                                           bool is_duplex_parent) const;
 
     // Barcode.
@@ -112,7 +116,7 @@ public:
     models::RapidChemistry rapid_chemistry{models::RapidChemistry::UNKNOWN};
 
     // Track length of estimated polyA tail in bases.
-    int rna_poly_tail_length{-1};
+    int rna_poly_tail_length{POLY_TAIL_NOT_ENABLED};
     // Track position of end of RNA adapter in signal space. If the RNA adapter is
     // trimmed, this will be 0. Otherwise it will be the position in the signal
     // where the adapter ends.
@@ -132,7 +136,7 @@ public:
 private:
     void generate_duplex_read_tags(bam1_t*) const;
     void generate_read_tags(bam1_t* aln, bool emit_moves, bool is_duplex_parent) const;
-    void generate_modbase_tags(bam1_t* aln, uint8_t threshold) const;
+    void generate_modbase_tags(bam1_t* aln, std::optional<uint8_t> threshold) const;
     std::string generate_read_group() const;
 };
 
@@ -216,6 +220,7 @@ public:
     std::shared_ptr<ClientInfo> client_info;
     std::string sequencing_kit{};
     std::shared_ptr<BarcodeScoreResult> barcoding_result{};
+    PrimerClassification primer_classification{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
 };

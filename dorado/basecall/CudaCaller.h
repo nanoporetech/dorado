@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include "BasecallerParams.h"
-#include "CRFModelConfig.h"
+#include "ModelRunnerBase.h"
+#include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "utils/stats.h"
 
@@ -36,7 +36,7 @@ public:
     std::pair<at::Tensor, at::Tensor> create_input_output_tensor(size_t batch_dims_idx) const;
     size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
-    const CRFModelConfig &config() const { return m_config; }
+    const config::BasecallModelConfig &config() const { return m_config; }
     bool is_low_latency() const { return m_low_latency; }
     std::string get_name() const { return std::string("CudaCaller_") + m_device; }
     stats::NamedStats sample_stats() const;
@@ -45,7 +45,7 @@ public:
 private:
     struct NNTask;
 
-    static int get_batch_size_granularity(const CRFModelConfig &model_config) {
+    static int get_batch_size_granularity(const config::BasecallModelConfig &model_config) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return model_config.is_tx_model() ? 32 : 64;
     }
@@ -56,7 +56,7 @@ private:
     void start_threads();
     void cuda_thread_fn();
 
-    const CRFModelConfig m_config;
+    const config::BasecallModelConfig m_config;
     const std::string m_device;
     std::unique_ptr<decode::Decoder> m_decoder;
     decode::DecoderOptions m_decoder_options;

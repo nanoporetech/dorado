@@ -30,11 +30,6 @@ public:
         start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
     }
 
-    static void fix_misidentified_primers(const BarcodeScoreResult& bc_res,
-                                          std::pair<int, int>& primer_trim_interval,
-                                          int seqlen,
-                                          bool trim_primers);
-
 private:
     std::atomic<int> m_num_records{0};
     demux::BarcodeClassifierSelector m_barcoder_selector{};

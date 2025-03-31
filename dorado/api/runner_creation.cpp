@@ -1,9 +1,8 @@
 #include "runner_creation.h"
 
-#include "basecall/BasecallerParams.h"
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
-#include "modbase/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
@@ -30,9 +29,9 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     size_t num_devices = 1;
 
     if (params.device == "cpu") {
-#ifdef DORADO_TX2
+#if DORADO_TX2
         spdlog::warn("CPU basecalling is not supported on this platform. Results may be incorrect");
-#endif  // #ifdef DORADO_TX2
+#endif  // DORADO_TX2
 
         if (num_cpu_runners == 0) {
             num_cpu_runners = basecall::auto_calculate_num_runners(params.model_config,
@@ -121,7 +120,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
         return {};
     }
 
-    modbase::check_modbase_multi_model_compatibility(modbase_models);
+    config::check_modbase_multi_model_compatibility(modbase_models);
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> runners;

@@ -1,17 +1,16 @@
 #include "torch_utils/gpu_monitor.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
-#define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 #define DEFINE_TEST_FIXTURE_METHOD(name) \
-    TEST_CASE_METHOD(GpuMonitorTestFixture, CUT_TAG " " name, CUT_TAG)
+    CATCH_TEST_CASE_METHOD(GpuMonitorTestFixture, CUT_TAG " " name, CUT_TAG)
 
 namespace {
 
@@ -38,43 +37,43 @@ namespace dorado::utils::gpu_monitor::test {
 DEFINE_TEST("get_nvidia_driver_version has value if torch::hasCUDA") {
     auto driver_version = get_nvidia_driver_version();
     if (torch::hasCUDA()) {
-        REQUIRE(driver_version.has_value());
+        CATCH_REQUIRE(driver_version.has_value());
     }
 }
 
 DEFINE_TEST("get_nvidia_driver_version retruns valid version string") {
     auto driver_version = get_nvidia_driver_version();
     if (driver_version.has_value()) {
-        CHECK(!driver_version->empty());
+        CATCH_CHECK(!driver_version->empty());
         // Version string should be made up of digits and dots only.
         auto is_valid_char = [](char c) {
             return std::isdigit(static_cast<unsigned char>(c)) || c == '.';
         };
-        CHECK(std::all_of(driver_version->begin(), driver_version->end(), is_valid_char));
-        CHECK(std::count(driver_version->begin(), driver_version->end(), '.') <= 3);
+        CATCH_CHECK(std::all_of(driver_version->begin(), driver_version->end(), is_valid_char));
+        CATCH_CHECK(std::count(driver_version->begin(), driver_version->end(), '.') <= 3);
     }
 }
 
 DEFINE_TEST("get_nvidia_driver_version multiple calls return the same result") {
     auto driver_version_0 = get_nvidia_driver_version();
     auto driver_version_1 = get_nvidia_driver_version();
-    CHECK(driver_version_0.has_value() == driver_version_1.has_value());
+    CATCH_CHECK(driver_version_0.has_value() == driver_version_1.has_value());
     if (driver_version_0.has_value()) {
-        REQUIRE(*driver_version_0 == *driver_version_1);
+        CATCH_REQUIRE(*driver_version_0 == *driver_version_1);
     }
 }
 
 #if defined(__APPLE__)
 DEFINE_TEST("get_nvidia_driver_version does not have value on Apple") {
     auto driver_version = get_nvidia_driver_version();
-    CHECK(!driver_version.has_value());
+    CATCH_CHECK(!driver_version.has_value());
 }
 #endif  // __APPLE__
 
-#if defined(DORADO_TX2)
+#if DORADO_TX2
 DEFINE_TEST("get_nvidia_driver_version always has a value on Jetson") {
     auto driver_version = get_nvidia_driver_version();
-    CHECK(driver_version.has_value());
+    CATCH_CHECK(driver_version.has_value());
 }
 #endif  // DORADO_TX2
 
@@ -121,11 +120,11 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
     };
 
     for (const auto &test : tests) {
-        CAPTURE(test.test_name);
+        CATCH_CAPTURE(test.test_name);
         auto version = detail::parse_nvidia_version_line(test.line);
-        CHECK(version.has_value() == test.valid);
+        CATCH_CHECK(version.has_value() == test.valid);
         if (version.has_value() && test.valid) {
-            CHECK(version.value() == test.version);
+            CATCH_CHECK(version.value() == test.version);
         }
     }
 }
@@ -166,22 +165,22 @@ DEFINE_TEST("parse_nvidia_tegra_line parameterised test") {
     };
 
     for (const auto &test : tests) {
-        CAPTURE(test.test_name);
+        CATCH_CAPTURE(test.test_name);
         auto version = detail::parse_nvidia_tegra_line(test.line);
-        CHECK(version.has_value() == test.valid);
+        CATCH_CHECK(version.has_value() == test.valid);
         if (version.has_value() && test.valid) {
-            CHECK(version.value() == test.version);
+            CATCH_CHECK(version.value() == test.version);
         }
     }
 }
 
-DEFINE_TEST("get_device_count does not throw") { REQUIRE_NOTHROW(get_device_count()); }
+DEFINE_TEST("get_device_count does not throw") { CATCH_REQUIRE_NOTHROW(get_device_count()); }
 
 DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device does not throw") {
     if (!first_accessible_device) {
         return;
     }
-    CHECK_NOTHROW(get_device_status_info(*first_accessible_device));
+    CATCH_CHECK_NOTHROW(get_device_status_info(*first_accessible_device));
 }
 
 DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device has assigned value") {
@@ -189,7 +188,7 @@ DEFINE_TEST_FIXTURE_METHOD("get_device_status_info with valid device has assigne
         return;
     }
     auto info = get_device_status_info(*first_accessible_device);
-    CHECK(info.has_value());
+    CATCH_CHECK(info.has_value());
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -201,8 +200,8 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CHECK(info->device_index == *first_accessible_device);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CHECK(info->device_index == *first_accessible_device);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -214,10 +213,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->current_temperature_error);
-    REQUIRE(info->current_temperature.has_value());
-    CHECK(*info->current_temperature > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->current_temperature_error);
+    CATCH_REQUIRE(info->current_temperature.has_value());
+    CATCH_CHECK(*info->current_temperature > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -229,10 +228,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->gpu_shutdown_temperature_error);
-    REQUIRE(info->gpu_shutdown_temperature.has_value());
-    CHECK(*info->gpu_shutdown_temperature > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->gpu_shutdown_temperature_error);
+    CATCH_REQUIRE(info->gpu_shutdown_temperature.has_value());
+    CATCH_CHECK(*info->gpu_shutdown_temperature > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -244,10 +243,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->gpu_slowdown_temperature_error);
-    REQUIRE(info->gpu_slowdown_temperature.has_value());
-    CHECK(*info->gpu_slowdown_temperature > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->gpu_slowdown_temperature_error);
+    CATCH_REQUIRE(info->gpu_slowdown_temperature.has_value());
+    CATCH_CHECK(*info->gpu_slowdown_temperature > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -260,10 +259,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->gpu_max_operating_temperature_error);
-    REQUIRE(info->gpu_max_operating_temperature.has_value());
-    CHECK(*info->gpu_max_operating_temperature > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->gpu_max_operating_temperature_error);
+    CATCH_REQUIRE(info->gpu_max_operating_temperature.has_value());
+    CATCH_CHECK(*info->gpu_max_operating_temperature > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -275,10 +274,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->current_power_usage_error);
-    REQUIRE(info->current_power_usage.has_value());
-    CHECK(*info->current_power_usage > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->current_power_usage_error);
+    CATCH_REQUIRE(info->current_power_usage.has_value());
+    CATCH_CHECK(*info->current_power_usage > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -290,10 +289,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->default_power_cap_error);
-    REQUIRE(info->default_power_cap.has_value());
-    CHECK(*info->default_power_cap > 0);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->default_power_cap_error);
+    CATCH_REQUIRE(info->default_power_cap.has_value());
+    CATCH_CHECK(*info->default_power_cap > 0);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -306,10 +305,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->percentage_utilization_error);
-    REQUIRE(info->percentage_utilization_gpu.has_value());
-    CHECK(*info->percentage_utilization_gpu <= 100);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->percentage_utilization_error);
+    CATCH_REQUIRE(info->percentage_utilization_gpu.has_value());
+    CATCH_CHECK(*info->percentage_utilization_gpu <= 100);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -322,10 +321,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->percentage_utilization_error);
-    REQUIRE(info->percentage_utilization_memory.has_value());
-    CHECK(*info->percentage_utilization_memory <= 100);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->percentage_utilization_error);
+    CATCH_REQUIRE(info->percentage_utilization_memory.has_value());
+    CATCH_CHECK(*info->percentage_utilization_memory <= 100);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -338,10 +337,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->current_performance_state_error);
-    REQUIRE(info->current_performance_state.has_value());
-    CHECK(*info->current_performance_state <= 32);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->current_performance_state_error);
+    CATCH_REQUIRE(info->current_performance_state.has_value());
+    CATCH_CHECK(*info->current_performance_state <= 32);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -354,10 +353,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->current_throttling_reason_error);
-    REQUIRE(info->current_throttling_reason.has_value());
-    CHECK(*info->current_throttling_reason <= 0x1000ULL);
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->current_throttling_reason_error);
+    CATCH_REQUIRE(info->current_throttling_reason.has_value());
+    CATCH_CHECK(*info->current_throttling_reason <= 0x1000ULL);
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -369,10 +368,10 @@ DEFINE_TEST_FIXTURE_METHOD(
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.has_value());
-    CAPTURE(info->device_name_error);
-    REQUIRE(info->device_name.has_value());
-    CHECK_FALSE(info->device_name->empty());
+    CATCH_REQUIRE(info.has_value());
+    CATCH_CAPTURE(info->device_name_error);
+    CATCH_REQUIRE(info->device_name.has_value());
+    CATCH_CHECK_FALSE(info->device_name->empty());
 }
 
 DEFINE_TEST_FIXTURE_METHOD(
@@ -381,18 +380,18 @@ DEFINE_TEST_FIXTURE_METHOD(
     if (!first_accessible_device) {
         return;
     }
-    CAPTURE(*first_accessible_device);
+    CATCH_CAPTURE(*first_accessible_device);
     auto info_collection = get_devices_status_info();
-    REQUIRE_FALSE(info_collection.empty());
-    REQUIRE(info_collection.size() > *first_accessible_device);
-    REQUIRE(info_collection[*first_accessible_device].has_value());
+    CATCH_REQUIRE_FALSE(info_collection.empty());
+    CATCH_REQUIRE(info_collection.size() > *first_accessible_device);
+    CATCH_REQUIRE(info_collection[*first_accessible_device].has_value());
     auto info = *info_collection[*first_accessible_device];
-    CAPTURE(info.device_name_error);
+    CATCH_CAPTURE(info.device_name_error);
 
     // N.B. test may fail has_value() check if a CI runner GPU does not support an nvml query
     // in which case consider rewriting the specific test to pass if the optional is not set
-    REQUIRE(info.device_name.has_value());
-    CHECK_FALSE(info.device_name->empty());
+    CATCH_REQUIRE(info.device_name.has_value());
+    CATCH_CHECK_FALSE(info.device_name->empty());
 }
 
 #if !defined(__APPLE__)
@@ -400,10 +399,10 @@ DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is no
     if (!torch::getNumGPUs()) {
         return;
     }
-    CHECK(get_device_count() > 0);
+    CATCH_CHECK(get_device_count() > 0);
 }
 #else
-DEFINE_TEST("get_device_count on apple returns zero") { REQUIRE(get_device_count() == 0); }
+DEFINE_TEST("get_device_count on apple returns zero") { CATCH_REQUIRE(get_device_count() == 0); }
 #endif
 
 }  // namespace dorado::utils::gpu_monitor::test

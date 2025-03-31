@@ -187,8 +187,8 @@ std::vector<int> sequence_to_ints(const std::string& sequence) {
     NVTX3_FUNC_RANGE();
     std::vector<int> sequence_ints;
     sequence_ints.reserve(sequence.size());
-    std::transform(std::begin(sequence), std::end(sequence),
-                   std::back_insert_iterator<std::vector<int>>(sequence_ints), &base_to_int);
+    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
+                   &base_to_int);
     return sequence_ints;
 }
 

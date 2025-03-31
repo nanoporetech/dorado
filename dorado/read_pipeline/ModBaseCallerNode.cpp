@@ -1,7 +1,7 @@
 #include "ModBaseCallerNode.h"
 
+#include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseContext.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "modbase/ModbaseEncoder.h"
 #include "torch_utils/tensor_utils.h"
@@ -100,6 +100,11 @@ void ModBaseCallerNode::terminate_impl() {
     if (m_output_worker.joinable()) {
         m_output_worker.join();
     }
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in ModBaseCallerNode");
+    }
 }
 
 void ModBaseCallerNode::restart() {
@@ -114,7 +119,7 @@ void ModBaseCallerNode::restart() {
 }
 
 void ModBaseCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
+    std::vector<std::reference_wrapper<const config::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners[0];
     modbase::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
@@ -126,7 +131,7 @@ void ModBaseCallerNode::init_modbase_info() {
         m_num_states += params.count;
     }
 
-    auto mod_info = modbase::get_modbase_info(base_mod_params);
+    auto mod_info = config::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(mod_info.alphabet), std::move(mod_info.long_names), context_handler.encode());
     m_base_prob_offsets = mod_info.base_probs_offsets();
@@ -454,9 +459,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         // then call what we have.
         if (batched_chunks.size() == m_batch_size ||
             (status == utils::AsyncQueueStatus::Timeout && !batched_chunks.empty())) {
-            if (batched_chunks.size() != m_batch_size) {
-                ++m_num_partial_batches_called;
-            }
             // Input tensor is full, let's get scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }

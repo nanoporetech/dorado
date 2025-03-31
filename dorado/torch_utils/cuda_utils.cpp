@@ -122,6 +122,8 @@ void matmul_f16(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) {
     selected_mat_mul(A, B, C);
 }
 
+namespace {
+
 bool is_cuda_device_string(const std::string &device_string) {
     return device_string.substr(0, 5) == "cuda:";
 }
@@ -217,6 +219,8 @@ bool try_parse_id_list(const std::string &device_string,
     return true;
 }
 
+}  // namespace
+
 bool try_parse_cuda_device_string(const std::string &device_string,
                                   std::vector<std::string> &devices,
                                   std::string &error_message) {
@@ -310,8 +314,7 @@ std::unique_lock<std::mutex> acquire_gpu_lock(int gpu_index, bool use_lock) {
 // This might come in handy for tracking down where big Torch allocations happen
 void print_cuda_alloc_info(const std::string &label) {
     auto stats = c10::cuda::CUDACachingAllocator::getDeviceStats(0);
-    auto print_stat_array = [](c10::cuda::CUDACachingAllocator::StatArray &stat,
-                               const std::string &lbl) {
+    auto print_stat_array = [](const auto &stat, const std::string &lbl) {
         constexpr float gig = 1024.f * 1024.f * 1024.f;
         std::cerr << lbl << "[" << stat[0].current / gig << ", " << stat[0].peak / gig << ", "
                   << stat[0].allocated / gig << ", " << stat[0].freed / gig << "] ";

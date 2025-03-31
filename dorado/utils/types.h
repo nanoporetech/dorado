@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -15,6 +16,8 @@ struct sam_hdr_t;
 struct kstring_t;
 
 namespace dorado {
+
+inline const std::string UNCLASSIFIED = "unclassified";
 
 struct AlignmentResult {
     std::string name;    ///< Record name, if applicable
@@ -81,9 +84,9 @@ struct BarcodeScoreResult {
     float top_flank_score = -1.f;
     float bottom_flank_score = -1.f;
     bool use_top = false;
-    std::string barcode_name = "unclassified";
-    std::string kit = "unclassified";
-    std::string barcode_kit = "unclassified";
+    std::string barcode_name = UNCLASSIFIED;
+    std::string kit = UNCLASSIFIED;
+    std::string barcode_kit = UNCLASSIFIED;
     std::string variant = "n/a";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
@@ -92,7 +95,7 @@ struct BarcodeScoreResult {
 
 struct SingleEndResult {
     float score = -1.f;
-    std::string name = "unclassified";
+    std::string name = UNCLASSIFIED;
     std::pair<int, int> position = {-1, -1};
 };
 
@@ -111,6 +114,31 @@ struct ReadGroup {
     std::string sample_id;
     std::string position_id;
     std::string experiment_id;
+};
+
+enum class StrandOrientation : int {
+    REVERSE = -1,  ///< "-" orientation
+    UNKNOWN = 0,   ///< "?" orientation
+    FORWARD = 1,   ///< "+" orientation
+};
+
+inline char to_char(const StrandOrientation orientation) {
+    switch (orientation) {
+    case StrandOrientation::REVERSE:
+        return '-';
+    case StrandOrientation::FORWARD:
+        return '+';
+    case StrandOrientation::UNKNOWN:
+        return '?';
+    default:
+        throw std::runtime_error("Invalid orientation value " + std::to_string(int(orientation)));
+    }
+}
+
+struct PrimerClassification {
+    std::string primer_name = UNCLASSIFIED;
+    std::string umi_tag_sequence{};
+    StrandOrientation orientation = StrandOrientation::UNKNOWN;
 };
 
 using BarcodeFilterSet = std::optional<std::unordered_set<std::string>>;

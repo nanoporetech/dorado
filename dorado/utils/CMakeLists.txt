@@ -44,8 +44,6 @@ add_library(dorado_utils
     memory_utils.h
     MergeHeaders.cpp
     MergeHeaders.h
-    modbase_parameters.cpp
-    modbase_parameters.h
     overlap.h
     parameters.cpp
     parameters.h
@@ -83,6 +81,19 @@ target_compile_definitions(dorado_utils
         DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
         DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
 )
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
+    target_compile_definitions(dorado_utils
+        PUBLIC
+            DORADO_TX2=$<VERSION_LESS:${CUDAToolkit_VERSION},11.0>
+            DORADO_ORIN=$<VERSION_GREATER_EQUAL:${CUDAToolkit_VERSION},11.0>
+    )
+else()
+    target_compile_definitions(dorado_utils
+        PUBLIC
+            DORADO_TX2=0
+            DORADO_ORIN=0
+    )
+endif()
 
 target_include_directories(dorado_utils
     INTERFACE
@@ -94,7 +105,6 @@ target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-    ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_utils
@@ -102,10 +112,12 @@ target_link_libraries(dorado_utils
         date::date
         edlib
         spdlog::spdlog
+        argparse::argparse
     PRIVATE
         dorado_compat
         minimap2
         htslib
+        toml11::toml11
 )
 
 if (NOT APPLE)

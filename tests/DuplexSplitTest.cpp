@@ -9,9 +9,8 @@
 #include "splitter/DuplexReadSplitter.h"
 #include "splitter/ReadSplitter.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>
-// Catch2 must come after torch since both define CHECK()
-#include <catch2/catch.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -59,55 +58,55 @@ auto make_read() {
 }
 }  // namespace
 
-TEST_CASE("4 subread splitting test", TEST_GROUP) {
+CATCH_TEST_CASE("4 subread splitting test", TEST_GROUP) {
     auto read = make_read();
 
     dorado::splitter::DuplexReadSplitter splitter_node(
             dorado::splitter::DuplexSplitSettings(false));
 
     const auto split_res = splitter_node.split(std::move(read));
-    REQUIRE(split_res.size() == 4);
+    CATCH_REQUIRE(split_res.size() == 4);
 
-    CHECK(split_res[0]->read_common.seq.size() == 6858);
-    CHECK(split_res[1]->read_common.seq.size() == 7854);
-    CHECK(split_res[2]->read_common.seq.size() == 5185);
-    CHECK(split_res[3]->read_common.seq.size() == 5168);
+    CATCH_CHECK(split_res[0]->read_common.seq.size() == 6858);
+    CATCH_CHECK(split_res[1]->read_common.seq.size() == 7854);
+    CATCH_CHECK(split_res[2]->read_common.seq.size() == 5185);
+    CATCH_CHECK(split_res[3]->read_common.seq.size() == 5168);
 
-    CHECK(split_res[0]->read_common.attributes.start_time == "2023-02-21T12:46:01.529+00:00");
-    CHECK(split_res[1]->read_common.attributes.start_time == "2023-02-21T12:46:25.837+00:00");
-    CHECK(split_res[2]->read_common.attributes.start_time == "2023-02-21T12:46:39.607+00:00");
-    CHECK(split_res[3]->read_common.attributes.start_time == "2023-02-21T12:46:53.105+00:00");
+    CATCH_CHECK(split_res[0]->read_common.attributes.start_time == "2023-02-21T12:46:01.529+00:00");
+    CATCH_CHECK(split_res[1]->read_common.attributes.start_time == "2023-02-21T12:46:25.837+00:00");
+    CATCH_CHECK(split_res[2]->read_common.attributes.start_time == "2023-02-21T12:46:39.607+00:00");
+    CATCH_CHECK(split_res[3]->read_common.attributes.start_time == "2023-02-21T12:46:53.105+00:00");
 
-    CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
-    CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
-    CHECK(split_res[2]->read_common.start_time_ms == 1676983599607);
-    CHECK(split_res[3]->read_common.start_time_ms == 1676983613105);
+    CATCH_CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
+    CATCH_CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
+    CATCH_CHECK(split_res[2]->read_common.start_time_ms == 1676983599607);
+    CATCH_CHECK(split_res[3]->read_common.start_time_ms == 1676983613105);
 
-    CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
-    CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
-    CHECK(split_res[2]->read_common.attributes.num_samples == 53950);
-    CHECK(split_res[3]->read_common.attributes.num_samples == 50475);
+    CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
+    CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
+    CATCH_CHECK(split_res[2]->read_common.attributes.num_samples == 53950);
+    CATCH_CHECK(split_res[3]->read_common.attributes.num_samples == 50475);
 
-    CHECK(split_res[0]->read_common.split_point == 0);
-    CHECK(split_res[1]->read_common.split_point == 97230);
-    CHECK(split_res[2]->read_common.split_point == 152310);
-    CHECK(split_res[3]->read_common.split_point == 206305);
+    CATCH_CHECK(split_res[0]->read_common.split_point == 0);
+    CATCH_CHECK(split_res[1]->read_common.split_point == 97230);
+    CATCH_CHECK(split_res[2]->read_common.split_point == 152310);
+    CATCH_CHECK(split_res[3]->read_common.split_point == 206305);
 
-    CHECK(std::all_of(split_res.begin(), split_res.end(),
-                      [](const auto &r) { return r->read_common.read_tag == 42; }));
+    CATCH_CHECK(std::all_of(split_res.begin(), split_res.end(),
+                            [](const auto &r) { return r->read_common.read_tag == 42; }));
 
-    CHECK(split_res[0]->prev_read == "prev");
-    CHECK(split_res[1]->prev_read == "e7e47439-5968-4883-96ff-7f2d2040dc43");
-    CHECK(split_res[2]->prev_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
-    CHECK(split_res[3]->prev_read == "f8e75422-3275-47f6-b45f-062aa00df368");
+    CATCH_CHECK(split_res[0]->prev_read == "prev");
+    CATCH_CHECK(split_res[1]->prev_read == "e7e47439-5968-4883-96ff-7f2d2040dc43");
+    CATCH_CHECK(split_res[2]->prev_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
+    CATCH_CHECK(split_res[3]->prev_read == "f8e75422-3275-47f6-b45f-062aa00df368");
 
-    CHECK(split_res[0]->next_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
-    CHECK(split_res[1]->next_read == "f8e75422-3275-47f6-b45f-062aa00df368");
-    CHECK(split_res[2]->next_read == "c4219558-db6c-476e-a9e5-81f4694f263c");
-    CHECK(split_res[3]->next_read == "next");
+    CATCH_CHECK(split_res[0]->next_read == "a62e28ab-c367-4a93-af9b-84130d3df58c");
+    CATCH_CHECK(split_res[1]->next_read == "f8e75422-3275-47f6-b45f-062aa00df368");
+    CATCH_CHECK(split_res[2]->next_read == "c4219558-db6c-476e-a9e5-81f4694f263c");
+    CATCH_CHECK(split_res[3]->next_read == "next");
 }
 
-TEST_CASE("4 subread split tagging", TEST_GROUP) {
+CATCH_TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto read = make_read();
 
     dorado::PipelineDescriptor pipeline_desc;
@@ -129,9 +128,9 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    CHECK(messages.size() == 6);
-    REQUIRE(std::all_of(messages.begin(), messages.end(),
-                        [](const auto &message) { return is_read_message(message); }));
+    CATCH_CHECK(messages.size() == 6);
+    CATCH_REQUIRE(std::all_of(messages.begin(), messages.end(),
+                              [](const auto &message) { return is_read_message(message); }));
 
     std::vector<size_t> expected_subread_ids = {0, 1, 2, 3, 4, 5};
     std::vector<size_t> subread_ids;
@@ -141,19 +140,19 @@ TEST_CASE("4 subread split tagging", TEST_GROUP) {
     }
 
     std::sort(std::begin(subread_ids), std::end(subread_ids));
-    CHECK(subread_ids == expected_subread_ids);
-    CHECK(std::all_of(messages.begin(), messages.end(),
-                      [split_count = expected_subread_ids.size()](const auto &message) {
-                          const auto &read_common = get_read_common_data(message);
-                          return read_common.split_count == split_count;
-                      }));
-    CHECK(std::all_of(messages.begin(), messages.end(), [](const auto &message) {
+    CATCH_CHECK(subread_ids == expected_subread_ids);
+    CATCH_CHECK(std::all_of(messages.begin(), messages.end(),
+                            [split_count = expected_subread_ids.size()](const auto &message) {
+                                const auto &read_common = get_read_common_data(message);
+                                return read_common.split_count == split_count;
+                            }));
+    CATCH_CHECK(std::all_of(messages.begin(), messages.end(), [](const auto &message) {
         const auto &read_common = get_read_common_data(message);
         return read_common.read_tag == 42;
     }));
 }
 
-TEST_CASE("No split output read properties", TEST_GROUP) {
+CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
@@ -194,15 +193,15 @@ TEST_CASE("No split output read properties", TEST_GROUP) {
     pipeline.reset();
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-    CHECK(reads.size() == 1);
+    CATCH_CHECK(reads.size() == 1);
 
     read = std::move(reads.front());
-    CHECK(read->read_common.read_id == init_read_id);
-    CHECK(read->read_common.subread_id == 0);
-    CHECK(read->read_common.split_count == 1);
+    CATCH_CHECK(read->read_common.read_id == init_read_id);
+    CATCH_CHECK(read->read_common.subread_id == 0);
+    CATCH_CHECK(read->read_common.split_count == 1);
 }
 
-TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
+CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     auto data_dir = std::filesystem::path(get_data_dir("split")) / "one_subread_split";
 
     auto read = std::make_unique<dorado::SimplexRead>();
@@ -244,8 +243,8 @@ TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     pipeline->push_message(std::move(read));
     pipeline.reset();
 
-    CHECK(messages.size() == 1);
+    CATCH_CHECK(messages.size() == 1);
 
     const auto &read_common = get_read_common_data(messages[0]);
-    CHECK(read_common.parent_read_id != read_common.read_id);
+    CATCH_CHECK(read_common.parent_read_id != read_common.read_id);
 }

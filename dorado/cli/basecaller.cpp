@@ -1,16 +1,18 @@
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
 #include "basecall_output_args.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
+#include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
-#include "dorado_version.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
@@ -29,32 +31,21 @@
 #include "read_pipeline/ResumeLoader.h"
 #include "read_pipeline/TrimmerNode.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
-#include "utils/dev_utils.h"
-#include "utils/fs_utils.h"
-#include "utils/modbase_parameters.h"
-#include "utils/string_utils.h"
-
-#include <argparse.hpp>
-#include <cxxpool.h>
-
-#include <stdexcept>
-#include <string>
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/sys_stats.h"
-#include "utils/tty_utils.h"
 
+#include <argparse/argparse.hpp>
+#include <cxxpool.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <torch/utils.h>
@@ -67,15 +58,21 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
+
 using dorado::utils::default_parameters;
-using dorado::utils::modbase::default_modbase_parameters;
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 using namespace std::chrono_literals;
 using namespace dorado::models;
 using namespace dorado::model_resolution;
+using namespace dorado::config;
 namespace fs = std::filesystem;
 
 namespace dorado {
@@ -97,9 +94,9 @@ public:
 };
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
-                           basecall::CRFModelConfig& model_config,
+                           BasecallModelConfig& model_config,
                            const std::string& device) {
-    model_config.basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+    model_config.basecaller.update(BatchParams::Priority::CLI_ARG,
                                    cli::get_optional_argument<int>("--chunksize", arg),
                                    cli::get_optional_argument<int>("--overlap", arg),
                                    cli::get_optional_argument<int>("--batchsize", arg));
@@ -118,8 +115,6 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
 
     model_config.normalise_basecaller_params();
 }
-
-}  // namespace
 
 void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbosity) {
     parser.visible.add_argument("model").help(
@@ -143,7 +138,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
                       "read tag.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Input data arguments");
@@ -154,7 +149,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("-l", "--read-ids")
                 .help("A file with a newline-delimited list of reads to basecall. If not provided, "
                       "all reads will be basecalled.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         parser.visible.add_argument("-n", "--max-reads")
                 .help("Limit the number of reads to be basecalled.")
                 .default_value(0)
@@ -162,7 +157,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--resume-from")
                 .help("Resume basecalling from the given HTS file. Fully written read records are "
                       "not processed again.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Output arguments");
@@ -180,7 +175,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_group("Alignment arguments");
         parser.visible.add_argument("--reference")
                 .help("Path to reference for alignment.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         alignment::mm2::add_options_string_arg(parser);
     }
     {
@@ -200,15 +195,13 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                     return value;
                 });
         parser.visible.add_argument("--modified-bases-models")
-                .default_value(std::string())
+                .default_value(std::string{})
                 .help("A comma separated list of modified base model paths.");
         parser.visible.add_argument("--modified-bases-threshold")
-                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>()
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].");
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(0)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
@@ -220,7 +213,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(std::string{});
         parser.visible.add_argument("--sample-sheet")
                 .help("Path to the sample sheet to use.")
-                .default_value(std::string(""));
+                .default_value(std::string{});
         parser.visible.add_argument("--barcode-both-ends")
                 .help("Require both ends of a read to be barcoded for a double ended barcode.")
                 .default_value(false)
@@ -241,13 +234,12 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("--trim")
-                .help("Specify what to trim. Options are 'none', 'all', 'adapters', and 'primers'. "
-                      "Default behaviour is to trim all detected adapters, primers, or barcodes. "
-                      "Choose 'adapters' to just trim adapters. The 'primers' choice will trim "
-                      "adapters and primers, but not barcodes. The 'none' choice is equivelent to "
-                      "using --no-trim. Note that this only applies to DNA. "
-                      "RNA adapters are always trimmed.")
-                .default_value(std::string(""));
+                .help("Specify what to trim. Options are 'none', 'all', and 'adapters'. The "
+                      "default behaviour is to trim all detected adapters, primers, and barcodes. "
+                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivelent to "
+                      "using --no-trim. Note that this only applies to DNA. RNA adapters are "
+                      "always trimmed.")
+                .default_value(std::string{});
         parser.hidden.add_argument("--rna-adapters")
                 .help("Force use of RNA adapters.")
                 .implicit_value(true)
@@ -262,7 +254,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .implicit_value(true);
         parser.visible.add_argument("--poly-a-config")
                 .help("Configuration file for poly(A) estimation to change default behaviours")
-                .default_value(std::string(""));
+                .default_value(std::string{});
     }
     {
         parser.visible.add_group("Advanced arguments");
@@ -283,15 +275,47 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     cli::add_internal_arguments(parser);
 }
 
+ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                           utils::arg_parse::ArgParser& parser) {
+    // Convert path to params.
+    auto params = get_modbase_params(paths);
+
+    // Allow user to override batchsize.
+    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+        modbase_batchsize.has_value()) {
+        params.batchsize = *modbase_batchsize;
+    }
+
+    // Allow user to override threshold.
+    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+        methylation_threshold.has_value()) {
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
+        }
+        params.threshold = *methylation_threshold;
+    }
+
+    // Check that the paths are all valid.
+    for (const auto& mb_path : paths) {
+        if (!is_modbase_model(mb_path)) {
+            throw std::runtime_error("Modified bases model not found in the model path at " +
+                                     std::filesystem::weakly_canonical(mb_path).string());
+        }
+    }
+
+    // All looks good.
+    return params;
+}
+
 void setup(const std::vector<std::string>& args,
-           const basecall::CRFModelConfig& model_config,
+           const BasecallModelConfig& model_config,
            const InputFolderInfo& input_folder_info,
            const std::vector<fs::path>& modbase_models,
            const std::string& device,
            const std::string& ref,
            const std::string& bed,
            size_t num_runners,
-           const utils::modbase::ModBaseParams modbase_params,
+           const ModBaseBatchParams& modbase_params,
            std::unique_ptr<utils::HtsFile> hts_file,
            bool emit_moves,
            size_t max_reads,
@@ -365,14 +389,6 @@ void setup(const std::vector<std::string>& args,
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto modbase_runners = api::create_modbase_runners(
             modbase_models, device, modbase_params.runners_per_caller, modbase_params.batchsize);
-
-    // Disable chunked modbase models for RNA until we have RNA models - See DOR-972 for details
-    if (!modbase_runners.empty() && is_rna_model(model_config) &&
-        modbase_runners.at(0)->takes_chunk_inputs()) {
-        throw std::runtime_error(
-                "`conv_lstm_v2` modified base models are not supported for RNA data in this "
-                "version of dorado.");
-    }
 
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
@@ -496,7 +512,7 @@ void setup(const std::vector<std::string>& args,
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
                         polya_config, is_rna_model(model_config), is_rna_adapter,
-                        model_config.polya_coeffs);
+                        model_config.polya_speed_correction, model_config.polya_offset_correction);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
                 poly_tail_calc_selector);
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
@@ -530,9 +546,9 @@ void setup(const std::vector<std::string>& args,
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
     if (enable_aligner) {
-        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
     hts_file->set_header(hdr.get());
@@ -552,11 +568,14 @@ void setup(const std::vector<std::string>& args,
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
 
+        std::vector<std::string> resume_args_excluding_mm2_opts{};
+        alignment::mm2::extract_options_string_arg(tokens, resume_args_excluding_mm2_opts);
+
         // Create a new basecaller parser to parse the resumed basecaller CLI string
         utils::arg_parse::ArgParser resume_parser("dorado");
         int verbosity = 0;
         set_dorado_basecaller_args(resume_parser, verbosity);
-        resume_parser.visible.parse_known_args(tokens);
+        resume_parser.visible.parse_known_args(resume_args_excluding_mm2_opts);
 
         const std::string model_arg = resume_parser.visible.get<std::string>("model");
         const ModelComplex resume_model_complex = ModelComplexParser::parse(model_arg);
@@ -585,7 +604,8 @@ void setup(const std::vector<std::string>& args,
     // If we're doing alignment, post-processing takes longer due to bam file sorting.
     float post_processing_percentage = (hts_file->finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
 
-    ProgressTracker tracker(int(num_reads), false, post_processing_percentage);
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, int(num_reads),
+                            post_processing_percentage);
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -630,10 +650,12 @@ void setup(const std::vector<std::string>& args,
     }
 }
 
+}  // namespace
+
 int basecaller(int argc, char* argv[]) {
+    utils::initialise_torch();
     utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
-    torch::set_num_threads(1);
 
     utils::arg_parse::ArgParser parser("dorado");
     int verbosity = 0;
@@ -677,12 +699,6 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
-    if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
-        spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-        return EXIT_FAILURE;
-    }
-
     if (parser.visible.get<std::string>("--reference").empty() &&
         !parser.visible.get<std::string>("--bed-file").empty()) {
         spdlog::error("--bed-file cannot be used without --reference.");
@@ -710,21 +726,19 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    bool no_trim_barcodes = false, no_trim_primers = false, no_trim_adapters = false;
+    bool trim_barcodes = true, trim_primers = true, trim_adapters = true;
     auto trim_options = parser.visible.get<std::string>("--trim");
     if (parser.visible.get<bool>("--no-trim")) {
         if (!trim_options.empty()) {
             spdlog::error("Only one of --no-trim and --trim can be used.");
             return EXIT_FAILURE;
         }
-        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
+        trim_barcodes = trim_primers = trim_adapters = false;
     }
     if (trim_options == "none") {
-        no_trim_barcodes = no_trim_primers = no_trim_adapters = true;
-    } else if (trim_options == "primers") {
-        no_trim_barcodes = true;
+        trim_barcodes = trim_primers = trim_adapters = false;
     } else if (trim_options == "adapters") {
-        no_trim_barcodes = no_trim_primers = true;
+        trim_barcodes = trim_primers = false;
     } else if (!trim_options.empty() && trim_options != "all") {
         spdlog::error("Unsupported --trim value '{}'.", trim_options);
         return EXIT_FAILURE;
@@ -756,7 +770,7 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
-        barcoding_info->trim = !no_trim_barcodes;
+        barcoding_info->trim = trim_barcodes;
 
         std::optional<std::string> custom_seqs =
                 parser.visible.present<std::string>("--barcode-sequences");
@@ -809,8 +823,8 @@ int basecaller(int argc, char* argv[]) {
     }
 
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
-    adapter_info->trim_adapters = !no_trim_adapters;
-    adapter_info->trim_primers = !no_trim_primers;
+    adapter_info->trim_adapters = trim_adapters;
+    adapter_info->trim_primers = trim_primers;
     adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
 
@@ -825,7 +839,7 @@ int basecaller(int argc, char* argv[]) {
         if (!check_model_path(model_path)) {
             return EXIT_FAILURE;
         }
-        if (utils::modbase::is_modbase_model(model_path)) {
+        if (is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -869,7 +883,7 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = basecall::load_crf_model_config(model_path);
+    auto model_config = load_model_config(model_path);
     set_basecaller_params(parser.visible, model_config, device);
 
     spdlog::info("> Creating basecall pipeline");
@@ -882,20 +896,10 @@ int basecaller(int argc, char* argv[]) {
     }
 
     // Force on running of batchsize benchmarks if emission is on
-    bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
-                                    parser.hidden.get<bool>("--run-batchsize-benchmarks");
+    const bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
+                                          parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
-            mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
-            methylation_threshold);
-
-    for (const auto& mb_path : mods_model_paths) {
-        if (!utils::modbase::is_modbase_model(mb_path)) {
-            spdlog::error("Modified bases model not found in the model path at '{}'.",
-                          std::filesystem::weakly_canonical(mb_path).string());
-            return EXIT_FAILURE;
-        }
-    }
+    const auto modbase_params = validate_modbase_params(mods_model_paths, parser);
 
     try {
         setup(args, model_config, input_folder_info, mods_model_paths, device,

@@ -1,17 +1,19 @@
 #include "Decoder.h"
 
+#include "config/BasecallModelConfig.h"
+
 #if DORADO_CUDA_BUILD
 #include "CUDADecoder.h"
 #endif
 
 #include "CPUDecoder.h"
-#include "basecall/CRFModelConfig.h"
 
 #include <c10/core/Device.h>
 
 namespace dorado::basecall::decode {
 
-std::unique_ptr<Decoder> create_decoder(c10::Device device, const CRFModelConfig& config) {
+std::unique_ptr<Decoder> create_decoder(c10::Device device,
+                                        const config::BasecallModelConfig& config) {
 #if DORADO_CUDA_BUILD
     if (device.is_cuda()) {
         return std::make_unique<decode::CUDADecoder>(config.clamp ? 5.f : 0.f);

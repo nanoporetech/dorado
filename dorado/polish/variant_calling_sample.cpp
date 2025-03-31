@@ -76,4 +76,10 @@ std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample
     return os;
 }
 
+bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs) {
+    return (lhs.logits.equal(rhs.logits)) &&
+           (std::tie(lhs.seq_id, lhs.positions_major, lhs.positions_minor) ==
+            std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor));
+}
+
 }  // namespace dorado::polisher

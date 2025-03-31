@@ -3,7 +3,6 @@
 #include "utils/sequence_utils.h"
 
 #include <toml.hpp>
-#include <toml/value.hpp>
 
 #include <filesystem>
 #include <fstream>

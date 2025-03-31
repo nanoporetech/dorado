@@ -1,10 +1,10 @@
 #pragma once
 
+#include "secondary/bam_file.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
-
-class BamFile;
 
 namespace dorado::polisher {
 
@@ -68,7 +68,7 @@ public:
  *  If row_per_read is false, new reads will be placed in the first row where
  *  there previous read has terminated, if one exists.
  */
-ReadAlignmentData calculate_read_alignment(BamFile &bam_file,
+ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const std::string &chr_name,
                                            const int64_t start,  // Zero-based.
                                            const int64_t end,    // Non-inclusive.

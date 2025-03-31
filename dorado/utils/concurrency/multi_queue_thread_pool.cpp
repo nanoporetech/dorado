@@ -120,7 +120,7 @@ detail::WaitingTask MultiQueueThreadPool::decrement_in_flight_and_wait_on_next_t
 }
 
 void MultiQueueThreadPool::process_task_queue() {
-    set_thread_name(m_name);
+    set_thread_name(m_name.c_str());
     detail::WaitingTask waiting_task{};
     std::optional<TaskPriority> last_task_priority{std::nullopt};
     while (!m_done.load(std::memory_order_relaxed)) {

@@ -3,7 +3,7 @@
 #include "utils/PostCondition.h"
 #include "utils/concurrency/synchronisation.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <memory>
@@ -11,8 +11,8 @@
 #include <utility>
 
 #define CUT_TAG "[dorado::utils::concurrency::AsyncTaskExecutor]"
-#define DEFINE_TEST(name) TEST_CASE(CUT_TAG " " name, CUT_TAG)
-#define DEFINE_SCENARIO(name) SCENARIO(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
+#define DEFINE_CATCH_SCENARIO(name) CATCH_SCENARIO(CUT_TAG " " name, CUT_TAG)
 
 using namespace std::chrono_literals;
 
@@ -27,14 +27,14 @@ constexpr std::size_t MAX_QUEUE_SIZE{100};
 
 DEFINE_TEST("AsyncTaskExecutor constructor with valid thread pool does not throw") {
     MultiQueueThreadPool pool{1};
-    REQUIRE_NOTHROW(AsyncTaskExecutor(pool, TaskPriority::normal, MAX_QUEUE_SIZE));
+    CATCH_REQUIRE_NOTHROW(AsyncTaskExecutor(pool, TaskPriority::normal, MAX_QUEUE_SIZE));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() does not throw") {
     MultiQueueThreadPool pool{2};
     AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
 
-    REQUIRE_NOTHROW(cut.send([] {}));
+    CATCH_REQUIRE_NOTHROW(cut.send([] {}));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
@@ -44,7 +44,7 @@ DEFINE_TEST("AsyncTaskExecutor::send() invokes the task") {
 
     cut.send([&invoked] { invoked.signal(); });
 
-    REQUIRE(invoked.wait_for(TIMEOUT));
+    CATCH_REQUIRE(invoked.wait_for(TIMEOUT));
 }
 
 DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task") {
@@ -62,14 +62,14 @@ DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task")
 
     cut.send([signaller = std::move(non_copyable_signaller)] { signaller->signal(); });
 
-    REQUIRE(invoked.wait_for(TIMEOUT));
+    CATCH_REQUIRE(invoked.wait_for(TIMEOUT));
 }
 
-DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
+DEFINE_CATCH_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
     MultiQueueThreadPool pool{2};
     AsyncTaskExecutor cut(pool, TaskPriority::normal, MAX_QUEUE_SIZE);
 
-    GIVEN("2 tasks are running") {
+    CATCH_GIVEN("2 tasks are running") {
         std::vector<std::unique_ptr<Flag>> task_release_flags{};
         task_release_flags.reserve(3);
         task_release_flags.emplace_back(std::make_unique<Flag>());
@@ -104,10 +104,10 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
         });
 
         // it's required that both tasks have started to proceed
-        REQUIRE(task_started_flags[0]->wait_for(TIMEOUT));
-        REQUIRE(task_started_flags[1]->wait_for(TIMEOUT));
+        CATCH_REQUIRE(task_started_flags[0]->wait_for(TIMEOUT));
+        CATCH_REQUIRE(task_started_flags[1]->wait_for(TIMEOUT));
 
-        AND_GIVEN("third task is sent") {
+        CATCH_AND_GIVEN("third task is sent") {
             std::thread third_task_thread([&cut, &create_task] { cut.send(create_task(2)); });
             auto join_third_task_thread_on_exit =
                     PostCondition([&release_all_tasks, &third_task_thread] {
@@ -117,18 +117,20 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
                         }
                     });
 
-            THEN("third task is not invoked") {
-                CHECK_FALSE(task_started_flags[2]->wait_for(200ms));
+            CATCH_THEN("third task is not invoked") {
+                CATCH_CHECK_FALSE(task_started_flags[2]->wait_for(200ms));
             }
 
-            WHEN("first task completes") {
+            CATCH_WHEN("first task completes") {
                 task_release_flags[0]->signal();
 
-                THEN("third task is invoked") { CHECK(task_started_flags[2]->wait_for(TIMEOUT)); }
+                CATCH_THEN("third task is invoked") {
+                    CATCH_CHECK(task_started_flags[2]->wait_for(TIMEOUT));
+                }
             }
         }
 
-        WHEN("flush is called") {
+        CATCH_WHEN("flush is called") {
             Flag flush_completed{};
             std::thread flushing_thread([&cut, &flush_completed] {
                 cut.flush();
@@ -142,17 +144,19 @@ DEFINE_SCENARIO("AsyncTaskExecutor created with pool of 2 threads") {
                         }
                     });
 
-            THEN("flush is blocked") { CHECK_FALSE(flush_completed.wait_for(200ms)); }
+            CATCH_THEN("flush is blocked") { CATCH_CHECK_FALSE(flush_completed.wait_for(200ms)); }
 
-            AND_WHEN("one tasks is completed") {
+            CATCH_AND_WHEN("one tasks is completed") {
                 task_release_flags[0]->signal();
 
-                THEN("flush is still blocked") { CHECK_FALSE(flush_completed.wait_for(200ms)); }
+                CATCH_THEN("flush is still blocked") {
+                    CATCH_CHECK_FALSE(flush_completed.wait_for(200ms));
+                }
             }
 
-            AND_WHEN("all tasks are completed") {
+            CATCH_AND_WHEN("all tasks are completed") {
                 release_all_tasks();
-                THEN("flush is unblocked") { CHECK(flush_completed.wait_for(TIMEOUT)); }
+                CATCH_THEN("flush is unblocked") { CATCH_CHECK(flush_completed.wait_for(TIMEOUT)); }
             }
         }
     }
@@ -199,7 +203,7 @@ DEFINE_TEST("AsyncTaskExecutor destructor blocks till all tasks completed") {
         // the AsyncTaskExecutor go out of scope and check that all tasks completed
         unblock_tasks.signal();
     }
-    REQUIRE(num_completed_tasks == NUM_TASKS);
+    CATCH_REQUIRE(num_completed_tasks == NUM_TASKS);
 }
 
 }  // namespace dorado::utils::concurrency::async_task_executor

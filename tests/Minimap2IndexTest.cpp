@@ -8,7 +8,7 @@
 #include "utils/stream_utils.h"
 #include "utils/types.h"
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
@@ -42,19 +42,20 @@ public:
 
 namespace dorado::alignment::test {
 
-TEST_CASE(TEST_GROUP " initialise() with default options does not throw", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " initialise() with default options does not throw", TEST_GROUP) {
     Minimap2Index cut{};
 
-    REQUIRE_NOTHROW(cut.initialise(create_dflt_options()));
+    CATCH_REQUIRE_NOTHROW(cut.initialise(create_dflt_options()));
 }
 
-TEST_CASE(TEST_GROUP " initialise() with default options returns true", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " initialise() with default options returns true", TEST_GROUP) {
     Minimap2Index cut{};
 
-    REQUIRE(cut.initialise(create_dflt_options()));
+    CATCH_REQUIRE(cut.initialise(create_dflt_options()));
 }
 
-TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing options", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing options",
+                TEST_GROUP) {
     Minimap2Index cut{};
 
     auto options{create_dflt_options()};
@@ -64,12 +65,12 @@ TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing options"
 
     cut.initialise(options);
 
-    CHECK(cut.index_options().k == options.index_options->get().k);
-    CHECK(cut.index_options().w == options.index_options->get().w);
-    CHECK(cut.index_options().batch_size == options.index_options->get().batch_size);
+    CATCH_CHECK(cut.index_options().k == options.index_options->get().k);
+    CATCH_CHECK(cut.index_options().w == options.index_options->get().w);
+    CATCH_CHECK(cut.index_options().batch_size == options.index_options->get().batch_size);
 }
 
-TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
     Minimap2Index cut{};
     auto options{create_dflt_options()};
     options.mapping_options->get().bw = 300;
@@ -77,76 +78,80 @@ TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", 
 
     cut.initialise(options);
 
-    CHECK(cut.mapping_options().bw == options.mapping_options->get().bw);
-    CHECK(cut.mapping_options().bw_long == options.mapping_options->get().bw_long);
+    CATCH_CHECK(cut.mapping_options().bw == options.mapping_options->get().bw);
+    CATCH_CHECK(cut.mapping_options().bw_long == options.mapping_options->get().bw_long);
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP " load() with invalid reference file returns reference_file_not_found",
-                 TEST_GROUP) {
-    REQUIRE(cut.load("some_reference_file", 1, false) == IndexLoadResult::reference_file_not_found);
+CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                       TEST_GROUP
+                       " load() with invalid reference file returns reference_file_not_found",
+                       TEST_GROUP) {
+    CATCH_REQUIRE(cut.load("some_reference_file", 1, false) ==
+                  IndexLoadResult::reference_file_not_found);
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP " load() with empty reference file returns end_of_index",
-                 TEST_GROUP) {
-    REQUIRE(cut.load(empty_file, 1, false) == IndexLoadResult::end_of_index);
+CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                       TEST_GROUP " load() with empty reference file returns end_of_index",
+                       TEST_GROUP) {
+    CATCH_REQUIRE(cut.load(empty_file, 1, false) == IndexLoadResult::end_of_index);
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP " load() with valid reference file returns success",
-                 TEST_GROUP) {
-    REQUIRE(cut.load(reference_file, 1, false) == IndexLoadResult::success);
+CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                       TEST_GROUP " load() with valid reference file returns success",
+                       TEST_GROUP) {
+    CATCH_REQUIRE(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP
-                 " get_options() after successful load() compares as equal to default options",
-                 TEST_GROUP) {
-    CHECK(cut.load(reference_file, 1, false) == IndexLoadResult::success);
+CATCH_TEST_CASE_METHOD(
+        Minimap2IndexTestFixture,
+        TEST_GROUP " get_options() after successful load() compares as equal to default options",
+        TEST_GROUP) {
+    CATCH_CHECK(cut.load(reference_file, 1, false) == IndexLoadResult::success);
 
-    REQUIRE(cut.get_options() == dorado::alignment::create_dflt_options());
+    CATCH_REQUIRE(cut.get_options() == dorado::alignment::create_dflt_options());
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP " create_compatible_index() with valid options returns non-null",
-                 TEST_GROUP) {
+CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
+                       TEST_GROUP " create_compatible_index() with valid options returns non-null",
+                       TEST_GROUP) {
     cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{create_dflt_options()};
     compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
-    REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
+    CATCH_REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
 }
 
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP
-                 " create_compatible_index() with valid options returns Minimap2Index with same "
-                 "underlying index",
-                 TEST_GROUP) {
-    cut.load(reference_file, 1, false);
-    Minimap2Options compatible_options{create_dflt_options()};
-    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
-
-    auto compatible_index = cut.create_compatible_index(compatible_options);
-
-    REQUIRE(compatible_index->index() == cut.index());
-}
-
-TEST_CASE_METHOD(Minimap2IndexTestFixture,
-                 TEST_GROUP
-                 " create_compatible_index() with valid options returns Minimap2Index with mapping "
-                 "options updated",
-                 TEST_GROUP) {
+CATCH_TEST_CASE_METHOD(
+        Minimap2IndexTestFixture,
+        TEST_GROUP
+        " create_compatible_index() with valid options returns Minimap2Index with same "
+        "underlying index",
+        TEST_GROUP) {
     cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{create_dflt_options()};
     compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
-    REQUIRE(compatible_index->mapping_options().best_n == cut.mapping_options().best_n + 1);
+    CATCH_REQUIRE(compatible_index->index() == cut.index());
 }
 
-TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
+CATCH_TEST_CASE_METHOD(
+        Minimap2IndexTestFixture,
+        TEST_GROUP
+        " create_compatible_index() with valid options returns Minimap2Index with mapping "
+        "options updated",
+        TEST_GROUP) {
+    cut.load(reference_file, 1, false);
+    Minimap2Options compatible_options{create_dflt_options()};
+    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
+
+    auto compatible_index = cut.create_compatible_index(compatible_options);
+
+    CATCH_REQUIRE(compatible_index->mapping_options().best_n == cut.mapping_options().best_n + 1);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     // Create large index file
     auto temp_dir = tests::make_temp_dir("mm2_split_index_test");
     auto temp_input_file = temp_dir.m_path / "input.fa";
@@ -171,17 +176,42 @@ TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     }
     hts_file.finalise([](size_t) { /* noop */ });
 
-    Minimap2Index cut{};
-    cut.initialise(mm2::parse_options("-I 10k"));
+    // The -I option in minimap2 appears to be a soft limit. It will load full sequences until
+    // the total number of bases exceeds this value. So setting this to 10K would result in it
+    // putting 2 full 10,000 base sequences into each batch.
+    auto opts = mm2::parse_options("-I 8K");
 
-    SECTION("No split index allowed") {
-        CHECK(cut.load(temp_input_file.string(), 1, false) ==
-              IndexLoadResult::split_index_not_supported);
+    CATCH_SECTION("Full split-index loading") {
+        Minimap2Index cut{};
+        cut.initialise(opts);
+
+        CATCH_CHECK(cut.load(temp_input_file.string(), 1, false) == IndexLoadResult::success);
+
+        auto header_records = cut.get_sequence_records_for_header();
+        CATCH_CHECK(header_records.size() == 5);
+        for (size_t i = 0; i < header_records.size(); ++i) {
+            CATCH_CHECK(header_records[i].first == ("read" + std::to_string(i + 1)));
+            CATCH_CHECK(header_records[i].second == 10000u);
+        }
     }
 
-    SECTION("Split index allowed") {
-        CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
-        CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
+    CATCH_SECTION("Sequential index loading") {
+        Minimap2Index cut{};
+        cut.initialise(opts);
+
+        CATCH_CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
+        auto header_records = cut.get_sequence_records_for_header();
+        CATCH_CHECK(header_records.size() == 1);
+        CATCH_CHECK(std::string(header_records[0].first) == "read1");
+        CATCH_CHECK(header_records[0].second == 10000u);
+
+        for (int i = 2; i < 6; ++i) {
+            CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
+            header_records = cut.get_sequence_records_for_header();
+            CATCH_CHECK(header_records[0].first == ("read" + std::to_string(i)));
+            CATCH_CHECK(header_records[0].second == 10000u);
+        }
+        CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::end_of_index);
     }
 }
 

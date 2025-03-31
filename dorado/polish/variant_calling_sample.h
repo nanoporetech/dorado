@@ -27,4 +27,6 @@ struct VariantCallingSample {
 
 std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample);
 
+bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs);
+
 }  // namespace dorado::polisher

@@ -26,6 +26,10 @@ public:
     std::vector<Query>& get_adapter_sequences(const std::string& kit_name);
     std::vector<Query>& get_primer_sequences(const std::string& kit_name);
 
+    PrimerClassification classify_primers(const AdapterScoreResult& result,
+                                          std::pair<int, int>& trim_interval,
+                                          const std::string& seq);
+
 private:
     enum QueryType { ADAPTER, PRIMER };
 
@@ -36,6 +40,11 @@ private:
     AdapterScoreResult detect(const std::string& seq,
                               const std::vector<Query>& queries,
                               QueryType query_type) const;
+    SingleEndResult find_umi_tag(const std::string& seq);
+    void check_for_umi_tags(const AdapterScoreResult& primer_results,
+                            PrimerClassification& classification,
+                            const std::string& sequence,
+                            std::pair<int, int>& trim_interval);
 };
 
 }  // namespace demux

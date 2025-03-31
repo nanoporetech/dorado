@@ -1,3 +1,4 @@
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
 #include "dorado_version.h"
@@ -8,7 +9,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 
-#include <argparse.hpp>
+#include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>

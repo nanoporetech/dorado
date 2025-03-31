@@ -1,8 +1,8 @@
 #pragma once
 
-#include "polish/bam_file.h"
 #include "polish/consensus_result.h"
 #include "polish/sample.h"
+#include "secondary/bam_file.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -35,7 +35,7 @@ constexpr auto FeatureTensorType = torch::kFloat32;
 inline NormaliseType parse_normalise_type(std::string type) {
     // Convert to lower case.
     std::transform(std::begin(type), std::end(type), std::begin(type),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (type == "total") {
         return NormaliseType::TOTAL;
     } else if (type == "fwd_rev") {
@@ -48,7 +48,7 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual Sample encode_region(BamFile& bam_file,
+    virtual Sample encode_region(secondary::BamFile& bam_file,
                                  const std::string& ref_name,
                                  const int64_t ref_start,
                                  const int64_t ref_end,

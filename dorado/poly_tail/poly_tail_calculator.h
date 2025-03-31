@@ -30,8 +30,10 @@ struct SignalAnchorInfo {
 
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config, const std::vector<float>& calibration_coeffs)
-            : m_config(std::move(config)), m_calibration_coeffs(calibration_coeffs) {}
+    PolyTailCalculator(PolyTailConfig config, float speed_calibration, float offset_calibration)
+            : m_config(std::move(config)),
+              m_speed_calibration(speed_calibration),
+              m_offset_calibration(offset_calibration) {}
 
     virtual ~PolyTailCalculator() = default;
 
@@ -50,9 +52,6 @@ protected:
     // Returns any adjustment required for the provided signal_len
     virtual int signal_length_adjustment(const SimplexRead& read, int signal_len) const = 0;
 
-    // Applies any model calibration factors to the provided signal_len
-    int apply_signal_len_calibration(int signal_len) const;
-
     // Floor for average signal value of poly tail.
     virtual float min_avg_val() const = 0;
 
@@ -61,10 +60,10 @@ protected:
                                              float samples_per_base) const = 0;
 
     // Determine the outer boundary of the signal space to consider based on the anchor.
-    std::pair<int, int> signal_range(int signal_anchor,
-                                     int signal_len,
-                                     float samples_per_base,
-                                     bool fwd) const;
+    virtual std::pair<int, int> signal_range(int signal_anchor,
+                                             int signal_len,
+                                             float samples_per_base,
+                                             bool fwd) const;
 
     std::pair<float, float> estimate_samples_per_base(const dorado::SimplexRead& read) const;
 
@@ -76,16 +75,17 @@ protected:
                                                 float std_samples_per_base) const;
 
     const PolyTailConfig m_config;
-    const std::vector<float> m_calibration_coeffs;
+    const float m_speed_calibration;
+    const float m_offset_calibration;
 };
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(
-            const PolyTailConfig& config,
-            bool is_rna,
-            bool is_rna_adapter,
-            const std::vector<float>& calibration_coeffs);
+    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
+                                                            bool is_rna,
+                                                            bool is_rna_adapter,
+                                                            float speed_calibration,
+                                                            float offset_calibration);
 };
 
 }  // namespace dorado::poly_tail

@@ -1,7 +1,8 @@
 #include "encoder_read_alignment.h"
 
 #include "medaka_read_matrix.h"
-#include "polish/polish_utils.h"
+#include "torch_utils/tensor_utils.h"
+#include "utils/container_utils.h"
 #include "utils/ssize.h"
 #include "utils/timer_high_res.h"
 
@@ -83,17 +84,18 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                         torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
 
                 spdlog::trace("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
-                              tensor_shape_as_string(chunk), tensor_shape_as_string(padding));
+                              utils::tensor_shape_as_string(chunk),
+                              utils::tensor_shape_as_string(padding));
 
                 auto concated = torch::cat({std::move(chunk), std::move(padding)}, 1);
 
                 spdlog::trace("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
-                              tensor_shape_as_string(concated));
+                              utils::tensor_shape_as_string(concated));
 
                 padded_chunks.emplace_back(std::move(concated));
             } else {
                 spdlog::trace("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
-                              tensor_shape_as_string(chunk));
+                              utils::tensor_shape_as_string(chunk));
 
                 padded_chunks.emplace_back(std::move(chunk));
             }
@@ -126,7 +128,8 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
             spdlog::trace(
                     "[reorder_reads] n = {}, rids_out.size() = {}, rids_in.size() = {}, "
                     "chunk.shape = {}",
-                    n, std::size(rids_out), std::size(rids_in), tensor_shape_as_string(chunk));
+                    n, std::size(rids_out), std::size(rids_in),
+                    utils::tensor_shape_as_string(chunk));
 
             // Create a lookup.
             std::unordered_map<std::string, int64_t> rids_in_map;
@@ -165,9 +168,9 @@ std::vector<Sample> merge_adjacent_samples_impl(std::vector<Sample> samples) {
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
             spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                          print_container_as_string(missing_in_indices, ", "));
+                          utils::print_container_as_string(missing_in_indices, ", "));
             spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                          print_container_as_string(missing_out_indices, ", "));
+                          utils::print_container_as_string(missing_out_indices, ", "));
 
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;
@@ -340,7 +343,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype} {}
 
-Sample EncoderReadAlignment::encode_region(BamFile& bam_file,
+Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
                                            const std::string& ref_name,
                                            const int64_t ref_start,
                                            const int64_t ref_end,

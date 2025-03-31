@@ -1,29 +1,26 @@
 #include "ModBaseCaller.h"
 
-#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
 #include "MotifMatcher.h"
+#include "config/ModBaseModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
 
+#include <nvtx3/nvtx3.hpp>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
+#include <vector>
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <torch/cuda.h>
 #endif
-#include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
-
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#include <chrono>
 
 using namespace std::chrono_literals;
 
@@ -43,26 +40,28 @@ struct ModBaseCaller::ModBaseTask {
     int num_chunks;
 };
 
-ModBaseCaller::ModBaseData::ModBaseData(const ModBaseModelConfig& config,
+ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config,
                                         const at::TensorOptions& opts,
                                         const int batch_size_)
         : params(config),
+          kmer_refinement_levels(load_kmer_refinement_levels(config)),
           module_holder(load_modbase_model(params, opts)),
           matcher(params),
           batch_size(batch_size_) {
     if (params.refine.do_rough_rescale) {
-        scaler = std::make_unique<ModBaseScaler>(params.refine.levels, params.refine.kmer_len,
+        scaler = std::make_unique<ModBaseScaler>(kmer_refinement_levels, params.general.kmer_len,
                                                  params.refine.center_idx);
     }
 
 #if DORADO_CUDA_BUILD
     if (opts.device().is_cuda()) {
+        c10::cuda::CUDAGuard device_guard(opts.device());
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
         const int channels = utils::BaseInfo::NUM_BASES * params.general.kmer_len;
 
         // Warmup
-        c10::cuda::OptionalCUDAStreamGuard guard(stream);
+        c10::cuda::CUDAStreamGuard guard(*stream);
         auto input_sigs = torch::empty({batch_size, 1, get_sig_len()}, opts);
         auto input_seqs = torch::empty({batch_size, get_seq_len(), channels}, opts);
         module_holder.forward(input_sigs, input_seqs);
@@ -79,13 +78,11 @@ int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
 
-    const size_t cs_ = params.is_chunked_input_model()
-                               ? static_cast<int64_t>(params.context.chunk_size)
-                               : static_cast<int64_t>(params.context.samples);
-    const int64_t cs = static_cast<int64_t>(cs_);
+    const int64_t cs =
+            params.is_chunked_input_model() ? params.context.chunk_size : params.context.samples;
     if (cs < 0) {
         throw std::runtime_error("Integer conversion error in ModBaseData::get_sig_len value: '" +
-                                 std::to_string(cs_) + "'.");
+                                 std::to_string(cs) + "'.");
     }
     return cs;
 }
@@ -109,14 +106,8 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
         m_options = at::TensorOptions().device(torch::kCPU).dtype(torch::kFloat32);
 #ifdef __APPLE__
     } else if (device == "metal") {
-#if TARGET_OS_IPHONE
-        spdlog::warn("Using CPU backend since no MPS backend available on iOS.");
-        const auto device_type = torch::kCPU;
-        const auto scalar_type = torch::kFloat32;
-#else
         const auto device_type = torch::kMPS;
         const auto scalar_type = torch::kFloat16;
-#endif
         m_options = at::TensorOptions().device(device_type).dtype(scalar_type);
 #endif
     } else {
@@ -129,8 +120,7 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
     m_task_threads.reserve(m_num_models);
 
     for (size_t i = 0; i < m_num_models; ++i) {
-        const auto& config = load_modbase_model_config(model_paths[i]);
-
+        const auto& config = config::load_modbase_model_config(model_paths[i]);
         at::InferenceMode guard;
         auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
         m_model_data.emplace_back(std::move(caller_data));

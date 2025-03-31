@@ -43,8 +43,7 @@ for model_name in \
 done
 
 # Extract the GPU name from the benchmark filenames
-benchmark_filenames="chunk_benchmarks__*"
-benchmark_files=( $benchmark_filenames )
+benchmark_files=(chunk_benchmarks__*)
 gpu_name="${benchmark_files[0]}"
 # strip off beginning "chunk_benchmarks__"
 gpu_name=${gpu_name#*__}
@@ -65,13 +64,15 @@ namespace dorado::basecall {
 
 void Add${gpu_name_no_dashes}Benchmarks(std::map<std::pair<std::string, std::string>, std::unordered_map<int, float>>& chunk_benchmarks) {" >> ${gpu_name}.cpp
 
-# Add the chunk benchmarks for every model 
+# Add the chunk benchmarks for every model
 cat chunk_benchmarks__*.txt >> ${gpu_name}.cpp
 
 echo "}
 
 } // namespace dorado::basecall
 " >> ${gpu_name}.cpp
+
+gpu_name=${gpu_name%%_cuda*}
 
 echo "#pragma once
 

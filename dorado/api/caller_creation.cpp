@@ -1,8 +1,8 @@
 #include "caller_creation.h"
 
 #if DORADO_CUDA_BUILD
-#include "basecall/BasecallerParams.h"
 #include "basecall/CudaCaller.h"
+#include "config/BatchParams.h"
 #elif DORADO_METAL_BUILD
 #include "basecall/MetalCaller.h"
 #endif
@@ -18,7 +18,7 @@ std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
 }
 #elif DORADO_METAL_BUILD
 std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const basecall::CRFModelConfig& model_config,
+        const config::BasecallModelConfig& model_config,
         float memory_limit_fraction) {
     if (model_config.is_tx_model()) {
         return std::make_shared<basecall::MetalTxCaller>(model_config);

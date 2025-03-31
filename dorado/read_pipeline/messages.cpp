@@ -4,6 +4,7 @@
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/types.h"
 
 #include <htslib/sam.h>
 
@@ -29,7 +30,7 @@ std::string ReadCommon::generate_read_group() const {
         } else {
             read_group += model_name;
         }
-        if (!barcode.empty() && barcode != "unclassified") {
+        if (!barcode.empty() && barcode != UNCLASSIFIED) {
             read_group += '_' + barcode;
         }
     }
@@ -57,6 +58,16 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
 
     bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
                    (uint8_t *)attributes.start_time.c_str());
+
+    if (primer_classification.orientation != StrandOrientation::UNKNOWN) {
+        auto sense_data = uint8_t(to_char(primer_classification.orientation));
+        bam_aux_append(aln, "TS", 'A', 1, &sense_data);
+    }
+    if (!primer_classification.umi_tag_sequence.empty()) {
+        auto len = int(primer_classification.umi_tag_sequence.size()) + 1;
+        auto data = (const uint8_t *)primer_classification.umi_tag_sequence.c_str();
+        bam_aux_append(aln, "RX", 'Z', len, data);
+    }
 
     // For reads which are the result of read splitting, the read number will be set to -1
     int rn = attributes.read_number;
@@ -101,7 +112,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
         bam_aux_update_array(aln, "mv", 'c', int(m.size()), (uint8_t *)m.data());
     }
 
-    if (rna_poly_tail_length >= 0) {
+    if (rna_poly_tail_length != ReadCommon::POLY_TAIL_NOT_ENABLED) {
         bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
                        (uint8_t *)&rna_poly_tail_length);
     }
@@ -133,9 +144,12 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     }
 }
 
-void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
+void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> threshold) const {
     if (!mod_base_info) {
         return;
+    }
+    if (!threshold.has_value()) {
+        throw std::logic_error("Cannot generate modbase tags without a valid threshold.");
     }
 
     const size_t num_channels = mod_base_info->alphabet.size();
@@ -167,7 +181,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
     }
     auto modbase_mask = context_handler.get_sequence_mask(seq);
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
-                                threshold);
+                                *threshold);
 
     if (is_duplex) {
         // If this is a duplex read, we need to compute the reverse complement mask and combine it
@@ -194,7 +208,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, uint8_t threshold) const {
         // Update the context mask using the reversed sequence
         context_handler.update_mask(modbase_mask_rc, reverse_complemented_seq,
                                     mod_base_info->alphabet,
-                                    reverseMatrix(base_mod_probs, num_states), threshold);
+                                    reverseMatrix(base_mod_probs, num_states), *threshold);
 
         // Reverse the mask in-place
         std::reverse(modbase_mask_rc.begin(), modbase_mask_rc.end());
@@ -302,7 +316,7 @@ float ReadCommon::calculate_mean_qscore() const {
 }
 
 std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
-                                                  uint8_t modbase_threshold,
+                                                  std::optional<uint8_t> modbase_threshold,
                                                   bool is_duplex_parent) const {
     if (read_id.empty()) {
         throw std::runtime_error("Empty read_name string provided");
@@ -325,13 +339,13 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     // Convert string qscore to phred vector.
     std::vector<uint8_t> qscore;
     std::transform(qstring.begin(), qstring.end(), std::back_inserter(qscore),
-                   [](char c) { return (uint8_t)(c)-33; });
+                   [](char c) { return static_cast<uint8_t>(c - 33); });
 
     bam_set1(aln, read_id.length(), read_id.c_str(), uint16_t(flags), -1, leftmost_pos,
              uint8_t(map_q), 0, nullptr, -1, next_pos, 0, seq.length(), seq.c_str(),
              (char *)qscore.data(), 0);
 
-    if (!barcode.empty() && barcode != "unclassified") {
+    if (!barcode.empty() && barcode != UNCLASSIFIED) {
         bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1), (uint8_t *)barcode.c_str());
     }
 

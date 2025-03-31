@@ -10,9 +10,12 @@
 #include <string>
 #include <vector>
 
+namespace dorado::config {
+struct ModBaseModelConfig;
+}
+
 namespace dorado::modbase {
 
-struct ModBaseModelConfig;
 class ModBaseCaller;
 
 class ModBaseRunner {
@@ -33,7 +36,7 @@ public:
     // Get the sequence indexes of all motif hits for this sequence
     std::vector<size_t> get_motif_hits(size_t model_id, const std::string& seq) const;
     // Get the modbase model config
-    const ModBaseModelConfig& model_params(size_t model_id) const;
+    const config::ModBaseModelConfig& model_params(size_t model_id) const;
     // Get the integer base_id for a model
     int model_base_id(size_t model_id) const;
     // The number of modbase models that have been loaded
@@ -43,7 +46,7 @@ public:
     size_t batch_size() const { return m_input_sigs[0].size(0); }
 
     // Asserts all modbase models are either chunked or context-centered
-    bool get_homogenous_model_type() const;
+    bool is_chunked_model_type() const;
     // Only meaningful for models accepting chunked inputs
     bool takes_chunk_inputs() const;
 

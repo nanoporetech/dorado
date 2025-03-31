@@ -1,10 +1,11 @@
 #include "ModBaseChunkCallerNode.h"
 
+#include "config/ModBaseModelConfig.h"
 #include "messages.h"
 #include "modbase/ModBaseContext.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "modbase/encode_kmer.h"
 #include "utils/dev_utils.h"
+#include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_naming.h"
 #include "utils/types.h"
@@ -17,6 +18,7 @@
 #include <c10/core/TensorOptions.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
+#include <torch/version.h>
 
 #include <algorithm>
 #include <atomic>
@@ -144,6 +146,11 @@ void ModBaseChunkCallerNode::terminate_impl() {
         }
     }
     m_output_workers.clear();
+
+    // There should be no reads left in the node after it's terminated.
+    if (!m_working_reads.empty()) {
+        throw std::logic_error("Reads have been left in ModBaseChunkCallerNode");
+    }
 }
 
 void ModBaseChunkCallerNode::restart() {
@@ -158,7 +165,7 @@ void ModBaseChunkCallerNode::restart() {
 }
 
 void ModBaseChunkCallerNode::init_modbase_info() {
-    std::vector<std::reference_wrapper<const modbase::ModBaseModelConfig>> base_mod_params;
+    std::vector<std::reference_wrapper<const config::ModBaseModelConfig>> base_mod_params;
     auto& runner = m_runners.at(0);
     modbase::ModBaseContext context_handler;
     for (size_t model_id = 0; model_id < runner->num_models(); ++model_id) {
@@ -170,7 +177,7 @@ void ModBaseChunkCallerNode::init_modbase_info() {
         m_num_states += params.count;
     }
 
-    ModBaseInfo mod_info = modbase::get_modbase_info(base_mod_params);
+    ModBaseInfo mod_info = config::get_modbase_info(base_mod_params);
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(mod_info.alphabet), std::move(mod_info.long_names), context_handler.encode());
     m_base_prob_offsets = mod_info.base_probs_offsets();
@@ -273,6 +280,7 @@ std::vector<uint64_t> ModBaseChunkCallerNode::get_seq_to_sig_map(const std::vect
     nvtx3::scoped_range range{"pop_s2s_map"};
     auto seq_to_sig_map = utils::moves_to_map(moves, m_canonical_stride, signal_len, reserve);
     if (m_is_rna_model) {
+        assert(signal_len % m_canonical_stride == 0);
         utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
     }
     return seq_to_sig_map;
@@ -334,12 +342,28 @@ void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
                                              const std::vector<int>& int_seq,
                                              const modbase::RunnerPtr& runner) const {
     if (m_is_rna_model) {
-        nvtx3::scoped_range range{"pop_sig_rev"};
-        // seq_to_sig_map is reversed on init do not reverse it again here.
-        signal = runner->scale_signal(0, at::flip(raw_data, 0), int_seq, seq_to_sig_map);
+        nvtx3::scoped_range range{"pop_sig_rna"};
+
+        // Reverse the RNA signal and prepend a short mirrored slice of padding to ensure moves are
+        // stride aligned.
+        const int64_t len = raw_data.size(0);
+        const int64_t padding = utils::pad_to(len, m_canonical_stride) - len;
+
+#if TORCH_VERSION_MAJOR < 2
+        at::Tensor sig =
+                at::concat({raw_data.slice(0, len - padding, len), at::flip(raw_data, 0)}, 0);
+#else
+        at::Tensor sig = at::empty({len + padding}, raw_data.options());
+        at::Tensor body = sig.slice(0, padding, len + padding);
+        at::flip_out(body, raw_data, 0);
+
+        sig.slice(0, 0, padding) = raw_data.slice(0, len - padding, len);
+#endif
+
+        signal = runner->scale_signal(0, sig, int_seq, seq_to_sig_map);
         return;
     }
-    nvtx3::scoped_range range{"pop_sig_fwd"};
+    nvtx3::scoped_range range{"pop_sig"};
     signal = runner->scale_signal(0, raw_data, int_seq, seq_to_sig_map);
     return;
 }
@@ -428,10 +452,10 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
 }
 
 template <typename ReadType>
-void ModBaseChunkCallerNode::finalise_read(std::unique_ptr<ReadType>& read_ptr,
-                                           std::shared_ptr<WorkingRead>& working_read) {
+void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
+                                                     std::shared_ptr<WorkingRead> working_read) {
     if (!read_ptr || !working_read) {
-        throw std::invalid_argument("Null pointer passed to finalise_read.");
+        throw std::invalid_argument("Null pointer passed to add_read_to_working_set.");
     }
 
     // Hand over our ownership to the working read
@@ -451,7 +475,11 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
                                                    const at::Tensor& signal,
                                                    const std::vector<uint8_t>& moves,
                                                    const std::string& read_id) const {
-    const size_t signal_len = signal.size(0);
+    // For RNA: Pad signal length to be evenly divisible by the canonical stride so that the
+    // sequence to signal mapping is always stride aligned and not offset by any remainder
+    // in the last move (which becomes the first move when reversed).
+    const size_t signal_len =
+            m_is_rna_model ? utils::pad_to(signal.size(0), m_canonical_stride) : signal.size(0);
 
     if (!populate_hits_seq(mbd.per_base_hits_seq, seq, runner)) {
         return false;
@@ -499,14 +527,14 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
 
     if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
                                read_id)) {
-        finalise_read(read_ptr, working_read);
+        send_message_to_sink(std::move(read_ptr));
         return;
-    };
+    }
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
 
-    finalise_read(read_ptr, working_read);
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
@@ -596,7 +624,12 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
         spdlog::error("ModBase Duplex Caller: {}", e.what());
     }
 
-    finalise_read(read_ptr, working_read);
+    if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
+        send_message_to_sink(std::move(read_ptr));
+        return;
+    }
+
+    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
     // Push the chunks to the chunk queues.
     // Needs to be done after working_read->read is set as chunks could be processed
@@ -861,10 +894,6 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 
         const std::vector<int64_t>& hits_seq = modbase_data.per_base_hits_seq.at(chunk->base_id);
         const std::vector<int64_t>& hits_sig = modbase_data.per_base_hits_sig.at(chunk->base_id);
-
-        if (hits_seq.empty()) {
-            continue;
-        }
 
         // The offset into the mod probs for the canonical base
         const int64_t base_offset = static_cast<int64_t>(m_base_prob_offsets.at(cfg.mods.base_id));

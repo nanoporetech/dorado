@@ -1,13 +1,14 @@
 #include "model_config.h"
 
 #include <toml.hpp>
-#include <toml/value.hpp>
 
 #include <cstddef>
 #include <ostream>
 #include <stdexcept>
 
 namespace dorado::polisher {
+
+namespace {
 
 void print_toml(std::ostream& os, const toml::value& val, int indent) {
     const std::string indent_str(indent, ' ');
@@ -61,6 +62,8 @@ std::unordered_map<std::string, std::string> parse_kwargs(const toml::value& tab
     return kwargs;
 }
 
+}  // namespace
+
 ModelConfig parse_model_config(const std::filesystem::path& config_path,
                                const std::string& model_file) {
     const toml::value config_toml = toml::parse(config_path.string());
@@ -76,14 +79,35 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     }
 
     // print_toml(config_toml, 0);
+    (void)&print_toml;
 
     ModelConfig cfg;
 
     // Parse the config version.
-    { cfg.version = toml::find<int>(config_toml, "config_version"); }
+    {
+        cfg.version = toml::find<int>(config_toml, "config_version");
+    }
 
     // Parse the config version.
-    { cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model"); }
+    {
+        cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model");
+    }
+
+    // Check if the "supported_basecallers" key exists
+    {
+        cfg.supported_basecallers.emplace(cfg.basecaller_model);
+
+        if (config_toml.contains("supported_basecallers")) {
+            try {
+                std::vector<std::string> data =
+                        toml::find<std::vector<std::string>>(config_toml, "supported_basecallers");
+                cfg.supported_basecallers.insert(std::begin(data), std::end(data));
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Error parsing 'supported_basecallers' from config: '" +
+                                         config_path.string() + "'. Message: " + e.what());
+            }
+        }
+    }
 
     // Check if the "supported_basecallers" key exists
     {

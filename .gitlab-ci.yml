@@ -31,7 +31,8 @@ variables:
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
   CUDA: "11.8"
-  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
+  WIN_CUDA: "12.8"
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${WIN_CUDA}"
   MTL_DEBUG_LAYER: 1
   FF_TIMESTAMPS: true
 
@@ -40,21 +41,19 @@ variables:
 .macos_arm_runner:
   tags:
     - osx_arm64
-    - xcode-15.0.1
+    - xcode-15.3
   variables:
-    MACOSX_DEPLOYMENT_TARGET: "11.0"
-
-.macos_x64_runner:
-  tags:
-    - osx_x86
-    - xcode-14.2
-  variables:
-    MACOSX_DEPLOYMENT_TARGET: "10.15"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
 
 .linux_runner:
   tags:
     - ubuntu-20.04
     - nvidia-docker
+
+.linux_cpu_runner:
+  tags:
+    - ubuntu-20.04
+    - docker-as
 
 .linux_arm64_runner:
   tags:
@@ -70,17 +69,29 @@ variables:
     - linux-arm64-gpu
     - nvidia-docker
 
+.linux_orin_cuda_12_runner:
+  tags:
+    - linux-arm64-gpu-12.6
+    - nvidia-docker
+
 .windows_runner:
   tags:
     - windows-10
     - VS2019
-    - cuda-${CUDA}
+    - cuda-${WIN_CUDA}
 
-.linux_dependencies:
+.linux_build_dependencies:
   before_script:
     - echo Dorado dependency stage
-    - apt-get update && apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libzstd-dev libsz2 ccache automake
+    - apt-get update
+    - apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
     - pip install gcovr
+
+.linux_test_dependencies:
+  before_script:
+    - echo Dorado dependency stage
+    - apt-get update
+    - apt-get install -y --no-install-recommends samtools curl
 
 .set_parallel_jobs:
   - |
@@ -209,7 +220,7 @@ pre-commit:
 build:linux:x86:focal:install_deps:
   image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
     - .on_nightly_or_manual
@@ -220,7 +231,7 @@ build:linux:x86:focal:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
 
@@ -229,7 +240,7 @@ build:linux:x86:focal_koi_from_source:
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
     - .on_nightly_or_manual
@@ -240,7 +251,7 @@ build:linux:x86:jammy:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
   artifacts: null
@@ -261,7 +272,7 @@ build:linux:x86:focal_coverage:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .on_nightly_or_manual
   script:
@@ -276,7 +287,8 @@ build:linux:x86:focal:clang_tidy:
   extends:
     - .linux_runner
   script:
-    - apt update && apt install -y clang clang-tidy
+    - apt update
+    - apt install -y clang clang-tidy
     - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
   artifacts: null
@@ -291,7 +303,8 @@ build:linux:x86:focal:clang_tidy:
     - .linux_runner
   script:
     - !reference [.set_parallel_jobs]
-    - apt update && apt install -y autoconf autotools-dev automake wget libc6-dbg
+    - apt update
+    - apt install -y autoconf autotools-dev automake wget libc6-dbg
     # We need a recent valgrind that includes https://bugs.kde.org/show_bug.cgi?id=402833.
     - VALGRIND_VERSION="3.22.0"
     - wget https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2
@@ -346,22 +359,14 @@ build:linux:arm64:bionic:unittests:
   needs:
     - build:linux:arm64:bionic
 
-build:linux:arm64:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
+build:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_and_test_dorado
-
-build:linux:arm64:focal:no_ccache:
-  variables:
-    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
-  extends:
-    - build:linux:arm64:focal
-    - .on_nightly_or_manual
-  artifacts: null
 
 build:linux:x86:focal:no_ccache:
   variables:
@@ -377,7 +382,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
 
 build:windows:debug:
   variables:
@@ -397,6 +402,15 @@ build:windows_koi_from_source:
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
   artifacts: null
 
+build:windows:no_ccache:
+  extends:
+    - build:windows
+    - .on_nightly_or_manual
+  before_script:
+    - !reference ["build:windows", before_script]
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
+  artifacts: null
+
 build:macos:arm:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
@@ -412,59 +426,6 @@ build:macos:arm:no_ccache:
     - .on_nightly_or_manual
   artifacts: null
 
-build:macos:x64:
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-  extends:
-    - .macos_x64_runner
-    - .build_and_test_dorado
-
-build:macos:x64:no_ccache:
-  variables:
-    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
-  extends:
-    - build:macos:x64
-    - .on_nightly_or_manual
-  artifacts: null
-
-build:ios:m1:
-  variables:
-    BUILD_TARGET: "ALL_BUILD"
-    PLATFORM: "OS64"
-    SDK_NAME: "iphoneos"
-    DORADO_RUN_TESTS: "OFF"
-  extends:
-    - .macos_arm_runner
-    - .build_and_test_dorado
-  script:
-    # If MACOSX_DEPLOYMENT_TARGET is set then Xcode will try to build for macOS.
-    - unset MACOSX_DEPLOYMENT_TARGET
-    - export SDKROOT=$(xcrun --sdk ${SDK_NAME} --show-sdk-path)
-    - echo "SDKROOT=${SDKROOT}"
-    - export BUILD_OPTIONS="
-      -G Xcode
-      -D CMAKE_TOOLCHAIN_FILE=$(pwd)/cmake/ios-cmake/ios.toolchain.cmake
-      -D PLATFORM=${PLATFORM}
-      -D ENABLE_BITCODE=OFF
-      -D SKIP_HDF_PLUGINS=ON
-      -D DEPLOYMENT_TARGET=16.0
-      -D DORADO_DISABLE_DORADO=ON
-      -D DORADO_RUN_TESTS=${DORADO_RUN_TESTS}
-      -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO"
-    - !reference [.build_and_test_dorado, script]
-  artifacts: null
-
-build:ios_sim:m1:
-  variables:
-    PLATFORM: "SIMULATORARM64"
-    SDK_NAME: "iphonesimulator"
-    DORADO_RUN_TESTS: "ON"
-  extends:
-    # Note that we don't technically need CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED
-    # disabled for simulator builds, but it doesn't hurt.
-    - build:ios:m1
-  artifacts: null
-
 build_archive:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
@@ -473,12 +434,11 @@ build_archive:linux:x86:focal:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
-  image: nvcr.io/nvidia/pytorch:24.06-py3
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-12.8.0:1.0
   variables:
-    # Note: the linker flag is a workaround for the provided torch forgetting to link to cublas.
-    BUILD_OPTIONS: "-D DORADO_LIBTORCH_DIR=/usr/local/lib/python3.10/dist-packages/torch -D CMAKE_EXE_LINKER_FLAGS:STRING='-Wl,--copy-dt-needed-entries'"
+    CUDA: "12.8"
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
@@ -490,13 +450,13 @@ build_archive:linux:arm64:bionic:
     - .build_dorado_archive
     - .on_nightly_or_manual
 
-build_archive:linux:arm64:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
+build_archive:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   extends:
-    - .linux_dependencies
+    - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual
+    - .on_nightly_or_manual    
 
 build_archive:linux:x86:centos7:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-centos7-cuda-${CUDA}.0:1.1
@@ -525,17 +485,6 @@ build_archive:macos:arm:
     - !reference [.build_dorado_archive, script]
     - !reference [.sign_dorado:macos, script]
 
-build_archive:macos:x64:
-  extends:
-    - .macos_x64_runner
-    - .build_dorado_archive
-    - .on_nightly_or_manual
-  script:
-    - !reference [.build_dorado_archive, script]
-    # Signing on x64 disabled for now since our CI machines are on 10.15.
-    # See https://developer.apple.com/forums/thread/712665.
-    #- !reference [.sign_dorado:macos, script]
-
 # Test stage components
 
 .test_dorado:
@@ -545,11 +494,14 @@ build_archive:macos:x64:
     MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 384
     NO_TEST_DORADO_CORRECT: 0
+    NO_TEST_DORADO_POLISH: 0
     NO_TEST_DUPLEX: 0
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
@@ -565,7 +517,9 @@ build_archive:macos:x64:
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
     - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
@@ -577,7 +531,9 @@ build_archive:macos:x64:
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
-    - rm -rf test_archive && mkdir test_archive && pushd test_archive
+    - rm -rf test_archive
+    - mkdir test_archive
+    - cd test_archive
     - mv ../archive .
     - tar -xzf archive/dorado-*.gz
     - ldd ./dorado-*/bin/dorado
@@ -597,7 +553,7 @@ test:windows:
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_runner
     - .test_dorado
   needs:
@@ -611,29 +567,25 @@ test:linux:x86:focal:
 test:linux:arm64:bionic:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r32.4.3-deps:1.3
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_tegra_runner
     - .test_dorado
   variables:
-    GIT_STRATEGY: none
-    MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
     BATCH: 0
-    MODEL_SPEED: hac
-    MODEL_VERSION: v4.2.0
     NO_TEST_DORADO_CORRECT: 1
     NO_TEST_DORADO_POLISH: 1
     NO_TEST_DUPLEX: 1
   needs:
     - build:linux:arm64:bionic
 
-test:linux:arm64:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
+test:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   extends:
-    - .linux_dependencies
-    - .linux_orin_runner
+    - .linux_test_dependencies
+    - .linux_orin_cuda_12_runner
     - .test_dorado
   needs:
-    - build:linux:arm64:focal
+    - build:linux:arm64:jammy
 
 test:macos:arm:
   extends:
@@ -642,48 +594,40 @@ test:macos:arm:
   needs:
     - build:macos:arm
 
-test:macos:x64:
+# Test that you can run dorado in clean environments
+.test_archive:linux:x86:
   extends:
-    - .macos_x64_runner
-    - .test_dorado
-  needs:
-    - build:macos:x64
-  variables:
-    GIT_STRATEGY: none
-    MODEL: dna_r10.4.1_e8.2_400bps_fast@v4.1.0
-    BATCH: 0
-    MODEL_SPEED: hac
-    MODEL_VERSION: v4.2.0
-    NO_TEST_DORADO_CORRECT: 1
-    NO_TEST_DUPLEX: 1
-  timeout: 1h 30m
-
-# Test that you can run dorado in a clean cuda 20.04 environment
-test_archive:linux:x86:20.04_nvidia:
-  image: nvidia/cuda:${CUDA}.0-devel-ubuntu20.04
-  extends:
-    - .linux_runner
     - .test_archive
+  tags:
+    - ubuntu-20.04
+    - ${RUNNER_TAG}
+  image: ${IMAGE}
+  parallel:
+    matrix:
+      # CUDA environment
+      - RUNNER_TAG: "nvidia-docker"
+        IMAGE:
+        - "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
+        - "nvidia/cuda:${CUDA}.0-devel-ubuntu22.04"
+        #- "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04" doesn't exist
+      # CPU environment
+      - RUNNER_TAG: "docker-as"
+        IMAGE:
+        - "${DORADO_DOCKER_EXT}/ubuntu:20.04"
+        - "${DORADO_DOCKER_EXT}/ubuntu:22.04"
+        - "${DORADO_DOCKER_EXT}/ubuntu:24.04"
+# CUDA 11 build
+test_archive:linux:x86:cuda11:
+  extends:
+    - .test_archive:linux:x86
   needs:
     - build_archive:linux:x86:centos7
-
-# Test that you can run dorado in a clean cpu 18.04 environment
-test_archive:linux:x86:18.04:
-  image: ${DORADO_DOCKER_EXT}/ubuntu:18.04
+# CUDA 12 build
+test_archive:linux:x86:cuda12:
   extends:
-    - .linux_runner
-    - .test_archive
+    - .test_archive:linux:x86
   needs:
-    - build_archive:linux:x86:centos7
-
-# Test that you can run dorado in a clean cpu 20.04 environment
-test_archive:linux:x86:20.04:
-  image: ${DORADO_DOCKER_EXT}/ubuntu:20.04
-  extends:
-    - .linux_runner
-    - .test_archive
-  needs:
-    - build_archive:linux:x86:centos7
+    - build_archive:linux:x86:cuda12
 
 # Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:18.04:
@@ -694,20 +638,20 @@ test_archive:linux:arm64:18.04:
   needs:
     - build_archive:linux:arm64:bionic
 
-test_archive:linux:arm64:20.04:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-pytorch-r35.1.0-pth1.13-py3:1.0
+# Test that you can run dorado in a clean l4t environment
+test_archive:linux:arm64:22.04:
+  image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
   extends:
-    - .linux_dependencies
-    - .linux_orin_runner
+    - .linux_orin_cuda_12_runner
     - .test_archive
   needs:
-    - build_archive:linux:arm64:focal
+    - build_archive:linux:arm64:jammy
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
     - .linux_runner
     - .on_nightly_or_manual
   stage: test
@@ -725,13 +669,13 @@ test:model_download:macos:arm:
     - build:macos:arm
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
-  timeout: 1h 30m
+  timeout: 3h
 
 # Auto bachsize stats generation
 generate_auto_benchmarks:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   extends:
-    - .linux_dependencies
+    - .linux_test_dependencies
   tags:
     - ubuntu-20.04
     - nvidia-docker
@@ -960,8 +904,8 @@ deploy:all:
     expire_in: 1 day
   needs:
     - build_archive:linux:x86:centos7
+    - build_archive:linux:x86:cuda12
     - build_archive:linux:arm64:bionic
-    - build_archive:linux:arm64:focal
+    - build_archive:linux:arm64:jammy
     - build_archive:macos:arm
-    - build_archive:macos:x64
     - build_archive:windows

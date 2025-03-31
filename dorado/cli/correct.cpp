@@ -1,3 +1,4 @@
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "correct/CorrectionProgressTracker.h"
 #include "dorado_version.h"
@@ -14,6 +15,7 @@
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
+#include "utils/string_utils.h"
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
@@ -60,6 +62,12 @@ struct Options {
     std::string resume_path_fn;
     bool compute_num_blocks = false;
     std::optional<int> run_block_id;
+    int32_t kmer_size = 25;
+    int32_t ovl_window_size = 17;
+    int32_t min_chain_score = 2500;
+    float mid_occ_frac = 0.05f;
+    std::unordered_set<std::string> debug_tnames;
+    bool legacy_windowing = false;
 };
 
 /// \brief Define the CLI options.
@@ -83,7 +91,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--infer-threads")
                 .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
-                .default_value(2)
+                .default_value(3)
 #else
                 .default_value(1)
 #endif
@@ -133,6 +141,31 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--run-block-id")
                 .help("ID of the index block to run. If specified, only this block will be run.")
                 .scan<'i', int>();
+    }
+    {
+        parser->hidden.add_argument("--kmer-size")
+                .help("Minimizer kmer size for overlapping.")
+                .default_value(25)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--ovl-window-size")
+                .help("Minimizer window size score for overlapping.")
+                .default_value(17)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--min-chain-score")
+                .help("Minimum chaining score for overlapping.")
+                .default_value(2500)
+                .scan<'i', int>();
+        parser->hidden.add_argument("--mid-occ-frac")
+                .help("Filter out top FLOAT fraction of repetitive minimizers during the overlap "
+                      "process.")
+                .default_value(0.05f)
+                .scan<'g', float>();
+        parser->hidden.add_argument("--debug-tnames")
+                .help("Comma separated list of one or more target read names to process.")
+                .default_value("");
+        parser->hidden.add_argument("--legacy-windowing")
+                .help("Runs legacy windowing instead of the new version.")
+                .flag();
     }
 
     return parser;
@@ -187,6 +220,20 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.compute_num_blocks = parser.visible.get<bool>("compute-num-blocks");
     opt.run_block_id = parser.visible.present<int>("run-block-id");
+
+    // Hidden parameters.
+    opt.kmer_size = parser.hidden.get<int>("kmer-size");
+    opt.ovl_window_size = parser.hidden.get<int>("ovl-window-size");
+    opt.min_chain_score = parser.hidden.get<int>("min-chain-score");
+    opt.mid_occ_frac = parser.hidden.get<float>("mid-occ-frac");
+    opt.legacy_windowing = parser.hidden.get<bool>("legacy-windowing");
+
+    // Debug option, hidden.
+    const std::string tnames_str = parser.hidden.get<std::string>("debug-tnames");
+    if (!std::empty(tnames_str)) {
+        const std::vector<std::string> tnames = utils::split(tnames_str, ',');
+        opt.debug_tnames.insert(std::begin(tnames), std::end(tnames));
+    }
 
     return opt;
 }
@@ -362,12 +409,16 @@ int correct(int argc, char* argv[]) {
     // Check if input options are good.
     validate_options(opt);
 
+    // Set the number of threads so that libtorch doesn't cause a thread bomb.
+    utils::initialise_torch();
+
     // After validation, there is exactly one reads file allowed:
     const std::string in_reads_fn = opt.in_reads_fns.front();
 
     // Compute the number of threads for each stage.
     const int aligner_threads = opt.threads;
-    const int correct_threads = std::max(4, static_cast<int>(opt.threads / 4));
+    const int correct_threads =
+            (!std::empty(opt.debug_tnames)) ? 1 : std::max(4, static_cast<int>(opt.threads / 4));
     const int correct_writer_threads = 1;
     spdlog::debug("Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
                   correct_threads, correct_writer_threads);
@@ -388,7 +439,9 @@ int correct(int argc, char* argv[]) {
         if (opt.compute_num_blocks) {
             spdlog::debug("Only computing the number of index blocks.");
 
-            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1);
+            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
+                                      opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
+                                      opt.mid_occ_frac);
 
             // Loop through all index blocks.
             while (node.load_next_index_block()) {
@@ -442,7 +495,7 @@ int correct(int argc, char* argv[]) {
             // 2. Window generation, encoding + inference and decoding to generate final reads.
             pipeline_desc.add_node<CorrectionInferenceNode>(
                     {hts_writer}, in_reads_fn, correct_threads, opt.device, opt.infer_threads,
-                    opt.batch_size, model_dir);
+                    opt.batch_size, model_dir, opt.legacy_windowing, opt.debug_tnames);
         } else {
             pipeline_desc.add_node<CorrectionPafWriterNode>({});
         }
@@ -465,7 +518,8 @@ int correct(int argc, char* argv[]) {
             // 1. Alignment node that generates alignments per read to be corrected.
             aligner = std::make_unique<CorrectionMapperNode>(
                     in_reads_fn, aligner_threads, opt.index_size, furthest_skip_header,
-                    std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1);
+                    std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1, opt.kmer_size,
+                    opt.ovl_window_size, opt.min_chain_score, opt.mid_occ_frac);
         }
 
         // Set up stats counting.

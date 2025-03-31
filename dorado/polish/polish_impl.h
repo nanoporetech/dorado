@@ -6,6 +6,8 @@
 #include "polish/features/encoder_factory.h"
 #include "polish_stats.h"
 #include "sample.h"
+#include "secondary/bam_file.h"
+#include "secondary/interval.h"
 #include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
@@ -18,7 +20,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <tuple>
+#include <utility>
 #include <vector>
 
 // Forward declare the FastxRandomReader.
@@ -39,16 +41,10 @@ struct DeviceInfo {
 struct PolisherResources {
     std::unique_ptr<EncoderBase> encoder;
     std::unique_ptr<DecoderBase> decoder;
-    std::vector<BamFile> bam_handles;
+    std::vector<secondary::BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<ModelTorchBase>> models;
-};
-
-struct BamInfo {
-    bool uses_dorado_aligner = false;
-    bool has_dwells = false;
-    std::unordered_set<std::string> read_groups;
-    std::unordered_set<std::string> basecaller_models;
+    std::vector<c10::optional<c10::Stream>> streams;
 };
 
 /**
@@ -77,20 +73,13 @@ PolisherResources create_resources(const ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
-                                   const int32_t num_inference_cpu_threads,
+                                   const int32_t num_inference_threads,
                                    const bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override);
-
-/**
- * \brief Opens the input BAM file and summarizes some information needed at runtime.
- * \param in_aln_bam_fn Path to the input BAM file.
- * \param cli_read_group If not empty, only this read group will be loaded from the BAM header.
- */
-BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
@@ -132,7 +121,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         std::vector<Sample>& window_samples,
         const EncoderBase& encoder,
         const Span<const Window> bam_regions,
-        const Span<const Interval> bam_region_intervals,
+        const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -144,7 +133,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
  *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
  */
 std::vector<Sample> encode_windows_in_parallel(
-        std::vector<BamFile>& bam_handles,
+        std::vector<secondary::BamFile>& bam_handles,
         const EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const Window> windows,
@@ -155,7 +144,7 @@ std::vector<Sample> encode_windows_in_parallel(
  *          input draft sequences into windows.
  */
 std::vector<Window> create_windows_from_regions(
-        const std::vector<Region>& regions,
+        const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap);
@@ -184,6 +173,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               const std::vector<c10::optional<c10::Stream>>& streams,
                                const EncoderBase& encoder);
 
 void sample_producer(PolisherResources& resources,
@@ -195,5 +185,13 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data);
+
+std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+        const secondary::Interval& region_batch,
+        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool fill_gaps,
+        const std::optional<char>& fill_char,
+        hts_io::FastxRandomReader& draft_reader);
 
 }  // namespace dorado::polisher

@@ -3,11 +3,12 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/DefaultClientInfo.h"
+#include "utils/fasta_reader.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
@@ -47,14 +48,18 @@ auto make_read(int delay_ms, size_t seq_len) {
 
 }  // namespace
 
-TEST_CASE("Split read pairing", TEST_GROUP) {
+CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     // the second read must start within 1000ms of the end of the first read
     // and min/max length ratio must be greater than 0.2
     // expected pairs: {2, 3} and {5, 6}
 
     // Load a pre-determined read to exercise the mapping pathway.
-    const std::string seq =
-            ReadFileIntoString(std::filesystem::path(get_aligner_data_dir()) / "long_target.fa");
+    const auto fa_file = std::filesystem::path(get_aligner_data_dir()) / "long_target.fa";
+    dorado::utils::FastaReader fa_reader(fa_file.string());
+    auto record = fa_reader.try_get_next_record();
+    record = fa_reader.try_get_next_record();  // Skip the first sequence and use the second one.
+    CATCH_REQUIRE(record.has_value());
+    const std::string seq = record->sequence();
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 
@@ -85,15 +90,15 @@ TEST_CASE("Split read pairing", TEST_GROUP) {
     pipeline.reset();
 
     // the 4 split reads generate one additional readpair
-    CHECK(messages.size() == 9);
+    CATCH_CHECK(messages.size() == 9);
     auto num_reads =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
                 return std::holds_alternative<dorado::SimplexReadPtr>(message);
             });
-    CHECK(num_reads == 7);
+    CATCH_CHECK(num_reads == 7);
     auto num_pairs =
             std::count_if(messages.begin(), messages.end(), [](const dorado::Message& message) {
                 return std::holds_alternative<dorado::ReadPair>(message);
             });
-    CHECK(num_pairs == 2);
+    CATCH_CHECK(num_pairs == 2);
 }

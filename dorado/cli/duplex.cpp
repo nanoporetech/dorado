@@ -1,14 +1,15 @@
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "basecall/CRFModelConfig.h"
 #include "cli/basecall_output_args.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "cli/model_resolution.h"
+#include "config/BasecallModelConfig.h"
+#include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
-#include "dorado_version.h"
 #include "file_info/file_info.h"
-#include "modbase/ModBaseModelConfig.h"
 #include "model_downloader/model_downloader.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
@@ -22,23 +23,18 @@
 #include "read_pipeline/ReadFilterNode.h"
 #include "read_pipeline/ReadToBamTypeNode.h"
 #include "torch_utils/auto_detect_device.h"
+#include "torch_utils/duplex_utils.h"
+#include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
-#include "utils/modbase_parameters.h"
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "torch_utils/duplex_utils.h"
-#include "torch_utils/torch_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
 #include "utils/sys_stats.h"
-#include "utils/tty_utils.h"
 #include "utils/types.h"
 
 #include <cxxpool.h>
@@ -56,6 +52,10 @@
 #include <unordered_set>
 #include <vector>
 
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
+
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 namespace fs = std::filesystem;
 
@@ -65,12 +65,13 @@ namespace {
 
 using namespace dorado::models;
 using namespace dorado::model_resolution;
+using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) {
-    basecall::BasecallerParams basecaller{};
-    basecaller.update(basecall::BasecallerParams::Priority::CLI_ARG,
+BatchParams get_batch_params(argparse::ArgumentParser& arg) {
+    BatchParams basecaller{};
+    basecaller.update(BatchParams::Priority::CLI_ARG,
                       cli::get_optional_argument<int>("--chunksize", arg),
                       cli::get_optional_argument<int>("--overlap", arg),
                       cli::get_optional_argument<int>("--batchsize", arg));
@@ -80,10 +81,10 @@ basecall::BasecallerParams get_basecaller_params(argparse::ArgumentParser& arg) 
 struct DuplexModels {
     std::filesystem::path model_path;
     std::string model_name;
-    basecall::CRFModelConfig model_config;
+    BasecallModelConfig model_config;
 
     std::filesystem::path stereo_model;
-    basecall::CRFModelConfig stereo_model_config;
+    BasecallModelConfig stereo_model_config;
     std::string stereo_model_name;
 
     std::vector<std::filesystem::path> mods_model_paths;
@@ -104,7 +105,7 @@ ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntri
             std::exit(EXIT_FAILURE);
         };
 
-        if (utils::modbase::is_modbase_model(model_path)) {
+        if (is_modbase_model(model_path)) {
             spdlog::error(
                     "Specified model `{}` is not a simplex model but a modified bases model. Pass "
                     "modified bases model paths using `--modified-bases-models`",
@@ -134,7 +135,7 @@ DuplexModels load_models(const std::string& model_arg,
                          const std::string& stereo_model_arg,
                          const std::optional<std::filesystem::path>& model_directory,
                          const DirEntries& dir_entries,
-                         const basecall::BasecallerParams& basecaller_params,
+                         const BatchParams& batch_params,
                          const bool skip_model_compatibility_check,
                          const std::string& device) {
     ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
@@ -175,7 +176,7 @@ DuplexModels load_models(const std::string& model_arg,
         }
 
         if (!skip_model_compatibility_check) {
-            const auto model_config = basecall::load_crf_model_config(model_path);
+            const auto model_config = load_model_config(model_path);
             const auto model_name = model_path.filename().string();
             const auto model_sample_rate = model_config.sample_rate < 0
                                                    ? get_sample_rate_by_model_name(model_name)
@@ -216,8 +217,8 @@ DuplexModels load_models(const std::string& model_arg,
     }
 
     const auto model_name = model_path.filename().string();
-    auto model_config = basecall::load_crf_model_config(model_path);
-    model_config.basecaller.update(basecaller_params);
+    auto model_config = load_model_config(model_path);
+    model_config.basecaller.update(batch_params);
     model_config.normalise_basecaller_params();
 
     if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
@@ -233,8 +234,8 @@ DuplexModels load_models(const std::string& model_arg,
 #endif
 
     const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = basecall::load_crf_model_config(stereo_model_path);
-    stereo_model_config.basecaller.update(basecaller_params);
+    auto stereo_model_config = load_model_config(stereo_model_path);
+    stereo_model_config.basecaller.update(batch_params);
     stereo_model_config.normalise_basecaller_params();
 
 #if DORADO_METAL_BUILD
@@ -259,14 +260,45 @@ DuplexModels load_models(const std::string& model_arg,
                         mods_model_paths,    downloader.temporary_models()};
 }
 
+ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+                                           utils::arg_parse::ArgParser& parser) {
+    // Convert path to params.
+    auto params = get_modbase_params(paths);
+
+    // Allow user to override batchsize.
+    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+        modbase_batchsize.has_value()) {
+        params.batchsize = *modbase_batchsize;
+    }
+
+    // Allow user to override threshold.
+    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+        methylation_threshold.has_value()) {
+        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
+            throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
+        }
+        params.threshold = *methylation_threshold;
+    }
+
+    // Check that the paths are all valid.
+    for (const auto& mb_path : paths) {
+        if (!is_modbase_model(mb_path)) {
+            throw std::runtime_error("Modified bases model not found in the model path at " +
+                                     std::filesystem::weakly_canonical(mb_path).string());
+        }
+    }
+
+    // All looks good.
+    return params;
+}
+
 }  // namespace
 
-using dorado::utils::default_parameters;
 using namespace std::chrono_literals;
 
 int duplex(int argc, char* argv[]) {
     using dorado::utils::default_parameters;
-    using dorado::utils::modbase::default_modbase_parameters;
+    utils::initialise_torch();
     utils::set_torch_allocator_max_split_size();
     // TODO: Re-enable torch deterministic for duplex after OOM
     // on smaller VRAM GPUs is fixed.
@@ -287,7 +319,6 @@ int duplex(int argc, char* argv[]) {
     // inference and decode step because of the fragmentation caused by the
     // cached CUBLAS workspace from the stero model. This causes OOM.
     //utils::make_torch_deterministic();
-    torch::set_num_threads(1);
 
     utils::arg_parse::ArgParser parser("dorado");
 
@@ -368,10 +399,8 @@ int duplex(int argc, char* argv[]) {
         parser.visible.add_argument("--modified-bases-threshold")
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].")
-                .default_value(default_modbase_parameters.methylation_threshold)
                 .scan<'f', float>();
         parser.visible.add_argument("--modified-bases-batchsize")
-                .default_value(default_modbase_parameters.batchsize)
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
@@ -446,7 +475,7 @@ int duplex(int argc, char* argv[]) {
                     "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        bool emit_moves = false, duplex = true;
+        bool emit_moves = false;
 
         auto output_mode = OutputMode::BAM;
 
@@ -523,15 +552,10 @@ int duplex(int argc, char* argv[]) {
             converted_reads_sink = aligner;
         }
 
-        const auto methylation_threshold = parser.visible.get<float>("--modified-bases-threshold");
-        if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
-            spdlog::error("--modified-bases-threshold must be between 0 and 1.");
-            return EXIT_FAILURE;
-        }
-
-        auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, methylation_threshold, nullptr, 1000);
-        auto duplex_read_tagger = pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
+        const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
+                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000);
+        const auto duplex_read_tagger =
+                pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
@@ -539,7 +563,8 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(int(num_reads), duplex, hts_file->finalise_is_noop() ? 0.f : 0.5f);
+        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX, int(num_reads),
+                                hts_file->finalise_is_noop() ? 0.f : 0.5f);
         tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
@@ -598,14 +623,14 @@ int duplex(int argc, char* argv[]) {
             }
 
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
-            const auto basecaller_params = get_basecaller_params(parser.visible);
+            const auto batch_params = get_batch_params(parser.visible);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
             const DuplexModels models = load_models(
                     model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
-                    input_files->get(), basecaller_params, skip_model_compatibility_check, device);
+                    input_files->get(), batch_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 
@@ -613,9 +638,7 @@ int duplex(int argc, char* argv[]) {
             auto initial_device_info = utils::get_cuda_device_info(device, false);
 #endif
 
-            const utils::modbase::ModBaseParams modbase_params = utils::modbase::get_modbase_params(
-                    models.mods_model_paths, parser.visible.get<int>("modified-bases-batchsize"),
-                    methylation_threshold);
+            const auto modbase_params = validate_modbase_params(models.mods_model_paths, parser);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,
@@ -746,11 +769,14 @@ int duplex(int argc, char* argv[]) {
                 return EXIT_FAILURE;
             }
 
+            // Set modbase threshold now that we have the params.
+            pipeline->get_node_ref<ReadToBamTypeNode>(read_converter)
+                    .set_modbase_threshold(modbase_params.threshold);
+
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
             if (!ref.empty()) {
-                const auto& aligner_ref =
-                        dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+                const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
             hts_file->set_header(hdr.get());

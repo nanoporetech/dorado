@@ -1,0 +1,21 @@
+diff --git a/include/highfive/bits/h5_wrapper.hpp b/include/highfive/bits/h5_wrapper.hpp
+index 6f418e3..06dbdf4 100644
+--- a/include/highfive/bits/h5_wrapper.hpp
++++ b/include/highfive/bits/h5_wrapper.hpp
+@@ -2,6 +2,16 @@
+ #include <H5public.h>
+ 
+ namespace HighFive {
++
++// H5free_memory() isn't added until 1.8.13.
++// Until then you had to call free(), or leak if you weren't on Linux.
++#if defined(__linux__) && H5_VERS_MAJOR <= 1 && H5_VERS_MINOR <= 8 && H5_VERS_RELEASE <= 12
++inline int H5free_memory(void* mem) {
++    free(mem);
++    return 0;
++}
++#endif
++
+ namespace detail {
+ inline void h5_free_memory(void* mem) {
+     if (H5free_memory(mem) < 0) {

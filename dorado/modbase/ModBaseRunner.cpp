@@ -1,10 +1,9 @@
 #include "ModBaseRunner.h"
 
 #include "ModBaseCaller.h"
-#include "ModBaseModelConfig.h"
 #include "ModbaseScaler.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -39,7 +38,7 @@ ModBaseRunner::ModBaseRunner(std::shared_ptr<ModBaseCaller> caller)
         : m_caller(std::move(caller)),
           m_input_sigs(m_caller->create_input_sig_tensors()),
           m_input_seqs(m_caller->create_input_seq_tensors()),
-          m_is_chunked_model_type(get_homogenous_model_type())
+          m_is_chunked_model_type(is_chunked_model_type())
 #if DORADO_CUDA_BUILD
           ,
           m_streams(get_streams_from_caller(m_caller))
@@ -111,7 +110,7 @@ std::vector<size_t> ModBaseRunner::get_motif_hits(size_t model_id, const std::st
     return m_caller->modbase_model_data(model_id)->get_motif_hits(seq);
 }
 
-const ModBaseModelConfig& ModBaseRunner::model_params(size_t model_id) const {
+const config::ModBaseModelConfig& ModBaseRunner::model_params(size_t model_id) const {
     return m_caller->modbase_model_data(model_id)->params;
 }
 
@@ -120,7 +119,7 @@ size_t ModBaseRunner::num_models() const { return m_caller->num_models(); }
 void ModBaseRunner::terminate() { m_caller->terminate(); }
 void ModBaseRunner::restart() { m_caller->restart(); }
 
-bool ModBaseRunner::get_homogenous_model_type() const {
+bool ModBaseRunner::is_chunked_model_type() const {
     // Assert all models are either chunked or context-centered.
     const bool is_chunked_model = model_params(0).is_chunked_input_model();
     for (size_t i = 1; i < num_models(); i++) {

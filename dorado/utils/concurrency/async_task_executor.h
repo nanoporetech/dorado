@@ -26,7 +26,7 @@ namespace dorado::utils::concurrency {
 // also flush.
 class AsyncTaskExecutor {
     MultiQueueThreadPool::ThreadPoolQueue& m_thread_pool_queue;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     std::condition_variable m_tasks_in_flight_cv;
     std::size_t m_num_tasks_in_flight{};
     std::unique_ptr<Latch> m_flushing_counter;
@@ -58,10 +58,17 @@ public:
                            task))]() -> decltype(auto) { return (*task_wrapper)(); });
     }
 
-    // Testability. Currently only needs to be made public for utests.
+    std::size_t num_tasks_in_flight() const {
+        std::lock_guard lock(m_mutex);
+        return m_num_tasks_in_flight;
+    }
+
     // Blocks until all queued tasks are completed.
-    // After invoking no further tasks may be enqueued by this executor.
+    // After invoking no further tasks may be enqueued by this executor until `restart` has been called.
     void flush();
+
+    // Allow jobs to be submitted once again.
+    void restart();
 
     // Testability. Do NOT use outside utests
     std::unique_ptr<std::thread> send_async(TaskType task);

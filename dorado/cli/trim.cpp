@@ -1,3 +1,4 @@
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "demux/adapter_info.h"
 #include "dorado_version.h"
@@ -175,7 +176,8 @@ int trim(int argc, char* argv[]) {
     }
 
     // Set up stats counting
-    ProgressTracker tracker(0, false, hts_file.finalise_is_noop() ? 0.f : 0.5f);
+    ProgressTracker tracker(ProgressTracker::Mode::TRIM, 0,
+                            hts_file.finalise_is_noop() ? 0.f : 0.5f);
     tracker.set_description("Trimming");
     std::vector<dorado::stats::StatsCallable> stats_callables;
     stats_callables.push_back(

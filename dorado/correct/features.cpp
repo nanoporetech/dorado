@@ -3,7 +3,8 @@
 #include "conversions.h"
 #include "correct/types.h"
 #include "read_pipeline/messages.h"
-#include "utils/cigar.cpp"
+#include "torch_utils/gpu_profiling.h"
+#include "utils/cigar.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -12,6 +13,7 @@
 #include <torch/types.h>
 
 #include <cstdint>
+#include <stdexcept>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
@@ -19,16 +21,21 @@
 #define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
 #endif
 
-const int TOP_K = 30;
+constexpr int32_t TOP_K = 30;
+constexpr int32_t MAX_INDEL_LEN = 30;
 
 namespace dorado::correction {
 
-bool overlap_has_long_indel(const OverlapWindow& overlap, const CorrectionAlignments& alignments) {
+namespace {
+
+bool overlap_has_long_indel(const OverlapWindow& overlap,
+                            const CorrectionAlignments& alignments,
+                            const int32_t max_indel_len) {
     const auto& cigar = alignments.cigars[overlap.overlap_idx];
-    size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
+    const size_t max_cigar_idx = std::min(size_t(overlap.cigar_end_idx + 1), cigar.size());
     for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
-        if (cigar[i].len >= 30 &&
-            (cigar[i].op == CigarOpType::I || cigar[i].op == CigarOpType::D)) {
+        if ((static_cast<int32_t>(cigar[i].len) >= max_indel_len) &&
+            ((cigar[i].op == CigarOpType::I) || (cigar[i].op == CigarOpType::D))) {
             LOG_TRACE("filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
                       overlap.qstart, overlap.qend, cigar[i].len);
             return true;
@@ -92,26 +99,29 @@ void calculate_accuracy(OverlapWindow& overlap, const CorrectionAlignments& alig
 // Calculate the maximum number of possible inserts for each position of the
 // target sequence. This is done by looking at all aligned queries at each position
 // and picking the longest insertion size.
-std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
-                                        const CorrectionAlignments& alignments,
-                                        int tstart,
-                                        int win_len) {
+std::vector<int32_t> get_max_ins_for_window(const std::vector<OverlapWindow>& overlaps,
+                                            const CorrectionAlignments& alignments) {
+    if (std::empty(overlaps)) {
+        return {};
+    }
+    const int32_t win_len = overlaps.front().win_tend - overlaps.front().win_tstart;
     std::vector<int> max_ins(win_len, 0);
     for (const auto& overlap : overlaps) {
-        auto tpos = overlap.tstart - tstart;
+        int32_t tpos = overlap.tstart - overlap.win_tstart;
 
         const auto& cigar = alignments.cigars[overlap.overlap_idx];
-        int cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
+        const int32_t cigar_len = overlap.cigar_end_idx - overlap.cigar_start_idx + 1;
 
-        for (int i = overlap.cigar_start_idx;
-             i <= std::min(overlap.cigar_end_idx, int(cigar.size()) - 1); i++) {
-            CigarOpType op = cigar[i].op;
-            int len = cigar[i].len;
+        for (int32_t i = overlap.cigar_start_idx;
+             i <= std::min(overlap.cigar_end_idx, static_cast<int32_t>(std::size(cigar)) - 1);
+             ++i) {
+            const CigarOpType op = cigar[i].op;
+            const int32_t len = cigar[i].len;
 
-            int l = -1;
-            if (op == CigarOpType::EQ || op == CigarOpType::X || op == CigarOpType::D) {
+            int32_t l = 0;
+            if ((op == CigarOpType::EQ) || (op == CigarOpType::X) || (op == CigarOpType::D)) {
                 l = len;
-            } else if (op == CigarOpType::I) {
+            } else if ((op == CigarOpType::I) && (tpos > 0)) {
                 max_ins[tpos - 1] = std::max(len, max_ins[tpos - 1]);
                 continue;
             }
@@ -138,9 +148,13 @@ std::vector<int> get_max_ins_for_window(const std::vector<OverlapWindow>& overla
 std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         const std::vector<OverlapWindow>& overlaps,
         const CorrectionAlignments& alignments,
-        int win_len,
-        int tstart,
-        const std::vector<int>& max_ins) {
+        const std::vector<int32_t>& max_ins) {
+    if (std::empty(overlaps)) {
+        return {};
+    }
+    const int32_t win_len = overlaps.front().win_tend - overlaps.front().win_tstart;
+    const int32_t win_tstart = overlaps.front().win_tstart;
+
     static auto base_encoding = gen_base_encoding();
 #ifndef NDEBUG
     static auto base_decoding = gen_base_decoding();
@@ -167,8 +181,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
     float* target_quals_tensor = quals.data_ptr<float>();
     // PyTorch stores data in column major format.
     for (int i = 0; i < win_len; i++) {
-        target_bases_tensor[tpos] = base_encoding[tseq[i + tstart]];
-        target_quals_tensor[tpos] = normalize_quals(float(tqual[i + tstart] + 33));
+        target_bases_tensor[tpos] = base_encoding[tseq[i + win_tstart]];
+        target_quals_tensor[tpos] = normalize_quals(float(tqual[i + win_tstart] + 33));
 
         LOG_TRACE("tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]],
                   target_quals_tensor[tpos]);
@@ -182,11 +196,12 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         float* query_quals_tensor = &target_quals_tensor[length * (w + 1)];
         const auto& overlap = overlaps[w];
         const auto& cigar = alignments.cigars[overlap.overlap_idx];
-        int offset = overlap.tstart - tstart;
+        int offset = overlap.tstart - win_tstart;
 
         bool fwd = alignments.overlaps[overlap.overlap_idx].fwd;
         int oqstart = alignments.overlaps[overlap.overlap_idx].qstart;
         int oqend = alignments.overlaps[overlap.overlap_idx].qend;
+        const int oqlen = alignments.overlaps[overlap.overlap_idx].qlen;
 
         int qstart = -1, qend = -1, qlen = -1;
         if (fwd) {
@@ -202,6 +217,13 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         LOG_TRACE("qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}",
                   qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
         int query_iter = 0;
+        if (qstart >= oqlen) {
+            throw std::runtime_error{
+                    "Query start coordinate is out of bounds when computing features. Make sure "
+                    "that the initial query start position in the window is set to 0, instead of "
+                    "overlap qstart. qstart = " +
+                    std::to_string(qstart) + ", oqlen = " + std::to_string(oqlen)};
+        }
         std::string qseq = alignments.seqs[overlap.overlap_idx].substr(qstart, qlen);
         std::vector<uint8_t> qqual(alignments.quals[overlap.overlap_idx].begin() + qstart,
                                    alignments.quals[overlap.overlap_idx].begin() + qend);
@@ -381,8 +403,12 @@ at::Tensor get_indices(const at::Tensor& bases, const std::vector<std::pair<int,
             .clone();
 }
 
+}  // namespace
+
 std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>& windows,
                                         const CorrectionAlignments& alignments) {
+    utils::ScopedProfileRange spr("filter_features", 1);
+
     std::unordered_set<int> overlap_idxs;
     for (int w = 0; w < (int)windows.size(); w++) {
         auto& overlap_windows = windows[w];
@@ -390,7 +416,7 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
         // Filter overlaps with very large indels
         std::vector<OverlapWindow> filtered_overlaps;
         for (auto& ovlp : overlap_windows) {
-            if (!overlap_has_long_indel(ovlp, alignments)) {
+            if (!overlap_has_long_indel(ovlp, alignments, MAX_INDEL_LEN)) {
                 filtered_overlaps.push_back(std::move(ovlp));
             }
         }
@@ -438,15 +464,10 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
 // Main interface function for generating features for the top_k overlaps for each window
 // given the overlaps for a target read.
 std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWindow>>& windows,
-                                             const CorrectionAlignments& alignments,
-                                             int window_size) {
-    const std::string& tseq = alignments.read_seq;
-    int tlen = (int)tseq.length();
-
+                                             const CorrectionAlignments& alignments) {
     std::vector<WindowFeatures> wfs;
     for (int w = 0; w < (int)windows.size(); w++) {
-        int win_len = (w == (int)windows.size() - 1) ? tlen - window_size * w : window_size;
-        LOG_TRACE("win idx {}: win len {}", w, win_len);
+        LOG_TRACE("win idx {}", w);
         auto& overlap_windows = windows[w];
 
         WindowFeatures wf;
@@ -455,12 +476,11 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
         wf.n_alns = (int)overlap_windows.size();
         if (overlap_windows.size() > 1) {
             // Find the maximum insert size
-            auto max_ins =
-                    get_max_ins_for_window(overlap_windows, alignments, w * window_size, win_len);
+            const std::vector<int32_t> max_ins =
+                    get_max_ins_for_window(overlap_windows, alignments);
 
             // Create tensors
-            auto [bases, quals] = get_features_for_window(overlap_windows, alignments, win_len,
-                                                          w * window_size, max_ins);
+            auto [bases, quals] = get_features_for_window(overlap_windows, alignments, max_ins);
             auto supported = get_supported(bases);
             wf.bases = std::move(bases);
             wf.quals = std::move(quals);

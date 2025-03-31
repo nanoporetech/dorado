@@ -1,17 +1,28 @@
 #include "crf_utils.h"
 
-#include "CRFModelConfig.h"
+#include "config/BasecallModelConfig.h"
 #include "nn/CRFModel.h"
 #include "nn/TxModel.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/memory_utils.h"
 
-#include <algorithm>
-#include <thread>
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAGuard.h>
+#endif
 
-using namespace torch::nn;
+#include <algorithm>
+#include <cstddef>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 namespace dorado::basecall {
+
+namespace {
+
+using namespace torch::nn;
+using namespace config;
+
 std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir,
                                                 bool decomposition,
                                                 bool linear_layer_bias) {
@@ -51,202 +62,78 @@ std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir
     return utils::load_tensors(dir, tensors);
 }
 
-std::vector<torch::Tensor> load_tx_model_weights(const std::filesystem::path &dir) {
-    auto tensors = std::vector<std::string>{
-            // convs 0-4
-            "conv.0.conv.weight.tensor",
-            "conv.0.conv.bias.tensor",
-            "conv.1.conv.weight.tensor",
-            "conv.1.conv.bias.tensor",
-            "conv.2.conv.weight.tensor",
-            "conv.2.conv.bias.tensor",
-            "conv.3.conv.weight.tensor",
-            "conv.3.conv.bias.tensor",
-            "conv.4.conv.weight.tensor",
-            "conv.4.conv.bias.tensor",
+std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg) {
+    if (!cfg.is_tx_model()) {
+        throw std::runtime_error(
+                "load_tx_model_weights expected a transformer model config from: '" +
+                cfg.model_path.string() + "'");
+    }
 
-            // tx encoder layer 0
-            "transformer_encoder.0.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.0.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.0.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.0.ff.fc1.weight.tensor",
-            "transformer_encoder.0.ff.fc2.weight.tensor",
-            "transformer_encoder.0.norm1.weight.tensor",
-            "transformer_encoder.0.norm2.weight.tensor",
+    const std::string conv_prefix = "conv.";
+    const std::vector<std::string> conv_names{".conv.weight.tensor", ".conv.bias.tensor"};
 
-            // tx encoder layer 1
-            "transformer_encoder.1.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.1.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.1.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.1.ff.fc1.weight.tensor",
-            "transformer_encoder.1.ff.fc2.weight.tensor",
-            "transformer_encoder.1.norm1.weight.tensor",
-            "transformer_encoder.1.norm2.weight.tensor",
+    const std::string enc_prefix = "transformer_encoder.";
+    const std::vector<std::string> enc_names{".self_attn.Wqkv.weight.tensor",
+                                             ".self_attn.out_proj.weight.tensor",
+                                             ".self_attn.out_proj.bias.tensor",
+                                             ".ff.fc1.weight.tensor",
+                                             ".ff.fc2.weight.tensor",
+                                             ".norm1.weight.tensor",
+                                             ".norm2.weight.tensor"};
 
-            // tx encoder layer 2
-            "transformer_encoder.2.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.2.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.2.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.2.ff.fc1.weight.tensor",
-            "transformer_encoder.2.ff.fc2.weight.tensor",
-            "transformer_encoder.2.norm1.weight.tensor",
-            "transformer_encoder.2.norm2.weight.tensor",
+    const std::vector<std::string> remaining_names{"upsample.linear.weight.tensor",
+                                                   "upsample.linear.bias.tensor",
+                                                   "crf.linear.weight.tensor"};
 
-            // tx encoder layer 3
-            "transformer_encoder.3.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.3.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.3.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.3.ff.fc1.weight.tensor",
-            "transformer_encoder.3.ff.fc2.weight.tensor",
-            "transformer_encoder.3.norm1.weight.tensor",
-            "transformer_encoder.3.norm2.weight.tensor",
+    const size_t num_conv_weights = cfg.convs.size() * conv_names.size();
+    const size_t num_tx_weights = cfg.tx->tx.depth * enc_names.size();
+    const size_t num_tensors = num_conv_weights + num_tx_weights + remaining_names.size();
 
-            // tx encoder layer 4
-            "transformer_encoder.4.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.4.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.4.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.4.ff.fc1.weight.tensor",
-            "transformer_encoder.4.ff.fc2.weight.tensor",
-            "transformer_encoder.4.norm1.weight.tensor",
-            "transformer_encoder.4.norm2.weight.tensor",
+    auto tensors = std::vector<std::string>{num_tensors};
 
-            // tx encoder layer 5
-            "transformer_encoder.5.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.5.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.5.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.5.ff.fc1.weight.tensor",
-            "transformer_encoder.5.ff.fc2.weight.tensor",
-            "transformer_encoder.5.norm1.weight.tensor",
-            "transformer_encoder.5.norm2.weight.tensor",
+    // Add convolutions
+    for (size_t cv = 0; cv < cfg.convs.size(); cv++) {
+        for (size_t n = 0; n < conv_names.size(); n++) {
+            const size_t idx = cv * conv_names.size() + n;
+            const std::string name = conv_prefix + std::to_string(cv) + conv_names.at(n);
+            tensors.at(idx) = name;
+        }
+    }
 
-            // tx encoder layer 6
-            "transformer_encoder.6.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.6.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.6.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.6.ff.fc1.weight.tensor",
-            "transformer_encoder.6.ff.fc2.weight.tensor",
-            "transformer_encoder.6.norm1.weight.tensor",
-            "transformer_encoder.6.norm2.weight.tensor",
+    // Add encoders
+    size_t offset = num_conv_weights;
+    for (int enc = 0; enc < cfg.tx->tx.depth; enc++) {
+        for (size_t n = 0; n < enc_names.size(); n++) {
+            const size_t idx = offset + enc * enc_names.size() + n;
+            const std::string name = enc_prefix + std::to_string(enc) + enc_names.at(n);
+            tensors.at(idx) = name;
+        }
+    }
 
-            // tx encoder layer 7
-            "transformer_encoder.7.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.7.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.7.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.7.ff.fc1.weight.tensor",
-            "transformer_encoder.7.ff.fc2.weight.tensor",
-            "transformer_encoder.7.norm1.weight.tensor",
-            "transformer_encoder.7.norm2.weight.tensor",
+    // Add upsample and linear
+    offset += num_tx_weights;
+    for (size_t i = 0; i < remaining_names.size(); i++) {
+        const size_t idx = offset + i;
+        const std::string &name = remaining_names.at(i);
+        tensors.at(idx) = name;
+    }
 
-            // tx encoder layer 8
-            "transformer_encoder.8.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.8.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.8.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.8.ff.fc1.weight.tensor",
-            "transformer_encoder.8.ff.fc2.weight.tensor",
-            "transformer_encoder.8.norm1.weight.tensor",
-            "transformer_encoder.8.norm2.weight.tensor",
-
-            // tx encoder layer 9
-            "transformer_encoder.9.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.9.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.9.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.9.ff.fc1.weight.tensor",
-            "transformer_encoder.9.ff.fc2.weight.tensor",
-            "transformer_encoder.9.norm1.weight.tensor",
-            "transformer_encoder.9.norm2.weight.tensor",
-
-            // tx encoder layer 10
-            "transformer_encoder.10.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.10.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.10.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.10.ff.fc1.weight.tensor",
-            "transformer_encoder.10.ff.fc2.weight.tensor",
-            "transformer_encoder.10.norm1.weight.tensor",
-            "transformer_encoder.10.norm2.weight.tensor",
-
-            // tx encoder layer 11
-            "transformer_encoder.11.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.11.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.11.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.11.ff.fc1.weight.tensor",
-            "transformer_encoder.11.ff.fc2.weight.tensor",
-            "transformer_encoder.11.norm1.weight.tensor",
-            "transformer_encoder.11.norm2.weight.tensor",
-
-            // tx encoder layer 12
-            "transformer_encoder.12.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.12.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.12.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.12.ff.fc1.weight.tensor",
-            "transformer_encoder.12.ff.fc2.weight.tensor",
-            "transformer_encoder.12.norm1.weight.tensor",
-            "transformer_encoder.12.norm2.weight.tensor",
-
-            // tx encoder layer 13
-            "transformer_encoder.13.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.13.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.13.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.13.ff.fc1.weight.tensor",
-            "transformer_encoder.13.ff.fc2.weight.tensor",
-            "transformer_encoder.13.norm1.weight.tensor",
-            "transformer_encoder.13.norm2.weight.tensor",
-
-            // tx encoder layer 14
-            "transformer_encoder.14.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.14.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.14.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.14.ff.fc1.weight.tensor",
-            "transformer_encoder.14.ff.fc2.weight.tensor",
-            "transformer_encoder.14.norm1.weight.tensor",
-            "transformer_encoder.14.norm2.weight.tensor",
-
-            // tx encoder layer 15
-            "transformer_encoder.15.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.15.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.15.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.15.ff.fc1.weight.tensor",
-            "transformer_encoder.15.ff.fc2.weight.tensor",
-            "transformer_encoder.15.norm1.weight.tensor",
-            "transformer_encoder.15.norm2.weight.tensor",
-
-            // tx encoder layer 16
-            "transformer_encoder.16.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.16.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.16.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.16.ff.fc1.weight.tensor",
-            "transformer_encoder.16.ff.fc2.weight.tensor",
-            "transformer_encoder.16.norm1.weight.tensor",
-            "transformer_encoder.16.norm2.weight.tensor",
-
-            // tx encoder layer 17
-            "transformer_encoder.17.self_attn.Wqkv.weight.tensor",
-            "transformer_encoder.17.self_attn.out_proj.weight.tensor",
-            "transformer_encoder.17.self_attn.out_proj.bias.tensor",
-            "transformer_encoder.17.ff.fc1.weight.tensor",
-            "transformer_encoder.17.ff.fc2.weight.tensor",
-            "transformer_encoder.17.norm1.weight.tensor",
-            "transformer_encoder.17.norm2.weight.tensor",
-
-            // tx decoder
-            "upsample.linear.weight.tensor",
-            "upsample.linear.bias.tensor",
-
-            // linear CRF
-            "crf.linear.weight.tensor",
-    };
-
-    return utils::load_tensors(dir, tensors);
+    return utils::load_tensors(cfg.model_path, tensors);
 }
 
-std::vector<at::Tensor> load_crf_model_weights(const CRFModelConfig &model_config) {
+}  // namespace
+
+std::vector<at::Tensor> load_crf_model_weights(const BasecallModelConfig &model_config) {
     if (model_config.is_tx_model()) {
-        return load_tx_model_weights(model_config.model_path);
+        return load_tx_model_weights(model_config);
     }
     return load_lstm_model_weights(model_config.model_path, model_config.out_features.has_value(),
                                    model_config.bias);
 }
 
-ModuleHolder<AnyModule> load_lstm_model(const CRFModelConfig &model_config,
+namespace {
+
+ModuleHolder<AnyModule> load_lstm_model(const BasecallModelConfig &model_config,
                                         const at::TensorOptions &options) {
     auto model = nn::CRFModel(model_config);
     auto state_dict = load_crf_model_weights(model_config);
@@ -260,7 +147,7 @@ ModuleHolder<AnyModule> load_lstm_model(const CRFModelConfig &model_config,
     return holder;
 }
 
-ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
+ModuleHolder<AnyModule> load_tx_model(const BasecallModelConfig &model_config,
                                       const at::TensorOptions &options) {
     auto model = nn::TxModel(model_config, options);
     auto state_dict = load_crf_model_weights(model_config);
@@ -274,15 +161,24 @@ ModuleHolder<AnyModule> load_tx_model(const CRFModelConfig &model_config,
     return holder;
 }
 
-ModuleHolder<AnyModule> load_crf_model(const CRFModelConfig &model_config,
+}  // namespace
+
+ModuleHolder<AnyModule> load_crf_model(const BasecallModelConfig &model_config,
                                        const torch::TensorOptions &options) {
+#if DORADO_CUDA_BUILD
+    c10::optional<c10::Device> device;
+    if (options.device().is_cuda()) {
+        device = options.device();
+    }
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+#endif
     if (model_config.is_tx_model()) {
         return load_tx_model(model_config, options);
     }
     return load_lstm_model(model_config, options);
 }
 
-size_t auto_calculate_num_runners(const CRFModelConfig &model_config, float memory_fraction) {
+size_t auto_calculate_num_runners(const BasecallModelConfig &model_config, float memory_fraction) {
     auto model_name = std::filesystem::canonical(model_config.model_path).filename().string();
 
     // very hand-wavy determination

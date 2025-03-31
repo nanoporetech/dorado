@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ModBaseModelConfig.h"
 #include "MotifMatcher.h"
+#include "config/ModBaseModelConfig.h"
 #include "torch_utils/module_utils.h"
 #include "utils/stats.h"
 #if DORADO_CUDA_BUILD
@@ -31,14 +31,15 @@ public:
         friend class ModBaseCaller;
 
     public:
-        ModBaseData(const ModBaseModelConfig& config,
+        ModBaseData(const config::ModBaseModelConfig& config,
                     const at::TensorOptions& opts,
                     const int batch_size_);
         std::vector<size_t> get_motif_hits(const std::string& seq) const;
         int64_t get_sig_len() const;
         int64_t get_seq_len() const;
 
-        const ModBaseModelConfig params;
+        const config::ModBaseModelConfig params;
+        const std::vector<float> kmer_refinement_levels;
         std::unique_ptr<ModBaseScaler> scaler;
 
     private:

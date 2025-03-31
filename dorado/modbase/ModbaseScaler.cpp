@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <stdexcept>
 
 namespace dorado::modbase {
 
@@ -16,7 +17,10 @@ ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
                              size_t centre_index)
         : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
     // ensure that the levels were the length we expected
-    assert(m_kmer_levels.size() == static_cast<size_t>(1ull << (2 * m_kmer_len)));
+    if (m_kmer_levels.size() != static_cast<size_t>(1ull << (2 * m_kmer_len))) {
+        throw std::runtime_error(
+                "Modbase refinement levels have invalid size for given kmer length.");
+    }
 }
 
 size_t ModBaseScaler::index_from_int_kmer(const int* int_kmer_start, size_t kmer_len) {

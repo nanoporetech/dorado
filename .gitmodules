@@ -1,6 +1,7 @@
 [submodule "dorado/3rdparty/HighFive"]
 	path = dorado/3rdparty/HighFive
 	url = https://github.com/BlueBrain/HighFive.git
+	ignore = dirty
 [submodule "dorado/3rdparty/toml11"]
 	path = dorado/3rdparty/toml11
 	url = https://github.com/ToruNiina/toml11.git
@@ -31,9 +32,6 @@
 [submodule "dorado/3rdparty/spdlog"]
 	path = dorado/3rdparty/spdlog
 	url = https://github.com/gabime/spdlog
-[submodule "cmake/ios-cmake"]
-	path = cmake/ios-cmake
-	url = https://github.com/leetal/ios-cmake.git
 [submodule "dorado/3rdparty/indicators"]
 	path = dorado/3rdparty/indicators
 	url = https://github.com/p-ranav/indicators.git
@@ -43,3 +41,9 @@
 [submodule "dorado/3rdparty/date"]
 	path = dorado/3rdparty/date
 	url = https://github.com/HowardHinnant/date.git
+[submodule "dorado/3rdparty/argparse"]
+	path = dorado/3rdparty/argparse
+	url = https://github.com/p-ranav/argparse.git
+[submodule "dorado/3rdparty/catch2"]
+	path = dorado/3rdparty/catch2
+	url = https://github.com/catchorg/Catch2.git

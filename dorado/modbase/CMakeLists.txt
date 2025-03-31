@@ -7,8 +7,6 @@ add_library(dorado_modbase STATIC
     ModBaseContext.h
     ModbaseEncoder.cpp
     ModbaseEncoder.h
-    ModBaseModelConfig.cpp
-    ModBaseModelConfig.h    
     ModBaseRunner.cpp
     ModBaseRunner.h
     ModbaseScaler.cpp
@@ -24,7 +22,6 @@ target_include_directories(dorado_modbase
     PUBLIC
     PRIVATE
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/toml11
 )
 
 target_link_libraries(dorado_modbase

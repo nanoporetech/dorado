@@ -85,6 +85,8 @@ void add_options_string_arg(utils::arg_parse::ArgParser& parser) {
                   "quotes.");
 }
 
+namespace {
+
 void add_arguments(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument("-k")
             .help("minimap2 k-mer size for alignment (maximum 28).")
@@ -230,6 +232,8 @@ std::optional<Minimap2Options> process_arguments(const utils::arg_parse::ArgPars
     return res;
 }
 
+}  // namespace
+
 std::string get_help_message() {
     utils::arg_parse::ArgParser parser("minimap2_options");
     add_arguments(parser);
@@ -247,6 +251,8 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
     }
     return *minimap2_options;
 }
+
+namespace {
 
 std::optional<Minimap2Options> try_parse_options_impl(utils::arg_parse::ArgParser& parser,
                                                       const std::string& minimap2_option_string,
@@ -267,6 +273,8 @@ std::optional<Minimap2Options> try_parse_options_impl(utils::arg_parse::ArgParse
 
     return process_arguments(parser, error_message);
 }
+
+}  // namespace
 
 std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
                                                  std::string& error_message) {

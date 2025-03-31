@@ -80,9 +80,8 @@ void AddTesla_V100_PCIE_16GBBenchmarks(std::map<std::pair<std::string, std::stri
             {576, 1.324576f}, {640, 1.316227f},
     };
     chunk_benchmarks[{"Tesla V100-PCIE-16GB", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0"}] = {
-            {32, 3.041088f},
-            {64, 2.766208f},
-            {96, 2.710037f},
+            {32, 1.7527f},  {64, 1.47701f},  {96, 1.44394f},
+            {128, 1.4282f}, {160, 1.42077f}, {352, 1.41429f},
     };
     chunk_benchmarks[{"Tesla V100-PCIE-16GB", "dna_r9.4.1_e8_fast@v3.4"}] = {
             {64, 0.175775f},  {128, 0.096824f},  {192, 0.070790f},  {256, 0.057820f},

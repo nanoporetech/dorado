@@ -7,7 +7,7 @@ Detailed information about Dorado and its features is available in the [Dorado D
 ## Features
 
 * One executable with sensible defaults, automatic hardware detection and configuration.
-* Runs on Apple silicon (M1/2 family) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
+* Runs on Apple silicon (M series) and Nvidia GPUs including multi-GPU with linear scaling (see [Platforms](#platforms)).
 * [Modified basecalling](#modified-basecalling).
 * [Duplex basecalling](#duplex) (watch the following video for an introduction to [Duplex](https://youtu.be/8DVMG7FEBys)).
 * Simplex [barcode classification](#barcode-classification).
@@ -24,10 +24,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.9.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-x64.tar.gz)
- - [dorado-0.9.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-arm64.tar.gz)
- - [dorado-0.9.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-osx-arm64.zip)
- - [dorado-0.9.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-win64.zip)
+ - [dorado-0.9.5-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-x64.tar.gz)
+ - [dorado-0.9.5-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-arm64.tar.gz)
+ - [dorado-0.9.5-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-osx-arm64.zip)
+ - [dorado-0.9.5-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -51,12 +51,10 @@ Dorado has been tested extensively and supported on the following systems:
 
 | Platform | GPU/CPU | Minimum Software Requirements |
 | --- |---------|--------------|
-| Linux x86_64  | (G)V100, A100 | CUDA Driver ≥450.80.02 |
-| | H100 | CUDA Driver ≥520 |
-| Linux arm64 | Jetson Orin | Linux for Tegra ≥34.1.1 |
-| Windows x86_64 | (G)V100, A100 | CUDA Driver ≥452.39 |
-| | H100 | CUDA Driver ≥520 |
-| Apple | Apple Silicon (M1/M2) | |
+| Linux x86_64  | (G)V100, A100, H100 | CUDA Driver ≥525.105 |
+| Linux arm64 | Jetson Orin | Linux for Tegra ≥36.4.3 (JetPack ≥6.2) |
+| Windows x86_64 | (G)V100, A100, H100 | CUDA Driver ≥529.19 |
+| Apple | Apple Silicon (M series) | macOS ≥13 |
 
 Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
@@ -68,7 +66,8 @@ AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.
 
 1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
 2. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
-3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a hetrogenous collection of GPUs, select the faster GPUs using the `--device` flag (e.g `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
+3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a heterogeneous collection of GPUs, select the faster GPUs using the `--device` flag (e.g., `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
+4. On Windows systems with Nvidia GPUs, open Nvidia Control Panel, navigate into “Manage 3D settings” and then set “CUDA - Sysmem Fallback Policy” to “Prefer No Sysmem Fallback”.  This will provide a significant performance improvement.
 
 ## Running
 
@@ -105,22 +104,23 @@ $ dorado basecaller hac pod5s/ --resume-from incomplete.bam > calls.bam
 
 ### DNA adapter and primer trimming
 
-Dorado can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demultiplex the reads at some later time, trimming adapters and primers may result in some portions of the flanking regions of the barcodes being removed, which could interfere with correct demultiplexing.
+Dorado can detect and remove any adapter and/or primer sequences from the beginning and end of DNA reads. Note that if you intend to demultiplex the reads at some later time, trimming primers will likely result in some portions of the flanking regions of the barcodes being removed, which could prevent demultiplexing from working properly.
 
 #### In-line with basecalling
 
-By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence.
+By default, `dorado basecaller` will attempt to detect any adapter or primer sequences at the beginning and ending of reads, and remove them from the output sequence. Additionally, dorado will attempt to use any detected primers to determine whether the DNA went through the pore in the 5'-to-3' direction, or the 3'-to-5' direction. If this can be inferred, then the `TS:A` tag will be included in the BAM output for the read, with a value of `+` or `-` respectively. If it cannot be inferred, then this tag will not be included in the output.
 
-This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences.
+In the specific cases of the SQK-PCS114 and SQK-PCB114 sequencing kits, if a UMI tag is present, it will also be detected and trimmed. Additionally, the UMI tag, if found, will be included in the BAM output for the read using the `RX:Z` tag.
+
+This functionality can be altered by using either the `--trim` or `--no-trim` options with `dorado basecaller`. The `--no-trim` option will prevent the trimming of detected barcode sequences as well as the detection and trimming of adapter and primer sequences. Note that if primer trimming is not enabled, then no attempt will be made to detect primers, or to classify the orientation of the strand based on them, or to detect UMI tags.
 
 The `--trim` option takes as its argument one of the following values:
 
-* `all` This is the the same as the default behavior. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
-* `primers` This will result in any detected adapters or primers being trimmed, but if barcoding is enabled the barcode sequences will not be trimmed.
+* `all` This is the same as the default behaviour. Any detected adapters or primers will be trimmed, and if barcoding is enabled then any detected barcodes will be trimmed.
 * `adapters` This will result in any detected adapters being trimmed, but primers will not be trimmed, and if barcoding is enabled then barcodes will not be trimmed either.
 * `none` This is the same as using the --no-trim option. Nothing will be trimmed.
 
-Dorado determines which adapter and primer sequences to search for and trim based on the sequencing-kit specified in the input file. If the sequencing-kit is not specified in the file, or is not a recognized and supported kit, then no adapter or primer trimming will be done. Note that the dorado software only supports adapter and primer trimming for kit14 sequencing kits.
+Dorado determines which adapter and primer sequences to search for and trim based on the sequencing-kit specified in the input file. If the sequencing-kit is not specified in the file, or is not a recognized and supported kit, then no adapter or primer trimming will be done. Note that by default the dorado software only supports adapter and primer trimming for kit14 sequencing kits.
 
 If adapter/primer trimming is done in-line with basecalling in combination with demultiplexing, then the software will automatically ensure that the trimming of adapters and primers does not interfere with the demultiplexing process. However, if you intend to do demultiplexing later as a separate step, then it is recommended that you disable adapter/primer trimming when basecalling with the `--no-trim` option, to ensure that any barcode sequences remain completely intact in the reads.
 
@@ -129,7 +129,7 @@ If adapter/primer trimming is done in-line with basecalling in combination with 
 Existing basecalled datasets can be scanned for adapter and/or primer sequences at either end, and trim any such found sequences. To do this, run:
 
 ```
-$ dorado trim <reads> --sequencing-kit <kit_name> trimmed.bam
+$ dorado trim <reads> --sequencing-kit <kit_name> > trimmed.bam
 ```
 
 `<reads>` can either be an HTS format file (e.g. FASTQ, BAM, etc.) or a stream of an HTS format (e.g. the output of Dorado basecalling).
@@ -138,7 +138,7 @@ $ dorado trim <reads> --sequencing-kit <kit_name> trimmed.bam
 
 The `--no-trim-primers` option can be used to prevent the trimming of primer sequences. In this case only adapter sequences will be trimmed.
 
-If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification.
+If it is also your intention to demultiplex the data, then it is recommended that you demultiplex before trimming any adapters and primers, as trimming adapters and primers first may interfere with correct barcode classification. It is also recommended in this case that you turn off trimming when you demultiplex, otherwise the trimming of the barcodes may prevent the proper detection of primers, resulting in partial primers remaining after trimming.
 
 The output of `dorado trim` will always be unaligned records, regardless of whether the input is aligned/sorted or not.
 
@@ -223,6 +223,7 @@ $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder> -
 $ dorado basecaller <model> <reads> --reference <index> --mm2-opt "-k 15 -w 10" > calls.bam
 ```
 
+Note that dorado does support split indexes, however the entire index must be able to fit in memory. Aligning to a split index may result in some spurious secondary and/or supplementary alignments, and the mapping score may not be as reliable as for a non-split index. So it is recommended that, if possible, you generate your `mmi` index files using the `-I` option with a large enough value to generate a non-split index. Or, if you are directly using a large fasta reference, pass a large enough value of the `-I` minimap2 option using `--mm2-opts` to insure that the index is not split.
 
 ### Sequencing Summary
 
@@ -309,7 +310,7 @@ In addition to supporting the standard barcode kits from Oxford Nanopore, Dorado
 
 ### Poly(A) tail estimation
 
-Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA, and can be configured for use with custom primer sequences, interrupted tails, and plasmids. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will not have the `pt:i` tag. Custom primer sequences, estimation of interrupted tails, and plasmid support can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
+Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and PCB kits) and RNA, and can be configured for use with custom primer sequences, interrupted tails, and plasmids. Note that Oxford Nanopore cDNA reads are sequenced in two different orientations and Dorado poly(A) tail length estimation handles both (A and T homopolymers). This feature can be enabled by passing `--estimate-poly-a` to the `basecaller` command. It is disabled by default. The estimated tail length is stored in the `pt:i` tag of the output record. Reads for which the tail length could not be estimated will have a value of -1 for the `pt:i` tag if the primer anchor for the tail was not found, or a value of 0 if the primer anchor was found, but the length could not be estimated. Custom primer sequences, estimation of interrupted tails, and plasmid support can be configured through the `--poly-a-config` option. See [here](documentation/PolyTailConfig.md) for more details.
 
 ### Read Error Correction
 

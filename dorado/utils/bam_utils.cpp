@@ -149,11 +149,9 @@ void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
 }
 
 void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
-    for (auto pair : seqs) {
-        char* name;
-        int length;
-        std::tie(name, length) = pair;
-        sam_hdr_add_line(hdr, "SQ", "SN", name, "LN", std::to_string(length).c_str(), NULL);
+    for (const auto& pair : seqs) {
+        sam_hdr_add_line(hdr, "SQ", "SN", pair.first.c_str(), "LN",
+                         std::to_string(pair.second).c_str(), NULL);
     }
 }
 
@@ -503,7 +501,7 @@ void remove_alignment_tags_from_record(bam1_t* record) {
     // of tags to remove.
     static const std::set<std::string> tags_to_remove = {"SA", "NM", "ms", "AS", "nn", "de",
                                                          "dv", "tp", "cm", "s1", "s2", "MD",
-                                                         "zd", "rl", "bh", "cs"};
+                                                         "zd", "rl", "bh", "cs", "TS"};
 
     uint8_t* aux_ptr = bam_aux_first(record);
     while (aux_ptr != NULL) {

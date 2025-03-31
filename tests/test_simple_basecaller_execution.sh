@@ -255,9 +255,10 @@ fi
 if command -v truncate > /dev/null
 then
     echo dorado basecaller resume feature
-    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --skip-model-compatibility-check > $output_dir/tmp.bam
+    # n.b. some of these options (--skip, --mm2-opts) won't affect the basecall but are included to test that we can resume with them present
+    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check  > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
-    $dorado_bin basecaller ${model} $data_dir/multi_read_pod5 -b ${batch} --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
     samtools quickcheck -u $output_dir/calls.bam
     num_reads=$(samtools view -c $output_dir/calls.bam)
     if [[ $num_reads -ne "4" ]]; then
@@ -373,9 +374,9 @@ test_barcoding_read_groups() (
             # Arrangement is |<barcode_alias>|, so trim the model from the prefix and the .bam from the suffix.
             barcode=${bam#*_${model_name_5k}_}
             barcode=${barcode%.bam*}
-        elif [[ $bam =~ "/9bf5b3eb10d3b031970acc022aecad4ecc918865_" ]]; then
+        elif [[ $bam =~ "/0d85015e-6a4e-400c-a80f-c187c65a6d03_" ]]; then
             # Demuxed file, so trim the run_id from the prefix and the .bam from the suffix.
-            barcode=${bam#*9bf5b3eb10d3b031970acc022aecad4ecc918865_}
+            barcode=${bam#*0d85015e-6a4e-400c-a80f-c187c65a6d03_}
             barcode=${barcode%.bam*}            
         else
             barcode="unclassified"
@@ -409,7 +410,7 @@ test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/9bf5b3eb10d3b031970acc022aecad4ecc918865_unclassified.bam ; do
+for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam ; do
     if [ ! -f $bam ]; then
         echo "Missing expected bam file $bam.  Generated files:"
         ls -l $output_dir/demux_only_test/

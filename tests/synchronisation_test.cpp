@@ -3,8 +3,7 @@
 #include "utils/PostCondition.h"
 
 // libtorch defines a CHECK macro, but we want catch2's version for testing
-#undef CHECK
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -21,101 +20,103 @@ namespace {
 constexpr std::chrono::milliseconds TIMEOUT{2000};
 }
 
-TEST_CASE(CUT_TAG " Latch::wait() - created with count 0 not signalled - returns", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait() - created with count 0 not signalled - returns", CUT_TAG) {
     Latch latch{0};
-    REQUIRE_NOTHROW(latch.wait());
+    CATCH_REQUIRE_NOTHROW(latch.wait());
     bool returned{true};
-    REQUIRE(returned);
+    CATCH_REQUIRE(returned);
 }
 
-TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 not signalled - returns false",
-          CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 not signalled - returns false",
+                CUT_TAG) {
     Latch latch{1};
-    REQUIRE_FALSE(latch.wait_for(10ms));
+    CATCH_REQUIRE_FALSE(latch.wait_for(10ms));
 }
 
-TEST_CASE(CUT_TAG " Latch::wait_until() - created with count 1 not signalled - returns false",
-          CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait_until() - created with count 1 not signalled - returns false",
+                CUT_TAG) {
     Latch latch{1};
-    REQUIRE_FALSE(latch.wait_until(test_clock::now() + 10ms));
+    CATCH_REQUIRE_FALSE(latch.wait_until(test_clock::now() + 10ms));
 }
 
-TEST_CASE(CUT_TAG " Latch::count_down() - created with count 1 - no throw", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::count_down() - created with count 1 - no throw", CUT_TAG) {
     Latch latch{1};
-    REQUIRE_NOTHROW(latch.count_down());
+    CATCH_REQUIRE_NOTHROW(latch.count_down());
 }
 
-TEST_CASE(CUT_TAG " Latch::count_down() - created with count 1 already signalled once - no throw",
-          CUT_TAG) {
-    Latch latch{1};
-    latch.count_down();
-    REQUIRE_NOTHROW(latch.count_down());
-}
-
-TEST_CASE(CUT_TAG " Latch::wait() - created with count 1 signalled once - returns", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG
+                " Latch::count_down() - created with count 1 already signalled once - no throw",
+                CUT_TAG) {
     Latch latch{1};
     latch.count_down();
-    REQUIRE_NOTHROW(latch.wait());
+    CATCH_REQUIRE_NOTHROW(latch.count_down());
+}
+
+CATCH_TEST_CASE(CUT_TAG " Latch::wait() - created with count 1 signalled once - returns", CUT_TAG) {
+    Latch latch{1};
+    latch.count_down();
+    CATCH_REQUIRE_NOTHROW(latch.wait());
     bool returned{true};
-    REQUIRE(returned);
+    CATCH_REQUIRE(returned);
 }
 
-TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 signalled once - returns true",
-          CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 signalled once - returns true",
+                CUT_TAG) {
     Latch latch{1};
     latch.count_down();
-    REQUIRE(latch.wait_for(10ms));
+    CATCH_REQUIRE(latch.wait_for(10ms));
 }
 
-TEST_CASE(CUT_TAG " Latch::wait_until() - created with count 1 signalled once - returns true",
-          CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait_until() - created with count 1 signalled once - returns true",
+                CUT_TAG) {
     Latch latch{1};
     latch.count_down();
-    REQUIRE(latch.wait_until(test_clock::now() + 10ms));
+    CATCH_REQUIRE(latch.wait_until(test_clock::now() + 10ms));
 }
 
-void pause_and_signal(Latch &latch) {
+static void pause_and_signal(Latch &latch) {
     std::this_thread::sleep_for(50ms);
     latch.count_down();
 }
 
-TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 - block until signalled", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Latch::wait_for() - created with count 1 - block until signalled",
+                CUT_TAG) {
     Latch latch{1};
     std::thread signalling_thread([&latch] { pause_and_signal(latch); });
     auto teardown = PostCondition([&signalling_thread] { signalling_thread.join(); });
-    REQUIRE(latch.wait_for(TIMEOUT));
+    CATCH_REQUIRE(latch.wait_for(TIMEOUT));
 }
 
-SCENARIO("Latch with count of 2", CUT_TAG) {
+CATCH_SCENARIO("Latch with count of 2", CUT_TAG) {
     Latch cut{2};
-    WHEN("signalled once") {
+    CATCH_WHEN("signalled once") {
         std::thread first_signalling_thread([&cut] { cut.count_down(); });
         auto teardown_1 =
                 PostCondition([&first_signalling_thread] { first_signalling_thread.join(); });
-        THEN("wait_for() returns false") {
-            REQUIRE_FALSE(cut.wait_for(50ms));
-            AND_WHEN("signalled a second time") {
+        CATCH_THEN("wait_for() returns false") {
+            CATCH_REQUIRE_FALSE(cut.wait_for(50ms));
+            CATCH_AND_WHEN("signalled a second time") {
                 std::thread second_signalling_thread([&cut] { cut.count_down(); });
                 auto teardown_2 = PostCondition(
                         [&second_signalling_thread] { second_signalling_thread.join(); });
-                THEN("wait_for() returns true") { REQUIRE(cut.wait_for(TIMEOUT)); }
+                CATCH_THEN("wait_for() returns true") { CATCH_REQUIRE(cut.wait_for(TIMEOUT)); }
             }
         }
     }
 }
 
-TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - returns false", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - returns false", CUT_TAG) {
     Flag flag{};
-    REQUIRE_FALSE(flag.wait_for(50ms));
+    CATCH_REQUIRE_FALSE(flag.wait_for(50ms));
 }
 
-TEST_CASE(CUT_TAG " Flag::wait() - signalled - does not block", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Flag::wait() - signalled - does not block", CUT_TAG) {
     Flag flag{};
     flag.signal();
-    REQUIRE_NOTHROW(flag.wait());
+    CATCH_REQUIRE_NOTHROW(flag.wait());
 }
 
-TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - blocks until signalled", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - blocks until signalled", CUT_TAG) {
     Flag flag{};
     std::thread signalling_thread([&flag] {
         std::this_thread::sleep_for(20ms);
@@ -123,15 +124,16 @@ TEST_CASE(CUT_TAG " Flag::wait_for() - not signalled - blocks until signalled", 
     });
     auto teardown = PostCondition([&signalling_thread] { signalling_thread.join(); });
 
-    REQUIRE_NOTHROW(flag.wait_for(TIMEOUT));
+    CATCH_REQUIRE_NOTHROW(flag.wait_for(TIMEOUT));
 }
 
-void do_signal(CompositeFlag &flags, std::size_t slot) {
+static void do_signal(CompositeFlag &flags, std::size_t slot) {
     std::this_thread::sleep_for(10ms);
     flags[slot].signal();
 }
 
-TEST_CASE(CUT_TAG " CompositeFlag::wait_for() - 4 flags 3 signaled - returns false ", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " CompositeFlag::wait_for() - 4 flags 3 signaled - returns false ",
+                CUT_TAG) {
     CompositeFlag flags{4};
     static constexpr std::size_t NUM_THREADS{3};
     std::thread signalling_threads[NUM_THREADS];
@@ -147,12 +149,13 @@ TEST_CASE(CUT_TAG " CompositeFlag::wait_for() - 4 flags 3 signaled - returns fal
         }
     });
 
-    REQUIRE_FALSE(flags.wait_for(100ms));
+    CATCH_REQUIRE_FALSE(flags.wait_for(100ms));
 }
 
-TEST_CASE(CUT_TAG
-          " CompositeFlag::wait_for() - 4 flags none signalled - returns true after 4 signalled ",
-          CUT_TAG) {
+CATCH_TEST_CASE(
+        CUT_TAG
+        " CompositeFlag::wait_for() - 4 flags none signalled - returns true after 4 signalled ",
+        CUT_TAG) {
     CompositeFlag flags{4};
     static constexpr std::size_t NUM_THREADS{4};
     std::thread signalling_threads[NUM_THREADS];
@@ -168,13 +171,14 @@ TEST_CASE(CUT_TAG
         }
     });
 
-    REQUIRE(flags.wait_for(TIMEOUT));
+    CATCH_REQUIRE(flags.wait_for(TIMEOUT));
 }
 
-TEST_CASE(CUT_TAG
-          " Flag::wait() - single producer multiple consumers - all consumers block until producer "
-          "signals",
-          CUT_TAG) {
+CATCH_TEST_CASE(
+        CUT_TAG
+        " Flag::wait() - single producer multiple consumers - all consumers block until producer "
+        "signals",
+        CUT_TAG) {
     Flag producer_flag{};
     static constexpr std::size_t NUM_CONSUMERS{4};
     Latch consumers_started{NUM_CONSUMERS};
@@ -200,13 +204,13 @@ TEST_CASE(CUT_TAG
                 }};
     }
 
-    REQUIRE(consumers_started.wait_for(TIMEOUT));
+    CATCH_REQUIRE(consumers_started.wait_for(TIMEOUT));
     std::this_thread::sleep_for(10ms);  // give consumers a chance to become blocked in wait()
     producer_flag.signal();
-    REQUIRE(consumers_signalled.wait_for(TIMEOUT));
+    CATCH_REQUIRE(consumers_signalled.wait_for(TIMEOUT));
 }
 
-TEST_CASE(CUT_TAG " TSan data race in Latch", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG " TSan data race in Latch", CUT_TAG) {
     // Spin up a runner that will wait for a Flag it should signal
     std::atomic<Flag *> flag_ptr{nullptr};
     std::thread runner([&flag_ptr] {

@@ -1,4 +1,5 @@
 #include "alignment/alignment_processing_items.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
@@ -322,12 +323,11 @@ int demuxer(int argc, char* argv[]) {
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& demux_writer_ref =
-            dynamic_cast<BarcodeDemuxerNode&>(pipeline->get_node_ref(demux_writer));
+    auto& demux_writer_ref = pipeline->get_node_ref<BarcodeDemuxerNode>(demux_writer);
     demux_writer_ref.set_header(header.get());
 
     // All progress reporting is in the post-processing part.
-    ProgressTracker tracker(0, false, 1.f);
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
     if (progress_stats_frequency > 0) {
         tracker.disable_progress_reporting();
     }

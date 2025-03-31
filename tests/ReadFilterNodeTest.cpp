@@ -3,7 +3,7 @@
 #include "MessageSinkUtils.h"
 
 #include <ATen/Functions.h>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #define TEST_GROUP "[read_pipeline][ReadFilterNode]"
 
@@ -20,7 +20,7 @@ auto make_filtered_pipeline(std::vector<dorado::Message>& messages,
 }
 }  // namespace
 
-TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
+CATCH_TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     {
         auto pipeline = make_filtered_pipeline(messages, 12, 0, {});
@@ -60,11 +60,11 @@ TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-    REQUIRE(reads.size() == 1);
-    CHECK(reads[0]->read_common.read_id == "read_2");
+    CATCH_REQUIRE(reads.size() == 1);
+    CATCH_CHECK(reads[0]->read_common.read_id == "read_2");
 }
 
-TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
+CATCH_TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 0, {"read_2"});
@@ -104,11 +104,11 @@ TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-    REQUIRE(reads.size() == 1);
-    CHECK(reads[0]->read_common.read_id == "read_1");
+    CATCH_REQUIRE(reads.size() == 1);
+    CATCH_CHECK(reads[0]->read_common.read_id == "read_1");
 }
 
-TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
+CATCH_TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
     std::vector<dorado::Message> messages;
     {
         auto pipeline = make_filtered_pipeline(messages, 0, 5, {});
@@ -148,6 +148,6 @@ TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) {
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
-    REQUIRE(reads.size() == 1);
-    CHECK(reads[0]->read_common.read_id == "read_1");
+    CATCH_REQUIRE(reads.size() == 1);
+    CATCH_CHECK(reads[0]->read_common.read_id == "read_1");
 }

@@ -2,6 +2,7 @@
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
+#include "cli/cli.h"
 #include "cli/cli_utils.h"
 #include "dorado_version.h"
 #include "read_pipeline/AlignerNode.h"
@@ -58,11 +59,6 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         throw std::runtime_error("Validation error checking minimap options");
     case dorado::alignment::IndexLoadResult::file_open_error:
         throw std::runtime_error("Error opening index file: " + filename);
-    case dorado::alignment::IndexLoadResult::split_index_not_supported:
-        throw std::runtime_error(
-                "Dorado doesn't support split index for alignment. Please re-run with larger "
-                "index "
-                "size.");
     case dorado::alignment::IndexLoadResult::no_index_loaded:
     case dorado::alignment::IndexLoadResult::end_of_index:
         throw std::runtime_error(
@@ -295,13 +291,13 @@ int aligner(int argc, char* argv[]) {
 
         // At present, header output file header writing relies on direct node method calls
         // rather than the pipeline framework.
-        const auto& aligner_ref = dynamic_cast<AlignerNode&>(pipeline->get_node_ref(aligner));
+        const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-        auto& hts_writer_ref = dynamic_cast<HtsWriter&>(pipeline->get_node_ref(hts_writer));
+        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
         hts_file.set_header(header.get());
 
         // All progress reporting is in the post-processing part.
-        ProgressTracker tracker(0, false, 1.f);
+        ProgressTracker tracker(ProgressTracker::Mode::ALIGN, 0, 1.f);
         if (progress_stats_frequency > 0) {
             tracker.disable_progress_reporting();
         }
