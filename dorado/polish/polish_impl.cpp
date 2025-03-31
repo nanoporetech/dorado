@@ -411,7 +411,7 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
 
 }  // namespace
 
-std::pair<std::vector<secondary::Sample>, std::vector<TrimInfo>>
+std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
 merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_samples,
                                         const secondary::EncoderBase& encoder,
                                         const Span<const secondary::Window> bam_regions,
@@ -439,7 +439,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
 
     const auto worker = [&](const int32_t start, const int32_t end,
                             std::vector<std::vector<secondary::Sample>>& results_samples,
-                            std::vector<std::vector<TrimInfo>>& results_trims) {
+                            std::vector<std::vector<secondary::TrimInfo>>& results_trims) {
         utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
 
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
@@ -505,7 +505,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
 
     // Result vectors for each BAM region.
     std::vector<std::vector<secondary::Sample>> merged_samples(std::size(bam_region_intervals));
-    std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
+    std::vector<std::vector<secondary::TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM regions in parallel.
     const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
@@ -545,7 +545,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
                                std::make_move_iterator(std::end(vals)));
     }
 
-    std::vector<TrimInfo> results_trims;
+    std::vector<secondary::TrimInfo> results_trims;
     results_trims.reserve(num_samples);
     for (auto& vals : merged_trims) {
         results_trims.insert(std::end(results_trims), std::make_move_iterator(std::begin(vals)),
@@ -963,7 +963,7 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
         for (int64_t j = 0; j < dorado::ssize(local_results); ++j) {
             auto& result = local_results[j];
             const secondary::Sample& sample = item.samples[j];
-            const TrimInfo& trim = item.trims[j];
+            const secondary::TrimInfo& trim = item.trims[j];
             const int64_t num_positions = dorado::ssize(sample.positions_major);
 
             if ((trim.start < 0) || (trim.start >= num_positions) || (trim.end <= 0) ||

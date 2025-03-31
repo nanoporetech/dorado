@@ -2,7 +2,7 @@
 
 #include "consensus_result.h"
 #include "consensus_utils.h"
-#include "polish/trim.h"
+#include "sample_trimming.h"
 #include "secondary/batching.h"
 #include "utils/rle.h"
 #include "utils/ssize.h"

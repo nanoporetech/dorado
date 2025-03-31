@@ -312,8 +312,6 @@ add_library(dorado_lib
     dorado/polish/polish_progress_tracker.cpp
     dorado/polish/polish_progress_tracker.h
     dorado/polish/polish_stats.h
-    dorado/polish/trim.cpp
-    dorado/polish/trim.h
     dorado/utils/container_utils.cpp
     dorado/utils/container_utils.h
     dorado/utils/io_utils.cpp

@@ -25,10 +25,12 @@ add_library(dorado_secondary
     architectures/model_torch_script.cpp
     architectures/model_torch_script.h
     consensus/consensus_result.h
-    consensus/sample.cpp
-    consensus/sample.h
     consensus/consensus_utils.cpp
     consensus/consensus_utils.h
+    consensus/sample.cpp
+    consensus/sample.h
+    consensus/sample_trimming.cpp
+    consensus/sample_trimming.h
     consensus/variant_calling.cpp
     consensus/variant_calling.h
     consensus/variant_calling_sample.cpp

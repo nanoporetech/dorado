@@ -1,6 +1,6 @@
 #pragma once
 
-#include "secondary/consensus/sample.h"
+#include "sample.h"
 #include "secondary/region.h"
 
 #include <cstdint>
@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 struct TrimInfo {
     int64_t start = 0;
@@ -25,8 +25,8 @@ struct TrimInfo {
  * \param region Optional region to trim to. After samples are trimmed on neighboring overlaps, region trimming is applied.
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
-std::vector<TrimInfo> trim_samples(const std::vector<secondary::Sample>& samples,
-                                   const std::optional<const secondary::RegionInt>& region);
+std::vector<TrimInfo> trim_samples(const std::vector<Sample>& samples,
+                                   const std::optional<const RegionInt>& region);
 
 /**
  * \brief Identical functionality to the above trim_samples, but this one allows for more efficient sample
@@ -37,11 +37,11 @@ std::vector<TrimInfo> trim_samples(const std::vector<secondary::Sample>& samples
  * \param region Optional region to trim to. After samples are trimmed on neighboring overlaps, region trimming is applied.
  * \return Vector of trimming regions, the same size as the input samples. If a sample is supposed to be completely trimmed out, the start/end coordinates will be set to -1.
  */
-std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& samples,
-                                   const std::optional<const secondary::RegionInt>& region);
+std::vector<TrimInfo> trim_samples(const std::vector<const Sample*>& samples,
+                                   const std::optional<const RegionInt>& region);
 
 bool operator==(const TrimInfo& lhs, const TrimInfo& rhs);
 
 std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs);
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary

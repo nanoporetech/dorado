@@ -1,8 +1,8 @@
 #include "variant_calling_sample.h"
 
 #include "consensus_utils.h"
-#include "polish/trim.h"
 #include "sample.h"
+#include "sample_trimming.h"
 #include "secondary/features/decoder_base.h"
 #include "utils/ssize.h"
 
@@ -290,8 +290,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
     }
 
     // Compute trimming of all samples for this group.
-    const std::vector<polisher::TrimInfo> trims =
-            polisher::trim_samples(local_samples, std::nullopt);
+    const std::vector<TrimInfo> trims = trim_samples(local_samples, std::nullopt);
 
     std::vector<VariantCallingSample> trimmed_samples;
 
@@ -301,7 +300,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
     for (int64_t i = 0; i < dorado::ssize(trims); ++i) {
         const int32_t id = group[i].second;
         const auto& s = vc_input_data[id];
-        const polisher::TrimInfo& t = trims[i];
+        const TrimInfo& t = trims[i];
 
         // Make sure that all vectors and tensors are of the same length.
         s.validate();

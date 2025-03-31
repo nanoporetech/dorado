@@ -6,13 +6,13 @@
 #include "secondary/bam_file.h"
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/sample.h"
+#include "secondary/consensus/sample_trimming.h"
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/consensus/window.h"
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
 #include "secondary/interval.h"
 #include "secondary/variant.h"
-#include "trim.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
 #include "utils/stats.h"
@@ -56,7 +56,7 @@ struct PolisherResources {
  */
 struct InferenceData {
     std::vector<secondary::Sample> samples;
-    std::vector<TrimInfo> trims;
+    std::vector<secondary::TrimInfo> trims;
 };
 
 /**
@@ -65,7 +65,7 @@ struct InferenceData {
 struct DecodeData {
     std::vector<secondary::Sample> samples;
     torch::Tensor logits;
-    std::vector<TrimInfo> trims;
+    std::vector<secondary::TrimInfo> trims;
 };
 
 /**
@@ -119,7 +119,7 @@ std::vector<secondary::ConsensusResult> stitch_sequence(
  * \param window_interval_offset Used for batching bam_region_intervals, because window_samples.size() matches the total size of bam_region_intervals,
  *                                  while coordinates of each BAM region interval are global and produced before draft batching on the client side.
  */
-std::pair<std::vector<secondary::Sample>, std::vector<TrimInfo>>
+std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
 merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_samples,
                                         const secondary::EncoderBase& encoder,
                                         const Span<const secondary::Window> bam_regions,

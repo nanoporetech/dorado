@@ -1,5 +1,5 @@
-#include "polish/trim.h"
 #include "secondary/consensus/sample.h"
+#include "secondary/consensus/sample_trimming.h"
 #include "secondary/region.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -14,7 +14,6 @@ namespace {
 #define TEST_GROUP "[PolishTrimSamples]"
 
 CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
-    using namespace dorado::polisher;
     using namespace dorado::secondary;
 
     // The actual Sample struct is complicated, but the only thing needed
@@ -358,7 +357,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
  *          previous fixture will also test all the other edge cases here.
  */
 CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
-    using namespace dorado::polisher;
     using namespace dorado::secondary;
 
     // The actual Sample struct is complicated, but the only thing needed

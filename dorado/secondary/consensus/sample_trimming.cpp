@@ -1,4 +1,4 @@
-#include "trim.h"
+#include "sample_trimming.h"
 
 #include "utils/ssize.h"
 
@@ -10,7 +10,7 @@
 #include <string>
 #include <tuple>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
 namespace {
 
@@ -446,4 +446,4 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     return result;
 }
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary
