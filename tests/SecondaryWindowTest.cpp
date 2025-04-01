@@ -8,7 +8,7 @@
 
 namespace dorado::secondary::sample::tests {
 
-#define TEST_GROUP "[SecondaryConsensusWindow]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
     struct TestCase {

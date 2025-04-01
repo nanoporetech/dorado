@@ -12,7 +12,7 @@
 
 namespace dorado::secondary::consensus::tests {
 
-#define TEST_GROUP "[SecondaryConsensusVariantCalling]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
     spdlog::set_level(spdlog::level::trace);

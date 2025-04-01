@@ -8,7 +8,7 @@
 
 namespace dorado::secondary::sample::tests {
 
-#define TEST_GROUP "[SecondaryConsensusSample]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
     // Create a mock sample.

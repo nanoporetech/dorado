@@ -12,7 +12,7 @@
 
 namespace dorado::secondary::consensus::tests {
 
-#define TEST_GROUP "[SecondaryConsensusVariantCalling]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
     struct TestCase {
