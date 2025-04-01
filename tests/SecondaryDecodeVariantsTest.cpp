@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-#define TEST_GROUP "[PolishDecodeVariants]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 namespace {
 at::Tensor make_haploid_probs(const std::string_view symbols,
@@ -65,11 +65,8 @@ at::Tensor make_polyploid_probs(const std::string_view symbols,
 }
 }  // namespace
 
-namespace dorado::polisher::tests {
+namespace dorado::secondary::tests {
 CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
-    using namespace dorado::polisher;
-    using namespace dorado::secondary;
-
     struct TestCase {
         std::string test_name;
         std::string ref_seq_with_gaps;
@@ -236,4 +233,4 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     }
 }
 
-}  // namespace dorado::polisher::tests
+}  // namespace dorado::secondary::tests
