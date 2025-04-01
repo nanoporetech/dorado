@@ -73,6 +73,13 @@ add_library(dorado_utils
     paf_utils.h
     fai_utils.cpp
     fai_utils.h
+    container_utils.cpp
+    container_utils.h
+    io_utils.cpp
+    io_utils.h
+    rle.h
+    ssize.h
+    span.h
  )
 
 target_compile_definitions(dorado_utils
