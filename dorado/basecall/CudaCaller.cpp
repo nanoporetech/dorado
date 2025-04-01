@@ -5,6 +5,7 @@
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
+#include "utils/sys_utils.h"
 #include "utils/thread_naming.h"
 
 #include <ATen/cuda/CUDAContext.h>
@@ -426,6 +427,12 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
                 "Calculating optimized batch size for GPU \"{}\" and model {}. Full benchmarking "
                 "will run for this device, which may take some time.",
                 prop->name, model_name);
+
+        if (params.emit_batchsize_benchmarks && utils::running_in_docker()) {
+            spdlog::warn(
+                    "Generating benchmarks inside of a container may not be representitive of the "
+                    "real hardware.");
+        }
     }
 
     for (int batch_size = batch_granularity; batch_size <= max_batch_size;
