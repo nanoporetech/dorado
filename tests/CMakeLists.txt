@@ -79,8 +79,8 @@ add_executable(dorado_tests
     SecondaryNormalizeVariantsTest.cpp
     SecondaryMergeVCSamplesTest.cpp
     SecondarySampleTest.cpp
+    SecondaryTrimTest.cpp
     SecondaryWindowTest.cpp
-    PolishTrimTest.cpp
     RleTest.cpp
     CorrectionWindowTest.cpp
 )

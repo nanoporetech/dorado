@@ -9,13 +9,11 @@
 #include <optional>
 #include <vector>
 
-namespace {
+namespace dorado::secondary::tests {
 
-#define TEST_GROUP "[PolishTrimSamples]"
+#define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
-    using namespace dorado::secondary;
-
     // The actual Sample struct is complicated, but the only thing needed
     // for trimming are seq_id, positions_major and positions_minor.
     // This would not be needed if C++20 was available because we could simply use
@@ -357,8 +355,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
  *          previous fixture will also test all the other edge cases here.
  */
 CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
-    using namespace dorado::secondary;
-
     // The actual Sample struct is complicated, but the only thing needed
     // for trimming are seq_id, positions_major and positions_minor.
     // This would not be needed if C++20 was available because we could simply use
@@ -456,4 +452,4 @@ CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     }
 }
 
-}  // namespace
+}  // namespace dorado::secondary::tests
