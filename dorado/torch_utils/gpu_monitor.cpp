@@ -1,5 +1,7 @@
 #include "gpu_monitor.h"
 
+#include "utils/sys_utils.h"
+
 #if defined(_WIN32) || defined(__linux__)
 #define HAS_NVML 1
 #else
@@ -688,20 +690,6 @@ std::optional<std::string> read_version_from_tegra_release() {
         spdlog::warn("Failed to parse version line from nv_tegra_release file: '{}'", line);
     }
     return info;
-}
-
-bool running_in_docker() {
-    // Look for docker paths in the init process.
-    std::ifstream cgroup_file("/proc/1/cgroup", std::ios_base::in | std::ios_base::binary);
-    if (cgroup_file.is_open()) {
-        std::string line;
-        while (std::getline(cgroup_file, line)) {
-            if (line.find(":/docker/") != line.npos) {
-                return true;
-            }
-        }
-    }
-    return false;
 }
 #endif  // DORADO_TX2
 
