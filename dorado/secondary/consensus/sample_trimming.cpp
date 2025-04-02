@@ -351,7 +351,8 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     // Sanity check the input pointers.
     for (size_t i = 0; i < std::size(samples); ++i) {
         if (!samples[i]) {
-            throw std::runtime_error{"Nullptr sample provided to trim_samples. Returning empty."};
+            spdlog::warn("Nullptr sample provided to trim_samples. Returning empty.");
+            return {};
         }
     }
 
@@ -452,13 +453,16 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         // Deprecated: result.back().is_last_in_contig = true;
     }
 
+    assert(std::size(result) == std::size(samples));
+
     // Trim each sample to the region.
     if (region) {
         if ((region->seq_id < 0) || (region->start < 0) || (region->end <= 0)) {
-            throw std::runtime_error{"Region trimming coordinates are not valid. seq_id = " +
-                                     std::to_string(region->seq_id) +
-                                     ", start = " + std::to_string(region->start) +
-                                     ", end = " + std::to_string(region->end)};
+            spdlog::warn(
+                    "Region trimming coordinates are not valid. Region: seq_id = {}, start = {} , "
+                    "end = {}. Skipping trimming to region in trim_samples.",
+                    region->seq_id, region->start, region->end);
+            return result;
         }
 
         spdlog::trace("[trim_samples] Trimming to region.");
