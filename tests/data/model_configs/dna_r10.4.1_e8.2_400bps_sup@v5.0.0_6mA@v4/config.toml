@@ -1,0 +1,102 @@
+[general]
+creation_date = "12/03/2024, 13:24:30"
+model = "conv_lstm_v3"
+
+[model_params]
+size = 384
+kmer_len = 9
+num_out = 2
+stride = 6
+
+[modbases]
+mod_bases = ["a"]
+offset = 0
+reverse_signal = false
+base_start_justify = true
+mod_long_names_0 = "6mA"
+chunk_context_0 = 150
+chunk_context_1 = 150
+kmer_context_bases_0 = 4
+kmer_context_bases_1 = 4
+motif = "A"
+motif_offset = 0
+chunk_size = 600
+
+[refinement]
+refine_do_rough_rescale = 1
+refine_kmer_center_idx = 6
+
+[sequence_encoder]
+[[sequence_encoder.sublayers]]
+type = "convolution"
+insize = 36
+size = 16
+winlen = 5
+stride = 1
+padding = 2
+activation = "tanh"
+
+[[sequence_encoder.sublayers]]
+type = "convolution"
+insize = 16
+size = 128
+winlen = 16
+stride = 1
+padding = 8
+activation = "tanh"
+
+
+[signal_encoder]
+[[signal_encoder.sublayers]]
+type = "convolution"
+insize = 1
+size = 4
+winlen = 5
+stride = 1
+padding = 2
+activation = "tanh"
+
+[[signal_encoder.sublayers]]
+type = "convolution"
+insize = 4
+size = 16
+winlen = 5
+stride = 1
+padding = 2
+activation = "tanh"
+
+[[signal_encoder.sublayers]]
+type = "convolution"
+insize = 16
+size = 128
+winlen = 16
+stride = 6
+padding = 8
+activation = "tanh"
+
+[encoder]
+[[encoder.sublayers]]
+type = "convolution"
+insize = 256
+size = 384
+winlen = 5
+stride = 1
+padding = 2
+activation = "tanh"
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 384
+reverse = 0
+
+[[encoder.sublayers]]
+type = "lstm"
+size = 384
+reverse = 1
+
+[[encoder.sublayers]]
+type = "linear"
+in_features = 384
+out_features = 2
+
+
