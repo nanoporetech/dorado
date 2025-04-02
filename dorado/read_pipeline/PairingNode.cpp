@@ -521,7 +521,7 @@ void PairingNode::restart() {
 }
 
 stats::NamedStats PairingNode::sample_stats() const {
-    stats::NamedStats stats = m_work_queue.sample_stats();
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["early_accepted_pairs"] = m_early_accepted_pairs.load();
     stats["overlap_accepted_pairs"] = m_overlap_accepted_pairs.load();
     stats["cached_signal_mb"] =

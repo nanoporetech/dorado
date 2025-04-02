@@ -113,7 +113,7 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
           m_input_signal_stride(input_signal_stride) {}
 
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
-    stats::NamedStats stats = m_work_queue.sample_stats();
+    stats::NamedStats stats = stats::from_obj(m_work_queue);
     stats["encoded_pairs"] = static_cast<double>(m_num_encoded_pairs);
     return stats;
 }
