@@ -81,6 +81,7 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
         : MessageSink(max_reads, static_cast<int>(modbase_threads)),
           m_runners(std::move(model_runners)),
           m_canonical_stride(canonical_stride),
+          m_sequence_stride_ratio(m_runners.at(0)->model_params(0).general.stride_ratio()),
           m_batch_size(m_runners.at(0)->batch_size()),
           m_kmer_len(m_runners.at(0)->model_params(0).context.kmer_len),
           m_is_rna_model(m_runners.at(0)->model_params(0).context.reverse),
@@ -326,14 +327,25 @@ void ModBaseChunkCallerNode::populate_hits_sig(PerBaseIntVec& per_base_hits_sig,
 
 void ModBaseChunkCallerNode::populate_encoded_kmer(
         std::vector<int8_t>& encoded_kmer,
-        const size_t output_size,
+        const size_t signal_len,
         const std::vector<int>& int_seq,
         const std::vector<uint64_t>& seq_to_sig_map) const {
     nvtx3::scoped_range range{"pop_enc_kmer"};
-    // Center the kmer over the "focus" base instead of placing it first
-    const bool kIsCentered = utils::get_dev_opt<bool>("kmer_centered", true);
-    encoded_kmer = modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, m_kmer_len, output_size, 0,
-                                              kIsCentered);
+    if (m_sequence_stride_ratio != 1) {
+        // Dividing the signal values by the stride ratio results in a downsampled encoded kmer
+        std::vector<uint64_t> strided_s2s;
+        strided_s2s.reserve(seq_to_sig_map.size());
+        std::transform(seq_to_sig_map.begin(), seq_to_sig_map.end(),
+                       std::back_inserter(strided_s2s),
+                       [ssr = m_sequence_stride_ratio](uint64_t value) { return value / ssr; });
+
+        encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, m_kmer_len,
+                                                  signal_len / m_sequence_stride_ratio, 0, true);
+        return;
+    }
+
+    encoded_kmer =
+            modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, m_kmer_len, signal_len, 0, true);
 }
 
 void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
@@ -498,8 +510,9 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
         throw std::runtime_error("Modbase signal processing failed.");
     }
 
-    const auto enc_kmer_size = mbd.encoded_kmers.size();
-    const auto expected = signal_len * m_kmer_len * utils::BaseInfo::NUM_BASES;
+    const size_t enc_kmer_size = mbd.encoded_kmers.size();
+    const size_t expected =
+            (signal_len / m_sequence_stride_ratio) * m_kmer_len * utils::BaseInfo::NUM_BASES;
     if (enc_kmer_size != expected) {
         spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
                       expected);
@@ -688,9 +701,12 @@ void ModBaseChunkCallerNode::create_and_submit_chunks(
 
         auto signal_chunk = modbase_data.signal.index({at::indexing::Slice(start, end)});
         // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
+
+        const int64_t kmer_start = start / m_sequence_stride_ratio;
+        const int64_t kmer_end = end / m_sequence_stride_ratio;
         auto encoded_kmers_chunk = std::vector<int8_t>(
-                modbase_data.encoded_kmers.begin() + start * kmer_size_per_sample,
-                modbase_data.encoded_kmers.begin() + end * kmer_size_per_sample);
+                modbase_data.encoded_kmers.begin() + kmer_start * kmer_size_per_sample,
+                modbase_data.encoded_kmers.begin() + kmer_end * kmer_size_per_sample);
 
         // Add any necessary padding to the end of the chunk.
         if (len < chunk_size) {
@@ -881,6 +897,9 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         const int64_t scores_states = chunk->num_states;
         const int64_t scores_size = static_cast<int64_t>(chunk->scores.size());
         const int64_t scores_seq_len = scores_size / scores_states;
+
+        // spdlog::info("scores_states:{} scores_size:{} scores_seq_len:{}", scores_states,
+        //              scores_size, scores_seq_len);
 
         if (scores_seq_len > chunk_size / modbase_stride) {
             spdlog::error("Modbase scores too long {}>{}/{}", scores_seq_len, chunk_size,

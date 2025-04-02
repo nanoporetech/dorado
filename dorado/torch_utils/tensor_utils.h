@@ -16,6 +16,9 @@ void serialise_tensor(const at::Tensor& t, const std::string& path);
 std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
                                      const std::vector<std::string>& tensors);
 
+// Serialise a tensor with a timestamp, name layer number "YYYYMMDD_hhmmss_nnn.{name}.{layer}.tensor"
+void dump_tensor(const at::Tensor& t, const std::string& name, const int layer_no);
+
 // Computes the q-th quantiles of each row of the input tensor `t`
 // using a partial sort as opposed a full sort per torch::quantiles
 // Only `interpolation='lower'` is currently implemented.

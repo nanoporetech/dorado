@@ -118,6 +118,7 @@ private:
 
     std::vector<modbase::RunnerPtr> m_runners;
     const int64_t m_canonical_stride;
+    const uint64_t m_sequence_stride_ratio;
     const int64_t m_batch_size;
 
     const int m_kmer_len;

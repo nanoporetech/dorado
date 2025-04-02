@@ -90,7 +90,18 @@ int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
 int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
-    return get_sig_len();
+    const auto signal_len = get_sig_len();
+    if (!params.general.modules.has_value()) {
+        return signal_len;
+    }
+
+    const int stride_ratio = params.general.modules->stride_ratio();
+    if (signal_len % stride_ratio != 0) {
+        throw std::runtime_error(
+                "modbase chunk size must be evenly divisible by sequence stride ratio");
+    }
+    const int64_t chunk_size = signal_len / stride_ratio;
+    return chunk_size;
 }
 
 ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
