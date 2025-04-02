@@ -325,24 +325,13 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
 
     at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
         // INPUT sigs: NCT & seqs: NTC
-        // spdlog::info("{} {}", utils::print_size(sigs, "sigs"), utils::print_size(seqs, "seqs"));
-        // utils::dump_tensor(sigs, "sigs_in", 0);
-        // utils::dump_tensor(seqs, "seqs_in", 0);
-
         {
             utils::ScopedProfileRange spr("sig convs", 2);
             sigs = sig_conv1(sigs);
-            // spdlog::info("{}", utils::print_size(seqs, "sigs_c1_out"));
-            // utils::dump_tensor(sigs, "sig_conv1", 0);
             sigs = sig_conv2(sigs);
-            // utils::dump_tensor(sigs, "sig_conv2", 0);
-            // spdlog::info("{}", utils::print_size(sigs, "sigs_c2_out"));
             sigs = sig_conv3(sigs);
         }
 
-        // utils::dump_tensor(sigs, "sigs_conv_out", 0);
-
-        // spdlog::info("{}", utils::print_size(sigs, "sigs_out"));
         // We are supplied one hot encoded sequences as (batch, signal/stride, kmer_len * base_count) int8.
         // We need (batch, kmer_len * base_count, signal/stride) and a dtype compatible with the float16
         // weights.
@@ -353,43 +342,30 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
         {
             utils::ScopedProfileRange spr("seq convs", 2);
             seqs = seq_conv1(seqs);
-            // spdlog::info("{}", utils::print_size(seqs, "seqs_c1_out"));
-            // utils::dump_tensor(seqs, "seq_conv1", 0);
             seqs = seq_conv2(seqs);
         }
 
-        // utils::dump_tensor(seqs, "seqs_conv_out", 0);
-
-        // spdlog::info("{}", utils::print_size(seqs, "seqs_out"));
         // z: NCT
         auto z = torch::cat({sigs, seqs}, 1);
-        // utils::dump_tensor(z, "merge_in", 0);
-        // spdlog::info("{}", utils::print_size(z, "cat"));
         {
             utils::ScopedProfileRange spr("merge convs", 2);
             // z: NCT -> TNC
             z = merge_conv1(z).permute({2, 0, 1});
         }
-        // utils::dump_tensor(z, "merge_conv_out", 0);
-        // spdlog::info("{}", utils::print_size(z, "merged"));
         {
             utils::ScopedProfileRange spr("lstm1", 2);
             auto [z1, h1] = lstm1(z);
-            z = z1.flip(0);
+            z = z1.flip(0);  // TNC -> T'NC
         }
-        // utils::dump_tensor(z, "lstm1_out", 0);
         {
             utils::ScopedProfileRange spr("lstm2", 2);
             auto [z2, h2] = lstm2(z);
-            z = z2;  // .flip(0) removed
+            z = z2;  // T'NC
         }
-        // utils::dump_tensor(z, "lstm2_out", 0);
 
         utils::ScopedProfileRange spr("linear", 2);
         // T'NC -> NTC
         z = linear(z).flip(0).permute({1, 0, 2}).softmax(2).flatten(1);
-        // utils::dump_tensor(z, "out", 0);
-        // spdlog::info("{}", utils::print_size(z, "out"));
         return z;
     }
 
@@ -397,50 +373,8 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
         utils::load_state_dict(*this, weights);
     }
 
-    std::vector<at::Tensor> load_weights([[maybe_unused]] const std::filesystem::path& dir) {
-        if (utils::get_dev_opt<int>("modbase_v3_random", 0) == 0) {
-            return utils::load_tensors(dir, weight_tensors);
-        }
-
-        const auto& modules = m_config.general.modules;
-        const auto& seq = modules->sequence_convs;
-        const auto& sig = modules->signal_convs;
-        const auto& merge = modules->merge_conv;
-        const auto& rnn = modules->lstms;
-        const auto& ll = modules->linear;
-
-        std::vector<at::IntArrayRef> sizes = {
-                {sig[0].size, sig[0].insize, sig[0].winlen},  // "sig_conv.conv1.weight.tensor"
-                {sig[0].size},                                // "sig_conv.conv1.bias.tensor"
-                {sig[1].size, sig[1].insize, sig[1].winlen},  // "sig_conv.conv2.weight.tensor"
-                {sig[1].size},                                // "sig_conv.conv2.bias.tensor"
-                {sig[2].size, sig[2].insize, sig[2].winlen},  // "sig_conv.conv3.weight.tensor"
-                {sig[2].size},                                // "sig_conv.conv3.bias.tensor"
-                {seq[0].size, seq[0].insize, seq[0].winlen},  // "seq_conv.conv1.weight.tensor"
-                {seq[0].size},                                // "seq_conv.conv1.bias.tensor"
-                {seq[1].size, seq[1].insize, seq[1].winlen},  // "seq_conv.conv2.weight.tensor"
-                {seq[1].size},                                // "seq_conv.conv2.bias.tensor"
-                {merge.size, merge.insize, merge.winlen},     // "merge_conv.conv1.weight.tensor"
-                {merge.size},                                 // "merge_conv.conv1.bias.tensor"
-                {4 * rnn[0].size, rnn[0].size},               // "rnns.rnn1.weight_ih_l0.tensor"
-                {4 * rnn[0].size, rnn[0].size},               // "rnns.rnn1.weight_hh_l0.tensor"
-                {4 * rnn[0].size},                            // "rnns.rnn1.bias_ih_l0.tensor"
-                {4 * rnn[0].size},                            // "rnns.rnn1.bias_hh_l0.tensor"
-                {4 * rnn[1].size, rnn[1].size},               // "rnns.rnn2.weight_ih_l0.tensor"
-                {4 * rnn[1].size, rnn[1].size},               // "rnns.rnn2.weight_hh_l0.tensor"
-                {4 * rnn[1].size},                            // "rnns.rnn2.bias_ih_l0.tensor"
-                {4 * rnn[1].size},                            // "rnns.rnn2.bias_hh_l0.tensor"
-                {ll.out_size, ll.in_size},                    // "linear.linear.weight.tensor"
-                {ll.out_size},                                // "linear.linear.bias.tensor"
-        };
-
-        const auto opts = at::TensorOptions().dtype(torch::kF16);
-        auto weights = std::vector<at::Tensor>();
-        for (const auto& szs : sizes) {
-            weights.push_back(torch::randn(szs, opts));
-        }
-
-        return weights;
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
+        return utils::load_tensors(dir, weight_tensors);
     }
 
     static const std::vector<std::string> weight_tensors;

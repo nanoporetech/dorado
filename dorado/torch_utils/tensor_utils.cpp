@@ -1,6 +1,7 @@
 #include "tensor_utils.h"
 
 #include "spdlog/spdlog.h"
+#include "utils/dev_utils.h"
 #include "utils/simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
@@ -102,6 +103,11 @@ void dump_tensor([[maybe_unused]] const at::Tensor& t,
                  [[maybe_unused]] const std::string& name,
                  [[maybe_unused]] const int layer_no) {
 #ifndef NDEBUG
+    static const bool is_active = utils::get_dev_opt<bool>("dump_tensors", false);
+    if (!is_active) {
+        return;
+    }
+
     // Get current time
     auto now = std::chrono::system_clock::now();
     auto now_t = std::chrono::system_clock::to_time_t(now);
