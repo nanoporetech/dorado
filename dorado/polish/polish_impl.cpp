@@ -706,62 +706,73 @@ void sample_producer(PolisherResources& resources,
             continue;
         }
 
-        const int32_t num_regions = region_id_end - region_id_start;
-        const int32_t window_id_start = bam_region_intervals[region_id_start].start;
-        const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
-        const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
+        try {
+            const int32_t num_regions = region_id_end - region_id_start;
+            const int32_t window_id_start = bam_region_intervals[region_id_start].start;
+            const int32_t window_id_end = bam_region_intervals[region_id_end - 1].end;
+            const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
 
-        // Encode samples in parallel. Non-const by design, data will be moved.
-        std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
-                resources.bam_handles, *resources.encoder, draft_lens,
-                Span<const secondary::Window>(std::data(windows) + window_id_start, num_windows),
-                num_threads);
+            // Encode samples in parallel. Non-const by design, data will be moved.
+            std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
+                    resources.bam_handles, *resources.encoder, draft_lens,
+                    Span<const secondary::Window>(std::data(windows) + window_id_start,
+                                                  num_windows),
+                    num_threads);
 
-        spdlog::trace(
-                "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
-                num_regions, std::size(region_samples));
+            spdlog::trace(
+                    "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = "
+                    "{}",
+                    num_regions, std::size(region_samples));
 
-        auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
-                region_samples, *resources.encoder,
-                Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
-                                              num_regions),
-                Span<const secondary::Interval>(std::data(bam_region_intervals) + region_id_start,
-                                                num_regions),
-                num_threads, window_len, window_overlap, window_id_start);
+            auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
+                    region_samples, *resources.encoder,
+                    Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
+                                                  num_regions),
+                    Span<const secondary::Interval>(
+                            std::data(bam_region_intervals) + region_id_start, num_regions),
+                    num_threads, window_len, window_overlap, window_id_start);
 
-        if (std::size(samples) != std::size(trims)) {
-            throw std::runtime_error("Size of samples and trims does not match! samples.size() = " +
-                                     std::to_string(std::size(samples)) +
-                                     ", trims.size() = " + std::to_string(std::size(trims)));
-        }
-
-        // Add samples to the batches.
-        for (size_t i = 0; i < std::size(samples); ++i) {
-            // If any of the samples is of wrong size, create a remainder batch of 1.
-            if (dorado::ssize(samples[i].positions_major) != window_len) {
-                InferenceData remainder_buffer;
-                remainder_buffer.samples = {std::move(samples[i])};
-                remainder_buffer.trims = {std::move(trims[i])};
-                spdlog::trace(
-                        "[producer] Pushing a batch of data to infer_data queue. "
-                        "remainder_buffer.samples.size() = {}",
-                        std::size(remainder_buffer.samples));
-                infer_data.try_push(std::move(remainder_buffer));
-                continue;
+            if (std::size(samples) != std::size(trims)) {
+                throw std::runtime_error(
+                        "Size of samples and trims does not match! samples.size() = " +
+                        std::to_string(std::size(samples)) +
+                        ", trims.size() = " + std::to_string(std::size(trims)));
             }
 
-            // Expand the current buffer.
-            buffer.samples.emplace_back(std::move(samples[i]));
-            buffer.trims.emplace_back(std::move(trims[i]));
+            // Add samples to the batches.
+            for (size_t i = 0; i < std::size(samples); ++i) {
+                // If any of the samples is of wrong size, create a remainder batch of 1.
+                if (dorado::ssize(samples[i].positions_major) != window_len) {
+                    InferenceData remainder_buffer;
+                    remainder_buffer.samples = {std::move(samples[i])};
+                    remainder_buffer.trims = {std::move(trims[i])};
+                    spdlog::trace(
+                            "[producer] Pushing a batch of data to infer_data queue. "
+                            "remainder_buffer.samples.size() = {}",
+                            std::size(remainder_buffer.samples));
+                    infer_data.try_push(std::move(remainder_buffer));
+                    continue;
+                }
 
-            if (dorado::ssize(buffer.samples) == batch_size) {
-                spdlog::trace(
-                        "[producer] Pushing a batch of data to infer_data queue. "
-                        "buffer.samples.size() = {}",
-                        std::size(buffer.samples));
-                infer_data.try_push(std::move(buffer));
-                buffer = {};
+                // Expand the current buffer.
+                buffer.samples.emplace_back(std::move(samples[i]));
+                buffer.trims.emplace_back(std::move(trims[i]));
+
+                if (dorado::ssize(buffer.samples) == batch_size) {
+                    spdlog::trace(
+                            "[producer] Pushing a batch of data to infer_data queue. "
+                            "buffer.samples.size() = {}",
+                            std::size(buffer.samples));
+                    infer_data.try_push(std::move(buffer));
+                    buffer = {};
+                }
             }
+        } catch (const std::exception& e) {
+            spdlog::warn(
+                    "Caught exception in the sample producer. Skipping the remaining regions in "
+                    "current batch (region_id_start = {}, region_id_end = {}). Exception: {}",
+                    region_id_start, region_id_end, e.what());
+            continue;
         }
     }
 
@@ -889,21 +900,29 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 
             // Inference.
-            torch::Tensor logits = batch_infer(model, item, tid);
+            try {
+                torch::Tensor logits = batch_infer(model, item, tid);
 
-            // One out_item contains samples for one inference batch.
-            // No guarantees on any sort of logical ordering of the samples.
-            DecodeData out_item;
-            out_item.samples = std::move(item.samples);
-            out_item.logits = std::move(logits);
-            out_item.trims = std::move(item.trims);
+                // One out_item contains samples for one inference batch.
+                // No guarantees on any sort of logical ordering of the samples.
+                DecodeData out_item;
+                out_item.samples = std::move(item.samples);
+                out_item.logits = std::move(logits);
+                out_item.trims = std::move(item.trims);
 
-            spdlog::trace(
-                    "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
-                    "out_item.samples.size() = {}, decode queue size: {}",
-                    tid, utils::tensor_shape_as_string(out_item.logits),
-                    std::size(out_item.samples), std::size(decode_queue));
-            decode_queue.try_push(std::move(out_item));
+                spdlog::trace(
+                        "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
+                        "out_item.samples.size() = {}, decode queue size: {}",
+                        tid, utils::tensor_shape_as_string(out_item.logits),
+                        std::size(out_item.samples), std::size(decode_queue));
+                decode_queue.try_push(std::move(out_item));
+
+            } catch (const std::exception& e) {
+                spdlog::warn(
+                        "Caught exception when inferring a batch of samples. Skipping this "
+                        "batch. Exception: {}",
+                        e.what());
+            }
         }
     };
 
@@ -1067,49 +1086,59 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                 break;
             }
 
-            const int64_t tensor_batch_size =
-                    (item.logits.sizes().size() == 0) ? 0 : item.logits.size(0);
+            try {
+                const int64_t tensor_batch_size =
+                        (item.logits.sizes().size() == 0) ? 0 : item.logits.size(0);
 
-            assert(tensor_batch_size == dorado::ssize(item.trims));
+                assert(tensor_batch_size == dorado::ssize(item.trims));
 
-            spdlog::trace(
-                    "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
-                    "tensor_batch_size = {}, queue size: {}",
-                    tid, utils::tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
-                    tensor_batch_size, std::size(decode_queue));
+                spdlog::trace(
+                        "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
+                        "tensor_batch_size = {}, queue size: {}",
+                        tid, utils::tensor_shape_as_string(item.logits), dorado::ssize(item.trims),
+                        tensor_batch_size, std::size(decode_queue));
 
-            // This should handle the timeout case too.
-            if (tensor_batch_size == 0) {
-                continue;
-            }
-
-            // Inference.
-            std::vector<secondary::ConsensusResult> results_samples = batch_decode(item, tid);
-
-            thread_results.insert(std::end(thread_results),
-                                  std::make_move_iterator(std::begin(results_samples)),
-                                  std::make_move_iterator(std::end(results_samples)));
-
-            // Separate the logits for each sample.
-            if (collect_vc_data) {
-                // Split logits for each input sample in the batch, and check that the number matches.
-                const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
-                if (std::size(item.samples) != std::size(split_logits)) {
-                    spdlog::error(
-                            "The number of logits produced by the batch inference does not match "
-                            "the "
-                            "input batch size! Variant calling for this batch will not be "
-                            "possible. "
-                            "samples.size = {}, split_logits.size = {}",
-                            std::size(item.samples), std::size(split_logits));
+                // This should handle the timeout case too.
+                if (tensor_batch_size == 0) {
                     continue;
                 }
-                // Create the variant calling data. Clone the tensor to convert the view to actual data.
-                for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
-                    thread_vc_data.emplace_back(secondary::VariantCallingSample{
-                            item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                            std::move(item.samples[i].positions_minor), split_logits[i].clone()});
+
+                // Inference.
+                std::vector<secondary::ConsensusResult> results_samples = batch_decode(item, tid);
+
+                thread_results.insert(std::end(thread_results),
+                                      std::make_move_iterator(std::begin(results_samples)),
+                                      std::make_move_iterator(std::end(results_samples)));
+
+                // Separate the logits for each sample.
+                if (collect_vc_data) {
+                    // Split logits for each input sample in the batch, and check that the number matches.
+                    const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
+                    if (std::size(item.samples) != std::size(split_logits)) {
+                        spdlog::error(
+                                "The number of logits produced by the batch inference does not "
+                                "match "
+                                "the "
+                                "input batch size! Variant calling for this batch will not be "
+                                "possible. "
+                                "samples.size = {}, split_logits.size = {}",
+                                std::size(item.samples), std::size(split_logits));
+                        continue;
+                    }
+                    // Create the variant calling data. Clone the tensor to convert the view to actual data.
+                    for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
+                        thread_vc_data.emplace_back(secondary::VariantCallingSample{
+                                item.samples[i].seq_id, std::move(item.samples[i].positions_major),
+                                std::move(item.samples[i].positions_minor),
+                                split_logits[i].clone()});
+                    }
                 }
+
+            } catch (const std::exception& e) {
+                spdlog::warn(
+                        "Caught an exception when decoding a batch of samples. Skipping this "
+                        "batch. Exception: {}",
+                        e.what());
             }
         }
     };
@@ -1261,33 +1290,44 @@ std::vector<secondary::Variant> call_variants(
             const int64_t seq_id = group_id + region_batch.start;
             const std::string& header = draft_lens[seq_id].first;
 
-            // Sort the group by start positions.
-            auto& group = groups[group_id];
-            std::stable_sort(std::begin(group), std::end(group));
+            // Catch exceptions here to skip variant calling only on one sequence instead
+            // of the entire batch.
+            try {
+                // Sort the group by start positions.
+                auto& group = groups[group_id];
+                std::stable_sort(std::begin(group), std::end(group));
 
-            if (std::empty(group)) {
-                continue;
-            }
+                if (std::empty(group)) {
+                    continue;
+                }
 
-            // Get the draft sequence.
-            const std::string draft = draft_readers[tid]->fetch_seq(header);
+                // Get the draft sequence.
+                const std::string draft = draft_readers[tid]->fetch_seq(header);
 
-            // Trim the overlapping portions between samples.
-            const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
+                // Trim the overlapping portions between samples.
+                const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
 
-            // Break and merge samples on non-variant positions.
-            // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
-            const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+                // Break and merge samples on non-variant positions.
+                // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+                const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
-            for (const auto& vc_sample : joined_samples) {
-                std::vector<secondary::Variant> variants =
-                        secondary::decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+                for (const auto& vc_sample : joined_samples) {
+                    std::vector<secondary::Variant> variants =
+                            secondary::decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
 
-                ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
+                    ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
 
-                results[group_id].insert(std::end(results[group_id]),
-                                         std::make_move_iterator(std::begin(variants)),
-                                         std::make_move_iterator(std::end(variants)));
+                    results[group_id].insert(std::end(results[group_id]),
+                                             std::make_move_iterator(std::begin(variants)),
+                                             std::make_move_iterator(std::end(variants)));
+                }
+            } catch (const std::exception& e) {
+                spdlog::warn(
+                        "Caught an exception in the call_variants::worker (tid = {}, group_id = "
+                        "{}, seq_id = {}, header = '{}'). Not returning any variants for this "
+                        "group. Original exception: '{}'",
+                        tid, group_id, seq_id, header, e.what());
+                results[group_id].clear();
             }
         }
     };
