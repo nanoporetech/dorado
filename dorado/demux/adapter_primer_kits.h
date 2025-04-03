@@ -32,14 +32,15 @@ const std::unordered_map<AdapterCode, Candidate> adapters = {
 // for that kit. We look for the specified front adapter sequence at the beginning of the
 // read, and the specified rear adapter sequence at the end of the read.
 const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter_kit_map = {
-        {AC::LSK110,
-         {KC::SQK_LSK114,       KC::SQK_LSK114_260,       KC::SQK_LSK114_XL, KC::SQK_LSK114_XL_260,
-          KC::SQK_PCS114,       KC::SQK_PCS114_260,       KC::SQK_RAD114,    KC::SQK_RAD114_260,
-          KC::SQK_ULK114,       KC::SQK_ULK114_260,       KC::SQK_16S114_24, KC::SQK_16S114_24_260,
-          KC::SQK_MLK114_96_XL, KC::SQK_MLK114_96_XL_260, KC::SQK_NBD114_24, KC::SQK_NBD114_24_260,
-          KC::SQK_NBD114_96,    KC::SQK_NBD114_96_260,    KC::SQK_PCB114_24, KC::SQK_PCB114_24_260,
-          KC::SQK_RBK114_24,    KC::SQK_RBK114_24_260,    KC::SQK_RBK114_96, KC::SQK_RBK114_96_260,
-          KC::SQK_RPB114_24,    KC::SQK_RPB114_24_260}},
+        {AC::LSK110, {KC::SQK_LSK114,        KC::SQK_LSK114_260,    KC::SQK_LSK114_XL,
+                      KC::SQK_LSK114_XL_260, KC::SQK_PCS114,        KC::SQK_PCS114_260,
+                      KC::SQK_RAD114,        KC::SQK_RAD114_260,    KC::SQK_ULK114,
+                      KC::SQK_ULK114_260,    KC::SQK_16S114_24,     KC::SQK_16S114_24_260,
+                      KC::SQK_MAB114_24,     KC::SQK_MLK114_96_XL,  KC::SQK_MLK114_96_XL_260,
+                      KC::SQK_NBD114_24,     KC::SQK_NBD114_24_260, KC::SQK_NBD114_96,
+                      KC::SQK_NBD114_96_260, KC::SQK_PCB114_24,     KC::SQK_PCB114_24_260,
+                      KC::SQK_RBK114_24,     KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
+                      KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260}},
         {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL}}};
 
 // Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
