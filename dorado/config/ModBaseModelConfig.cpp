@@ -121,7 +121,7 @@ std::vector<LSTMParams> parse_lstms(const std::vector<toml::value>& sublayers) {
     if (lstms.front().reverse) {
         throw std::runtime_error("Modbase model config first lstm layer must be forward");
     }
-    for (size_t i = 0; i < lstms.size() - 1; i++) {
+    for (size_t i = 0; i < (lstms.size() - 1); ++i) {
         if (lstms[i].size != lstms[i + 1].size) {
             throw std::runtime_error("Modbase model config lstm layers unequal sizes");
         }
@@ -161,8 +161,8 @@ ModulesParams parse_modules_params(const toml::value& config) {
 }
 
 int stride_product(const std::vector<ConvParams>& cs) {
-    return std::accumulate(cs.begin(), cs.end(), 1,
-                           [](int s, const auto& c) { return s * c.stride; });
+    return std::accumulate(cs.cbegin(), cs.cend(), 1,
+                           [](const int s, const auto& c) { return s * c.stride; });
 }
 }  // namespace
 
@@ -206,8 +206,8 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
     }
 
     if (modules.has_value()) {
-        if (size != modules->lstms.front().size ||
-            modules->lstms.front().size != modules->lstms.back().size) {
+        if ((size != modules->lstms.front().size) ||
+            (modules->lstms.front().size != modules->lstms.back().size)) {
             throw std::runtime_error("Modbase model config lstm size mismatch");
         }
         int signal_stride = 1;

@@ -124,8 +124,8 @@ struct ModBaseModelConfig {
 
     // Returns true if this modbase model processes chunks instead of context hits
     bool is_chunked_input_model() const {
-        return general.model_type == ModelType::CONV_LSTM_V2 ||
-               general.model_type == ModelType::CONV_LSTM_V3;
+        return (general.model_type == ModelType::CONV_LSTM_V2) ||
+               (general.model_type == ModelType::CONV_LSTM_V3);
     };
 
     ModBaseModelConfig(std::filesystem::path model_path_,

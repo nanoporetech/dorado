@@ -327,17 +327,17 @@ void ModBaseChunkCallerNode::populate_hits_sig(PerBaseIntVec& per_base_hits_sig,
 
 void ModBaseChunkCallerNode::populate_encoded_kmer(
         std::vector<int8_t>& encoded_kmer,
-        const size_t signal_len,
+        const std::size_t signal_len,
         const std::vector<int>& int_seq,
         const std::vector<uint64_t>& seq_to_sig_map) const {
     nvtx3::scoped_range range{"pop_enc_kmer"};
     if (m_sequence_stride_ratio != 1) {
         // Dividing the signal values by the stride ratio results in a downsampled encoded kmer
-        std::vector<uint64_t> strided_s2s;
+        std::vector<std::uint64_t> strided_s2s;
         strided_s2s.reserve(seq_to_sig_map.size());
-        std::transform(seq_to_sig_map.begin(), seq_to_sig_map.end(),
-                       std::back_inserter(strided_s2s),
-                       [ssr = m_sequence_stride_ratio](uint64_t value) { return value / ssr; });
+        std::transform(
+                seq_to_sig_map.cbegin(), seq_to_sig_map.cend(), std::back_inserter(strided_s2s),
+                [ssr = m_sequence_stride_ratio](const std::uint64_t value) { return value / ssr; });
 
         encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, m_kmer_len,
                                                   signal_len / m_sequence_stride_ratio, 0, true);
@@ -510,8 +510,8 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
         throw std::runtime_error("Modbase signal processing failed.");
     }
 
-    const size_t enc_kmer_size = mbd.encoded_kmers.size();
-    const size_t expected =
+    const std::size_t enc_kmer_size = mbd.encoded_kmers.size();
+    const std::size_t expected =
             (signal_len / m_sequence_stride_ratio) * m_kmer_len * utils::BaseInfo::NUM_BASES;
     if (enc_kmer_size != expected) {
         spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
@@ -702,8 +702,8 @@ void ModBaseChunkCallerNode::create_and_submit_chunks(
         auto signal_chunk = modbase_data.signal.index({at::indexing::Slice(start, end)});
         // TODO -- this copying could be eliminated by writing directly into the runner input_seqs_ptr
 
-        const int64_t kmer_start = start / m_sequence_stride_ratio;
-        const int64_t kmer_end = end / m_sequence_stride_ratio;
+        const std::int64_t kmer_start = start / m_sequence_stride_ratio;
+        const std::int64_t kmer_end = end / m_sequence_stride_ratio;
         auto encoded_kmers_chunk = std::vector<int8_t>(
                 modbase_data.encoded_kmers.begin() + kmer_start * kmer_size_per_sample,
                 modbase_data.encoded_kmers.begin() + kmer_end * kmer_size_per_sample);

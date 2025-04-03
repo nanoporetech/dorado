@@ -96,11 +96,11 @@ int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     }
 
     const int stride_ratio = params.general.modules->stride_ratio();
-    if (signal_len % stride_ratio != 0) {
+    if ((signal_len % stride_ratio) != 0) {
         throw std::runtime_error(
                 "modbase chunk size must be evenly divisible by sequence stride ratio");
     }
-    const int64_t chunk_size = signal_len / stride_ratio;
+    const std::int64_t chunk_size = signal_len / stride_ratio;
     return chunk_size;
 }
 
