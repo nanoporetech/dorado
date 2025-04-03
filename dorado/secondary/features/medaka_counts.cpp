@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <unordered_set>
 
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
