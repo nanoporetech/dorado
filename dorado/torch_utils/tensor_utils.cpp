@@ -1,6 +1,5 @@
 #include "tensor_utils.h"
 
-#include "spdlog/spdlog.h"
 #include "utils/dev_utils.h"
 #include "utils/simd.h"
 
@@ -14,6 +13,10 @@
 #include <ostream>
 #include <sstream>
 #include <vector>
+
+#ifndef NDEBUG
+#include <spdlog/spdlog.h>
+#endif
 
 namespace dorado::utils {
 

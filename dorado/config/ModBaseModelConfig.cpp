@@ -1,8 +1,6 @@
 #include "ModBaseModelConfig.h"
 
 #include "config/common.h"
-#include "toml11/find.hpp"
-#include "toml11/types.hpp"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -126,7 +124,7 @@ std::vector<LSTMParams> parse_lstms(const std::vector<toml::value>& sublayers) {
             throw std::runtime_error("Modbase model config lstm layers unequal sizes");
         }
         if (lstms[i].reverse == lstms[i + 1].reverse) {
-            throw std::runtime_error("Modbase model congig lstm layers must alternate direction");
+            throw std::runtime_error("Modbase model config lstm layers must alternate direction");
         }
     }
     return lstms;

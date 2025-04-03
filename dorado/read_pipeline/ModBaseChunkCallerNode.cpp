@@ -331,21 +331,21 @@ void ModBaseChunkCallerNode::populate_encoded_kmer(
         const std::vector<int>& int_seq,
         const std::vector<uint64_t>& seq_to_sig_map) const {
     nvtx3::scoped_range range{"pop_enc_kmer"};
-    if (m_sequence_stride_ratio != 1) {
-        // Dividing the signal values by the stride ratio results in a downsampled encoded kmer
-        std::vector<std::uint64_t> strided_s2s;
-        strided_s2s.reserve(seq_to_sig_map.size());
-        std::transform(
-                seq_to_sig_map.cbegin(), seq_to_sig_map.cend(), std::back_inserter(strided_s2s),
-                [ssr = m_sequence_stride_ratio](const std::uint64_t value) { return value / ssr; });
-
-        encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, m_kmer_len,
-                                                  signal_len / m_sequence_stride_ratio, 0, true);
+    if (m_sequence_stride_ratio == 1) {
+        encoded_kmer = modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, m_kmer_len, signal_len,
+                                                  0, true);
         return;
     }
 
-    encoded_kmer =
-            modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, m_kmer_len, signal_len, 0, true);
+    // Dividing the signal values by the stride ratio results in a downsampled encoded kmer
+    std::vector<std::uint64_t> strided_s2s;
+    strided_s2s.reserve(seq_to_sig_map.size());
+    std::transform(
+            seq_to_sig_map.cbegin(), seq_to_sig_map.cend(), std::back_inserter(strided_s2s),
+            [ssr = m_sequence_stride_ratio](const std::uint64_t value) { return value / ssr; });
+
+    encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, m_kmer_len,
+                                              signal_len / m_sequence_stride_ratio, 0, true);
 }
 
 void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
@@ -897,9 +897,6 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         const int64_t scores_states = chunk->num_states;
         const int64_t scores_size = static_cast<int64_t>(chunk->scores.size());
         const int64_t scores_seq_len = scores_size / scores_states;
-
-        // spdlog::info("scores_states:{} scores_size:{} scores_seq_len:{}", scores_states,
-        //              scores_size, scores_seq_len);
 
         if (scores_seq_len > chunk_size / modbase_stride) {
             spdlog::error("Modbase scores too long {}>{}/{}", scores_seq_len, chunk_size,
