@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -150,7 +151,7 @@ struct ProtocolInfo {
     RapidChemistry rapid_chemistry{RapidChemistry::NONE};
 };
 
-using MotorSpeed = uint16_t;
+using MotorSpeed = std::uint16_t;
 /*
 Sequencing Kit information with string name matching the minknow / pod5
 representation (using hyphens).

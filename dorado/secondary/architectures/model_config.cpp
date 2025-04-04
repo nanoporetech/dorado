@@ -6,6 +6,13 @@
 #include <ostream>
 #include <stdexcept>
 
+namespace {
+const std::string MODEL_TOML_KEY{"model"};
+const std::string KWARGS_TOML_KEY{"kwargs"};
+const std::string FEATURE_ENCODER_TOML_KEY{"feature_encoder"};
+const std::string LABEL_SCHEME_TOML_KEY{"label_scheme"};
+}  // namespace
+
 namespace dorado::secondary {
 
 namespace {
@@ -111,23 +118,23 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
 
     // Parse the model info.
     {
-        const auto& section = toml::find(config_toml, "model");
+        const auto& section = toml::find(config_toml, MODEL_TOML_KEY);
         cfg.model_type = toml::find<std::string>(section, "type");
         cfg.model_file = model_file;
         cfg.model_dir = config_path.parent_path().string();
 
         // Parse kwargs for the model.
-        const auto& model_kwargs = toml::find(section, "kwargs");
+        const auto& model_kwargs = toml::find(section, KWARGS_TOML_KEY);
         cfg.model_kwargs = parse_kwargs(model_kwargs);
     }
 
     // Parse the feature encoder info.
     {
-        const auto& section = toml::find(config_toml, "feature_encoder");
+        const auto& section = toml::find(config_toml, FEATURE_ENCODER_TOML_KEY);
         cfg.feature_encoder_type = toml::find<std::string>(section, "type");
 
         // Parse kwargs for the feature extractor.
-        const auto& model_kwargs = toml::find(section, "kwargs");
+        const auto& model_kwargs = toml::find(section, KWARGS_TOML_KEY);
         cfg.feature_encoder_kwargs = parse_kwargs(model_kwargs);
 
         // Parse dtypes separately and optionally. Perhaps some encoders won't have it.
@@ -148,7 +155,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
 
     // Parse the label scheme section.
     {
-        const auto& section = toml::find(config_toml, "label_scheme");
+        const auto& section = toml::find(config_toml, LABEL_SCHEME_TOML_KEY);
         cfg.label_scheme_type = toml::find<std::string>(section, "type");
     }
 

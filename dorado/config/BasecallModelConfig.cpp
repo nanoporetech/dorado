@@ -37,13 +37,31 @@ uint32_t get_mean_qscore_start_pos_by_model_name(const std::string &model_name) 
 }
 
 }  // namespace
+
+namespace keys {
+namespace {
+// Workaround GCC-13 dangling reference warnings by passing an lvalue instead of a temporary
+const std::string QSCORE{"qscore"};
+const std::string POLYA{"poly_a"};
+const std::string RUN_INFO{"run_info"};
+const std::string SCALING{"scaling"};
+const std::string NORM{"normalisation"};
+const std::string INPUT{"input"};
+const std::string GLOBAL_NORM{"global_norm"};
+const std::string LAYER{"layer"};
+const std::string SUBLAYERS{"sublayers"};
+const std::string CONV{"conv"};
+const std::string ENCODER{"encoder"};
+}  // namespace
+}  // namespace keys
+
 namespace dorado::config {
 
 namespace {
 
 void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_toml) {
-    if (config_toml.contains("qscore")) {
-        const auto &qscore = toml::find(config_toml, "qscore");
+    if (config_toml.contains(keys::QSCORE)) {
+        const auto &qscore = toml::find(config_toml, keys::QSCORE);
         config.qbias = toml::find<float>(qscore, "bias");
         config.qscale = toml::find<float>(qscore, "scale");
         if (qscore.contains("mean_qscore_start_pos")) {
@@ -63,8 +81,8 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
 }
 
 void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &config_toml) {
-    if (config_toml.contains("poly_a")) {
-        const auto &polya = toml::find(config_toml, "poly_a");
+    if (config_toml.contains(keys::POLYA)) {
+        const auto &polya = toml::find(config_toml, keys::POLYA);
         if (polya.contains("calibration_coefficients")) {
             throw std::runtime_error(
                     "This version of dorado does not support use of "
@@ -83,8 +101,8 @@ void parse_run_info(BasecallModelConfig &config,
                     const toml::value &config_toml) {
     // Fetch run_info parameters.
     // Do nothing if run_info is not available in config file.
-    if (config_toml.contains("run_info")) {
-        const auto &run_info = toml::find(config_toml, "run_info");
+    if (config_toml.contains(keys::RUN_INFO)) {
+        const auto &run_info = toml::find(config_toml, keys::RUN_INFO);
         config.sample_rate = toml::find<int>(run_info, "sample_rate");
 
         if (run_info.contains("sample_type")) {
@@ -124,14 +142,14 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
     }
 
     // scaling.strategy introduced with v4.3 models
-    if (config_toml.contains("scaling")) {
-        const auto &scaling = toml::find(config_toml, "scaling");
+    if (config_toml.contains(keys::SCALING)) {
+        const auto &scaling = toml::find(config_toml, keys::SCALING);
         params.strategy =
                 scaling_strategy_from_string(toml::find<std::string>(scaling, "strategy"));
     }
 
-    if (config_toml.contains("normalisation")) {
-        const auto &norm = toml::find(config_toml, "normalisation");
+    if (config_toml.contains(keys::NORM)) {
+        const auto &norm = toml::find(config_toml, keys::NORM);
         params.quantile.quantile_a = toml::find<float>(norm, "quantile_a");
         params.quantile.quantile_b = toml::find<float>(norm, "quantile_b");
         params.quantile.shift_multiplier = toml::find<float>(norm, "shift_multiplier");
@@ -144,7 +162,7 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
     }
 
     if (config_toml.contains("standardisation")) {
-        const auto &norm = toml::find(config_toml, "standardisation");
+        const auto norm = toml::find(config_toml, "standardisation");
         params.standardisation.standardise = toml::find<int>(norm, "standardise") > 0;
         if (params.standardisation.standardise) {
             params.standardisation.mean = toml::find<float>(norm, "mean");
@@ -190,13 +208,13 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     parse_qscore_params(config, config_toml);
     parse_polya_coefficients(config, config_toml);
 
-    const auto &input = toml::find(config_toml, "input");
+    const auto &input = toml::find(config_toml, keys::INPUT);
     config.num_features = toml::find<int>(input, "features");
 
-    const auto &encoder = toml::find(config_toml, "encoder");
+    const auto &encoder = toml::find(config_toml, keys::ENCODER);
     if (encoder.contains("type")) {
         const std::vector<toml::value> sublayers =
-                toml::find(config_toml, "encoder", "sublayers").as_array();
+                toml::find(config_toml, keys::ENCODER, "sublayers").as_array();
 
         warn_unrecognised_sublayers(sublayers);
         config.bias = false;
@@ -239,7 +257,7 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
                 ConvParams{16, config.lstm_size, 19, config.stride, Activation::SWISH});
     }
 
-    const auto &global_norm = toml::find(config_toml, "global_norm");
+    const auto &global_norm = toml::find(config_toml, keys::GLOBAL_NORM);
     // Note that in v4 files state_len appears twice: under global_norm and under
     // linearcrfencoder.  We are ignoring the latter.
     config.state_len = toml::find<int>(global_norm, "state_len");
@@ -318,7 +336,7 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     TxEncoderParams params;
     params.depth = toml::find<int>(enc, "depth");
 
-    const auto &layer = toml::find(enc, "layer");
+    const auto &layer = toml::find(enc, keys::LAYER);
     params.d_model = toml::find<int>(layer, "d_model");
     params.nhead = toml::find<int>(layer, "nhead");
     params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
@@ -383,8 +401,9 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.tx = TxStack{tx_encoder, upsample, crf_encoder};
     config.tx->check();
 
-    const auto &convs = toml::find(model_toml, "encoder", "conv");
-    for (const auto &segment : toml::find(convs, "sublayers").as_array()) {
+    const auto &convs = toml::find(model_toml, keys::ENCODER, keys::CONV);
+    const auto &sublayers = toml::find(convs, keys::SUBLAYERS).as_array();
+    for (const auto &segment : sublayers) {
         const auto type = toml::find<std::string>(segment, "type");
         if (type.compare("convolution") != 0) {
             continue;

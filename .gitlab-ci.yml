@@ -257,6 +257,17 @@ build:linux:x86:jammy:
     - .build_and_test_dorado
   artifacts: null
 
+# Need an updated hdf_plugins before this is possible
+# build:linux:x86:noble:
+#   image: ${DORADO_DOCKER_ROOT}/dorado-deps-24.04-cuda-${CUDA}.0:1.1
+#   variables:
+#     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+#   extends:
+#     - .linux_build_dependencies
+#     - .linux_runner
+#     - .build_and_test_dorado
+#   artifacts: null
+
 build:linux:x86:focal:debug:
   variables:
     BUILD_TYPE: "Debug"

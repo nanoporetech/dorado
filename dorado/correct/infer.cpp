@@ -14,6 +14,13 @@
 #include <toml.hpp>
 #include <torch/types.h>
 
+namespace keys {
+namespace {
+// Workaround GCC-13 dangling reference warnings by passing an lvalue instead of a temporary
+const std::string MODEL{"model"};
+}  // namespace
+}  // namespace keys
+
 namespace dorado::correction {
 
 int calculate_batch_size(const std::string& device, float memory_fraction) {
@@ -63,7 +70,7 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path) {
 
     ModelConfig cfg;
 
-    const auto& model = toml::find(config_toml, "model");
+    const auto& model = toml::find(config_toml, keys::MODEL);
     cfg.version = toml::find<int>(model, "version");
     cfg.window_size = toml::find<int>(model, "window_size");
     cfg.model_type = toml::find<std::string>(model, "model_type");

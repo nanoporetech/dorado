@@ -11,6 +11,12 @@
 #include <string>
 #include <unordered_set>
 
+namespace {
+const std::string ANCHORS_TOML_KEY{"anchors"};
+const std::string THRESHOLD_TOML_KEY{"threshold"};
+const std::string TAIL_TOML_KEY{"tail"};
+}  // namespace
+
 namespace dorado::poly_tail {
 namespace {
 
@@ -20,7 +26,7 @@ PolyTailConfig update_config(const toml::value& config_toml, PolyTailConfig conf
     }
 
     if (config_toml.contains("anchors")) {
-        const auto& anchors = toml::find(config_toml, "anchors");
+        const auto& anchors = toml::find(config_toml, ANCHORS_TOML_KEY);
 
         if (anchors.contains("front_primer") || anchors.contains("rear_primer")) {
             if (!(anchors.contains("front_primer") && anchors.contains("rear_primer"))) {
@@ -63,14 +69,14 @@ PolyTailConfig update_config(const toml::value& config_toml, PolyTailConfig conf
     }
 
     if (config_toml.contains("threshold")) {
-        const auto& threshold = toml::find(config_toml, "threshold");
+        const auto& threshold = toml::find(config_toml, THRESHOLD_TOML_KEY);
         if (threshold.contains("flank_threshold")) {
             config.flank_threshold = toml::find<float>(threshold, "flank_threshold");
         }
     }
 
     if (config_toml.contains("tail")) {
-        const auto& tail = toml::find(config_toml, "tail");
+        const auto& tail = toml::find(config_toml, TAIL_TOML_KEY);
 
         if (tail.contains("tail_interrupt_length")) {
             config.tail_interrupt_length = toml::find<int>(tail, "tail_interrupt_length");

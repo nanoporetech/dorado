@@ -298,7 +298,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
             results.emplace_back(merge_samples(buffer_ids));
-            buffer_ids = {i};
+            buffer_ids = std::vector{i};
             spdlog::trace(
                     "[merge_adjacent_samples_read_matrix] Merging samples in buffer, resetting the "
                     "buffer. i = {}",

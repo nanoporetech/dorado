@@ -16,11 +16,11 @@ using value = basic_value<type_config>;
 namespace dorado::config {
 
 // Activation functions
-enum class Activation : std::uint8_t { SWISH, SWISH_CLAMP, TANH };
+enum class Activation { SWISH, SWISH_CLAMP, TANH };
 std::string to_string(const Activation& activation);
 
 // Model config encoder.sublayers.type variants
-enum class SublayerType : std::uint8_t {
+enum class SublayerType {
     CLAMP,
     CONVOLUTION,
     LINEAR,
