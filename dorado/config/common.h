@@ -1,9 +1,17 @@
 #pragma once
 
-#include <toml_fwd.hpp>
-
 #include <cmath>
 #include <string>
+#include <vector>
+
+// Forward declaration of toml::value taken from toml_fwd.hpp
+namespace toml {
+template <typename TypeConfig>
+class basic_value;
+
+struct type_config;
+using value = basic_value<type_config>;
+}  // namespace toml
 
 namespace dorado::config {
 
