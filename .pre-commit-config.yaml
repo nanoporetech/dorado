@@ -31,14 +31,28 @@ repos:
     hooks:
       - id: clang-format
         exclude: 'dorado/3rdparty/'
+  - repo: https://github.com/falkben/pre-commit-prepend-jira-issue
+    rev: 'v0.0.2'
+    hooks:
+      - id: prepend-jira-issue
+        name: prepend jira issue
+        stages: [prepare-commit-msg]
+  - repo: local
+    hooks:
+    -   id: jira-ticket
+        name: check for jira ticket
+        language: pygrep
+        entry: '\A(?!\[?[A-Z]+-[0-9]+\]?)'
+        args: [--multiline]
+        stages: [commit-msg]
 
 # NB: by default, pre-commit only installs the pre-commit hook ("commit" stage),
-# but you can tell `pre-commit install` to install other hooks.
+# but you can tell `pre-commit install` to install other hooks using e.g. `-t commit-msg`
 # This set of default stages ensures we don't slow down or break other git operations
 # even if you install hooks for them.
 default_stages:
-  - commit
-  - merge-commit
+  - pre-commit
+  - pre-merge-commit
   - manual
 
 # vi:et:sw=2:sts=2:
