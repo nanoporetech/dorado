@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BatchParams.h"
+#include "config/common.h"
 #include "models/kits.h"
 
 #include <cmath>
@@ -12,10 +13,7 @@
 
 namespace dorado::config {
 
-enum class Activation { SWISH, SWISH_CLAMP, TANH };
-std::string to_string(const Activation& activation);
-
-enum class ScalingStrategy { MED_MAD, QUANTILE, PA };
+enum class ScalingStrategy : std::uint8_t { MED_MAD, QUANTILE, PA };
 std::string to_string(const ScalingStrategy& strategy);
 ScalingStrategy scaling_strategy_from_string(const std::string& strategy);
 
@@ -41,16 +39,6 @@ struct SignalNormalisationParams {
 
     QuantileScalingParams quantile;
     StandardisationScalingParams standardisation;
-
-    std::string to_string() const;
-};
-
-struct ConvParams {
-    int insize;
-    int size;
-    int winlen;
-    int stride = 1;
-    Activation activation;
 
     std::string to_string() const;
 };

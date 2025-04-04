@@ -4,9 +4,10 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/dev_utils.h"
 
 #include <ATen/core/TensorBody.h>
-#include <torch/csrc/autograd/generated/variable_factories.h>
+#include <spdlog/spdlog.h>
 #include <torch/torch.h>
 
 #if DORADO_CUDA_BUILD
@@ -47,17 +48,37 @@ struct ModsConvImpl : Module {
             : name("conv_act_" + std::to_string(size)) {
         conv = register_module(
                 "conv", Conv1d(Conv1dOptions(size, outsize, k).stride(stride).padding(padding)));
-        activation = register_module("activation", SiLU());
+        activation = config::Activation::SWISH;
+    }
+
+    ModsConvImpl(const config::ConvParams& params)
+            : name("conv_act_" + std::to_string(params.size)) {
+        spdlog::debug("{} {}", name, params.to_string());
+        conv = register_module("conv",
+                               Conv1d(Conv1dOptions(params.insize, params.size, params.winlen)
+                                              .stride(params.stride)
+                                              .padding(params.winlen / 2)));
+        activation = params.activation;
     }
 
     at::Tensor forward(const at::Tensor& x) {
         utils::ScopedProfileRange spr(name.c_str(), 3);
-        return activation(conv(x));
+        at::Tensor x_ = conv(x);
+
+        switch (activation) {
+        case config::Activation::SWISH:
+            return at::silu(x_);
+        case config::Activation::SWISH_CLAMP:
+            throw std::runtime_error("ModsConv is not implemented for SWISH_CLAMP");
+        case config::Activation::TANH:
+            return at::tanh(x_);
+        }
+        throw std::logic_error("ModsConv has unsupported activation");
     }
 
     const std::string name;
     Conv1d conv{nullptr};
-    SiLU activation{nullptr};
+    config::Activation activation;
 };
 
 TORCH_MODULE(ModsConv);
@@ -271,8 +292,130 @@ const std::vector<std::string> ModBaseConvLSTMModelImpl::weight_tensors{
         "fc.weight.tensor",          "fc.bias.tensor",
 };
 
+struct ModBaseConvLSTMV3ModelImpl : Module {
+    ModBaseConvLSTMV3ModelImpl(const config::ModBaseModelConfig& config) : m_config(config) {
+        const auto& sig_cvs = m_config.general.modules->signal_convs;
+        if (sig_cvs.size() != 3) {
+            throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
+        }
+        sig_conv1 = register_module("sig_conv1", ModsConv(sig_cvs.at(0)));
+        sig_conv2 = register_module("sig_conv2", ModsConv(sig_cvs.at(1)));
+        sig_conv3 = register_module("sig_conv3", ModsConv(sig_cvs.at(2)));
+
+        const auto& seq_cvs = m_config.general.modules->sequence_convs;
+        if (seq_cvs.size() != 2) {
+            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 sequence convolutions");
+        }
+        seq_conv1 = register_module("seq_conv1", ModsConv(seq_cvs.at(0)));
+        seq_conv2 = register_module("seq_conv2", ModsConv(seq_cvs.at(1)));
+
+        merge_conv1 =
+                register_module("merge_conv1", ModsConv(m_config.general.modules->merge_conv));
+
+        const auto& lstms = m_config.general.modules->lstms;
+        if (lstms.size() != 2) {
+            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 lstms");
+        }
+        lstm1 = register_module("lstm1", LSTM(LSTMOptions(lstms.at(0).size, lstms.at(0).size)));
+        lstm2 = register_module("lstm2", LSTM(LSTMOptions(lstms.at(1).size, lstms.at(1).size)));
+
+        const auto& ll = m_config.general.modules->linear;
+        linear = register_module("linear", Linear(ll.in_size, ll.out_size));
+    }
+
+    at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
+        // INPUT sigs: NCT & seqs: NTC
+        {
+            utils::ScopedProfileRange spr("sig convs", 2);
+            sigs = sig_conv1(sigs);
+            sigs = sig_conv2(sigs);
+            sigs = sig_conv3(sigs);
+        }
+
+        // We are supplied one hot encoded sequences as (batch, signal/stride, kmer_len * base_count) int8.
+        // We need (batch, kmer_len * base_count, signal/stride) and a dtype compatible with the float16
+        // weights.
+        const auto conv_dtype = (seqs.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
+
+        // seqs: NTC -> NCT - this is free as C=1
+        seqs = seqs.permute({0, 2, 1}).to(conv_dtype);
+        {
+            utils::ScopedProfileRange spr("seq convs", 2);
+            seqs = seq_conv1(seqs);
+            seqs = seq_conv2(seqs);
+        }
+
+        // z: NCT
+        auto z = torch::cat({sigs, seqs}, 1);
+        {
+            utils::ScopedProfileRange spr("merge convs", 2);
+            // z: NCT -> TNC
+            z = merge_conv1(z).permute({2, 0, 1});
+        }
+        {
+            utils::ScopedProfileRange spr("lstm1", 2);
+            auto [z1, h1] = lstm1(z);
+            z = z1.flip(0);  // TNC -> T'NC
+        }
+        {
+            utils::ScopedProfileRange spr("lstm2", 2);
+            auto [z2, h2] = lstm2(z);
+            z = z2;  // T'NC
+        }
+
+        utils::ScopedProfileRange spr("linear", 2);
+        // T'NC -> NTC
+        z = linear(z).flip(0).permute({1, 0, 2}).softmax(2).flatten(1);
+        return z;
+    }
+
+    void load_state_dict(const std::vector<at::Tensor>& weights) {
+        utils::load_state_dict(*this, weights);
+    }
+
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
+        return utils::load_tensors(dir, weight_tensors);
+    }
+
+    static const std::vector<std::string> weight_tensors;
+
+    const config::ModBaseModelConfig m_config;
+
+    ModsConv sig_conv1{nullptr};
+    ModsConv sig_conv2{nullptr};
+    ModsConv sig_conv3{nullptr};
+    ModsConv seq_conv1{nullptr};
+    ModsConv seq_conv2{nullptr};
+    ModsConv merge_conv1{nullptr};
+
+    LSTM lstm1{nullptr};
+    LSTM lstm2{nullptr};
+
+    Linear linear{nullptr};
+};
+
+const std::vector<std::string> ModBaseConvLSTMV3ModelImpl::weight_tensors{
+        "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
+        "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
+        "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
+
+        "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
+        "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
+
+        "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
+
+        "lstm1.weight_ih_l0.tensor", "lstm1.weight_hh_l0.tensor",
+        "lstm1.bias_ih_l0.tensor",   "lstm1.bias_hh_l0.tensor",
+
+        "lstm2.weight_ih_l0.tensor", "lstm2.weight_hh_l0.tensor",
+        "lstm2.bias_ih_l0.tensor",   "lstm2.bias_hh_l0.tensor",
+
+        "fc.weight.tensor",          "fc.bias.tensor",
+};
+
 TORCH_MODULE(ModBaseConvModel);
 TORCH_MODULE(ModBaseConvLSTMModel);
+TORCH_MODULE(ModBaseConvLSTMV3Model);
 
 }  // namespace nn
 
@@ -296,6 +439,10 @@ dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig
     case config::ModelType::CONV_LSTM_V2: {
         auto model = nn::ModBaseConvLSTMModel(params.size, params.kmer_len, params.num_out, true,
                                               params.stride);
+        return populate_model(std::move(model), config.model_path, options);
+    }
+    case config::ModelType::CONV_LSTM_V3: {
+        auto model = nn::ModBaseConvLSTMV3Model(config);
         return populate_model(std::move(model), config.model_path, options);
     }
     case config::ModelType::CONV_V1: {

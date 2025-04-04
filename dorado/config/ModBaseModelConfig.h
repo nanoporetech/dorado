@@ -1,20 +1,44 @@
 #pragma once
 
+#include "common.h"
 #include "utils/types.h"
 
 #include <cstddef>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace dorado::config {
 
-enum class ModelType : std::uint8_t { CONV_LSTM_V1, CONV_LSTM_V2, CONV_V1, UNKNOWN };
+enum class ModelType : std::uint8_t { CONV_LSTM_V1, CONV_LSTM_V2, CONV_LSTM_V3, CONV_V1, UNKNOWN };
 std::string to_string(const ModelType& model_type);
 ModelType model_type_from_string(const std::string& model_type);
 ModelType get_modbase_model_type(const std::filesystem::path& path);
 
 bool is_modbase_model(const std::filesystem::path& path);
+
+struct LinearParams {
+    int in_size;
+    int out_size;
+};
+
+struct LSTMParams {
+    int size;
+    bool reverse;
+};
+
+struct ModulesParams {
+    std::vector<ConvParams> sequence_convs;
+    std::vector<ConvParams> signal_convs;
+    ConvParams merge_conv;
+    std::vector<LSTMParams> lstms;  //< LSTM sizes per layer
+    LinearParams linear;
+
+    int stride_ratio() const;
+    int sequence_stride() const;
+    int signal_stride() const;
+};
 
 struct ModelGeneralParams {
     const ModelType model_type;
@@ -23,14 +47,17 @@ struct ModelGeneralParams {
     const int num_out;
     const int stride;
 
-    ModelGeneralParams(ModelType model_type_, int size_, int kmer_len_, int num_out_, int stride_);
-};
+    // For conv_lstm_v3 models only
+    const std::optional<ModulesParams> modules;
 
-struct LinearParams {
-    const int in;
-    const int out;
+    ModelGeneralParams(ModelType model_type_,
+                       int size_,
+                       int kmer_len_,
+                       int num_out_,
+                       int stride_,
+                       std::optional<ModulesParams> modules_);
 
-    LinearParams(int in_, int out_);
+    int stride_ratio() const { return modules.has_value() ? modules->stride_ratio() : 1; }
 };
 
 struct RefinementParams {
@@ -96,7 +123,10 @@ struct ModBaseModelConfig {
     RefinementParams refine;           ///< Params for kmer refinement
 
     // Returns true if this modbase model processes chunks instead of context hits
-    bool is_chunked_input_model() const { return general.model_type == ModelType::CONV_LSTM_V2; };
+    bool is_chunked_input_model() const {
+        return (general.model_type == ModelType::CONV_LSTM_V2) ||
+               (general.model_type == ModelType::CONV_LSTM_V3);
+    };
 
     ModBaseModelConfig(std::filesystem::path model_path_,
                        ModelGeneralParams general_,

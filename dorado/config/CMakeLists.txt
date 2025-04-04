@@ -3,6 +3,8 @@ add_library(dorado_config STATIC
     BatchParams.h
     BasecallModelConfig.cpp
     BasecallModelConfig.h
+    common.cpp
+    common.h
     ModBaseBatchParams.cpp
     ModBaseBatchParams.h
     ModBaseModelConfig.cpp

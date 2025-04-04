@@ -27,6 +27,7 @@ target_include_directories(dorado_modbase
 target_link_libraries(dorado_modbase
     PUBLIC
         torch_lib
+        dorado_config
     PRIVATE
         dorado_utils
         dorado_torch_utils

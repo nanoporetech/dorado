@@ -49,17 +49,18 @@ std::string ModBaseBatchParams::to_string() const {
 }
 
 ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths) {
-    const bool is_conv_lstm_v2 =
-            !paths.empty() && get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V2;
-    const std::size_t batch_size = is_conv_lstm_v2
+    const bool is_chunked_model =
+            !paths.empty() && ((get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V2) ||
+                               (get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V3));
+    const std::size_t batch_size = is_chunked_model
                                            ? DefaultModBaseParameters::batchsize_conv_lstm_v2
                                            : DefaultModBaseParameters::batchsize;
 
     const std::size_t threads = utils::get_dev_opt(
-            "modbase_threads", is_conv_lstm_v2 ? DefaultModBaseParameters::threads_conv_lstm_v2
-                                               : DefaultModBaseParameters::threads);
+            "modbase_threads", is_chunked_model ? DefaultModBaseParameters::threads_conv_lstm_v2
+                                                : DefaultModBaseParameters::threads);
     const std::size_t runners_per_caller = utils::get_dev_opt(
-            "modbase_runners", is_conv_lstm_v2
+            "modbase_runners", is_chunked_model
                                        ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2
                                        : DefaultModBaseParameters::runners_per_caller);
     if (runners_per_caller <= 0 || threads <= 0) {

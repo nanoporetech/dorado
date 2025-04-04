@@ -1,5 +1,6 @@
 #include "tensor_utils.h"
 
+#include "utils/dev_utils.h"
 #include "utils/simd.h"
 
 #include <torch/csrc/jit/serialization/pickle.h>
@@ -12,6 +13,10 @@
 #include <ostream>
 #include <sstream>
 #include <vector>
+
+#ifndef NDEBUG
+#include <spdlog/spdlog.h>
+#endif
 
 namespace dorado::utils {
 
@@ -95,6 +100,37 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
     }
 
     return weights;
+}
+
+void dump_tensor([[maybe_unused]] const at::Tensor& t,
+                 [[maybe_unused]] const std::string& name,
+                 [[maybe_unused]] const int layer_no) {
+#ifndef NDEBUG
+    static const bool is_active = utils::get_dev_opt<bool>("dump_tensors", false);
+    if (!is_active) {
+        return;
+    }
+
+    // Get current time
+    auto now = std::chrono::system_clock::now();
+    auto now_t = std::chrono::system_clock::to_time_t(now);
+
+    // Extract milliseconds
+    auto millis =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    // Format timestamp as YYYYMMDD_hhmmss_nnn (n = milliseconds)
+    std::ostringstream oss;
+    oss << std::put_time(std::localtime(&now_t), "%Y%m%d_%H%M%S") << "_" << std::setw(3)
+        << std::setfill('0') << millis.count();
+
+    // Construct file path
+    oss << "." << name << "." << layer_no << ".tensor";
+    std::string path = oss.str();
+
+    utils::serialise_tensor(t, path);
+    spdlog::warn("Writing {} to: {}", utils::print_size(t, name), path);
+#endif
 }
 
 at::Tensor quantile(const at::Tensor& t, const at::Tensor& q) {

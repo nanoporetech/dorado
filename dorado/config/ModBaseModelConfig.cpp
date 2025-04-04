@@ -1,11 +1,13 @@
 #include "ModBaseModelConfig.h"
 
+#include "config/common.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
+#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -46,6 +48,8 @@ std::string to_string(const ModelType& model_type) {
         return std::string("conv_lstm");
     case ModelType::CONV_LSTM_V2:
         return std::string("conv_lstm_v2");
+    case ModelType::CONV_LSTM_V3:
+        return std::string("conv_lstm_v3");
     case ModelType::CONV_V1:
         return std::string("conv_v1");
     case ModelType::UNKNOWN:
@@ -60,6 +64,9 @@ ModelType model_type_from_string(const std::string& model_type) {
     }
     if (model_type == "conv_lstm_v2") {
         return ModelType::CONV_LSTM_V2;
+    }
+    if (model_type == "conv_lstm_v3") {
+        return ModelType::CONV_LSTM_V3;
     }
     if (model_type == "conv_only" || model_type == "conv_v1") {
         return ModelType::CONV_V1;
@@ -83,16 +90,109 @@ bool is_modbase_model(const std::filesystem::path& path) {
     return get_modbase_model_type(path) != ModelType::UNKNOWN;
 }
 
+namespace {
+LinearParams parse_linear(const toml::value& segment) {
+    LinearParams p;
+    p.in_size = toml::find<int>(segment, "in_features");
+    p.out_size = toml::find<int>(segment, "out_features");
+    return p;
+}
+
+LSTMParams parse_lstm(const toml::value& segment) {
+    LSTMParams p;
+    p.size = toml::find<int>(segment, "size");
+    p.reverse = bool(toml::find<int>(segment, "reverse"));
+    return p;
+}
+
+std::vector<LSTMParams> parse_lstms(const std::vector<toml::value>& sublayers) {
+    std::vector<LSTMParams> lstms;
+    for (const auto& sublayer : sublayers) {
+        if (sublayer_type(sublayer) == SublayerType::LSTM) {
+            lstms.push_back(parse_lstm(sublayer));
+        }
+    }
+
+    if (lstms.empty()) {
+        throw std::runtime_error("Modbase model config has no lstm layers");
+    }
+    if (lstms.front().reverse) {
+        throw std::runtime_error("Modbase model config first lstm layer must be forward");
+    }
+    for (size_t i = 0; i < (lstms.size() - 1); ++i) {
+        if (lstms[i].size != lstms[i + 1].size) {
+            throw std::runtime_error("Modbase model config lstm layers unequal sizes");
+        }
+        if (lstms[i].reverse == lstms[i + 1].reverse) {
+            throw std::runtime_error("Modbase model config lstm layers must alternate direction");
+        }
+    }
+    return lstms;
+}
+
+ConvParams parse_merge_conv(const std::vector<toml::value>& sublayers) {
+    if (sublayers.empty()) {
+        throw std::runtime_error("Modbase model config missing enoder sublayers");
+    }
+    const auto& front = sublayers.front();
+    if (sublayer_type(front) != SublayerType::CONVOLUTION) {
+        throw std::runtime_error("Modbase model config missing enconder merge convolution");
+    }
+    return parse_conv_params(front, false);
+}
+
+ModulesParams parse_modules_params(const toml::value& config) {
+    ModulesParams m;
+    m.sequence_convs = parse_convs(toml::find(config, "sequence_encoder", "sublayers").as_array());
+    m.signal_convs = parse_convs(toml::find(config, "signal_encoder", "sublayers").as_array());
+
+    const auto& layers = toml::find(config, "encoder", "sublayers").as_array();
+    m.merge_conv = parse_merge_conv(layers);
+    m.lstms = parse_lstms(layers);
+    m.linear = parse_linear(layers.back());
+
+    if (m.lstms.back().size != m.linear.in_size) {
+        throw std::runtime_error("Modbase model config lstm and linear size mismatch");
+    }
+
+    return m;
+}
+
+int stride_product(const std::vector<ConvParams>& cs) {
+    return std::accumulate(cs.cbegin(), cs.cend(), 1,
+                           [](const int s, const auto& c) { return s * c.stride; });
+}
+}  // namespace
+
+int ModulesParams::sequence_stride() const { return stride_product(sequence_convs); };
+int ModulesParams::signal_stride() const { return stride_product(signal_convs); };
+int ModulesParams::stride_ratio() const {
+    const auto seq = sequence_stride();
+    const auto sig = signal_stride();
+
+    if (sig < seq) {
+        throw std::runtime_error(
+                "modbase sequence stride must be less than or equal to signal stride");
+    }
+    if (sig % seq != 0) {
+        throw std::runtime_error(
+                "modbase signal stride must be evenly divisible by sequence stride");
+    }
+    return sig / seq;
+};
+
 ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
                                        int size_,
                                        int kmer_len_,
                                        int num_out_,
-                                       int stride_)
+                                       int stride_,
+                                       std::optional<ModulesParams> modules_)
         : model_type(model_type_),
           size(size_),
           kmer_len(kmer_len_),
           num_out(num_out_),
-          stride(stride_) {
+          stride(stride_),
+          modules(std::move(modules_)) {
     if (model_type == ModelType::UNKNOWN) {
         throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
     }
@@ -102,34 +202,51 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
     if (kmer_len % 2 != 1) {
         throw std::runtime_error(ERR_STR + "general params: 'kmer_length is not odd'.");
     }
+
+    if (modules.has_value()) {
+        if ((size != modules->lstms.front().size) ||
+            (modules->lstms.front().size != modules->lstms.back().size)) {
+            throw std::runtime_error("Modbase model config lstm size mismatch");
+        }
+        int signal_stride = 1;
+        for (const auto& conv : modules->signal_convs) {
+            signal_stride *= conv.stride;
+        }
+        if (stride != signal_stride) {
+            throw std::runtime_error("Modbase model config signal convolution stride mismatch");
+        }
+        if (num_out != modules->linear.out_size) {
+            throw std::runtime_error("Modbase model config linear and num_out mismatch");
+        }
+    }
 }
 
 namespace {
 
 ModelGeneralParams parse_general_params(const toml::value& config_toml) {
+    ModelType model_type =
+            model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+
+    std::optional<ModulesParams> modules =
+            model_type == ModelType::CONV_LSTM_V3 ? std::optional(parse_modules_params(config_toml))
+                                                  : std::nullopt;
     const auto segment = toml::find(config_toml, "model_params");
 
     constexpr int MAX_SIZE = 4096;
     constexpr int MAX_KMER = 19;
     constexpr int MAX_FEATURES = 10;
     constexpr int MAX_STRIDE = 6;
-    ModelGeneralParams params{
-            model_type_from_string(toml::find<std::string>(config_toml, "general", "model")),
-            get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED),
-            get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED),
-            get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED),
-            get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3),
-    };
+
+    const auto size = get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED);
+    const auto kmer_len = get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED);
+    const auto num_out = get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED);
+    const auto stride = get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3);
+
+    ModelGeneralParams params{model_type, size, kmer_len, num_out, stride, modules};
     return params;
 }
 
 }  // namespace
-
-LinearParams::LinearParams(int in_, int out_) : in(in_), out(out_) {
-    if (in < 1 || out < 1) {
-        throw std::runtime_error(ERR_STR + "linear params: 'negative or zero value'.");
-    }
-}
 
 ModificationParams::ModificationParams(std::vector<std::string> codes_,
                                        std::vector<std::string> long_names_,
