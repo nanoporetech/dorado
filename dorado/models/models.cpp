@@ -1192,15 +1192,15 @@ namespace variant_caller {
 
 const std::vector<ModelInfo> models = {
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant@v1.0",
-                "1a291a9e259ce5b331f678aae3b9fd1460c1ead1acef10949bd7952744500e2d",
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0",
+                "e6843189aed9c9ce2b55e58209031599113287c0b26193fecdba9624c1b29d9e",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
                 ModsVariantPair{},
         },
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant@v1.0",
-                "cbb495e7a73efcaea720dda1bff03de3d302a18e11ba3bf56ccc316c63805dab",
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0",
+                "77c5d1db4e5acca8da76a32ea971ab2b6024e1704a565393fa4b5815404f24ea",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
                 ModsVariantPair{},
