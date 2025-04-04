@@ -1,5 +1,7 @@
 #include "async_task_executor.h"
 
+#include <stdexcept>
+
 namespace dorado::utils::concurrency {
 
 AsyncTaskExecutor::AsyncTaskExecutor(MultiQueueThreadPool& thread_pool,
