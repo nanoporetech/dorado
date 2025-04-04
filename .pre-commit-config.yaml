@@ -37,8 +37,8 @@ repos:
 # This set of default stages ensures we don't slow down or break other git operations
 # even if you install hooks for them.
 default_stages:
-  - commit
-  - merge-commit
+  - pre-commit
+  - pre-merge-commit
   - manual
 
 # vi:et:sw=2:sts=2:
