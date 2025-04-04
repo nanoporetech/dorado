@@ -5,6 +5,12 @@
 #include <stdexcept>
 #include <unordered_map>
 
+namespace keys {
+namespace {
+const std::string ACTIVATION{"activation"};
+}
+}  // namespace keys
+
 namespace dorado::config {
 
 static const std::unordered_map<std::string, SublayerType> sublayer_map = {
@@ -46,7 +52,7 @@ ConvParams parse_conv_params(const toml::value &segment, const bool clamp) {
     params.winlen = toml::find<int>(segment, "winlen");
     params.stride = toml::find<int>(segment, "stride");
 
-    const auto &activation = toml::find<std::string>(segment, "activation");
+    const auto &activation = toml::find<std::string>(segment, keys::ACTIVATION);
     if (activation == "swish") {
         params.activation = clamp ? Activation::SWISH_CLAMP : Activation::SWISH;
     } else if (activation == "tanh") {

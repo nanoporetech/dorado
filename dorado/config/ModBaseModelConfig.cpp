@@ -12,9 +12,15 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+namespace keys {
+namespace {
+// Workaround GCC-13 dangling reference warnings by passing an lvalue instead of a temporary
+const std::string MODBASES{"modbases"};
+const std::string MOD_BASES{"mod_bases"};
+}  // namespace
+}  // namespace keys
 
 namespace {
-
 const std::string ERR_STR = "Invalid modbase model parameter in ";
 
 // Indicates that a value has no default and is therefore required
@@ -295,10 +301,10 @@ char ModificationParams::get_canonical_base_name(const std::string& motif, size_
 namespace {
 
 ModificationParams parse_modification_params(const toml::value& config_toml) {
-    const auto& params = toml::find(config_toml, "modbases");
+    const auto& params = toml::find(config_toml, keys::MODBASES);
 
     std::vector<std::string> codes;
-    const auto& mod_bases = toml::find(params, "mod_bases");
+    const auto& mod_bases = toml::find(params, keys::MOD_BASES);
     if (mod_bases.is_string()) {
         // style: mod_bases = "hm" - does not accept chebi codes
         auto mod_base_string = mod_bases.as_string();
@@ -369,7 +375,7 @@ int64_t ContextParams::normalise(const int64_t v, const int64_t stride) {
 namespace {
 
 ContextParams parse_context_params(const toml::value& config_toml) {
-    const auto& params = toml::find(config_toml, "modbases");
+    const auto& params = toml::find(config_toml, keys::MODBASES);
 
     const int context_before = get_int_in_range(params, "chunk_context_0", 0, 4096, REQUIRED);
     const int context_after = get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED);

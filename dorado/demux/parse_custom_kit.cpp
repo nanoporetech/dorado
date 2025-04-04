@@ -7,6 +7,11 @@
 #include <string>
 #include <vector>
 
+namespace {
+const std::string ARRANGEMENT_TOML_KEY{"arrangement"};
+const std::string SCORING_TOML_KEY{"scoring"};
+}  // namespace
+
 namespace dorado::demux {
 
 bool check_normalized_id_pattern(const std::string& pattern) {
@@ -41,7 +46,7 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
     new_kit.ends_different = false;
     new_kit.rear_only_barcodes = false;
 
-    const auto& config = toml::find(config_toml, "arrangement");
+    const auto& config = toml::find(config_toml, ARRANGEMENT_TOML_KEY);
     std::string kit_name = toml::find<std::string>(config, "name");
 
     new_kit.name = toml::find<std::string>(config, "kit");
@@ -125,7 +130,7 @@ dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
         return params;
     }
 
-    const auto& config = toml::find(config_toml, "scoring");
+    const auto& config = toml::find(config_toml, SCORING_TOML_KEY);
     if (config.contains("max_barcode_penalty")) {
         params.max_barcode_penalty = toml::find<int>(config, "max_barcode_penalty");
     }
