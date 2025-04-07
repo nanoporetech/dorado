@@ -5,6 +5,8 @@ add_library(dorado_nn STATIC
     CRFModules.h
     KoiUtils.cpp
     KoiUtils.h
+    LSTMStack.cpp
+    LSTMStack.h
     TxModules.cpp
     TxModules.h
     WorkingMemory.cpp

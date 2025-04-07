@@ -2,6 +2,7 @@
 
 #include "nn/CRFModules.h"
 #include "nn/ConvStack.h"
+#include "nn/LSTMStack.h"
 
 #include <torch/nn.h>
 
