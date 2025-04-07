@@ -23,6 +23,7 @@
 [submodule "dorado/3rdparty/edlib"]
 	path = dorado/3rdparty/edlib
 	url = https://github.com/martinsos/edlib
+	ignore = dirty
 [submodule "dorado/3rdparty/htslib"]
 	path = dorado/3rdparty/htslib
 	url = https://github.com/samtools/htslib.git
