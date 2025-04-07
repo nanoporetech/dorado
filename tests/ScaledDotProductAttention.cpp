@@ -16,7 +16,7 @@
 
 #define TEST_TAG "[SDPA]"
 
-using namespace dorado::basecall::model;
+using namespace dorado::nn;
 
 CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2

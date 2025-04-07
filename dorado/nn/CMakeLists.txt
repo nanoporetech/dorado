@@ -1,9 +1,20 @@
 add_library(dorado_nn STATIC
-    Modules.cpp
-    Modules.h
+    CRFModules.cpp
+    CRFModules.h
     WorkingMemory.cpp
     WorkingMemory.h
+    TxModules.cpp
+    TxModules.h
 )
+
+
+if (DORADO_GPU_BUILD AND APPLE)
+    target_sources(dorado_nn
+        PRIVATE
+        metal/MetalModules.cpp
+        metal/MetalModules.h
+    )
+endif()
 
 target_include_directories(dorado_nn
     SYSTEM
