@@ -1,18 +1,11 @@
 #include "WorkingMemory.h"
 
-#include "config/common.h"
 #include "utils/math_utils.h"
 
 #if DORADO_CUDA_BUILD
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
-
-extern "C" {
-#include "koi.h"
-}
 #endif
-
-#include <torch/torch.h>
 
 namespace dorado::nn {
 

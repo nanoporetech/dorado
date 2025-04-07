@@ -1,12 +1,14 @@
 #pragma once
 
-#include "config/BasecallModelConfig.h"
 #include "nn/metal/MetalModules.h"
-#include "torch_utils/metal_utils.h"
 
 #include <torch/nn.h>
 
 #include <vector>
+
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
 namespace dorado::basecall::model {
 

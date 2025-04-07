@@ -1,5 +1,6 @@
 #include "CRFModules.h"
 
+#include "config/common.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 

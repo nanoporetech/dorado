@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config/BasecallModelConfig.h"
 #include "nn/CRFModules.h"
 #include "nn/TxModules.h"
 #include "torch_utils/module_utils.h"
@@ -10,6 +9,10 @@
 #include <torch/nn.h>
 
 #include <vector>
+
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
 namespace dorado::basecall::model {
 
