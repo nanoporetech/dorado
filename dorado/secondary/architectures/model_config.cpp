@@ -84,6 +84,9 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
     if (!config_toml.contains("config_version")) {
         throw std::runtime_error("Model config must contain 'config_version' attribute.");
     }
+    if (!config_toml.contains("label_scheme")) {
+        throw std::runtime_error("Model config must contain 'label_scheme' attribute.");
+    }
 
     // print_toml(config_toml, 0);
     (void)&print_toml;
@@ -100,10 +103,10 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
         cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model");
     }
 
-    // Check if the "supported_basecallers" key exists
-    {
-        cfg.supported_basecallers.emplace(cfg.basecaller_model);
+    cfg.supported_basecallers.emplace(cfg.basecaller_model);
 
+    // Check if the "supported_basecallers" key exists
+    if (cfg.version >= 2) {
         if (config_toml.contains("supported_basecallers")) {
             try {
                 std::vector<std::string> data =
