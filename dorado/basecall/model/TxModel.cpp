@@ -1,7 +1,7 @@
 #include "TxModel.h"
 
-#include "basecall/nn/CRFModel.h"
 #include "config/BasecallModelConfig.h"
+#include "nn/Modules.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/dev_utils.h"
 #include "utils/math_utils.h"
@@ -87,12 +87,11 @@ struct KoiTensorExt : public KoiTensor {
 
 #endif
 
-#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-namespace dorado::basecall::nn {
+namespace dorado::basecall::model {
 
 namespace {
 
@@ -939,7 +938,7 @@ at::Tensor LinearScaledCRFImpl::forward(const at::Tensor &x) {
 
 TxModelImpl::TxModelImpl(const BasecallModelConfig &config, const at::TensorOptions &options)
         : m_options(options) {
-    convs = register_module("convs", basecall::nn::ConvStack(config.convs));
+    convs = register_module("convs", nn::ConvStack(config.convs));
     tx_encoder = register_module("transformer_encoder", TxEncoderStack(config.tx->tx, m_options));
     tx_decoder = register_module("transformer_decoder", LinearUpsample(config.tx->upsample));
     crf = register_module("crf", LinearScaledCRF(config.tx->crf));
@@ -968,4 +967,4 @@ at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT) {
     return h;
 }
 
-}  // namespace dorado::basecall::nn
+}  // namespace dorado::basecall::model

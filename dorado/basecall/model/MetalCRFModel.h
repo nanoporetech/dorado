@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace dorado::basecall::nn {
+namespace dorado::basecall::model {
 
 struct MetalLinearImpl : torch::nn::Module {
     MetalLinearImpl(int insize, int outsize, bool has_bias);
@@ -102,4 +102,4 @@ struct MetalCRFModelImpl : torch::nn::Module {
 
 TORCH_MODULE(MetalCRFModel);
 
-}  // namespace dorado::basecall::nn
+}  // namespace dorado::basecall::model

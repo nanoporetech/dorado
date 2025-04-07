@@ -13,10 +13,10 @@ add_library(dorado_basecall STATIC
     decode/CPUDecoder.h
     decode/Decoder.cpp
     decode/Decoder.h
-    nn/CRFModel.cpp
-    nn/CRFModel.h
-    nn/TxModel.cpp
-    nn/TxModel.h
+    model/CRFModel.cpp
+    model/CRFModel.h
+    model/TxModel.cpp
+    model/TxModel.h
 )
 
 if (DORADO_GPU_BUILD)
@@ -27,8 +27,8 @@ if (DORADO_GPU_BUILD)
             MetalCaller.h
             MetalModelRunner.cpp
             MetalModelRunner.h
-            nn/MetalCRFModel.cpp
-            nn/MetalCRFModel.h
+            model/MetalCRFModel.cpp
+            model/MetalCRFModel.h
         )
     else()
         target_sources(dorado_basecall
@@ -58,6 +58,7 @@ target_link_libraries(dorado_basecall
         dorado_utils
         dorado_config
     PRIVATE
+        dorado_nn
         spdlog::spdlog
 )
 

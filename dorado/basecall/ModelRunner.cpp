@@ -2,7 +2,7 @@
 
 #include "crf_utils.h"
 #include "decode/Decoder.h"
-#include "nn/CRFModel.h"
+#include "model/CRFModel.h"
 
 namespace dorado::basecall {
 

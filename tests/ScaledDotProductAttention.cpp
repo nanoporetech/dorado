@@ -1,4 +1,4 @@
-#include <basecall/nn/TxModel.h>
+#include <basecall/model/TxModel.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/TensorOptions.h>
 #include <spdlog/spdlog.h>
@@ -16,7 +16,7 @@
 
 #define TEST_TAG "[SDPA]"
 
-using namespace dorado::basecall::nn;
+using namespace dorado::basecall::model;
 
 CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 #if TORCH_VERSION_MAJOR < 2

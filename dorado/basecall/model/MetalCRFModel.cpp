@@ -27,7 +27,7 @@ CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
 using namespace dorado::utils;
 using torch::indexing::Slice;
 
-namespace dorado::basecall::nn {
+namespace dorado::basecall::model {
 
 MetalLinearImpl::MetalLinearImpl(int insize, int outsize, bool has_bias) {
     auto weight = torch::empty({outsize, insize});
@@ -582,4 +582,4 @@ MTL::CommandBuffer *MetalCRFModelImpl::forward_async(at::Tensor &in,
     return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count, out);
 }
 
-}  // namespace dorado::basecall::nn
+}  // namespace dorado::basecall::model
