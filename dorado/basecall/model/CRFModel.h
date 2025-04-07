@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nn/CRFModules.h"
+#include "nn/ConvStack.h"
 
 #include <torch/nn.h>
 

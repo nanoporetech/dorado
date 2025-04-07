@@ -1,10 +1,14 @@
 add_library(dorado_nn STATIC
+    ConvStack.cpp
+    ConvStack.h
     CRFModules.cpp
     CRFModules.h
-    WorkingMemory.cpp
-    WorkingMemory.h
+    KoiUtils.cpp
+    KoiUtils.h
     TxModules.cpp
     TxModules.h
+    WorkingMemory.cpp
+    WorkingMemory.h
 )
 
 
