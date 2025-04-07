@@ -55,6 +55,7 @@ endif()
 disable_warnings(minimap2)
 
 # edlib
+apply_3rdparty_patch(edlib)
 set(BUILD_TESTING OFF)
 add_subdirectory(edlib EXCLUDE_FROM_ALL)
 # Disable warnings from edlib source

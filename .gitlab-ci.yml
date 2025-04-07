@@ -86,7 +86,6 @@ variables:
     - echo Dorado dependency stage
     - apt-get update
     - apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
-    - pip install gcovr
 
 .linux_test_dependencies:
   before_script:
@@ -257,16 +256,22 @@ build:linux:x86:jammy:
     - .build_and_test_dorado
   artifacts: null
 
-# Need an updated hdf_plugins before this is possible
-# build:linux:x86:noble:
-#   image: ${DORADO_DOCKER_ROOT}/dorado-deps-24.04-cuda-${CUDA}.0:1.1
-#   variables:
-#     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-#   extends:
-#     - .linux_build_dependencies
-#     - .linux_runner
-#     - .build_and_test_dorado
-#   artifacts: null
+build:linux:x86:noble:
+  image: ${DORADO_DOCKER_ROOT}/dorado-deps-24.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  extends:
+    - .linux_build_dependencies
+    - .linux_runner
+# TODO: DOR-1161 - modbase unittests currently fail on noble
+    #- .build_and_test_dorado
+  stage: build
+  script:
+    - !reference [.run_dorado_cmake_build]
+  before_script:
+    - !reference [.linux_build_dependencies, before_script]
+    - apt-get install -y build-essential
+  artifacts: null
 
 build:linux:x86:focal:debug:
   variables:
@@ -288,6 +293,7 @@ build:linux:x86:focal_coverage:
     - .linux_runner
     - .on_nightly_or_manual
   script:
+    - pip install gcovr
     - !reference [.run_dorado_cmake_build]
   artifacts:
     paths:
