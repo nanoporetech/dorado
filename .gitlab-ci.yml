@@ -86,7 +86,6 @@ variables:
     - echo Dorado dependency stage
     - apt-get update
     - apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
-    - pip install gcovr
 
 .linux_test_dependencies:
   before_script:
@@ -287,6 +286,7 @@ build:linux:x86:focal_coverage:
     - .linux_runner
     - .on_nightly_or_manual
   script:
+    - pip install gcovr
     - !reference [.run_dorado_cmake_build]
   artifacts:
     paths:
