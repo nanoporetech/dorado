@@ -264,6 +264,9 @@ build:linux:x86:noble:
     - .linux_build_dependencies
     - .linux_runner
     - .build_and_test_dorado
+  before_script:
+    - !reference [.linux_build_dependencies, before_script]
+    - apt-get install -y build-essential
   artifacts: null
 
 build:linux:x86:focal:debug:
