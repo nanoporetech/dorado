@@ -1,5 +1,4 @@
 #pragma once
-#include "WorkingMemory.h"
 
 #include <torch/types.h>
 

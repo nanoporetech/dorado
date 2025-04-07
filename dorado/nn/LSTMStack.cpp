@@ -4,11 +4,6 @@
 #include "torch_utils/tensor_utils.h"
 
 #if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-
-#include <ATen/cuda/CUDAContext.h>
-#include <c10/cuda/CUDAGuard.h>
-
 extern "C" {
 #include "koi.h"
 }

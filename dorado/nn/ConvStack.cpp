@@ -5,19 +5,12 @@
 #include "torch_utils/gpu_profiling.h"
 
 #if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-
-#include <ATen/cuda/CUDAContext.h>
-#include <c10/cuda/CUDAGuard.h>
-
 extern "C" {
 #include "koi.h"
 }
 #endif
 
 #include <torch/nn.h>
-
-using namespace torch::nn;
 
 namespace dorado::nn {
 
@@ -101,10 +94,12 @@ TensorLayout get_koi_lstm_input_layout(int layer_size, config::Activation activa
 ConvStackImpl::ConvStackImpl(const std::vector<config::ConvParams> &layer_params) {
     for (size_t i = 0; i < layer_params.size(); ++i) {
         auto &layer = layers.emplace_back(layer_params[i]);
-        auto opts = Conv1dOptions(layer.params.insize, layer.params.size, layer.params.winlen)
+        auto opts = torch::nn::Conv1dOptions(layer.params.insize, layer.params.size,
+                                             layer.params.winlen)
                             .stride(layer.params.stride)
                             .padding(layer.params.winlen / 2);
-        layer.conv = register_module(std::string("conv") + std::to_string(i + 1), Conv1d(opts));
+        layer.conv = register_module(std::string("conv") + std::to_string(i + 1),
+                                     torch::nn::Conv1d(opts));
     }
 }
 
