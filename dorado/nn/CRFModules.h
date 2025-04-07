@@ -1,7 +1,7 @@
 #pragma once
 
+#include "WorkingMemory.h"
 #include "config/common.h"
-#include "nn/WorkingMemory.h"
 
 #include <torch/nn.h>
 

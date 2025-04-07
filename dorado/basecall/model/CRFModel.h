@@ -1,11 +1,14 @@
 #pragma once
 
-#include "config/BasecallModelConfig.h"
 #include "nn/CRFModules.h"
 
 #include <torch/nn.h>
 
 #include <vector>
+
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
 namespace dorado::basecall::model {
 

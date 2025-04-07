@@ -14,7 +14,7 @@ extern "C" {
 }
 #endif
 
-#include <torch/torch.h>
+#include <torch/nn.h>
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;

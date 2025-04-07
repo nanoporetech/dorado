@@ -1,4 +1,5 @@
-#include <basecall/model/TxModel.h>
+#include "nn/TxModules.h"
+
 #include <c10/core/DeviceType.h>
 #include <c10/core/TensorOptions.h>
 #include <spdlog/spdlog.h>

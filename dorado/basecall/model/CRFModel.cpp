@@ -1,5 +1,6 @@
 #include "CRFModel.h"
 
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
@@ -16,7 +17,7 @@ extern "C" {
 }
 #endif
 
-#include <torch/torch.h>
+#include <torch/nn.h>
 
 using namespace torch::nn;
 namespace F = torch::nn::functional;

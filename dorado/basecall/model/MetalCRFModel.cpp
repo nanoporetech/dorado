@@ -4,6 +4,10 @@
 
 using namespace dorado::utils;
 
+namespace {
+CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
+}  // namespace
+
 namespace dorado::basecall::model {
 
 MetalCRFModelImpl::MetalCRFModelImpl(const config::BasecallModelConfig &config,

@@ -20,7 +20,7 @@ constexpr int kSIMDGroupWidth = 32;
 constexpr auto torch_dtype = torch::kF16;
 const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
-CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
+CREATE_POINT_OF_INTEREST_ID(MetalCRFModule);
 
 }  // namespace
 
@@ -463,7 +463,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
     {
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, convolutions, "try_count=%i", try_count);
+        POINT_OF_INTEREST_SCOPE(MetalCRFModule, convolutions, "try_count=%i", try_count);
         auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
         if (in.dtype() != torch::kF16) {
@@ -480,7 +480,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, lstm_layer, "id=%s, try_count=%i",
+        POINT_OF_INTEREST_SCOPE(MetalCRFModule, lstm_layer, "id=%s, try_count=%i",
                                 lstm_label.c_str(), try_count);
 
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
