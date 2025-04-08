@@ -37,6 +37,7 @@ void PolyACalculatorNode::input_thread_fn() {
 
         // Poly-tail selection is enabled, so adjust default value of poly-tail length.
         read->read_common.rna_poly_tail_length = ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND;
+        read->read_common.polya_signal_boundaries = std::make_pair(ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND,ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND);
 
         auto calculator = selector->get_calculator(read->read_common.barcode);
         if (!calculator) {
@@ -48,14 +49,20 @@ void PolyACalculatorNode::input_thread_fn() {
         auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
 
         if (signal_info.signal_anchor >= 0) {
-            int num_bases = calculator->calculate_num_bases(*read, signal_info);
+            // get the number of bases in the polyA/T tail and signal location
+            auto polya_tail_length_info = calculator->calculate_num_bases(*read, signal_info);
+            int num_bases = polya_tail_length_info.num_bases; 
             if (signal_info.split_tail) {
-                auto split_bases = std::max(
-                        0, calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
-                                                                   signal_info.split_tail}));
+                auto split_polya_length_info = calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
+                                                                             signal_info.split_tail});
+                int split_bases = std::max(0, split_polya_length_info.num_bases);
                 num_bases += split_bases;
+                // no adjustment of signal start/stop, as this is hard to report in case of tails split between front/end of read
             }
 
+            // set signal boundaries in the read (adjust for number of bases trimmed)
+            // we want to return it even if the tail length is 0, for debugging purposes
+            read->read_common.polya_signal_boundaries = std::make_pair(polya_tail_length_info.signal_start - read->read_common.num_trimmed_samples, polya_tail_length_info.signal_end - read->read_common.num_trimmed_samples);
             if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;

@@ -115,6 +115,13 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     if (rna_poly_tail_length != ReadCommon::POLY_TAIL_NOT_ENABLED) {
         bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
                        (uint8_t *)&rna_poly_tail_length);
+
+        if (polya_signal_boundaries.first != -1 && polya_signal_boundaries.second != -1) {
+            // Store the start and end of the polyA/T tail in the signal (if found) in the ps:i: tag
+            std::string pts = std::to_string(polya_signal_boundaries.first) + "," + 
+                              std::to_string(polya_signal_boundaries.second);
+            bam_aux_append(aln, "ps", 'Z', int(pts.length() + 1), (uint8_t *)pts.c_str());
+        }
     }
 }
 

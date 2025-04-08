@@ -28,6 +28,16 @@ struct SignalAnchorInfo {
     bool split_tail = false;
 };
 
+struct PolyTailLengthInfo {
+
+    // the length of polyA/T tail (or -1 on failure)
+    int num_bases = -1;
+    // the start of the polyA/T tail in the raw signal
+    int signal_start = -1;
+    // the end of the polyA/T tail in the raw signal
+    int signal_end = -1;
+};
+
 class PolyTailCalculator {
 public:
     PolyTailCalculator(PolyTailConfig config, float speed_calibration, float offset_calibration)
@@ -40,8 +50,8 @@ public:
     // returns information about the polyA/T tail. signal_anchor = -1 on failure
     virtual SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const = 0;
 
-    // returns the number of bases in the polyA/T tail, or -1 on failure
-    int calculate_num_bases(const SimplexRead& read, const SignalAnchorInfo& signal_info) const;
+    // returns the array with: number of bases in the polyA/T tail () or -1 on failure), and start and end of poly(A) in raw signal 
+    virtual PolyTailLengthInfo calculate_num_bases(const SimplexRead& read, const SignalAnchorInfo& signal_info) const;
 
     static int max_tail_length() { return 750; };
 
