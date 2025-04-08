@@ -243,7 +243,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype,
-                                           const int32_t max_reads) {
+                                           const int32_t max_reads,
+                                           const bool right_align_insertions) {
     if ((num_dtypes == 1) && !std::empty(dtypes)) {
         throw std::runtime_error(
                 "Received invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
@@ -501,11 +502,17 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
             int32_t query_pos_offset = 0;
             int32_t minor = min_minor;
             for (; minor <= max_minor; ++minor, ++query_pos_offset) {
+                // Major position is kept left aligned, while insertions are now pushed to the right.
+                const int32_t left_offset = (!right_align_insertions || (minor == 0))
+                                                    ? minor
+                                                    : (max_ins - max_minor + minor);
+
                 const int32_t base_j = bam1_seqi(read.seqi, p->qpos + query_pos_offset);
                 const int8_t base_i = NUM_TO_COUNT_BASE_SYMM[base_j];
                 const size_t partial_index =
-                        major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
-                        + pileup.featlen * read_i;  // skip to read row
+                        major_col +
+                        pileup.featlen * pileup.buffer_reads * left_offset  // skip to column
+                        + pileup.featlen * read_i;                          // skip to read row
 
                 pileup.matrix[partial_index + 0] = base_i;                                 //base
                 pileup.matrix[partial_index + 1] = read.qual[p->qpos + query_pos_offset];  //qual
@@ -524,7 +531,11 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                   (include_haplotype ? 1 : 0)] = read.dtype;  //dtype
                 }
             }
-            for (; minor <= max_ins; ++minor) {
+
+            const int32_t minor_start = right_align_insertions ? 1 : minor;
+            const int32_t minor_end = right_align_insertions ? (max_ins - max_minor) : max_ins;
+
+            for (minor = minor_start; minor <= minor_end; ++minor) {
                 const size_t partial_index =
                         major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
                         + pileup.featlen * read_i;  // skip to read row
