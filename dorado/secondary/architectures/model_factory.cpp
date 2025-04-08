@@ -22,6 +22,8 @@ ModelType parse_model_type(const std::string& type) {
         return ModelType::GRU;
     } else if (type == "LatentSpaceLSTM") {
         return ModelType::LATENT_SPACE_LSTM;
+    } else if (type == "SlotAttentionConsensus") {
+        return ModelType::SLOT_ATTENTION_CONSENSUS;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }

@@ -24,6 +24,8 @@ std::string DecoderBase::get_label_scheme_symbols() const {
 LabelSchemeType parse_label_scheme_type(const std::string& type) {
     if (type == "HaploidLabelScheme") {
         return LabelSchemeType::HAPLOID;
+    } else if (type == "DiploidLabelScheme") {
+        return LabelSchemeType::DIPLOID;
     }
     throw std::runtime_error{"Unknown label scheme type: '" + type + "'!"};
 }
@@ -125,11 +127,12 @@ std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
 }
 
 std::string label_scheme_symbols(const LabelSchemeType label_scheme_type) {
-    if (label_scheme_type == LabelSchemeType::HAPLOID) {
+    switch (label_scheme_type) {
+    case LabelSchemeType::HAPLOID:
+    case LabelSchemeType::DIPLOID:
         return "*ACGT";
-    } else {
-        throw std::runtime_error("Unsupported label scheme type!");
     }
+    throw std::runtime_error("Unsupported label scheme type!");
 }
 
 }  // namespace dorado::secondary
