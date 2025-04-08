@@ -182,10 +182,10 @@ void remove_deletions(secondary::ConsensusResult& cons) {
     cons.quals.resize(n);
 }
 
-std::vector<secondary::ConsensusResult> stitch_sequence(
+std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         const hts_io::FastxRandomReader& fastx_reader,
         const std::string& header,
-        const std::vector<secondary::ConsensusResult>& sample_results,
+        const std::vector<std::vector<secondary::ConsensusResult>>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
         const std::optional<char>& fill_char) {
@@ -198,7 +198,7 @@ std::vector<secondary::ConsensusResult> stitch_sequence(
                 "from input.",
                 header, std::size(draft));
         std::string dummy_quals(std::size(draft), '!');
-        return {secondary::ConsensusResult{header, draft, std::move(dummy_quals)}};
+        return {{secondary::ConsensusResult{header, draft, std::move(dummy_quals)}}};
     } else if (!fill_gaps && std::empty(samples_for_seq)) {
         spdlog::debug(
                 "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
@@ -207,65 +207,115 @@ std::vector<secondary::ConsensusResult> stitch_sequence(
         return {};
     }
 
-    std::vector<secondary::ConsensusResult> ret;
+    // Find the maximum number of haplotypes. All inner vectors should either be of
+    // same size or empty, nothing else.
+    int64_t max_haps = 0;
+    for (const auto& part : sample_results) {
+        max_haps = std::max(max_haps, dorado::ssize(part));
+    }
 
-    secondary::ConsensusResult result;
-    result.name = header;
-    result.draft_start = draft_len;
-    result.draft_end = 0;
+    std::vector<std::vector<secondary::ConsensusResult>> ret;
+
+    const auto init_part = [&max_haps, &header, &draft_len]() {
+        std::vector<secondary::ConsensusResult> part;
+        for (int64_t hap_id = 0; hap_id < max_haps; ++hap_id) {
+            secondary::ConsensusResult hap_result;
+            hap_result.name = header;
+            hap_result.draft_start = draft_len;
+            hap_result.draft_end = 0;
+            part.emplace_back(hap_result);
+        }
+        return part;
+    };
+
+    std::vector<secondary::ConsensusResult> part = init_part();
 
     // This is an inclusive coordinate.
     int64_t last_end = 0;
     for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
-        const secondary::ConsensusResult& sample_result = sample_results[sample_index];
+        const std::vector<secondary::ConsensusResult>& sample_haps = sample_results[sample_index];
+
+        if (!std::empty(sample_haps) && (dorado::ssize(sample_haps) != max_haps)) {
+            spdlog::warn(
+                    "Unexpected number of haplotype sequences found for a sample. Expected that "
+                    "all samples have the same number of generated haplotype consensus sequences, "
+                    "but max_haps = {}, and number of haplotypes for the current sample: {}. "
+                    "Returning empty.",
+                    max_haps, std::size(sample_haps));
+            return {};
+        }
+
+        // This should not happen. Create a multi-part output if so.
+        if (std::empty(sample_haps)) {
+            if (!std::empty(part) && !std::empty(part.front().seq)) {
+                ret.emplace_back(std::move(part));
+            }
+            part = init_part();
+            continue;
+        }
+
+        // Draft start should be identical for all haplotypes of this sample.
+        const int64_t draft_start = sample_haps.front().draft_start;
+        const int64_t draft_end = sample_haps.front().draft_end;
 
         // Fill the gap with either the draft or a fill char.
-        if (sample_result.draft_start > last_end) {
+        if (draft_start > last_end) {
             if (fill_gaps) {
-                const int64_t fill_len = sample_result.draft_start - last_end;
-                result.seq += (fill_char) ? std::string(fill_len, *fill_char)
-                                          : draft.substr(last_end, fill_len);
-                result.quals += std::string(fill_len, '!');
-                result.draft_start = std::min(result.draft_start, last_end);
-                result.draft_end = std::max(result.draft_end, sample_result.draft_start);
-            } else {
-                if (!std::empty(result.seq)) {
-                    ret.emplace_back(std::move(result));
+                const int64_t fill_len = draft_start - last_end;
+                const std::string fill_seq = (fill_char) ? std::string(fill_len, *fill_char)
+                                                         : draft.substr(last_end, fill_len);
+                // Fill all haplotypes.
+                for (secondary::ConsensusResult& hap_result : part) {
+                    hap_result.seq += fill_seq;
+                    hap_result.quals += std::string(fill_len, '!');
+                    hap_result.draft_start = std::min(hap_result.draft_start, last_end);
+                    hap_result.draft_end = std::max(hap_result.draft_end, draft_start);
                 }
-                result = {};
-                result.name = header;
-                result.draft_start = draft_len;
-                result.draft_end = 0;
+            } else {
+                if (!std::empty(part) && !std::empty(part.front().seq)) {
+                    ret.emplace_back(std::move(part));
+                }
+                part = init_part();
             }
         }
 
-        // Splice a polished chunk.
-        result.seq += sample_result.seq;
-        result.quals += sample_result.quals;
-        result.draft_start = std::min(result.draft_start, sample_result.draft_start);
-        result.draft_end = std::max(result.draft_end, sample_result.draft_end);
+        // Append the sequence.
+        for (int64_t hap_id = 0; hap_id < max_haps; ++hap_id) {
+            const secondary::ConsensusResult& sample_result = sample_results[sample_index][hap_id];
+            secondary::ConsensusResult& hap_result = part[hap_id];
 
-        last_end = sample_result.draft_end;
+            // Splice a polished chunk.
+            hap_result.seq += sample_result.seq;
+            hap_result.quals += sample_result.quals;
+            hap_result.draft_start = std::min(hap_result.draft_start, sample_result.draft_start);
+            hap_result.draft_end = std::max(hap_result.draft_end, sample_result.draft_end);
+        }
+
+        last_end = draft_end;
     }
 
     // Add the back draft part (or fill char).
     if ((last_end < dorado::ssize(draft)) && fill_gaps) {
         const int64_t fill_len = draft_len - last_end;
-        result.seq += (fill_char) ? std::string(fill_len, *fill_char) : draft.substr(last_end);
-        result.quals += std::string(draft_len - last_end, '!');
-        result.draft_start = std::min(result.draft_start, last_end);
-        result.draft_end = std::max(result.draft_end, draft_len);
-        if (!std::empty(result.seq)) {
-            ret.emplace_back(std::move(result));
+        const std::string fill_seq =
+                (fill_char) ? std::string(fill_len, *fill_char) : draft.substr(last_end);
+        // Fill all haplotypes.
+        for (secondary::ConsensusResult& hap_result : part) {
+            hap_result.seq += fill_seq;
+            hap_result.quals += std::string(fill_len, '!');
+            hap_result.draft_start = std::min(hap_result.draft_start, last_end);
+            hap_result.draft_end = std::max(hap_result.draft_end, draft_len);
+        }
+        if (!std::empty(part) && !std::empty(part.front().seq)) {
+            ret.emplace_back(std::move(part));
         }
     }
 
-    spdlog::trace("[stitch_sequence] header = '{}', result.seq.size() = {}, final.", header,
-                  std::size(result.seq));
+    spdlog::trace("[stitch_sequence] header = '{}', final.", header);
 
-    if (!std::empty(result.seq)) {
-        ret.emplace_back(std::move(result));
+    if (!std::empty(part) && !std::empty(part.front().seq)) {
+        ret.emplace_back(std::move(part));
     }
 
     return ret;
@@ -969,7 +1019,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
     spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
 }
 
-void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results_cons,
+void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResult>>& results_cons,
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 secondary::Stats& stats,
@@ -986,9 +1036,12 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
         timer::TimerHighRes timer_decode;
 
         // Decode output to bases and qualities.
-        std::vector<secondary::ConsensusResult> local_results = decoder.decode_bases(item.logits);
+        // Decode output to bases and qualities. Dimensions: [samples x haplotypes].
+        std::vector<std::vector<secondary::ConsensusResult>> local_results =
+                decoder.decode_bases(item.logits);
 
-        std::vector<secondary::ConsensusResult> final_results;
+        // Dimensions: [samples x haplotypes].
+        std::vector<std::vector<secondary::ConsensusResult>> final_results;
         final_results.reserve(std::size(local_results));
 
         const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
@@ -999,7 +1052,11 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
         // Trim the overlapping sequences.
         timer::TimerHighRes timer_trim;
         for (int64_t j = 0; j < dorado::ssize(local_results); ++j) {
-            auto& result = local_results[j];
+            // Empty local results should not be possible, but better be safe.
+            if (std::empty(local_results[j])) {
+                continue;
+            }
+
             const secondary::Sample& sample = item.samples[j];
             const secondary::TrimInfo& trim = item.trims[j];
             const int64_t num_positions = dorado::ssize(sample.positions_major);
@@ -1010,7 +1067,6 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                         "Trim coordinate is < 0. j = {}, trim.start = {}, trim.end = {}, "
                         "trim.heuristic = {}, num_positions = {}",
                         j, trim.start, trim.end, trim.heuristic, num_positions);
-                result = {};
                 continue;
             }
 
@@ -1038,23 +1094,29 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                 }
             }
 
-            if (std::size(good_intervals) == 1) {
-                // Trim and mark the region.
-                result.draft_id = sample.seq_id;
-                result.draft_start = sample.positions_major[trim.start];
-                result.draft_end = sample.positions_major[trim.end - 1] + 1;
-                result.seq = result.seq.substr(trim.start, trim.end - trim.start);
-                result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+            int64_t draft_span = 0;
 
-                final_results.emplace_back(std::move(result));
+            if (std::size(good_intervals) == 1) {
+                const int64_t draft_start = sample.positions_major[trim.start];
+                const int64_t draft_end = sample.positions_major[trim.end - 1] + 1;
+                draft_span = draft_end - draft_start;
+
+                // Trim and mark the region.
+                for (auto& result : local_results[j]) {
+                    result.draft_id = sample.seq_id;
+                    result.draft_start = draft_start;
+                    result.draft_end = draft_end;
+                    result.seq = result.seq.substr(trim.start, trim.end - trim.start);
+                    result.quals = result.quals.substr(trim.start, trim.end - trim.start);
+                }
+
+                final_results.emplace_back(std::move(local_results[j]));
 
             } else {
                 for (const auto& interval : good_intervals) {
                     if ((interval.start < 0) || (interval.end <= 0)) {
                         continue;
                     }
-
-                    secondary::ConsensusResult new_result;
 
                     const int32_t start =
                             std::max(static_cast<int32_t>(trim.start), interval.start);
@@ -1064,20 +1126,30 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                         continue;
                     }
 
-                    new_result.draft_id = sample.seq_id;
-                    new_result.draft_start = sample.positions_major[start];
-                    new_result.draft_end = sample.positions_major[end - 1] + 1;
-                    new_result.seq = result.seq.substr(start, end - start);
-                    new_result.quals = result.quals.substr(start, end - start);
+                    const int64_t draft_start = sample.positions_major[start];
+                    const int64_t draft_end = sample.positions_major[end - 1] + 1;
+                    draft_span = draft_end - draft_start;
 
-                    final_results.emplace_back(std::move(new_result));
+                    std::vector<secondary::ConsensusResult> new_results;
+
+                    for (auto& result : local_results[j]) {
+                        secondary::ConsensusResult new_result;
+                        new_result.draft_id = sample.seq_id;
+                        new_result.draft_start = draft_start;
+                        new_result.draft_end = draft_end;
+                        new_result.seq = result.seq.substr(start, end - start);
+                        new_result.quals = result.quals.substr(start, end - start);
+                        new_results.emplace_back(std::move(new_result));
+                    }
+
+                    final_results.emplace_back(std::move(new_results));
                 }
             }
 
-            stats.add("processed", static_cast<double>(result.draft_end - result.draft_start));
+            stats.add("processed", static_cast<double>(draft_span));
         }
-        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
 
+        const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
         const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
         spdlog::trace(
@@ -1089,7 +1161,7 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
     };
 
     const auto worker = [&](const int32_t tid,
-                            std::vector<secondary::ConsensusResult>& thread_results,
+                            std::vector<std::vector<secondary::ConsensusResult>>& thread_results,
                             std::vector<secondary::VariantCallingSample>& thread_vc_data) {
         utils::ScopedProfileRange spr2("decode_samples_in_parallel-worker", 3);
         at::InferenceMode infer_guard;
@@ -1122,7 +1194,8 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                 }
 
                 // Inference.
-                std::vector<secondary::ConsensusResult> results_samples = batch_decode(item, tid);
+                std::vector<std::vector<secondary::ConsensusResult>> results_samples =
+                        batch_decode(item, tid);
 
                 thread_results.insert(std::end(thread_results),
                                       std::make_move_iterator(std::begin(results_samples)),
@@ -1161,7 +1234,8 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
         }
     };
 
-    std::vector<std::vector<secondary::ConsensusResult>> thread_results(num_threads);
+    // Dimensions: threads x samples x haplotypes.
+    std::vector<std::vector<std::vector<secondary::ConsensusResult>>> thread_results(num_threads);
     std::vector<std::vector<secondary::VariantCallingSample>> thread_vc_data(num_threads);
 
     cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
@@ -1190,9 +1264,16 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
         }
         results_cons.clear();
         results_cons.reserve(total_size);
-        for (auto& vals : thread_results) {
-            results_cons.insert(std::end(results_cons), std::make_move_iterator(std::begin(vals)),
-                                std::make_move_iterator(std::end(vals)));
+
+        // Take only the first haplotype of the consensus.
+        for (size_t thread_id = 0; thread_id < std::size(thread_results); ++thread_id) {
+            for (size_t sample_id = 0; sample_id < std::size(thread_results[thread_id]);
+                 ++sample_id) {
+                if (std::empty(thread_results[thread_id][sample_id])) {
+                    continue;
+                }
+                results_cons.emplace_back(std::move(thread_results[thread_id][sample_id]));
+            }
         }
     }
     {
@@ -1212,9 +1293,9 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
 }
 
-std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
+std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_consensus_seqs(
         const secondary::Interval& region_batch,
-        const std::vector<secondary::ConsensusResult>& all_results_cons,
+        const std::vector<std::vector<secondary::ConsensusResult>>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
         const std::optional<char>& fill_char,
@@ -1224,35 +1305,45 @@ std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
-        const secondary::ConsensusResult& r = all_results_cons[i];
-        const int32_t local_id = r.draft_id - region_batch.start;
-        // Skip filtered samples.
-        if (r.draft_id < 0) {
+        const std::vector<secondary::ConsensusResult>& hap_results = all_results_cons[i];
+
+        if (std::empty(hap_results)) {
             continue;
         }
-        if ((r.draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+
+        const int32_t draft_id = hap_results.front().draft_id;
+        const int32_t local_id = draft_id - region_batch.start;
+
+        // Skip filtered samples.
+        if (draft_id < 0) {
+            continue;
+        }
+
+        if ((draft_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
             (local_id >= dorado::ssize(groups))) {
             spdlog::error(
                     "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
                     "groups.size = {}",
-                    r.draft_id, std::size(draft_lens), std::size(groups));
+                    draft_id, std::size(draft_lens), std::size(groups));
             continue;
         }
-        groups[local_id].emplace_back(r.draft_start, i);
+        groups[local_id].emplace_back(hap_results.front().draft_start, i);
     }
 
-    std::vector<std::vector<secondary::ConsensusResult>> ret;
+    // Dimensions: [draft_id x part_id x haplotype_id].
+    std::vector<std::vector<std::vector<secondary::ConsensusResult>>> ret;
 
     // Consensus sequence - stitch the windows and write output.
     for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
         const int64_t seq_id = group_id + region_batch.start;
 
-        auto& group = groups[group_id];
+        std::vector<std::pair<int64_t, int32_t>>& group = groups[group_id];
         std::sort(std::begin(group), std::end(group));  // Sort by start pos.
 
         const std::string& header = draft_lens[seq_id].first;
 
-        std::vector<secondary::ConsensusResult> consensus = stitch_sequence(
+        // Dimensions: [part_id x haplotype_id].
+        std::vector<std::vector<secondary::ConsensusResult>> consensus = stitch_sequence(
                 draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
 
         ret.emplace_back(std::move(consensus));

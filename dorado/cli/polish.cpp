@@ -442,8 +442,12 @@ void validate_options(const Options& opt) {
     }
 }
 
+/**
+ * \brief Writes the consensus sequence from the given results. The dimensions of the `results` vector
+ *          are: [part_id x haplotype_id].
+ */
 void write_consensus_results(std::ostream& os,
-                             const std::vector<secondary::ConsensusResult>& results,
+                             const std::vector<std::vector<secondary::ConsensusResult>>& results,
                              const bool fill_gaps,
                              const bool write_quals) {
     if (std::empty(results)) {
@@ -451,10 +455,14 @@ void write_consensus_results(std::ostream& os,
     }
 
     for (size_t i = 0; i < std::size(results); ++i) {
-        secondary::ConsensusResult out = results[i];
+        if (std::empty(results[i])) {
+            continue;
+        }
+
+        secondary::ConsensusResult out = results[i].front();
         polisher::remove_deletions(out);
 
-        std::string header = results[i].name;
+        std::string header = out.name;
         if (!fill_gaps) {
             header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
                       std::to_string(out.draft_end);
@@ -803,7 +811,7 @@ void run_polishing(const Options& opt,
                           secondary::region_to_string(region_batch[i]));
         }
 
-        std::vector<secondary::ConsensusResult> all_results_cons;
+        std::vector<std::vector<secondary::ConsensusResult>> all_results_cons;
         std::vector<secondary::VariantCallingSample> vc_input_data;
 
         // Inference and consensus.
@@ -893,10 +901,11 @@ void run_polishing(const Options& opt,
             if (opt.write_consensus) {
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
-                const std::vector<std::vector<secondary::ConsensusResult>> consensus_seqs =
-                        polisher::construct_consensus_seqs(batch_interval, all_results_cons,
-                                                           draft_lens, opt.fill_gaps, opt.fill_char,
-                                                           *draft_readers.front());
+                // Dimensions: [draft_id x part_id x haplotype_id].
+                const std::vector<std::vector<std::vector<secondary::ConsensusResult>>>
+                        consensus_seqs = polisher::construct_consensus_seqs(
+                                batch_interval, all_results_cons, draft_lens, opt.fill_gaps,
+                                opt.fill_char, *draft_readers.front());
 
                 // Write the consensus file.
                 for (const auto& consensus : consensus_seqs) {
