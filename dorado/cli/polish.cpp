@@ -459,19 +459,25 @@ void write_consensus_results(std::ostream& os,
             continue;
         }
 
-        secondary::ConsensusResult out = results[i].front();
-        polisher::remove_deletions(out);
+        for (size_t hap_id = 0; hap_id < std::size(results[i]); ++hap_id) {
+            const std::string hap_label =
+                    (std::size(results[i]) > 1) ? ("_hap_" + std::to_string(hap_id)) : "";
 
-        std::string header = out.name;
-        if (!fill_gaps) {
-            header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
-                      std::to_string(out.draft_end);
-        }
+            secondary::ConsensusResult out = results[i][hap_id];
+            polisher::remove_deletions(out);
 
-        if (write_quals) {
-            os << '@' << header << '\n' << out.seq << "\n+\n" << out.quals << '\n';
-        } else {
-            os << '>' << header << '\n' << out.seq << '\n';
+            std::string header = out.name + hap_label;
+
+            if (!fill_gaps) {
+                header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
+                          std::to_string(out.draft_end);
+            }
+
+            if (write_quals) {
+                os << '@' << header << '\n' << out.seq << "\n+\n" << out.quals << '\n';
+            } else {
+                os << '>' << header << '\n' << out.seq << '\n';
+            }
         }
     }
 }
