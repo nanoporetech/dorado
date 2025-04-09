@@ -28,7 +28,25 @@ torch::Device ModelTorchScript::get_device() const {
 }
 
 torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
-    return m_module.forward({std::move(x)}).toTensor();
+    torch::IValue output = m_module.forward({std::move(x)});
+
+    if (output.isTensor()) {
+        // Output of the model is just a tensor.
+        return output.toTensor();
+
+    } else if (output.isTuple()) {
+        // Output of the model is a tuple, return the first element.
+        const auto tuple = output.toTuple();
+        if (std::empty(tuple->elements())) {
+            spdlog::warn("Model forward function returned an empty tuple!");
+            return {};
+        }
+        return tuple->elements()[0].toTensor();
+    }
+
+    spdlog::warn("Model returned an unsupported output type.");
+
+    return {};
 }
 
 void ModelTorchScript::to_half() {
