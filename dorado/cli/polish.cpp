@@ -760,6 +760,7 @@ void run_polishing(const Options& opt,
         // These are the only available FILTER options.
         const std::vector<std::pair<std::string, std::string>> filters{
                 {"PASS", "All filters passed"},
+                {"LowQual", "Variant quality is below threshold"},
                 {".", "Non-variant position"},
         };
 

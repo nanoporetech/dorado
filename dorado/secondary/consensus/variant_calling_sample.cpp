@@ -209,8 +209,9 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
                 draft, vc_sample.positions_major, vc_sample.positions_minor);
         const std::vector<ConsensusResult>& calls_with_gaps = c.front();
 
+        // Use std::nullopt to be more strict about merging/breaking on variants.
         const std::vector<bool> is_variant = find_polyploid_variants(
-                vc_sample.positions_minor, draft_with_gaps, calls_with_gaps);
+                vc_sample.positions_minor, draft_with_gaps, calls_with_gaps, std::nullopt);
 
         const int64_t num_positions = dorado::ssize(vc_sample.positions_major);
 

@@ -1,5 +1,8 @@
 #include "vcf_writer.h"
 
+#include "utils/container_utils.h"
+#include "utils/ssize.h"
+
 #include <htslib/vcf.h>
 
 #include <sstream>
@@ -116,24 +119,34 @@ void VCFWriter::write_variant(const Variant& variant) {
     {
         std::vector<std::string> format_keys;
         std::vector<int32_t> format_values;
+        std::vector<int32_t> genotype_values;
+
         for (const auto& [key, value] : variant.genotype) {
             if (key == "GT") {
+                const std::vector<int32_t> values = utils::parse_int32_vector(value, '/');
+                for (const int32_t val : values) {
+                    if (val < 0) {
+                        genotype_values.emplace_back(bcf_int32_missing);
+                    } else {
+                        genotype_values.emplace_back(bcf_gt_unphased(val));
+                    }
+                }
+            } else {
                 format_keys.emplace_back(key);
-                format_values.emplace_back(bcf_gt_unphased(value));
-                break;
+                format_values.emplace_back(std::stoi(value));
             }
         }
-        for (const auto& [key, value] : variant.genotype) {
-            if (key != "GT") {
-                format_keys.emplace_back(key);
-                format_values.emplace_back(value);
-            }
+
+        if (std::empty(genotype_values)) {
+            throw std::runtime_error("No genotype information found in variant.genotype!");
         }
-        if (std::empty(format_keys) || (format_keys.front() != "GT")) {
-            throw std::runtime_error("Genotype key GT not found in variant.genotype!");
-        }
-        bcf_update_genotypes(m_header.get(), record.get(), &format_values[0], 1);
-        for (size_t i = 1; i < std::size(format_keys); ++i) {
+
+        // Update the genotype.
+        bcf_update_genotypes(m_header.get(), record.get(), std::data(genotype_values),
+                             std::size(genotype_values));
+
+        // Update other keys (like genotype quality).
+        for (int64_t i = 0; i < dorado::ssize(format_keys); ++i) {
             bcf_update_format_int32(m_header.get(), record.get(), format_keys[i].c_str(),
                                     &format_values[i], 1);
         }

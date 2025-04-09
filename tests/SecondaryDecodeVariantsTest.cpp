@@ -97,7 +97,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "One variant, one haplotype. No normalization.",
             "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false,
             {
-                Variant{0, 1, "C", {"G"}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 1, 2},
+                Variant{0, 1, "C", {"G"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 1, 2},
             },
             false,
         },
@@ -106,7 +106,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One SNP variant, one haplotype. No effect, SNPs cannot be normalized.",
             "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
             {
-                Variant{0, 1, "A", {"C"}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 1, 2},
+                Variant{0, 1, "A", {"C"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 1, 2},
             },
             false,
         },
@@ -115,7 +115,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One deletion variant, one haplotype.",
             "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
             {
-                Variant{0, 0, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 0, 3},
+                Variant{0, 0, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 3},
             },
             false,
         },
@@ -134,7 +134,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One deletion variant at position 0, one haplotype. Deletion is the first event, cannot left-extend. Extend to the right with one reference base instead.",
             "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
             {
-                Variant{0, 0, "AT", {"T"}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 0, 2},
+                Variant{0, 0, "AT", {"T"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 2},
             },
             false,
         },
@@ -143,7 +143,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. Single reference base which is deleted in the alt.",
             "A", {"*"}, {0}, {0}, true, false, false,
             {
-                Variant{0, 0, "A", {""}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 0, 1},
+                Variant{0, 0, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 1},
             },
             false,
         },
@@ -152,12 +152,12 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Return all reference positions (gVCF). This includes reference positions on variant sites as well.",
             "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, true, false, true,
             {
-                Variant{0, 0, "A", {"."}, ".", {}, 70.0f, {{"GT", 0}, {"GQ", 70}}, 0, 1},
-                Variant{0, 1, "C", {"."}, ".", {}, 70.0f, {{"GT", 0}, {"GQ", 70}}, 1, 2},
-                Variant{0, 2, "T", {"A"}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 2, 3},
-                Variant{0, 2, "T", {"."}, ".", {}, 0.0f, {{"GT", 0}, {"GQ", 0}}, 2, 3},
-                Variant{0, 3, "G", {"."}, ".", {}, 70.0f, {{"GT", 0}, {"GQ", 70}}, 3, 4},
-                Variant{0, 4, "A", {"."}, ".", {}, 70.0f, {{"GT", 0}, {"GQ", 70}}, 4, 5},
+                Variant{0, 0, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 1},
+                Variant{0, 1, "C", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 1, 2},
+                Variant{0, 2, "T", {"A"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 2, 3},
+                Variant{0, 2, "T", {"."}, ".", {}, 0.0f, {{"GT", "0"}, {"GQ", "0"}}, 2, 3},
+                Variant{0, 3, "G", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},
+                Variant{0, 4, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 4, 5},
             },
             false,
         },
@@ -166,7 +166,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Prepending with a reference base because the entire variant is in an insertion.",
             "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, true, false, false,
             {
-                Variant{0, 2, "T", {"TAAA"}, "PASS", {}, 210.0f, {{"GT", 1}, {"GQ", 210}}, 2, 6},
+                Variant{0, 2, "T", {"TAAA"}, "PASS", {}, 210.0f, {{"GT", "1"}, {"GQ", "210"}}, 2, 6},
             },
             false,
         },
@@ -180,7 +180,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0},
             true, false, false,
             {
-                Variant{0, 6, "A", {"TC"}, "PASS", {}, 280.0f, {{"GT", 1}, {"GQ", 280}}, 4, 18},
+                Variant{0, 6, "A", {"TC"}, "PASS", {}, 280.0f, {{"GT", "1"}, {"GQ", "280"}}, 4, 18},
             },
             false,
         },

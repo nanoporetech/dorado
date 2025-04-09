@@ -45,7 +45,7 @@ bool is_valid(const Variant& var) {
         return false;
     }
     if (std::all_of(std::cbegin(var.alts), std::cend(var.alts),
-                    [&var](const std::string& val) { return val == var.ref; })) {
+                    [&var](const std::string_view val) { return val == var.ref; })) {
         return false;
     }
     return true;
