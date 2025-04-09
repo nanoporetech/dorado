@@ -647,7 +647,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     bool useBiasProj = true;
     bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", false);
     bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", false);
-    bool useBiasfc2 = false; // ! No bias for fc2, passing zeros bias for performance
+    bool useBiasfc2 = false; // No bias for fc2
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
     const float alpha = params.deepnorm_alpha;
@@ -709,7 +709,6 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     auto t_out_rms1 = torch::empty({N, T / 16, C / 16, 16, 16}, f16_opts);
     auto t_fc1_out = torch::empty({N * T / 16, (E / 2) / 16, 16, 16}, f16_opts);
     auto t_fc2_out = torch::empty({N, T / 16, C / 16, 16, 16}, f16_opts);
-    // auto fc2_bias_zeros = torch::zeros({N}, f16_opts); // fc2 kernel has better perforamnce when passed a bias
 
     int res = KOI_SUCCESS;
     int calls = 0;
@@ -750,7 +749,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         utils::ScopedProfileRange spr("FC2 Volta", 3);
         res = koi_volta_linear(stream, t_fc1_out.data_ptr(), t_fc2_wts.data_ptr(),
                                t_fc2_out.data_ptr(),
-                               nullptr,  // ! No bias for fc2, passing zeros bias for performance
+                               nullptr,  // No bias for fc2
                                useFloatAccumfc2, useBiasfc2, N * T, E / 2);
     }
     if (res == KOI_SUCCESS && ++calls) {
@@ -758,7 +757,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         utils::ScopedProfileRange spr("LNORM2 Volta", 3);
         res = koi_volta_rmsnorm_residual(
                 stream, t_out_rms1.data_ptr(), t_fc2_out.data_ptr(), t_res2_weights.data_ptr(),
-                // ! Use initial input x_f16 as output buffer for second rmsnorm
+                // Use initial input x_f16 as output buffer for second rmsnorm
                 x_f16.data_ptr(), alpha, N * T);
     }
     if (res != KOI_SUCCESS) {
