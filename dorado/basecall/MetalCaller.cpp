@@ -3,7 +3,7 @@
 #include "ModelRunnerBase.h"
 #include "crf_utils.h"
 #include "decode/beam_search.h"
-#include "nn/TxModel.h"
+#include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
@@ -313,8 +313,8 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     m_out_batch_size = m_batch_size / m_out_split;
     assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
 
-    m_model = nn::MetalCRFModel(model_config, m_in_chunk_size, m_batch_size, m_out_split,
-                                m_device.get());
+    m_model = model::MetalCRFModel(model_config, m_in_chunk_size, m_batch_size, m_out_split,
+                                   m_device.get());
     m_model->load_state_dict(state_dict);
     m_model->eval();
 
@@ -538,7 +538,7 @@ void MetalTxCaller::load_tx_model(const BasecallModelConfig &model_config) {
     const auto scalar_type = torch::kFloat16;
     const auto options = at::TensorOptions().device(device_type).dtype(scalar_type);
 
-    m_model = nn::TxModel(model_config, options);
+    m_model = model::TxModel(model_config, options);
 
     auto state_dict = load_crf_model_weights(model_config);
     m_model->load_state_dict(state_dict);

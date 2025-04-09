@@ -1,9 +1,6 @@
 #pragma once
 
-#include "basecall/nn/CRFModel.h"
 #include "config/BasecallModelConfig.h"
-#include "torch_utils/gpu_profiling.h"
-#include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
 
 #include <c10/core/Device.h>
@@ -15,9 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::basecall {
-
-namespace nn {
+namespace dorado::nn {
 
 torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
@@ -167,26 +162,4 @@ struct LinearScaledCRFImpl : torch::nn::Module {
 
 TORCH_MODULE(LinearScaledCRF);
 
-struct TxModelImpl : torch::nn::Module {
-    explicit TxModelImpl(const config::BasecallModelConfig &config,
-                         const at::TensorOptions &options);
-
-    void load_state_dict(const std::vector<at::Tensor> &weights) {
-        utils::load_state_dict(*this, weights);
-    }
-
-    at::Tensor forward(const at::Tensor &chunk_NCT);
-
-    basecall::nn::ConvStack convs{nullptr};
-    TxEncoderStack tx_encoder{nullptr};
-    LinearUpsample tx_decoder{nullptr};
-    LinearScaledCRF crf{nullptr};
-
-    const at::TensorOptions m_options;
-};
-
-TORCH_MODULE(TxModel);
-
-}  // namespace nn
-
-}  // namespace dorado::basecall
+}  // namespace dorado::nn

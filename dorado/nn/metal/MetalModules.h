@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace dorado::basecall::nn {
+namespace dorado::nn::metal {
 
 struct MetalLinearImpl : torch::nn::Module {
     MetalLinearImpl(int insize, int outsize, bool has_bias);
@@ -83,23 +83,4 @@ struct MetalBlockImpl : torch::nn::Module {
 
 TORCH_MODULE(MetalBlock);
 
-struct MetalCRFModelImpl : torch::nn::Module {
-    MetalCRFModelImpl(const config::BasecallModelConfig &config,
-                      int chunk_size,
-                      int batch_size,
-                      int out_split,
-                      MTL::Device *const device);
-
-    void load_state_dict(const std::vector<at::Tensor> &weights);
-
-    MTL::CommandBuffer *forward_async(at::Tensor &in,
-                                      MTL::SharedEvent *const linear_hold_off_event,
-                                      uint64_t linear_hold_off_id,
-                                      int try_count,
-                                      std::vector<at::Tensor> &out);
-    MetalBlock mtl_block{nullptr};
-};
-
-TORCH_MODULE(MetalCRFModel);
-
-}  // namespace dorado::basecall::nn
+}  // namespace dorado::nn::metal

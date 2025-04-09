@@ -1,4 +1,4 @@
-#include "MetalCRFModel.h"
+#include "MetalModules.h"
 
 #include "torch_utils/module_utils.h"
 #include "utils/math_utils.h"
@@ -20,14 +20,14 @@ constexpr int kSIMDGroupWidth = 32;
 constexpr auto torch_dtype = torch::kF16;
 const size_t dtype_bytes = torch::elementSize(torch_dtype);
 
-CREATE_POINT_OF_INTEREST_ID(MetalCRFModel);
+CREATE_POINT_OF_INTEREST_ID(MetalCRFModule);
 
 }  // namespace
 
 using namespace dorado::utils;
 using torch::indexing::Slice;
 
-namespace dorado::basecall::nn {
+namespace dorado::nn::metal {
 
 MetalLinearImpl::MetalLinearImpl(int insize, int outsize, bool has_bias) {
     auto weight = torch::empty({outsize, insize});
@@ -463,7 +463,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                                                   int try_count,
                                                   std::vector<at::Tensor> &out) {
     {
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, convolutions, "try_count=%i", try_count);
+        POINT_OF_INTEREST_SCOPE(MetalCRFModule, convolutions, "try_count=%i", try_count);
         auto command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 
         if (in.dtype() != torch::kF16) {
@@ -480,7 +480,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     std::string lstm_label = "lstm_rnn0";
     for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
         lstm_label.back()++;
-        POINT_OF_INTEREST_SCOPE(MetalCRFModel, lstm_layer, "id=%s, try_count=%i",
+        POINT_OF_INTEREST_SCOPE(MetalCRFModule, lstm_layer, "id=%s, try_count=%i",
                                 lstm_label.c_str(), try_count);
 
 #if !USE_SPLIT_LSTM_COMMAND_BUFFERS
@@ -559,27 +559,4 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     return command_buffer;
 }
 
-MetalCRFModelImpl::MetalCRFModelImpl(const config::BasecallModelConfig &config,
-                                     int chunk_size,
-                                     int batch_size,
-                                     int out_split,
-                                     MTL::Device *const device) {
-    mtl_block = register_module("mtl_block",
-                                MetalBlock(chunk_size, batch_size, config, out_split, device));
-}
-
-void MetalCRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
-    utils::load_state_dict(*this, weights);
-    mtl_block->load_weights();
-}
-
-MTL::CommandBuffer *MetalCRFModelImpl::forward_async(at::Tensor &in,
-                                                     MTL::SharedEvent *const linear_hold_off_event,
-                                                     uint64_t linear_hold_off_id,
-                                                     int try_count,
-                                                     std::vector<at::Tensor> &out) {
-    POINT_OF_INTEREST_SCOPE(MetalCRFModel, forward_async, "try_count=%i", try_count);
-    return mtl_block->forward_async(in, linear_hold_off_event, linear_hold_off_id, try_count, out);
-}
-
-}  // namespace dorado::basecall::nn
+}  // namespace dorado::nn::metal

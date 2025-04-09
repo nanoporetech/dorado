@@ -1,8 +1,8 @@
 #include "crf_utils.h"
 
 #include "config/BasecallModelConfig.h"
-#include "nn/CRFModel.h"
-#include "nn/TxModel.h"
+#include "model/CRFModel.h"
+#include "model/TxModel.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/memory_utils.h"
 
@@ -135,7 +135,7 @@ namespace {
 
 ModuleHolder<AnyModule> load_lstm_model(const BasecallModelConfig &model_config,
                                         const at::TensorOptions &options) {
-    auto model = nn::CRFModel(model_config);
+    auto model = model::CRFModel(model_config);
     auto state_dict = load_crf_model_weights(model_config);
     model->load_state_dict(state_dict);
     model->to(options.dtype().toScalarType());
@@ -149,7 +149,7 @@ ModuleHolder<AnyModule> load_lstm_model(const BasecallModelConfig &model_config,
 
 ModuleHolder<AnyModule> load_tx_model(const BasecallModelConfig &model_config,
                                       const at::TensorOptions &options) {
-    auto model = nn::TxModel(model_config, options);
+    auto model = model::TxModel(model_config, options);
     auto state_dict = load_crf_model_weights(model_config);
     model->load_state_dict(state_dict);
     model->to(options.dtype().toScalarType());

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "decode/Decoder.h"
-#include "nn/MetalCRFModel.h"
-#include "nn/TxModel.h"
+#include "model/MetalCRFModel.h"
+#include "model/TxModel.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/core/TensorBody.h>
@@ -97,7 +97,7 @@ private:
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    nn::MetalCRFModel m_model{nullptr};
+    model::MetalCRFModel m_model{nullptr};
     torch::ScalarType m_scores_dtype = torch::kChar;
     torch::ScalarType m_posts_dtype = torch::kShort;
 
@@ -136,7 +136,7 @@ private:
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    nn::TxModel m_model{nullptr};
+    model::TxModel m_model{nullptr};
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
 
     torch::ScalarType m_scores_dtype = torch::kHalf;

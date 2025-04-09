@@ -5,7 +5,7 @@ download_and_extract(
 )
 
 set(AIR_FILES)
-set(METAL_SOURCES dorado/basecall/metal/nn.metal)
+set(METAL_SOURCES dorado/nn/metal/nn.metal)
 
 
 set(XCRUN_SDK macosx)
