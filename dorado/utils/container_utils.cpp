@@ -2,19 +2,28 @@
 
 #include <algorithm>
 #include <sstream>
+#include <unordered_set>
 
 namespace dorado::utils {
 
-std::vector<int32_t> parse_int32_vector(const std::string& input) {
+std::vector<int32_t> parse_int32_vector(const std::string& input, const char delimiter) {
     if (std::empty(input)) {
         return {};
     }
-    if ((std::size(input) < 2) || (input.front() != '[') || (input.back() != ']')) {
-        throw std::runtime_error("Input string must start with '[' and end with ']'.");
+
+    const std::unordered_set<char> open_set{'(', '[', '{', '<'};
+    const std::unordered_set<char> closed_set{')', ']', '}', '>'};
+
+    std::string trimmed;
+
+    if ((std::size(input) >= 2) && (open_set.find(input.front()) != open_set.cend()) &&
+        (closed_set.find(input.back()) != closed_set.cend())) {
+        // Remove the brackets and trim the string
+        trimmed = input.substr(1, std::size(input) - 2);
+    } else {
+        trimmed = input;
     }
 
-    // Remove the brackets and trim the string
-    std::string trimmed = input.substr(1, std::size(input) - 2);
     trimmed.erase(std::remove(std::begin(trimmed), std::end(trimmed), ' '), std::end(trimmed));
     trimmed.erase(std::remove(std::begin(trimmed), std::end(trimmed), '\t'), std::end(trimmed));
 
@@ -22,7 +31,7 @@ std::vector<int32_t> parse_int32_vector(const std::string& input) {
     std::istringstream ss(trimmed);
     std::string token;
 
-    while (std::getline(ss, token, ',')) {
+    while (std::getline(ss, token, delimiter)) {
         if (std::empty(token)) {
             continue;
         }
