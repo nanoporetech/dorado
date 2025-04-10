@@ -15,6 +15,7 @@ public:
     static constexpr FieldFlags GENERAL_FIELDS = 1;
     static constexpr FieldFlags BARCODING_FIELDS = 2;
     static constexpr FieldFlags ALIGNMENT_FIELDS = 4;
+    static constexpr FieldFlags POLYA_FIELDS = 8;
 
     SummaryData();
     SummaryData(FieldFlags flags);
