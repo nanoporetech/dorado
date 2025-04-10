@@ -62,7 +62,7 @@ void PolyACalculatorNode::input_thread_fn() {
 
             // set signal boundaries in the read (adjust for number of bases trimmed)
             // we want to return it even if the tail length is 0, for debugging purposes
-            read->read_common.polya_signal_boundaries = std::make_pair(polya_tail_length_info.signal_start - read->read_common.num_trimmed_samples, polya_tail_length_info.signal_end - read->read_common.num_trimmed_samples);
+            read->read_common.polya_signal_boundaries = std::make_pair(polya_tail_length_info.signal_start + read->read_common.num_trimmed_samples, polya_tail_length_info.signal_end + read->read_common.num_trimmed_samples);
             if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
                 // Update debug stats.
                 total_tail_lengths_called += num_bases;
