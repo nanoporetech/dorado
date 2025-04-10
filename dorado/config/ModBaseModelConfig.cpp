@@ -457,6 +457,25 @@ ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
     }
 }
 
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_sequence_input_TC() const {
+    assert(is_chunked_input_model());
+    const int64_t T = context.chunk_size / general.stride_ratio();
+    const int64_t C = context.kmer_len * 4;
+    return {T, C};
+};
+
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_signal_input_TC() const {
+    assert(is_chunked_input_model());
+    return {context.chunk_size, 1};
+};
+
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_output_TC() const {
+    assert(is_chunked_input_model());
+    const int64_t T = context.chunk_size / general.stride;
+    const int64_t C = general.num_out;
+    return {T, C};
+};
+
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     const auto config_toml = toml::parse(model_path / "config.toml");
 

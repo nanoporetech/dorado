@@ -133,6 +133,13 @@ struct ModBaseModelConfig {
                        ModificationParams mods_,
                        ContextParams context_,
                        RefinementParams refine_);
+
+    // Sequence input tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_sequence_input_TC() const;
+    // Signal input tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_signal_input_TC() const;
+    // Output tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_output_TC() const;
 };
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
