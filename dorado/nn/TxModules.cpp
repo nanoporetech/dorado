@@ -59,6 +59,8 @@ struct KoiTensorExt : public KoiTensor {
             return KOI_F16;
         } else if (t.dtype() == torch::kF32) {
             return KOI_F32;
+        } else if (t.dtype() == torch::kFloat8_e4m3fn) {
+            return KOI_E4M3;
         } else if (t.dtype() == torch::kI8) {
             return KOI_I8;
         }
@@ -460,7 +462,7 @@ void TxEncoderImpl::remove_bits() {
     apply_rounding(wqkv_weights_f16.t, utils::get_dev_opt("remove_bits_qkv", default_remove));
     apply_rounding(proj_weight, utils::get_dev_opt("remove_bits_proj", default_remove));
     apply_rounding(t_res_weights, utils::get_dev_opt("remove_bits_res", default_remove));
-    apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
+    // apply_rounding(t_fc2_wts, utils::get_dev_opt("remove_bits_fc2", default_remove));
     apply_rounding(t_fc1_wts_f16.t, utils::get_dev_opt("remove_bits_fc1", default_remove));
     apply_rounding(t_res2_weights, utils::get_dev_opt("remove_bits_res2", default_remove));
 }
@@ -479,8 +481,8 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     const auto [win_upper, win_lower] = params.attn_window;
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-    // Atomic counter, need 4 buffers of 4B each of working memory
-    auto ctr = torch::zeros({4}, x_f16.options().dtype(torch::kI32));
+    // Atomic counter, need 2 buffers of 4B each of working memory
+    auto ctr = torch::zeros({2}, x_f16.options().dtype(torch::kI32));
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
     const float alpha = params.deepnorm_alpha;
@@ -528,8 +530,17 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         t_res2_weights = norm2->weight.view({C});
 
         // Quantize SwiGLU weights, interleave, and rearrange as tiled
+        const auto fc1_weight_shuffle_index =
+                torch::tensor({0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15},
+                              x_f16.options().dtype(torch::kI32));
+
         auto fc1_weight_interleaved =
                 ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
+
+        fc1_weight_interleaved =
+                torch::index_select(fc1_weight_interleaved, 2, fc1_weight_shuffle_index)
+                        .contiguous();
+
         t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
         t_fc1_wts_i8.scale.reciprocal_();
         t_fc1_wts_i8.t = t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
@@ -537,7 +548,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
 
-        t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
+        t_fc2_wts = ff->fc2->weight.to(torch::kFloat8_e4m3fn)
+                            .view({C / 16, 16, E / 32, 16})
+                            .transpose(1, 2)
+                            .contiguous();
 
         this->remove_bits();
     }
@@ -546,7 +560,8 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, f16_opts);
     auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, f16_opts);
     auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
-    auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, f16_opts);
+    auto t_fc1_out = torch::empty({N * T / 16, E / 32, 16, 16},
+                                  x_f16.options().dtype(torch::kFloat8_e4m3fn));
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
 
     //Define Koi Tensors for the above buffers.
@@ -594,8 +609,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul
         utils::ScopedProfileRange spr("OUTP", 3);
-        res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
-                         ctr[1].data_ptr<int>());
+        res = koi_hopper_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS residual
@@ -607,14 +621,13 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
-        res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
+        res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[1].data_ptr<int>(),
                             use_f32_accum);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Fully connected
         utils::ScopedProfileRange spr("FC2", 3);
-        res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
-                         ctr[3].data_ptr<int>());
+        res = koi_hopper_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS Norm Residual again
@@ -631,6 +644,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
+    /*
 #if DORADO_CUDA_BUILD && !DORADO_TX2 && !DORADO_ORIN
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
@@ -763,6 +777,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
         spdlog::error("Koi Volta tiled path failed {}", calls);
     }
 #endif
+*/
 }
 
 at::Tensor TxEncoderImpl::forward(at::Tensor x) {
@@ -818,17 +833,20 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
-    bool is_sup_model = (params.d_model == 512) && (params.nhead == 8) &&
-                        (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
-                        (params.dim_feedforward == 2048);
-    use_koi_tiled = is_sup_model && options.device().is_cuda() &&
-                    koi_tc_is_available(KOI_F16) == KOI_SUCCESS;
+    const bool is_sup_model =
+            (params.d_model == 512) && (params.nhead == 8) && (params.attn_window.first == 127) &&
+            (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    const bool is_hyp_model =
+            (params.d_model == 1536) && (params.nhead == 24) && (params.attn_window.first == 255) &&
+            (params.attn_window.second == 256) && (params.dim_feedforward == 6144);
+    use_koi_tiled = (is_sup_model || is_hyp_model) && options.device().is_cuda() &&
+                    (koi_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 
 #if !DORADO_ORIN
     // Custom Volta flag
     use_koi_volta_tiled = is_sup_model && options.device().is_cuda() &&
-                          koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS;
+                          false;  // (koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
 #endif
 #endif
