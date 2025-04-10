@@ -45,7 +45,7 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
                                         const int batch_size_)
         : params(config),
           kmer_refinement_levels(load_kmer_refinement_levels(config)),
-          module_holder(load_modbase_model(params, opts)),
+          module_holder(load_modbase_model(params, opts, batch_size_)),
           matcher(params),
           batch_size(batch_size_) {
     if (params.refine.do_rough_rescale) {

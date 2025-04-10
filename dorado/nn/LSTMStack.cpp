@@ -3,6 +3,10 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
+#include <spdlog/spdlog.h>
+
+#include <string>
+
 #if DORADO_CUDA_BUILD
 extern "C" {
 #include "koi.h"
@@ -13,7 +17,8 @@ extern "C" {
 
 namespace dorado::nn {
 
-LSTMStackImpl::LSTMStackImpl(int num_layers, int size) : layer_size(size) {
+LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
+        : layer_size(size), reverse_first(reverse_first_) {
     // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
     const auto lstm_opts = torch::nn::LSTMOptions(size, size).batch_first(true);
     for (int i = 0; i < num_layers; ++i) {
@@ -23,13 +28,13 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size) : layer_size(size) {
 };
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
+    // FIXME: Test on HAC models that the reverse_first logic hasn't broken anything
     // Input is [N, T, C], contiguity optional
-    for (auto &rnn : rnns) {
-        x = std::get<0>(rnn(x.flip(1)));
+    for (size_t i = 0; i < rnns.size(); ++i) {
+        x = std::get<0>(rnns[i]((i == 0 && !reverse_first) ? x : x.flip(1)));
     }
-
     // Output is [N, T, C], contiguous
-    return (rnns.size() & 1) ? x.flip(1) : x;
+    return ((rnns.size() & 1) != reverse_first) ? x.flip(1) : x;
 }
 
 #if DORADO_CUDA_BUILD
@@ -80,7 +85,7 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
     auto gate_buf = wm.temp({wm.N, layer_size * 4}, torch::kF16);
 
     for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
-        bool reverse = !(layer_idx & 1);
+        bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
         utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
         auto state_buf = torch::zeros({wm.N, layer_size}, in.options());
         {
@@ -127,7 +132,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
 
     for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
         utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
-        bool reverse = !(layer_idx & 1);
+        bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
         auto in = wm.current;
         auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_F16) ? KOI_F16 : KOI_I8;
         auto state_buf = torch::zeros({wm.N, layer_size}, opts_f16);
@@ -165,21 +170,33 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
             device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
         }
 
+        spdlog::info("{} {}", utils::print_size(wm.current, "lstm_in_" + std::to_string(layer_idx)),
+                     to_string(wm.layout));
+        utils::dump_tensor(wm.get_current_NTC_view(), "lstm_in_NTC", layer_idx);
+        utils::dump_tensor(in, "lstm_in_raw", layer_idx);
+
         host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T, reverse ? -1 : 1,
                           int(in.stride(1)), in.data_ptr(), device_weights[layer_idx].data_ptr(),
                           device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
                           state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
 
-        if (type_id == KOI_F16) {
-            utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
-            auto out = wm.next_TC(wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
-            host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
-                         int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
-                         int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
-                         int(in.size(1)), int(in.size(2)));
-        }
+        // FIXME: Disabled dtype cast conversion while developing CUDA modbases
+        // if (type_id == KOI_F16) {
+        //     utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
+        //     auto out = wm.next_TC(wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
+        //     host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
+        //                  int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
+        //                  int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
+        //                  int(in.size(1)), int(in.size(2)));
+        // }
 
         wm.is_input_to_rev_lstm = !reverse;
+
+        spdlog::info("{} {}",
+                     utils::print_size(wm.current, "lstm_out_" + std::to_string(layer_idx)),
+                     to_string(wm.layout));
+        utils::dump_tensor(wm.get_current_NTC_view(), "lstm_out_NTC", layer_idx);
+        utils::dump_tensor(in, "lstm_out_raw", layer_idx);
     }
 #endif  // DORADO_TX2
 }

@@ -10,7 +10,7 @@ namespace dorado::nn {
 struct ConvStackImpl : torch::nn::Module {
     explicit ConvStackImpl(const std::vector<config::ConvParams> &layer_params);
 #if DORADO_CUDA_BUILD
-    void reserve_working_memory(WorkingMemory &wm);
+    void reserve_working_memory(WorkingMemory &wm, std::optional<TensorLayout> output_layout);
     void run_koi(WorkingMemory &wm);
 #endif  // if DORADO_CUDA_BUILD
 

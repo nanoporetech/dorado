@@ -3,18 +3,14 @@
 #include "config/BasecallModelConfig.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
-#include "torch_utils/tensor_utils.h"
-#include "utils/math_utils.h"
+
+#include <optional>
 
 #if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 
-extern "C" {
-#include "koi.h"
-}
 #endif
 
 #include <torch/nn.h>
@@ -66,7 +62,7 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
     // Determine working memory size
     WorkingMemory wm(int(in.size(0)));
     wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
-    convs->reserve_working_memory(wm);
+    convs->reserve_working_memory(wm, std::nullopt);
     rnns->reserve_working_memory(wm);
     linear1->reserve_working_memory(wm);
     if (linear2) {

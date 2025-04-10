@@ -11,6 +11,23 @@ namespace dorado::nn {
 
 #if DORADO_CUDA_BUILD
 
+std::string to_string(const TensorLayout &layout) {
+    switch (layout) {
+    case TensorLayout::NTC:
+        return std::string("NTC");
+    case TensorLayout::TNC:
+        return std::string("TNC");
+    case TensorLayout::CUTLASS_TNC_F16:
+        return std::string("CUTLASS_TNC_F16");
+    case TensorLayout::CUTLASS_TNC_I8:
+        return std::string("CUTLASS_TNC_I8");
+    case TensorLayout::CUBLAS_TN2C:
+        return std::string("CUBLAS_TN2C");
+    default:
+        return std::string("TensorLayout::UNKNOWN");
+    }
+}
+
 int64_t WorkingMemory::tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype) {
     auto elems = c10::multiply_integers(sizes);
     return utils::pad_to<int64_t>(elems * torch::elementSize(dtype), ALIGNMENT);

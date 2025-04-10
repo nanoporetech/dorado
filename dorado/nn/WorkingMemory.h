@@ -7,6 +7,7 @@ namespace dorado::nn {
 #if DORADO_CUDA_BUILD
 
 enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C };
+std::string to_string(const TensorLayout & layout);
 
 // `WorkingMemory` encapsulates a backing tensor from which we create tensor views which map to
 // either the front or the back of the backing tensor. The idea here is that we usually have one

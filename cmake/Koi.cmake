@@ -1,4 +1,4 @@
-OPTION(BUILD_KOI_FROM_SOURCE OFF)
+OPTION(BUILD_KOI_FROM_SOURCE ON)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
@@ -61,7 +61,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
             execute_process(
                 COMMAND
                     git clone
-                        -b v${KOI_VERSION}
+                        -b ${KOI_VERSION}
                         # TODO: once we drop centos support we can use these instead of a separate submodule update
                         #--depth 1
                         #--recurse-submodules
