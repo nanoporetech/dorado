@@ -647,7 +647,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     bool useBiasProj = true;
     bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", false);
     bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", false);
-    bool useBiasfc2 = false; // No bias for fc2
+    bool useBiasfc2 = false;  // No bias for fc2
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
     const float alpha = params.deepnorm_alpha;
