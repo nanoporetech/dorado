@@ -362,15 +362,17 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     result[0].start = 0;
     result[0].end = dorado::ssize(samples.front()->positions_major);
 
-    for (int64_t i = 1; i < dorado::ssize(samples); ++i) {
+    std::vector<bool> filtered(std::size(samples), false);
+
+    for (int64_t idx_s2 = 1; idx_s2 < dorado::ssize(samples); ++idx_s2) {
         const secondary::Sample& s1 = *samples[idx_s1];
-        const secondary::Sample& s2 = *samples[i];
+        const secondary::Sample& s2 = *samples[idx_s2];
         bool heuristic = false;
 
         const Relationship rel = relative_position(s1, s2);
 
         TrimInfo& trim1 = result[idx_s1];
-        TrimInfo& trim2 = result[i];
+        TrimInfo& trim2 = result[idx_s2];
 
         // Initialize with no trimming (full sample is used).
         trim2.start = 0;
@@ -378,7 +380,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
 
         const auto make_unhandled_warning = [&]() {
             std::ostringstream oss;
-            oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << i
+            oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << idx_s2
                 << "): " << s2 << ", trim 1 = " << trim1 << ", trim 2 = " << trim2;
             spdlog::warn(
                     "Unhandled overlap type in trim_samples. Relationship: {}. Marking the second "
@@ -390,12 +392,14 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         // Contained, mark as filtered.
         case Relationship::S2_WITHIN_S1: {
             trim2 = {};
+            filtered[idx_s2] = true;
             continue;
         }
         case Relationship::S1_WITHIN_S2: {
             // The new sample completely overlaps the previous one.
             // Mark the previous one as filtered and find the predecessor.
             trim1 = {};
+            filtered[idx_s1] = true;
             const int64_t prev_idx = idx_s1;
             while ((idx_s1 > 0) && !is_trim_info_valid(result[idx_s1])) {
                 --idx_s1;
@@ -405,10 +409,11 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
             // Avoid infinite loops.
             if (idx_s1 == prev_idx) {
                 trim2 = {};
+                filtered[idx_s2] = true;
                 continue;
             }
             // Reprocess the current sample with a new predecessor.
-            --i;
+            --idx_s2;
             continue;
         }
 
@@ -424,6 +429,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         case Relationship::REVERSE_GAPPED:
         case Relationship::UNKNOWN: {
             trim2 = {};
+            filtered[idx_s2] = true;
             make_unhandled_warning();
             break;
         }
@@ -438,17 +444,18 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         // Catch all, though all current cases are handled above.
         default: {
             trim2 = {};
+            filtered[idx_s2] = true;
             make_unhandled_warning();
             break;
         }
         }
 
-        idx_s1 = i;
+        idx_s1 = idx_s2;
 
         num_heuristic += heuristic;
     }
 
-    {
+    if (!filtered.back()) {
         result.back().end = dorado::ssize(samples.back()->positions_major);
         // Deprecated: result.back().is_last_in_contig = true;
     }
