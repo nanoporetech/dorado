@@ -378,7 +378,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         trim2.start = 0;
         trim2.end = dorado::ssize(s2.positions_major);
 
-        const auto make_unhandled_warning = [&]() {
+        const auto print_unhandled_warning = [&]() {
             std::ostringstream oss;
             oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << idx_s2
                 << "): " << s2 << ", trim 1 = " << trim1 << ", trim 2 = " << trim2;
@@ -430,7 +430,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         case Relationship::UNKNOWN: {
             trim2 = {};
             filtered[idx_s2] = true;
-            make_unhandled_warning();
+            print_unhandled_warning();
             break;
         }
 
@@ -445,7 +445,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         default: {
             trim2 = {};
             filtered[idx_s2] = true;
-            make_unhandled_warning();
+            print_unhandled_warning();
             break;
         }
         }
@@ -457,7 +457,6 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
 
     if (!filtered.back()) {
         result.back().end = dorado::ssize(samples.back()->positions_major);
-        // Deprecated: result.back().is_last_in_contig = true;
     }
 
     assert(std::size(result) == std::size(samples));
