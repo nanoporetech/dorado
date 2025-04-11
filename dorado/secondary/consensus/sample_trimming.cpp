@@ -362,7 +362,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     result[0].start = 0;
     result[0].end = dorado::ssize(samples.front()->positions_major);
 
-    std::vector<bool> filtered(std::size(samples), false);
+    int64_t max_filtered_idx = -1;
 
     for (int64_t idx_s2 = 1; idx_s2 < dorado::ssize(samples); ++idx_s2) {
         const secondary::Sample& s1 = *samples[idx_s1];
@@ -392,14 +392,14 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         // Contained, mark as filtered.
         case Relationship::S2_WITHIN_S1: {
             trim2 = {};
-            filtered[idx_s2] = true;
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
             continue;
         }
         case Relationship::S1_WITHIN_S2: {
             // The new sample completely overlaps the previous one.
             // Mark the previous one as filtered and find the predecessor.
             trim1 = {};
-            filtered[idx_s1] = true;
+            max_filtered_idx = std::max(max_filtered_idx, idx_s1);
             const int64_t prev_idx = idx_s1;
             while ((idx_s1 > 0) && !is_trim_info_valid(result[idx_s1])) {
                 --idx_s1;
@@ -409,7 +409,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
             // Avoid infinite loops.
             if (idx_s1 == prev_idx) {
                 trim2 = {};
-                filtered[idx_s2] = true;
+                max_filtered_idx = std::max(max_filtered_idx, idx_s2);
                 continue;
             }
             // Reprocess the current sample with a new predecessor.
@@ -429,7 +429,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         case Relationship::REVERSE_GAPPED:
         case Relationship::UNKNOWN: {
             trim2 = {};
-            filtered[idx_s2] = true;
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
             print_unhandled_warning();
             break;
         }
@@ -444,7 +444,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         // Catch all, though all current cases are handled above.
         default: {
             trim2 = {};
-            filtered[idx_s2] = true;
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
             print_unhandled_warning();
             break;
         }
@@ -455,7 +455,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         num_heuristic += heuristic;
     }
 
-    if (!filtered.back()) {
+    if (!std::empty(samples) && (max_filtered_idx != (dorado::ssize(samples) - 1))) {
         result.back().end = dorado::ssize(samples.back()->positions_major);
     }
 
