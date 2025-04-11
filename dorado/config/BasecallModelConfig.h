@@ -109,6 +109,7 @@ struct BasecallModelConfig {
     float qscale = 1.0f;
     float qbias = 0.0f;
     int lstm_size = 0;
+    int lstm_layers = 5;
     int stride = 1;
     bool bias = true;
     bool clamp = false;

@@ -227,7 +227,7 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
             config.stride *= cv.stride;
         }
         config.lstm_size = config.convs.back().size;
-
+        config.lstm_layers = 0;  // Count the number of lstm sublayers
         for (const auto &segment : sublayers) {
             const auto type = sublayer_type(segment);
             if (type == SublayerType::LINEAR) {
@@ -237,6 +237,8 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
                 config.bias = config.lstm_size > 128;
             } else if (type == SublayerType::LINEAR_CRF_ENCODER) {
                 config.blank_score = toml::find<float>(segment, "blank_score");
+            } else if (type == SublayerType::LSTM) {
+                config.lstm_layers++;
             }
         }
     } else {
