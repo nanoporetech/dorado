@@ -303,17 +303,23 @@ std::vector<VariantCallingSample> trim_vc_samples(
         const TrimInfo& t = trims[i];
 
         // Make sure that all vectors and tensors are of the same length.
-        s.validate();
-
-        const int64_t num_columns = dorado::ssize(s.positions_major);
-        if ((t.start < 0) || (t.start >= num_columns) || (t.start >= t.end) ||
-            (t.end > num_columns)) {
-            throw std::out_of_range("Index is out of range in trim_vc_samples. idx_start = " +
-                                    std::to_string(t.start) +
-                                    ", idx_end = " + std::to_string(t.end) +
-                                    ", num_columns = " + std::to_string(num_columns));
+        try {
+            s.validate();
+        } catch (const std::exception& e) {
+            std::ostringstream oss;
+            oss << "Sample not valid in trim_vc_samples! Skipping the sample. Sample: " << s
+                << ", trim: " << t << ", exception: '" << e.what();
+            spdlog::warn(oss.str());
+            continue;
         }
 
+        // Skip samples which were filtered during by trimming (coords are
+        // out of bounds or not valid).
+        if (!is_trim_info_valid(t, dorado::ssize(s.positions_major))) {
+            continue;
+        }
+
+        // Add a new trimmed sample.
         trimmed_samples.emplace_back(VariantCallingSample{
                 s.seq_id,
                 std::vector<int64_t>(std::begin(s.positions_major) + t.start,
