@@ -383,7 +383,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
             oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << idx_s2
                 << "): " << s2 << ", trim 1 = " << trim1 << ", trim 2 = " << trim2;
             spdlog::warn(
-                    "Unhandled overlap type in trim_samples. Relationship: {}. Marking the second "
+                    "Cannot trim samples with relationship: {}. Marking the second "
                     "sample as filtered. {}",
                     relationship_to_string(rel), oss.str());
         };
