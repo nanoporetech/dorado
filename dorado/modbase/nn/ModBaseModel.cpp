@@ -16,6 +16,8 @@
 #include <optional>
 
 #if DORADO_CUDA_BUILD
+#include "nn/KoiUtils.h"
+
 #include <c10/cuda/CUDAGuard.h>
 #endif
 
@@ -330,17 +332,12 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
 
     at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
         // INPUT sigs: NCT & seqs: NTC
-        utils::dump_tensor(sigs.transpose(1, 2), "sig_in", 0);
-        utils::dump_tensor(seqs, "seq_in", 0);
         {
             utils::ScopedProfileRange spr("sig convs", 2);
             sigs = sig_conv1(sigs);
             sigs = sig_conv2(sigs);
             sigs = sig_conv3(sigs);
         }
-
-        spdlog::info("{}", utils::print_size(sigs, "sig_convs_out"));
-        utils::dump_tensor(sigs, "sig_convs_out", 0);
 
         // We are supplied one hot encoded sequences as (batch, signal/stride, kmer_len * base_count) int8.
         // We need (batch, kmer_len * base_count, signal/stride) and a dtype compatible with the float16
@@ -355,52 +352,23 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
             seqs = seq_conv2(seqs);
         }
 
-        spdlog::info("{}", utils::print_size(sigs, "seq_convs_out"));
-        utils::dump_tensor(seqs, "seq_convs_out", 0);  // NCT
         // z: NCT -> N(2C)T
         auto z = torch::cat({sigs, seqs}, 1);
         {
             utils::ScopedProfileRange spr("merge convs", 2);
-            // NCT
-            utils::dump_tensor(z, "merge_conv_in", 0);
-            // z: NCT -> TNC
-            z = merge_conv1(z).permute({2, 0, 1});
-            utils::dump_tensor(z, "merge_conv_out", 0);
+            z = merge_conv1(z).permute({2, 0, 1});  // NCT -> TNC
         }
         {
             utils::ScopedProfileRange spr("lstm1", 2);
-            utils::dump_tensor(z.permute({1, 0, 2}), "lstm_in_NTC", 0);
-            utils::dump_tensor(z, "lstm_in_raw", 0);
-
-            auto [z1, h1] = lstm1(z);
-
-            utils::dump_tensor(z1.permute({1, 0, 2}), "lstm_out_NTC", 0);
-            utils::dump_tensor(z1, "lstm_out_raw", 0);
-            z = z1.flip(0);  // TNC -> T'NC
+            z = std::get<0>(lstm1(z)).flip(0);  // TNC -> T'NC
         }
         {
             utils::ScopedProfileRange spr("lstm2", 2);
-            utils::dump_tensor(z.permute({1, 0, 2}), "lstm_in_NTC", 1);
-            utils::dump_tensor(z, "lstm_in_raw", 1);
-
-            auto [z2, h2] = lstm2(z);
-
-            utils::dump_tensor(z2.permute({1, 0, 2}), "lstm_out_NTC", 1);
-            utils::dump_tensor(z2, "lstm_out_raw", 1);
-
-            z = z2;  // T'NC
+            z = std::get<0>(lstm2(z));  // T'NC
         }
 
-        utils::dump_tensor(z, "lstm_out", 0);
-
         utils::ScopedProfileRange spr("linear", 2);
-        // T'NC -> NTC
-        z = linear(z);
-        utils::dump_tensor(z, "linear_out", 0);
-
-        z = z.flip(0).permute({1, 0, 2}).softmax(2).flatten(1);
-
-        utils::dump_tensor(z, "out", 0);
+        z = linear(z).flip(0).permute({1, 0, 2}).softmax(2).flatten(1);  // T'NC -> N(TC)
         return z;
     }
 
@@ -452,6 +420,8 @@ TORCH_MODULE(ModBaseConvModel);
 TORCH_MODULE(ModBaseConvLSTMModel);
 TORCH_MODULE(ModBaseConvLSTMV3Model);
 
+#if DORADO_CUDA_BUILD
+
 struct ModBaseConvLSTMV3CUDAModelImpl : Module {
     ModBaseConvLSTMV3CUDAModelImpl(const config::ModBaseModelConfig& config,
                                    const at::TensorOptions& options,
@@ -477,7 +447,6 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         seq_convs = register_module("seq", nn::ConvStack(seq_cvs));
         merge_conv = register_module("merge", nn::ConvStack(std::vector{merge_cv}));
         lstm = register_module("lstm", nn::LSTMStack(lstms.size(), lstms.at(0).size, false));
-        // linear = register_module("linear", nn::LinearCRF(ll.in_size, ll.out_size, true, false));
         linear = register_module("linear", Linear(ll.in_size, ll.out_size));
 
         {
@@ -488,38 +457,34 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             wm_seq.allocate_backing_tensor(options.device());
         }
         {
-            const auto& params = config.general;
             // Reserve and allocate working memory for everything else
+            const auto& params = config.general;
             auto [T, C] = config.chunked_signal_input_TC();
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nn::TensorLayout::NTC);
 
-            // TODO: Do we need the padding?
             // Buffer for concatenating conv outputs before merge_conv
             const int padding = merge_cv.winlen / 2;
             const int64_t T_merge_conv = (T / params.modules->signal_stride()) + (2 * padding);
             wm.next_TC(T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
 
-            // FIXME: Forcing output size here is not going to for all platforms - testing f16
-            // auto force_dtype = utils::get_dev_opt("modbase_i8", false)
-            //                            ? nn::TensorLayout::CUTLASS_TNC_I8
-            //                            : nn::TensorLayout::CUTLASS_TNC_F16;
-            // auto force_dtype = std::nullopt;
-            auto force_dtype = nn::TensorLayout::CUTLASS_TNC_F16;
+            std::optional<nn::TensorLayout> force_dtype = std::nullopt;
+            if (nn::koi_can_use_cutlass()) {
+                force_dtype = utils::get_dev_opt("modbase_i8", true)
+                                      ? nn::TensorLayout::CUTLASS_TNC_I8
+                                      : nn::TensorLayout::CUTLASS_TNC_F16;
+                spdlog::debug("Set modbase merge_conv CUTLASS dtype: {}",
+                              to_string(force_dtype.value()));
+            }
+
             merge_conv->reserve_working_memory(wm, force_dtype);
             lstm->reserve_working_memory(wm);
-
-            wm.next_TC(wm.T, wm.C, nn::TensorLayout::NTC);
-            // TODO: Determine if allocating at runtime is a performance impact or not
             wm.allocate_backing_tensor(options.device());
         }
     }
 
     at::Tensor forward(const at::Tensor& sigs_N1T, const at::Tensor& seqs_NTC) {
         utils::ScopedProfileRange spr("mbv3 koi", 1);
-
-        utils::dump_tensor(sigs_N1T.transpose(1, 2), "sig_in", 0);
-        utils::dump_tensor(seqs_NTC, "seq_in", 0);
 
         c10::cuda::CUDAGuard device_guard(sigs_N1T.device());
 
@@ -538,107 +503,63 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             // This transpose is free because C is 1
             wm_in.index({Slice()}) = sigs_N1T.transpose(1, 2);
         }
-
-        spdlog::info("{}", utils::print_size(wm_seq.current, "seq_convs_in"));
-
-        // Run the signal and sequence convs
-        seq_convs->run_koi(wm_seq);
-        spdlog::info("{} {}", utils::print_size(wm_seq.current, "seq_convs_out"),
-                     to_string(wm_seq.layout));
-        utils::dump_tensor(wm_seq.get_current_NTC_view(), "seq_convs_out", 0);
-
-        sig_convs->run_koi(wm);
-        spdlog::info("{} {}", utils::print_size(wm.current, "sig_convs_out"), to_string(wm.layout));
-        utils::dump_tensor(wm.get_current_NTC_view(), "sig_convs_out", 0);
+        {
+            utils::ScopedProfileRange spr2("seq_convs", 2);
+            // Run the signal and sequence convs
+            seq_convs->run_koi(wm_seq);
+        }
+        {
+            utils::ScopedProfileRange spr2("sig_convs", 2);
+            sig_convs->run_koi(wm);
+        }
 
         if (wm.layout != wm_seq.layout) {
             throw std::runtime_error(
-                    "Signal and sequence convolution stacks must have the same output layout");
+                    "Signal and sequence convolution stacks must have the same output "
+                    "layout");
         }
-
-        // TODO: This can be removed with changes to the sequence and signal convolutions
         {
+            // TODO: This can be removed with changes to the sequence and signal convolutions
             // Copy the output of seq_convs stored in wm_seq into wm for the merge_conv input buffer.
-            utils::ScopedProfileRange spr2("merge prep", 2);
+            utils::ScopedProfileRange spr2("merge_prep", 2);
 
             const auto& merge_cv = m_config.general.modules->merge_conv;
             auto seq_out = wm_seq.current;
             auto sig_out = wm.current;
 
-            // utils::dump_tensor(seq_out, "seq_out", 0);
-            // utils::dump_tensor(sig_out, "sig_out", 0);
+            // If the merge conv is using CUTLASS - need to add padding
+            const auto mcv_layout = merge_conv->layers.back().output_layout;
+            const bool using_cutlass = mcv_layout == nn::TensorLayout::CUTLASS_TNC_F16 ||
+                                       mcv_layout == nn::TensorLayout::CUTLASS_TNC_I8;
 
-            const size_t merge_insize = size_t(merge_cv.insize);
+            const int padding = using_cutlass ? merge_cv.winlen / 2 : 0;
+            const int T = seq_out.size(1);
+            const int Tp = T + (2 * padding);
             const size_t C_sum = seq_out.size(2) + sig_out.size(2);
 
-            // TODO: Remove when working
-            bool has_error = false;
-            if (seq_out.size(0) != batch_size || seq_out.size(0) != sig_out.size(0)) {
-                has_error = true;
-                spdlog::error("Modbase batchsize mismatch: {} {} {}", seq_out.size(0),
-                              sig_out.size(0), batch_size);
-            }
-            if (seq_out.size(1) != sig_out.size(1)) {
-                has_error = true;
-                spdlog::error("Modbase convs T dim mismatch {} != {}", seq_out.size(1),
-                              sig_out.size(1));
-            }
-
-            if (C_sum != merge_insize) {
-                has_error = true;
-                spdlog::error("Modbase convs C dim size mismatch {}+{} != {} ", seq_out.size(2),
-                              sig_out.size(2), merge_insize);
-            }
-            if (has_error) {
-                spdlog::error("{}", utils::print_size(sig_out, "sig_conv_out"));
-                spdlog::error("{}", utils::print_size(seq_out, "seq_conv_out"));
-                throw std::runtime_error("Modbase model size mismatch");
-            }
-
-            // If the merge conv is using CUTLASS - need to explicitly add padding into
-            // the input buffer
-            const auto mcv_layout = merge_conv->layers.back().output_layout;
-            const bool using_cutlass_merge = mcv_layout == nn::TensorLayout::CUTLASS_TNC_F16 ||
-                                             mcv_layout == nn::TensorLayout::CUTLASS_TNC_I8;
-
-            const int T = seq_out.size(1);
-            const int padding = using_cutlass_merge ? merge_cv.winlen / 2 : 0;
-            const int Tp = T + (2 * padding);
-
-            // Interleave the outputs of the split convolutions which results in the same layout
-            // as torch::cat({sig, seq}, 1);
+            // Performing torch::cat({sig, seq}, 1) but with optional padding
             auto merge_conv_in =
                     wm.next_TC(Tp, C_sum, nn::TensorLayout::NTC).view({batch_size, Tp, 2, -1});
             merge_conv_in.index({Slice(), Slice(padding, T + padding), 0}) = sig_out;
             merge_conv_in.index({Slice(), Slice(padding, T + padding), 1}) = seq_out;
-
-            spdlog::info("{}", utils::print_size(merge_conv_in, "merge_conv_in"));
-            utils::dump_tensor(merge_conv_in, "merge_conv_in", 0);
+        }
+        {
+            utils::ScopedProfileRange spr2("merge_conv", 2);
+            wm.is_input_to_rev_lstm = false;
+            merge_conv->run_koi(wm);
+        }
+        {
+            utils::ScopedProfileRange spr2("lstms", 2);
+            lstm->run_koi(wm);
         }
 
-        wm.is_input_to_rev_lstm = false;  // First LSTM in modbase is forward
-        merge_conv->run_koi(wm);
-        spdlog::info("{} {}", utils::print_size(wm.current, "merge_conv_out_current"),
-                     to_string(wm.layout));
-        spdlog::info("{} {}", utils::print_size(wm.get_current_NTC_view(), "merge_conv_out_NTC"),
-                     to_string(wm.layout));
-        utils::dump_tensor(wm.get_current_NTC_view(), "merge_conv_out", 0);
-
-        lstm->run_koi(wm);
-        spdlog::info("{} {}", utils::print_size(wm.current, "lstm_out"), to_string(wm.layout));
-        utils::dump_tensor(wm.get_current_NTC_view(), "lstm_out", 0);
-
-        // linear->run_koi(wm);
-        // spdlog::info("{} {}", utils::print_size(wm.current, "linear_out"), to_string(wm.layout));
-        // TODO: Can run the linear in TNC and do transpose after the linear
-        at::Tensor out = linear->forward(wm.get_current_NTC_view());
-
-        // at::Tensor out = wm.get_current_NTC_view();
-        utils::dump_tensor(out, "linear_out", 0);
-        out = out.softmax(2).flatten(1);
-
-        spdlog::info("{}", utils::print_size(out, "out"));
-        utils::dump_tensor(out, "out", 0);
+        utils::ScopedProfileRange spr2("linear", 2);
+        at::Tensor out =
+                linear->forward(wm.layout == nn::TensorLayout::CUTLASS_TNC_I8
+                                        ? wm.get_current_NTC_view().to(torch::kF16) / 127.0f
+                                        : wm.get_current_NTC_view())
+                        .softmax(2)
+                        .flatten(1);
 
         return out;
     }
@@ -659,7 +580,6 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
     nn::ConvStack seq_convs{nullptr};
     nn::ConvStack merge_conv{nullptr};
     nn::LSTMStack lstm{nullptr};
-    // nn::LinearCRF linear{nullptr};
     torch::nn::Linear linear{nullptr};
 
     const int batch_size;
@@ -686,6 +606,8 @@ const std::vector<std::string> ModBaseConvLSTMV3CUDAModelImpl::weight_tensors{
 };
 
 TORCH_MODULE(ModBaseConvLSTMV3CUDAModel);
+
+#endif
 
 }  // namespace model
 
