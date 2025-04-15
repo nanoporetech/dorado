@@ -17,6 +17,23 @@ struct TrimInfo {
 };
 
 /**
+ * \brief Checks the start/end coordinates of the provided TrimInfo object.
+ *          If they are not valid (i.e. start < 0, end <= 0 or start >= end), then
+ *          this function returns false.
+ */
+bool is_trim_info_valid(const TrimInfo& t);
+
+/**
+ * \brief Checks the start/end coordinates of the provided TrimInfo object.
+ *          If they are not valid (i.e. start < 0, end <= 0 or start >= end), then
+ *          this function returns false.
+ *
+ *          Additionally, checks if the coordinates are smaller than `len`
+ *          (i.e. start < len, end <= len).
+ */
+bool is_trim_info_valid(const TrimInfo& t, int64_t len);
+
+/**
  * \brief Finds the trimming coordinates for each sample, so that they can be spliced directly.
  *          If a `region` is provided, then the samples will also be trimmed to fit into that region.
  *          Samples completely filtered by the `region` will have TrimInfo{-1, -1, false}.

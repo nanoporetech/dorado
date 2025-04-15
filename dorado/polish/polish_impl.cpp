@@ -16,7 +16,9 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <memory>
+#include <stdexcept>
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
@@ -499,7 +501,23 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
             results_trims[bam_region_id] = trim_samples(
                     local_samples, std::optional<secondary::RegionInt>(
                                            {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
-            results_samples[bam_region_id] = std::move(local_samples);
+
+            // Filter local_samples on non-valid trims before returning.
+            std::vector<secondary::Sample> filt_local_samples;
+            std::vector<secondary::TrimInfo> filt_trims;
+            filt_local_samples.reserve(std::size(local_samples));
+            filt_trims.reserve(std::size(local_samples));
+            assert(std::size(local_samples) == std::size(results_trims[bam_region_id]));
+            for (size_t sample_id = 0; sample_id < std::size(local_samples); ++sample_id) {
+                auto& trim = results_trims[bam_region_id][sample_id];
+                if (!secondary::is_trim_info_valid(trim)) {
+                    continue;
+                }
+                filt_local_samples.emplace_back(std::move(local_samples[sample_id]));
+                filt_trims.emplace_back(std::move(trim));
+            }
+            results_samples[bam_region_id] = std::move(filt_local_samples);
+            results_trims[bam_region_id] = std::move(filt_trims);
         }
     };
 
