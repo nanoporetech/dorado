@@ -143,7 +143,7 @@ const BarcodeKitScoringParams MAB114_PARAMS{
         /*front_barcode_window*/ 175,
         /*rear_barcode_window*/ 175,
         /*min_flank_score*/ 0.0f,
-        /*midstrand_flank_score*/ 0.95f,
+        /*midstrand_flank_score*/ 0.7f,  // Note: see wiki writeup attached to INSTX-9193.
 };
 
 const BarcodeKitScoringParams TWIST_PARAMS{
