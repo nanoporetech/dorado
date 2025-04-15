@@ -1,8 +1,9 @@
 #include "polish_impl.h"
 
 #include "hts_io/FastxRandomReader.h"
+#include "secondary/architectures/model_factory.h"
 #include "secondary/batching.h"
-#include "secondary/interval.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -60,7 +61,7 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 
 }  // namespace
 
-PolisherResources create_resources(const ModelConfig& model_config,
+PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
@@ -82,7 +83,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     // Construct the model.
     spdlog::debug("[create_resources] Loading the model.");
     const auto create_models = [&]() {
-        std::vector<std::shared_ptr<ModelTorchBase>> ret;
+        std::vector<std::shared_ptr<secondary::ModelTorchBase>> ret;
         std::vector<c10::optional<c10::Stream>> ret_streams;
 
         for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
@@ -98,7 +99,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
 #endif
 
                 spdlog::debug("[create_resources] Creating a model from the config.");
-                auto model = model_factory(model_config);
+                auto model = secondary::model_factory(model_config);
 
                 spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
                               device_info.name);
@@ -156,7 +157,7 @@ PolisherResources create_resources(const ModelConfig& model_config,
     return resources;
 }
 
-void remove_deletions(ConsensusResult& cons) {
+void remove_deletions(secondary::ConsensusResult& cons) {
     if (std::size(cons.seq) != std::size(cons.quals)) {
         spdlog::error(
                 "[remove_deletions] Sequence and quality string length mismatch! Not removing "
@@ -177,10 +178,10 @@ void remove_deletions(ConsensusResult& cons) {
     cons.quals.resize(n);
 }
 
-std::vector<ConsensusResult> stitch_sequence(
+std::vector<secondary::ConsensusResult> stitch_sequence(
         const hts_io::FastxRandomReader& fastx_reader,
         const std::string& header,
-        const std::vector<ConsensusResult>& sample_results,
+        const std::vector<secondary::ConsensusResult>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
         const std::optional<char>& fill_char) {
@@ -193,7 +194,7 @@ std::vector<ConsensusResult> stitch_sequence(
                 "from input.",
                 header, std::size(draft));
         std::string dummy_quals(std::size(draft), '!');
-        return {ConsensusResult{header, draft, std::move(dummy_quals)}};
+        return {secondary::ConsensusResult{header, draft, std::move(dummy_quals)}};
     } else if (!fill_gaps && std::empty(samples_for_seq)) {
         spdlog::debug(
                 "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
@@ -202,9 +203,9 @@ std::vector<ConsensusResult> stitch_sequence(
         return {};
     }
 
-    std::vector<ConsensusResult> ret;
+    std::vector<secondary::ConsensusResult> ret;
 
-    ConsensusResult result;
+    secondary::ConsensusResult result;
     result.name = header;
     result.draft_start = draft_len;
     result.draft_end = 0;
@@ -213,7 +214,7 @@ std::vector<ConsensusResult> stitch_sequence(
     int64_t last_end = 0;
     for (size_t i = 0; i < std::size(samples_for_seq); ++i) {
         const int32_t sample_index = samples_for_seq[i].second;
-        const ConsensusResult& sample_result = sample_results[sample_index];
+        const secondary::ConsensusResult& sample_result = sample_results[sample_index];
 
         // Fill the gap with either the draft or a fill char.
         if (sample_result.draft_start > last_end) {
@@ -275,8 +276,8 @@ namespace {
  *          When possible, input data is moved to the output, and that is
  *          why the inpunt is not const.
  */
-std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
-    std::vector<Sample> results;
+std::vector<secondary::Sample> split_sample_on_discontinuities(secondary::Sample& sample) {
+    std::vector<secondary::Sample> results;
 
     const auto find_gaps = [](const std::vector<int64_t>& positions,
                               int64_t threshold) -> std::vector<int64_t> {
@@ -322,10 +323,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
             std::vector<std::string> read_ids_left =
                     (n == 0) ? sample.read_ids_left : placeholder_ids;
 
-            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start, end),
-                                        std::move(new_major_pos), std::move(new_minor_pos),
-                                        sample.depth.slice(0, start, end), std::move(read_ids_left),
-                                        placeholder_ids});
+            results.emplace_back(secondary::Sample{
+                    sample.seq_id, sample.features.slice(0, start, end), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start, end),
+                    std::move(read_ids_left), placeholder_ids});
             start = end;
         }
 
@@ -334,10 +335,10 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
                                                std::end(sample.positions_major));
             std::vector<int64_t> new_minor_pos(std::begin(sample.positions_minor) + start,
                                                std::end(sample.positions_minor));
-            results.emplace_back(Sample{sample.seq_id, sample.features.slice(0, start),
-                                        std::move(new_major_pos), std::move(new_minor_pos),
-                                        sample.depth.slice(0, start), placeholder_ids,
-                                        sample.read_ids_right});
+            results.emplace_back(secondary::Sample{
+                    sample.seq_id, sample.features.slice(0, start), std::move(new_major_pos),
+                    std::move(new_minor_pos), sample.depth.slice(0, start), placeholder_ids,
+                    sample.read_ids_right});
         }
     }
 
@@ -350,23 +351,24 @@ std::vector<Sample> split_sample_on_discontinuities(Sample& sample) {
  *          In case of a short trailing portion (shorter than chunk_len), a potentially large overlap is produced to
  *          cover this region instead of just outputing the small chunk.
  */
-std::vector<Sample> split_samples(std::vector<Sample> samples,
-                                  const int64_t chunk_len,
-                                  const int64_t chunk_overlap) {
+std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samples,
+                                             const int64_t chunk_len,
+                                             const int64_t chunk_overlap) {
     if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
         throw std::runtime_error(
                 "Wrong chunk_overlap length. chunk_len = " + std::to_string(chunk_len) +
                 ", chunk_overlap = " + std::to_string(chunk_overlap));
     }
 
-    const auto create_chunk = [](const Sample& sample, const int64_t start, const int64_t end) {
+    const auto create_chunk = [](const secondary::Sample& sample, const int64_t start,
+                                 const int64_t end) {
         torch::Tensor new_features = sample.features.slice(0, start, end);
         std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
                                        std::begin(sample.positions_major) + end);
         std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
                                        std::begin(sample.positions_minor) + end);
         torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        return Sample{
+        return secondary::Sample{
                 sample.seq_id,
                 std::move(new_features),
                 std::move(new_major),
@@ -377,7 +379,7 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
         };
     };
 
-    std::vector<Sample> results;
+    std::vector<secondary::Sample> results;
     results.reserve(std::size(samples));
 
     for (auto& sample : samples) {
@@ -409,35 +411,35 @@ std::vector<Sample> split_samples(std::vector<Sample> samples,
 
 }  // namespace
 
-std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_regions_in_parallel(
-        std::vector<Sample>& window_samples,
-        const EncoderBase& encoder,
-        const Span<const Window> bam_regions,
-        const Span<const secondary::Interval> bam_region_intervals,
-        const int32_t num_threads,
-        const int32_t window_len,
-        const int32_t window_overlap,
-        const int32_t window_interval_offset) {
+std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
+merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_samples,
+                                        const secondary::EncoderBase& encoder,
+                                        const Span<const secondary::Window> bam_regions,
+                                        const Span<const secondary::Interval> bam_region_intervals,
+                                        const int32_t num_threads,
+                                        const int32_t window_len,
+                                        const int32_t window_overlap,
+                                        const int32_t window_interval_offset) {
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-    const auto debug_print_samples = [](std::ostream& os, const std::vector<Sample>& samples,
-                                        int64_t start /* = 0*/, int64_t end /* = -1 */,
-                                        int64_t debug_id /* = -1 */) {
-        start = std::max<int64_t>(0, start);
-        end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
+    const auto debug_print_samples =
+            [](std::ostream& os, const std::vector<secondary::Sample>& samples,
+               int64_t start /* = 0*/, int64_t end /* = -1 */, int64_t debug_id /* = -1 */) {
+                start = std::max<int64_t>(0, start);
+                end = (end <= 0) ? static_cast<int64_t>(std::size(samples)) : end;
 
-        for (int64_t i = start; i < end; ++i) {
-            os << "[i = " << i << "] ";
-            debug_print_sample(os, samples[i], 0, -1, i == debug_id);
-            os << '\n';
-        }
-    };
+                for (int64_t i = start; i < end; ++i) {
+                    os << "[i = " << i << "] ";
+                    debug_print_sample(os, samples[i], 0, -1, i == debug_id);
+                    os << '\n';
+                }
+            };
 #endif
 
     utils::ScopedProfileRange spr1("merge_and_split_bam_regions_in_parallel", 3);
 
     const auto worker = [&](const int32_t start, const int32_t end,
-                            std::vector<std::vector<Sample>>& results_samples,
-                            std::vector<std::vector<TrimInfo>>& results_trims) {
+                            std::vector<std::vector<secondary::Sample>>& results_samples,
+                            std::vector<std::vector<secondary::TrimInfo>>& results_trims) {
         utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
 
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
@@ -452,12 +454,13 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
             debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
 #endif
 
-            std::vector<Sample> local_samples;
+            std::vector<secondary::Sample> local_samples;
 
             // Split all samples on discontinuities.
             for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
                 auto& sample = window_samples[sample_id];
-                std::vector<Sample> disc_samples = split_sample_on_discontinuities(sample);
+                std::vector<secondary::Sample> disc_samples =
+                        split_sample_on_discontinuities(sample);
                 local_samples.insert(std::end(local_samples),
                                      std::make_move_iterator(std::begin(disc_samples)),
                                      std::make_move_iterator(std::end(disc_samples)));
@@ -492,7 +495,7 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
 #endif
 
             // Compute sample trimming coordinates.
-            const Window& reg = bam_regions[bam_region_id];
+            const secondary::Window& reg = bam_regions[bam_region_id];
             results_trims[bam_region_id] = trim_samples(
                     local_samples, std::optional<secondary::RegionInt>(
                                            {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
@@ -501,8 +504,8 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     };
 
     // Result vectors for each BAM region.
-    std::vector<std::vector<Sample>> merged_samples(std::size(bam_region_intervals));
-    std::vector<std::vector<TrimInfo>> merged_trims(std::size(bam_region_intervals));
+    std::vector<std::vector<secondary::Sample>> merged_samples(std::size(bam_region_intervals));
+    std::vector<std::vector<secondary::TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM regions in parallel.
     const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
@@ -535,14 +538,14 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
         num_samples += std::size(vals);
     }
 
-    std::vector<Sample> results_samples;
+    std::vector<secondary::Sample> results_samples;
     results_samples.reserve(num_samples);
     for (auto& vals : merged_samples) {
         results_samples.insert(std::end(results_samples), std::make_move_iterator(std::begin(vals)),
                                std::make_move_iterator(std::end(vals)));
     }
 
-    std::vector<TrimInfo> results_trims;
+    std::vector<secondary::TrimInfo> results_trims;
     results_trims.reserve(num_samples);
     for (auto& vals : merged_trims) {
         results_trims.insert(std::end(results_trims), std::make_move_iterator(std::begin(vals)),
@@ -552,17 +555,17 @@ std::pair<std::vector<Sample>, std::vector<TrimInfo>> merge_and_split_bam_region
     return {results_samples, results_trims};
 }
 
-std::vector<Sample> encode_windows_in_parallel(
+std::vector<secondary::Sample> encode_windows_in_parallel(
         std::vector<secondary::BamFile>& bam_handles,
-        const EncoderBase& encoder,
+        const secondary::EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const dorado::Span<const Window> windows,
+        const dorado::Span<const secondary::Window> windows,
         const int32_t num_threads) {
     utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
 
     // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
-                            std::vector<Sample>& results) {
+                            std::vector<secondary::Sample>& results) {
         utils::ScopedProfileRange spr2("encode_windows_in_parallel-worker", 4);
 
         for (int32_t i = start; i < end; ++i) {
@@ -592,7 +595,7 @@ std::vector<Sample> encode_windows_in_parallel(
     std::vector<std::future<void>> futures;
     futures.reserve(std::size(thread_chunks));
 
-    std::vector<Sample> results(std::size(windows));
+    std::vector<secondary::Sample> results(std::size(windows));
 
     // Add jobs to the pool.
     for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
@@ -612,14 +615,14 @@ std::vector<Sample> encode_windows_in_parallel(
     return results;
 }
 
-std::vector<Window> create_windows_from_regions(
+std::vector<secondary::Window> create_windows_from_regions(
         const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
         const int32_t bam_chunk_len,
         const int32_t window_overlap) {
     utils::ScopedProfileRange spr1("create_windows_from_regions", 2);
 
-    std::vector<Window> windows;
+    std::vector<secondary::Window> windows;
 
     for (auto region : regions) {
         spdlog::debug("Creating windows for region: '{}'.", region_to_string(region));
@@ -643,9 +646,9 @@ std::vector<Window> create_windows_from_regions(
         }
 
         // Split the custom region if it's too long.
-        std::vector<Window> new_windows =
-                create_windows(static_cast<int32_t>(seq_id), region.start, region.end, seq_length,
-                               bam_chunk_len, window_overlap);
+        std::vector<secondary::Window> new_windows =
+                secondary::create_windows(static_cast<int32_t>(seq_id), region.start, region.end,
+                                          seq_length, bam_chunk_len, window_overlap);
 
         spdlog::debug("Generated {} windows for region: '{}'.", std::size(new_windows),
                       region_to_string(region));
@@ -657,7 +660,7 @@ std::vector<Window> create_windows_from_regions(
 }
 
 void sample_producer(PolisherResources& resources,
-                     const std::vector<Window>& bam_regions,
+                     const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                      const int32_t num_threads,
                      const int32_t batch_size,
@@ -671,12 +674,12 @@ void sample_producer(PolisherResources& resources,
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
-    std::vector<Window> windows;
+    std::vector<secondary::Window> windows;
     std::vector<secondary::Interval> bam_region_intervals;
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
-        const Window& bw = bam_regions[i];
-        std::vector<Window> new_windows =
-                create_windows(bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
+        const secondary::Window& bw = bam_regions[i];
+        std::vector<secondary::Window> new_windows = secondary::create_windows(
+                bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
         if (std::empty(new_windows)) {
             bam_region_intervals.emplace_back(secondary::Interval{0, 0});
             continue;
@@ -709,9 +712,10 @@ void sample_producer(PolisherResources& resources,
         const size_t num_windows = static_cast<size_t>(window_id_end - window_id_start);
 
         // Encode samples in parallel. Non-const by design, data will be moved.
-        std::vector<Sample> region_samples = encode_windows_in_parallel(
+        std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
                 resources.bam_handles, *resources.encoder, draft_lens,
-                Span<const Window>(std::data(windows) + window_id_start, num_windows), num_threads);
+                Span<const secondary::Window>(std::data(windows) + window_id_start, num_windows),
+                num_threads);
 
         spdlog::trace(
                 "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = {}",
@@ -719,7 +723,8 @@ void sample_producer(PolisherResources& resources,
 
         auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
                 region_samples, *resources.encoder,
-                Span<const Window>(std::data(bam_regions) + region_id_start, num_regions),
+                Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
+                                              num_regions),
                 Span<const secondary::Interval>(std::data(bam_region_intervals) + region_id_start,
                                                 num_regions),
                 num_threads, window_len, window_overlap, window_id_start);
@@ -775,16 +780,16 @@ void sample_producer(PolisherResources& resources,
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<ModelTorchBase>>& models,
+                               std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
                                const std::vector<c10::optional<c10::Stream>>& streams,
-                               const EncoderBase& encoder) {
+                               const secondary::EncoderBase& encoder) {
     utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
 
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    auto batch_infer = [&encoder](ModelTorchBase& model, const InferenceData& batch,
+    auto batch_infer = [&encoder](secondary::ModelTorchBase& model, const InferenceData& batch,
                                   const int32_t tid) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
@@ -853,7 +858,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         return output;
     };
 
-    const auto worker = [&](const int32_t tid, ModelTorchBase& model,
+    const auto worker = [&](const int32_t tid, secondary::ModelTorchBase& model,
                             [[maybe_unused]] const c10::optional<c10::Stream>& stream) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-worker", 3);
 
@@ -925,11 +930,11 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
     spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
 }
 
-void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
-                                std::vector<VariantCallingSample>& results_vc_data,
+void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results_cons,
+                                std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 PolishStats& polish_stats,
-                                const DecoderBase& decoder,
+                                const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data) {
@@ -943,9 +948,9 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
         timer::TimerHighRes timer_decode;
 
         // Decode output to bases and qualities.
-        std::vector<ConsensusResult> local_results = decoder.decode_bases(item.logits);
+        std::vector<secondary::ConsensusResult> local_results = decoder.decode_bases(item.logits);
 
-        std::vector<ConsensusResult> final_results;
+        std::vector<secondary::ConsensusResult> final_results;
         final_results.reserve(std::size(local_results));
 
         const int64_t time_decode = timer_decode.GetElapsedMilliseconds();
@@ -957,8 +962,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
         timer::TimerHighRes timer_trim;
         for (int64_t j = 0; j < dorado::ssize(local_results); ++j) {
             auto& result = local_results[j];
-            const Sample& sample = item.samples[j];
-            const TrimInfo& trim = item.trims[j];
+            const secondary::Sample& sample = item.samples[j];
+            const secondary::TrimInfo& trim = item.trims[j];
             const int64_t num_positions = dorado::ssize(sample.positions_major);
 
             if ((trim.start < 0) || (trim.start >= num_positions) || (trim.end <= 0) ||
@@ -1011,7 +1016,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                         continue;
                     }
 
-                    ConsensusResult new_result;
+                    secondary::ConsensusResult new_result;
 
                     const int32_t start =
                             std::max(static_cast<int32_t>(trim.start), interval.start);
@@ -1046,8 +1051,9 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
         return final_results;
     };
 
-    const auto worker = [&](const int32_t tid, std::vector<ConsensusResult>& thread_results,
-                            std::vector<VariantCallingSample>& thread_vc_data) {
+    const auto worker = [&](const int32_t tid,
+                            std::vector<secondary::ConsensusResult>& thread_results,
+                            std::vector<secondary::VariantCallingSample>& thread_vc_data) {
         utils::ScopedProfileRange spr2("decode_samples_in_parallel-worker", 3);
         at::InferenceMode infer_guard;
 
@@ -1078,7 +1084,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
             }
 
             // Inference.
-            std::vector<ConsensusResult> results_samples = batch_decode(item, tid);
+            std::vector<secondary::ConsensusResult> results_samples = batch_decode(item, tid);
 
             thread_results.insert(std::end(thread_results),
                                   std::make_move_iterator(std::begin(results_samples)),
@@ -1100,7 +1106,7 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
                 }
                 // Create the variant calling data. Clone the tensor to convert the view to actual data.
                 for (int64_t i = 0; i < dorado::ssize(item.samples); ++i) {
-                    thread_vc_data.emplace_back(VariantCallingSample{
+                    thread_vc_data.emplace_back(secondary::VariantCallingSample{
                             item.samples[i].seq_id, std::move(item.samples[i].positions_major),
                             std::move(item.samples[i].positions_minor), split_logits[i].clone()});
                 }
@@ -1108,8 +1114,8 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
         }
     };
 
-    std::vector<std::vector<ConsensusResult>> thread_results(num_threads);
-    std::vector<std::vector<VariantCallingSample>> thread_vc_data(num_threads);
+    std::vector<std::vector<secondary::ConsensusResult>> thread_results(num_threads);
+    std::vector<std::vector<secondary::VariantCallingSample>> thread_vc_data(num_threads);
 
     cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
 
@@ -1159,9 +1165,9 @@ void decode_samples_in_parallel(std::vector<ConsensusResult>& results_cons,
     spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
 }
 
-std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
+std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
         const secondary::Interval& region_batch,
-        const std::vector<ConsensusResult>& all_results_cons,
+        const std::vector<secondary::ConsensusResult>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
         const std::optional<char>& fill_char,
@@ -1171,7 +1177,7 @@ std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(all_results_cons); ++i) {
-        const ConsensusResult& r = all_results_cons[i];
+        const secondary::ConsensusResult& r = all_results_cons[i];
         const int32_t local_id = r.draft_id - region_batch.start;
         // Skip filtered samples.
         if (r.draft_id < 0) {
@@ -1188,7 +1194,7 @@ std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
         groups[local_id].emplace_back(r.draft_start, i);
     }
 
-    std::vector<std::vector<ConsensusResult>> ret;
+    std::vector<std::vector<secondary::ConsensusResult>> ret;
 
     // Consensus sequence - stitch the windows and write output.
     for (int64_t group_id = 0; group_id < dorado::ssize(groups); ++group_id) {
@@ -1199,13 +1205,139 @@ std::vector<std::vector<ConsensusResult>> construct_consensus_seqs(
 
         const std::string& header = draft_lens[seq_id].first;
 
-        std::vector<ConsensusResult> consensus = stitch_sequence(
+        std::vector<secondary::ConsensusResult> consensus = stitch_sequence(
                 draft_reader, header, all_results_cons, group, fill_gaps, fill_char);
 
         ret.emplace_back(std::move(consensus));
     }
 
     return ret;
+}
+
+std::vector<secondary::Variant> call_variants(
+        const secondary::Interval& region_batch,
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+        const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const secondary::DecoderBase& decoder,
+        const bool ambig_ref,
+        const bool gvcf,
+        const int32_t num_threads,
+        polisher::PolishStats& polish_stats) {
+    // Group samples by sequence ID.
+    std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
+    for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
+        const auto& vc_sample = vc_input_data[i];
+
+        const int32_t local_id = vc_sample.seq_id - region_batch.start;
+
+        // Skip filtered samples.
+        if (vc_sample.seq_id < 0) {
+            continue;
+        }
+
+        if ((vc_sample.seq_id >= dorado::ssize(draft_lens)) || (local_id < 0) ||
+            (local_id >= dorado::ssize(groups))) {
+            spdlog::error(
+                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                    "groups.size = {}",
+                    vc_sample.seq_id, std::size(draft_lens), std::size(groups));
+            continue;
+        }
+        groups[local_id].emplace_back(vc_sample.start(), i);
+    }
+
+    // Worker for parallel processing.
+    const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
+                            std::vector<std::vector<secondary::Variant>>& results,
+                            polisher::PolishStats& ps) {
+        if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
+            throw std::runtime_error("Worker group_id is out of bounds! start = " +
+                                     std::to_string(start) + ", end = " + std::to_string(end) +
+                                     ", results.size = " + std::to_string(std::size(results)));
+        }
+
+        for (int32_t group_id = start; group_id < end; ++group_id) {
+            const int64_t seq_id = group_id + region_batch.start;
+            const std::string& header = draft_lens[seq_id].first;
+
+            // Sort the group by start positions.
+            auto& group = groups[group_id];
+            std::stable_sort(std::begin(group), std::end(group));
+
+            if (std::empty(group)) {
+                continue;
+            }
+
+            // Get the draft sequence.
+            const std::string draft = draft_readers[tid]->fetch_seq(header);
+
+            // Trim the overlapping portions between samples.
+            const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
+
+            // Break and merge samples on non-variant positions.
+            // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
+            const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+
+            for (const auto& vc_sample : joined_samples) {
+                std::vector<secondary::Variant> variants =
+                        secondary::decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+
+                ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
+
+                results[group_id].insert(std::end(results[group_id]),
+                                         std::make_move_iterator(std::begin(variants)),
+                                         std::make_move_iterator(std::end(variants)));
+            }
+        }
+    };
+
+    // Partition groups to chunks for multithreaded processing.
+    const std::vector<secondary::Interval> thread_chunks =
+            secondary::compute_partitions(static_cast<int32_t>(std::size(groups)), num_threads);
+
+    // Create the thread pool.
+    cxxpool::thread_pool pool{std::size(thread_chunks)};
+
+    // Create the futures.
+    std::vector<std::future<void>> futures;
+    futures.reserve(std::size(thread_chunks));
+
+    // Reserve the space for results for each individual group.
+    std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
+
+    // Add worker tasks.
+    for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
+        const auto [chunk_start, chunk_end] = thread_chunks[tid];
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
+                                       std::ref(thread_results), std::ref(polish_stats)));
+    }
+
+    // Join and catch exceptions.
+    try {
+        for (auto& f : futures) {
+            f.get();
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error{std::string("Caught exception when computing variants: ") +
+                                 e.what()};
+    }
+
+    // Flatten the results.
+    std::vector<secondary::Variant> all_results;
+    {
+        size_t count = 0;
+        for (const auto& vals : thread_results) {
+            count += std::size(vals);
+        }
+        all_results.reserve(count);
+        for (auto& vals : thread_results) {
+            all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(vals)),
+                               std::make_move_iterator(std::end(vals)));
+        }
+    }
+
+    return all_results;
 }
 
 }  // namespace dorado::polisher

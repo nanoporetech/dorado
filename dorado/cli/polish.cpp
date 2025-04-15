@@ -4,12 +4,12 @@
 #include "hts_io/FastxRandomReader.h"
 #include "model_downloader/model_downloader.h"
 #include "models/models.h"
-#include "polish/architectures/model_config.h"
 #include "polish/polish_impl.h"
 #include "polish/polish_progress_tracker.h"
-#include "polish/variant_calling.h"
+#include "secondary/architectures/model_config.h"
 #include "secondary/bam_info.h"
 #include "secondary/batching.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
@@ -442,7 +442,7 @@ void validate_options(const Options& opt) {
 }
 
 void write_consensus_results(std::ostream& os,
-                             const std::vector<polisher::ConsensusResult>& results,
+                             const std::vector<secondary::ConsensusResult>& results,
                              const bool fill_gaps,
                              const bool write_quals) {
     if (std::empty(results)) {
@@ -450,8 +450,8 @@ void write_consensus_results(std::ostream& os,
     }
 
     for (size_t i = 0; i < std::size(results); ++i) {
-        polisher::ConsensusResult out = results[i];
-        remove_deletions(out);
+        secondary::ConsensusResult out = results[i];
+        polisher::remove_deletions(out);
 
         std::string header = results[i].name;
         if (!fill_gaps) {
@@ -477,11 +477,11 @@ std::filesystem::path download_model(const std::string& model_name) {
     return (tmp_dir / model_name);
 }
 
-const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
-                                          const std::string& model_str,
-                                          const bool load_scripted_model,
-                                          const bool bacteria,
-                                          const bool any_model) {
+const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
+                                           const std::string& model_str,
+                                           const bool load_scripted_model,
+                                           const bool bacteria,
+                                           const bool any_model) {
     const auto count_model_hits = [](const dorado::models::ModelList& model_list,
                                      const std::string& model_name) {
         int32_t num_found = 0;
@@ -620,8 +620,8 @@ const polisher::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     // Load the model.
     spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
-    polisher::ModelConfig model_config =
-            polisher::parse_model_config(model_dir / "config.toml", model_file);
+    secondary::ModelConfig model_config =
+            secondary::parse_model_config(model_dir / "config.toml", model_file);
 
     // Check that both the model and data have dwells, or that they both do not have dwells.
     const auto it_dwells = model_config.model_kwargs.find("use_dwells");
@@ -802,8 +802,8 @@ void run_polishing(const Options& opt,
                           secondary::region_to_string(region_batch[i]));
         }
 
-        std::vector<polisher::ConsensusResult> all_results_cons;
-        std::vector<polisher::VariantCallingSample> vc_input_data;
+        std::vector<secondary::ConsensusResult> all_results_cons;
+        std::vector<secondary::VariantCallingSample> vc_input_data;
 
         // Profiling block.
         {
@@ -812,8 +812,9 @@ void run_polishing(const Options& opt,
             // Split the sequences into larger BAM windows, like Medaka.
             // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
             spdlog::debug("Creating BAM windows.");
-            const std::vector<polisher::Window> bam_regions = polisher::create_windows_from_regions(
-                    region_batch, draft_lookup, opt.bam_chunk, opt.window_overlap);
+            const std::vector<secondary::Window> bam_regions =
+                    polisher::create_windows_from_regions(region_batch, draft_lookup, opt.bam_chunk,
+                                                          opt.window_overlap);
 
             spdlog::debug(
                     "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
@@ -879,7 +880,7 @@ void run_polishing(const Options& opt,
             if (opt.write_consensus) {
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
-                const std::vector<std::vector<polisher::ConsensusResult>> consensus_seqs =
+                const std::vector<std::vector<secondary::ConsensusResult>> consensus_seqs =
                         polisher::construct_consensus_seqs(batch_interval, all_results_cons,
                                                            draft_lens, opt.fill_gaps, opt.fill_char,
                                                            *draft_readers.front());
@@ -988,7 +989,7 @@ int polish(int argc, char* argv[]) {
         utils::initialise_torch();
 
         // Resolve the model for polishing.
-        const polisher::ModelConfig model_config = resolve_model(
+        const secondary::ModelConfig model_config = resolve_model(
                 bam_info, opt.model_str, opt.load_scripted_model, opt.bacteria, opt.any_model);
 
         // Create the models, encoders and BAM handles.
