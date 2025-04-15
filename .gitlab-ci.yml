@@ -490,6 +490,8 @@ build_archive:linux:x86:rocky8:cuda12:
   variables:
     CUDA: "12.8"
     BUILD_OPTIONS: "-DDYNAMIC_HDF=ON"
+  before_script:
+    - scl enable gcc-toolset-11 bash
   extends:
     - .linux_runner
     - .build_dorado_archive
