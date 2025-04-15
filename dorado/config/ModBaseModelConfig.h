@@ -34,6 +34,7 @@ struct ModulesParams {
     ConvParams merge_conv;
     std::vector<LSTMParams> lstms;  //< LSTM sizes per layer
     LinearParams linear;
+    std::optional<LinearUpsampleParams> upsample;
 
     int stride_ratio() const;
     int sequence_stride() const;

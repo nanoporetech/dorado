@@ -170,8 +170,6 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
             device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
         }
 
-        spdlog::debug("lstm {} {}", std::to_string(layer_idx), to_string(wm.layout));
-
         host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T, reverse ? -1 : 1,
                           int(in.stride(1)), in.data_ptr(), device_weights[layer_idx].data_ptr(),
                           device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),

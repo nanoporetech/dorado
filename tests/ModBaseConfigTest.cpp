@@ -49,8 +49,9 @@ const ModulesParams modules_6mA_v4{
         LSTMParams{384, 0}, 
         LSTMParams{384, 1}
     },
-    LinearParams{384, 2}  // clang-format on
-};
+    LinearParams{384, 2},  
+    LinearUpsampleParams{2, 2}};
+// clang-format on
 
 CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     using Gen = ModelGeneralParams;

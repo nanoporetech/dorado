@@ -104,6 +104,13 @@ LinearParams parse_linear(const toml::value& segment) {
     return p;
 }
 
+LinearUpsampleParams parse_linear_upsample(const toml::value& segment) {
+    LinearUpsampleParams p;
+    p.size = toml::find<int>(segment, "size");
+    p.scale_factor = toml::find<int>(segment, "scale_factor");
+    return p;
+}
+
 LSTMParams parse_lstm(const toml::value& segment) {
     LSTMParams p;
     p.size = toml::find<int>(segment, "size");
@@ -155,7 +162,15 @@ ModulesParams parse_modules_params(const toml::value& config) {
     const auto& layers = toml::find(config, "encoder", "sublayers").as_array();
     m.merge_conv = parse_merge_conv(layers);
     m.lstms = parse_lstms(layers);
-    m.linear = parse_linear(layers.back());
+
+    for (const auto& layer : layers) {
+        if (sublayer_type(layer) == SublayerType::LINEAR) {
+            m.linear = parse_linear(layer);
+        }
+        if (sublayer_type(layer) == SublayerType::UPSAMPLE) {
+            m.upsample = parse_linear_upsample(layer);
+        }
+    }
 
     if (m.lstms.back().size != m.linear.in_size) {
         throw std::runtime_error("Modbase model config lstm and linear size mismatch");
