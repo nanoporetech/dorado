@@ -1,43 +1,33 @@
 #include "variant.h"
 
+#include "utils/container_utils.h"
+
 #include <ostream>
+#include <string_view>
 #include <tuple>
 
 namespace dorado::secondary {
 
 std::ostream& operator<<(std::ostream& os, const Variant& v) {
+    const auto print_map = [&os](const std::string_view name, const auto& paired_data) {
+        os << name << ':';
+        bool first = true;
+        for (const auto& [key, val] : paired_data) {
+            if (!first) {
+                os << ',';
+            }
+            os << key << '=' << val;
+            first = false;
+        }
+    };
+
     os << v.seq_id << '\t' << v.pos << '\t' << v.ref << "\t{";
-    for (size_t i = 0; i < std::size(v.alts); ++i) {
-        if (i > 0) {
-            os << ',';
-        }
-        os << '\'' << v.alts[i] << '\'';
-    }
+    utils::print_container(os, v.alts, ",");
     os << "}\t" << v.filter << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
-
-    {
-        os << "\tgt:";
-        bool first = true;
-        for (const auto& [key, val] : v.genotype) {
-            if (!first) {
-                os << ',';
-            }
-            os << key << '=' << val;
-            first = false;
-        }
-    }
-
-    {
-        os << "\tinfo:";
-        bool first = true;
-        for (const auto& [key, val] : v.info) {
-            if (!first) {
-                os << ',';
-            }
-            os << key << '=' << val;
-            first = false;
-        }
-    }
+    os << '\t';
+    print_map("gt", v.genotype);
+    os << '\t';
+    print_map("info", v.info);
 
     return os;
 }
