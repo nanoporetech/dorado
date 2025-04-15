@@ -118,11 +118,36 @@ if(DORADO_USING_OLD_CPP_ABI)
 endif()
 
 # Use ccache for C and C++ if it's available
-find_program(CCACHE_EXE ccache)
+find_program(CCACHE_EXE ccache
+    HINTS
+        "C:/Program\ Files/ccache/"
+        "C:/ProgramData/chocolatey/lib/ccache/tools/ccache-4.11.2-windows-x86_64"
+)
 option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
 if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
-    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
-    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
+    if(MSVC)
+        # See https://github.com/ccache/ccache/wiki/MS-Visual-Studio#usage-with-cmake
+        file(COPY_FILE
+            ${CCACHE_EXE} ${CMAKE_BINARY_DIR}/cl.exe
+            ONLY_IF_DIFFERENT
+        )
+
+        # By default Visual Studio generators will use /Zi which is not compatible
+        # with ccache, so tell Visual Studio to use /Z7 instead.
+        message(STATUS "Setting MSVC debug information format to 'Embedded'")
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+
+        set(CMAKE_VS_GLOBALS
+            "CLToolExe=cl.exe"
+            "CLToolPath=${CMAKE_BINARY_DIR}"
+            "UseMultiToolTask=true"
+            "DebugInformationFormat=OldStyle"
+        )
+    else()
+        set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_EXE})
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_EXE})
+    endif()
+    message(STATUS "Using ccache at: ${CCACHE_EXE}")
     set(DORADO_ENABLE_PCH FALSE)
 else()
     # Fallback to using a PCH if we don't have ccache support, since making them work together isn't simple.
