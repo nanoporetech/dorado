@@ -485,6 +485,21 @@ build_archive:linux:x86:centos7:
     - .build_dorado_archive
     - .on_nightly_or_manual
 
+build_archive:linux:x86:rocky8:cuda12:
+  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:0
+  variables:
+    CUDA: "12.8"
+    BUILD_OPTIONS: "-DDYNAMIC_HDF=ON"
+  script:
+    - source /opt/rh/gcc-toolset-11/enable
+    - which gcc
+    - gcc --version
+    - !reference [.build_dorado_archive, script]
+  extends:
+    - .linux_runner
+    - .build_dorado_archive
+    - .on_nightly_or_manual
+
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
