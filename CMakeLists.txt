@@ -117,18 +117,26 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
+set(CHOCO_CCACHE_HINT)
+file(GLOB CHOCO_CACHE_LIST LIST_DIRECTORIES true "C:/ProgramData/chocolatey/lib/ccache/tools/ccache-*")
+if (CHOCO_CACHE_LIST)
+    list(SORT CHOCO_CACHE_LIST)
+    list(GET CHOCO_CACHE_LIST -1 CHOCO_CCACHE_HINT)
+endif()
+
 # Use ccache for C and C++ if it's available
 find_program(CCACHE_EXE ccache
     HINTS
         "C:/Program\ Files/ccache/"
-        "C:/ProgramData/chocolatey/lib/ccache/tools/ccache-4.11.2-windows-x86_64"
+        ${CHOCO_CCACHE_HINT}
 )
 option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
 if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
     if(MSVC)
         # See https://github.com/ccache/ccache/wiki/MS-Visual-Studio#usage-with-cmake
-        file(CREATE_LINK
+        file(COPY_FILE
             ${CCACHE_EXE} ${CMAKE_BINARY_DIR}/cl.exe
+            ONLY_IF_DIFFERENT
         )
 
         # By default Visual Studio generators will use /Zi which is not compatible
