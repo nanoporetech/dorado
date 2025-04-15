@@ -113,6 +113,7 @@ CATCH_TEST_CASE(TEST_TAG "  KitCode enumeration", TEST_TAG) {
         CATCH_CHECK(to_string(KitCode::SQK_16S024) == "SQK-16S024");
         CATCH_CHECK(to_string(KitCode::SQK_16S114_24) == "SQK-16S114-24");
         CATCH_CHECK(to_string(KitCode::SQK_16S114_24_260) == "SQK-16S114-24-260");
+        CATCH_CHECK(to_string(KitCode::SQK_MAB114_24) == "SQK-MAB114-24");
         CATCH_CHECK(to_string(KitCode::SQK_LWB001) == "SQK-LWB001");
         CATCH_CHECK(to_string(KitCode::SQK_MLK111_96_XL) == "SQK-MLK111-96-XL");
         CATCH_CHECK(to_string(KitCode::SQK_MLK114_96_XL) == "SQK-MLK114-96-XL");
