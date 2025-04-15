@@ -805,62 +805,74 @@ void run_polishing(const Options& opt,
         std::vector<secondary::ConsensusResult> all_results_cons;
         std::vector<secondary::VariantCallingSample> vc_input_data;
 
-        // Profiling block.
-        {
-            utils::ScopedProfileRange spr1("run-prep_infer_decode", 1);
-
-            // Split the sequences into larger BAM windows, like Medaka.
-            // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
-            spdlog::debug("Creating BAM windows.");
-            const std::vector<secondary::Window> bam_regions =
-                    polisher::create_windows_from_regions(region_batch, draft_lookup, opt.bam_chunk,
-                                                          opt.window_overlap);
-
-            spdlog::debug(
-                    "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
-                    "(number: {}, total "
-                    "length: {:.2f} Mbp)",
-                    batch_interval.start, batch_interval.end, std::size(input_regions),
-                    std::size(region_batch), batch_bases / (1000.0 * 1000.0));
-
-            // Update the tracker title.
+        // Inference and consensus.
+        try {
+            // Profiling block.
             {
-                std::ostringstream oss;
-                oss << batch_interval.start << "-" << batch_interval.end << "/"
-                    << std::size(input_regions) << ", bases: " << batch_bases;
-                tracker.set_description("Polishing draft sequences: " + oss.str());
+                utils::ScopedProfileRange spr1("run-prep_infer_decode", 1);
+
+                // Split the sequences into larger BAM windows, like Medaka.
+                // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
+                spdlog::debug("Creating BAM windows.");
+                const std::vector<secondary::Window> bam_regions =
+                        polisher::create_windows_from_regions(region_batch, draft_lookup,
+                                                              opt.bam_chunk, opt.window_overlap);
+
+                spdlog::debug(
+                        "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
+                        "(number: {}, total "
+                        "length: {:.2f} Mbp)",
+                        batch_interval.start, batch_interval.end, std::size(input_regions),
+                        std::size(region_batch), batch_bases / (1000.0 * 1000.0));
+
+                // Update the tracker title.
+                {
+                    std::ostringstream oss;
+                    oss << batch_interval.start << "-" << batch_interval.end << "/"
+                        << std::size(input_regions) << ", bases: " << batch_bases;
+                    tracker.set_description("Polishing draft sequences: " + oss.str());
+                }
+
+                // Each item is one batch for inference.
+                utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
+                utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
+
+                std::thread thread_sample_producer = std::thread(
+                        &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
+                        std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
+                        opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
+
+                std::thread thread_sample_decoder = std::thread(
+                        &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
+                        std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
+                        std::cref(*resources.decoder), opt.threads, opt.min_depth,
+                        opt.run_variant_calling);
+
+                polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
+                                                    resources.streams, *resources.encoder);
+
+                if (thread_sample_producer.joinable()) {
+                    thread_sample_producer.join();
+                }
+                if (thread_sample_decoder.joinable()) {
+                    thread_sample_decoder.join();
+                }
             }
 
-            // Each item is one batch for inference.
-            utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
-            utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
-
-            std::thread thread_sample_producer = std::thread(
-                    &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
-                    std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
-                    opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
-
-            std::thread thread_sample_decoder =
-                    std::thread(&polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                                std::ref(vc_input_data), std::ref(decode_queue),
-                                std::ref(polish_stats), std::cref(*resources.decoder), opt.threads,
-                                opt.min_depth, opt.run_variant_calling);
-
-            polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                resources.streams, *resources.encoder);
-
-            if (thread_sample_producer.joinable()) {
-                thread_sample_producer.join();
-            }
-
-            if (thread_sample_decoder.joinable()) {
-                thread_sample_decoder.join();
-            }
+        } catch (const std::exception& e) {
+            // Emit a warning, but do not continue the loop, so that the empty sequences are written.
+            spdlog::warn(
+                    "Exception caught when polishing the batch interval of drafts: [{}, {}). "
+                    "Skipping this batch and optionally outputting unpolished sequences. Original "
+                    "exception: \"{}\"",
+                    batch_interval.start, batch_interval.end, e.what());
         }
 
-        // Profiling block.
+        // Write the consensus. If a sequence has no inferred samples, it can be
+        // written verbatim to the output.
+        // If this fails, stop execution.
         {
-            utils::ScopedProfileRange spr1("run-post_infer", 1);
+            utils::ScopedProfileRange spr1("run-construct_consensus_and_write", 1);
 
             // Round the counter, in case some samples were dropped.
             total_batch_bases += batch_bases;
@@ -891,11 +903,14 @@ void run_polishing(const Options& opt,
                                             (opt.out_format == OutputFormat::FASTQ));
                 }
             }
+        }
+
+        // Variant calling.
+        try {
+            utils::ScopedProfileRange spr1("run-variant_calling", 1);
 
             // Run variant calling, optionally.
             if (opt.run_variant_calling) {
-                utils::ScopedProfileRange spr2("run-variant_calling", 2);
-
                 std::vector<secondary::Variant> variants = call_variants(
                         batch_interval, vc_input_data, draft_readers, draft_lens,
                         *resources.decoder, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
@@ -916,6 +931,13 @@ void run_polishing(const Options& opt,
                 total_batch_bases += batch_bases;
                 polish_stats.set("processed", static_cast<double>(total_batch_bases));
             }
+        } catch (const std::exception& e) {
+            spdlog::warn(
+                    "Exception caught when calling variants in the batch interval of drafts: [{}, "
+                    "{}). Not producing variant calls for this batch of drafts. Original "
+                    "exception: \"{}\"",
+                    batch_interval.start, batch_interval.end, e.what());
+            continue;
         }
     }
 }
