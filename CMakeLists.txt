@@ -127,9 +127,8 @@ option(DORADO_DISABLE_CCACHE "Explicitly disable the use of ccache" OFF)
 if (CCACHE_EXE AND NOT DORADO_DISABLE_CCACHE)
     if(MSVC)
         # See https://github.com/ccache/ccache/wiki/MS-Visual-Studio#usage-with-cmake
-        file(COPY_FILE
+        file(CREATE_LINK
             ${CCACHE_EXE} ${CMAKE_BINARY_DIR}/cl.exe
-            ONLY_IF_DIFFERENT
         )
 
         # By default Visual Studio generators will use /Zi which is not compatible
