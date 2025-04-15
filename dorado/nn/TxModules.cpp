@@ -907,21 +907,6 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
     return stack->forward(x);
 }
 
-LinearUpsampleImpl::LinearUpsampleImpl(const EncoderUpsampleParams &params)
-        : scale_factor(params.scale_factor) {
-    linear = register_module(
-            "linear",
-            Linear(LinearOptions(params.d_model, scale_factor * params.d_model).bias(true)));
-};
-
-at::Tensor LinearUpsampleImpl::forward(const at::Tensor &x) {
-    const int64_t N = x.size(0);
-    const int64_t T = x.size(1);
-    const int64_t C = x.size(2);
-    at::Tensor out = linear(x).reshape({N, scale_factor * T, C});
-    return out;
-};
-
 LinearScaledCRFImpl::LinearScaledCRFImpl(const CRFEncoderParams &params) {
     m_params = params;
     linear = register_module(

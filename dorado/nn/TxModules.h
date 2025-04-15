@@ -139,17 +139,6 @@ struct TxEncoderStackImpl : torch::nn::Module {
 
 TORCH_MODULE(TxEncoderStack);
 
-struct LinearUpsampleImpl : torch::nn::Module {
-    LinearUpsampleImpl(const config::EncoderUpsampleParams &params);
-
-    at::Tensor forward(const at::Tensor &x);
-
-    const int scale_factor;
-    torch::nn::Linear linear{nullptr};
-};
-
-TORCH_MODULE(LinearUpsample);
-
 struct LinearScaledCRFImpl : torch::nn::Module {
     LinearScaledCRFImpl(const config::CRFEncoderParams &params);
 

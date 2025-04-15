@@ -14,9 +14,13 @@ const std::string ACTIVATION{"activation"};
 namespace dorado::config {
 
 static const std::unordered_map<std::string, SublayerType> sublayer_map = {
-        {"clamp", SublayerType::CLAMP},   {"convolution", SublayerType::CONVOLUTION},
-        {"linear", SublayerType::LINEAR}, {"linearcrfencoder", SublayerType::LINEAR_CRF_ENCODER},
-        {"lstm", SublayerType::LSTM},     {"permute", SublayerType::PERMUTE},
+        {"clamp", SublayerType::CLAMP},
+        {"convolution", SublayerType::CONVOLUTION},
+        {"linear", SublayerType::LINEAR},
+        {"linearcrfencoder", SublayerType::LINEAR_CRF_ENCODER},
+        {"lstm", SublayerType::LSTM},
+        {"permute", SublayerType::PERMUTE},
+        {"upsample", SublayerType::UPSAMPLE},
 };
 
 std::string to_string(const Activation &activation) {
@@ -79,6 +83,13 @@ std::vector<ConvParams> parse_convs(const std::vector<toml::value> &sublayers) {
         }
     }
     return convs;
+}
+
+std::string LinearUpsampleParams::to_string() const {
+    std::ostringstream oss;
+    oss << "LinearUpsampleParams {"
+        << " size:" << size << " scale_factor:" << scale_factor << " }";
+    return oss.str();
 }
 
 }  // namespace dorado::config
