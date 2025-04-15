@@ -153,6 +153,8 @@ variables:
 .build_dorado_archive:
   stage: build
   script:
+    - which gcc
+    - gcc --version
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_cpack]
   artifacts:
@@ -492,6 +494,8 @@ build_archive:linux:x86:rocky8:cuda12:
     BUILD_OPTIONS: "-DDYNAMIC_HDF=ON"
   before_script:
     - scl enable gcc-toolset-11 bash
+    - which gcc
+    - gcc --version
   extends:
     - .linux_runner
     - .build_dorado_archive
