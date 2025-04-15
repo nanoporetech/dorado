@@ -11,6 +11,7 @@ ModelTorchScript::ModelTorchScript(const std::filesystem::path& model_path) {
     try {
         spdlog::debug("Loading model from file: {}", model_path.string());
         m_module = torch::jit::load(model_path.string());
+        m_module.get_method("set_normalise")({false});
     } catch (const c10::Error& e) {
         throw std::runtime_error("Error loading model from " + model_path.string() +
                                  " with error: " + e.what());
@@ -28,7 +29,7 @@ torch::Device ModelTorchScript::get_device() const {
 }
 
 torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
-    torch::IValue output = m_module.forward({std::move(x)});
+    torch::IValue output = m_module.get_method("infer_on_features")({x});
 
     if (output.isTensor()) {
         // Output of the model is just a tensor.
@@ -37,10 +38,12 @@ torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
     } else if (output.isTuple()) {
         // Output of the model is a tuple, return the first element.
         const auto tuple = output.toTuple();
+
         if (std::empty(tuple->elements())) {
             spdlog::warn("Model forward function returned an empty tuple!");
             return {};
         }
+
         return tuple->elements()[0].toTensor();
     }
 
