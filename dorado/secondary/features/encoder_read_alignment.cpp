@@ -168,9 +168,9 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
             spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                          utils::print_container_as_string(missing_in_indices, ", "));
+                          utils::print_container_as_string(missing_in_indices, ", ", true));
             spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                          utils::print_container_as_string(missing_out_indices, ", "));
+                          utils::print_container_as_string(missing_out_indices, ", ", true));
 
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;

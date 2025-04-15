@@ -23,7 +23,7 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
     };
 
     os << v.seq_id << '\t' << v.pos << '\t' << v.ref << "\t{";
-    utils::print_container(os, v.alts, ",");
+    utils::print_container(os, v.alts, ",", true);
     os << "}\t" << v.filter << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
     os << '\t';
     print_map("gt", v.genotype);

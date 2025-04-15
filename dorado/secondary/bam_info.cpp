@@ -116,7 +116,7 @@ void check_read_groups(const BamInfo& bam_info, const std::string& cli_read_grou
     } else if (!std::empty(cli_read_group) && !std::empty(bam_info.read_groups)) {
         if (bam_info.read_groups.count(cli_read_group) == 0) {
             std::ostringstream oss;
-            utils::print_container(oss, bam_info.read_groups, ", ");
+            utils::print_container(oss, bam_info.read_groups, ", ", true);
             throw std::runtime_error{"Requested RG is not in the input BAM. Requested: '" +
                                      cli_read_group + "'"};
         }
